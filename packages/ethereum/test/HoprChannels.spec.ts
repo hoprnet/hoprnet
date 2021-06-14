@@ -16,7 +16,8 @@ import {
   Response,
   AcknowledgedTicket,
   PublicKey,
-  generateChannelId
+  generateChannelId,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 
@@ -29,11 +30,6 @@ type TicketValues = {
   ticketIndex: string
   ticketEpoch: string
 }
-
-const WAITING_FOR_COMMITMENT = '1'
-const OPEN = '2'
-const CLOSED = '0'
-const PENDING_CLOSURE = '3'
 
 const percentToUint256 = (percent: any) => ethers.constants.MaxUint256.mul(percent).div(100)
 
@@ -164,8 +160,8 @@ const useFixtures = deployments.createFixture(async () => {
     SECRET_1
   )
 
-  await fundEther(accountA.address, ethers.utils.parseEther(OPEN))
-  await fundEther(accountB.address, ethers.utils.parseEther(OPEN))
+  await fundEther(accountA.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
+  await fundEther(accountB.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
 
   return {
     token,
@@ -237,10 +233,10 @@ describe('funding a HoprChannel success', function () {
     )
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
-    validateChannel(ab, { balance: '70', status: WAITING_FOR_COMMITMENT })
-    validateChannel(ba, { balance: '30', status: WAITING_FOR_COMMITMENT })
+    validateChannel(ab, { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
+    validateChannel(ba, { balance: '30', status: ChannelStatus.WaitingForCommitment + '' })
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
-    expect(accountABalance.toString()).to.equal(CLOSED)
+    expect(accountABalance.toString()).to.equal(ChannelStatus.Closed + '')
   })
 
   it('should multi fund and open channel B->A, no commitment', async function () {
@@ -250,8 +246,8 @@ describe('funding a HoprChannel success', function () {
       channels,
       'ChannelUpdate'
     )
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: WAITING_FOR_COMMITMENT })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: WAITING_FOR_COMMITMENT })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.WaitingForCommitment + '' })
   })
 
   it('should multi fund and open channel B->A, commit afterwards', async function () {
@@ -262,8 +258,8 @@ describe('funding a HoprChannel success', function () {
       'ChannelUpdate'
     )
     await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: WAITING_FOR_COMMITMENT })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
   })
 
   it('should multi fund and open channel B->A, pre-commitment', async function () {
@@ -274,8 +270,8 @@ describe('funding a HoprChannel success', function () {
       channels,
       'ChannelUpdate'
     )
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: WAITING_FOR_COMMITMENT })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
   })
 
   it('should multi fund and open channel B->A, commit both', async function () {
@@ -287,8 +283,8 @@ describe('funding a HoprChannel success', function () {
       channels,
       'ChannelUpdate'
     )
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
   })
 
   it('should fund A->B using send', async function () {
@@ -302,12 +298,12 @@ describe('funding a HoprChannel success', function () {
           '30',
           abiEncoder.encode(
             ['address', 'address', 'uint256', 'uint256'],
-            [ACCOUNT_B.address, ACCOUNT_A.address, '30', CLOSED]
+            [ACCOUNT_B.address, ACCOUNT_A.address, '30', ChannelStatus.Closed + '']
           )
         )
     ).to.emit(channels, 'ChannelUpdate')
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: CLOSED, status: CLOSED })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: WAITING_FOR_COMMITMENT })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: ChannelStatus.Closed + '', status: ChannelStatus.Closed + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.WaitingForCommitment + '' })
   })
 })
 
@@ -324,13 +320,13 @@ describe('with single funded HoprChannels: AB: 70', function () {
   })
 
   it('should reedem ticket for account B -> directly to wallet', async function () {
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '100', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '0', status: CLOSED })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '100', status: ChannelStatus.Open + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '0', status: ChannelStatus.Closed + '' })
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
-    validateChannel(ab, { balance: '90', status: OPEN })
-    validateChannel(ba, { balance: '0', status: CLOSED })
+    validateChannel(ab, { balance: '90', status: ChannelStatus.Open + '' })
+    validateChannel(ba, { balance: '0', status: ChannelStatus.Closed + '' })
     expect(ab.commitment).to.equal(SECRET_1)
     expect((await fixtures.token.balanceOf(ACCOUNT_A.address)).toString()).to.equal('0')
     expect((await fixtures.token.balanceOf(ACCOUNT_B.address)).toString()).to.equal('10')
@@ -365,26 +361,26 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
       SECRET_1
     )
 
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
 
     await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN.ticket))
 
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '80', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '20', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '80', status: ChannelStatus.Open + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '20', status: ChannelStatus.Open + '' })
     const channel = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
     expect(channel.commitment).to.equal(SECRET_1)
   })
 
   it('should reedem ticket for account B', async function () {
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
 
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
-    validateChannel(ab, { balance: '60', status: OPEN })
-    validateChannel(ba, { balance: '40', status: OPEN })
+    validateChannel(ab, { balance: '60', status: ChannelStatus.Open + '' })
+    validateChannel(ba, { balance: '40', status: ChannelStatus.Open + '' })
     expect(ab.commitment).to.equal(SECRET_1)
   })
 
@@ -422,7 +418,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
 
   it('should fail to redeem ticket when signer is not the issuer', async function () {
     const TICKET_AB_WIN = fixtures.TICKET_AB_WIN
-    const FAKE_SIGNATURE = await fixtures.accountA.signMessage(ethers.utils.id(CLOSED))
+    const FAKE_SIGNATURE = await fixtures.accountA.signMessage(ethers.utils.id(ChannelStatus.Closed + ''))
     await expect(
       channels
         .connect(fixtures.accountB)
@@ -464,7 +460,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
       'ChannelUpdate'
     )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: '3' })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
   })
 
   it('B can initialize channel closure', async function () {
@@ -472,8 +468,8 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
       channels,
       'ChannelUpdate'
     )
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: PENDING_CLOSURE })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.PendingToClose + ''})
   })
 
   it('should fail to initialize channel closure A->A', async function () {
@@ -519,8 +515,8 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
       'ChannelUpdate'
     )
 
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: CLOSED })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: WAITING_FOR_COMMITMENT })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: ChannelStatus.Closed + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.WaitingForCommitment + '' })
     expect((await token.balanceOf(ACCOUNT_A.address)).toString()).to.equal('70')
     expect((await token.balanceOf(ACCOUNT_B.address)).toString()).to.equal('0')
   })
@@ -562,8 +558,8 @@ describe('with a closed channel', function () {
   it('should allow a fund to reopen channel', async function () {
     await fixtures.fundAndApprove(fixtures.accountA, 100)
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: WAITING_FOR_COMMITMENT }) // 30 + 30
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: ChannelStatus.WaitingForCommitment + '' }) // 30 + 30
   })
 })
 
@@ -610,8 +606,8 @@ describe('with a reopened channel', function () {
   })
 
   it('sanity check', async function () {
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: OPEN }) // 30 + 30
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: ChannelStatus.Open + '' }) // 30 + 30
   })
 
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
@@ -624,16 +620,16 @@ describe('with a reopened channel', function () {
     await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN_RECYCLED.ticket))
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
-    validateChannel(ab, { balance: '80', status: OPEN })
-    validateChannel(ba, { balance: '50', status: OPEN })
+    validateChannel(ab, { balance: '80', status: ChannelStatus.Open + '' })
+    validateChannel(ba, { balance: '50', status: ChannelStatus.Open + '' })
     expect(ba.commitment).to.equal(SECRET_1)
   })
 
   it('should reedem ticket for account B', async function () {
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_WIN_RECYCLED.ticket))
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(ab, { balance: '60', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '70', status: OPEN }) // 30 + 30 + 10
+    validateChannel(ab, { balance: '60', status: ChannelStatus.Open + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' }) // 30 + 30 + 10
     expect(ab.commitment).to.equal(SECRET_1)
   })
 
@@ -641,8 +637,8 @@ describe('with a reopened channel', function () {
     await channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)
     await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
     await channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: CLOSED })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: ChannelStatus.Closed + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: ChannelStatus.Open + '' })
   })
 })
 

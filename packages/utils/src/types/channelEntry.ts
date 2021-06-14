@@ -1,18 +1,18 @@
-import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
+import { u8aConcat, u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
 import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from './solidity'
 import BN from 'bn.js'
 import chalk from 'chalk'
 
 export enum ChannelStatus {
-  Closed = 'CLOSED',
-  WaitingForCommitment = 'WAITING_FOR_COMMITMENT',
-  Open = 'OPEN',
-  PendingToClose = 'PENDING_TO_CLOSE'
+  Closed = 0,
+  WaitingForCommitment = 1,
+  Open = 2,
+  PendingToClose = 3
 }
 
 export function generateChannelId(source: Address, destination: Address) {
-  return Hash.create(Buffer.concat([source.serialize(), destination.serialize()]))
+  return Hash.create(u8aConcat(source.serialize(), destination.serialize()))
 }
 
 function numberToChannelStatus(i: number): ChannelStatus {
@@ -35,18 +35,7 @@ function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
 }
 
 function channelStatusToU8a(c: ChannelStatus): Uint8Array {
-  switch (c) {
-    case 'CLOSED':
-      return Uint8Array.of(0)
-    case 'WAITING_FOR_COMMITMENT':
-      return Uint8Array.of(1)
-    case 'OPEN':
-      return Uint8Array.of(2)
-    case 'PENDING_TO_CLOSE':
-      return Uint8Array.of(3)
-    default:
-      throw Error(`Invalid status. Got ${c}`)
-  }
+  return Uint8Array.of(c)
 }
 
 // TODO, find a better way to do this.
@@ -123,16 +112,16 @@ export class ChannelEntry {
   toString() {
     return (
       // prettier-ignore
-      `ChannelEntry (${chalk.yellow(this.getId().toHex())}):\n` +
-      `  source:            ${chalk.yellow(this.source.toHex())}\n` +
-      `  destination:       ${chalk.yellow(this.destination.toHex())}\n` +
-      `  balance:           ${this.balance.toFormattedString()}\n` +
-      `  commitment:        ${this.commitment.toHex()}\n` +
-      `  ticketEpoch:       ${this.ticketEpoch.toBN().toString(10)}\n` +
-      `  ticketIndex:       ${this.ticketIndex.toBN().toString(10)}\n` +
-      `  status:            ${chalk.green(this.status)}\n` +
-      `  channelEpoch:      ${this.channelEpoch.toBN().toString(10)}\n` +
-      `  closureTime:       ${this.closureTime.toBN().toString(10)}\n`
+      `ChannelEntry   (${chalk.yellow(this.getId().toHex())}):\n` +
+      `  source:       ${chalk.yellow(this.source.toHex())}\n` +
+      `  destination:  ${chalk.yellow(this.destination.toHex())}\n` +
+      `  balance:      ${this.balance.toFormattedString()}\n` +
+      `  commitment:   ${this.commitment.toHex()}\n` +
+      `  ticketEpoch:  ${this.ticketEpoch.toBN().toString(10)}\n` +
+      `  ticketIndex:  ${this.ticketIndex.toBN().toString(10)}\n` +
+      `  status:       ${chalk.green(this.status)}\n` +
+      `  channelEpoch: ${this.channelEpoch.toBN().toString(10)}\n` +
+      `  closureTime:  ${this.closureTime.toBN().toString(10)}\n`
     )
   }
 

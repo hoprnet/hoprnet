@@ -5,7 +5,7 @@ import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
 import Indexer from '.'
-import { stringToU8a, Address, ChannelEntry, Hash, HoprDB, generateChannelId } from '@hoprnet/hopr-utils'
+import { stringToU8a, Address, ChannelEntry, Hash, HoprDB, generateChannelId, ChannelStatus } from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import Defer from 'p-defer'
 import * as fixtures from './fixtures'
@@ -326,17 +326,17 @@ describe('test indexer', function () {
 
     indexer.on('own-channel-updated', (channel: ChannelEntry) => {
       switch (channel.status) {
-        case 'WAITING_FOR_COMMITMENT':
+        case ChannelStatus.WaitingForCommitment:
           opened.resolve()
           break
-        case 'OPEN':
+        case ChannelStatus.Open:
           commitmentSet.resolve()
           break
-        case 'PENDING_TO_CLOSE': {
+        case ChannelStatus.PendingToClose: {
           pendingIniated.resolve()
           break
         }
-        case 'CLOSED': {
+        case ChannelStatus.Closed: {
           closed.resolve()
           break
         }

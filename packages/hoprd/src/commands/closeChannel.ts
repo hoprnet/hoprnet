@@ -3,6 +3,8 @@ import type PeerId from 'peer-id'
 import chalk from 'chalk'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
+import { ChannelStatus } from '@hoprnet/hopr-utils'
+
 
 export default class CloseChannel extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -34,7 +36,7 @@ export default class CloseChannel extends AbstractCommand {
       const smartContractInfo = await this.node.smartContractInfo()
       const channelClosureMins = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
 
-      if (status === 'PENDING_TO_CLOSE') {
+      if (status === ChannelStatus.PendingToClose) {
         return log(`${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`)
       } else {
         return log(

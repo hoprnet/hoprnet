@@ -690,7 +690,7 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: string }> {
+  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: ChannelStatus }> {
     const ethereum = await this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
@@ -698,15 +698,15 @@ class Hopr extends EventEmitter {
     const channelState = await channel.usToThem()
 
     // TODO: should we wait for confirmation?
-    if (channelState.status === 'CLOSED') {
+    if (channelState.status === ChannelStatus.Closed) {
       throw new Error('Channel is already closed')
     }
 
-    if (channelState.status === 'OPEN') {
+    if (channelState.status === ChannelStatus.Open) {
       await this.strategy.onChannelWillClose(channel)
     }
 
-    const txHash = await (channelState.status === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
+    const txHash = await (channelState.status === ChannelStatus.Open ? channel.initializeClosure() : channel.finalizeClosure())
 
     return { receipt: txHash, status: channelState.status }
   }

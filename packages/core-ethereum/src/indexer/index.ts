@@ -401,7 +401,7 @@ class Indexer extends EventEmitter {
   public async getOpenRoutingChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const channels = await this.getChannelsFrom(sourcePubKey.toAddress()).then((channels) =>
-      channels.filter((channel) => channel.status === 'OPEN')
+      channels.filter((channel) => channel.status === ChannelStatus.Open)
     )
 
     let cout: RoutingChannel[] = []
