@@ -246,8 +246,14 @@ describe('funding a HoprChannel success', function () {
       channels,
       'ChannelUpdate'
     )
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.WaitingForCommitment + '' })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
+      balance: '70',
+      status: ChannelStatus.WaitingForCommitment + ''
+    })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
+      balance: '30',
+      status: ChannelStatus.WaitingForCommitment + ''
+    })
   })
 
   it('should multi fund and open channel B->A, commit afterwards', async function () {
@@ -258,7 +264,10 @@ describe('funding a HoprChannel success', function () {
       'ChannelUpdate'
     )
     await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
+      balance: '70',
+      status: ChannelStatus.WaitingForCommitment + ''
+    })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
   })
 
@@ -270,7 +279,10 @@ describe('funding a HoprChannel success', function () {
       channels,
       'ChannelUpdate'
     )
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
+      balance: '70',
+      status: ChannelStatus.WaitingForCommitment + ''
+    })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
   })
 
@@ -302,8 +314,14 @@ describe('funding a HoprChannel success', function () {
           )
         )
     ).to.emit(channels, 'ChannelUpdate')
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: ChannelStatus.Closed + '', status: ChannelStatus.Closed + '' })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.WaitingForCommitment + '' })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
+      balance: ChannelStatus.Closed + '',
+      status: ChannelStatus.Closed + ''
+    })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
+      balance: '30',
+      status: ChannelStatus.WaitingForCommitment + ''
+    })
   })
 })
 
@@ -469,7 +487,10 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
       'ChannelUpdate'
     )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.PendingToClose + ''})
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
+      balance: '30',
+      status: ChannelStatus.PendingToClose + ''
+    })
   })
 
   it('should fail to initialize channel closure A->A', async function () {
@@ -516,7 +537,10 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
     )
 
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: ChannelStatus.Closed + '' })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.WaitingForCommitment + '' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
+      balance: '30',
+      status: ChannelStatus.WaitingForCommitment + ''
+    })
     expect((await token.balanceOf(ACCOUNT_A.address)).toString()).to.equal('70')
     expect((await token.balanceOf(ACCOUNT_B.address)).toString()).to.equal('0')
   })
@@ -559,7 +583,10 @@ describe('with a closed channel', function () {
     await fixtures.fundAndApprove(fixtures.accountA, 100)
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: ChannelStatus.WaitingForCommitment + '' }) // 30 + 30
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
+      balance: '60',
+      status: ChannelStatus.WaitingForCommitment + ''
+    }) // 30 + 30
   })
 })
 

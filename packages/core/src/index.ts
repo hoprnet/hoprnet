@@ -706,7 +706,9 @@ class Hopr extends EventEmitter {
       await this.strategy.onChannelWillClose(channel)
     }
 
-    const txHash = await (channelState.status === ChannelStatus.Open ? channel.initializeClosure() : channel.finalizeClosure())
+    const txHash = await (channelState.status === ChannelStatus.Open
+      ? channel.initializeClosure()
+      : channel.finalizeClosure())
 
     return { receipt: txHash, status: channelState.status }
   }
