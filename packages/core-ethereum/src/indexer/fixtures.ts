@@ -70,4 +70,3 @@ export const OPENED_EVENT = {
     }
   } as any
 } as Event<'ChannelUpdate'>
-
