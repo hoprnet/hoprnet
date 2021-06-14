@@ -204,7 +204,7 @@ jobs:
           HOPR_GIT_MSG: "Update smart contract deployments"
         run: ./scripts/commit-and-push-all-changes.sh
 
-  release:
+  github_release:
     name: Create Github Release
     runs-on: ubuntu-latest
     needs: [build, deploy_smart_contracts, publish_npm]
@@ -249,8 +249,15 @@ jobs:
 
       - name: Building Docker image using Google Cloud Build
         run: | # TODO - actually parse semver to tag v1
+          # need to pull changes because we've updated the package versions in
+          # the job publish_npm beforehand
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          git pull origin "${branch}" --rebase
+          # now we get the updated version and can proceed with building the
+          # Do<Plug>_cker image
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
-          gcloud builds submit --config packages/hoprd/cloudbuild.yml
+          gcloud builds submit --config packages/hoprd/cloudbuild.yml \
+            --substitutions=_HOPR_PACKAGE_VERSION=${HOPR_PACKAGE_VERSION}
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION} ${HOPR_DOCKER_IMAGE}:1
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION} ${HOPR_DOCKER_IMAGE}:latest
         env:

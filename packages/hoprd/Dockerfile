@@ -1,13 +1,24 @@
 # Run HOPRd  within a single container using npm
 
-FROM node:14-buster@sha256:d1d71f63a8b92fa73d8df65fc512f64f2bac8a46b08cbd8caf4d36203d6e210b
+# use latest alpine version with node v14, fairly small Docker image size as a
+# result
+FROM node:14-alpine3.13@sha256:782e891986f16cc661bfe928d0d163d4d0e6cf5cc05453dff2093c015fcc4a64
 
-RUN wget https://github.com/Yelp/dumb-init/releases/download/v1.2.5/dumb-init_1.2.5_amd64.deb && \
-    dpkg -i dumb-init_*.deb
+# we use dumb-init as process 1 to catch signals properly
+# python is used by some nodejs dependencies as an installation requirement
+RUN apk --no-cache --update-cache --available upgrade && \
+    apk --no-cache --update-cache add \
+    build-base \
+    dumb-init \
+    python3
 
+# enable to pass the version to Docker using either --build-arg or an
+# environment variable
+# if its not given, yarn will install the latest version of the package
 ARG HOPRD_VERSION
 ENV HOPRD_VERSION=${HOPRD_VERSION:-}
 
+# making sure some standard environment variables are set for production use
 ENV NODE_ENV 'production'
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV DEBUG 'hopr*'

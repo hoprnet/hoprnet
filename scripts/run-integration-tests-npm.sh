@@ -81,7 +81,7 @@ function cleanup {
   echo "- Cleaning up processes"
   for port in 8545 3301 3302 3303 3304 9091 9092 9093 9094; do
     if lsof -i ":${port}" -s TCP:LISTEN; then
-      kill $(lsof -i ":${port}" -s TCP:LISTEN | awk '{print $2}')
+      lsof -i ":${port}" -s TCP:LISTEN -t | kill
     fi
   done
 
