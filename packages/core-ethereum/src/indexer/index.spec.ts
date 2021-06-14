@@ -313,7 +313,7 @@ describe('test indexer', function () {
   })
 
   it('should emit events on updated channels', async function () {
-    this.timeout(5000)
+    this.timeout(8000)
     const { indexer, newEvent, newBlock } = useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
