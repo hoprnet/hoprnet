@@ -10,6 +10,9 @@ export const NAME = name.replace(/@[a-zA-z0-9\-]+\//, '')
 export const CODE_P2P = Multiaddr.protocols.names['p2p'].code
 export const CODE_IP4 = Multiaddr.protocols.names['ip4'].code
 export const CODE_IP6 = Multiaddr.protocols.names['ip6'].code
+export const CODE_DNS4 = Multiaddr.protocols.names['dns4'].code
+export const CODE_DNS6 = Multiaddr.protocols.names['dns6'].code
+
 export const CODE_CIRCUIT = Multiaddr.protocols.names['p2p-circuit'].code
 export const CODE_TCP = Multiaddr.protocols.names['tcp'].code
 
