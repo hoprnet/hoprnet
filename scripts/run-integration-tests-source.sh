@@ -87,7 +87,7 @@ trap cleanup EXIT
 # $3 = node data directory
 # $4 = node log file
 # $5 = node id file
-# $6 = additional args to hoprd
+# $6 = OPTIONAL: additional args to hoprd
 function setup_node() {
   local port=${1}
   local host_port=${2}
