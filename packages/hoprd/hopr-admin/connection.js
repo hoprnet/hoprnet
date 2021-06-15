@@ -8,8 +8,9 @@ export class Connection {
   logs = []
   prevLog = ''
 
-  constructor(setConnecting, setMessages, setConnectedPeers) {
+  constructor(setConnecting, setStarted, setMessages, setConnectedPeers) {
     this.setConnecting = setConnecting
+    this.setStarted = setStarted
     this.setMessages = setMessages
     this.setConnectedPeers = setConnectedPeers
     this.connect()
@@ -38,6 +39,8 @@ export class Connection {
         }
 
         this.setMessages(this.logs.slice(0)) // Need a clone
+      } else if (msg.type === 'status') {
+        this.setStarted(true)
       }
     } catch (e) {
       console.log('ERR', e)

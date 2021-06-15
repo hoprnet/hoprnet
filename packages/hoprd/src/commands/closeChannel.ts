@@ -29,6 +29,8 @@ export default class CloseChannel extends AbstractCommand {
       return log(styleValue(err.message, 'failure'))
     }
 
+    log('Closing channel...')
+
     try {
       const { status, receipt } = await this.node.closeChannel(peerId)
       const smartContractInfo = await this.node.smartContractInfo()
