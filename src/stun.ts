@@ -47,7 +47,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
 
   // Overwrite console.log because 'webrtc-stun' package
   // pollutes console output
-  const backup = console.log
+  const consoleBackup = console.log
   console.log = log
 
   if (req.loadBuffer(data)) {
@@ -64,7 +64,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
   } else {
     error(`Received a message that is not a STUN message. Dropping message.`)
   }
-  console.log = backup
+  console.log = consoleBackup
 }
 
 /**
@@ -123,12 +123,12 @@ export function getExternalIp(
 
       // Overwrite console.log because 'webrtc-stun' package
       // pollutes console output
-      const backup = console.log
+      const consoleBackup = console.log
       console.log = log
 
       if (!res.loadBuffer(msg)) {
         error(`Could not decode STUN response`)
-        console.log = backup
+        console.log = consoleBackup
         return
       }
 
@@ -136,14 +136,14 @@ export function getExternalIp(
 
       if (index < 0) {
         error(`Received STUN response with invalid transactionId. Dropping response.`)
-        console.log = backup
+        console.log = consoleBackup
         return
       }
 
       tids.splice(index, 1)
       const attr = res.getXorMappedAddressAttribute() ?? res.getMappedAddressAttribute()
 
-      console.log = backup
+      console.log = consoleBackup
 
       if (attr == null) {
         error(`STUN response seems to have neither MappedAddress nor XORMappedAddress set. Dropping message`)
@@ -164,7 +164,7 @@ export function getExternalIp(
     if (allSent.length > 0) {
       const sendResults = await Promise.all(allSent)
 
-      if (!sendResults.some((result) => result)) {
+      if (!sendResults.some((resultOk: boolean) => resultOk)) {
         reject(
           new Error(
             `Cannot send any STUN packets. Tried with: ${usableMultiaddrs
