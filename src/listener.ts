@@ -359,7 +359,11 @@ class Listener extends EventEmitter implements InterfaceListener {
             return cOpts.host !== host || cOpts.port !== port
           })
 
-    this.externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
+    try {
+      this.externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
+    } catch (err) {
+      error(err.message)
+    }
 
     return this.udpSocket.address().port
   }
