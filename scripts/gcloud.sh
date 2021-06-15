@@ -37,6 +37,21 @@ gcloud_get_address() {
   echo $ip | awk '{ print $2 }'
 }
 
+# Waits until the node is ready (port 8080 healthcheck by default)
+# $1 = ip
+wait_until_node_is_ready() {
+  is_ready=0
+  while [ $is_ready -eq 0 ]; do
+    if curl $1:8080/healthcheck/v1/version; then
+      echo "VM with IP $1 has a HOPR node up and running"
+      is_ready=1
+    else
+      echo "VM with IP $1 is not ready, sleeping for 10s"
+      sleep 10
+    fi
+  done
+}
+
 # Get external IP for running node or die
 # $1 - name
 gcloud_get_ip() {

@@ -66,6 +66,26 @@ For ease of use you can set up a shell alias to run the latest docker container:
 alias hoprd='docker run --pull always --rm -v $(pwd)/db:/app/db gcr.io/hoprassociation/hoprd:latest'
 ```
 
+You can run `hoprd` using Docker with the same configuration we do on our infrastructure with this:
+
+```sh
+docker run -v $(pwd)/db:/app/db \
+  -e NODE_OPTIONS=--max-old-space-size=4096 -e DEBUG=hopr\* \
+  -p 9091:9091 -p 3000:3000 -p 3001:3001 \
+  -it gcr.io/hoprassociation/hoprd \
+  --identity /app/db/.hopr-identity \
+  --password switzerland \
+  --init true \
+  --announce true \
+  --rest true \
+  --restHost 0.0.0.0 \
+  --healthCheck true \
+  --healthCheckHost 0.0.0.0 \
+  --admin true \
+  --adminHost 0.0.0.0 \
+  --run "cover-traffic start;daemonize"
+```
+
 ### Using [Nix package manager][1]
 
 NOTE: This setup should only be used for development or if you know what you
