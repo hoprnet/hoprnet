@@ -106,7 +106,7 @@ function setup_node() {
   local version=${6}
   local additional_args=${7:-""}
 
-  if [ -n "$additional_args" ]; then
+  if [ -n "${additional_args}" ]; then
     echo "- Additional args: \"${additional-args}\""
   fi
 
