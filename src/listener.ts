@@ -332,32 +332,41 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param port binding port
    */
   private async listenUDP(port: number, host?: string): Promise<number> {
-    await Promise.all([
-      new Promise<void>((resolve) => this.udpSocket.once('listening', resolve)),
-      new Promise<void>((resolve, reject) => {
-        this.udpSocket.once('error', reject)
+    await new Promise<void>((resolve, reject) => {
+      this.udpSocket.once('error', reject)
+      this.udpSocket.once('listening', resolve)
 
+      try {
         this.udpSocket.bind(port, () => {
           this.udpSocket.removeListener('error', reject)
           resolve()
         })
-      })
-    ])
+      } catch (err) {
+        error(`Could not bind to UDP socket. ${err.message}`)
+        reject()
+      }
+    })
 
     // Prevent from sending a STUN request to self
-    const usableStunServers =
-      host == undefined
-        ? this.stunServers
-        : this.stunServers?.filter((ma) => {
-            let cOpts: { host: string; port: number }
-            try {
-              cOpts = ma.toOptions()
-            } catch (err) {
-              return false
-            }
+    let usableStunServers: Multiaddr[] = []
+    if (host == undefined) {
+      usableStunServers = this.stunServers ?? []
+    } else if (this.stunServers != undefined) {
+      for (const potentialStunServer of this.stunServers) {
+        let cOpts: { host: string; port: number }
+        try {
+          cOpts = potentialStunServer.toOptions()
+        } catch (err) {
+          continue
+        }
 
-            return cOpts.host !== host || cOpts.port !== port
-          })
+        if (cOpts.host === host && cOpts.port === port) {
+          continue
+        }
+
+        usableStunServers.push(potentialStunServer)
+      }
+    }
 
     this.externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
 
@@ -369,22 +378,20 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param opts host and port to bind to
    */
   private async listenTCP(opts?: { host: string; port: number }): Promise<number> {
-    await Promise.all([
-      new Promise<void>((resolve) => this.tcpSocket.once('listening', resolve)),
-      new Promise<void>((resolve, reject) => {
-        this.tcpSocket.once('error', reject)
+    await new Promise<void>((resolve, reject) => {
+      this.tcpSocket.once('error', reject)
+      this.tcpSocket.once('listening', resolve)
 
-        try {
-          this.tcpSocket.listen(opts, () => {
-            this.tcpSocket.removeListener('error', reject)
-            resolve()
-          })
-        } catch (err) {
-          error(`Could not bind to TCP socket. ${err.message}`)
-          reject()
-        }
-      })
-    ])
+      try {
+        this.tcpSocket.listen(opts, () => {
+          this.tcpSocket.removeListener('error', reject)
+          resolve()
+        })
+      } catch (err) {
+        error(`Could not bind to TCP socket. ${err.message}`)
+        reject()
+      }
+    })
 
     log('Listening on %s', this.tcpSocket.address())
 
