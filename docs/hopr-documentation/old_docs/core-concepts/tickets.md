@@ -1,3 +1,0 @@
-# Tickets
-
-\[Coming Soon\]
