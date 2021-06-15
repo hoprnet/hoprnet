@@ -20,7 +20,6 @@ ENV HOPRD_VERSION=${HOPRD_VERSION:-}
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
-ENV DEBUG 'hopr*'
 ENV NODE_OPTIONS=--max_old_space_size=4096
 ENV npm_config_build_from_source false
 
@@ -55,6 +54,12 @@ VOLUME ["/app/db"]
 
 # finally set the non-root user so the process also run un-privilidged
 USER node
+
+# making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV DEBUG 'hopr*'
+ENV NODE_OPTIONS=--max_old_space_size=4096
 
 # Admin web server
 EXPOSE 3000
