@@ -1,3 +1,10 @@
+<a name="0.2.29"></a>
+
+## [0.2.29](https://github.com/hoprnet/hopr-connect/compare/v0.2.28...v0.2.29) (2021-06-15)
+
+- fix STUN request failing on DNS failures
+- minore bugfixes in STUN code
+
 <a name="0.2.28"></a>
 
 ## [0.2.28](https://github.com/hoprnet/hopr-connect/compare/v0.2.27...v0.2.28) (2021-06-10)
