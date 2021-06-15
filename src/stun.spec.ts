@@ -9,25 +9,28 @@ import { once } from 'events'
 describe('test STUN', function () {
   let servers: Socket[]
 
-  before(() => {
-    servers = Array.from({ length: 4 }).map((_) => {
-      const server = dgram.createSocket('udp4')
-      server.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(server, msg, rinfo))
-      server.on('error', (e) => {
-        throw e
-      })
-      return server
-    })
+  before(async () => {
+    servers = await Promise.all(
+      Array.from({ length: 4 }).map(
+        (_) =>
+          new Promise<Socket>((resolve, reject) => {
+            const server = dgram.createSocket('udp4')
+
+            server.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(server, msg, rinfo))
+            server.once('error', reject)
+            server.once('listening', () => {
+              server.removeListener('error', reject)
+
+              resolve(server)
+            })
+
+            server.bind()
+          })
+      )
+    )
   })
 
   it('should perform a STUN request', async function () {
-    await Promise.all(
-      servers.map((server) => {
-        server.bind()
-        return once(server, 'listening')
-      })
-    )
-
     const multiAddrs = servers.map((server: Socket) =>
       Multiaddr.fromNodeAddress(nodeToMultiaddr(server.address()), 'udp')
     )
@@ -66,6 +69,23 @@ describe('test STUN', function () {
     assert(result != undefined, `Timeout should not lead to empty result`)
   })
 
+  it('should not fail on DNS requests', async function () {
+    await assert.rejects(
+      async () => await getExternalIp([new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`)], servers[0]),
+      {
+        name: 'Error',
+        message: 'Cannot send any STUN packets. Tried with: /dns4/totallyinvalidurl.hoprnet.org/udp/12345'
+      }
+    )
+
+    const stunResult = await getExternalIp(
+      [new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`), ...PUBLIC_STUN_SERVERS],
+      servers[0]
+    )
+
+    assert(stunResult != undefined, `STUN request should work even if there are DNS failures`)
+  })
+
   after(async () => {
     await Promise.all(
       servers.map((server) => {
@@ -73,7 +93,5 @@ describe('test STUN', function () {
         return once(server, 'close')
       })
     )
-
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), 500))
   })
 })
