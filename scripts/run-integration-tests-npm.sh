@@ -164,6 +164,10 @@ echo -e "\tnode3"
 echo -e "\t\tdata dir: ${node3_dir} (will be removed)"
 echo -e "\t\tlog: ${node3_log}"
 echo -e "\t\tid: ${node3_id}"
+echo -e "\tnode4"
+echo -e "\t\tdata dir: ${node4_dir} (will be removed)"
+echo -e "\t\tlog: ${node4_log}"
+echo -e "\t\tid: ${node4_id}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -171,6 +175,7 @@ ensure_port_is_free 8545
 ensure_port_is_free 3301
 ensure_port_is_free 3302
 ensure_port_is_free 3303
+ensure_port_is_free 3304
 ensure_port_is_free 9091
 ensure_port_is_free 9092
 ensure_port_is_free 9093
