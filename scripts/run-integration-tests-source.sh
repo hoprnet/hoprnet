@@ -98,7 +98,7 @@ function setup_node() {
 
   echo "- Run node ${id} on rest port ${port}"
 
-  if [ -n "$additional_args" ]; then
+  if [ -n "${additional_args}" ]; then
     echo "- Additional args: \"${additional-args}\""
   fi
 
