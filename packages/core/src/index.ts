@@ -132,6 +132,9 @@ class Hopr extends EventEmitter {
       this.addressSorter = localAddressesFirst
       log('Preferring local addresses')
     } else {
+      // Overwrite libp2p's default addressSorter to make
+      // sure it doesn't fail on HOPR-flavored addresses
+      this.addressSorter = (x) => x
       log('Addresses are sorted by default')
     }
   }
@@ -192,9 +195,6 @@ class Hopr extends EventEmitter {
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
           }
-        },
-        peerDiscovery: {
-          autoDial: false
         },
         dht: {
           enabled: true
