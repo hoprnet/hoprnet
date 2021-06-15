@@ -96,7 +96,7 @@ trap cleanup EXIT
 # $4 = node log file
 # $5 = node id file
 # $6 = npm package version
-# $7 = additions args to hoprd
+# $7 = OPTIONAL: additions args to hoprd
 function setup_node() {
   local port=${1}
   local host_port=${2}
