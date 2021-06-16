@@ -5,41 +5,61 @@ import { nodeToMultiaddr } from './utils'
 import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
 import { once } from 'events'
+import Defer, { DeferredPromise } from 'p-defer'
+
+type ServerType = {
+  socket: Socket
+  gotContacted: DeferredPromise<number>
+  contactCount: number
+  index: number
+}
 
 describe('test STUN', function () {
-  let servers: Socket[]
+  let servers: ServerType[]
 
   before(async () => {
     servers = await Promise.all(
-      Array.from({ length: 4 }).map(
-        (_) =>
-          new Promise<Socket>((resolve, reject) => {
-            const server = dgram.createSocket('udp4')
+      Array.from({ length: DEFAULT_PARALLEL_STUN_CALLS + 2 }).map(
+        (_: any, index: number) =>
+          new Promise<ServerType>((resolve, reject) => {
+            const socket = dgram.createSocket('udp4')
 
-            server.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(server, msg, rinfo))
-            server.once('error', reject)
-            server.once('listening', () => {
-              server.removeListener('error', reject)
+            const gotContacted = Defer<number>()
+            let contactCount = 0
 
-              resolve(server)
+            socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
+              gotContacted.resolve(index)
+              contactCount++
+              handleStunRequest(socket, msg, rinfo)
+            })
+            socket.once('error', reject)
+            socket.once('listening', () => {
+              socket.removeListener('error', reject)
+
+              resolve({
+                socket,
+                gotContacted,
+                contactCount,
+                index
+              })
             })
 
-            server.bind()
+            socket.bind()
           })
       )
     )
   })
 
   it('should perform a STUN request', async function () {
-    const multiAddrs = servers.map((server: Socket) =>
-      Multiaddr.fromNodeAddress(nodeToMultiaddr(server.address()), 'udp')
+    const multiAddrs = servers.map((server: ServerType) =>
+      Multiaddr.fromNodeAddress(nodeToMultiaddr(server.socket.address()), 'udp')
     )
 
-    const result = await getExternalIp(multiAddrs, servers[0])
+    const result = await getExternalIp(multiAddrs, servers[0].socket)
 
     assert(result != undefined, `STUN request must be successful`)
 
-    assert(servers[0].address().port === result.port, 'Ports should match')
+    assert(servers[0].socket.address().port === result.port, 'Ports should match')
     /*
      // DISABLED - with IP4 the address changes from 0.0.0.0 to 127.0.0.1
      // IPV6 doesn't work at present.
@@ -50,7 +70,7 @@ describe('test STUN', function () {
   })
 
   it('should get our external address from a public server if there is no other server given', async function () {
-    const result = await getExternalIp(undefined, servers[0])
+    const result = await getExternalIp(undefined, servers[0].socket)
 
     assert(result != undefined, 'server should be able to detect its external address')
   })
@@ -62,7 +82,7 @@ describe('test STUN', function () {
         ...PUBLIC_STUN_SERVERS.slice(0, Math.max(0, DEFAULT_PARALLEL_STUN_CALLS - 1)),
         new Multiaddr(`/ip4/127.0.0.1/udp/1`)
       ],
-      servers[0]
+      servers[0].socket
     )
 
     assert(Date.now() - before >= 0, `should not resolve before timeout ends`)
@@ -71,7 +91,8 @@ describe('test STUN', function () {
 
   it('should not fail on DNS requests', async function () {
     await assert.rejects(
-      async () => await getExternalIp([new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`)], servers[0]),
+      async () =>
+        await getExternalIp([new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`)], servers[0].socket),
       {
         name: 'Error',
         message: 'Cannot send any STUN packets. Tried with: /dns4/totallyinvalidurl.hoprnet.org/udp/12345'
@@ -80,17 +101,50 @@ describe('test STUN', function () {
 
     const stunResult = await getExternalIp(
       [new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`), ...PUBLIC_STUN_SERVERS],
-      servers[0]
+      servers[0].socket
     )
 
     assert(stunResult != undefined, `STUN request should work even if there are DNS failures`)
   })
 
+  it('should contact only a few STUN servers', async function () {
+    const multiaddrs = servers
+      .slice(1)
+      .map((server: ServerType) => Multiaddr.fromNodeAddress(nodeToMultiaddr(server.socket.address()), 'udp'))
+
+    assert(multiaddrs.length == DEFAULT_PARALLEL_STUN_CALLS + 1)
+
+    const stunResult = await getExternalIp(multiaddrs, servers[0].socket)
+
+    assert(stunResult != undefined)
+
+    let contactedPromises = servers.slice(1).map((server) => server.gotContacted.promise)
+    const contactedIndices: number[] = []
+
+    for (let i = 0; i < DEFAULT_PARALLEL_STUN_CALLS; i++) {
+      const next = await Promise.race(contactedPromises)
+
+      contactedIndices.push(next)
+      contactedPromises = servers
+        .slice(1)
+        .filter((server: ServerType) => !contactedIndices.includes(server.index))
+        .map((server: ServerType) => server.gotContacted.promise)
+    }
+
+    assert(
+      servers.some((server: ServerType) => contactedIndices.includes(server.index) && server.contactCount == 0),
+      `At least one server should not have been contacted`
+    )
+  })
+
   after(async () => {
     await Promise.all(
       servers.map((server) => {
-        server.close()
-        return once(server, 'close')
+        // Make sure that there are no hanging promises
+        server.gotContacted.resolve()
+
+        server.socket.close()
+        return once(server.socket, 'close')
       })
     )
   })

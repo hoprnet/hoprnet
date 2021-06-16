@@ -82,6 +82,8 @@ export function getExternalIp(
     let usableMultiaddrs: Multiaddr[]
     if (multiAddrs == undefined || multiAddrs.length == 0) {
       usableMultiaddrs = randomSubset(PUBLIC_STUN_SERVERS, DEFAULT_PARALLEL_STUN_CALLS)
+    } else if (multiAddrs.length > DEFAULT_PARALLEL_STUN_CALLS) {
+      usableMultiaddrs = randomSubset(multiAddrs, DEFAULT_PARALLEL_STUN_CALLS)
     } else {
       usableMultiaddrs = multiAddrs
     }
