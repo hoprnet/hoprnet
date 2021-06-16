@@ -509,7 +509,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     const promises: Promise<ConnectResult>[] = []
     const abort = new AbortController()
 
-    for (const relay of randomSubset(this.relays, MAX_RELAYS_TO_CHECK)) {
+    for (const relay of randomSubset(this.relays, Math.min(MAX_RELAYS_TO_CHECK, this.relays.length))) {
       const relayPeerId = relay.getPeerId()
 
       if (relayPeerId == null || this.peerId.toB58String() === relayPeerId) {
