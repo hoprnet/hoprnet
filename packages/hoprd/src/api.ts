@@ -13,14 +13,25 @@ export default function setupAPI(node: Hopr, logs: any, options: any) {
 
   const cmds = new Commands(node)
   service.post('/api/v1/command', async (req, res) => {
-    logs.log('executing API command', req.body, node.status)
     await node.waitForRunning()
     logs.log('Node is running')
+    if (options.apiToken !== undefined) {
+      if (req.headers['x-auth-token'] !== options.apiToken) {
+        logs.log('command rejected: authentication failed')
+        res.send('authentication failed', 403)
+        return
+      }
+      logs.log('command accepted: authentication succeeded')
+    } else {
+      logs.log('command accepted: authentication DISABLED')
+    }
+
     let response = ''
     let log = (s) => {
       response += s
       logs.log(s)
     }
+    logs.log('executing API command', req.body, node.status)
     await cmds.execute(log, req.body)
     logs.log('command complete')
     res.send(response)

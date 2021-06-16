@@ -24,6 +24,14 @@ jobs:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
+      - name: Install Yarn (only when using ACT)
+        if: env.ACT != ''
+        run: |
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          apt update
+          apt install --no-install-recommends yarn
+
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
@@ -45,6 +53,6 @@ jobs:
         run: |
           yarn
           yarn build
-
+          
       - name: Test
         run: ./scripts/run-integration-tests-source.sh

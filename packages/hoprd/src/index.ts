@@ -67,6 +67,11 @@ const argv = yargs
     describe: 'A password to encrypt your keys',
     default: ''
   })
+  .option('apiToken', {
+    describe: 'A REST API token and admin panel password for user authentication',
+    string: true,
+    default: ''
+  })
   .option('identity', {
     describe: 'The path to the identity file',
     default: DEFAULT_ID_PATH
@@ -139,7 +144,8 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     announce: argv.announce,
     hosts: parseHosts(),
     announceLocalAddresses: argv.testAnnounceLocalAddresses,
-    preferLocalAddresses: argv.testPreferLocalAddresses
+    preferLocalAddresses: argv.testPreferLocalAddresses,
+    apiToken: argv.apiToken
   }
 
   if (argv.password !== undefined) {
@@ -187,7 +193,7 @@ async function main() {
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
     // as if the HOPR node fails, we need to put an error message up.
-    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
+    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort, argv.apiToken)
     await adminServer.setup()
   }
 
