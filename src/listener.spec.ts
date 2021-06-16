@@ -13,6 +13,7 @@ import net from 'net'
 import Defer from 'p-defer'
 import type { DeferredPromise } from 'p-defer'
 import * as stun from 'webrtc-stun'
+import { once } from 'events'
 
 import { networkInterfaces } from 'os'
 
@@ -89,17 +90,19 @@ describe.only('check listening to sockets', function () {
   }
 
   async function stopListener(socket: Listener) {
-    await new Promise((resolve) => {
-      socket.once('close', resolve)
-      socket.close()
-    })
+    const promise = once(socket, 'close')
+
+    await socket.close()
+
+    return promise
   }
 
   async function waitUntilListening(socket: Listener, ma: Multiaddr) {
-    await new Promise((resolve) => {
-      socket.once('listening', resolve)
-      socket.listen(ma)
-    })
+    const promise = once(socket, 'listening')
+
+    await socket.listen(ma)
+
+    return promise
   }
 
   it('recreate the socket and perform STUN request', async function () {
