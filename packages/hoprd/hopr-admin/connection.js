@@ -39,7 +39,7 @@ export class Connection {
         }
 
         this.setMessages(this.logs.slice(0)) // Need a clone
-      } else if (msg.type === 'status') {
+      } else if (msg.type === 'status' && msg.msg === 'STARTED') {
         this.setStarted(true)
       }
     } catch (e) {
