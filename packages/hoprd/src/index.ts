@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { NativeBalance } from '@hoprnet/hopr-utils'
 import { decode } from 'rlp'
-import BN from 'bn.js'
 import { Commands } from './commands'
 import { LogStream } from './logs'
 import { AdminServer } from './admin'
@@ -230,7 +229,7 @@ async function main() {
 
     const ethAddr = (await node.getEthereumAddress()).toHex()
     // 0.1 NativeBalance
-    const fundsReq = new NativeBalance(new BN('100000000000000000')).toFormattedString()
+    const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
     logs.log(`Node is not started, please fund this node ${ethAddr} with atleast ${fundsReq}`)
     // 2.5 Await funding of wallet.

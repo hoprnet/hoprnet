@@ -28,7 +28,6 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "dependencies": {
-    "bn.js": "^5.2.0",
     "@hoprnet/hopr-core": "1.72.10",
     "@hoprnet/hopr-utils": "1.72.10",
     "body-parser": "^1.19.0",
