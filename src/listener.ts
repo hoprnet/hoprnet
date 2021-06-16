@@ -23,10 +23,16 @@ import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
 import { isAnyAddress } from './utils'
 import { TCPConnection } from './tcp'
+import { randomSubset } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-connect:listener')
 const error = debug('hopr-connect:listener:error')
 const verbose = debug('hopr-connect:verbose:listener')
+
+// @TODO to be adjusted
+const MAX_RELAYS_PER_NODE = 7
+// @TODO to be adjusted
+const MAX_RELAYS_TO_CHECK = 91
 
 /**
  * Attempts to close the given maConn. If a failure occurs, it will be logged.
@@ -503,7 +509,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     const promises: Promise<ConnectResult>[] = []
     const abort = new AbortController()
 
-    for (const relay of this.relays) {
+    for (const relay of randomSubset(this.relays, MAX_RELAYS_TO_CHECK)) {
       const relayPeerId = relay.getPeerId()
 
       if (relayPeerId == null || this.peerId.toB58String() === relayPeerId) {
@@ -527,7 +533,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     const filteredAndSortedResult = rawResults.filter((res) => res.latency >= 0).sort((a, b) => a.latency - b.latency)
 
-    for (const res of filteredAndSortedResult) {
+    for (const res of filteredAndSortedResult.slice(0, MAX_RELAYS_PER_NODE)) {
       this.addrs.relays.push(new Multiaddr(`/p2p/${res.id}/p2p-circuit/p2p/${this.peerId}`))
     }
   }
