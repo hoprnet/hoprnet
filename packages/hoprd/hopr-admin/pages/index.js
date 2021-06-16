@@ -13,15 +13,18 @@ export default function Home() {
 
   const [showConnected, setShowConnected] = useState(false)
   const [connecting, setConnecting] = useState(true)
+  const [started, setStarted] = useState(false)
   const [messages, setMessages] = useState([]) // The fetish for immutability in react means this will be slower than a mutable array..
   const [peers, setConnectedPeers] = useState([])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      connection = new Connection(setConnecting, setMessages, setConnectedPeers)
+      connection = new Connection(setConnecting, setStarted, setMessages, setConnectedPeers)
       return Connection.disconnect
     }
   }, [])
+
+  const isNodeReady = !connecting && started
 
   return (
     <div className={styles.container}>
@@ -38,7 +41,7 @@ export default function Home() {
         <input
           id="command"
           type="text"
-          disabled={connecting}
+          disabled={!isNodeReady}
           autoFocus
           placeholder="type 'help' for full list of commands"
         />

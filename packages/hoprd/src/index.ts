@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
+import { NativeBalance } from '@hoprnet/hopr-utils'
 import { decode } from 'rlp'
 import { Commands } from './commands'
 import { LogStream } from './logs'
@@ -226,10 +227,14 @@ async function main() {
       })
     }
 
-    logs.log('node is waiting for funds to', (await node.getEthereumAddress()).toHex())
+    const ethAddr = (await node.getEthereumAddress()).toHex()
+    // 0.1 NativeBalance
+    const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
+
+    logs.log(`Node is not started, please fund this node ${ethAddr} with atleast ${fundsReq}`)
     // 2.5 Await funding of wallet.
     await node.waitForFunds()
-    logs.log('node funded, starting')
+    logs.log('Node has been funded, starting...')
 
     // 3. Start the node.
     await node.start()
@@ -238,6 +243,9 @@ async function main() {
     if (adminServer) {
       adminServer.registerNode(node, cmds)
     }
+
+    logs.logStatus('STARTED')
+    logs.log('Node has started!')
 
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
