@@ -116,7 +116,7 @@ describe('test STUN', function () {
 
     const stunResult = await getExternalIp(multiaddrs, servers[0].socket)
 
-    assert(stunResult != undefined)
+    assert(stunResult != undefined, `STUN requests must lead to a result`)
 
     let contactedPromises = servers.slice(1).map((server) => server.gotContacted.promise)
     const contactedIndices: number[] = []
