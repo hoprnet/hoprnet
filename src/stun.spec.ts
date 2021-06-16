@@ -132,7 +132,7 @@ describe('test STUN', function () {
     }
 
     assert(
-      servers.some((server: ServerType) => contactedIndices.includes(server.index) && server.contactCount == 0),
+      servers.some((server: ServerType) => !contactedIndices.includes(server.index) && server.contactCount == 0),
       `At least one server should not have been contacted`
     )
   })
