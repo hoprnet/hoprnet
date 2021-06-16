@@ -18,7 +18,6 @@ import { networkInterfaces } from 'os'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('check listening to sockets', function () {
-
   /**
    * Encapsulates the logic that is necessary to lauch a test
    * STUN server instance and track whether it receives requests
@@ -198,10 +197,14 @@ describe('check listening to sockets', function () {
 
     const testMessage = new TextEncoder().encode('test')
 
-    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
-      msgReceived,
-      expectedMessageReceived
-    }, testMessage)
+    const node = await startNode(
+      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+      {
+        msgReceived,
+        expectedMessageReceived
+      },
+      testMessage
+    )
 
     new Promise<void>((resolve) => {
       const socket = net.createConnection(
@@ -233,6 +236,7 @@ describe('check listening to sockets', function () {
       return
     }
 
+    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
     const listener = new Listener(
@@ -240,7 +244,7 @@ describe('check listening to sockets', function () {
       {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
       } as unknown as Upgrader,
-      undefined,
+      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
       undefined,
       peerId,
       validInterfaces[0]
@@ -250,7 +254,7 @@ describe('check listening to sockets', function () {
       await waitUntilListening(listener, new Multiaddr(`/ip4/0.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
     })
 
-    await stopListener(listener)
+    await Promise.all([stopListener(listener), stopStunServer(stunServer)])
   })
 
   it('check that node speaks STUN', async function () {
