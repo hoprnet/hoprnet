@@ -49,8 +49,12 @@ instructions using GitPod.
 Using the [hoprd npm package][6]:
 
 ```sh
-npm install -g @hoprnet/hoprd
-hoprd --admin
+mkdir MY_NEW_HOPR_TEST_FOLDER
+cd MY_NEW_HOPR_TEST_FOLDER
+npm install @hoprnet/hoprd@1.72
+
+# run hoprd
+DEBUG=hopr* npx hoprd --admin --init --announce
 ```
 
 ### Using Docker
