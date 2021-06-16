@@ -40,7 +40,7 @@ async function attemptClose(maConn: MultiaddrConnection) {
   try {
     await maConn.close()
   } catch (err) {
-    error('an error occurred closing the connection', err)
+    error('an error occurred while closing the connection', err)
   }
 }
 
@@ -69,13 +69,13 @@ class Listener extends EventEmitter implements InterfaceListener {
     port: number
   }
 
-  private stunServers: Multiaddr[] | undefined
+  private stunServers: Multiaddr[]
 
   constructor(
     private handler: ConnHandler | undefined,
     private upgrader: Upgrader,
     stunServers: Multiaddr[] | undefined,
-    private relays: Multiaddr[] | undefined,
+    private relays: Multiaddr[] = [],
     private peerId: PeerId,
     private _interface: string | undefined
   ) {
@@ -94,7 +94,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       reuseAddr: true
     })
 
-    this.stunServers = stunServers?.filter((ma: Multiaddr) => {
+    this.stunServers = (stunServers ?? []).filter((ma: Multiaddr) => {
       let maPeerId = ma.getPeerId()
 
       if (maPeerId == null) {
@@ -197,21 +197,23 @@ class Listener extends EventEmitter implements InterfaceListener {
     this.state = State.CLOSING
 
     await Promise.all([
-      new Promise((resolve) => {
+      new Promise<void>((resolve) => {
         this.udpSocket.once('close', resolve)
         this.udpSocket.close()
       }),
-      this.tcpSocket.listening
-        ? new Promise((resolve) => {
-            this.__connections.forEach(attemptClose)
-            this.tcpSocket.once('close', resolve)
-            this.tcpSocket.close()
-          })
-        : Promise.resolve()
+      new Promise<void>((resolve) => {
+        if (!this.tcpSocket.listening) {
+          resolve()
+          return
+        }
+
+        this.__connections.forEach(attemptClose)
+        this.tcpSocket.once('close', resolve)
+        this.tcpSocket.close()
+      })
     ])
 
     this.state = State.CLOSED
-
     this.emit('close')
   }
 
@@ -333,8 +335,11 @@ class Listener extends EventEmitter implements InterfaceListener {
    */
   private async listenUDP(port: number, host?: string): Promise<number> {
     await new Promise<void>((resolve, reject) => {
+      this.udpSocket.once('error', (err: any) => {
+        this.udpSocket.removeListener('listening', resolve)
+        reject(err)
+      })
       this.udpSocket.once('error', reject)
-      this.udpSocket.once('listening', resolve)
 
       try {
         this.udpSocket.bind(port, () => {
@@ -343,30 +348,12 @@ class Listener extends EventEmitter implements InterfaceListener {
         })
       } catch (err) {
         error(`Could not bind to UDP socket. ${err.message}`)
-        reject()
+        reject(err)
       }
     })
 
     // Prevent from sending a STUN request to self
-    let usableStunServers: Multiaddr[] = []
-    if (host == undefined) {
-      usableStunServers = this.stunServers ?? []
-    } else if (this.stunServers != undefined) {
-      for (const potentialStunServer of this.stunServers) {
-        let cOpts: { host: string; port: number }
-        try {
-          cOpts = potentialStunServer.toOptions()
-        } catch (err) {
-          continue
-        }
-
-        if (cOpts.host === host && cOpts.port === port) {
-          continue
-        }
-
-        usableStunServers.push(potentialStunServer)
-      }
-    }
+    let usableStunServers = this.getUsableStunServers(port, host)
 
     try {
       this.externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
@@ -383,8 +370,11 @@ class Listener extends EventEmitter implements InterfaceListener {
    */
   private async listenTCP(opts?: { host: string; port: number }): Promise<number> {
     await new Promise<void>((resolve, reject) => {
+      this.tcpSocket.once('error', (err: any) => {
+        this.tcpSocket.removeListener('listening', resolve)
+        reject(err)
+      })
       this.tcpSocket.once('error', reject)
-      this.tcpSocket.once('listening', resolve)
 
       try {
         this.tcpSocket.listen(opts, () => {
@@ -393,13 +383,38 @@ class Listener extends EventEmitter implements InterfaceListener {
         })
       } catch (err) {
         error(`Could not bind to TCP socket. ${err.message}`)
-        reject()
+        reject(err)
       }
     })
 
     log('Listening on %s', this.tcpSocket.address())
 
     return (this.tcpSocket.address() as AddressInfo).port
+  }
+
+  private getUsableStunServers(port: number, host?: string): Multiaddr[] {
+    if (host == undefined) {
+      return this.stunServers
+    }
+
+    const usableStunServers: Multiaddr[] = []
+
+    for (const potentialStunServer of this.stunServers) {
+      let cOpts: { host: string; port: number }
+      try {
+        cOpts = potentialStunServer.toOptions()
+      } catch (err) {
+        continue
+      }
+
+      if (cOpts.host === host && cOpts.port === port) {
+        continue
+      }
+
+      usableStunServers.push(potentialStunServer)
+    }
+
+    return usableStunServers
   }
 
   private getAddressForInterface(host: string, family: NetworkInterfaceInfo['family']): string {
@@ -443,14 +458,12 @@ class Listener extends EventEmitter implements InterfaceListener {
 
   private async connectToRelays() {
     // @TODO check address family
-    if (this.relays == undefined || this.relays.length == 0) {
+    if (this.relays.length == 0) {
       return
     }
 
     const promises: Promise<ConnectResult>[] = []
     const abort = new AbortController()
-
-    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CONTACT_TIMEOUT)
 
     for (const relay of this.relays) {
       const relayPeerId = relay.getPeerId()
@@ -463,6 +476,8 @@ class Listener extends EventEmitter implements InterfaceListener {
       promises.push(this.connectToRelay(relay, relayPeerId, { signal: abort.signal }))
     }
 
+    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CONTACT_TIMEOUT)
+
     const results = await Promise.all(promises)
 
     clearTimeout(timeout)
@@ -471,21 +486,17 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   private async connectToRelay(relay: Multiaddr, relayPeerId: string, opts?: { signal: AbortSignal }) {
-    const start = Date.now()
     let latency: number
     let conn: Connection | undefined
     let maConn: MultiaddrConnection | undefined
+
+    const start = Date.now()
 
     try {
       maConn = await TCPConnection.create(relay, this.peerId, opts)
     } catch (err) {
       if (maConn != undefined) {
-        attemptClose(maConn)
-      }
-
-      return {
-        id: relayPeerId,
-        latency: -1
+        await attemptClose(maConn)
       }
     }
 
@@ -498,25 +509,25 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     try {
       conn = await this.upgrader.upgradeOutbound(maConn)
-      latency = Date.now() - start
     } catch (err) {
       error(err)
-      attemptClose(maConn)
-
-      return {
-        id: relayPeerId,
-        latency: -1
+      if (conn != undefined) {
+        try {
+          await conn.close()
+        } catch (err) {
+          error(err)
+        }
       }
     }
 
     if (conn == undefined) {
-      attemptClose(maConn)
-
       return {
         id: relayPeerId,
         latency: -1
       }
     }
+
+    latency = Date.now() - start
 
     this.trackConn(maConn)
 

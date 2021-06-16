@@ -16,7 +16,7 @@ import * as stun from 'webrtc-stun'
 
 import { networkInterfaces } from 'os'
 
-describe('check listening to sockets', function () {
+describe.only('check listening to sockets', function () {
   this.timeout(5000)
 
   /**
@@ -31,28 +31,36 @@ describe('check listening to sockets', function () {
   ): Promise<Socket> {
     const socket = dgram.createSocket('udp4')
 
-    const promises: Promise<void>[] = [
-      new Promise((resolve) => socket.once('listening', resolve)),
-      new Promise((resolve) => socket.bind(port, resolve))
-    ]
+    await new Promise<void>((resolve, reject) => {
+      socket.once('error', (err: any) => {
+        socket.removeListener('listening', resolve)
+        reject(err)
+      })
+      socket.once('listening', resolve)
+
+      try {
+        socket.bind(port, () => {
+          socket.removeListener('error', reject)
+          resolve()
+        })
+      } catch (err) {
+        reject(err)
+      }
+    })
 
     socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
       state.msgReceived.resolve()
       handleStunRequest(socket, msg, rinfo)
     })
 
-    await Promise.all(promises)
-
     return socket
   }
 
   async function stopStunServer(socket: Socket) {
-    const promises: Promise<void>[] = [
-      new Promise<void>((resolve) => socket.once('close', resolve)),
-      new Promise<void>((resolve) => socket.close(resolve))
-    ]
-
-    await Promise.all(promises)
+    await new Promise<void>((resolve) => {
+      socket.once('close', resolve)
+      socket.close()
+    })
   }
 
   async function startBootstrap(state: { msgReceived: DeferredPromise<void> }) {
@@ -81,21 +89,17 @@ describe('check listening to sockets', function () {
   }
 
   async function stopListener(socket: Listener) {
-    const promises: Promise<void>[] = [
-      // prettier-ignore
-      new Promise<void>((resolve) => socket.once('close', resolve)),
+    await new Promise((resolve) => {
+      socket.once('close', resolve)
       socket.close()
-    ]
-
-    await Promise.all(promises)
+    })
   }
 
   async function waitUntilListening(socket: Listener, ma: Multiaddr) {
-    const promises: Promise<void>[] = [
-      new Promise<void>((resolve) => socket.once('listening', resolve)),
+    await new Promise((resolve) => {
+      socket.once('listening', resolve)
       socket.listen(ma)
-    ]
-    await Promise.all(promises)
+    })
   }
 
   it('recreate the socket and perform STUN request', async function () {
@@ -290,14 +294,9 @@ describe('check listening to sockets', function () {
       validInterfaces[0]
     )
 
-    let errThrown = false
-    try {
+    await assert.rejects(async () => {
       await waitUntilListening(listener, new Multiaddr(`/ip4/0.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
-    } catch {
-      errThrown = true
-    }
-
-    assert(errThrown)
+    })
 
     await stopListener(listener)
   })
