@@ -4,7 +4,9 @@ The simplest way to get started with HOPR is to run our pre-prepared [script](ht
 
 ```eval_rst
 .. ATTENTION::
-   Please bear in mind that at the time of writing, ``hoprd`` only has been tested in version ``14``. For now, ``hoprd`` does not work with version ``15`` or higher as some dependencies (particularly ``webrtc``) breaks in any version ``>14``.
+   Please bear in mind that at the time of writing, ``hoprd`` only has been tested in version ``14``.
+
+   If you are a MacOS M1 user, please refer to the `npm guide <./using-npm.html>`_, this script will not work for you.
 ```
 
 ## Setup and install HOPRd
@@ -78,7 +80,7 @@ working directory where it will store the encrypted key to your node and your of
 private data.
 
 ```bash
-DEBUG=hopr* hoprd --init --rest --admin --password='' 2>&1 | tee ~/hoprd-logs.txt
+DEBUG=hopr* hoprd --admin --init --announce --password='' 2>&1 | tee ~/hoprd-logs.txt
 ```
 
 ### Accessing HOPRd on a local machine
