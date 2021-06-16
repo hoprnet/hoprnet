@@ -51,10 +51,10 @@ Using the [hoprd npm package][6]:
 ```sh
 mkdir MY_NEW_HOPR_TEST_FOLDER
 cd MY_NEW_HOPR_TEST_FOLDER
-yarn add @hoprnet/hoprd@1.72.11
+npm install @hoprnet/hoprd@1.72.11
 
 # run hoprd
-DEBUG=hopr* yarn hoprd --admin --init --announce
+DEBUG=hopr* npx hoprd --admin --init --announce
 ```
 
 ### Using Docker
