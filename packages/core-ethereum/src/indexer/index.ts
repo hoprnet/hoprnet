@@ -231,10 +231,10 @@ class Indexer extends EventEmitter {
       confirmedEvents.push(event)
     }
 
-    // Sort announcements first, so we have a record of address => publickeys 
+    // Sort announcements first, so we have a record of address => publickeys
     // when processing other updates.
     confirmedEvents.sort((a, b) => {
-      if (a.event === ANNOUNCEMENT){
+      if (a.event === ANNOUNCEMENT) {
         return b.event === ANNOUNCEMENT ? 0 : -1
       }
       return b.event === ANNOUNCEMENT ? 1 : 0
