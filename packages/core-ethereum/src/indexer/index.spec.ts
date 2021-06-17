@@ -49,7 +49,6 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
   }
 
-
   class FakeChannels extends EventEmitter {
     async channels(channelId: string) {
       for (let ev of pastEvents) {
