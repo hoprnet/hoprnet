@@ -435,7 +435,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     if (externalAddress == undefined) {
-      log(`STUN requests led to multiple ambigous results, hence node seems to be behind a bidirectional NAT.`)
+      log(`STUN requests led to multiple ambiguous results, hence node seems to be behind a bidirectional NAT.`)
       return
     }
 
