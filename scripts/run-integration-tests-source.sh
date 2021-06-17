@@ -30,7 +30,7 @@ source "${mydir}/utils.sh"
 declare wait_delay=2
 declare wait_max_wait=1000
 
-if [ -n "${CI:-}" ]; then
+if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   wait_delay=10
   wait_max_wait=10
 fi

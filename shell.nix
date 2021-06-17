@@ -30,7 +30,7 @@ mkShell {
     python3
 
     # test Github automation
-    act
+    unstable.act
 
     # custom pkg groups
     macosPkgs
