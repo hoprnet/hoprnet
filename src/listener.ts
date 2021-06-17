@@ -281,8 +281,6 @@ class Listener extends EventEmitter implements InterfaceListener {
       } else {
         this.__connections[index] = this.__connections.pop() as MultiaddrConnection
       }
-
-      console.log(`after`, this.__connections.length)
     }
 
     maConn.conn.once('close', untrackConn)

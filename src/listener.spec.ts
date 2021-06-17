@@ -55,13 +55,6 @@ describe.only('check listening to sockets', function () {
     return socket
   }
 
-  async function stopStunServer(socket: Socket) {
-    await new Promise<void>((resolve) => {
-      socket.once('close', resolve)
-      socket.close()
-    })
-  }
-
   async function waitUntilListening(socket: Listener, ma: Multiaddr) {
     const promise = once(socket, 'listening')
 
@@ -108,12 +101,12 @@ describe.only('check listening to sockets', function () {
     }
   }
 
-  async function stopListener(socket: Listener) {
-    const promise = once(socket, 'close')
+  async function stopNode(socket: Socket | Listener) {
+    const closePromise = once(socket, 'close')
 
-    await socket.close()
+    socket.close()
 
-    return promise
+    return closePromise
   }
 
   it('recreate the socket and perform STUN request', async function () {
@@ -141,12 +134,12 @@ describe.only('check listening to sockets', function () {
       )
 
       await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
-      await stopListener(listener)
+      await stopNode(listener)
     }
 
     await Promise.all(msgReceived.map((received) => received.promise))
 
-    await Promise.all(stunServers.map((s) => stopStunServer(s)))
+    await Promise.all(stunServers.map(stopNode))
   })
 
   it('should contact potential relays and expose relay addresses', async function () {
@@ -176,12 +169,7 @@ describe.only('check listening to sockets', function () {
       `Listener must expose circuit address`
     )
 
-    await Promise.all([
-      // prettier-ignore
-      stopListener(node.listener),
-      stopListener(relay.listener),
-      stopStunServer(stunServer)
-    ])
+    await Promise.all([stopNode(node.listener), stopNode(relay.listener), stopNode(stunServer)])
   })
 
   it('check that node is reachable', async function () {
@@ -215,7 +203,7 @@ describe.only('check listening to sockets', function () {
 
     await msgReceived.promise
 
-    await Promise.all([stopListener(node.listener), stopStunServer(stunServer)])
+    await Promise.all([stopNode(node.listener), stopNode(stunServer)])
   })
 
   it('should bind to specific interfaces', async function () {
@@ -246,7 +234,7 @@ describe.only('check listening to sockets', function () {
       await waitUntilListening(listener, new Multiaddr(`/ip4/0.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
     })
 
-    await Promise.all([stopListener(listener), stopStunServer(stunServer)])
+    await Promise.all([stopNode(listener), stopNode(stunServer)])
   })
 
   it('check that node speaks STUN', async function () {
@@ -290,7 +278,7 @@ describe.only('check listening to sockets', function () {
 
     await defer.promise
 
-    await stopListener(node.listener)
+    await stopNode(node.listener)
   })
 
   it('get the right addresses', async function () {
@@ -327,7 +315,7 @@ describe.only('check listening to sockets', function () {
 
     assert(addrsFromListener.length == uniqueAddresses.size, `Addresses must not appear twice`)
 
-    await Promise.all([stopListener(relay.listener), stopListener(node.listener), stopStunServer(stunServer)])
+    await Promise.all([stopNode(relay.listener), stopNode(node.listener), stopNode(stunServer)])
   })
 
   it('check connection tracking', async function () {
@@ -372,13 +360,13 @@ describe.only('check listening to sockets', function () {
     socketOne.end()
     socketTwo.end()
 
-    await Promise.all([
-      socketOneClosePromise,
-      socketTwoClosePromise
-    ])
+    await Promise.all([socketOneClosePromise, socketTwoClosePromise])
+
+    // let I/O actions happen
+    await new Promise((resolve) => setImmediate(resolve))
 
     assert(node.listener.getConnections() == 0, `Connection must have been removed`)
 
-    await Promise.all([stopListener(node.listener), stopStunServer(stunServer)])
+    await Promise.all([stopNode(node.listener), stopNode(stunServer)])
   })
 })
