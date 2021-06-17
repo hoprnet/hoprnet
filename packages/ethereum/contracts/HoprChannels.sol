@@ -352,13 +352,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         if (channel.status == ChannelStatus.CLOSED) {
           // We are reopening the channel
           channel.channelEpoch = channel.channelEpoch.add(1);
-          channel.ticketEpoch = 0; // As we've bumped the channel epoch, we can restart the ticket counter
+          channel.ticketEpoch = 0; // As we've incremented the channel epoch, we can restart the ticket counter
+          channel.ticketIndex = 0;
+
           if (channel.commitment != bytes32(0)) {
             channel.status = ChannelStatus.OPEN;
           } else {
             channel.status = ChannelStatus.WAITING_FOR_COMMITMENT;
           }
-          channel.ticketIndex = 0;
         }
 
         channel.balance = channel.balance.add(amount);

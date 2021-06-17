@@ -594,7 +594,7 @@ describe('with a closed channel', function () {
 })
 
 describe('with a reopened channel', function () {
-  let channels, fixtures, TICKET_AB_WIN_RECYCLED, TICKET_BA_WIN_RECYCLED
+  let channels, fixtures, TICKET_AB_WIN_RECYCLED  
   beforeEach(async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
@@ -620,19 +620,6 @@ describe('with a reopened channel', function () {
       ACCOUNT_A,
       SECRET_1
     )
-    TICKET_BA_WIN_RECYCLED = await createTicket(
-      {
-        recipient: ACCOUNT_A.address,
-        proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-        ticketIndex: '1',
-        ticketEpoch: '0',
-        amount: '10',
-        winProb: WIN_PROB_100.toString(),
-        channelEpoch: '1'
-      },
-      ACCOUNT_B,
-      SECRET_1
-    )
   })
 
   it('sanity check', async function () {
@@ -644,15 +631,6 @@ describe('with a reopened channel', function () {
     await expect(
       channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
     ).to.be.revertedWith('signer must match the counterparty')
-  })
-
-  it('should redeem ticket for account A', async function () {
-    await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN_RECYCLED.ticket))
-    const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
-    validateChannel(ab, { balance: '80', status: ChannelStatus.Open + '' })
-    validateChannel(ba, { balance: '50', status: ChannelStatus.Open + '' })
-    expect(ba.commitment).to.equal(SECRET_1)
   })
 
   it('should reedem ticket for account B', async function () {
