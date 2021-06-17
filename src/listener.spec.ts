@@ -201,20 +201,17 @@ describe.only('check listening to sockets', function () {
       testMessage
     )
 
-    new Promise<void>((resolve) => {
-      const socket = net.createConnection(
-        {
-          host: '127.0.0.1',
-          port: node.listener.getPort()
-        },
-        () => {
-          socket.write(testMessage, () => {
-            socket.end()
-            resolve()
-          })
-        }
-      )
-    })
+    const socket = net.createConnection(
+      {
+        host: '127.0.0.1',
+        port: node.listener.getPort()
+      },
+      () => {
+        socket.write(testMessage, () => {
+          socket.end()
+        })
+      }
+    )
 
     await msgReceived.promise
 
