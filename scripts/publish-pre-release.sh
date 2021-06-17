@@ -25,7 +25,7 @@ npx lerna version "${version_type}" --yes --exact --no-push --no-changelog \
   --preid next -m "chore(release): publish %s"
 
 # only make remote changes if running in CI
-if [ -n "${CI:-}" ]; then
+if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   # push changes back onto origin including new tag
   git push origin "${branch}" --tags
 

@@ -14,7 +14,7 @@ npx lerna version patch --yes --exact --no-push --no-changelog \
   -m "chore(release): publish %s"
 
 # only make remote changes if running in CI
-if [ -n "${CI:-}" ]; then
+if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   # push changes back onto origin including new tag
   git push origin "${HOPR_GITHUB_REF}" --tags
 
