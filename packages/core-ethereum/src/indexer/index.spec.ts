@@ -221,7 +221,7 @@ describe('test indexer', function () {
   it('should continue processing events', async function () {
     const { indexer, newEvent, newBlock, OPENED_CHANNEL } = await useFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
     await indexer.start()
 
@@ -255,7 +255,7 @@ describe('test indexer', function () {
   it('should get all data from DB', async function () {
     const { indexer, OPENED_CHANNEL } = await useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
     await indexer.start()
@@ -281,7 +281,7 @@ describe('test indexer', function () {
   it('should handle provider error by restarting', async function () {
     const { indexer, provider } = await useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
     await indexer.start()

@@ -17,6 +17,7 @@ export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balanc
 
 const log = Debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
+const ANNOUNCEMENT = 'Announcement'
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -199,6 +200,7 @@ class Indexer extends EventEmitter {
     }
 
     let lastSnapshot = await this.db.getLatestConfirmedSnapshot()
+    const confirmedEvents = []
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
@@ -226,10 +228,21 @@ class Indexer extends EventEmitter {
           continue
         }
       }
+      confirmedEvents.push(event)
+    }
 
+    // Sort announcements first, so we have a record of address => publickeys 
+    // when processing other updates.
+    confirmedEvents.sort((a, b) => {
+      if (a.event === ANNOUNCEMENT){
+        return b.event === ANNOUNCEMENT ? 0 : -1
+      }
+      return b.event === ANNOUNCEMENT ? 1 : 0
+    })
+
+    for (const event of confirmedEvents) {
       const eventName = event.event as EventNames
-
-      if (eventName === 'Announcement') {
+      if (eventName === ANNOUNCEMENT) {
         await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
       } else if (eventName === 'ChannelUpdate') {
         await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
@@ -283,7 +296,7 @@ class Indexer extends EventEmitter {
     try {
       channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
     } catch (e) {
-      log('could not process channel event, skipping it')
+      log('could not process channel event, skipping it', e)
       return
     }
 
@@ -361,17 +374,17 @@ class Indexer extends EventEmitter {
 
   public async getPublicKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.db.getAccount(address)
-    if (account && account.hasAnnounced()) {
+    if (account) {
       return account.getPublicKey()
     }
-    throw new Error('Could not find public key for address - have they announced?')
+    throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }
 
   private async toIndexerChannel(channel: ChannelEntry): Promise<RoutingChannel> {
     return [channel.source.toPeerId(), channel.destination.toPeerId(), channel.balance]
   }
 
-  public async getAnnouncdAddresses(): Promise<Multiaddr[]> {
+  public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
     return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
   }
 

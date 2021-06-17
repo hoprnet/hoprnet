@@ -8,11 +8,13 @@ import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtu
 export * from '../fixtures'
 
 export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountEntry) => {
+  assert(actual, 'account is null')
   assert.strictEqual(actual.address.toString(), expected.address.toString(), 'address')
   assert.strictEqual(actual.getPublicKey().toString(), expected.getPublicKey().toString(), 'publicKey')
 }
 
 export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelEntry) => {
+  assert(actual, 'channel is null')
   assert.strictEqual(actual.source.toHex(), expected.source.toHex(), 'source')
   assert.strictEqual(actual.destination.toHex(), expected.destination.toHex(), 'destination')
   assert.strictEqual(actual.balance.toBN().toString(), expected.balance.toBN().toString(), 'balance')
