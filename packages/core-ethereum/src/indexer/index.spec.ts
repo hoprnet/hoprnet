@@ -44,7 +44,6 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     } else if (ev.event == 'Announce') {
       pubkeys[ev.args.account] = ev.args.multiaddr
     } else {
-      console.log('MISSING', ev)
       //throw new Error("MISSING EV HANDLER IN TEST")
     }
   }
@@ -65,8 +64,8 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
         transactionIndex: 0,
         logIndex: 0,
         args: {
-          source: PARTY_A.toAddress().toHex(),
-          destination: PARTY_B.toAddress().toHex(),
+          source: PARTY_B.toAddress().toHex(),
+          destination: PARTY_A.toAddress().toHex(),
           newState: {
             balance: BigNumber.from('3'),
             commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
@@ -319,7 +318,7 @@ describe('test indexer', function () {
     this.timeout(5000)
     const { indexer, newEvent, newBlock } = await useFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
 
     const opened = Defer()
@@ -374,6 +373,9 @@ describe('test indexer', function () {
     newBlock()
     newBlock()
     await opened.promise
+    // Total hack as this test sucks. There is no way to await the actual
+    // commitment setting as this is behind an event.
+    await new Promise(resolve => setTimeout(resolve, 2000))
     newBlock()
     newBlock()
     await commitmentSet.promise
