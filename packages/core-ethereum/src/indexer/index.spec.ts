@@ -375,7 +375,7 @@ describe('test indexer', function () {
     await opened.promise
     // Total hack as this test sucks. There is no way to await the actual
     // commitment setting as this is behind an event.
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    await new Promise((resolve) => setTimeout(resolve, 2000))
     newBlock()
     newBlock()
     await commitmentSet.promise
