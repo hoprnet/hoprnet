@@ -594,7 +594,7 @@ describe('with a closed channel', function () {
 })
 
 describe('with a reopened channel', function () {
-  let channels, fixtures, TICKET_AB_WIN_RECYCLED  
+  let channels, fixtures, TICKET_AB_WIN_RECYCLED
   beforeEach(async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
