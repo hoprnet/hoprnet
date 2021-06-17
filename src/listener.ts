@@ -250,6 +250,15 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   /**
+   * Get amount of currently open connections
+   * @dev used for testing
+   * @returns amount of currently open connections
+   */
+  getConnections(): number {
+    return this.__connections.length
+  }
+
+  /**
    * Tracks connections to close them once necessary.
    * @param maConn connection to track
    */
@@ -267,11 +276,13 @@ class Listener extends EventEmitter implements InterfaceListener {
         return
       }
 
-      if ([index, 1].includes(this.__connections.length)) {
+      if ([index + 1, 1].includes(this.__connections.length)) {
         this.__connections.pop()
       } else {
         this.__connections[index] = this.__connections.pop() as MultiaddrConnection
       }
+
+      console.log(`after`, this.__connections.length)
     }
 
     maConn.conn.once('close', untrackConn)
@@ -287,12 +298,26 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     let maConn: MultiaddrConnection | undefined
     let conn: Connection
+
     try {
       maConn = TCPConnection.fromSocket(socket, this.peerId)
-      log('new inbound connection %s', maConn.remoteAddr)
+    } catch (err) {
+      error(`inbound connection failed. ${err.message}`)
+
+      socket.destroy()
+      return
+    }
+
+    log('new inbound connection %s', maConn.remoteAddr)
+
+    try {
       conn = await this.upgrader.upgradeInbound(maConn)
     } catch (err) {
-      error('inbound connection failed', err)
+      if (err.code === 'ERR_ENCRYPTION_FAILED') {
+        error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
+      } else {
+        error('inbound connection failed', err)
+      }
 
       if (maConn != undefined) {
         return attemptClose(maConn)

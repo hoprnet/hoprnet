@@ -330,5 +330,55 @@ describe.only('check listening to sockets', function () {
     await Promise.all([stopListener(relay.listener), stopListener(node.listener), stopStunServer(stunServer)])
   })
 
-  // @TODO add test for connection tracking
+  it('check connection tracking', async function () {
+    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const msgReceived = Defer<void>()
+    const expectedMessageReceived = Defer<void>()
+
+    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], undefined, {
+      msgReceived,
+      expectedMessageReceived
+    })
+
+    const bothConnectionsOpened = Defer()
+    let connections = 0
+
+    node.listener.on('connection', () => {
+      connections++
+
+      if (connections == 2) {
+        bothConnectionsOpened.resolve()
+      }
+    })
+
+    const socketOne = net.createConnection({
+      host: '127.0.0.1',
+      port: node.listener.getPort()
+    })
+
+    const socketTwo = net.createConnection({
+      host: '127.0.0.1',
+      port: node.listener.getPort()
+    })
+
+    await bothConnectionsOpened.promise
+
+    assert(node.listener.getConnections() == 2)
+
+    // Add event listener at the end of the event listeners array
+    const socketOneClosePromise = once(socketOne, 'close')
+    const socketTwoClosePromise = once(socketTwo, 'close')
+
+    socketOne.end()
+    socketTwo.end()
+
+    await Promise.all([
+      socketOneClosePromise,
+      socketTwoClosePromise
+    ])
+
+    assert(node.listener.getConnections() == 0, `Connection must have been removed`)
+
+    await Promise.all([stopListener(node.listener), stopStunServer(stunServer)])
+  })
 })
