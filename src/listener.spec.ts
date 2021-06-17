@@ -17,7 +17,7 @@ import { once } from 'events'
 import { networkInterfaces } from 'os'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
-describe.only('check listening to sockets', function () {
+describe('check listening to sockets', function () {
   /**
    * Encapsulates the logic that is necessary to lauch a test
    * STUN server instance and track whether it receives requests
