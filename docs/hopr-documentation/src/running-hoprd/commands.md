@@ -71,7 +71,7 @@ Type `channels` to see your currently open channels. You'll see the node that ea
 
 ## close
 
-Type `close [HOPR address]` to close an open channel. Once you've initiated channel closure, you have to wait at least two minutes and then send the command again. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.
+Type `close [HOPR address]` to close an open channel. Once you've initiated channel closure, you have to wait for a specified closure time, then you may send the command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.
 
 ## tickets
 
@@ -82,6 +82,8 @@ Type `tickets` to displays information about your redeemed and unredeemed ticket
 Type `redeemTickets` to attempt to redeem your earned tickets for HOPR. Make sure you have sufficient native currency in your balance to cover the gas fees.
 
 ## covertraffic
+
+This feature is work in progress and may contain bugs.
 
 Type `covertraffic start` to being generating cover traffic messages. Type `covertraffic stop` to stop the cover traffic. You can type `covertraffic stats` to see the current status and reliability of your cover traffic.
 
