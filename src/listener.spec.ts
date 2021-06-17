@@ -17,7 +17,7 @@ import { once } from 'events'
 import { networkInterfaces } from 'os'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
-describe('check listening to sockets', function () {
+describe.only('check listening to sockets', function () {
   /**
    * Encapsulates the logic that is necessary to lauch a test
    * STUN server instance and track whether it receives requests
@@ -72,6 +72,7 @@ describe('check listening to sockets', function () {
 
   async function startNode(
     stunServers: Multiaddr[],
+    potentialRelays: Multiaddr[] = [],
     state: { msgReceived: DeferredPromise<void>; expectedMessageReceived?: DeferredPromise<void> },
     expectedMessage?: Uint8Array
   ) {
@@ -94,7 +95,7 @@ describe('check listening to sockets', function () {
         upgradeOutbound: async (conn: MultiaddrConnection) => conn
       } as unknown as Upgrader,
       stunServers,
-      undefined,
+      potentialRelays,
       peerId,
       undefined
     )
@@ -149,42 +150,35 @@ describe('check listening to sockets', function () {
   })
 
   it('should contact potential relays and expose relay addresses', async function () {
-    const peerId = await PeerId.create({ keyType: 'secp256k1' })
-
     const relayContacted = Defer<void>()
 
     const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
 
-    const relay = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+    const stunServerMultiaddr = new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
+
+    const relay = await startNode([stunServerMultiaddr], undefined, {
       msgReceived: relayContacted
     })
 
-    const listener = new Listener(
-      undefined,
-      {
-        upgradeOutbound: async (maConn: MultiaddrConnection) => maConn
-      } as unknown as Upgrader,
-      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+    const node = await startNode(
+      [stunServerMultiaddr],
       [new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)],
-      peerId,
-      undefined
+      { msgReceived: Defer() }
     )
-
-    await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
 
     // Checks that relay and STUN got contacted, otherwise timeout
     await relayContacted.promise
 
-    const addrs = listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+    const addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
     assert(
-      addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`),
+      addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`),
       `Listener must expose circuit address`
     )
 
     await Promise.all([
       // prettier-ignore
-      stopListener(listener),
+      stopListener(node.listener),
       stopListener(relay.listener),
       stopStunServer(stunServer)
     ])
@@ -199,6 +193,7 @@ describe('check listening to sockets', function () {
 
     const node = await startNode(
       [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+      undefined,
       {
         msgReceived,
         expectedMessageReceived
@@ -261,7 +256,7 @@ describe('check listening to sockets', function () {
     const defer = Defer<void>()
     const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
 
-    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], undefined, {
       msgReceived: Defer()
     })
 
@@ -299,6 +294,43 @@ describe('check listening to sockets', function () {
     await defer.promise
 
     await stopListener(node.listener)
+  })
+
+  it('get the right addresses', async function () {
+    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+
+    const relay = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], undefined, {
+      msgReceived: Defer()
+    })
+
+    const node = await startNode(
+      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+      [
+        new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`),
+        new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+      ],
+      {
+        msgReceived: Defer()
+      }
+    )
+
+    const addrsFromListener = node.listener.getAddrs()
+
+    const uniqueAddresses = new Set<string>(addrsFromListener.map((ma: Multiaddr) => ma.toString()))
+
+    assert(
+      uniqueAddresses.has(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`),
+      `Addresses must include relay address`
+    )
+
+    assert(
+      uniqueAddresses.has(`/ip4/127.0.0.1/tcp/${node.listener.getPort()}/p2p/${node.peerId.toB58String()}`),
+      `Addresses must include relay address`
+    )
+
+    assert(addrsFromListener.length == uniqueAddresses.size, `Addresses must not appear twice`)
+
+    await Promise.all([stopListener(relay.listener), stopListener(node.listener), stopStunServer(stunServer)])
   })
 
   // @TODO add test for connection tracking

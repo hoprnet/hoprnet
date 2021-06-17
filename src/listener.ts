@@ -82,7 +82,7 @@ class Listener extends EventEmitter implements InterfaceListener {
   constructor(
     private handler: ConnHandler | undefined,
     private upgrader: Upgrader,
-    stunServers: Multiaddr[] | undefined,
+    stunServers: Multiaddr[] = [],
     private relays: Multiaddr[] = [],
     private peerId: PeerId,
     private _interface: string | undefined
@@ -102,7 +102,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       reuseAddr: true
     })
 
-    this.stunServers = (stunServers ?? []).filter((ma: Multiaddr) => {
+    this.stunServers = stunServers.filter((ma: Multiaddr) => {
       let maPeerId = ma.getPeerId()
 
       if (maPeerId == null) {
@@ -416,17 +416,18 @@ class Listener extends EventEmitter implements InterfaceListener {
       return
     }
 
-    // @TODO remove from interface if directly listening to public IPv4 address
-    this.addrs.external.push(
-      Multiaddr.fromNodeAddress(
-        {
-          address: externalAddress.address,
-          port: externalAddress.port,
-          family: 4
-        },
-        'tcp'
-      ).encapsulate(`/p2p/${this.peerId}`)
-    )
+    const externalMultiaddr = Multiaddr.fromNodeAddress(
+      {
+        address: externalAddress.address,
+        port: externalAddress.port,
+        family: 4
+      },
+      'tcp'
+    ).encapsulate(`/p2p/${this.peerId}`)
+
+    this.addrs.interface = this.addrs.interface.filter((ma: Multiaddr) => !externalMultiaddr.equals(ma))
+
+    this.addrs.external.push(externalMultiaddr)
   }
 
   /**
@@ -509,6 +510,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     const promises: Promise<ConnectResult>[] = []
     const abort = new AbortController()
 
+    const usedPeerIds = new Set<string>()
+
     for (const relay of randomSubset(this.relays, Math.min(MAX_RELAYS_TO_CHECK, this.relays.length))) {
       const relayPeerId = relay.getPeerId()
 
@@ -516,6 +519,12 @@ class Listener extends EventEmitter implements InterfaceListener {
         // Relay must have a peerId and must be not self
         continue
       }
+
+      if (usedPeerIds.has(relayPeerId)) {
+        continue
+      }
+
+      usedPeerIds.add(relayPeerId)
 
       promises.push(this.connectToRelay(relay, relayPeerId, { signal: abort.signal }))
     }
