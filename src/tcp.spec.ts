@@ -2,89 +2,129 @@
 /// <reference path="./@types/libp2p-interfaces.ts" />
 
 import { createServer, Socket } from 'net'
-import { TCPConnection } from './tcp'
-import Listener from './listener'
+import type { AddressInfo } from 'net'
+import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'
+// import Listener from './listener'
 import Defer from 'p-defer'
+import { once } from 'events'
 import { Multiaddr } from 'multiaddr'
 import { u8aEquals } from '@hoprnet/hopr-utils'
-import type { Upgrader } from 'libp2p'
+// import type { Upgrader } from 'libp2p'
 import PeerId from 'peer-id'
-import { Connection } from 'libp2p-interfaces'
+// import { Connection } from 'libp2p-interfaces'
 import assert from 'assert'
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {
     const msgReceived = Defer<void>()
-    const bound = Defer<void>()
 
-    const test = new TextEncoder().encode('test')
+    const testMessage = new TextEncoder().encode('test')
+    const testMessageReply = new TextEncoder().encode('reply')
 
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
     const server = createServer((socket: Socket) => {
       socket.on('data', (data: Uint8Array) => {
-        assert(u8aEquals(data, test))
+        assert(u8aEquals(data, testMessage))
+        socket.write(testMessageReply)
+
         msgReceived.resolve()
       })
     })
 
-    server.listen(9091, () => {
-      bound.resolve()
-    })
+    const boundPromise = once(server, 'listening')
+    server.listen()
 
-    await bound.promise
+    await boundPromise
 
-    const conn = await TCPConnection.create(new Multiaddr('/ip4/127.0.0.1/tcp/9091'), peerId)
+    const conn = await TCPConnection.create(
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
+      peerId
+    )
 
-    conn.sink(
+    await conn.sink(
       (async function* () {
-        yield new TextEncoder().encode('test')
+        yield testMessage
       })()
     )
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    for await (const msg of conn.source) {
+      assert(u8aEquals(msg.slice(), testMessageReply))
+    }
 
-    await conn.close()
+    await msgReceived.promise
 
-    await new Promise((resolve) => server.close(resolve))
+    conn.close()
+
+    await once(conn.conn, 'close')
 
     assert(conn.conn.destroyed)
 
-    await msgReceived.promise
-  })
-
-  it('should test TCPConnection against Listener', async function () {
-    const upgrader = {
-      upgradeInbound: (arg: any) => Promise.resolve(arg),
-      upgradeOutbound: (arg: any) => Promise.resolve(arg)
-    } as unknown as Upgrader
-
-    const peerId = await PeerId.create({ keyType: 'secp256k1' })
-    const listener = new Listener(
-      (_conn: Connection) => {
-        console.log('new connection')
-      },
-      upgrader,
-      undefined,
-      undefined,
-      peerId,
-      undefined
+    assert(
+      conn.timeline.close != undefined &&
+        conn.timeline.close <= Date.now() &&
+        conn.timeline.open <= conn.timeline.close,
+      `TCPConnection must populate timeline object`
     )
 
-    await listener.listen(new Multiaddr('/ip4/127.0.0.1/tcp/9091'))
+    const serverClosePromise = once(server, 'close')
+    server.close()
 
-    const tcpConn = await TCPConnection.create(new Multiaddr('/ip4/127.0.0.1/tcp/9091'), peerId)
+    await serverClosePromise
+  })
 
-    tcpConn.sink(
+  it('trigger a socket close timeout', async function () {
+    this.timeout(SOCKET_CLOSE_TIMEOUT + 2e3)
+
+    const testMessage = new TextEncoder().encode('test')
+
+    const server = createServer()
+
+    const boundPromise = once(server, 'listening')
+    server.listen()
+
+    await boundPromise
+
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const conn = await TCPConnection.create(
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
+      peerId
+    )
+
+    await conn.sink(
       (async function* () {
-        yield new TextEncoder().encode('test')
+        yield testMessage
       })()
     )
 
-    await tcpConn.close()
+    const start = Date.now()
+    const closePromise = once(conn.conn, 'close')
+    conn.close()
 
-    await listener.close()
+    await closePromise
 
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    assert(Date.now() - start >= SOCKET_CLOSE_TIMEOUT)
+
+    assert(
+      conn.timeline.close != undefined &&
+        conn.timeline.close <= Date.now() &&
+        conn.timeline.open <= conn.timeline.close,
+      `TCPConnection must populate timeline object`
+    )
+  })
+
+  it('tcp socket timeout and error cases', async function () {
+    const INVALID_PORT = 54221
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+
+    await assert.rejects(
+      async () => {
+        await TCPConnection.create(new Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}`), peerId)
+      },
+      {
+        name: 'Error',
+        code: 'ECONNREFUSED'
+      }
+    )
   })
 })

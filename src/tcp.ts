@@ -6,12 +6,13 @@ import abortable, { AbortError } from 'abortable-iterator'
 import type { Socket, AddressInfo } from 'net'
 import Debug from 'debug'
 import { nodeToMultiaddr } from './utils'
+import { once } from 'events'
 
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
 const verbose = Debug('hopr-connect:verbose:tcp')
 
-const SOCKET_CLOSE_TIMEOUT = 2000
+export const SOCKET_CLOSE_TIMEOUT = 1000
 
 import type { MultiaddrConnection, Stream, DialOptions, StreamType } from 'libp2p'
 import { Multiaddr } from 'multiaddr'
@@ -19,6 +20,9 @@ import toIterable from 'stream-to-it'
 import { toU8aStream } from './utils'
 import { PeerId } from 'libp2p-interfaces'
 
+/**
+ * Class to encapsulate TCP sockets
+ */
 class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
   public sink: Stream['sink']
@@ -63,43 +67,41 @@ class TCPConnection implements MultiaddrConnection {
 
   public async close(): Promise<void> {
     if (this.conn.destroyed) {
-      return Promise.resolve()
+      return
     }
 
-    return new Promise<void>((resolve, reject) => {
-      const start = Date.now()
+    const closePromise = once(this.conn, 'close')
 
-      // Attempt to end the socket. If it takes longer to close than the
-      // timeout, destroy it manually.
-      const timeout = setTimeout(() => {
-        const cOptions = this.remoteAddr.toOptions()
-        log(
-          'timeout closing socket to %s:%s after %dms, destroying it manually',
-          cOptions.host,
-          cOptions.port,
-          Date.now() - start
-        )
+    const start = Date.now()
 
-        if (this.conn.destroyed) {
-          log('%s:%s is already destroyed', cOptions.host, cOptions.port)
-        } else {
-          this.conn.destroy()
-        }
+    // Attempt to end the socket. If it takes longer to close than the
+    // timeout, destroy it manually.
+    const timeout = setTimeout(() => {
+      const cOptions = this.remoteAddr.toOptions()
+      log(
+        'timeout closing socket to %s:%s after %dms, destroying it manually',
+        cOptions.host,
+        cOptions.port,
+        Date.now() - start
+      )
 
-        resolve()
-      }, SOCKET_CLOSE_TIMEOUT)
+      if (this.conn.destroyed) {
+        log('%s:%s is already destroyed', cOptions.host, cOptions.port)
+      } else {
+        log(`destroying connection`)
+        this.conn.destroy()
+      }
+    }, SOCKET_CLOSE_TIMEOUT)
 
-      this.conn.once('close', () => clearTimeout(timeout))
-      this.conn.end((err?: Error) => {
-        this.timeline.close = Date.now()
-        if (err) {
-          error(err)
-          return reject(err)
-        }
+    try {
+      this.conn.end()
+    } catch (err) {
+      console.log(err)
+    }
 
-        resolve()
-      })
-    })
+    await closePromise
+
+    clearTimeout(timeout)
   }
 
   private async _sink(source: Stream['source']): Promise<void> {
@@ -155,6 +157,7 @@ class TCPConnection implements MultiaddrConnection {
         const err = new Error(`connection timeout after ${Date.now() - start}ms`)
         // Note: this will result in onError() being called
         rawSocket.emit('error', err)
+        done()
       }
 
       const onConnect = () => {
