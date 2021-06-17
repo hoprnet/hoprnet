@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.72.0-next.28",
+  "version": "1.73.0-next.13",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -13,7 +13,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "engines": {
-    "node": "14 || 15",
+    "node": "14",
     "yarn": "1"
   },
   "scripts": {
@@ -33,9 +33,9 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-connect": "0.2.27",
-    "@hoprnet/hopr-core-ethereum": "1.72.0-next.28",
-    "@hoprnet/hopr-utils": "1.72.0-next.28",
+    "@hoprnet/hopr-connect": "0.2.29",
+    "@hoprnet/hopr-core-ethereum": "1.73.0-next.13",
+    "@hoprnet/hopr-utils": "1.73.0-next.13",
     "abort-controller": "^3.0.0",
     "bn.js": "5.2.0",
     "chalk": "~4.1.0",
@@ -43,7 +43,7 @@
     "heap-js": "^2.1.2",
     "leveldown": "~6.0.0",
     "levelup": "~5.0.0",
-    "libp2p": "0.31.6",
+    "libp2p": "0.31.7",
     "libp2p-crypto": "0.19.4",
     "libp2p-kad-dht": "0.22.0",
     "libp2p-mplex": "0.10.3",
@@ -53,7 +53,7 @@
     "secp256k1": "~4.0.2"
   },
   "devDependencies": {
-    "@hoprnet/hopr-ethereum": "1.72.0-next.28",
+    "@hoprnet/hopr-ethereum": "1.73.0-next.13",
     "@types/chai-as-promised": "^7.1.3",
     "@types/debug": "^4.1.5",
     "@types/err-code": "^3.0.0",
@@ -66,7 +66,7 @@
     "@types/sinon": "^10.0.0",
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
-    "libp2p-tcp": "0.15",
+    "libp2p-tcp": "0.16",
     "memdown": "^6.0.0",
     "mocha": "^9.0.0",
     "rimraf": "^3.0.2",

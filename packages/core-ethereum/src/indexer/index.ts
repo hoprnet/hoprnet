@@ -234,7 +234,8 @@ class Indexer extends EventEmitter {
       } else if (eventName === 'ChannelUpdate') {
         await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
       } else {
-        throw new Error('bad event name')
+        log('skipping event: ', eventName, ' as it isnt recognized')
+        //throw new Error('bad event name: ' + eventName)
       }
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
@@ -401,7 +402,7 @@ class Indexer extends EventEmitter {
   public async getOpenRoutingChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const channels = await this.getChannelsFrom(sourcePubKey.toAddress()).then((channels) =>
-      channels.filter((channel) => channel.status === 'OPEN')
+      channels.filter((channel) => channel.status === ChannelStatus.Open)
     )
 
     let cout: RoutingChannel[] = []

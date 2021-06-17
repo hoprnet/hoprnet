@@ -21,7 +21,8 @@ npm_package=$(${mydir}/get-npm-package-info.sh)
 test -n "${npm_package}" && version_type="preminor" || version_type="prerelease"
 
 # create new version in each package, and tag in Git
-npx lerna version "${version_type}" --yes --exact --no-push --no-changelog --preid next
+npx lerna version "${version_type}" --yes --exact --no-push --no-changelog \
+  --preid next -m "chore(release): publish %s"
 
 # only make remote changes if running in CI
 if [ -n "${CI:-}" ]; then

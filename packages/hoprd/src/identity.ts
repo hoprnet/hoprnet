@@ -1,39 +1,33 @@
 // TODO - replace serialization with a library
 import PeerId from 'peer-id'
-import { randomBytes, createCipheriv, scryptSync, createHmac } from 'crypto'
-import { privKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
+import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import fs from 'fs'
-import path from 'path'
+import { resolve } from 'path'
 import Debug from 'debug'
 const log = Debug(`hoprd:identity`)
 
-export const KEYPAIR_CIPHER_ALGORITHM = 'chacha20'
-export const KEYPAIR_IV_LENGTH = 16
-export const KEYPAIR_CIPHER_KEY_LENGTH = 32
-export const KEYPAIR_SALT_LENGTH = 32
-export const KEYPAIR_SCRYPT_PARAMS = { N: 8192, r: 8, p: 16 }
-export const KEYPAIR_PADDING = Buffer.alloc(16, 0x00)
-export const KEYPAIR_MESSAGE_DIGEST_ALGORITHM = 'sha256'
+import Wallet from 'ethereumjs-wallet'
 
 /**
  * Serializes a given peerId by serializing the included private key and public key.
  *
  * @param peerId the peerId that should be serialized
  */
-export function serializeKeyPair(peerId: PeerId, password: Uint8Array) {
-  const salt: Buffer = randomBytes(KEYPAIR_SALT_LENGTH)
-  const key = scryptSync(password, salt, KEYPAIR_CIPHER_KEY_LENGTH, KEYPAIR_SCRYPT_PARAMS)
-  const iv = randomBytes(KEYPAIR_IV_LENGTH)
-  const ciphertext = createCipheriv(KEYPAIR_CIPHER_ALGORITHM, key, iv).update(peerId.privKey.marshal())
+export async function serializeKeyPair(peerId: PeerId, password: string, useWeakCrypto = false): Promise<Uint8Array> {
+  const w = new Wallet(peerId.privKey.marshal() as Buffer)
 
-  return Uint8Array.from([
-    ...salt,
-    ...createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key)
-      .update(Uint8Array.from([...iv, ...ciphertext]))
-      .digest(),
-    ...iv,
-    ...ciphertext
-  ])
+  let serialized: string
+  if (useWeakCrypto) {
+    // Use weak settings during development for quicker
+    // node startup
+    serialized = await w.toV3String(password, {
+      n: 1
+    })
+  } else {
+    serialized = await w.toV3String(password)
+  }
+
+  return new TextEncoder().encode(serialized)
 }
 
 /**
@@ -46,67 +40,63 @@ export function serializeKeyPair(peerId: PeerId, password: Uint8Array) {
  *
  * @param encryptedSerializedKeyPair the encoded and encrypted key pair
  */
-export async function deserializeKeyPair(encryptedSerializedKeyPair: Uint8Array, password: Uint8Array) {
-  const [salt, mac, iv, ciphertext] = [
-    encryptedSerializedKeyPair.subarray(0, 32),
-    encryptedSerializedKeyPair.subarray(32, 64),
-    encryptedSerializedKeyPair.subarray(64, 80),
-    encryptedSerializedKeyPair.subarray(80, 112)
-  ]
+export async function deserializeKeyPair(serialized: Uint8Array, password: string, useWeakCrypto = false) {
+  const decoded = JSON.parse(new TextDecoder().decode(serialized))
 
-  const key = scryptSync(password, salt, KEYPAIR_CIPHER_KEY_LENGTH, KEYPAIR_SCRYPT_PARAMS)
-
-  if (
-    !u8aEquals(
-      createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key)
-        .update(Uint8Array.from([...iv, ...ciphertext]))
-        .digest(),
-      mac
-    )
-  ) {
-    throw Error(`Invalid MAC. Ciphertext might have been corrupted`)
+  if (decoded.crypto.kdfparams.n == 1 && useWeakCrypto != true) {
+    throw Error(`Attempting to use a development key while not being in development mode`)
   }
 
-  if (iv.length != KEYPAIR_IV_LENGTH) {
-    throw Error('Invalid IV length.')
-  }
+  const w = await Wallet.fromV3(decoded, password)
 
-  let plaintext = createCipheriv(KEYPAIR_CIPHER_ALGORITHM, key, iv).update(ciphertext)
-
-  return await privKeyToPeerId(plaintext)
+  return privKeyToPeerId(w.getPrivateKey())
 }
+
 export type IdentityOptions = {
   initialize: boolean
   idPath: string
   password: string
+  useWeakCrypto?: boolean
 }
 
-async function loadIdentity(pth: string, password: string): Promise<PeerId> {
-  const serialized: Uint8Array = fs.readFileSync(path.resolve(pth))
-  return await deserializeKeyPair(serialized, new TextEncoder().encode(password))
+function loadIdentity(path: string): Uint8Array {
+  return fs.readFileSync(resolve(path))
 }
 
-async function storeIdentity(pth: string, id: Uint8Array) {
-  fs.writeFileSync(path.resolve(pth), id)
+async function storeIdentity(path: string, id: Uint8Array) {
+  fs.writeFileSync(resolve(path), id)
 }
 
-async function createIdentity(idPath: string, password: string): Promise<PeerId> {
+async function createIdentity(idPath: string, password: string, useWeakCrypto = false) {
   const peerId = await PeerId.create({ keyType: 'secp256k1' })
-  const serializedKeyPair = serializeKeyPair(peerId, new TextEncoder().encode(password))
+  const serializedKeyPair = await serializeKeyPair(peerId, password, useWeakCrypto)
   await storeIdentity(idPath, serializedKeyPair)
   return peerId
 }
 
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
+  if (typeof options.password !== 'string' || options.password.length == 0) {
+    throw new Error(`Password must not be empty`)
+  }
+
+  let storedIdentity: Uint8Array | undefined
   try {
-    return await loadIdentity(options.idPath, options.password)
+    storedIdentity = loadIdentity(options.idPath)
   } catch {
     log('Could not load identity', options.idPath)
   }
 
+  if (options.useWeakCrypto) {
+    log(`Using weaker key protection to accelerate node startup`)
+  }
+  if (storedIdentity != undefined) {
+    return await deserializeKeyPair(storedIdentity, options.password, options.useWeakCrypto)
+  }
+
   if (options.initialize) {
     log('Creating new identity', options.idPath)
-    return await createIdentity(options.idPath, options.password)
+    return await createIdentity(options.idPath, options.password, options.useWeakCrypto)
   }
+
   throw new Error('Cannot load identity')
 }
