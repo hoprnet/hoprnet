@@ -372,10 +372,7 @@ describe.only('check listening to sockets', function () {
     socketOne.end()
     socketTwo.end()
 
-    await Promise.all([
-      socketOneClosePromise,
-      socketTwoClosePromise
-    ])
+    await Promise.all([socketOneClosePromise, socketTwoClosePromise])
 
     assert(node.listener.getConnections() == 0, `Connection must have been removed`)
 
