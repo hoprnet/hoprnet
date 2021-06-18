@@ -426,7 +426,7 @@ class Hopr extends EventEmitter {
           ticketIssuer = PublicKey.fromPeerId(this.getId())
           ticketReceiver = intermediatePath[0]
         } else {
-          ticketIssuer = (intermediatePath[i - 1])
+          ticketIssuer = intermediatePath[i - 1]
           ticketReceiver = intermediatePath[i]
         }
 
@@ -469,7 +469,7 @@ class Hopr extends EventEmitter {
           try {
             packet = await Packet.create(
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-              path.map(x => x.toPeerId()),
+              path.map((x) => x.toPeerId()),
               this.getId(),
               await this.paymentChannels
             )

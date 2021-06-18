@@ -47,12 +47,14 @@ export class SendMessage extends AbstractCommand {
       if (peerIdString.includes(',')) {
         // Manual routing
         // Direct routing can be done with ,recipient
-        const path = (await Promise.all(
-          peerIdString
-            .split(',')
-            .filter(Boolean)
-            .map((x) => checkPeerIdInput(x, state))
-        )).map(x => PublicKey.fromPeerId(x))
+        const path = (
+          await Promise.all(
+            peerIdString
+              .split(',')
+              .filter(Boolean)
+              .map((x) => checkPeerIdInput(x, state))
+          )
+        ).map((x) => PublicKey.fromPeerId(x))
         if (path.length > MAX_HOPS + 1) {
           throw new Error('Cannot create path longer than MAX_HOPS')
         }

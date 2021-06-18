@@ -81,7 +81,10 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
     peers: NetworkPeers,
     getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
-    log('currently open', currentChannels.map(x => x.toString()))
+    log(
+      'currently open',
+      currentChannels.map((x) => x.toString())
+    )
     let toOpen: ChannelsToOpen[] = []
 
     let i = 0
@@ -94,7 +97,7 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
       if (
         balance.gtn(0) &&
         currentChannels.length + toOpen.length < MAX_AUTO_CHANNELS &&
-        !toOpen.find((x) => (x[0]).eq(PublicKey.fromPeerId(peerId))) &&
+        !toOpen.find((x) => x[0].eq(PublicKey.fromPeerId(peerId))) &&
         !currentChannels.find((x) => x.destination.toPeerId().equals(peerId)) &&
         peers.qualityOf(peerId) > NETWORK_QUALITY_THRESHOLD
       ) {
@@ -117,7 +120,7 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
       log('evaluating', randomChannel.source.toString())
       peers.register(randomChannel.source.toPeerId())
       if (
-        !toOpen.find((x) => (x[0]).eq(randomChannel.source)) &&
+        !toOpen.find((x) => x[0].eq(randomChannel.source)) &&
         !currentChannels.find((x) => x.destination.eq(randomChannel.source)) &&
         peers.qualityOf(randomChannel.source.toPeerId()) > NETWORK_QUALITY_THRESHOLD
       ) {
@@ -125,7 +128,10 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
         balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
       }
     }
-    log('Promiscuous toOpen: ', toOpen.map(p => p.toString()))
+    log(
+      'Promiscuous toOpen: ',
+      toOpen.map((p) => p.toString())
+    )
     return [toOpen, toClose]
   }
 }
