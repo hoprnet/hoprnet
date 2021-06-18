@@ -433,8 +433,12 @@ class Hopr extends EventEmitter {
         const channel = ethereum.getChannel(ticketIssuer, ticketReceiver)
         const channelState = await channel.usToThem()
 
-        if (typeof channelState === "undefined") {
-          throw Error(`Channel from ${ticketIssuer.toPeerId().toB58String()} to ${ticketReceiver.toPeerId().toB58String()} not found`)
+        if (typeof channelState === 'undefined') {
+          throw Error(
+            `Channel from ${ticketIssuer.toPeerId().toB58String()} to ${ticketReceiver
+              .toPeerId()
+              .toB58String()} not found`
+          )
         } else if (channelState.status !== ChannelStatus.Open) {
           throw Error(`Channel ${channelState.getId().toHex()} is not open`)
         }
