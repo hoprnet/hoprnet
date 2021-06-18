@@ -1,5 +1,6 @@
 /// <reference path="./@types/it-handshake.ts" />
 /// <reference path="./@types/libp2p.ts" />
+/// <reference path="./@types/libp2p-interfaces.ts" />
 
 import debug from 'debug'
 const log = debug('hopr-connect')
@@ -7,7 +8,7 @@ const error = debug('hopr-connect:error')
 const verbose = debug('hopr-connect:verbose:error')
 
 import { blue, yellow } from 'chalk'
-import libp2p, { ConnectionManager } from 'libp2p'
+import libp2p from 'libp2p'
 import { WebRTCUpgrader } from './webrtc'
 
 import handshake from 'it-handshake'
@@ -33,18 +34,30 @@ import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
 import { WebRTCConnection } from './webRTCConnection'
 
-import type { DialOptions, Handler, Stream } from 'libp2p'
+import type { Connection } from 'libp2p-interfaces'
+import type { DialOptions, Handler, Stream, ConnHandler, Dialer, ConnectionManager, Upgrader } from 'libp2p'
 import { AbortError } from 'abortable-iterator'
 import { dialHelper } from './utils'
+import { BLInterface } from 'bl'
 
 class Relay {
   private _streams: Map<string, { [index: string]: RelayContext }>
   private _connectionManager: ConnectionManager
+  private _dialer: Dialer
 
-  constructor(private libp2p: libp2p, private webRTCUpgrader?: WebRTCUpgrader, private __noWebRTCUpgrade?: boolean) {
+  constructor(
+    private libp2p: libp2p,
+    private upgrader: Upgrader,
+    private connHandler: ConnHandler | undefined,
+    private webRTCUpgrader?: WebRTCUpgrader,
+    private __noWebRTCUpgrade?: boolean
+  ) {
     this._connectionManager = libp2p.connectionManager
+    this._dialer = libp2p.dialer
 
     this._streams = new Map<string, { [index: string]: RelayContext }>()
+
+    libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
 
     libp2p.handle(RELAY, this.handleRelay.bind(this))
   }
@@ -52,7 +65,6 @@ class Relay {
   async connect(
     relay: PeerId,
     destination: PeerId,
-    onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
     options?: DialOptions
   ): Promise<RelayConnection | WebRTCConnection | undefined> {
     const opts =
@@ -86,7 +98,7 @@ class Relay {
         self: this.libp2p.peerId,
         relay,
         counterparty: destination,
-        onReconnect,
+        onReconnect: this.onReconnect.bind(this),
         webRTC: {
           channel,
           upgradeInbound: this.webRTCUpgrader.upgradeInbound.bind(this.webRTCUpgrader)
@@ -114,7 +126,7 @@ class Relay {
         self: this.libp2p.peerId,
         relay,
         counterparty: destination,
-        onReconnect
+        onReconnect: this.onReconnect.bind(this)
       })
     }
   }
@@ -181,18 +193,13 @@ class Relay {
   }
 
   private async performHandshake(stream: Stream, relay: PeerId, destination: PeerId): Promise<Stream | undefined> {
-    let shaker = handshake<Uint8Array>(stream)
+    let shaker = handshake<Uint8Array | BLInterface>(stream)
 
     shaker.write(destination.pubKey.marshal())
 
     let answer: Uint8Array | undefined
     try {
       answer = (await shaker.read())?.slice()
-      log(
-        `Received ${yellow(new TextDecoder().decode(answer))} from relay ${blue(
-          relay.toB58String()
-        )} for relaying to ${blue(destination.toB58String())}`
-      )
     } catch (err) {
       error(`Error while reading answer ${blue(relay.toB58String())}. ${err.message}`)
       return
@@ -219,7 +226,7 @@ class Relay {
   }
 
   private async handleHandshake(stream: Stream): Promise<{ stream: Stream; counterparty: PeerId } | undefined> {
-    let shaker = handshake<Uint8Array>(stream)
+    let shaker = handshake<Uint8Array | BLInterface>(stream)
 
     let pubKeySender: Uint8Array | undefined
     try {
@@ -237,7 +244,7 @@ class Relay {
 
     let counterparty: PeerId
     try {
-      counterparty = await pubKeyToPeerId(pubKeySender)
+      counterparty = pubKeyToPeerId(pubKeySender)
     } catch (err) {
       error(`Could not decode sender peerId. Error was: ${err.message}`)
       shaker.write(FAIL)
@@ -253,21 +260,21 @@ class Relay {
 
   private async handleRelay({ stream, connection }: Handler): Promise<void> {
     log(`handle relay request`)
-    const shaker = handshake<Uint8Array>(stream)
+    const shaker = handshake<Uint8Array | BLInterface>(stream)
 
     let pubKeySender: Uint8Array | undefined
-
-    try {
-      pubKeySender = (await shaker.read())?.slice()
-    } catch (err) {
-      error(err)
-    }
 
     if (connection == undefined || connection.remotePeer == undefined) {
       error(`Could not identify peer. Ending relayed connection.`)
       shaker.write(FAIL_COULD_NOT_IDENTIFY_PEER)
       shaker.rest()
       return
+    }
+
+    try {
+      pubKeySender = (await shaker.read())?.slice()
+    } catch (err) {
+      error(err)
     }
 
     if (pubKeySender == null) {
@@ -283,7 +290,7 @@ class Relay {
 
     let counterparty: PeerId
     try {
-      counterparty = await pubKeyToPeerId(pubKeySender)
+      counterparty = pubKeyToPeerId(pubKeySender)
     } catch (err) {
       error(
         `Peer ${yellow(
@@ -331,7 +338,7 @@ class Relay {
       )
     }
 
-    const deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
+    const deliveryStream = await this.contactCounterparty(connection.remotePeer, counterparty)
 
     if (deliveryStream == undefined) {
       shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
@@ -362,7 +369,74 @@ class Relay {
     this._streams.set(channelId, contextEntry)
   }
 
-  private async establishForwarding(initiator: PeerId, counterparty: PeerId): Promise<Stream | undefined> {
+  /**
+   * Called once a relayed connection is establishing
+   * @param handler handles the relayed connection
+   */
+  private async handleIncoming(handler: Handler): Promise<void> {
+    let newConn: Connection
+
+    try {
+      const relayConnection = await this.handleRelayConnection(handler, this.onReconnect.bind(this))
+
+      if (relayConnection == undefined) {
+        return
+      }
+
+      newConn = await this.upgrader.upgradeInbound(relayConnection)
+    } catch (err) {
+      error(`Could not upgrade relayed connection. Error was: ${err}`)
+      return
+    }
+
+    // this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])
+
+    this.connHandler?.(newConn)
+  }
+
+  /**
+   * Dialed once a reconnect happens
+   * @param newStream new relayed connection
+   * @param counterparty counterparty of the relayed connection
+   */
+  private async onReconnect(newStream: RelayConnection, counterparty: PeerId): Promise<void> {
+    log(`####### inside reconnect #######`)
+
+    let newConn: Connection
+
+    try {
+      if (this.webRTCUpgrader != undefined) {
+        newConn = await this.upgrader.upgradeInbound(
+          new WebRTCConnection(
+            {
+              conn: newStream,
+              self: this.libp2p.peerId,
+              counterparty,
+              channel: newStream.webRTC!.channel,
+              libp2p: {
+                connectionManager: this._connectionManager
+              } as any
+            },
+            {
+              __noWebRTCUpgrade: this.__noWebRTCUpgrade
+            }
+          )
+        )
+      } else {
+        newConn = await this.upgrader.upgradeInbound(newStream)
+      }
+    } catch (err) {
+      error(err)
+      return
+    }
+
+    this._dialer._pendingDials[counterparty.toB58String()]?.destroy()
+    this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
+
+    this.connHandler?.(newConn)
+  }
+
+  private async contactCounterparty(initiator: PeerId, counterparty: PeerId): Promise<Stream | undefined> {
     // @TODO this produces struct with unset connection property
     let newConn = await dialHelper(this.libp2p, counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
 
