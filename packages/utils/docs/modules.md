@@ -857,14 +857,14 @@ ___
 
 ### generateChannelId
 
-▸ **generateChannelId**(`self`, `counterparty`): [Hash](classes/hash.md)
+▸ **generateChannelId**(`source`, `destination`): [Hash](classes/hash.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `self` | [Address](classes/address.md) |
-| `counterparty` | [Address](classes/address.md) |
+| `source` | [Address](classes/address.md) |
+| `destination` | [Address](classes/address.md) |
 
 #### Returns
 
@@ -872,7 +872,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L13)
+[types/channelEntry.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L14)
 
 ___
 

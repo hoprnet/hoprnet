@@ -1,7 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { PublicKey } from '@hoprnet/hopr-utils'
+import { PublicKey, ChannelStatus } from '@hoprnet/hopr-utils'
 
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -25,32 +25,32 @@ export default class ListOpenChannels extends AbstractCommand {
       const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = selfPubKey.toAddress()
       const channelsFrom = (await this.node.getChannelsFrom(selfAddress)).filter(
-        (channel) => channel.status !== 'CLOSED'
+        (channel) => channel.status !== ChannelStatus.Closed
       )
       if (channelsFrom.length == 0) {
         log(`\nNo open channels from node.`)
       }
       // find counterpartys' peerIds
       for (const channel of channelsFrom) {
-        const peerId = await this.node.getPublicKeyOf(channel.destination)
         log(`
 Outgoing Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-To:                     ${styleValue(peerId.toPeerId().toB58String(), 'peerId')}
+To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
 Status:                 ${styleValue(channel.status, 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)
       }
 
-      const channelsTo = (await this.node.getChannelsTo(selfAddress)).filter((channel) => channel.status !== 'CLOSED')
+      const channelsTo = (await this.node.getChannelsTo(selfAddress)).filter(
+        (channel) => channel.status !== ChannelStatus.Closed
+      )
       if (channelsTo.length == 0) {
         log(`\nNo open channels to node.`)
       }
       // find counterpartys' peerIds
       for (const channel of channelsTo) {
-        const peerId = await this.node.getPublicKeyOf(channel.source)
         log(`
 Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-To:                     ${styleValue(peerId.toPeerId().toB58String(), 'peerId')}
+To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
 Status:                 ${styleValue(channel.status, 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)

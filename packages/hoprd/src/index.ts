@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
+import { NativeBalance } from '@hoprnet/hopr-utils'
 import { decode } from 'rlp'
 import { Commands } from './commands'
 import { LogStream } from './logs'
@@ -106,6 +107,11 @@ const argv = yargs
     describe: 'For testing local testnets. Prefer local peers to remote.',
     default: false
   })
+  .option('testUseWeakCrypto', {
+    boolean: true,
+    describe: 'weaker crypto for faster node startup',
+    default: false
+  })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
 function parseHosts(): HoprOptions['hosts'] {
@@ -196,7 +202,8 @@ async function main() {
   const peerId = await getIdentity({
     initialize: argv.init,
     idPath: argv.identity,
-    password: argv.password
+    password: argv.password,
+    useWeakCrypto: argv.testUseWeakCrypto
   })
 
   // 2. Create node instance
@@ -226,10 +233,14 @@ async function main() {
       })
     }
 
-    logs.log('node is waiting for funds to', (await node.getEthereumAddress()).toHex())
+    const ethAddr = (await node.getEthereumAddress()).toHex()
+    // 0.1 NativeBalance
+    const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
+
+    logs.log(`Node is not started, please fund this node ${ethAddr} with atleast ${fundsReq}`)
     // 2.5 Await funding of wallet.
     await node.waitForFunds()
-    logs.log('node funded, starting')
+    logs.log('Node has been funded, starting...')
 
     // 3. Start the node.
     await node.start()
@@ -238,6 +249,9 @@ async function main() {
     if (adminServer) {
       adminServer.registerNode(node, cmds)
     }
+
+    logs.logStatus('STARTED')
+    logs.log('Node has started!')
 
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
@@ -249,8 +263,10 @@ async function main() {
         if (c === 'daemonize') {
           return
         }
-        let resp = await cmds.execute(logs.log, c)
-        console.log(resp)
+        await cmds.execute((msg) => {
+          logs.log(msg)
+          console.log(msg)
+        }, c)
       }
       await node.stop()
       process.exit(0)

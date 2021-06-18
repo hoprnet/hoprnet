@@ -10,7 +10,8 @@ import {
   ChannelEntry,
   UnacknowledgedTicket,
   Challenge,
-  generateChannelId
+  generateChannelId,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import type { RedeemTicketResponse } from '.'
@@ -116,7 +117,7 @@ class Channel {
     try {
       c = await this.usToThem()
     } catch {}
-    if (c && c.status !== 'CLOSED') {
+    if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }
 
@@ -133,7 +134,7 @@ class Channel {
   async initializeClosure() {
     const c = await this.usToThem()
     const counterpartyAddress = this.counterparty.toAddress()
-    if (c.status !== 'OPEN') {
+    if (c.status !== ChannelStatus.Open) {
       throw Error('Channel status is not OPEN')
     }
     return await this.chain.initiateChannelClosure(counterpartyAddress)
@@ -143,7 +144,7 @@ class Channel {
     const c = await this.usToThem()
     const counterpartyAddress = this.counterparty.toAddress()
 
-    if (c.status !== 'PENDING_TO_CLOSE') {
+    if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
     return await this.chain.finalizeChannelClosure(counterpartyAddress)

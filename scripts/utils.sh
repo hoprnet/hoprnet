@@ -21,27 +21,44 @@ function get_version_maj_min_pat() {
 function ensure_port_is_free() {
   local port=${1}
 
-  if lsof -i ":${port}" | grep -q 'LISTEN' && true || false; then
+  if lsof -i ":${port}" -s TCP:LISTEN; then
     echo "Port is not free $1"
-    echo "Process: $(lsof -i ":${port}" | grep 'LISTEN' || :)"
+    echo "Process: $(lsof -i ":${port}" -s TCP:LISTEN || :)"
     exit 1
   fi
 }
 
 # $1 = port to wait for
-# $2 = optional: delay between checks in seconds, defaults to 2s
-# $3 = optional: max number of checks, defaults to 1000
-# $4 = optional: file to tail for debug info
+# $2 = optional: file to tail for debug info
+# $3 = optional: delay between checks in seconds, defaults to 2s
+# $4 = optional: max number of checks, defaults to 1000
 function wait_for_http_port() {
   local port=${1}
-  local delay=${2:-2}
-  local max_wait=${3:-1000}
-  local log_file=${4:-}
+  local log_file=${2:-}
+  local delay=${3:-2}
+  local max_wait=${4:-1000}
+  local cmd="curl --silent "localhost:${port}""
+
+  wait_for_port "${port}" "${log_file}" "${delay}" "${max_wait}" "${cmd}"
+}
+
+# $1 = port to wait for
+# $2 = optional: file to tail for debug info
+# $3 = optional: delay between checks in seconds, defaults to 2s
+# $4 = optional: max number of checks, defaults to 1000
+# $5 = optional: command to check
+function wait_for_port() {
+  local port=${1}
+  local log_file=${2:-}
+  local delay=${3:-2}
+  local max_wait=${4:-1000}
+  # by default we do a basic listen check
+  local cmd=${5:-lsof -i ":${port}" -s TCP:LISTEN}
 
   i=0
-  until curl --silent "localhost:${port}"; do
+  until ${cmd}; do
     echo "Waiting (${delay}) seconds for port ${port}"
-    if [ -n "${log_file}" ]; then
+    if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
       echo "Last 5 logs:"
       tail -n 5 "${log_file}"
     fi

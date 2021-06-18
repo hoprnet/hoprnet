@@ -53,6 +53,11 @@ export class LogStream {
     this.log('VERBOSE', message)
   }
 
+  logStatus(status: string) {
+    const msg = { type: 'status', msg: status, ts: new Date().toISOString() }
+    this._log(msg)
+  }
+
   logFullLine(...args: string[]) {
     const msg = { type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString() }
     this._log(msg)

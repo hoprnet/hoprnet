@@ -1,18 +1,18 @@
-import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
-import { Address, Balance, Hash } from './primitives'
+import { u8aConcat, u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
+import { Address, Balance, Hash, PublicKey } from './primitives'
 import { UINT256 } from './solidity'
 import BN from 'bn.js'
 import chalk from 'chalk'
 
 export enum ChannelStatus {
-  Closed = 'CLOSED',
-  WaitingForCommitment = 'WAITING_FOR_COMMITMENT',
-  Open = 'OPEN',
-  PendingToClose = 'PENDING_TO_CLOSE'
+  Closed = 0,
+  WaitingForCommitment = 1,
+  Open = 2,
+  PendingToClose = 3
 }
 
 export function generateChannelId(source: Address, destination: Address) {
-  return Hash.create(Buffer.concat([source.serialize(), destination.serialize()]))
+  return Hash.create(u8aConcat(source.serialize(), destination.serialize()))
 }
 
 function numberToChannelStatus(i: number): ChannelStatus {
@@ -35,24 +35,13 @@ function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
 }
 
 function channelStatusToU8a(c: ChannelStatus): Uint8Array {
-  switch (c) {
-    case 'CLOSED':
-      return Uint8Array.of(0)
-    case 'WAITING_FOR_COMMITMENT':
-      return Uint8Array.of(1)
-    case 'OPEN':
-      return Uint8Array.of(2)
-    case 'PENDING_TO_CLOSE':
-      return Uint8Array.of(3)
-    default:
-      throw Error(`Invalid status. Got ${c}`)
-  }
+  return Uint8Array.of(c)
 }
 
 // TODO, find a better way to do this.
 const components = [
-  Address,
-  Address,
+  PublicKey,
+  PublicKey,
   Balance,
   Hash,
   UINT256,
@@ -64,8 +53,8 @@ const components = [
 
 export class ChannelEntry {
   constructor(
-    public readonly source: Address,
-    public readonly destination: Address,
+    public readonly source: PublicKey,
+    public readonly destination: PublicKey,
     public readonly balance: Balance,
     public readonly commitment: Hash,
     public readonly ticketEpoch: UINT256,
@@ -90,12 +79,12 @@ export class ChannelEntry {
     return new ChannelEntry(...params)
   }
 
-  static fromSCEvent(event: any): ChannelEntry {
+  static async fromSCEvent(event: any, keyFor: (a: Address) => Promise<PublicKey>): Promise<ChannelEntry> {
     // TODO type
     const { source, destination, newState } = event.args
     return new ChannelEntry(
-      Address.fromString(source),
-      Address.fromString(destination),
+      await keyFor(Address.fromString(source)),
+      await keyFor(Address.fromString(destination)),
       new Balance(new BN(newState.balance.toString())),
       new Hash(stringToU8a(newState.commitment)),
       new UINT256(new BN(newState.ticketEpoch.toString())),
@@ -108,8 +97,8 @@ export class ChannelEntry {
 
   public serialize(): Uint8Array {
     return serializeToU8a([
-      [this.source.serialize(), Address.SIZE],
-      [this.destination.serialize(), Address.SIZE],
+      [this.source.serialize(), PublicKey.SIZE],
+      [this.destination.serialize(), PublicKey.SIZE],
       [this.balance.serialize(), Balance.SIZE],
       [this.commitment.serialize(), Hash.SIZE],
       [this.ticketEpoch.serialize(), UINT256.SIZE],
@@ -123,20 +112,35 @@ export class ChannelEntry {
   toString() {
     return (
       // prettier-ignore
-      `ChannelEntry (${chalk.yellow(this.getId().toHex())}):\n` +
-      `  source:            ${chalk.yellow(this.source.toHex())}\n` +
-      `  destination:       ${chalk.yellow(this.destination.toHex())}\n` +
-      `  balance:           ${this.balance.toFormattedString()}\n` +
-      `  commitment:        ${this.commitment.toHex()}\n` +
-      `  ticketEpoch:       ${this.ticketEpoch.toBN().toString(10)}\n` +
-      `  ticketIndex:       ${this.ticketIndex.toBN().toString(10)}\n` +
-      `  status:            ${chalk.green(this.status)}\n` +
-      `  channelEpoch:      ${this.channelEpoch.toBN().toString(10)}\n` +
-      `  closureTime:       ${this.closureTime.toBN().toString(10)}\n`
+      `ChannelEntry   (${chalk.yellow(this.getId().toHex())}):\n` +
+      `  source:       ${chalk.yellow(this.source.toHex())}\n` +
+      `  destination:  ${chalk.yellow(this.destination.toHex())}\n` +
+      `  balance:      ${this.balance.toFormattedString()}\n` +
+      `  commitment:   ${this.commitment.toHex()}\n` +
+      `  ticketEpoch:  ${this.ticketEpoch.toBN().toString(10)}\n` +
+      `  ticketIndex:  ${this.ticketIndex.toBN().toString(10)}\n` +
+      `  status:       ${chalk.green(this.status)}\n` +
+      `  channelEpoch: ${this.channelEpoch.toBN().toString(10)}\n` +
+      `  closureTime:  ${this.closureTime.toBN().toString(10)}\n`
     )
   }
 
   public getId() {
-    return generateChannelId(this.source, this.destination)
+    return generateChannelId(this.source.toAddress(), this.destination.toAddress())
+  }
+
+  public static createMock(): ChannelEntry {
+    const pub = PublicKey.createMock()
+    return new ChannelEntry(
+      pub,
+      pub,
+      new Balance(new BN(1)),
+      Hash.create(),
+      new UINT256(new BN(1)),
+      new UINT256(new BN(1)),
+      ChannelStatus.Closed,
+      new UINT256(new BN(1)),
+      new UINT256(new BN(1))
+    )
   }
 }

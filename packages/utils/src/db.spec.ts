@@ -32,10 +32,6 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
   )
 }
 
-function createMockedChannelEntry() {
-  return ChannelEntry.deserialize(new Uint8Array({ length: ChannelEntry.SIZE }).fill(1))
-}
-
 describe(`database tests`, function () {
   let db: HoprDB
 
@@ -101,7 +97,7 @@ describe(`database tests`, function () {
   })
 
   it('should store ChannelEntry', async function () {
-    const channelEntry = createMockedChannelEntry()
+    const channelEntry = ChannelEntry.createMock()
 
     await db.updateChannel(channelEntry.getId(), channelEntry)
 

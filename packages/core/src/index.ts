@@ -21,7 +21,7 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import { Multiaddr } from 'multiaddr'
+import { protocols, Multiaddr } from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
@@ -132,6 +132,9 @@ class Hopr extends EventEmitter {
       this.addressSorter = localAddressesFirst
       log('Preferring local addresses')
     } else {
+      // Overwrite libp2p's default addressSorter to make
+      // sure it doesn't fail on HOPR-flavored addresses
+      this.addressSorter = (x) => x
       log('Addresses are sorted by default')
     }
   }
@@ -193,9 +196,6 @@ class Hopr extends EventEmitter {
             // __noWebRTCUpgrade: false
           }
         },
-        peerDiscovery: {
-          autoDial: false
-        },
         dht: {
           enabled: true
         },
@@ -244,7 +244,17 @@ class Hopr extends EventEmitter {
     this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
     ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
-      this.libp2p.peerStore.addressBook.add(id, multiaddrs)
+      const dialables = multiaddrs.filter((ma: Multiaddr) => {
+        const tuples = ma.tuples()
+        return tuples.length > 1 || tuples[0][0] != protocols.names['p2p'].code
+      })
+
+      // @ts-ignore
+      this.libp2p.peerStore.keyBook.set(id)
+
+      if (dialables.length > 0) {
+        this.libp2p.peerStore.addressBook.add(id, multiaddrs)
+      }
     })
 
     log('announcing')
@@ -694,7 +704,7 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: string }> {
+  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: ChannelStatus }> {
     const ethereum = await this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
@@ -702,15 +712,17 @@ class Hopr extends EventEmitter {
     const channelState = await channel.usToThem()
 
     // TODO: should we wait for confirmation?
-    if (channelState.status === 'CLOSED') {
+    if (channelState.status === ChannelStatus.Closed) {
       throw new Error('Channel is already closed')
     }
 
-    if (channelState.status === 'OPEN') {
+    if (channelState.status === ChannelStatus.Open) {
       await this.strategy.onChannelWillClose(channel)
     }
 
-    const txHash = await (channelState.status === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
+    const txHash = await (channelState.status === ChannelStatus.Open
+      ? channel.initializeClosure()
+      : channel.finalizeClosure())
 
     return { receipt: txHash, status: channelState.status }
   }
@@ -740,7 +752,7 @@ class Hopr extends EventEmitter {
   public async redeemAllTickets() {
     let count = 0,
       redeemed = 0,
-      total = 0
+      total = new BN(0)
 
     for (const ackTicket of await this.getAcknowledgedTickets()) {
       count++
@@ -748,7 +760,7 @@ class Hopr extends EventEmitter {
 
       if (result.status === 'SUCCESS') {
         redeemed++
-        total += ackTicket.ticket.amount.toBN().toNumber()
+        total.iadd(ackTicket.ticket.amount.toBN())
         console.log(`Redeemed ticket ${count}`)
       } else {
         console.log(`Failed to redeem ticket ${count}`)
@@ -757,7 +769,7 @@ class Hopr extends EventEmitter {
     return {
       count,
       redeemed,
-      total
+      total: new Balance(total)
     }
   }
 

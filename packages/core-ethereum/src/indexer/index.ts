@@ -17,6 +17,7 @@ export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balanc
 
 const log = Debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
+const ANNOUNCEMENT = 'Announcement'
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -199,6 +200,7 @@ class Indexer extends EventEmitter {
     }
 
     let lastSnapshot = await this.db.getLatestConfirmedSnapshot()
+    const confirmedEvents = []
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
@@ -226,15 +228,27 @@ class Indexer extends EventEmitter {
           continue
         }
       }
+      confirmedEvents.push(event)
+    }
 
+    // Sort announcements first, so we have a record of address => publickeys
+    // when processing other updates.
+    confirmedEvents.sort((a, b) => {
+      if (a.event === ANNOUNCEMENT) {
+        return b.event === ANNOUNCEMENT ? 0 : -1
+      }
+      return b.event === ANNOUNCEMENT ? 1 : 0
+    })
+
+    for (const event of confirmedEvents) {
       const eventName = event.event as EventNames
-
-      if (eventName === 'Announcement') {
+      if (eventName === ANNOUNCEMENT) {
         await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
       } else if (eventName === 'ChannelUpdate') {
         await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
       } else {
-        throw new Error('bad event name')
+        log('skipping event: ', eventName, ' as it isnt recognized')
+        //throw new Error('bad event name: ' + eventName)
       }
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
@@ -278,15 +292,21 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
-    const channel = ChannelEntry.fromSCEvent(event)
+    let channel
+    try {
+      channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
+    } catch (e) {
+      log('could not process channel event, skipping it', e)
+      return
+    }
 
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
 
-    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
+    if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
-      if (channel.destination.eq(this.address)) {
+      if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           await this.onOwnUnsetCommitment(channel)
@@ -298,13 +318,13 @@ class Indexer extends EventEmitter {
   }
 
   private onOwnUnsetCommitment(channel: ChannelEntry) {
-    if (!channel.destination.eq(this.address)) {
+    if (!channel.destination.toAddress().eq(this.address)) {
       throw new Error('shouldnt be called unless we are the destination')
     }
     log(`Found channel ${chalk.yellow(channel.getId().toHex())} to us with unset commitment. Setting commitment`)
 
     return new Commitment(
-      (comm: Hash) => this.chain.setCommitment(channel.source, comm),
+      (comm: Hash) => this.chain.setCommitment(channel.source.toAddress(), comm),
       async () => (await this.getChannel(channel.getId())).commitment,
       this.db,
       channel.getId(),
@@ -342,32 +362,26 @@ class Indexer extends EventEmitter {
 
   public async getChannelsFrom(address: Address) {
     return this.db.getChannels((channel) => {
-      return address.eq(channel.source)
+      return address.eq(channel.source.toAddress())
     })
   }
 
   public async getChannelsTo(address: Address) {
     return this.db.getChannels((channel) => {
-      return address.eq(channel.destination)
+      return address.eq(channel.destination.toAddress())
     })
   }
 
-  // routing
-  public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
+  public async getPublicKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.db.getAccount(address)
-    if (account && account.hasAnnounced()) {
+    if (account) {
       return account.getPublicKey()
     }
-
-    return undefined
+    throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }
 
   private async toIndexerChannel(channel: ChannelEntry): Promise<RoutingChannel> {
-    const [sourcePubKey, destPubKey] = await Promise.all([
-      this.getPublicKeyOf(channel.source),
-      this.getPublicKeyOf(channel.destination)
-    ])
-    return [sourcePubKey.toPeerId(), destPubKey.toPeerId(), channel.balance]
+    return [channel.source.toPeerId(), channel.destination.toPeerId(), channel.balance]
   }
 
   public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
@@ -401,7 +415,7 @@ class Indexer extends EventEmitter {
   public async getOpenRoutingChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const channels = await this.getChannelsFrom(sourcePubKey.toAddress()).then((channels) =>
-      channels.filter((channel) => channel.status === 'OPEN')
+      channels.filter((channel) => channel.status === ChannelStatus.Open)
     )
 
     let cout: RoutingChannel[] = []

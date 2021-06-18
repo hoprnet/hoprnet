@@ -268,6 +268,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             msg.sender
         );
 
+        require(newCommitment != bytes32(0), "Cannot set empty commitment");
         channel.commitment = newCommitment;
         channel.ticketEpoch = channel.ticketEpoch.add(1);
         if (channel.status == ChannelStatus.WAITING_FOR_COMMITMENT){
@@ -351,12 +352,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         if (channel.status == ChannelStatus.CLOSED) {
           // We are reopening the channel
           channel.channelEpoch = channel.channelEpoch.add(1);
+          channel.ticketEpoch = 0; // As we've incremented the channel epoch, we can restart the ticket counter
+          channel.ticketIndex = 0;
+
           if (channel.commitment != bytes32(0)) {
             channel.status = ChannelStatus.OPEN;
           } else {
             channel.status = ChannelStatus.WAITING_FOR_COMMITMENT;
           }
-          channel.ticketIndex = 0;
         }
 
         channel.balance = channel.balance.add(amount);
@@ -423,6 +426,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function _computeChallenge(bytes32 response) internal pure returns (address)  {
         // Field order of the base field
         uint256 FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+
+        // TODO: We need to check whether the point lies on our curve to prevent
+        // secp256k1 twist attacks. This is currently out of scope, but will be
+        // addressed at some point.
 
         // x-coordinate of the base point
         uint256 gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
