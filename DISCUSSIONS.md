@@ -45,6 +45,24 @@ There's two design issues here:
 
 This was initially defined in #947.
 
+### Spam protection of entry nodes / basic DoS protection
+
+#### Problem statement
+
+By adding nodes with their IP address to the blockchain, we create very easy entry point for attackers to DoS honest entry nodes. This allows attackers to shutdown important parts of the HOPR network.
+
+#### Discussion
+
+Check (and implement) basic countermeasures against DoS attacks
+
+- limit requests per IP:Port combination
+- limit requests per IP
+- add artificial delays
+
+Discuss further security countermeasures, such as
+
+- limit available relay slots, e.g. stop answering request once node "is full"
+
 ## Implementation
 
 _These discussions relate to the implementation of the HOPR protocol, or more particularly, `hoprd`. The protocol is defined by our yellowpaper, but the only existing implementation is located in `packages/hoprd`, as a Typescript/JavaScript node.js application._
