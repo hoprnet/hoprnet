@@ -106,7 +106,7 @@ function setup_node() {
     --testAnnounceLocalAddresses --identity="${id}" \
     --host="127.0.0.1:${host_port}" --testPreferLocalAddresses \
     --data="${dir}" --rest --restPort "${port}" --announce \
-    --password="e2e-test" \
+    --password="e2e-test" --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
 
