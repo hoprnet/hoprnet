@@ -54,7 +54,7 @@ export default class HoprEthereum {
    * Stops the connector.
    */
   async stop(): Promise<void> {
-    log('Stopping connector..')
+    log('Stopping connector...')
     await this.indexer.stop()
   }
 
