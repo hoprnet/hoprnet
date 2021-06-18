@@ -122,7 +122,7 @@ class RelayHandshake {
 
   async negotiate(
     source: PeerId,
-    getStreamToCounterparty: (peerId: PeerId) => Promise<Stream>,
+    getStreamToCounterparty: (peerId: PeerId) => Promise<Stream | undefined>,
     exists: InstanceType<typeof RelayState>['exists'],
     isActive: InstanceType<typeof RelayState>['isActive'],
     updateExisting: InstanceType<typeof RelayState>['updateExisting'],
@@ -198,7 +198,39 @@ class RelayHandshake {
       return
     }
 
-    createNew(source, destination, this.shaker.stream, toDestination)
+    const destinationShaker = handshake<StreamResult>(toDestination)
+
+    destinationShaker.write(source.pubKey.marshal())
+
+    let destinationChunk: StreamResult | undefined
+
+    try {
+      destinationChunk = await destinationShaker.read()
+    } catch (err) {
+      error(err)
+    }
+
+    if (destinationChunk == null) {
+      this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
+      this.shaker.rest()
+
+      destinationShaker.rest()
+      return
+    }
+
+    const destinationAnswer = destinationChunk.slice(0, 1)[0]
+
+    if (destinationAnswer != RelayHandshakeMessage.OK) {
+      this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
+      this.shaker.rest()
+
+      destinationShaker.rest()
+      return
+    }
+
+    destinationShaker.rest()
+
+    createNew(source, destination, this.shaker.stream, destinationShaker.stream)
   }
 
   async handle(): Promise<HandleResponse> {

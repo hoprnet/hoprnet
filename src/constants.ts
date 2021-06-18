@@ -31,10 +31,6 @@ const encoder = new TextEncoder()
 
 export const OK = encoder.encode('OK')
 export const FAIL = encoder.encode('FAIL')
-export const FAIL_COULD_NOT_REACH_COUNTERPARTY = encoder.encode('FAIL_COULD_NOT_REACH_COUNTERPARTY')
-export const FAIL_COULD_NOT_IDENTIFY_PEER = encoder.encode('FAIL_COULD_NOT_IDENTIFY_INITIATOR')
-export const FAIL_LOOPBACKS_ARE_NOT_ALLOWED = encoder.encode('FAIL_LOOPBACKS_ARE_NOT_ALLOWED')
-export const FAIL_INVALID_PUBLIC_KEY = encoder.encode('FAIL_INVALID_PUBLIC_KEY')
 
 export const STOP = encoder.encode('STOP')
 export const RESTART = encoder.encode('RESTART')
