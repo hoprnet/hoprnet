@@ -23,7 +23,7 @@ function checkPath(path: PublicKey[], edges: Map<PublicKey, PublicKey[]>) {
 export function fakePublicKey(i: number | string): PublicKey {
   return {
     //@ts-ignore
-    id: i, 
+    id: i,
     //@ts-ignore
     eq: (x: PublicKey) => x.id == i,
     toB58String: () => i,
@@ -41,7 +41,7 @@ describe('test pathfinder with some simple topologies', function () {
   } as unknown as NetworkPeers // Node 3 is down
   const STAKE_1 = () => new Balance(new BN(1))
   // @ts-ignore
-  const STAKE_N = (x: PublicKey) => new Balance(new BN((x.id) + 0.1))
+  const STAKE_N = (x: PublicKey) => new Balance(new BN(x.id + 0.1))
 
   // Bidirectional star, all pass through node 0
   const STAR = new Map<PublicKey, PublicKey[]>()
@@ -57,10 +57,10 @@ describe('test pathfinder with some simple topologies', function () {
   ARROW.set(TEST_NODES[2], [TEST_NODES[3]])
   ARROW.set(TEST_NODES[3], [TEST_NODES[4]])
 
-  function fakeIndexer(edges: Map<PublicKey, PublicKey[]>, stakes: (i:PublicKey) => Balance): Indexer {
+  function fakeIndexer(edges: Map<PublicKey, PublicKey[]>, stakes: (i: PublicKey) => Balance): Indexer {
     return {
       getOpenChannelsFrom: (a: PublicKey) =>
-        Promise.resolve((edges.get(a) || []).map((b) => ({source: a, destination: b, balance: stakes(b) as any})))
+        Promise.resolve((edges.get(a) || []).map((b) => ({ source: a, destination: b, balance: stakes(b) as any })))
     } as unknown as Indexer
   }
 
@@ -88,7 +88,7 @@ describe('test pathfinder with some simple topologies', function () {
     )
     checkPath(path, STAR)
     // @ts-ignore
-    assert((path[1].id) == 4, 'Last hop should be 4 (most valuable choice)')
+    assert(path[1].id == 4, 'Last hop should be 4 (most valuable choice)')
   })
 
   it('should not find a path if it doesnt exist', async () => {

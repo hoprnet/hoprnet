@@ -11,7 +11,7 @@ export type Path = PublicKey[]
 type ChannelPath = ChannelEntry[]
 
 const sum = (a: BN, b: BN) => a.add(b)
-const pathFrom = (c: ChannelPath): Path => c.map(ce => ce.destination) // Doesn't include ourself [0]
+const pathFrom = (c: ChannelPath): Path => c.map((ce) => ce.destination) // Doesn't include ourself [0]
 const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.eq(c.destination))
 const rand = () => Math.random() // TODO - swap for something crypto safe
 const debugPath = (p: ChannelPath) =>
