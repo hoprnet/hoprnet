@@ -5,15 +5,13 @@ import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { randomChoice, HoprDB, stringToU8a, ChannelStatus } from '@hoprnet/hopr-utils'
-import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
+import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import { Commitment } from '../commitment'
 import Debug from 'debug'
 import { Multiaddr } from 'multiaddr'
 import { EventEmitter } from 'events'
 import Defer, { DeferredPromise } from 'p-defer'
-
-export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
 const log = Debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
@@ -380,10 +378,6 @@ class Indexer extends EventEmitter {
     throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }
 
-  private async toIndexerChannel(channel: ChannelEntry): Promise<RoutingChannel> {
-    return [channel.source.toPeerId(), channel.destination.toPeerId(), channel.balance]
-  }
-
   public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
     return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
   }
@@ -394,7 +388,7 @@ class Indexer extends EventEmitter {
     )
   }
 
-  public async getRandomChannel() {
+  public async getRandomChannel(): Promise<ChannelEntry> {
     const channels = await this.getChannels()
 
     if (channels.length === 0) {
@@ -403,7 +397,7 @@ class Indexer extends EventEmitter {
     }
 
     log('picking random from %d channels', channels.length)
-    return this.toIndexerChannel(randomChoice(channels))
+    return randomChoice(channels)
   }
 
   /**
@@ -412,21 +406,10 @@ class Indexer extends EventEmitter {
    * @param source peer
    * @returns peer's open channels
    */
-  public async getOpenRoutingChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
-    const sourcePubKey = new PublicKey(source.pubKey.marshal())
-    const channels = await this.getChannelsFrom(sourcePubKey.toAddress()).then((channels) =>
+  public async getOpenChannelsFrom(source: PublicKey): Promise<ChannelEntry[]> {
+    return await this.getChannelsFrom(source.toAddress()).then((channels) =>
       channels.filter((channel) => channel.status === ChannelStatus.Open)
     )
-
-    let cout: RoutingChannel[] = []
-    for (let channel of channels) {
-      let directed = await this.toIndexerChannel(channel)
-      if (directed[2].toBN().gtn(0)) {
-        cout.push(directed)
-      }
-    }
-
-    return cout
   }
 }
 

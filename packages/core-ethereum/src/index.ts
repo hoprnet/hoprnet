@@ -1,5 +1,4 @@
 import type { Multiaddr } from 'multiaddr'
-import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import debug from 'debug'
@@ -14,7 +13,6 @@ import {
   ChannelEntry
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
-import { RoutingChannel } from './indexer'
 import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
@@ -72,8 +70,8 @@ export default class HoprEthereum extends EventEmitter {
     return this.chain.withdraw(currency, recipient, amount)
   }
 
-  public getOpenRoutingChannelsFromPeer(p: PeerId) {
-    return this.indexer.getOpenRoutingChannelsFromPeer(p)
+  public getOpenChannelsFrom(p: PublicKey) {
+    return this.indexer.getOpenChannelsFrom(p)
   }
 
   public getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
@@ -174,4 +172,4 @@ export default class HoprEthereum extends EventEmitter {
   }
 }
 
-export { ChannelEntry, Channel, Indexer, RoutingChannel }
+export { ChannelEntry, Channel, Indexer }

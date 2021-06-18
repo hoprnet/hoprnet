@@ -1,6 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
+import { PublicKey } from '@hoprnet/hopr-utils'
 import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
@@ -26,7 +27,7 @@ export class SendMessage extends AbstractCommand {
     state: GlobalState,
     recipient: PeerId,
     rawMessage: string,
-    path?: PeerId[]
+    path?: PublicKey[]
   ): Promise<string> {
     const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
@@ -46,24 +47,24 @@ export class SendMessage extends AbstractCommand {
       if (peerIdString.includes(',')) {
         // Manual routing
         // Direct routing can be done with ,recipient
-        const path = await Promise.all(
+        const path = (await Promise.all(
           peerIdString
             .split(',')
             .filter(Boolean)
             .map((x) => checkPeerIdInput(x, state))
-        )
+        )).map(x => PublicKey.fromPeerId(x))
         if (path.length > MAX_HOPS + 1) {
           throw new Error('Cannot create path longer than MAX_HOPS')
         }
 
         const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
         console.log(
-          `Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path
+          `Sending message to ${styleValue(recipient.toString(), 'peerId')} via ${path
             .slice(0, path.length - 1)
-            .map((current) => styleValue(current.toB58String(), 'peerId'))
+            .map((current) => styleValue(current.toString(), 'peerId'))
             .join(',')} ...`
         )
-        log(await this.sendMessage(state, recipient, message, intermediateNodes))
+        log(await this.sendMessage(state, recipient.toPeerId(), message, intermediateNodes))
 
         return
       }

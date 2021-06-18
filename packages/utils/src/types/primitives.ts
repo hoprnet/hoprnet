@@ -67,6 +67,10 @@ export class PublicKey {
     return u8aToHex(this.arr)
   }
 
+  toString(): string {
+    return `<PubKey:${this.toHex()}>`
+  }
+
   eq(b: PublicKey) {
     return u8aEquals(this.arr, b.serialize())
   }

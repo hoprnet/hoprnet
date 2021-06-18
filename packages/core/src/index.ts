@@ -41,7 +41,7 @@ import {
   AcknowledgedTicket,
   ChannelStatus
 } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum, { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { getAddrs } from './identity'
 
@@ -294,7 +294,7 @@ class Hopr extends EventEmitter {
     }
   }
 
-  private async tickChannelStrategy(newChannels: RoutingChannel[]) {
+  private async tickChannelStrategy(newChannels: ChannelEntry[]) {
     verbose('strategy tick', this.status)
     if (this.status != 'RUNNING') {
       return
@@ -318,16 +318,16 @@ class Hopr extends EventEmitter {
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
       verbose(`closing ${toClose}`)
-      await this.closeChannel(toClose)
-      verbose(`closed channel to ${toClose.toB58String()}`)
+      await this.closeChannel(toClose.toPeerId())
+      verbose(`closed channel to ${toClose.toString()}`)
       this.emit('hopr:channel:closed', toClose)
     }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
-      this.networkPeers.register(channelToOpen[0])
+      this.networkPeers.register(channelToOpen[0].toPeerId())
       try {
         // Opening channels can fail if we can't establish a connection.
-        const hash = await this.openChannel(...channelToOpen)
+        const hash = await this.openChannel(channelToOpen[0].toPeerId(), channelToOpen[1])
         verbose('- opened', channelToOpen, hash)
         this.emit('hopr:channel:opened', channelToOpen)
       } catch (e) {
@@ -336,8 +336,8 @@ class Hopr extends EventEmitter {
     }
   }
 
-  private async getOpenChannels(): Promise<RoutingChannel[]> {
-    return (await this.paymentChannels).getOpenRoutingChannelsFromPeer(this.getId())
+  private async getOpenChannels(): Promise<ChannelEntry[]> {
+    return (await this.paymentChannels).getOpenChannelsFrom(PublicKey.fromPeerId(this.getId()))
   }
 
   /**
@@ -408,7 +408,7 @@ class Hopr extends EventEmitter {
    * @param destination PeerId of the destination
    * @param intermediateNodes optional set path manually
    */
-  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PeerId[]): Promise<void> {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]): Promise<void> {
     const promises: Promise<void>[] = []
     const ethereum = await this.paymentChannels
 
@@ -424,10 +424,10 @@ class Hopr extends EventEmitter {
 
         if (i == 0) {
           ticketIssuer = PublicKey.fromPeerId(this.getId())
-          ticketReceiver = PublicKey.fromPeerId(intermediatePath[0])
+          ticketReceiver = intermediatePath[0]
         } else {
-          ticketIssuer = PublicKey.fromPeerId(intermediatePath[i - 1])
-          ticketReceiver = PublicKey.fromPeerId(intermediatePath[i])
+          ticketIssuer = (intermediatePath[i - 1])
+          ticketReceiver = intermediatePath[i]
         }
 
         const channel = ethereum.getChannel(ticketIssuer, ticketReceiver)
@@ -453,7 +453,7 @@ class Hopr extends EventEmitter {
         new Promise<void>(async (resolve, reject) => {
           if (intermediatePath == undefined) {
             try {
-              intermediatePath = await this.getIntermediateNodes(destination)
+              intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
             } catch (e) {
               reject(e)
               return
@@ -463,13 +463,13 @@ class Hopr extends EventEmitter {
             }
           }
 
-          const path: PeerId[] = [].concat(intermediatePath, [destination])
+          const path: PublicKey[] = [].concat(intermediatePath, [destination])
 
           let packet: Packet
           try {
             packet = await Packet.create(
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-              path,
+              path.map(x => x.toPeerId()),
               this.getId(),
               await this.paymentChannels
             )
@@ -482,7 +482,7 @@ class Hopr extends EventEmitter {
           })
 
           try {
-            await this.forward.interact(path[0], packet)
+            await this.forward.interact(path[0].toPeerId(), packet)
           } catch (err) {
             return reject(err)
           }
@@ -599,7 +599,7 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public setChannelStrategy(strategy: ChannelStrategyNames) {
+  public async setChannelStrategy(strategy: ChannelStrategyNames) {
     if (strategy == 'passive') {
       this.strategy = new PassiveStrategy()
       return
@@ -609,6 +609,7 @@ class Hopr extends EventEmitter {
       return
     }
 
+    const ethereum = await this.paymentChannels
     ethereum.on('ticket:win', (ack, channel) => {
       this.strategy.onWinningTicket(ack, channel)
     })
@@ -810,14 +811,14 @@ class Hopr extends EventEmitter {
    *
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
-  private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
+  private async getIntermediateNodes(destination: PublicKey): Promise<PublicKey[]> {
     const ethereum = await this.paymentChannels
     return await findPath(
-      this.getId(),
+      PublicKey.fromPeerId(this.getId()),
       destination,
       MAX_HOPS - 1,
       this.networkPeers,
-      ethereum.getOpenRoutingChannelsFromPeer.bind(ethereum),
+      ethereum.getOpenChannelsFrom.bind(ethereum),
       PATH_RANDOMNESS
     )
   }
