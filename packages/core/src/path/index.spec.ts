@@ -25,8 +25,10 @@ export function fakePublicKey(i: number | string): PublicKey {
     //@ts-ignore
     id: i, 
     //@ts-ignore
-    equals: (x: PublicKey) => x.id == i,
-    toB58String: () => i
+    eq: (x: PublicKey) => x.id == i,
+    toB58String: () => i,
+    toPeerId: () => {},
+    toHex: () => '' + i
   } as unknown as PublicKey 
 }
 
