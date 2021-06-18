@@ -116,11 +116,11 @@ function setup_node() {
 
   log "Run node ${id} on rest port ${port}"
   DEBUG="hopr*" yarn --cwd "${npm_install_dir}" hoprd \
-    --init --provider=ws://127.0.0.1:8545/ \
+    --init --provider=http://127.0.0.1:8545/ \
     --testAnnounceLocalAddresses --identity="${id}" \
-    --host="0.0.0.0:${host_port}" \
+    --host="127.0.0.1:${host_port}" --testPreferLocalAddresses \
     --data="${dir}" --rest --restPort "${port}" --announce \
-    --password="e2e-test" --testUseWeakCrypto \
+    --password="e2e-test" \
     ${additional_args} \
     > "${log}" 2>&1 &
 
