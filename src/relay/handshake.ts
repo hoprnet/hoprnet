@@ -183,7 +183,7 @@ class RelayHandshake {
         return
       }
     }
-    
+
     let toDestination: Stream | undefined
     try {
       toDestination = await getStreamToCounterparty(destination)
