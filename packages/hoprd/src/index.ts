@@ -63,6 +63,15 @@ const argv = yargs
     describe: 'Updates the port for the healthcheck server',
     default: 8080
   })
+  .option('publicLogs', {
+    boolean: true,
+    describe: 'Appends all your node logs to a public logging instance',
+    default: false
+  })
+  .option('publicLogsProvider', {
+    describe: 'A provider url for the Logging Network node to use',
+    default: 'https://ceramic-clay.3boxlabs.com'
+  })
   .option('password', {
     describe: 'A password to encrypt your keys',
     default: ''
@@ -168,7 +177,7 @@ async function main() {
   addUnhandledPromiseRejectionHandler()
 
   let node: Hopr
-  let logs = new LogStream()
+  let logs = new LogStream(argv.publicLogs)
   let adminServer = undefined
   let cmds: Commands
 
@@ -182,6 +191,10 @@ async function main() {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())
     }
+  }
+
+  if (logs.isReadyForPublicLogging()) {
+    await logs.enablePublicLoggingNode(argv.publicLogsProvider);
   }
 
   if (argv.admin) {
