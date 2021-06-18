@@ -194,7 +194,7 @@ async function main() {
   }
 
   if (logs.isReadyForPublicLogging()) {
-    await logs.enablePublicLoggingNode(argv.publicLogsProvider);
+    await logs.enablePublicLoggingNode(argv.publicLogsProvider)
   }
 
   if (argv.admin) {

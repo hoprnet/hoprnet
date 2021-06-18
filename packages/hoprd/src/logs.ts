@@ -4,18 +4,17 @@ import { randomBytes } from 'crypto'
 import { Ed25519Provider } from 'key-did-provider-ed25519'
 import KeyResolver from 'key-did-resolver'
 import { DID } from 'dids'
-import CeramicClient from '@ceramicnetwork/http-client';
-import { TileDocument } from '@ceramicnetwork/stream-tile';
-
+import CeramicClient from '@ceramicnetwork/http-client'
+import { TileDocument } from '@ceramicnetwork/stream-tile'
 
 export type Socket = ws
 
 let debugLog = debug('hoprd')
 
 let appendToPublicLogs = (msg: Message, publicLogsClient: CeramicClient, existingPublicLogs: TileDocument) => {
-  TileDocument.load(publicLogsClient, existingPublicLogs.id).then(publicLogs => {
-    const newPublicLogsContent = Object.assign({}, publicLogs.content, { [Date.now()]: msg });
-    publicLogs.update(newPublicLogsContent);
+  TileDocument.load(publicLogsClient, existingPublicLogs.id).then((publicLogs) => {
+    const newPublicLogsContent = Object.assign({}, publicLogs.content, { [Date.now()]: msg })
+    publicLogs.update(newPublicLogsContent)
   })
 }
 
@@ -32,15 +31,15 @@ type Message = {
 export class LogStream {
   private messages: Message[] = []
   private connections: Socket[] = []
-  private did: DID = undefined;
-  private isPubliclyLogging: boolean = false;
-  private logClient: CeramicClient = undefined;
-  private publicLogs: TileDocument = undefined;
+  private did: DID = undefined
+  private isPubliclyLogging: boolean = false
+  private logClient: CeramicClient = undefined
+  private publicLogs: TileDocument = undefined
 
   constructor(publicLogs = false) {
-    this.isPubliclyLogging = publicLogs;
+    this.isPubliclyLogging = publicLogs
     if (this.isPubliclyLogging) {
-      this.did = this._setupDid();
+      this.did = this._setupDid()
     }
   }
 
@@ -96,19 +95,19 @@ export class LogStream {
       throw Error('Public logging is trying to be enabled but no unique DID was found.')
     }
     await this.did.authenticate()
-    this.logClient = new CeramicClient(loggingProviderUrl);
-    this.logClient.setDID(this.did);
+    this.logClient = new CeramicClient(loggingProviderUrl)
+    this.logClient.setDID(this.did)
     this.publicLogs = await TileDocument.create(this.logClient, {})
     debugLog(`Public log entry created, see logs at http://documint.net/${this.publicLogs.id.toString()}`)
   }
 
-  isReadyForPublicLogging = () => this.isPubliclyLogging && this.did;
+  isReadyForPublicLogging = () => this.isPubliclyLogging && this.did
 
   _setupDid(): DID {
     const secretKey = Uint8Array.from(randomBytes(32))
     const provider = new Ed25519Provider(secretKey)
     const did = new DID({ provider, resolver: KeyResolver.getResolver() })
-    return did;
+    return did
   }
 
   _log(msg: Message) {
