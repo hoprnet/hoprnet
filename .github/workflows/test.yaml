@@ -29,8 +29,9 @@ jobs:
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
 
       - name: Restore cache of node modules and yarn cache
-        id: nodejs-cache
         uses: actions/cache@v2
+        if: ${{ !env.ACT }}
+        id: nodejs-cache
         with:
           path: |
             node_modules
@@ -41,7 +42,6 @@ jobs:
             ${{ runner.os }}-nodejs-
 
       - name: Install dependencies
-        if: steps.nodejs-cache.outputs.cache-hit != 'true'
         run: |
           yarn --prefer-offline
           npx lerna bootstrap

@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [ -n "${CI:-}" ]; then
+if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   git config user.email "noreply@hoprnet.org"
   git config user.name "HOPR CI robot"
   git config pull.rebase false

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.73.0-next.14",
+  "version": "1.73.0-next.18",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -28,8 +28,8 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.73.0-next.14",
-    "@hoprnet/hopr-utils": "1.73.0-next.14",
+    "@hoprnet/hopr-ethereum": "1.73.0-next.18",
+    "@hoprnet/hopr-utils": "1.73.0-next.18",
     "async-mutex": "^0.3.0",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
@@ -59,8 +59,9 @@
     "sinon": "^11.0.0",
     "ts-generator": "^0.1.1",
     "ts-node": "^9.0.0",
-    "typedoc": "^0.20.36",
-    "typescript": "4.2.4"
+    "typedoc": "0.21.0",
+    "typedoc-plugin-markdown": "3.9.0",
+    "typescript": "4.3.4"
   },
   "mocha": {
     "extension": [

@@ -30,6 +30,7 @@ jobs:
 
       - name: Restore cache of node modules and yarn cache
         uses: actions/cache@v2
+        if: ${{ !env.ACT }}
         id: nodejs-cache
         with:
           path: |

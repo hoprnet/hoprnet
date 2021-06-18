@@ -25,6 +25,7 @@ jobs:
 
       - name: Restore cache of node modules and yarn cache
         uses: actions/cache@v2
+        if: ${{ !env.ACT }}
         id: nodejs-cache
         with:
           path: |
@@ -35,13 +36,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nodejs-
 
-      - name: Install dependencies
-        if: steps.nodejs-cache.outputs.cache-hit != 'true'
-        run: |
-          yarn
-
       - name: Run linter
         run: |
+          yarn
           yarn lint:fix
 
       - name: Check if changed
