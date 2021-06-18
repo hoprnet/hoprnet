@@ -20,6 +20,8 @@
 - [toHex](publickey.md#tohex)
 - [toPeerId](publickey.md#topeerid)
 - [toUncompressedPubKeyHex](publickey.md#touncompressedpubkeyhex)
+- [createMock](publickey.md#createmock)
+- [deserialize](publickey.md#deserialize)
 - [fromPeerId](publickey.md#frompeerid)
 - [fromPrivKey](publickey.md#fromprivkey)
 - [fromString](publickey.md#fromstring)
@@ -144,6 +146,40 @@ ___
 #### Defined in
 
 [types/primitives.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L42)
+
+___
+
+### createMock
+
+▸ `Static` **createMock**(): [PublicKey](publickey.md)
+
+#### Returns
+
+[PublicKey](publickey.md)
+
+#### Defined in
+
+[types/primitives.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L78)
+
+___
+
+### deserialize
+
+▸ `Static` **deserialize**(`arr`): [PublicKey](publickey.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `arr` | `Uint8Array` |
+
+#### Returns
+
+[PublicKey](publickey.md)
+
+#### Defined in
+
+[types/primitives.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L74)
 
 ___
 

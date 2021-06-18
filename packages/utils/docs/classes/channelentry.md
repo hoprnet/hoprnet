@@ -29,6 +29,7 @@
 - [getId](channelentry.md#getid)
 - [serialize](channelentry.md#serialize)
 - [toString](channelentry.md#tostring)
+- [createMock](channelentry.md#createmock)
 - [deserialize](channelentry.md#deserialize)
 - [fromSCEvent](channelentry.md#fromscevent)
 
@@ -42,8 +43,8 @@
 
 | Name | Type |
 | :------ | :------ |
-| `source` | [Address](address.md) |
-| `destination` | [Address](address.md) |
+| `source` | [PublicKey](publickey.md) |
+| `destination` | [PublicKey](publickey.md) |
 | `balance` | [Balance](balance.md) |
 | `commitment` | [Hash](hash.md) |
 | `ticketEpoch` | [UINT256](uint256.md) |
@@ -84,13 +85,13 @@ ___
 
 ### destination
 
-• `Readonly` **destination**: [Address](address.md)
+• `Readonly` **destination**: [PublicKey](publickey.md)
 
 ___
 
 ### source
 
-• `Readonly` **source**: [Address](address.md)
+• `Readonly` **source**: [PublicKey](publickey.md)
 
 ___
 
@@ -168,6 +169,20 @@ ___
 
 ___
 
+### createMock
+
+▸ `Static` **createMock**(): [ChannelEntry](channelentry.md)
+
+#### Returns
+
+[ChannelEntry](channelentry.md)
+
+#### Defined in
+
+[types/channelEntry.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L132)
+
+___
+
 ### deserialize
 
 ▸ `Static` **deserialize**(`arr`): [ChannelEntry](channelentry.md)
@@ -190,17 +205,18 @@ ___
 
 ### fromSCEvent
 
-▸ `Static` **fromSCEvent**(`event`): [ChannelEntry](channelentry.md)
+▸ `Static` **fromSCEvent**(`event`, `keyFor`): `Promise`<[ChannelEntry](channelentry.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `event` | `any` |
+| `keyFor` | (`a`: [Address](address.md)) => `Promise`<[PublicKey](publickey.md)\> |
 
 #### Returns
 
-[ChannelEntry](channelentry.md)
+`Promise`<[ChannelEntry](channelentry.md)\>
 
 #### Defined in
 
