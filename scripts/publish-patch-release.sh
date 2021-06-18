@@ -10,10 +10,11 @@ test -z "${HOPR_GITHUB_REF:-}" && (echo "Missing environment variable HOPR_GITHU
 git pull origin "${HOPR_GITHUB_REF}"
 
 # create new version in each package, and tag in Git
-npx lerna version patch --yes --exact --no-push --no-changelog
+npx lerna version patch --yes --exact --no-push --no-changelog \
+  -m "chore(release): publish %s"
 
 # only make remote changes if running in CI
-if [ -n "${CI:-}" ]; then
+if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   # push changes back onto origin including new tag
   git push origin "${HOPR_GITHUB_REF}" --tags
 

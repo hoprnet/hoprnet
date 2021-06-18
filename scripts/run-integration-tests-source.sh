@@ -30,7 +30,7 @@ source "${mydir}/utils.sh"
 declare wait_delay=2
 declare wait_max_wait=1000
 
-if [ -n "${CI:-}" ]; then
+if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   wait_delay=10
   wait_max_wait=10
 fi
@@ -65,8 +65,8 @@ function cleanup {
 
   echo "- Cleaning up processes"
   for port in 8545 3301 3302 3303 9091 9092 9093; do
-    if lsof -i ":${port}" | grep -q 'LISTEN' && true || false; then
-      kill $(lsof -i ":${port}" | grep 'LISTEN' | awk '{print $2}')
+    if lsof -i ":${port}" -s TCP:LISTEN; then
+      lsof -i ":${port}" -s TCP:LISTEN -t | xargs kill
     fi
   done
 
