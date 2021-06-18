@@ -8,11 +8,13 @@ import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtu
 export * from '../fixtures'
 
 export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountEntry) => {
+  assert(actual, 'account is null')
   assert.strictEqual(actual.address.toString(), expected.address.toString(), 'address')
   assert.strictEqual(actual.getPublicKey().toString(), expected.getPublicKey().toString(), 'publicKey')
 }
 
 export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelEntry) => {
+  assert(actual, 'channel is null')
   assert.strictEqual(actual.source.toHex(), expected.source.toHex(), 'source')
   assert.strictEqual(actual.destination.toHex(), expected.destination.toHex(), 'destination')
   assert.strictEqual(actual.balance.toBN().toString(), expected.balance.toBN().toString(), 'balance')
@@ -50,6 +52,8 @@ export const PARTY_B_INITIALIZED_EVENT = {
 
 export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A.toAddress(), PARTY_A_MULTIADDR, new BN(1))
 
+export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B.toAddress(), PARTY_B_MULTIADDR, new BN(1))
+
 export const OPENED_EVENT = {
   event: 'ChannelUpdate',
   transactionHash: '',
@@ -70,5 +74,3 @@ export const OPENED_EVENT = {
     }
   } as any
 } as Event<'ChannelUpdate'>
-
-export const OPENED_CHANNEL = ChannelEntry.fromSCEvent(OPENED_EVENT)

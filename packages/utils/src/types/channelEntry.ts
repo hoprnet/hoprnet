@@ -1,5 +1,5 @@
 import { u8aConcat, u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
-import { Address, Balance, Hash } from './primitives'
+import { Address, Balance, Hash, PublicKey } from './primitives'
 import { UINT256 } from './solidity'
 import BN from 'bn.js'
 import chalk from 'chalk'
@@ -40,8 +40,8 @@ function channelStatusToU8a(c: ChannelStatus): Uint8Array {
 
 // TODO, find a better way to do this.
 const components = [
-  Address,
-  Address,
+  PublicKey,
+  PublicKey,
   Balance,
   Hash,
   UINT256,
@@ -53,8 +53,8 @@ const components = [
 
 export class ChannelEntry {
   constructor(
-    public readonly source: Address,
-    public readonly destination: Address,
+    public readonly source: PublicKey,
+    public readonly destination: PublicKey,
     public readonly balance: Balance,
     public readonly commitment: Hash,
     public readonly ticketEpoch: UINT256,
@@ -79,12 +79,12 @@ export class ChannelEntry {
     return new ChannelEntry(...params)
   }
 
-  static fromSCEvent(event: any): ChannelEntry {
+  static async fromSCEvent(event: any, keyFor: (a: Address) => Promise<PublicKey>): Promise<ChannelEntry> {
     // TODO type
     const { source, destination, newState } = event.args
     return new ChannelEntry(
-      Address.fromString(source),
-      Address.fromString(destination),
+      await keyFor(Address.fromString(source)),
+      await keyFor(Address.fromString(destination)),
       new Balance(new BN(newState.balance.toString())),
       new Hash(stringToU8a(newState.commitment)),
       new UINT256(new BN(newState.ticketEpoch.toString())),
@@ -97,8 +97,8 @@ export class ChannelEntry {
 
   public serialize(): Uint8Array {
     return serializeToU8a([
-      [this.source.serialize(), Address.SIZE],
-      [this.destination.serialize(), Address.SIZE],
+      [this.source.serialize(), PublicKey.SIZE],
+      [this.destination.serialize(), PublicKey.SIZE],
       [this.balance.serialize(), Balance.SIZE],
       [this.commitment.serialize(), Hash.SIZE],
       [this.ticketEpoch.serialize(), UINT256.SIZE],
@@ -126,6 +126,21 @@ export class ChannelEntry {
   }
 
   public getId() {
-    return generateChannelId(this.source, this.destination)
+    return generateChannelId(this.source.toAddress(), this.destination.toAddress())
+  }
+
+  public static createMock(): ChannelEntry {
+    const pub = PublicKey.createMock()
+    return new ChannelEntry(
+      pub,
+      pub,
+      new Balance(new BN(1)),
+      Hash.create(),
+      new UINT256(new BN(1)),
+      new UINT256(new BN(1)),
+      ChannelStatus.Closed,
+      new UINT256(new BN(1)),
+      new UINT256(new BN(1))
+    )
   }
 }

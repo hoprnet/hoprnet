@@ -32,10 +32,9 @@ export default class ListOpenChannels extends AbstractCommand {
       }
       // find counterpartys' peerIds
       for (const channel of channelsFrom) {
-        const peerId = await this.node.getPublicKeyOf(channel.destination)
         log(`
 Outgoing Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-To:                     ${styleValue(peerId.toPeerId().toB58String(), 'peerId')}
+To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
 Status:                 ${styleValue(channel.status, 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)
@@ -49,10 +48,9 @@ Balance:                ${styleValue(channel.balance.toFormattedString(), 'numbe
       }
       // find counterpartys' peerIds
       for (const channel of channelsTo) {
-        const peerId = await this.node.getPublicKeyOf(channel.source)
         log(`
 Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-To:                     ${styleValue(peerId.toPeerId().toB58String(), 'peerId')}
+To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
 Status:                 ${styleValue(channel.status, 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)
