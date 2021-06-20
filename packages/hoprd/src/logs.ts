@@ -1,6 +1,6 @@
 import ws from 'ws'
 import debug from 'debug'
-import RunQueue from 'run-queue';
+import RunQueue from 'run-queue'
 import { randomBytes } from 'crypto'
 import { Ed25519Provider } from 'key-did-provider-ed25519'
 import KeyResolver from 'key-did-resolver'
@@ -13,7 +13,7 @@ export type Socket = ws
 let debugLog = debug('hoprd')
 
 const MAX_MESSAGES_CACHED = 100
-const queue = new RunQueue({maxConcurrency: 1});
+const queue = new RunQueue({ maxConcurrency: 1 })
 
 type Message = {
   type: string
@@ -94,7 +94,7 @@ export class LogStream {
     this.logClient.setDID(this.did)
     this.publicLogs = await TileDocument.create(this.logClient, {})
     debugLog(`Public log entry created, see logs at http://documint.net/${this.publicLogs.id.toString()}`)
-    return this.publicLogs.id.toString();
+    return this.publicLogs.id.toString()
   }
 
   isReadyForPublicLogging = () => this.isPubliclyLogging && this.did
@@ -116,7 +116,7 @@ export class LogStream {
 
   _log(msg: Message) {
     if (this.isPubliclyLogging) {
-      queue.add(0, async () => await this.appendToPublicLogs(msg));
+      queue.add(0, async () => await this.appendToPublicLogs(msg))
     }
     debugLog(msg)
     this.messages.push(msg)
