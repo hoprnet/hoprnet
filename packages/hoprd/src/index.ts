@@ -194,7 +194,9 @@ async function main() {
   }
 
   if (logs.isReadyForPublicLogging()) {
-    await logs.enablePublicLoggingNode(argv.publicLogsProvider)
+    const publicLogsId = await logs.enablePublicLoggingNode(argv.publicLogsProvider)
+    logs.log(`Share your node logs via http://documint.net/${publicLogsId}`)
+    logs.startLoggingQueue()
   }
 
   if (argv.admin) {

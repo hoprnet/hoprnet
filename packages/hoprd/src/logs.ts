@@ -1,5 +1,6 @@
 import ws from 'ws'
 import debug from 'debug'
+import RunQueue from 'run-queue';
 import { randomBytes } from 'crypto'
 import { Ed25519Provider } from 'key-did-provider-ed25519'
 import KeyResolver from 'key-did-resolver'
@@ -11,14 +12,8 @@ export type Socket = ws
 
 let debugLog = debug('hoprd')
 
-let appendToPublicLogs = (msg: Message, publicLogsClient: CeramicClient, existingPublicLogs: TileDocument) => {
-  TileDocument.load(publicLogsClient, existingPublicLogs.id).then((publicLogs) => {
-    const newPublicLogsContent = Object.assign({}, publicLogs.content, { [Date.now()]: msg })
-    publicLogs.update(newPublicLogsContent)
-  })
-}
-
 const MAX_MESSAGES_CACHED = 100
+const queue = new RunQueue({maxConcurrency: 1});
 
 type Message = {
   type: string
@@ -99,9 +94,18 @@ export class LogStream {
     this.logClient.setDID(this.did)
     this.publicLogs = await TileDocument.create(this.logClient, {})
     debugLog(`Public log entry created, see logs at http://documint.net/${this.publicLogs.id.toString()}`)
+    return this.publicLogs.id.toString();
   }
 
   isReadyForPublicLogging = () => this.isPubliclyLogging && this.did
+
+  startLoggingQueue = () => setInterval(() => queue.run(), 5000)
+
+  appendToPublicLogs = async (msg: Message) => {
+    const publicLogs = await TileDocument.load(this.logClient, this.publicLogs.id)
+    const newPublicLogsContent = Object.assign({}, publicLogs.content, { [Date.now()]: msg })
+    await publicLogs.update(newPublicLogsContent)
+  }
 
   _setupDid(): DID {
     const secretKey = Uint8Array.from(randomBytes(32))
@@ -112,7 +116,7 @@ export class LogStream {
 
   _log(msg: Message) {
     if (this.isPubliclyLogging) {
-      appendToPublicLogs(msg, this.logClient, this.publicLogs)
+      queue.add(0, async () => await this.appendToPublicLogs(msg));
     }
     debugLog(msg)
     this.messages.push(msg)
