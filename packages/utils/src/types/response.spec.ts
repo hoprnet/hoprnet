@@ -7,7 +7,7 @@ describe(`test response`, function () {
   const INVALID_FIELD_ELEMENT = u8aAdd(false, FIELD_ORDER, toU8a(1, 32))
 
   it('check response generation and edge cases', function () {
-      // Zero is not allowed
+    // Zero is not allowed
     assert.throws(() => new Response(toU8a(0, 32)))
 
     // FIELD_ORDER is in same equality class as zero, hence not allowed
