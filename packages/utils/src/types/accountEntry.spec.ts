@@ -1,7 +1,9 @@
-import { expect } from 'chai'
+import assert from 'assert'
 import { Multiaddr } from 'multiaddr'
 import { Address, AccountEntry } from '.'
+import { encode } from 'bs58'
 import BN from 'bn.js'
+import { publicKeyVerify } from 'secp256k1'
 
 // TODO: move these & similar into constants file
 const EMPTY_ADDRESS = new Address(new Uint8Array({ length: Address.SIZE }))
@@ -15,8 +17,8 @@ describe('AccountEntry', function () {
   it('should be empty', function () {
     const accountEntry = AccountEntry.deserialize(new Uint8Array({ length: AccountEntry.SIZE }))
 
-    expect(accountEntry.address.toHex()).to.equal(EMPTY_ADDRESS.toHex())
-    expect(accountEntry.multiAddr).to.equal(undefined)
+    assert(accountEntry.address.eq(EMPTY_ADDRESS))
+    assert(accountEntry.multiAddr === undefined)
   })
 
   it('should contain the right values', function () {
@@ -24,7 +26,22 @@ describe('AccountEntry', function () {
       new AccountEntry(PARTY_A_ADDRESS, PARTY_A_MULTI_ADDR, new BN('1')).serialize()
     )
 
-    expect(accountEntry.address.toHex()).to.equal(PARTY_A_ADDRESS.toHex())
-    expect(accountEntry.multiAddr.toString()).to.equal(PARTY_A_MULTI_ADDR.toString())
+    assert(accountEntry.address.eq(PARTY_A_ADDRESS))
+    assert(accountEntry.multiAddr.equals(PARTY_A_MULTI_ADDR))
+  })
+
+  it('should fail on invalid public keys', function () {
+    const INVALID_PUBLIC_KEY = Uint8Array.from([0x03, ...new Uint8Array(32).fill(0xff)])
+
+    assert(!publicKeyVerify(INVALID_PUBLIC_KEY), 'Public key must be invalid')
+
+    const MULTIHASH_PREFIX = Uint8Array.from([0x00, 0x25, 0x08, 0x02, 0x12, 0x21])
+    const INVALID_ENCODED_KEY = encode(Uint8Array.from([...MULTIHASH_PREFIX, ...INVALID_PUBLIC_KEY]))
+
+    assert.throws(
+      () =>
+        new AccountEntry(PARTY_A_ADDRESS, new Multiaddr(`/ip4/1.2.3.4/tcp/0/p2p/${INVALID_ENCODED_KEY}`), new BN('1')),
+      Error('Invalid public key')
+    )
   })
 })

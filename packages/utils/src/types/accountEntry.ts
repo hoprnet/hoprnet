@@ -4,13 +4,33 @@ import { ethers } from 'ethers'
 import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '..'
 import BN from 'bn.js'
 import { Address, PublicKey } from '.' // TODO: cyclic dep
+import { decode } from 'bs58'
+import { publicKeyVerify } from 'secp256k1'
 
 export class AccountEntry {
   constructor(
     public readonly address: Address,
-    public readonly multiAddr: Multiaddr,
+    public readonly multiAddr: Multiaddr | undefined,
     public readonly updatedBlock: BN
-  ) {}
+  ) {
+    // If we have a multiaddr
+    if (multiAddr) {
+      let encodedPublicKey: string
+      try {
+        encodedPublicKey = multiAddr.getPeerId()
+      } catch {}
+
+      if (encodedPublicKey) {
+        // Decode bs58-encoded public key and take last 33 bytes
+        // which contain the public key
+        const pubKey = decode(encodedPublicKey).slice(-33)
+
+        if (!publicKeyVerify(pubKey)) {
+          throw Error(`Invalid public key`)
+        }
+      }
+    }
+  }
 
   static get SIZE(): number {
     return Address.SIZE + MULTI_ADDR_MAX_LENGTH + 32
