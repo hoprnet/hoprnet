@@ -11,6 +11,9 @@ import {
   UINT256,
   Balance,
   stringToU8a,
+  u8aAdd,
+  u8aToHex,
+  toU8a,
   Ticket,
   Hash,
   Response,
@@ -20,7 +23,6 @@ import {
   ChannelStatus,
   PromiseValue
 } from '@hoprnet/hopr-utils'
-import { randomBytes } from 'crypto'
 import type { Wallet } from '@ethersproject/wallet'
 
 type TicketValues = {
@@ -660,8 +662,9 @@ describe('with a reopened channel', function () {
   })
 })
 
-describe.only('test internals with mock', function () {
+describe('test internals with mock', function () {
   let channels: HoprChannels
+
   beforeEach(async function () {
     channels = (await useFixtures()).mockChannels
   })
@@ -716,10 +719,27 @@ describe.only('test internals with mock', function () {
   })
 
   it('should get the right challenge', async function () {
-    const response = new Response(Uint8Array.from(randomBytes(Response.SIZE)))
+    const response = Response.createMock()
 
     const challenge = await channels.computeChallengeInternal(response.toHex())
 
     expect(challenge.toLowerCase()).to.equal(response.toChallenge().toEthereumChallenge().toHex())
+  })
+
+  it('should get the right challenge - edge cases', async function () {
+    const FIELD_ORDER = stringToU8a('0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141')
+    const INVALID_FIELD_ELEMENT_GREATER_THAN_FIELD_ORDER = u8aAdd(false, FIELD_ORDER, toU8a(1, 32))
+
+    await expect(channels.computeChallengeInternal(toU8a(0, 32))).to.be.revertedWith(
+      'Invalid response. Value must be within the field'
+    )
+
+    await expect(channels.computeChallengeInternal(u8aToHex(FIELD_ORDER))).to.be.revertedWith(
+      'Invalid response. Value must be within the field'
+    )
+
+    await expect(
+      channels.computeChallengeInternal(u8aToHex(INVALID_FIELD_ELEMENT_GREATER_THAN_FIELD_ORDER))
+    ).to.be.revertedWith('Invalid response. Value must be within the field')
   })
 })
