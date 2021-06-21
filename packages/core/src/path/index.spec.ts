@@ -29,7 +29,7 @@ export function fakePublicKey(i: number | string): PublicKey {
     toB58String: () => i,
     toPeerId: () => {},
     toHex: () => '' + i
-  } as unknown as PublicKey 
+  } as unknown as PublicKey
 }
 
 describe('test pathfinder with some simple topologies', function () {
