@@ -172,7 +172,7 @@ result=$(run_command ${api2} "ping ${addr3}" "Pong received in:")
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
-result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR")
+result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR" 10)
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
@@ -192,7 +192,7 @@ for i in `seq 1 10`; do
 done
 
 log "Node 2 should now have a ticket"
-result=$(run_command ${api2} "tickets" "Win Proportion:   100%")
+result=$(run_command ${api2} "tickets" "Win Proportion:   100%" 10)
 log "-- ${result}"
 
 for i in `seq 1 10`; do
@@ -201,11 +201,15 @@ for i in `seq 1 10`; do
 done
 
 log "Node 3 should now have a ticket"
-result=$(run_command ${api3} "tickets" "Win Proportion:   100%")
+result=$(run_command ${api3} "tickets" "Win Proportion:   100%" 10)
 log "-- ${result}"
 
 log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
 run_command "${api1}" "send ${addr2},${addr3},${addr4},${addr5} 'hello, world'" "Message sent" 60
+
+log "Node 4 should now have a ticket"
+result=$(run_command ${api4} "tickets" "Win Proportion:   100%" 10)
+log "-- ${result}"
 
 log "Node 1 send message to node 5"
 run_command "${api1}" "send ${addr3} 'hello, world'" "Message sent"
