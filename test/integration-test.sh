@@ -30,6 +30,8 @@ test -z "${3:-}" && { msg "Missing third parameter"; usage; exit 1; }
 declare api1="${1}"
 declare api2="${2}"
 declare api3="${3}"
+declare api4="${4}"
+declare api5="${5}"
 
 # $1 = endpoint
 # $2 = Hopr command
@@ -117,28 +119,36 @@ validate_node_balance_gt0() {
   fi
 }
 
-log "Running full E2E test with ${api1}, ${api2}, ${api3}"
+log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}"
 
 validate_node_eth_address "${api1}"
 validate_node_eth_address "${api2}"
 validate_node_eth_address "${api3}"
+validate_node_eth_address "${api4}"
+validate_node_eth_address "${api5}"
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
 validate_node_balance_gt0 "${api2}"
 validate_node_balance_gt0 "${api3}"
+validate_node_balance_gt0 "${api4}"
+validate_node_balance_gt0 "${api5}"
 log "Nodes are funded"
 
 declare addr1 addr2 addr3 addr4 result
 addr1="$(get_hopr_address "${api1}")"
 addr2="$(get_hopr_address "${api2}")"
 addr3="$(get_hopr_address "${api3}")"
+addr3="$(get_hopr_address "${api4}")"
+addr3="$(get_hopr_address "${api5}")"
 log "hopr addr1: ${addr1}"
 log "hopr addr2: ${addr2}"
 log "hopr addr3: ${addr3}"
+log "hopr addr4: ${addr4}"
+log "hopr addr5: ${addr5}"
 
 log "Check peers"
-result=$(run_command ${api1} "peers" '3 peers have announced themselves' 60)
+result=$(run_command ${api1} "peers" '5 peers have announced themselves' 60)
 log "-- ${result}"
 
 log "Node 1 ping node 2"
@@ -147,6 +157,14 @@ log "-- ${result}"
 
 log "Node 1 ping node 3"
 result=$(run_command ${api1} "ping ${addr3}" "Pong received in:")
+log "-- ${result}"
+
+log "Node 1 ping node 4"
+result=$(run_command ${api1} "ping ${addr4}" "Pong received in:")
+log "-- ${result}"
+
+log "Node 1 ping node 5"
+result=$(run_command ${api1} "ping ${addr5}" "Pong received in:")
 log "-- ${result}"
 
 log "Node 2 ping node 3"
@@ -186,5 +204,5 @@ log "Node 3 should now have a ticket"
 result=$(run_command ${api3} "tickets" "Win Proportion:   100%")
 log "-- ${result}"
 
-log "Node 1 send message to node 3"
+log "Node 1 send message to node 5"
 run_command "${api1}" "send ${addr3} 'hello, world'" "Message sent"

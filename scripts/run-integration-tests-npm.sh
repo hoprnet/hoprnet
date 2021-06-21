@@ -45,16 +45,22 @@ declare node1_dir="/tmp/hopr-npm-node-1"
 declare node2_dir="/tmp/hopr-npm-node-2"
 declare node3_dir="/tmp/hopr-npm-node-3"
 declare node4_dir="/tmp/hopr-npm-node-4"
+declare node5_dir="/tmp/hopr-npm-node-5"
+declare node6_dir="/tmp/hopr-npm-node-6"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
 declare node3_log="${node3_dir}.log"
 declare node4_log="${node4_dir}.log"
+declare node5_log="${node5_dir}.log"
+declare node6_log="${node6_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
 declare node3_id="${node3_dir}.id"
 declare node4_id="${node4_dir}.id"
+declare node5_id="${node4_dir}.id"
+declare node6_id="${node4_dir}.id"
 
 declare hardhat_rpc_log="/tmp/hopr-npm-hardhat-rpc.log"
 
@@ -80,7 +86,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${npm_install_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 3301 3302 3303 3304 9091 9092 9093 9094; do
+  for port in 8545 3301 3302 3303 3304 3305 3306 9091 9092 9093 9094 9095 9096; do
     if lsof -i ":${port}" -s TCP:LISTEN; then
       lsof -i ":${port}" -s TCP:LISTEN -t | xargs kill
     fi
@@ -169,6 +175,14 @@ log "\tnode4"
 log "\t\tdata dir: ${node4_dir} (will be removed)"
 log "\t\tlog: ${node4_log}"
 log "\t\tid: ${node4_id}"
+log "\tnode5"
+log "\t\tdata dir: ${node5_dir} (will be removed)"
+log "\t\tlog: ${node5_log}"
+log "\t\tid: ${node5_id}"
+log "\tnode6"
+log "\t\tdata dir: ${node6_dir} (will be removed)"
+log "\t\tlog: ${node6_log}"
+log "\t\tid: ${node6_id}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -177,10 +191,14 @@ ensure_port_is_free 3301
 ensure_port_is_free 3302
 ensure_port_is_free 3303
 ensure_port_is_free 3304
+ensure_port_is_free 3305
+ensure_port_is_free 3306
 ensure_port_is_free 9091
 ensure_port_is_free 9092
 ensure_port_is_free 9093
 ensure_port_is_free 9094
+ensure_port_is_free 9095
+ensure_port_is_free 9096
 # }}}
 
 # --- Running Mock Blockchain --- {{{
@@ -197,7 +215,9 @@ wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 setup_node 3301 9091 "${node1_dir}" "${node1_log}" "${node1_id}" "${npm_package_version}"
 setup_node 3302 9092 "${node2_dir}" "${node2_log}" "${node2_id}" "${npm_package_version}"
 setup_node 3303 9093 "${node3_dir}" "${node3_log}" "${node3_id}" "${npm_package_version}"
-setup_node 3304 9094 "${node4_dir}" "${node4_log}" "${node4_id}" "${npm_package_version}" "--run \"info;balance\""
+setup_node 3304 9094 "${node4_dir}" "${node4_log}" "${node4_id}" "${npm_package_version}"
+setup_node 3305 9095 "${node5_dir}" "${node5_log}" "${node5_id}" "${npm_package_version}"
+setup_node 3306 9096 "${node6_dir}" "${node6_log}" "${node6_id}" "${npm_package_version}" "--run \"info;balance\""
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -205,6 +225,8 @@ fund_node 3301 "${node1_log}"
 fund_node 3302 "${node2_log}"
 fund_node 3303 "${node3_log}"
 fund_node 3304 "${node4_log}"
+fund_node 3305 "${node4_log}"
+fund_node 3306 "${node4_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
@@ -212,11 +234,13 @@ wait_for_port 9091 "${node1_log}"
 wait_for_port 9092 "${node2_log}"
 wait_for_port 9093 "${node3_log}"
 wait_for_port 9094 "${node4_log}"
+wait_for_port 9095 "${node4_log}"
+wait_for_port 9096 "${node4_log}"
 # }}}
 
 # --- Run test --- {{{
 ${mydir}/../test/integration-test.sh \
-  "localhost:3301" "localhost:3302" "localhost:3303"
+  "localhost:3301" "localhost:3302" "localhost:3303" "localhost:3304" "localhost:3305"
 # }}}
 
 # -- Verify node4 has executed the commands {{{
