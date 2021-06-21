@@ -225,8 +225,8 @@ fund_node 3301 "${node1_log}"
 fund_node 3302 "${node2_log}"
 fund_node 3303 "${node3_log}"
 fund_node 3304 "${node4_log}"
-fund_node 3305 "${node4_log}"
-fund_node 3306 "${node4_log}"
+fund_node 3305 "${node5_log}"
+fund_node 3306 "${node6_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
@@ -234,8 +234,8 @@ wait_for_port 9091 "${node1_log}"
 wait_for_port 9092 "${node2_log}"
 wait_for_port 9093 "${node3_log}"
 wait_for_port 9094 "${node4_log}"
-wait_for_port 9095 "${node4_log}"
-wait_for_port 9096 "${node4_log}"
+wait_for_port 9095 "${node5_log}"
+wait_for_port 9096 "${node6_log}"
 # }}}
 
 # --- Run test --- {{{

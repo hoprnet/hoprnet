@@ -15,7 +15,7 @@ source "${mydir}/../scripts/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3>"
+  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5>"
   msg
 }
 
@@ -26,6 +26,8 @@ usage() {
 test -z "${1:-}" && { msg "Missing first parameter"; usage; exit 1; }
 test -z "${2:-}" && { msg "Missing second parameter"; usage; exit 1; }
 test -z "${3:-}" && { msg "Missing third parameter"; usage; exit 1; }
+test -z "${4:-}" && { msg "Missing fourth parameter"; usage; exit 1; }
+test -z "${5:-}" && { msg "Missing fifth parameter"; usage; exit 1; }
 
 declare api1="${1}"
 declare api2="${2}"
@@ -172,7 +174,7 @@ result=$(run_command ${api2} "ping ${addr3}" "Pong received in:")
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
-result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR")
+result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 wxHOPR")
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
