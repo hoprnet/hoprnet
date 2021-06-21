@@ -48,12 +48,14 @@ if [ ${STATUS_CODE} -ne 403 ]; then
   exit 1
 fi
 
-npx wscat --connect ws://${host}:${admin_port}/ --execute info
+yarn global add wscat
+
+wscat --connect ws://${host}:${admin_port}/ --execute info
 log $?
 
 # should reject admin panel commands with no tocken
 log "Testing WS rejecting null token"
-WS_RESPONSE=$(npx wscat --connect ws://${host}:${admin_port}/ --execute info)
+WS_RESPONSE=$(wscat --connect ws://${host}:${admin_port}/ --execute info)
 if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   log "Didn't fail ws authentication with no token"
   log "Expected response: 'authentication failed' "
@@ -64,7 +66,7 @@ fi
 
 # should reject admin panel commands with bad token
 log "Testing WS rejecting bad token"
-WS_RESPONSE=$(npx wscat --connect ws://${host}:${admin_port}/ --execute info --header "Cookie:X-Auth-Token=bad-token")
+WS_RESPONSE=$(wscat --connect ws://${host}:${admin_port}/ --execute info --header "Cookie:X-Auth-Token=bad-token")
 if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   log "Didn't fail ws authentication with bad token"
   log "Expected response: 'authentication failed' "
@@ -75,7 +77,7 @@ fi
 
 # should execute admin panel commands with right token
 log "Testing WS executing commands with right token"
-WS_RESPONSE=$(npx wscat --connect ws://${host}:${admin_port}/ --execute info --header "Cookie:X-Auth-Token=e2e-api-token")
+WS_RESPONSE=$(wscat --connect ws://${host}:${admin_port}/ --execute info --header "Cookie:X-Auth-Token=e2e-api-token")
 log "${WS_RESPONSE}" | grep -q "ws connection authenticated with token"
 
 log "Security tests finished successfully"
