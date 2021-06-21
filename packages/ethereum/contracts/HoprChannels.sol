@@ -427,9 +427,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         // Field order of the base field
         uint256 FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
 
-        // TODO: We need to check whether the point lies on our curve to prevent
-        // secp256k1 twist attacks. This is currently out of scope, but will be
-        // addressed at some point.
+        require(0 < uint256(response), "Invalid response. Value must be within the field");
+        require(uint256(response) < FIELD_ORDER, "Invalid response. Value must be within the field");
 
         // x-coordinate of the base point
         uint256 gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;

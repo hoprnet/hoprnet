@@ -45,7 +45,7 @@ function createFakeChain(privKey: PeerId) {
   const acknowledge = (unacknowledgedTicket: UnacknowledgedTicket, _ackKeyShare: HalfKey) => {
     return new AcknowledgedTicket(
       unacknowledgedTicket.ticket,
-      new Response(new Uint8Array({ length: Response.SIZE })),
+      Response.createMock(),
       new Hash(new Uint8Array({ length: Hash.SIZE })),
       unacknowledgedTicket.signer
     )
