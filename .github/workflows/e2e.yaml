@@ -19,28 +19,18 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Use Node.js
-        if: ${{ !env.QUICK }}
         uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
-      - name: Install Yarn (only when using ACT)
-        if: ${{ !env.QUICK }}
-        run: |
-          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-          apt update
-          apt install --no-install-recommends yarn
-
       - name: Get yarn cache directory path
-        if: ${{ !env.QUICK }}
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
 
       - name: Restore cache of node modules and yarn cache
         uses: actions/cache@v2
-        if: ${{ !env.QUICK }}
+        if: ${{ !env.ACT }}
         id: nodejs-cache
         with:
           path: |
@@ -52,10 +42,9 @@ jobs:
             ${{ runner.os }}-nodejs-
 
       - name: Build
-        if: ${{ !env.QUICK }}
         run: |
           yarn
           yarn build
-          
+
       - name: Test
         run: ./scripts/run-integration-tests-source.sh
