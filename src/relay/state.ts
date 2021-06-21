@@ -4,7 +4,7 @@ import { Stream } from 'libp2p'
 import type PeerId from 'peer-id'
 
 import { u8aCompare } from '@hoprnet/hopr-utils'
-import { RelayContext } from '../relayContext'
+import { RelayContext } from './context'
 
 type State = {
   [id: string]: RelayContext

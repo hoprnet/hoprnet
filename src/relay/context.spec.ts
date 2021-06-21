@@ -1,10 +1,10 @@
-/// <reference path="./@types/it-pair.ts" />
-/// <reference path="./@types/libp2p.ts" />
+/// <reference path="../@types/it-pair.ts" />
+/// <reference path="../@types/libp2p.ts" />
 
 import { durations, u8aEquals } from '@hoprnet/hopr-utils'
-import { RELAY_PAYLOAD_PREFIX } from './constants'
-import { RelayContext } from './relayContext'
-import { RelayConnection } from './relayConnection'
+import { RELAY_PAYLOAD_PREFIX } from '../constants'
+import { RelayContext } from './context'
+import { RelayConnection } from '../relayConnection'
 import type { Stream } from 'libp2p'
 import assert from 'assert'
 

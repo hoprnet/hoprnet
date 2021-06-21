@@ -18,7 +18,7 @@ import {
   PING,
   PONG,
   VALID_PREFIXES
-} from './constants'
+} from '../constants'
 
 const DEFAULT_PING_TIMEOUT = 300
 
