@@ -49,6 +49,8 @@ if [ ${STATUS_CODE} -ne 403 ]; then
   exit 1
 fi
 
+npx wscat --connect ws://${host}:${admin_port} --execute info
+
 # should reject admin panel commands with no tocken
 log " - Testing WS rejecting null token"
 WS_RESPONSE=$(npx wscat --connect ws://${host}:${admin_port} --execute info)
