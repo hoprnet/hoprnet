@@ -19,7 +19,7 @@ describe(`test response`, function () {
       Error(`Invalid input argument. Given value is not a valid field element.`)
     )
 
-    // INVALID_FIELD_ELEMENT is outside field, hence not allowed
+    // INVALID_FIELD_ELEMENT is outside of the field, hence not allowed
     assert.throws(
       () => new Response(INVALID_FIELD_ELEMENT),
       Error(`Invalid input argument. Given value is not a valid field element.`)
