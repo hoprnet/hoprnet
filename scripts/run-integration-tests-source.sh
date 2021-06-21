@@ -79,7 +79,7 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-#trap cleanup SIGINT SIGTERM ERR EXIT
+trap cleanup SIGINT SIGTERM ERR EXIT
 
 # $1 = rest port
 # $2 = node port
