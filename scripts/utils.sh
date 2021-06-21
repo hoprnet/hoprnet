@@ -5,7 +5,7 @@ $(return >/dev/null 2>&1)
 test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
-set -Eeuo pipefail
+#set -Eeuo pipefail
 
 # $1=version string, semver
 function get_version_maj_min() {
