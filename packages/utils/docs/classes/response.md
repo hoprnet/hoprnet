@@ -17,6 +17,7 @@
 - [serialize](response.md#serialize)
 - [toChallenge](response.md#tochallenge)
 - [toHex](response.md#tohex)
+- [createMock](response.md#createmock)
 - [deserialize](response.md#deserialize)
 - [fromHalfKeys](response.md#fromhalfkeys)
 
@@ -34,7 +35,7 @@
 
 #### Defined in
 
-[types/response.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L8)
+[types/response.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L10)
 
 ## Properties
 
@@ -44,7 +45,7 @@
 
 #### Defined in
 
-[types/response.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L39)
+[types/response.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L45)
 
 ## Methods
 
@@ -58,7 +59,7 @@
 
 #### Defined in
 
-[types/response.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L31)
+[types/response.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L37)
 
 ___
 
@@ -72,7 +73,7 @@ ___
 
 #### Defined in
 
-[types/response.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L35)
+[types/response.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L41)
 
 ___
 
@@ -86,7 +87,21 @@ ___
 
 #### Defined in
 
-[types/response.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L27)
+[types/response.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L33)
+
+___
+
+### createMock
+
+▸ `Static` **createMock**(): [Response](response.md)
+
+#### Returns
+
+[Response](response.md)
+
+#### Defined in
+
+[types/response.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L47)
 
 ___
 
@@ -106,7 +121,7 @@ ___
 
 #### Defined in
 
-[types/response.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L23)
+[types/response.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L29)
 
 ___
 
@@ -127,4 +142,4 @@ ___
 
 #### Defined in
 
-[types/response.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L19)
+[types/response.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L25)
