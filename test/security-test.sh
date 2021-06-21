@@ -40,7 +40,7 @@ if [ ${STATUS_CODE} -ne 403 ]; then
   exit 1
 fi
 
-# # should fail REST authentication without a token
+# should fail REST authentication without a token
 log "Testing REST rejecting bad token"
 STATUS_CODE=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${STATUS_CODE} -ne 403 ]; then
