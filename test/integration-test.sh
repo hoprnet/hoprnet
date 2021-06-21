@@ -204,5 +204,8 @@ log "Node 3 should now have a ticket"
 result=$(run_command ${api3} "tickets" "Win Proportion:   100%")
 log "-- ${result}"
 
+log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
+run_command "${api1}" "send ${addr2},${addr3},${addr4},${addr5} 'hello, world'" "Message sent" 60
+
 log "Node 1 send message to node 5"
 run_command "${api1}" "send ${addr3} 'hello, world'" "Message sent"
