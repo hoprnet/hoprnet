@@ -1,5 +1,4 @@
-import Hopr, { SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
-import BN from 'bn.js'
+import Hopr, { SUGGESTED_BALANCE, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
@@ -94,7 +93,7 @@ export class AdminServer {
     })
 
     this.node.on('hopr:warning:unfunded', (addr) => {
-      const min = new Balance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
+      const min = new Balance(SUGGESTED_BALANCE).toFormattedString()
 
       this.logs.log(
         `- The account associated with this node has no ${Balance.SYMBOL},\n` +
@@ -104,7 +103,7 @@ export class AdminServer {
     })
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
-      const min = new NativeBalance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
+      const min = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
       this.logs.log(
         `- The account associated with this node has no ${NativeBalance.SYMBOL},\n` +

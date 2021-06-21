@@ -115,3 +115,7 @@ See
 https://github.com/christianlundkvist/blog/blob/master/2020_05_26_secp256k1_twist_attacks/secp256k1_twist_attacks.md
 
 (Formerly https://github.com/hoprnet/hoprnet/issues/1791)
+
+## Tracking pending state
+
+There is a delay between the time where we trigger an on-chain action and the time where the indexer registers it. We need to discuss how we are going to track _pending_ state.

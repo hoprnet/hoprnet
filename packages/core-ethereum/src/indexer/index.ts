@@ -394,15 +394,19 @@ class Indexer extends EventEmitter {
     )
   }
 
-  public async getRandomChannel() {
-    const channels = await this.getChannels()
+  /**
+   * Returns a random open routing channel
+   * NOTE: channels with status 'PENDING_TO_CLOSE' are not included
+   * @returns get a random open routing channel
+   */
+  public async getRandomOpenRoutingChannel(): Promise<RoutingChannel> {
+    const channels = await this.getChannels((channel) => channel.status === ChannelStatus.Open)
 
     if (channels.length === 0) {
-      log('no channels exist in indexer')
+      log('no open channels exist in indexer')
       return undefined
     }
 
-    log('picking random from %d channels', channels.length)
     return this.toIndexerChannel(randomChoice(channels))
   }
 

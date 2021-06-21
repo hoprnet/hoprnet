@@ -37,10 +37,11 @@ export const NETWORK_QUALITY_THRESHOLD = 0.5
 export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(PRICE_PER_PACKET).muln(100)
 export const MAX_NEW_CHANNELS_PER_TICK = 5
 export const MAX_AUTO_CHANNELS = 5
-export const MIN_NATIVE_BALANCE = new BN('1000000000000000') // 0.001 ETH
 
-// enough to fund 10 channels
-export const SUGGESTED_BALANCE = MINIMUM_REASONABLE_CHANNEL_STAKE.muln(MAX_AUTO_CHANNELS * 2)
-export const SUGGESTED_NATIVE_BALANCE = MIN_NATIVE_BALANCE.muln(250) // 0.025 ETH
+// native balance (eth, xdai)
+export const MIN_NATIVE_BALANCE = new BN('1000000000000000') // 0.001
+export const SUGGESTED_NATIVE_BALANCE = MIN_NATIVE_BALANCE.muln(10) // 0.01
+// balance (HOPR)
+export const SUGGESTED_BALANCE = MINIMUM_REASONABLE_CHANNEL_STAKE.muln(MAX_AUTO_CHANNELS * 2) // enough to fund 10 channels
 
-export const CHECK_TIMEOUT = 10000
+export const CHECK_TIMEOUT = 60000

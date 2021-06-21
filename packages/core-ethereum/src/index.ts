@@ -90,8 +90,8 @@ export default class HoprEthereum {
     return this.indexer.getPublicKeyOf(addr)
   }
 
-  public getRandomChannel() {
-    return this.indexer.getRandomChannel()
+  public getRandomOpenRoutingChannel() {
+    return this.indexer.getRandomOpenRoutingChannel()
   }
 
   private uncachedGetBalance = () => this.chain.getBalance(this.address)
