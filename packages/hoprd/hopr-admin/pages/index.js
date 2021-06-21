@@ -5,6 +5,7 @@ import Logo from '../components/logo'
 import { Logs } from '../components/log'
 import { Connection } from '../connection'
 import dynamic from 'next/dynamic'
+import Cookies from 'js-cookie';
 
 const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
 
@@ -16,6 +17,7 @@ export default function Home() {
   const [started, setStarted] = useState(false)
   const [messages, setMessages] = useState([]) // The fetish for immutability in react means this will be slower than a mutable array..
   const [peers, setConnectedPeers] = useState([])
+  const authToken = Cookies.get('X-Auth-Token')
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -44,6 +46,14 @@ export default function Home() {
           disabled={!isNodeReady}
           autoFocus
           placeholder="type 'help' for full list of commands"
+        />
+      </div>
+
+      <div className="send">
+        <input
+          id="token"
+          type="password"
+          placeholder="security token"
         />
       </div>
 
