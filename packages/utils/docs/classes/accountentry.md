@@ -43,7 +43,7 @@
 
 #### Defined in
 
-[types/accountEntry.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L8)
+[types/accountEntry.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L10)
 
 ## Properties
 
@@ -75,7 +75,7 @@ ___
 
 #### Defined in
 
-[types/accountEntry.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L15)
+[types/accountEntry.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L35)
 
 ## Methods
 
@@ -89,7 +89,7 @@ ___
 
 #### Defined in
 
-[types/accountEntry.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L51)
+[types/accountEntry.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L71)
 
 ___
 
@@ -103,7 +103,7 @@ ___
 
 #### Defined in
 
-[types/accountEntry.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L43)
+[types/accountEntry.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L63)
 
 ___
 
@@ -117,7 +117,7 @@ ___
 
 #### Defined in
 
-[types/accountEntry.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L47)
+[types/accountEntry.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L67)
 
 ___
 
@@ -131,7 +131,7 @@ ___
 
 #### Defined in
 
-[types/accountEntry.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L56)
+[types/accountEntry.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L76)
 
 ___
 
@@ -145,7 +145,7 @@ ___
 
 #### Defined in
 
-[types/accountEntry.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L30)
+[types/accountEntry.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L50)
 
 ___
 
@@ -165,4 +165,4 @@ ___
 
 #### Defined in
 
-[types/accountEntry.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L19)
+[types/accountEntry.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L39)
