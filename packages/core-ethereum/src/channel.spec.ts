@@ -124,7 +124,6 @@ describe('test channel', function () {
       utils.hexlify((await aliceMocks.channel.usToThem()).serialize()),
       utils.hexlify(aliceMocks.channelUsThem.serialize())
     )
-
   })
 
   it("should validate ticket's response", async function () {

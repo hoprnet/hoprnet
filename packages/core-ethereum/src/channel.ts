@@ -225,7 +225,7 @@ class Channel {
    * of our channels, but we can see the bounds based on how many tickets are
    * outstanding.
    */
-  async balanceToThem(): Promise<{maximum: BN, minimum: BN}> {
+  async balanceToThem(): Promise<{ maximum: BN; minimum: BN }> {
     const stake = (await this.usToThem()).balance
     const outstandingTicketBalance = await this.db.getPendingBalanceTo(this.counterparty.toAddress())
 
