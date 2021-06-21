@@ -51,7 +51,7 @@ run_command(){
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
-    now=$(date +"%s%N")
+    now=$(node -e "const now = new Date(); const seconds = Math.round(now.getTime() / 1000); var hrTime = process.hrtime(); const nanoseconds = hrTime[1]; console.log(seconds.toString() + nanoseconds.toString())")
     # need to calculate in nanoseconds
     ((end_time_ns=now+wait_time*1000000000))
   fi
@@ -62,7 +62,7 @@ run_command(){
   if [ -z "${assertion}" ] || [[ -n "${assertion}" && "${result}" == *"${assertion}"* ]]; then
     echo "${result}"
   else
-    now=$(date +"%s%N")
+    now=$(node -e "const now = new Date(); const seconds = Math.round(now.getTime() / 1000); var hrTime = process.hrtime(); const nanoseconds = hrTime[1]; console.log(seconds.toString() + nanoseconds.toString())")
     if [ ${end_time_ns} -lt ${now} ]; then
       log "${RED}run_command (${cmd} \"${hopr_cmd}\") FAILED, received: ${result}${NOFORMAT}"
       exit 1
