@@ -50,7 +50,7 @@ fi
 
 curl -i -N -H "Connection: Upgrade" -H "Upgrade: Websocket" http://${host}:${admin_port}/
 
-websocat ws://${host}:${admin_port}/ -vvv
+websocat ws://${host}:${admin_port}/ --exit-on-eof -vvv 
 
 yarn global add wscat
 PATH=$HOME/.yarn/bin:$PATH
