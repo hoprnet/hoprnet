@@ -289,7 +289,6 @@ jobs:
         if: ${{ !env.ACT }}
         run: |
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION}
-          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:latest
         env:
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
           HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
