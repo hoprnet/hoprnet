@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e 
+set -x
 
 declare rest_host_port="${1}"
 declare admin_host_port="${2}"
