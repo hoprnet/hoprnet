@@ -16,7 +16,6 @@ export const INVERSE_TICKET_WIN_PROB = new BN('1') // 100%
 
 export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(PRICE_PER_PACKET).muln(100)
 
-
 export const MAX_AUTO_CHANNELS = 5
 export const MIN_NATIVE_BALANCE = new BN('1000000000000000') // 0.001 ETH
 

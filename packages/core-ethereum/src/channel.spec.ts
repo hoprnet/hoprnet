@@ -126,10 +126,7 @@ describe('test channel', function () {
   })
 
   it("should validate ticket's response", async function () {
-    const ticket = await aliceMocks.channel.createTicket(
-      1,
-      aliceMocks.response.toChallenge()
-    )
+    const ticket = await aliceMocks.channel.createTicket(1, aliceMocks.response.toChallenge())
 
     const goodAck = new AcknowledgedTicket(
       ticket,
@@ -153,10 +150,7 @@ describe('test channel', function () {
   })
 
   it("should validate ticket's preimage", async function () {
-    const ticket = await aliceMocks.channel.createTicket(
-      1,
-      aliceMocks.response.toChallenge(),
-    )
+    const ticket = await aliceMocks.channel.createTicket(1, aliceMocks.response.toChallenge())
 
     const acknowledgement = new AcknowledgedTicket(
       ticket,

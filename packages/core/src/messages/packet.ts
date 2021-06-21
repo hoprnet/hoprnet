@@ -21,7 +21,7 @@ import {
   Challenge,
   ChannelStatus,
   PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB 
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
@@ -245,10 +245,7 @@ export class Packet {
     if (isDirectMessage) {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
-      ticket = await channel.createTicket(
-        path.length,
-        ticketChallenge
-      )
+      ticket = await channel.createTicket(path.length, ticketChallenge)
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -387,10 +384,7 @@ export class Packet {
     if (pathPosition == 1) {
       this.ticket = channel.createDummyTicket(this.nextChallenge)
     } else {
-      this.ticket = await channel.createTicket(
-        pathPosition,
-        this.nextChallenge
-      )
+      this.ticket = await channel.createTicket(pathPosition, this.nextChallenge)
     }
     this.oldChallenge = this.challenge.clone()
     this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)
