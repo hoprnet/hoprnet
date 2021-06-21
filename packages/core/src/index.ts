@@ -9,7 +9,7 @@ const { HoprConnect } = require('@hoprnet/hopr-connect')
 
 import {
   PACKET_SIZE,
-  MAX_HOPS,
+  MIN_HOPS_REQUIRED,
   VERSION,
   CHECK_TIMEOUT,
   PATH_RANDOMNESS,
@@ -843,7 +843,7 @@ class Hopr extends EventEmitter {
     return await findPath(
       this.getId(),
       destination,
-      MAX_HOPS,
+      MIN_HOPS_REQUIRED,
       this.networkPeers,
       ethereum.getOpenRoutingChannelsFromPeer.bind(ethereum),
       PATH_RANDOMNESS

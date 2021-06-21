@@ -1,4 +1,4 @@
-import { Packet, MAX_HOPS } from './packet'
+import { Packet, MIN_HOPS_REQUIRED } from './packet'
 import { HoprDB, Ticket, UINT256, Balance, PublicKey, u8aEquals, Challenge } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
@@ -41,7 +41,7 @@ function createMockTickets(privKey: Uint8Array) {
 
 describe('packet creation and transformation', function () {
   it('create packet and transform it', async function () {
-    const AMOUNT = MAX_HOPS + 1
+    const AMOUNT = MIN_HOPS_REQUIRED + 1
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
@@ -78,7 +78,7 @@ describe('packet creation and transformation', function () {
   })
 
   it('create packet and transform it - reduced path', async function () {
-    const AMOUNT = MAX_HOPS
+    const AMOUNT = MIN_HOPS_REQUIRED
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
@@ -152,7 +152,7 @@ describe('packet creation and transformation', function () {
   })
 
   it('create packet and transform it - false positives', async function () {
-    const AMOUNT = MAX_HOPS + 1
+    const AMOUNT = MIN_HOPS_REQUIRED + 1
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )

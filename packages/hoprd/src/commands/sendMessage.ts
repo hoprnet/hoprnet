@@ -1,6 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
+import { MIN_HOPS_REQUIRED } from '@hoprnet/hopr-core/lib/constants'
 import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
@@ -52,8 +52,8 @@ export class SendMessage extends AbstractCommand {
             .filter(Boolean)
             .map((x) => checkPeerIdInput(x, state))
         )
-        if (path.length > MAX_HOPS + 1) {
-          throw new Error('Cannot create path longer than MAX_HOPS')
+        if (path.length > MIN_HOPS_REQUIRED + 1) {
+          throw new Error('Cannot create path longer than MIN_HOPS_REQUIRED')
         }
 
         const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
