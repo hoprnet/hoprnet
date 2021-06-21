@@ -33,7 +33,7 @@ nc -z ${host} ${rest_port}
 # test admin port open
 nc -z ${host} ${admin_port}
 
-# should fail authentication without proper token
+# should fail REST authentication without proper token
 log " - Testing REST rejecting null token"
 STATUS_CODE=$(curl -H "X-Auth-Token: bad-token" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${STATUS_CODE} -ne 403 ]; then
@@ -41,7 +41,7 @@ if [ ${STATUS_CODE} -ne 403 ]; then
   exit 1
 fi
 
-# should fail authentication without a token
+# should fail REST authentication without a token
 log " - Testing REST rejecting bad token"
 STATUS_CODE=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${STATUS_CODE} -ne 403 ]; then
@@ -62,7 +62,7 @@ fi
 
 # should reject admin panel commands with bad token
 log " - Testing WS rejecting bad token"
-WS_RESPONSE=$(npx wscat --connect ws://${host}:${admin_port} --execute info --header "Cookie:X-Auth-Token=bad-token")
+npx wscat --connect ws://${host}:${admin_port} --execute info --header "Cookie:X-Auth-Token=bad-token")
 if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   log " - Didn't fail ws authentication with bad token"
   log " - Expected response: 'authentication failed' "
@@ -71,7 +71,7 @@ if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   exit 1
 fi
 
-# should execute commands with right token
+# should execute admin panel commands with right token
 log " - Testing WS executing commands with right token"
 WS_RESPONSE=$(npx wscat --connect ws://${host}:${admin_port} --execute info --header "Cookie:X-Auth-Token=e2e-api-token")
 log "${WS_RESPONSE}" | grep -q "ws connection authenticated with token"
