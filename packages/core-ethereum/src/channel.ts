@@ -193,6 +193,7 @@ class Channel {
       channelState.channelEpoch,
       this.privateKey
     )
+    await this.db.markPending(ticket);
 
     log(`Creating ticket in channel ${chalk.yellow(channelState.getId().toHex())}. Ticket data: \n${ticket.toString()}`)
 
@@ -221,19 +222,16 @@ class Channel {
 
   /*
    * As we issue probabilistic tickets, we can't be sure of the exact balance
-   * of our channels, but we can estimate based on how many tickets are
+   * of our channels, but we can see the bounds based on how many tickets are
    * outstanding.
    */
   async balanceToThem(): Promise<any> {
     const stake = (await this.usToThem()).balance
-    const outstandingTicketBalance = new BN('0')
-    //const numTicketsOutstanding = 0
-    //const estimatedSuccess = outstandingTicketBalance.muln(numTicketsOutstanding)
+    const outstandingTicketBalance = this.db.getPendingBalanceTo(this.counterparty)
 
     return {
       minimum: stake.toBN().sub(outstandingTicketBalance),
       maximum: stake
-      //estimated: 0 //TODO
     }
   }
 
