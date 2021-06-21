@@ -19,6 +19,9 @@ describe('test STUN', function () {
 
   before(async () => {
     servers = await Promise.all(
+      // 1 STUN server that contacts
+      // DEFAULT_PARALLEL_STUN_CALLS STUN servers and leaves out
+      // 1 available STUN server
       Array.from({ length: DEFAULT_PARALLEL_STUN_CALLS + 2 }).map(
         (_: any, index: number) =>
           new Promise<ServerType>((resolve, reject) => {
