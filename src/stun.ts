@@ -69,7 +69,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
 
 /**
  * Tries to determine the external IPv4 address
- * @returns Addrs+Port or undefined if the STUN response are ambigous (e.g. bidirectional NAT)
+ * @returns Addrs+Port or undefined if the STUN response are ambiguous (e.g. bidirectional NAT)
  *
  * @param multiAddrs Multiaddrs to use as STUN servers
  * @param socket Node.JS socket to use for the STUN request
