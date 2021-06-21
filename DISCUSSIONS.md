@@ -115,3 +115,13 @@ See
 https://github.com/christianlundkvist/blog/blob/master/2020_05_26_secp256k1_twist_attacks/secp256k1_twist_attacks.md
 
 (Formerly https://github.com/hoprnet/hoprnet/issues/1791)
+
+
+
+## Ticket Value and Win Probability
+
+At the moment these are global constants. At some point we want to adjust this.
+One point of view is that they are constants that are voted on by the DAO.
+Another is that they are variable and bidded on in a free market.
+All of this is out of scope for now.
+

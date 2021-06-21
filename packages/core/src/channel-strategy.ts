@@ -1,11 +1,9 @@
 import type { ChannelEntry, Channel } from '@hoprnet/hopr-core-ethereum'
-import { AcknowledgedTicket, PublicKey } from '@hoprnet/hopr-utils'
+import { AcknowledgedTicket, PublicKey, MINIMUM_REASONABLE_CHANNEL_STAKE, MAX_AUTO_CHANNELS} from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import {
-  MINIMUM_REASONABLE_CHANNEL_STAKE,
   MAX_NEW_CHANNELS_PER_TICK,
   NETWORK_QUALITY_THRESHOLD,
-  MAX_AUTO_CHANNELS
 } from './constants'
 import debug from 'debug'
 import type NetworkPeers from './network/network-peers'

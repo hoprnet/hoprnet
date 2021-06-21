@@ -3,7 +3,6 @@ import {
   Ticket,
   UINT256,
   PublicKey,
-  Balance,
   UnacknowledgedTicket,
   HoprDB,
   getPacketLength,
@@ -20,7 +19,9 @@ import {
   HalfKeyChallenge,
   HalfKey,
   Challenge,
-  ChannelStatus
+  ChannelStatus,
+  PRICE_PER_PACKET,
+  INVERSE_TICKET_WIN_PROB 
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
@@ -29,7 +30,6 @@ import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
-import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants'
 
 export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
@@ -246,9 +246,8 @@ export class Packet {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
       ticket = await channel.createTicket(
-        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(path.length - 1)),
-        ticketChallenge,
-        new BN(INVERSE_TICKET_WIN_PROB)
+        path.length,
+        ticketChallenge
       )
     }
 
@@ -389,9 +388,8 @@ export class Packet {
       this.ticket = channel.createDummyTicket(this.nextChallenge)
     } else {
       this.ticket = await channel.createTicket(
-        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(pathPosition - 1)),
-        this.nextChallenge,
-        new BN(INVERSE_TICKET_WIN_PROB)
+        pathPosition,
+        this.nextChallenge
       )
     }
     this.oldChallenge = this.challenge.clone()

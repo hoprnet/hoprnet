@@ -11,7 +11,9 @@ import {
   UnacknowledgedTicket,
   Challenge,
   generateChannelId,
-  ChannelStatus
+  ChannelStatus,
+  PRICE_PER_PACKET,
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import type { RedeemTicketResponse } from '.'
@@ -173,11 +175,13 @@ class Channel {
    * @param winProb the winning probability to use
    * @returns a signed ticket
    */
-  async createTicket(amount: Balance, challenge: Challenge, winProb: BN) {
+  async createTicket(pathLength: number, challenge: Challenge) {
     const counterpartyAddress = this.counterparty.toAddress()
     const channelState = await this.usToThem()
     const id = generateChannelId(this.self.toAddress(), this.counterparty.toAddress())
     const currentTicketIndex = await this.bumpTicketIndex(id)
+    const amount = new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(pathLength - 1))
+    const winProb = new BN(INVERSE_TICKET_WIN_PROB)
 
     const ticket = Ticket.create(
       counterpartyAddress,
@@ -213,6 +217,25 @@ class Channel {
       UINT256.fromString('0'),
       this.privateKey
     )
+  }
+
+
+  /*
+   * As we issue probabilistic tickets, we can't be sure of the exact balance
+   * of our channels, but we can estimate based on how many tickets are
+   * outstanding.
+   */
+  async balanceToThem(): Promise<any> {
+    const stake = (await this.usToThem()).balance
+    const outstandingTicketBalance = new BN('0')
+    //const numTicketsOutstanding = 0
+    //const estimatedSuccess = outstandingTicketBalance.muln(numTicketsOutstanding)
+
+    return {
+      minimum: stake.toBN().sub(outstandingTicketBalance),
+      maximum: stake, 
+      //estimated: 0 //TODO
+    }
   }
 
   async getAcknowledgedTickets(): Promise<AcknowledgedTicket[]> {

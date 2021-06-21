@@ -13,7 +13,6 @@ import {
   VERSION,
   CHECK_TIMEOUT,
   PATH_RANDOMNESS,
-  MIN_NATIVE_BALANCE,
   FULL_VERSION
 } from './constants'
 
@@ -39,7 +38,8 @@ import {
   libp2pSendMessage,
   LibP2PHandlerFunction,
   AcknowledgedTicket,
-  ChannelStatus
+  ChannelStatus,
+  MIN_NATIVE_BALANCE,
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
