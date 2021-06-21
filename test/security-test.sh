@@ -1,12 +1,9 @@
 #!/bin/bash
 
-echo "hahaha"
-
 # prevent souring of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
-#set -Eeuo pipefail
 set -x
 
 # set log id and use shared log function for readable logs
