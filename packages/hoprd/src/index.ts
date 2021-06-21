@@ -195,7 +195,8 @@ async function main() {
 
   if (logs.isReadyForPublicLogging()) {
     const publicLogsId = await logs.enablePublicLoggingNode(argv.publicLogsProvider)
-    logs.log(`Share your node logs via http://documint.net/${publicLogsId}`)
+    logs.log(`Your unique Log Id is ${publicLogsId}`)
+    logs.log(`See logs via http://documint.net/${publicLogsId}`)
     logs.startLoggingQueue()
   }
 

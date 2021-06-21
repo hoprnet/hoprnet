@@ -13,7 +13,32 @@ export type Socket = ws
 let debugLog = debug('hoprd')
 
 const MAX_MESSAGES_CACHED = 100
-const queue = new RunQueue({ maxConcurrency: 1 })
+
+
+class Queue {
+  private queue: RunQueue = undefined;
+  private completed: boolean = false;
+  private opts: {
+    maxConcurrency: number,
+  } = undefined;
+
+  constructor(opts) {
+    this.opts = opts;
+    this.queue = new RunQueue(opts)
+  }
+  add(priority, job) {
+    if (this.completed) {
+      this.queue = new RunQueue(this.opts)
+      this.completed = false;
+    }
+    this.queue.add(priority, job)
+  }
+  async run() {
+    this.queue.run().then(() => this.completed = true)
+  }
+}
+
+const queue = new Queue({ maxConcurrency: 1 })
 
 type Message = {
   type: string
