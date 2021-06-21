@@ -1,5 +1,14 @@
 import { Packet, MAX_HOPS } from './packet'
-import { HoprDB, Ticket, UINT256, Balance, PublicKey, u8aEquals, Challenge, PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
+import {
+  HoprDB,
+  Ticket,
+  UINT256,
+  Balance,
+  PublicKey,
+  u8aEquals,
+  Challenge,
+  PRICE_PER_PACKET
+} from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import assert from 'assert'
