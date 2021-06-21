@@ -208,7 +208,7 @@ wait_for_port 9094 "${node4_log}"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  "localhost:3301" "127.0.0.1:9501"
+  localhost 3301 9501
 #}}}
 
 # --- Run protocol test --- {{{
