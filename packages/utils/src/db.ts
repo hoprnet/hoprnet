@@ -45,7 +45,8 @@ const CURRENT = encoder.encode('current')
 const REDEEMED_TICKETS_COUNT = encoder.encode('statistics:redeemed:count')
 const REDEEMED_TICKETS_VALUE = encoder.encode('statistics:redeemed:value')
 const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
-const PENDING_TICKETS_VALUE = (address: Address) => u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
+const PENDING_TICKETS_VALUE = (address: Address) =>
+  u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
 
 export class HoprDB {
   private db: LevelUp
@@ -152,7 +153,6 @@ export class HoprDB {
     await this.put(key, Uint8Array.of(val + 1))
     return val + 1
   }
-
 
   private async addBalance(key: Uint8Array, amount: Balance): Promise<void> {
     let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO())

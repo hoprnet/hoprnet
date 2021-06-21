@@ -193,7 +193,7 @@ class Channel {
       channelState.channelEpoch,
       this.privateKey
     )
-    await this.db.markPending(ticket);
+    await this.db.markPending(ticket)
 
     log(`Creating ticket in channel ${chalk.yellow(channelState.getId().toHex())}. Ticket data: \n${ticket.toString()}`)
 
