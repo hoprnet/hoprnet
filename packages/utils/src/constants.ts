@@ -10,9 +10,9 @@ export const SIGNATURE_RECOVERY_LENGTH = 1
 // a multi address can have an arbitary length
 export const MULTI_ADDR_MAX_LENGTH = 200
 
-export const PRICE_PER_PACKET = '10000000000000000' // 0.01 HOPR
+export const PRICE_PER_PACKET = new BN('10000000000000000') // 0.01 HOPR
 // Must be a natural number, will be rounded to a natural number otherwise
-export const INVERSE_TICKET_WIN_PROB = '1' // 100%
+export const INVERSE_TICKET_WIN_PROB = new BN('1') // 100%
 
 export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(PRICE_PER_PACKET).muln(100)
 

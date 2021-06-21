@@ -19,7 +19,8 @@ import {
   Balance,
   createPoRValuesForSender,
   Hash,
-  u8aEquals
+  u8aEquals,
+  PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
 
 import { AcknowledgementChallenge, Packet } from '../../messages'
@@ -53,8 +54,8 @@ function createFakeChain(privKey: PeerId) {
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket: (amount: Balance, challenge: Challenge, _winProb: number) => {
-      return Promise.resolve(createFakeTicket(privKey, challenge, counterparty.toAddress(), amount))
+    createTicket: (pathLength: number, challenge: Challenge) => {
+      return Promise.resolve(createFakeTicket(privKey, challenge, counterparty.toAddress(), new Balance(PRICE_PER_PACKET.muln(pathLength))))
     },
     createDummyTicket: (challenge: Challenge) =>
       Ticket.create(

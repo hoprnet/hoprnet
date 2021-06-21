@@ -180,7 +180,7 @@ class Channel {
     const channelState = await this.usToThem()
     const id = generateChannelId(this.self.toAddress(), this.counterparty.toAddress())
     const currentTicketIndex = await this.bumpTicketIndex(id)
-    const amount = new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(pathLength - 1))
+    const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
     const winProb = new BN(INVERSE_TICKET_WIN_PROB)
 
     const ticket = Ticket.create(

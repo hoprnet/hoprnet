@@ -349,8 +349,8 @@ export class Packet {
 
     return validateUnacknowledgedTicket(
       privKey,
-      new BN(PRICE_PER_PACKET),
-      new BN(INVERSE_TICKET_WIN_PROB),
+      PRICE_PER_PACKET,
+      INVERSE_TICKET_WIN_PROB,
       previousHop,
       this.ticket,
       channel,
@@ -383,7 +383,7 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    const pathPosition = this.ticket.getPathPosition(new BN(PRICE_PER_PACKET), new BN(INVERSE_TICKET_WIN_PROB))
+    const pathPosition = this.ticket.getPathPosition()
     if (pathPosition == 1) {
       this.ticket = channel.createDummyTicket(this.nextChallenge)
     } else {
