@@ -46,5 +46,8 @@ jobs:
           yarn
           yarn build
 
+      - name: Install websocat
+        run: ./scripts/install-websocat.sh 
+
       - name: Test
         run: ./scripts/run-integration-tests-source.sh
