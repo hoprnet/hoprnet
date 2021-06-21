@@ -227,10 +227,10 @@ class Channel {
    */
   async balanceToThem(): Promise<any> {
     const stake = (await this.usToThem()).balance
-    const outstandingTicketBalance = this.db.getPendingBalanceTo(this.counterparty)
+    const outstandingTicketBalance = await this.db.getPendingBalanceTo(this.counterparty.toAddress())
 
     return {
-      minimum: stake.toBN().sub(outstandingTicketBalance),
+      minimum: stake.toBN().sub(outstandingTicketBalance.toBN()),
       maximum: stake
     }
   }
