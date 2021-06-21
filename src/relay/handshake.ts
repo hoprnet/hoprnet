@@ -7,15 +7,14 @@ import { BLInterface } from 'bl'
 import handshake, { Handshake } from 'it-handshake'
 import PeerId from 'peer-id'
 
-import { blue, yellow } from 'chalk'
-
+import { green, yellow } from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
 import { RelayState } from './state'
 
 import debug from 'debug'
 
-enum RelayHandshakeMessage {
+export enum RelayHandshakeMessage {
   OK,
   FAIL,
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
@@ -68,7 +67,7 @@ type HandleResponse =
       counterparty: PeerId
     }
 
-type StreamResult = Buffer | Uint8Array | BLInterface
+export type StreamResult = Buffer | Uint8Array | BLInterface
 
 class RelayHandshake {
   private shaker: Handshake<StreamResult>
@@ -84,10 +83,10 @@ class RelayHandshake {
     try {
       chunk = await this.shaker.read()
     } catch (err) {
-      error(`Error while reading answer ${blue(relay.toB58String())}. ${err.message}`)
+      error(`Error while reading answer ${green(relay.toB58String())}. ${err.message}`)
     }
 
-    if (chunk == null) {
+    if (chunk == null || chunk.length == 0) {
       verbose(`Received empty message. Discarding`)
       this.shaker.rest()
       return {
@@ -101,7 +100,7 @@ class RelayHandshake {
     this.shaker.rest()
 
     if (answer == RelayHandshakeMessage.OK) {
-      verbose(`Relay handshake with ${blue(destination.toB58String())} successful`)
+      log(`Successfully established outbound relayed connection with ${green(destination.toB58String())} over relay ${green(relay.toB58String())}`)
       return {
         success: true,
         stream: this.shaker.stream
@@ -109,7 +108,7 @@ class RelayHandshake {
     }
 
     error(
-      `Could not establish relayed connection to ${blue(
+      `Could not establish relayed connection to ${green(
         destination.toB58String()
       )} over relay ${relay.toB58String()}. Answer was: <${yellow(handshakeMessageToString(answer))}>`
     )
@@ -128,7 +127,7 @@ class RelayHandshake {
     updateExisting: InstanceType<typeof RelayState>['updateExisting'],
     createNew: InstanceType<typeof RelayState>['createNew']
   ): Promise<void> {
-    log(`handle relay request`)
+    log(`handling relay request`)
 
     let chunk: StreamResult | undefined
 
@@ -138,7 +137,7 @@ class RelayHandshake {
       error(err)
     }
 
-    if (chunk == null) {
+    if (chunk == null || chunk.length == 0) {
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_INVALID_PUBLIC_KEY))
       this.shaker.rest()
       error(`Received empty message from peer ${yellow(source)}. Ending stream because unable to identify counterparty`)
@@ -148,7 +147,7 @@ class RelayHandshake {
     let destination: PeerId | undefined
 
     try {
-      destination = PeerId.createFromBytes(chunk.slice())
+      destination = pubKeyToPeerId(chunk.slice())
     } catch (err) {
       error(err)
     }
@@ -210,7 +209,7 @@ class RelayHandshake {
       error(err)
     }
 
-    if (destinationChunk == null) {
+    if (destinationChunk == null || destinationChunk.length == 0) {
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
       this.shaker.rest()
 
@@ -228,12 +227,13 @@ class RelayHandshake {
       return
     }
 
+    this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
     destinationShaker.rest()
 
     createNew(source, destination, this.shaker.stream, destinationShaker.stream)
   }
 
-  async handle(): Promise<HandleResponse> {
+  async handle(source: PeerId): Promise<HandleResponse> {
     let chunk: Uint8Array | BLInterface | undefined
     try {
       chunk = await this.shaker.read()
@@ -241,7 +241,7 @@ class RelayHandshake {
       error(err)
     }
 
-    if (chunk == null) {
+    if (chunk == null || chunk.length == 0) {
       error(`Received empty message. Ignoring request`)
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL))
       this.shaker.rest()
@@ -269,6 +269,8 @@ class RelayHandshake {
         code: 'FAIL'
       }
     }
+
+    log(`Successfully established inbound relayed connection from initiator ${green(initiator.toB58String())} over relay ${green(source.toB58String())}.`)
 
     this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
     this.shaker.rest()

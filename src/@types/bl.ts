@@ -1,6 +1,7 @@
 declare module 'bl' {
   interface BLInterface {
     slice(): Uint8Array
+    length: number
   }
 
   type BLArg = BLInterface | Uint8Array | Buffer

@@ -145,7 +145,7 @@ class Relay {
       return
     }
 
-    const handShakeResult = await new RelayHandshake(conn.stream).handle()
+    const handShakeResult = await new RelayHandshake(conn.stream).handle(conn.connection.remotePeer)
 
     if (!handShakeResult.success) {
       return
