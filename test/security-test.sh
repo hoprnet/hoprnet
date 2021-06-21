@@ -73,6 +73,6 @@ fi
 # should execute admin panel commands with right token
 log "Testing WS executing commands with right token"
 WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ -vvv --header "Cookie:X-Auth-Token=e2e-api-token")
-log "${WS_RESPONSE}" | grep -q "ws connection authenticated with token"
+"${WS_RESPONSE}" | grep -q "ws connection authenticated with token"
 
 log "Security tests finished successfully"
