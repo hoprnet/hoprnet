@@ -1,7 +1,7 @@
 import type { ChannelEntry, Channel } from '@hoprnet/hopr-core-ethereum'
-import { AcknowledgedTicket, PublicKey, MINIMUM_REASONABLE_CHANNEL_STAKE, MAX_AUTO_CHANNELS } from '@hoprnet/hopr-utils'
+import { AcknowledgedTicket, PublicKey, MINIMUM_REASONABLE_CHANNEL_STAKE, MAX_AUTO_CHANNELS, PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD } from './constants'
+import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, MAX_HOPS } from './constants'
 import debug from 'debug'
 import type NetworkPeers from './network/network-peers'
 const log = debug('hopr-core:channel-strategy')
@@ -84,8 +84,18 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
 
     let i = 0
     let toClose = currentChannels
-      .filter((x: ChannelEntry) => peers.qualityOf(x.destination.toPeerId()) < 0.1)
+      .filter((x: ChannelEntry) => {
+        return (
+          peers.qualityOf(x.destination.toPeerId()) < 0.1 ||
+          // Lets append channels with less balance than a full hop messageto toClose.
+          // NB: This is based on channel balance, not expected balance so may not be
+          // aggressive enough.
+          x.balance.toBN().lte(PRICE_PER_PACKET.muln(MAX_HOPS))
+             )
+      })
       .map((x) => x.destination)
+
+
 
     // First let's open channels to any interesting peers we have
     peers.all().forEach((peerId) => {
