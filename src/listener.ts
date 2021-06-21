@@ -99,6 +99,8 @@ class Listener extends EventEmitter implements InterfaceListener {
       // `udp6` does not seem to work in Node 12.x
       // can receive IPv6 packet and IPv4 after reconnecting the socket
       type: 'udp4',
+      // set to true to reuse port that is bound
+      // to TCP socket
       reuseAddr: true
     })
 
@@ -237,7 +239,11 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @returns list of addresses under which the node is available
    */
   getAddrs(): Multiaddr[] {
-    return [...this.addrs.external, ...this.addrs.relays, ...this.addrs.interface].filter((addr) => addr)
+    return (
+      [...this.addrs.external, ...this.addrs.relays, ...this.addrs.interface]
+        // Filter empty entries
+        .filter((addr) => addr)
+    )
   }
 
   /**
@@ -343,13 +349,14 @@ class Listener extends EventEmitter implements InterfaceListener {
         this.udpSocket.removeListener('listening', resolve)
         reject(err)
       })
-      this.udpSocket.once('error', reject)
+
+      this.udpSocket.once('listening', () => {
+        this.udpSocket.removeListener('error', reject)
+        resolve()
+      })
 
       try {
-        this.udpSocket.bind(port, () => {
-          this.udpSocket.removeListener('error', reject)
-          resolve()
-        })
+        this.udpSocket.bind(port)
       } catch (err) {
         error(`Could not bind to UDP socket. ${err.message}`)
         reject(err)
@@ -369,13 +376,14 @@ class Listener extends EventEmitter implements InterfaceListener {
         this.tcpSocket.removeListener('listening', resolve)
         reject(err)
       })
-      this.tcpSocket.once('error', reject)
+
+      this.tcpSocket.once('listening', () => {
+        this.tcpSocket.removeListener('error', reject)
+        resolve()
+      })
 
       try {
-        this.tcpSocket.listen(opts, () => {
-          this.tcpSocket.removeListener('error', reject)
-          resolve()
-        })
+        this.tcpSocket.listen(opts)
       } catch (err) {
         error(`Could not bind to TCP socket. ${err.message}`)
         reject(err)
@@ -504,7 +512,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       (iface: NetworkInterfaceInfo) => iface.family.toLowerCase() == family && !iface.internal
     )
 
-    if (usableInterfaces == undefined) {
+    if (usableInterfaces == undefined || usableInterfaces.length == 0) {
       throw Error(`Desired interface <${this._interface}> does not exist or does not have any external addresses.`)
     }
 
@@ -563,10 +571,10 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     clearTimeout(timeout)
 
-    const filteredAndSortedResult = rawResults.filter((res) => res.latency >= 0).sort((a, b) => a.latency - b.latency)
+    const filteredAndSortedResults = rawResults.filter((res) => res.latency >= 0).sort((a, b) => a.latency - b.latency)
 
-    for (const res of filteredAndSortedResult.slice(0, MAX_RELAYS_PER_NODE)) {
-      this.addrs.relays.push(new Multiaddr(`/p2p/${res.id}/p2p-circuit/p2p/${this.peerId}`))
+    for (const result of filteredAndSortedResults.slice(0, MAX_RELAYS_PER_NODE)) {
+      this.addrs.relays.push(new Multiaddr(`/p2p/${result.id}/p2p-circuit/p2p/${this.peerId}`))
     }
   }
 
@@ -595,7 +603,13 @@ class Listener extends EventEmitter implements InterfaceListener {
     try {
       conn = await this.upgrader.upgradeOutbound(maConn)
     } catch (err) {
-      error(err)
+      if (err.code === 'ERR_ENCRYPTION_FAILED') {
+        error(
+          `outbound connection to potential relay node failed because encryption failed. Maybe connected to the wrong node?`
+        )
+      } else {
+        error('outbound connection to potential relay node failed.', err)
+      }
       if (conn != undefined) {
         try {
           await conn.close()

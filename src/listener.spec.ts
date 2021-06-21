@@ -35,13 +35,13 @@ describe('check listening to sockets', function () {
         socket.removeListener('listening', resolve)
         reject(err)
       })
-      socket.once('listening', resolve)
+      socket.once('listening', () => {
+        socket.removeListener('error', reject)
+        resolve()
+      })
 
       try {
-        socket.bind(port, () => {
-          socket.removeListener('error', reject)
-          resolve()
-        })
+        socket.bind(port)
       } catch (err) {
         reject(err)
       }

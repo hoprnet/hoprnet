@@ -105,11 +105,10 @@ class TCPConnection implements MultiaddrConnection {
   }
 
   private async _sink(source: Stream['source']): Promise<void> {
+    const u8aStream = toU8aStream(source)
     try {
       await this._stream.sink(
-        this._signal != undefined
-          ? (abortable(toU8aStream(source), this._signal) as Stream['source'])
-          : toU8aStream(source)
+        this._signal != undefined ? (abortable(u8aStream, this._signal) as Stream['source']) : u8aStream
       )
     } catch (err) {
       // If aborted we can safely ignore
@@ -144,7 +143,7 @@ class TCPConnection implements MultiaddrConnection {
       })
 
       const onError = (err: Error) => {
-        verbose('Error connecting:', err)
+        verbose('Error connecting:', err.message)
         // ENETUNREACH
         // ECONNREFUSED
         // @TODO check error(s)
