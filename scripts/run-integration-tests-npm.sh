@@ -222,15 +222,15 @@ wait_for_port 9093 "${node3_log}"
 wait_for_port 9094 "${node4_log}"
 # }}}
 
-# --- Run test --- {{{
-${mydir}/../test/integration-test.sh \
-  "localhost:3301" "localhost:3302" "localhost:3303"
-# }}}
-
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
   "localhost:3301" "127.0.0.1:9501" 
 #}}}
+
+# --- Run test --- {{{
+${mydir}/../test/integration-test.sh \
+  "localhost:3301" "localhost:3302" "localhost:3303"
+# }}}
 
 # -- Verify node4 has executed the commands {{{
 # REMOVED AS THIS IS BROKEN

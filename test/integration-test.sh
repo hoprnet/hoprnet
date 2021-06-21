@@ -47,7 +47,7 @@ run_command(){
   local wait_time=${4:-0}
   local step_time=${5:-1}
   local end_time_ns=${6:-0}
-  local cmd="curl --silent --max-time 360 -X POST --url ${endpoint}/api/v1/command --data"
+  local cmd="curl --silent --max-time 360 -X POST --url ${endpoint}/api/v1/command --data --header 'X-Auth-Token: e2e-api-token'"
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
