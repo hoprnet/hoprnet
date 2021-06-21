@@ -1,5 +1,11 @@
 import type { ChannelEntry, Channel } from '@hoprnet/hopr-core-ethereum'
-import { AcknowledgedTicket, PublicKey, MINIMUM_REASONABLE_CHANNEL_STAKE, MAX_AUTO_CHANNELS, PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
+import {
+  AcknowledgedTicket,
+  PublicKey,
+  MINIMUM_REASONABLE_CHANNEL_STAKE,
+  MAX_AUTO_CHANNELS,
+  PRICE_PER_PACKET
+} from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, MAX_HOPS } from './constants'
 import debug from 'debug'
@@ -91,11 +97,9 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
           // NB: This is based on channel balance, not expected balance so may not be
           // aggressive enough.
           x.balance.toBN().lte(PRICE_PER_PACKET.muln(MAX_HOPS))
-             )
+        )
       })
       .map((x) => x.destination)
-
-
 
     // First let's open channels to any interesting peers we have
     peers.all().forEach((peerId) => {
