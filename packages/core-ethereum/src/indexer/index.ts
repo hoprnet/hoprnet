@@ -284,7 +284,7 @@ class Indexer extends EventEmitter {
       })
       await this.db.updateAccount(account)
     } catch (e) {
-      // Issue with the multiaddress, no worries, we ignore this announcement.
+      // Issue with the multiaddress or invalid public key, no worries, we ignore this announcement.
       log('Error with announced peer', e, event)
     }
   }
