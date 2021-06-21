@@ -48,6 +48,8 @@ if [ ${STATUS_CODE} -ne 403 ]; then
   exit 1
 fi
 
+curl -i -N -H "Connection: Upgrade" -H "Upgrade: Websocket" http://${host}:${admin_port}/
+
 yarn global add wscat
 PATH=$HOME/.yarn/bin:$PATH
 
