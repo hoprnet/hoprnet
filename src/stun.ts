@@ -69,7 +69,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
 
 /**
  * Tries to determine the external IPv4 address
- * @returns Addrs+Port or undefined if the STUN response are ambigous (e.g. bidirectional NAT)
+ * @returns Addrs+Port or undefined if the STUN response are ambiguous (e.g. bidirectional NAT)
  *
  * @param multiAddrs Multiaddrs to use as STUN servers
  * @param socket Node.JS socket to use for the STUN request
@@ -82,6 +82,8 @@ export function getExternalIp(
     let usableMultiaddrs: Multiaddr[]
     if (multiAddrs == undefined || multiAddrs.length == 0) {
       usableMultiaddrs = randomSubset(PUBLIC_STUN_SERVERS, DEFAULT_PARALLEL_STUN_CALLS)
+    } else if (multiAddrs.length > DEFAULT_PARALLEL_STUN_CALLS) {
+      usableMultiaddrs = randomSubset(multiAddrs, DEFAULT_PARALLEL_STUN_CALLS)
     } else {
       usableMultiaddrs = multiAddrs
     }

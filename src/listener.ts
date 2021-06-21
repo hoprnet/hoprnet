@@ -3,6 +3,7 @@
 
 import net, { AddressInfo, Socket as TCPSocket } from 'net'
 import dgram, { RemoteInfo } from 'dgram'
+import { once } from 'events'
 
 import { EventEmitter } from 'events'
 import debug from 'debug'
@@ -22,10 +23,16 @@ import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
 import { isAnyAddress } from './utils'
 import { TCPConnection } from './tcp'
+import { randomSubset } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-connect:listener')
 const error = debug('hopr-connect:listener:error')
 const verbose = debug('hopr-connect:verbose:listener')
+
+// @TODO to be adjusted
+const MAX_RELAYS_PER_NODE = 7
+// @TODO to be adjusted
+const MAX_RELAYS_TO_CHECK = 91
 
 /**
  * Attempts to close the given maConn. If a failure occurs, it will be logged.
@@ -40,7 +47,7 @@ async function attemptClose(maConn: MultiaddrConnection) {
   try {
     await maConn.close()
   } catch (err) {
-    error('an error occurred closing the connection', err)
+    error('an error occurred while closing the connection', err)
   }
 }
 
@@ -53,6 +60,8 @@ enum State {
 
 type ConnectResult = { id: string; latency: number }
 
+type Address = { port: number; address: string }
+
 class Listener extends EventEmitter implements InterfaceListener {
   private __connections: MultiaddrConnection[]
   private tcpSocket: net.Server
@@ -62,20 +71,19 @@ class Listener extends EventEmitter implements InterfaceListener {
 
   private listeningAddr?: Multiaddr
 
-  private relayConnectResults?: ConnectResult[]
-
-  private externalAddress?: {
-    address: string
-    port: number
+  private addrs: {
+    interface: Multiaddr[]
+    external: Multiaddr[]
+    relays: Multiaddr[]
   }
 
-  private stunServers: Multiaddr[] | undefined
+  private stunServers: Multiaddr[]
 
   constructor(
     private handler: ConnHandler | undefined,
     private upgrader: Upgrader,
-    stunServers: Multiaddr[] | undefined,
-    private relays: Multiaddr[] | undefined,
+    stunServers: Multiaddr[] = [],
+    private relays: Multiaddr[] = [],
     private peerId: PeerId,
     private _interface: string | undefined
   ) {
@@ -91,10 +99,12 @@ class Listener extends EventEmitter implements InterfaceListener {
       // `udp6` does not seem to work in Node 12.x
       // can receive IPv6 packet and IPv4 after reconnecting the socket
       type: 'udp4',
+      // set to true to reuse port that is bound
+      // to TCP socket
       reuseAddr: true
     })
 
-    this.stunServers = stunServers?.filter((ma: Multiaddr) => {
+    this.stunServers = stunServers.filter((ma: Multiaddr) => {
       let maPeerId = ma.getPeerId()
 
       if (maPeerId == null) {
@@ -124,6 +134,12 @@ class Listener extends EventEmitter implements InterfaceListener {
     // Forward socket errors
     this.tcpSocket.on('error', (err) => this.emit('error', err))
     this.udpSocket.on('error', (err) => this.emit('error', err))
+
+    this.addrs = {
+      interface: [],
+      external: [],
+      relays: []
+    }
   }
 
   /**
@@ -172,16 +188,30 @@ class Listener extends EventEmitter implements InterfaceListener {
     options.host = this.getAddressForInterface(options.host, family)
 
     if (options.port == 0 || options.port == null) {
-      // @TODO check listening to host on any port
-      const tcpPort = await this.listenTCP()
-      await this.listenUDP(tcpPort)
+      // First bind to any TCP port and then
+      // bind the UDP socket and bind to same port
+      await this.listenTCP().then((tcpPort) => this.listenUDP(tcpPort))
     } else {
       await Promise.all([
         // prettier-ignore
         this.listenTCP(options),
-        this.listenUDP(options.port, options.host)
+        this.listenUDP(options.port)
       ])
     }
+
+    const address = this.tcpSocket.address() as AddressInfo
+
+    this.addrs.interface.push(
+      ...getAddrs(address.port, this.peerId.toB58String(), {
+        useIPv4: true,
+        includePrivateIPv4: true,
+        includeLocalhostIPv4: true
+      })
+    )
+
+    // Prevent from sending a STUN request to self
+    let usableStunServers = this.getUsableStunServers(address.port, address.address)
+    await this.determinePublicIpAddress(usableStunServers)
 
     await this.connectToRelays()
 
@@ -196,73 +226,42 @@ class Listener extends EventEmitter implements InterfaceListener {
   async close(): Promise<void> {
     this.state = State.CLOSING
 
-    await Promise.all([
-      new Promise((resolve) => {
-        this.udpSocket.once('close', resolve)
-        this.udpSocket.close()
-      }),
-      this.tcpSocket.listening
-        ? new Promise((resolve) => {
-            this.__connections.forEach(attemptClose)
-            this.tcpSocket.once('close', resolve)
-            this.tcpSocket.close()
-          })
-        : Promise.resolve()
-    ])
+    await Promise.all([this.closeUDP(), this.closeTCP()])
 
     this.state = State.CLOSED
-
     this.emit('close')
   }
 
   /**
    * Used to determine which addresses to announce in the network.
-   * @dev Called after `listen()` has returned
+   * @dev Should be called after `listen()` has returned
+   * @dev List gets updated while waiting for `listen()`
+   * @returns list of addresses under which the node is available
    */
-  getAddrs() {
-    if (this.state != State.LISTENING) {
-      throw Error(`Listener is not yet ready`)
-    }
-
-    let addrs: Multiaddr[] = []
-    const address = this.tcpSocket.address() as AddressInfo
-
-    if (this.externalAddress == undefined) {
-      log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
-    } else {
-      addrs.push(
-        Multiaddr.fromNodeAddress(
-          {
-            address: this.externalAddress.address,
-            port: this.externalAddress.port,
-            family: 4
-          },
-          'tcp'
-        ).encapsulate(`/p2p/${this.peerId}`)
-      )
-    }
-
-    for (const res of this.relayConnectResults ?? []) {
-      addrs.push(new Multiaddr(`/p2p/${res.id}/p2p-circuit/p2p/${this.peerId}`))
-    }
-
-    addrs.push(
-      ...getAddrs(address.port, this.peerId.toB58String(), {
-        useIPv4: true,
-        includePrivateIPv4: true,
-        includeLocalhostIPv4: true
-      })
+  getAddrs(): Multiaddr[] {
+    return (
+      [...this.addrs.external, ...this.addrs.relays, ...this.addrs.interface]
+        // Filter empty entries
+        .filter((addr) => addr)
     )
-
-    return addrs
   }
 
   /**
    * Get listening port
    * @dev used for testing
+   * @returns if listening, return port number, otherwise -1
    */
   getPort(): number {
-    return (this.tcpSocket.address() as AddressInfo)?.port
+    return (this.tcpSocket.address() as AddressInfo)?.port ?? -1
+  }
+
+  /**
+   * Get amount of currently open connections
+   * @dev used for testing
+   * @returns amount of currently open connections
+   */
+  getConnections(): number {
+    return this.__connections.length
   }
 
   /**
@@ -283,7 +282,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         return
       }
 
-      if ([index, 1].includes(this.__connections.length)) {
+      if ([index + 1, 1].includes(this.__connections.length)) {
         this.__connections.pop()
       } else {
         this.__connections[index] = this.__connections.pop() as MultiaddrConnection
@@ -303,12 +302,26 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     let maConn: MultiaddrConnection | undefined
     let conn: Connection
+
     try {
       maConn = TCPConnection.fromSocket(socket, this.peerId)
-      log('new inbound connection %s', maConn.remoteAddr)
+    } catch (err) {
+      error(`inbound connection failed. ${err.message}`)
+
+      socket.destroy()
+      return
+    }
+
+    log('new inbound connection %s', maConn.remoteAddr)
+
+    try {
       conn = await this.upgrader.upgradeInbound(maConn)
     } catch (err) {
-      error('inbound connection failed', err)
+      if (err.code === 'ERR_ENCRYPTION_FAILED') {
+        error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
+      } else {
+        error('inbound connection failed', err)
+      }
 
       if (maConn != undefined) {
         return attemptClose(maConn)
@@ -327,43 +340,28 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   /**
-   * Binds the process to a UDP socket and uses the socket
-   * to retrieve the public IP address by using STUN
+   * Binds the process to a UDP socket
    * @param port binding port
    */
-  private async listenUDP(port: number, host?: string): Promise<number> {
-    await Promise.all([
-      new Promise<void>((resolve) => this.udpSocket.once('listening', resolve)),
-      new Promise<void>((resolve, reject) => {
-        this.udpSocket.once('error', reject)
-
-        this.udpSocket.bind(port, () => {
-          this.udpSocket.removeListener('error', reject)
-          resolve()
-        })
+  private async listenUDP(port: number): Promise<number> {
+    await new Promise<void>((resolve, reject) => {
+      this.udpSocket.once('error', (err: any) => {
+        this.udpSocket.removeListener('listening', resolve)
+        reject(err)
       })
-    ])
 
-    // Prevent from sending a STUN request to self
-    const usableStunServers =
-      host == undefined
-        ? this.stunServers
-        : this.stunServers?.filter((ma) => {
-            let cOpts: { host: string; port: number }
-            try {
-              cOpts = ma.toOptions()
-            } catch (err) {
-              return false
-            }
+      this.udpSocket.once('listening', () => {
+        this.udpSocket.removeListener('error', reject)
+        resolve()
+      })
 
-            return cOpts.host !== host || cOpts.port !== port
-          })
-
-    try {
-      this.externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
-    } catch (err) {
-      error(err.message)
-    }
+      try {
+        this.udpSocket.bind(port)
+      } catch (err) {
+        error(`Could not bind to UDP socket. ${err.message}`)
+        reject(err)
+      }
+    })
 
     return this.udpSocket.address().port
   }
@@ -373,26 +371,126 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param opts host and port to bind to
    */
   private async listenTCP(opts?: { host: string; port: number }): Promise<number> {
-    await Promise.all([
-      new Promise<void>((resolve) => this.tcpSocket.once('listening', resolve)),
-      new Promise<void>((resolve, reject) => {
-        this.tcpSocket.once('error', reject)
-
-        try {
-          this.tcpSocket.listen(opts, () => {
-            this.tcpSocket.removeListener('error', reject)
-            resolve()
-          })
-        } catch (err) {
-          error(`Could not bind to TCP socket. ${err.message}`)
-          reject()
-        }
+    await new Promise<void>((resolve, reject) => {
+      this.tcpSocket.once('error', (err: any) => {
+        this.tcpSocket.removeListener('listening', resolve)
+        reject(err)
       })
-    ])
+
+      this.tcpSocket.once('listening', () => {
+        this.tcpSocket.removeListener('error', reject)
+        resolve()
+      })
+
+      try {
+        this.tcpSocket.listen(opts)
+      } catch (err) {
+        error(`Could not bind to TCP socket. ${err.message}`)
+        reject(err)
+      }
+    })
 
     log('Listening on %s', this.tcpSocket.address())
 
     return (this.tcpSocket.address() as AddressInfo).port
+  }
+
+  /**
+   * Closes the TCP socket and tries to close all pending
+   * connections.
+   * @returns Promise that resolves once TCP socket is closed
+   */
+  private async closeTCP() {
+    if (!this.tcpSocket.listening) {
+      return
+    }
+
+    await Promise.all(this.__connections.map(attemptClose))
+
+    const promise = once(this.tcpSocket, 'close')
+
+    this.tcpSocket.close()
+
+    return promise
+  }
+
+  /**
+   * Closes the UDP socket
+   * @returns Promise that resolves once UDP socket is closed
+   */
+  private closeUDP() {
+    const promise = once(this.udpSocket, 'close')
+
+    this.udpSocket.close()
+
+    return promise
+  }
+
+  /**
+   * Tries to determine a node's public IP address by
+   * using STUN servers
+   * @param port the port on which we are listening
+   * @param host [optional] the host on which we are listening
+   * @returns Promise that resolves once STUN request came back or STUN timeout was reched
+   */
+  private async determinePublicIpAddress(usableStunServers: Multiaddr[]): Promise<void> {
+    let externalAddress: Address | undefined
+    try {
+      externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
+    } catch (err) {
+      error(err.message)
+      return
+    }
+
+    if (externalAddress == undefined) {
+      log(`STUN requests led to multiple ambiguous results, hence node seems to be behind a bidirectional NAT.`)
+      return
+    }
+
+    const externalMultiaddr = Multiaddr.fromNodeAddress(
+      {
+        address: externalAddress.address,
+        port: externalAddress.port,
+        family: 4
+      },
+      'tcp'
+    ).encapsulate(`/p2p/${this.peerId}`)
+
+    this.addrs.interface = this.addrs.interface.filter((ma: Multiaddr) => !externalMultiaddr.equals(ma))
+
+    this.addrs.external.push(externalMultiaddr)
+  }
+
+  /**
+   * Returns a list of STUN servers that we can use to determine
+   * our own public IP address
+   * @param port the port on which we are listening
+   * @param host [optional] the host on which we are listening
+   * @returns a list of STUN servers, excluding ourself
+   */
+  private getUsableStunServers(port: number, host?: string): Multiaddr[] {
+    if (host == undefined) {
+      return this.stunServers
+    }
+
+    const usableStunServers: Multiaddr[] = []
+
+    for (const potentialStunServer of this.stunServers) {
+      let cOpts: { host: string; port: number }
+      try {
+        cOpts = potentialStunServer.toOptions()
+      } catch (err) {
+        continue
+      }
+
+      if (cOpts.host === host && cOpts.port === port) {
+        continue
+      }
+
+      usableStunServers.push(potentialStunServer)
+    }
+
+    return usableStunServers
   }
 
   private getAddressForInterface(host: string, family: NetworkInterfaceInfo['family']): string {
@@ -414,7 +512,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       (iface: NetworkInterfaceInfo) => iface.family.toLowerCase() == family && !iface.internal
     )
 
-    if (usableInterfaces == undefined) {
+    if (usableInterfaces == undefined || usableInterfaces.length == 0) {
       throw Error(`Desired interface <${this._interface}> does not exist or does not have any external addresses.`)
     }
 
@@ -436,16 +534,16 @@ class Listener extends EventEmitter implements InterfaceListener {
 
   private async connectToRelays() {
     // @TODO check address family
-    if (this.relays == undefined || this.relays.length == 0) {
+    if (this.relays.length == 0) {
       return
     }
 
     const promises: Promise<ConnectResult>[] = []
     const abort = new AbortController()
 
-    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CONTACT_TIMEOUT)
+    const usedPeerIds = new Set<string>()
 
-    for (const relay of this.relays) {
+    for (const relay of randomSubset(this.relays, Math.min(MAX_RELAYS_TO_CHECK, this.relays.length))) {
       const relayPeerId = relay.getPeerId()
 
       if (relayPeerId == null || this.peerId.toB58String() === relayPeerId) {
@@ -453,32 +551,45 @@ class Listener extends EventEmitter implements InterfaceListener {
         continue
       }
 
+      if (usedPeerIds.has(relayPeerId)) {
+        continue
+      }
+
+      usedPeerIds.add(relayPeerId)
+
       promises.push(this.connectToRelay(relay, relayPeerId, { signal: abort.signal }))
     }
 
-    const results = await Promise.all(promises)
+    if (promises.length == 0) {
+      // No usable relays found
+      return
+    }
+
+    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CONTACT_TIMEOUT)
+
+    const rawResults = await Promise.all(promises)
 
     clearTimeout(timeout)
 
-    this.relayConnectResults = results.filter((res) => res.latency >= 0).sort((a, b) => a.latency - b.latency)
+    const filteredAndSortedResults = rawResults.filter((res) => res.latency >= 0).sort((a, b) => a.latency - b.latency)
+
+    for (const result of filteredAndSortedResults.slice(0, MAX_RELAYS_PER_NODE)) {
+      this.addrs.relays.push(new Multiaddr(`/p2p/${result.id}/p2p-circuit/p2p/${this.peerId}`))
+    }
   }
 
   private async connectToRelay(relay: Multiaddr, relayPeerId: string, opts?: { signal: AbortSignal }) {
-    const start = Date.now()
     let latency: number
     let conn: Connection | undefined
     let maConn: MultiaddrConnection | undefined
+
+    const start = Date.now()
 
     try {
       maConn = await TCPConnection.create(relay, this.peerId, opts)
     } catch (err) {
       if (maConn != undefined) {
-        attemptClose(maConn)
-      }
-
-      return {
-        id: relayPeerId,
-        latency: -1
+        await attemptClose(maConn)
       }
     }
 
@@ -491,25 +602,31 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     try {
       conn = await this.upgrader.upgradeOutbound(maConn)
-      latency = Date.now() - start
     } catch (err) {
-      error(err)
-      attemptClose(maConn)
-
-      return {
-        id: relayPeerId,
-        latency: -1
+      if (err.code === 'ERR_ENCRYPTION_FAILED') {
+        error(
+          `outbound connection to potential relay node failed because encryption failed. Maybe connected to the wrong node?`
+        )
+      } else {
+        error('outbound connection to potential relay node failed.', err)
+      }
+      if (conn != undefined) {
+        try {
+          await conn.close()
+        } catch (err) {
+          error(err)
+        }
       }
     }
 
     if (conn == undefined) {
-      attemptClose(maConn)
-
       return {
         id: relayPeerId,
         latency: -1
       }
     }
+
+    latency = Date.now() - start
 
     this.trackConn(maConn)
 
