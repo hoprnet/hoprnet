@@ -11,7 +11,8 @@ import {
   AcknowledgedTicket,
   Response,
   generateChannelId,
-  HalfKey
+  HalfKey,
+  PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
@@ -123,10 +124,11 @@ describe('test channel', function () {
       utils.hexlify((await aliceMocks.channel.usToThem()).serialize()),
       utils.hexlify(aliceMocks.channelUsThem.serialize())
     )
+
   })
 
   it("should validate ticket's response", async function () {
-    const ticket = await aliceMocks.channel.createTicket(1, aliceMocks.response.toChallenge())
+    const ticket = await aliceMocks.channel.createTicket(2, aliceMocks.response.toChallenge())
 
     const goodAck = new AcknowledgedTicket(
       ticket,
@@ -147,10 +149,13 @@ describe('test channel', function () {
 
     const badResponse = await bobMocks.channel.redeemTicket(badAck)
     assert(badResponse.status === 'FAILURE' && badResponse.message === 'Invalid response to acknowledgement')
+
+    const aBalances = await aliceMocks.channel.balanceToThem()
+    assert(aBalances.minimum.eq(aBalances.maximum.sub(PRICE_PER_PACKET)), 'max and min balance diverge')
   })
 
   it("should validate ticket's preimage", async function () {
-    const ticket = await aliceMocks.channel.createTicket(1, aliceMocks.response.toChallenge())
+    const ticket = await aliceMocks.channel.createTicket(2, aliceMocks.response.toChallenge())
 
     const acknowledgement = new AcknowledgedTicket(
       ticket,
