@@ -3,7 +3,7 @@ import PeerId from 'peer-id'
 import { ethers } from 'ethers'
 import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '..'
 import BN from 'bn.js'
-import { Address, PublicKey } from '.' // TODO: cyclic dep
+import { Address, PublicKey } from './primitives'
 import { decode } from 'bs58'
 import { publicKeyVerify } from 'secp256k1'
 
@@ -26,7 +26,7 @@ export class AccountEntry {
         const pubKey = decode(encodedPublicKey).slice(-33)
 
         if (!publicKeyVerify(pubKey)) {
-          throw Error(`Invalid public key`)
+          throw Error(`Multiaddr does not contain a valid public key.`)
         }
       }
     }
