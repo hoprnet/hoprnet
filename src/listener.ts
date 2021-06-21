@@ -604,7 +604,9 @@ class Listener extends EventEmitter implements InterfaceListener {
       conn = await this.upgrader.upgradeOutbound(maConn)
     } catch (err) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
-        error(`outbound connection to potential relay node failed because encryption failed. Maybe connected to the wrong node?`)
+        error(
+          `outbound connection to potential relay node failed because encryption failed. Maybe connected to the wrong node?`
+        )
       } else {
         error('outbound connection to potential relay node failed.', err)
       }
