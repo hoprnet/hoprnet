@@ -109,7 +109,7 @@ function setup_node() {
     --host="127.0.0.1:${node_port}" --testPreferLocalAddresses \
     --data="${dir}" --rest --restPort "${rest_port}" --announce \
     --api-token "e2e-api-token" \
-    --admin --adminHost "127.0.0.1" --adminPort ${admin_port} \    
+    --admin --adminHost "127.0.0.1" --adminPort ${admin_port} \
     --password="e2e-test" --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
