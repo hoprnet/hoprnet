@@ -100,7 +100,11 @@ class RelayHandshake {
     this.shaker.rest()
 
     if (answer == RelayHandshakeMessage.OK) {
-      log(`Successfully established outbound relayed connection with ${green(destination.toB58String())} over relay ${green(relay.toB58String())}`)
+      log(
+        `Successfully established outbound relayed connection with ${green(
+          destination.toB58String()
+        )} over relay ${green(relay.toB58String())}`
+      )
       return {
         success: true,
         stream: this.shaker.stream
@@ -270,7 +274,11 @@ class RelayHandshake {
       }
     }
 
-    log(`Successfully established inbound relayed connection from initiator ${green(initiator.toB58String())} over relay ${green(source.toB58String())}.`)
+    log(
+      `Successfully established inbound relayed connection from initiator ${green(
+        initiator.toB58String()
+      )} over relay ${green(source.toB58String())}.`
+    )
 
     this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
     this.shaker.rest()
