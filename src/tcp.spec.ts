@@ -4,14 +4,11 @@
 import { createServer, Socket } from 'net'
 import type { AddressInfo } from 'net'
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'
-// import Listener from './listener'
 import Defer from 'p-defer'
 import { once } from 'events'
 import { Multiaddr } from 'multiaddr'
 import { u8aEquals } from '@hoprnet/hopr-utils'
-// import type { Upgrader } from 'libp2p'
 import PeerId from 'peer-id'
-// import { Connection } from 'libp2p-interfaces'
 import assert from 'assert'
 
 describe('test TCP connection', function () {
