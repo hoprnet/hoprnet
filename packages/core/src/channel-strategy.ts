@@ -1,10 +1,7 @@
 import type { ChannelEntry, Channel } from '@hoprnet/hopr-core-ethereum'
-import { AcknowledgedTicket, PublicKey, MINIMUM_REASONABLE_CHANNEL_STAKE, MAX_AUTO_CHANNELS} from '@hoprnet/hopr-utils'
+import { AcknowledgedTicket, PublicKey, MINIMUM_REASONABLE_CHANNEL_STAKE, MAX_AUTO_CHANNELS } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import {
-  MAX_NEW_CHANNELS_PER_TICK,
-  NETWORK_QUALITY_THRESHOLD,
-} from './constants'
+import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD } from './constants'
 import debug from 'debug'
 import type NetworkPeers from './network/network-peers'
 const log = debug('hopr-core:channel-strategy')

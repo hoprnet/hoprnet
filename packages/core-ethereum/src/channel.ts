@@ -219,7 +219,6 @@ class Channel {
     )
   }
 
-
   /*
    * As we issue probabilistic tickets, we can't be sure of the exact balance
    * of our channels, but we can estimate based on how many tickets are
@@ -233,7 +232,7 @@ class Channel {
 
     return {
       minimum: stake.toBN().sub(outstandingTicketBalance),
-      maximum: stake, 
+      maximum: stake
       //estimated: 0 //TODO
     }
   }

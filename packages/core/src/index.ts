@@ -7,14 +7,7 @@ import { NOISE } from 'libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 
-import {
-  PACKET_SIZE,
-  MAX_HOPS,
-  VERSION,
-  CHECK_TIMEOUT,
-  PATH_RANDOMNESS,
-  FULL_VERSION
-} from './constants'
+import { PACKET_SIZE, MAX_HOPS, VERSION, CHECK_TIMEOUT, PATH_RANDOMNESS, FULL_VERSION } from './constants'
 
 import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
@@ -39,7 +32,7 @@ import {
   LibP2PHandlerFunction,
   AcknowledgedTicket,
   ChannelStatus,
-  MIN_NATIVE_BALANCE,
+  MIN_NATIVE_BALANCE
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
