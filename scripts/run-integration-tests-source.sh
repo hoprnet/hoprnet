@@ -55,9 +55,9 @@ declare node6_id="${node6_dir}.id"
 declare hardhat_rpc_log="/tmp/hopr-source-hardhat-rpc.log"
 
 function cleanup {
-  trap - SIGINT SIGTERM ERR EXIT
-
   local EXIT_CODE=$?
+
+  trap - SIGINT SIGTERM ERR EXIT
 
   # Cleaning up everything
   if [ "$EXIT_CODE" != "0" ]; then
