@@ -5,6 +5,8 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
 import PeerId from 'peer-id'
 import Defer from 'p-defer'
+import assert from 'assert'
+import { Stream } from 'libp2p'
 
 describe('test relay handshake', function () {
   let initiator: PeerId, relay: PeerId, destination: PeerId
@@ -113,5 +115,81 @@ describe('test relay handshake', function () {
     await Promise.all([handshakePromise, destinationHandshake])
 
     await okReceived.promise
+  })
+
+  it('should send messages after handshake', async function () {
+    const initiatorToRelay = Pair()
+    const relayToInitiator = Pair()
+
+    const relayToDestination = Pair()
+    const destinationToRelay = Pair()
+
+    const initiatorHandshake = new RelayHandshake({
+      source: relayToInitiator.source,
+      sink: initiatorToRelay.sink
+    })
+
+    const relayHandshake = new RelayHandshake({
+      source: initiatorToRelay.source,
+      sink: relayToInitiator.sink
+    })
+
+    const destinationHandshake = new RelayHandshake({
+      source: relayToDestination.source,
+      sink: destinationToRelay.sink
+    })
+
+    relayHandshake.negotiate(
+      initiator,
+      async () => {
+        return {
+          source: destinationToRelay.source,
+          sink: relayToDestination.sink
+        }
+      },
+      () => false,
+      async () => true,
+      () => {},
+      (_source, _destination, toSource: Stream, toDestination: Stream) => {
+        toSource.sink(toDestination.source)
+        toDestination.sink(toSource.source)
+      }
+    )
+
+    const [initiatorResult, destinationResult] = await Promise.all([
+      initiatorHandshake.initiate(relay, destination),
+      destinationHandshake.handle(relay)
+    ])
+
+    assert(initiatorResult.success && destinationResult.success)
+
+    const messageInitiatorDestination = new TextEncoder().encode('initiatorMessage')
+    const messageDestinationInitiator = new TextEncoder().encode('initiatorMessage')
+
+    initiatorResult.stream.sink(
+      (async function* () {
+        yield messageInitiatorDestination
+      })()
+    )
+
+    destinationResult.stream.sink(
+      (async function* () {
+        yield messageDestinationInitiator
+      })()
+    )
+
+    let msgReceivedInitiator = false
+    for await (const msg of initiatorResult.stream.source) {
+      assert(u8aEquals(msg.slice(), messageDestinationInitiator))
+      msgReceivedInitiator = true
+    }
+
+    let msgReceivedDestination = false
+    for await (const msg of destinationResult.stream.source) {
+      assert(u8aEquals(msg.slice(), messageInitiatorDestination))
+      msgReceivedDestination = true
+    }
+
+    assert(msgReceivedDestination && msgReceivedInitiator)
   })
 })

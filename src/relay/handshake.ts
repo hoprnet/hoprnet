@@ -232,6 +232,7 @@ class RelayHandshake {
     }
 
     this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
+    this.shaker.rest()
     destinationShaker.rest()
 
     createNew(source, destination, this.shaker.stream, destinationShaker.stream)
