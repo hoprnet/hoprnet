@@ -50,7 +50,7 @@ fi
 
 # should reject admin panel commands with no tocken
 log "Testing WS rejecting with no token"
-WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ -vvv)
+WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/)
 if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   log "Didn't fail ws authentication with no token"
   log "Expected response: 'authentication failed' "
@@ -61,7 +61,7 @@ fi
 
 # should reject admin panel commands with bad token
 log "Testing WS rejecting bad token"
-WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ -vvv --header "Cookie:X-Auth-Token=bad-token")
+WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=bad-token")
 if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   log "Didn't fail ws authentication with bad token"
   log "Expected response: 'authentication failed' "
@@ -72,7 +72,7 @@ fi
 
 # should execute admin panel commands with right token
 log "Testing WS executing commands with right token"
-WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ -vvv --header "Cookie:X-Auth-Token=e2e-api-token")
+WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=e2e-api-token")
 echo "${WS_RESPONSE}" | grep -q "ws connection authenticated with token"
 
 log "Security tests finished successfully"
