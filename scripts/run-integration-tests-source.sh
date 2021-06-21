@@ -186,7 +186,7 @@ wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 3301 9091 9100 "${node1_dir}" "${node1_log}" "${node1_id}"
+setup_node 3301 9091 9501 "${node1_dir}" "${node1_log}" "${node1_id}"
 setup_node 3302 9092 9502 "${node2_dir}" "${node2_log}" "${node2_id}"
 setup_node 3303 9093 9503 "${node3_dir}" "${node3_log}" "${node3_id}"
 setup_node 3304 9094 9504 "${node4_dir}" "${node4_log}" "${node4_id}" "--run \"info;balance\""
@@ -208,12 +208,12 @@ wait_for_port 9094 "${node4_log}"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 3301 9100
+  127.0.0.1 3301 9501
 #}}}
 
 # --- Run protocol test --- {{{
-# ${mydir}/../test/integration-test.sh \
-#   "localhost:3301" "localhost:3302" "localhost:3303"
+${mydir}/../test/integration-test.sh \
+  "localhost:3301" "localhost:3302" "localhost:3303"
 # }}}
 
 # -- Verify node4 has executed the commands {{{
