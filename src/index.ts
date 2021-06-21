@@ -12,7 +12,7 @@ import { Transport, Connection } from 'libp2p-interfaces'
 import chalk from 'chalk'
 import { TCPConnection } from './tcp'
 import { WebRTCUpgrader } from './webrtc'
-import { Relay }  from './relay'
+import { Relay } from './relay'
 import { Discovery } from './discovery'
 import { Filter } from './filter'
 
