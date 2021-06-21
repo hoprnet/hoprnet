@@ -14,27 +14,26 @@ let debugLog = debug('hoprd')
 
 const MAX_MESSAGES_CACHED = 100
 
-
 class Queue {
-  private queue: RunQueue = undefined;
-  private completed: boolean = false;
+  private queue: RunQueue = undefined
+  private completed: boolean = false
   private opts: {
-    maxConcurrency: number,
-  } = undefined;
+    maxConcurrency: number
+  } = undefined
 
   constructor(opts) {
-    this.opts = opts;
+    this.opts = opts
     this.queue = new RunQueue(opts)
   }
   add(priority, job) {
     if (this.completed) {
       this.queue = new RunQueue(this.opts)
-      this.completed = false;
+      this.completed = false
     }
     this.queue.add(priority, job)
   }
   async run() {
-    this.queue.run().then(() => this.completed = true)
+    this.queue.run().then(() => (this.completed = true))
   }
 }
 
