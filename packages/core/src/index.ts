@@ -843,7 +843,7 @@ class Hopr extends EventEmitter {
     return await findPath(
       this.getId(),
       destination,
-      MAX_HOPS - 1,
+      MAX_HOPS,
       this.networkPeers,
       ethereum.getOpenRoutingChannelsFromPeer.bind(ethereum),
       PATH_RANDOMNESS

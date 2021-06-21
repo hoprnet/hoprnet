@@ -186,6 +186,5 @@ log "Node 3 should now have a ticket"
 result=$(run_command ${api3} "tickets" "Win Proportion:   100%")
 log "-- ${result}"
 
-# multihop
 log "Node 1 send message to node 3"
 run_command "${api1}" "send ${addr3} 'hello, world'" "Message sent"
