@@ -2,7 +2,7 @@ import { deployments, ethers } from 'hardhat'
 import Multiaddr from 'multiaddr'
 import { expect } from 'chai'
 import BN from 'bn.js'
-import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory } from '../types'
+import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory, HoprChannels, HoprToken } from '../types'
 import { increaseTime } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './constants'
 import {
@@ -11,15 +11,19 @@ import {
   UINT256,
   Balance,
   stringToU8a,
+  u8aAdd,
+  u8aToHex,
+  toU8a,
   Ticket,
   Hash,
   Response,
   AcknowledgedTicket,
   PublicKey,
   generateChannelId,
-  ChannelStatus
+  ChannelStatus,
+  PromiseValue
 } from '@hoprnet/hopr-utils'
-import { randomBytes } from 'crypto'
+import type { Wallet } from '@ethersproject/wallet'
 
 type TicketValues = {
   recipient: string
@@ -33,7 +37,7 @@ type TicketValues = {
 
 const percentToUint256 = (percent: any) => ethers.constants.MaxUint256.mul(percent).div(100)
 
-export const redeemArgs = (ticket: AcknowledgedTicket) => [
+export const redeemArgs = (ticket: AcknowledgedTicket): Parameters<HoprChannels['redeemTicket']> => [
   ticket.signer.toAddress().toHex(),
   ticket.preImage.toHex(),
   ticket.ticket.epoch.toHex(),
@@ -188,7 +192,7 @@ describe('announce user', function () {
 })
 
 describe('funding HoprChannel catches failures', function () {
-  let fixtures, channels, accountA
+  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>, channels: HoprChannels, accountA: Wallet
   before(async function () {
     // All of these tests revert, so we can rely on stateless single fixture.
     fixtures = await useFixtures()
@@ -326,8 +330,8 @@ describe('funding a HoprChannel success', function () {
 })
 
 describe('with single funded HoprChannels: AB: 70', function () {
-  let channels
-  let fixtures
+  let channels: HoprChannels
+  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
 
   beforeEach(async function () {
     fixtures = await useFixtures()
@@ -352,8 +356,8 @@ describe('with single funded HoprChannels: AB: 70', function () {
 })
 
 describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', function () {
-  let channels
-  let fixtures
+  let channels: HoprChannels
+  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
 
   beforeEach(async function () {
     fixtures = await useFixtures()
@@ -516,7 +520,10 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
 })
 
 describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
-  let channels, token, fixtures
+  let channels: HoprChannels
+  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let token: HoprToken
+
   beforeEach(async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
@@ -564,7 +571,9 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
 })
 
 describe('with a closed channel', function () {
-  let channels, fixtures
+  let channels: HoprChannels
+  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+
   beforeEach(async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
@@ -594,7 +603,10 @@ describe('with a closed channel', function () {
 })
 
 describe('with a reopened channel', function () {
-  let channels, fixtures, TICKET_AB_WIN_RECYCLED
+  let channels: HoprChannels
+  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let TICKET_AB_WIN_RECYCLED: PromiseValue<ReturnType<typeof createTicket>>
+
   beforeEach(async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
@@ -651,7 +663,8 @@ describe('with a reopened channel', function () {
 })
 
 describe('test internals with mock', function () {
-  let channels
+  let channels: HoprChannels
+
   beforeEach(async function () {
     channels = (await useFixtures()).mockChannels
   })
@@ -706,10 +719,27 @@ describe('test internals with mock', function () {
   })
 
   it('should get the right challenge', async function () {
-    const response = new Response(Uint8Array.from(randomBytes(Response.SIZE)))
+    const response = Response.createMock()
 
     const challenge = await channels.computeChallengeInternal(response.toHex())
 
     expect(challenge.toLowerCase()).to.equal(response.toChallenge().toEthereumChallenge().toHex())
+  })
+
+  it('should get the right challenge - edge cases', async function () {
+    const FIELD_ORDER = stringToU8a('0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141')
+    const INVALID_FIELD_ELEMENT_GREATER_THAN_FIELD_ORDER = u8aAdd(false, FIELD_ORDER, toU8a(1, 32))
+
+    await expect(channels.computeChallengeInternal(toU8a(0, 32))).to.be.revertedWith(
+      'Invalid response. Value must be within the field'
+    )
+
+    await expect(channels.computeChallengeInternal(u8aToHex(FIELD_ORDER))).to.be.revertedWith(
+      'Invalid response. Value must be within the field'
+    )
+
+    await expect(
+      channels.computeChallengeInternal(u8aToHex(INVALID_FIELD_ELEMENT_GREATER_THAN_FIELD_ORDER))
+    ).to.be.revertedWith('Invalid response. Value must be within the field')
   })
 })

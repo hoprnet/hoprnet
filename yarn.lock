@@ -2093,9 +2093,9 @@
     "@types/chai" "*"
 
 "@types/chai@*", "@types/chai@^4.2.15":
-  version "4.2.18"
-  resolved "https://registry.yarnpkg.com/@types/chai/-/chai-4.2.18.tgz#0c8e298dbff8205e2266606c1ea5fbdba29b46e4"
-  integrity sha512-rS27+EkB/RE1Iz3u0XtVL5q36MGDWbgYe7zWiodyKNUnthxY0rukK5V36eiUCtCisB7NN8zKYH6DO2M37qxFEQ==
+  version "4.2.19"
+  resolved "https://registry.yarnpkg.com/@types/chai/-/chai-4.2.19.tgz#80f286b515897413c7a35bdda069cc80f2344233"
+  integrity sha512-jRJgpRBuY+7izT7/WNXP/LsMO9YonsstuL+xuvycDyESpoDoIAsMd7suwpB4h9oEWB+ZlPTqJJ8EHomzNhwTPQ==
 
 "@types/concat-stream@^1.6.0":
   version "1.6.0"
@@ -9967,9 +9967,9 @@ mocha@^7.1.1, mocha@^7.1.2:
     yargs-unparser "1.6.0"
 
 mocha@^9.0.0:
-  version "9.0.0"
-  resolved "https://registry.yarnpkg.com/mocha/-/mocha-9.0.0.tgz#67ce848170cb6426f9e84c57e38376dc9017bab4"
-  integrity sha512-GRGG/q9bIaUkHJB9NL+KZNjDhMBHB30zW3bZW9qOiYr+QChyLjPzswaxFWkI1q6lGlSL28EQYzAi2vKWNkPx+g==
+  version "9.0.1"
+  resolved "https://registry.yarnpkg.com/mocha/-/mocha-9.0.1.tgz#01e66b7af0012330c0a38c4b6eaa6d92b8a81bf9"
+  integrity sha512-9zwsavlRO+5csZu6iRtl3GHImAbhERoDsZwdRkdJ/bE+eVplmoxNKE901ZJ9LdSchYBjSCPbjKc5XvcAri2ylw==
   dependencies:
     "@ungap/promise-all-settled" "1.1.2"
     ansi-colors "4.1.1"
@@ -14060,10 +14060,10 @@ typedoc-default-themes@^0.12.10:
   resolved "https://registry.yarnpkg.com/typedoc-default-themes/-/typedoc-default-themes-0.12.10.tgz#614c4222fe642657f37693ea62cad4dafeddf843"
   integrity sha512-fIS001cAYHkyQPidWXmHuhs8usjP5XVJjWB8oZGqkTowZaz3v7g3KDZeeqE82FBrmkAnIBOY3jgy7lnPnqATbA==
 
-typedoc-plugin-markdown@3.9.0:
-  version "3.9.0"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-markdown/-/typedoc-plugin-markdown-3.9.0.tgz#d9c0390b8ddeeda56fdbf01264521ef04b3c19c7"
-  integrity sha512-s445YeUe8bH7me15T+hsHZgNmAvvF7QIpX02vFgseLGtghAwmtdZYVOqPneWoKqRv/JNpPSuyZb3CeblML9jOg==
+typedoc-plugin-markdown@3.10.0:
+  version "3.10.0"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-markdown/-/typedoc-plugin-markdown-3.10.0.tgz#fa06e9e67376095e68e2ce0a778b4827748d1b8b"
+  integrity sha512-FYset/F0zFuoTVn3ljUEH+CShMe95JPMnFOTFuqxJViztmgIIvGiygcQz2DKjdEv+fHTohrvjq30KGPkuv+6Qg==
   dependencies:
     handlebars "^4.7.7"
 
