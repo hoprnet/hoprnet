@@ -49,6 +49,7 @@ if [ ${STATUS_CODE} -ne 403 ]; then
 fi
 
 yarn global add wscat
+PATH=$HOME/.yarn/bin:$PATH
 
 wscat --connect ws://${host}:${admin_port}/ --execute info
 log $?
