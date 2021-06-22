@@ -75,7 +75,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 3301 3302 3303 3304 3305 3306 9091 9092 9093 9094 9095 9096; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096; do
     if lsof -i ":${port}" -s TCP:LISTEN; then
       lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
     fi
@@ -170,18 +170,18 @@ log "\t\tid: ${node6_id}"
 
 # --- Check all resources we need are free {{{
 ensure_port_is_free 8545
-ensure_port_is_free 3301
-ensure_port_is_free 3302
-ensure_port_is_free 3303
-ensure_port_is_free 3304
-ensure_port_is_free 3305
-ensure_port_is_free 3306
-ensure_port_is_free 9091
-ensure_port_is_free 9092
-ensure_port_is_free 9093
-ensure_port_is_free 9094
-ensure_port_is_free 9095
-ensure_port_is_free 9096
+ensure_port_is_free 13301
+ensure_port_is_free 13302
+ensure_port_is_free 13303
+ensure_port_is_free 13304
+ensure_port_is_free 13305
+ensure_port_is_free 13306
+ensure_port_is_free 19091
+ensure_port_is_free 19092
+ensure_port_is_free 19093
+ensure_port_is_free 19094
+ensure_port_is_free 19095
+ensure_port_is_free 19096
 # }}}
 
 # --- Running Mock Blockchain --- {{{
@@ -195,40 +195,40 @@ wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 3301 9091 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 3302 9092 "${node2_dir}" "${node2_log}" "${node2_id}"
-setup_node 3303 9093 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 3304 9094 "${node4_dir}" "${node4_log}" "${node4_id}"
-setup_node 3305 9095 "${node5_dir}" "${node5_log}" "${node5_id}"
-setup_node 3306 9096 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+setup_node 13301 19091 "${node1_dir}" "${node1_log}" "${node1_id}"
+setup_node 13302 19092 "${node2_dir}" "${node2_log}" "${node2_id}"
+setup_node 13303 19093 "${node3_dir}" "${node3_log}" "${node3_id}"
+setup_node 13304 19094 "${node4_dir}" "${node4_log}" "${node4_id}"
+setup_node 13305 19095 "${node5_dir}" "${node5_log}" "${node5_id}"
+setup_node 13306 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
 # }}}
 
 #  --- Fund nodes --- {{{
-fund_node 3301 "${node1_log}"
-fund_node 3302 "${node2_log}"
-fund_node 3303 "${node3_log}"
-fund_node 3304 "${node4_log}"
-fund_node 3305 "${node5_log}"
-fund_node 3306 "${node6_log}"
+fund_node 13301 "${node1_log}"
+fund_node 13302 "${node2_log}"
+fund_node 13303 "${node3_log}"
+fund_node 13304 "${node4_log}"
+fund_node 13305 "${node5_log}"
+fund_node 13306 "${node6_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_port 9091 "${node1_log}"
-wait_for_port 9092 "${node2_log}"
-wait_for_port 9093 "${node3_log}"
-wait_for_port 9094 "${node4_log}"
-wait_for_port 9095 "${node5_log}"
-wait_for_port 9096 "${node6_log}"
+wait_for_port 19091 "${node1_log}"
+wait_for_port 19092 "${node2_log}"
+wait_for_port 19093 "${node3_log}"
+wait_for_port 19094 "${node4_log}"
+wait_for_port 19095 "${node5_log}"
+# no need to wait for node 6 since that will stop right away
 # }}}
 
 # --- Run test --- {{{
 ${mydir}/../test/integration-test.sh \
-  "localhost:3301" "localhost:3302" "localhost:3303" "localhost:3304" "localhost:3305"
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305"
 # }}}
 
-# -- Verify node4 has executed the commands {{{
-# REMOVED AS THIS IS BROKEN
-#echo "- Verifying node4 log output"
-#grep -q "^HOPR Balance:" "${node4_log}"
-#grep -q "^Running on: localhost" "${node4_log}"
-#}}}
+# -- Verify node6 has executed the commands {{{
+log "Verifying node6 log output"
+grep -q "^HOPR Balance: *1 HOPR$" "${node6_log}"
+grep -q "^ETH Balance: *1 xDAI$" "${node6_log}"
+grep -q "^Running on: localhost$" "${node6_log}"
+# }}}

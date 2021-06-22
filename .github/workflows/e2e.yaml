@@ -55,6 +55,7 @@ jobs:
 
       - name: Upload node logs
         uses: actions/upload-artifact@v2
+        if: always()
         with:
           name: hopr-e2e-source-node-logs
           path: |
