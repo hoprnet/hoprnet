@@ -22,29 +22,26 @@ declare admin_port="${3}"
 
 log "Security tests started"
 log "Rest API @ ${host}:${rest_port}"
-log "WS API @ ${host}:${admin_port}"
+log "Admin websocket API @ ${host}:${admin_port}"
 
 wait_for_port ${rest_port}
 wait_for_port ${admin_port}
 
-# should fail REST authentication without proper token
-log "Testing REST rejecting null token"
+log "REST API should reject authentication without token"
 STATUS_CODE=$(curl -H "X-Auth-Token: bad-token" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${STATUS_CODE} -ne 403 ]; then
   log "Didn't get 403 with bad token"
   exit 1
 fi
 
-# should fail REST authentication without a token
-log "Testing REST rejecting bad token"
+log "REST API should reject authentication with invalid token"
 STATUS_CODE=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${STATUS_CODE} -ne 403 ]; then
   log "Didn't get 403 with no token"
   exit 1
 fi
 
-# should reject admin panel commands with no tocken
-log "Testing WS rejecting with no token"
+log "Admin websocket should reject commands without token"
 WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/)
 if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   log "Didn't fail ws authentication with no token"
@@ -54,8 +51,7 @@ if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   exit 1
 fi
 
-# should reject admin panel commands with bad token
-log "Testing WS rejecting bad token"
+log "Admin websocket should reject commands with invalid token"
 WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=bad-token")
 if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   log "Didn't fail ws authentication with bad token"
@@ -65,8 +61,7 @@ if [ "${WS_RESPONSE}" != "authentication failed" ]; then
   exit 1
 fi
 
-# should execute admin panel commands with right token
-log "Testing WS executing commands with right token"
+log "Admin websocket should execute info command with correct token"
 WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=e2e-api-token")
 echo "${WS_RESPONSE}" | grep -q "ws connection authenticated with token"
 
