@@ -461,7 +461,8 @@ class Hopr extends EventEmitter {
             }
           }
 
-          const path: PublicKey[] = [].concat(intermediatePath, [destination])
+          const path: PublicKey[] = [].concat(intermediatePath, [PublicKey.fromPeerId(destination)])
+          console.log(">>>", path)
 
           let packet: Packet
           try {
