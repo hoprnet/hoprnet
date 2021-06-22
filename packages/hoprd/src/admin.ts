@@ -13,6 +13,7 @@ import { LogStream } from './logs'
 import { NODE_ENV } from './env'
 import { Balance, NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
+import cookie from 'cookie'
 
 let debugLog = debug('hoprd:admin')
 
@@ -23,7 +24,28 @@ export class AdminServer {
   private wsServer: any
   private cmds: Commands
 
-  constructor(private logs: LogStream, private host: string, private port: number) {}
+  constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) {}
+
+  authenticate(req): boolean {
+    if (this.apiToken === undefined) {
+      this.logs.log('web client connected [ authentication DISABLED ]')
+      return true
+    }
+
+    let cookies: ReturnType<typeof cookie.parse> | undefined
+    try {
+      cookies = cookie.parse(req.headers.cookie)
+    } catch (e) {
+      this.logs.error(`failed parsing cookies`, e)
+    }
+
+    if (!cookies || cookies['X-Auth-Token'] !== this.apiToken) {
+      this.logs.log('web client failed authentication')
+      return false
+    }
+    this.logs.log('ws client connected [ authentication ENABLED ]')
+    return true
+  }
 
   async setup() {
     let adminPath = path.resolve(__dirname, '../hopr-admin/')
@@ -56,7 +78,13 @@ export class AdminServer {
 
     this.wsServer = new ws.Server({ server: this.server })
 
-    this.wsServer.on('connection', (socket: any) => {
+    this.wsServer.on('connection', (socket: any, req: any) => {
+      if (!this.authenticate(req)) {
+        socket.send('authentication failed')
+        socket.close()
+        return
+      }
+
       socket.on('message', (message: string) => {
         debugLog('Message from client', message)
         this.logs.logFullLine(`admin > ${message}`)
@@ -70,6 +98,7 @@ export class AdminServer {
           }, message.toString())
         }
       })
+
       socket.on('error', (err: string) => {
         debugLog('Error', err)
         this.logs.log('Websocket error', err.toString())

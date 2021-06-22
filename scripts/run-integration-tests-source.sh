@@ -82,20 +82,22 @@ function cleanup {
 trap cleanup SIGINT SIGTERM ERR EXIT
 
 # $1 = rest port
-# $2 = host port
-# $3 = node data directory
-# $4 = node log file
-# $5 = node id file
-# $6 = OPTIONAL: additional args to hoprd
+# $2 = node port
+# $3 = admin port
+# $4 = node data directory
+# $5 = node log file
+# $6 = node id file
+# $7 = OPTIONAL: additional args to hoprd
 function setup_node() {
-  local port=${1}
-  local host_port=${2}
-  local dir=${3}
-  local log=${4}
-  local id=${5}
-  local additional_args=${6:-""}
+  local rest_port=${1}
+  local node_port=${2}
+  local admin_port=${3}
+  local dir=${4}
+  local log=${5}
+  local id=${6}
+  local additional_args=${7:-""}
 
-  log "Run node ${id} on rest port ${port}"
+  log "Run node ${id} on rest port ${rest_port}"
 
   if [ -n "${additional_args}" ]; then
     log "Additional args: \"${additional_args}\""
@@ -104,21 +106,23 @@ function setup_node() {
   DEBUG="hopr*" node packages/hoprd/lib/index.js \
     --init --provider=http://127.0.0.1:8545/ \
     --testAnnounceLocalAddresses --identity="${id}" \
-    --host="127.0.0.1:${host_port}" --testPreferLocalAddresses \
-    --data="${dir}" --rest --restPort "${port}" --announce \
+    --host="127.0.0.1:${node_port}" --testPreferLocalAddresses \
+    --data="${dir}" --rest --restPort "${rest_port}" --announce \
+    --api-token "e2e-api-token" \
+    --admin --adminHost "127.0.0.1" --adminPort ${admin_port} \
     --password="e2e-test" --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
 
-  wait_for_http_port "${port}" "${log}" "${wait_delay}" "${wait_max_wait}"
+  wait_for_http_port "${rest_port}" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
 
-# $1 = port
+# $1 = rest port
 # $2 = node log file
 function fund_node() {
-  local port=${1}
+  local rest_port=${1}
   local log=${2}
-  local api="127.0.0.1:${port}"
+  local api="127.0.0.1:${rest_port}"
 
   local eth_address
   eth_address="$(curl --silent "${api}/api/v1/address/hopr")"
@@ -165,6 +169,10 @@ ensure_port_is_free 9091
 ensure_port_is_free 9092
 ensure_port_is_free 9093
 ensure_port_is_free 9094
+ensure_port_is_free 9501
+ensure_port_is_free 9502
+ensure_port_is_free 9503
+ensure_port_is_free 9504
 # }}}
 
 # --- Running Mock Blockchain --- {{{
@@ -178,10 +186,10 @@ wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 3301 9091 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 3302 9092 "${node2_dir}" "${node2_log}" "${node2_id}"
-setup_node 3303 9093 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 3304 9094 "${node4_dir}" "${node4_log}" "${node4_id}" "--run \"info;balance\""
+setup_node 3301 9091 9501 "${node1_dir}" "${node1_log}" "${node1_id}"
+setup_node 3302 9092 9502 "${node2_dir}" "${node2_log}" "${node2_id}"
+setup_node 3303 9093 9503 "${node3_dir}" "${node3_log}" "${node3_id}"
+setup_node 3304 9094 9504 "${node4_dir}" "${node4_log}" "${node4_id}" "--run \"info;balance\""
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -198,7 +206,12 @@ wait_for_port 9093 "${node3_log}"
 wait_for_port 9094 "${node4_log}"
 # }}}
 
-# --- Run test --- {{{
+# --- Run security tests --- {{{
+${mydir}/../test/security-test.sh \
+  127.0.0.1 3301 9501
+#}}}
+
+# --- Run protocol test --- {{{
 ${mydir}/../test/integration-test.sh \
   "localhost:3301" "localhost:3302" "localhost:3303" "localhost:3304"
 # }}}
