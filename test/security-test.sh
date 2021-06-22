@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # prevent souring of this script, only allow execution
 $(return >/dev/null 2>&1)
