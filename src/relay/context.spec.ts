@@ -150,33 +150,52 @@ describe('relay swtich context', function () {
 
     assert(u8aEquals((await nodeShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...secondMessage])))
 
-    const nodeToRelayAfterUpdate = Pair()
-    const relayToNodeAfterUpdate = Pair()
-
     // Try to read something
     nodeShaker.read()
 
-    ctx.update({
-      source: nodeToRelayAfterUpdate.source,
-      sink: relayToNodeAfterUpdate.sink
-    })
+    const UPDATE_ATTEMPTS = 5
 
-    const nodeShakerAfterUpdate = handshake<StreamType>({
-      source: relayToNodeAfterUpdate.source,
-      sink: nodeToRelayAfterUpdate.sink
-    })
+    for (let i = 0; i < UPDATE_ATTEMPTS; i++) {
+      const nodeToRelayAfterUpdate = Pair()
+      const relayToNodeAfterUpdate = Pair()
 
-    const firstMessageAfterUpdate = new TextEncoder().encode('first message after update')
-    nodeShakerAfterUpdate.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...firstMessageAfterUpdate]))
+      ctx.update({
+        source: nodeToRelayAfterUpdate.source,
+        sink: relayToNodeAfterUpdate.sink
+      })
 
-    assert(u8aEquals((await destinationShaker.read()).slice(), Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)))
+      const nodeShakerAfterUpdate = handshake<StreamType>({
+        source: relayToNodeAfterUpdate.source,
+        sink: nodeToRelayAfterUpdate.sink
+      })
 
-    assert(u8aEquals((await destinationShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...firstMessageAfterUpdate])))
+      const firstMessageAfterUpdate = new TextEncoder().encode('first message after update')
+      nodeShakerAfterUpdate.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...firstMessageAfterUpdate]))
 
-    await new Promise((resolve) => setTimeout(resolve))
-    const secondMessageAfterUpdate = new TextEncoder().encode('second message after update')
-    destinationShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...secondMessageAfterUpdate]))
+      assert(
+        u8aEquals(
+          (await destinationShaker.read()).slice(),
+          Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
+        )
+      )
 
-    assert(u8aEquals((await nodeShakerAfterUpdate.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...secondMessageAfterUpdate])))
+      assert(
+        u8aEquals(
+          (await destinationShaker.read()).slice(),
+          Uint8Array.from([RelayPrefix.PAYLOAD, ...firstMessageAfterUpdate])
+        )
+      )
+
+      await new Promise((resolve) => setTimeout(resolve))
+      const secondMessageAfterUpdate = new TextEncoder().encode('second message after update')
+      destinationShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...secondMessageAfterUpdate]))
+
+      assert(
+        u8aEquals(
+          (await nodeShakerAfterUpdate.read()).slice(),
+          Uint8Array.from([RelayPrefix.PAYLOAD, ...secondMessageAfterUpdate])
+        )
+      )
+    }
   })
 })

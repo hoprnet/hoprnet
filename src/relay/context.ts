@@ -265,6 +265,12 @@ class RelayContext {
 
       let result: SinkResult
 
+      const next = () => {
+        result = undefined
+
+        sourcePromise = currentSource?.next()
+      }
+
       while (iteration == drainIteration) {
         const promises: Promise<SinkResult>[] = []
 
@@ -312,8 +318,7 @@ class RelayContext {
 
         if (received.value.length == 0) {
           this.verbose(`Ignoring empty message`)
-          sourcePromise = currentSource?.next()
-          result = undefined
+          next()
           continue
         }
 
@@ -321,8 +326,7 @@ class RelayContext {
 
         if (SUFFIX.length == 0) {
           this.verbose(`Ignoring empty payload`)
-          sourcePromise = currentSource?.next()
-          result = undefined
+          next()
           continue
         }
 
@@ -331,8 +335,7 @@ class RelayContext {
           break
         }
 
-        sourcePromise = currentSource?.next()
-        result = undefined
+        next()
 
         yield received.value
       }
