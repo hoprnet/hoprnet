@@ -34,8 +34,22 @@ export const FAIL = encoder.encode('FAIL')
 
 export const STOP = encoder.encode('STOP')
 export const RESTART = encoder.encode('RESTART')
-export const PING = encoder.encode('PING')
-export const PONG = encoder.encode('PONG')
+export enum StatusMessages {
+  PING,
+  PONG
+}
+
+export enum ConnectionStatusMessages {
+  STOP,
+  RESTART
+}
+
+export enum RelayPrefix {
+  PAYLOAD,
+  STATUS_MESSAGE,
+  CONNECTION_STATUS,
+  WEBRTC_SIGNALLING
+}
 
 export const RELAY_PAYLOAD_PREFIX = Uint8Array.from([0])
 export const RELAY_STATUS_PREFIX = Uint8Array.from([1])

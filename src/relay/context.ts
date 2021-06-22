@@ -12,10 +12,10 @@ const _error = Debug(`hopr-connect:error`)
 
 import { RelayPrefix, StatusMessages, VALID_PREFIXES, ConnectionStatusMessages } from '../constants'
 
-const DEFAULT_PING_TIMEOUT = 300
+export const DEFAULT_PING_TIMEOUT = 300
 
 class RelayContext {
-  private _switchPromise: DeferredPromise<Stream>
+  // private _switchPromise: DeferredPromise<Stream>
   private _streamSourceSwitchPromise: DeferredPromise<Stream['source']>
   private _streamSinkSwitchPromise: DeferredPromise<Stream['sink']>
 
@@ -31,17 +31,11 @@ class RelayContext {
 
   private _sourcePromise: Promise<StreamResult> | undefined
   private _sourceSwitched: boolean
-  private _sinkSwitched: boolean
 
   public source: Stream['source']
   public sink: Stream['sink']
-  public ping: (ms?: number) => Promise<number>
 
   constructor(stream: Stream) {
-    this._switchPromise = Defer<Stream>()
-
-    this._switchPromise.promise.then(this.switchFunction.bind(this))
-
     this._id = u8aToHex(randomBytes(4), false)
 
     this._statusMessagePromise = Defer<void>()
@@ -49,7 +43,6 @@ class RelayContext {
     this._stream = stream
 
     this._sourceSwitched = false
-    this._sinkSwitched = false
 
     this._sinkSourceAttached = false
     this._sinkSourceAttachedPromise = Defer<Stream['source']>()
@@ -68,46 +61,51 @@ class RelayContext {
       return Promise.resolve()
     }
 
-    this.ping = async (ms: number = DEFAULT_PING_TIMEOUT) => {
-      this.log(`ping`)
-      let start = Date.now()
-      this._pingResponsePromise = Defer<void>()
-
-      let timeoutDone = false
-
-      const timeoutPromise = Defer<void>()
-      const timeout = setTimeout(() => {
-        this.log(`ping timeout done`)
-        timeoutDone = true
-        timeoutPromise.resolve()
-      }, ms)
-
-      this.queueStatusMessage(StatusMessages.PING)
-
-      await Promise.race([
-        // prettier-ignore
-        timeoutPromise.promise,
-        this._pingResponsePromise.promise
-      ])
-
-      if (timeoutDone) {
-        return -1
-      }
-
-      // Make sure that we don't produce any hanging promises
-      timeoutPromise.resolve()
-      clearTimeout(timeout)
-      return Date.now() - start
-    }
-
     this._createSink()
   }
 
+  public async ping(ms = DEFAULT_PING_TIMEOUT): Promise<number> {
+    console.log(`ping called`)
+    let start = Date.now()
+    this._pingResponsePromise = Defer<void>()
+
+    let timeoutDone = false
+
+    const timeoutPromise = Defer<void>()
+    const timeout = setTimeout(() => {
+      this.log(`ping timeout done`)
+      timeoutDone = true
+      // Make sure that we don't produce any hanging promises
+      this._pingResponsePromise?.resolve()
+      this._pingResponsePromise = undefined
+      timeoutPromise.resolve()
+    }, ms)
+
+    this.queueStatusMessage(StatusMessages.PING)
+
+    await Promise.race([
+      // prettier-ignore
+      timeoutPromise.promise,
+      this._pingResponsePromise.promise
+    ])
+
+    if (timeoutDone) {
+      return -1
+    }
+
+    // Make sure that we don't produce any hanging promises
+    timeoutPromise.resolve()
+    clearTimeout(timeout)
+    return Date.now() - start
+  }
+
   public update(newStream: Stream) {
+    this._sourceSwitched = true
+
+    this._streamSourceSwitchPromise.resolve(newStream.source)
+    this._streamSinkSwitchPromise.resolve(newStream.sink)
+
     this.log(`updating`)
-    let tmpPromise = this._switchPromise
-    this._switchPromise = Defer<Stream>()
-    tmpPromise.resolve(newStream)
   }
 
   private log(..._: any[]) {
@@ -120,18 +118,6 @@ class RelayContext {
 
   private error(..._: any[]) {
     _error(`RX [${this._id}]`, ...arguments)
-  }
-
-  private switchFunction(stream: Stream): void {
-    this._sinkSwitched = true
-    this._sourceSwitched = true
-
-    this._streamSourceSwitchPromise.resolve(stream.source)
-    this._streamSinkSwitchPromise.resolve(stream.sink)
-
-    this._switchPromise = Defer<Stream>()
-
-    this._switchPromise.promise.then(this.switchFunction.bind(this))
   }
 
   private _createSource(): Stream['source'] {
@@ -171,9 +157,11 @@ class RelayContext {
           result = undefined
 
           this._streamSourceSwitchPromise = Defer<Stream['source']>()
-          yield Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
 
           this._sourcePromise = this._stream.source.next()
+
+          yield Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
+
           continue
         }
 
@@ -267,21 +255,24 @@ class RelayContext {
 
     let currentSource: Stream['source'] | undefined
 
-    let switchPromise = Defer<void>()
+    let iteration = 0
 
     async function* drain(this: RelayContext): Stream['source'] {
-      type SinkResult = Stream['sink'] | Stream['source'] | StreamResult | void
+      // deep-clone number
+      // @TODO make sure that the compiler does not notice
+      const drainIteration = parseInt(iteration.toString())
+      type SinkResult = Stream['source'] | StreamResult | void
 
       let result: SinkResult
 
-      while (true) {
+      while (iteration == drainIteration) {
         const promises: Promise<SinkResult>[] = []
 
         if (currentSource == undefined) {
           promises.push(this._sinkSourceAttachedPromise.promise)
         }
 
-        promises.push(this._streamSinkSwitchPromise.promise, this._statusMessagePromise.promise)
+        promises.push(this._statusMessagePromise.promise)
 
         if (currentSource != undefined && (result == undefined || (result as StreamResult).done != true)) {
           sourcePromise = sourcePromise ?? currentSource.next()
@@ -294,6 +285,11 @@ class RelayContext {
         // 2. Handle status messages
         // 3. Handle payload messages
         result = await Promise.race(promises)
+
+        // Don't handle incoming messages after migration
+        if (iteration != drainIteration) {
+          break
+        }
 
         if (this._sinkSourceAttached) {
           this._sinkSourceAttached = false
@@ -308,50 +304,46 @@ class RelayContext {
           continue
         }
 
-        if (this._sinkSwitched) {
-          currentSink = result as Stream['sink']
-          this._streamSinkSwitchPromise = Defer<Stream['sink']>()
-
-          let tmpPromise = switchPromise
-          switchPromise = Defer<void>()
-
-          sourcePromise = undefined
-          this._sinkSwitched = false
-
-          tmpPromise.resolve()
-          break
-        }
-
         let received = result as StreamResult
 
         if (received.done) {
           continue
         }
 
-        try {
-          let [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
-
-          if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS && SUFFIX[0] == ConnectionStatusMessages.STOP) {
-            yield received.value
-            break
-          }
-
-          yield received.value
-
-          result = undefined
-
+        if (received.value.length == 0) {
+          this.verbose(`Ignoring empty message`)
           sourcePromise = currentSource?.next()
-        } catch (err) {
-          this.error(err)
-          throw err
+          result = undefined
+          continue
         }
+
+        let [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
+
+        if (SUFFIX.length == 0) {
+          this.verbose(`Ignoring empty payload`)
+          sourcePromise = currentSource?.next()
+          result = undefined
+          continue
+        }
+
+        if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS && SUFFIX[0] == ConnectionStatusMessages.STOP) {
+          yield received.value
+          break
+        }
+
+        sourcePromise = currentSource?.next()
+        result = undefined
+
+        yield received.value
       }
     }
 
     while (true) {
       currentSink(drain.call(this))
 
-      await switchPromise.promise
+      currentSink = await this._streamSinkSwitchPromise.promise
+      iteration++
+      this._streamSinkSwitchPromise = Defer<Stream['sink']>()
     }
   }
 
