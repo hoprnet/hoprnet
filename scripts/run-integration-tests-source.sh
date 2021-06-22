@@ -62,18 +62,17 @@ function cleanup {
   # Cleaning up everything
   if [ "$EXIT_CODE" != "0" ]; then
     log "Exited with fail, code $EXIT_CODE"
-    for log_file in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}"; do
+    for log_file in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}"; do
       if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
         log "Printing last 100 lines from logs"
-        tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" \
-          "${node4_log}" | sed "s/^/\t/" || :
+        tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" | sed "s/^/\t/" || :
         log "Printing last 100 lines from logs DONE"
       fi
     done
   fi
 
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}"
 
   log "Cleaning up processes"
   for port in 8545 3301 3302 3303 3304 3305 3306 9091 9092 9093 9094 9095 9096; do

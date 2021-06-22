@@ -59,8 +59,8 @@ declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
 declare node3_id="${node3_dir}.id"
 declare node4_id="${node4_dir}.id"
-declare node5_id="${node4_dir}.id"
-declare node6_id="${node4_dir}.id"
+declare node5_id="${node5_dir}.id"
+declare node6_id="${node6_dir}.id"
 
 declare hardhat_rpc_log="/tmp/hopr-npm-hardhat-rpc.log"
 
@@ -72,11 +72,10 @@ function cleanup {
   # Cleaning up everything
   if [ "$EXIT_CODE" != "0" ]; then
     log "Exited with fail, code $EXIT_CODE"
-    for log_file in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}"; do
+    for log_file in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}"; do
       if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
         log "Printing last 100 lines from logs"
-        tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" \
-          "${node4_log}" | sed "s/^/\t/" || :
+        tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" | sed "s/^/\t/" || :
         log "Printing last 100 lines from logs DONE"
       fi
     done
@@ -225,8 +224,8 @@ fund_node 3301 "${node1_log}"
 fund_node 3302 "${node2_log}"
 fund_node 3303 "${node3_log}"
 fund_node 3304 "${node4_log}"
-fund_node 3305 "${node4_log}"
-fund_node 3306 "${node4_log}"
+fund_node 3305 "${node5_log}"
+fund_node 3306 "${node6_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
@@ -234,8 +233,8 @@ wait_for_port 9091 "${node1_log}"
 wait_for_port 9092 "${node2_log}"
 wait_for_port 9093 "${node3_log}"
 wait_for_port 9094 "${node4_log}"
-wait_for_port 9095 "${node4_log}"
-wait_for_port 9096 "${node4_log}"
+wait_for_port 9095 "${node5_log}"
+wait_for_port 9096 "${node6_log}"
 # }}}
 
 # --- Run test --- {{{
