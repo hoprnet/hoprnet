@@ -48,3 +48,10 @@ jobs:
 
       - name: Test
         run: ./scripts/run-integration-tests-source.sh
+
+      - name: Upload node logs
+        uses: actions/upload-artifact@v2
+        with:
+          name: hopr-e2e-source-node-logs
+          path: |
+            /tmp/hopr-*-node*.log
