@@ -19,6 +19,7 @@
 - [toAddress](publickey.md#toaddress)
 - [toHex](publickey.md#tohex)
 - [toPeerId](publickey.md#topeerid)
+- [toString](publickey.md#tostring)
 - [toUncompressedPubKeyHex](publickey.md#touncompressedpubkeyhex)
 - [createMock](publickey.md#createmock)
 - [deserialize](publickey.md#deserialize)
@@ -75,7 +76,7 @@
 
 #### Defined in
 
-[types/primitives.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L70)
+[types/primitives.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L74)
 
 ___
 
@@ -135,6 +136,20 @@ ___
 
 ___
 
+### toString
+
+▸ **toString**(): `string`
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[types/primitives.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L70)
+
+___
+
 ### toUncompressedPubKeyHex
 
 ▸ **toUncompressedPubKeyHex**(): `string`
@@ -159,7 +174,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L78)
+[types/primitives.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L82)
 
 ___
 
@@ -179,7 +194,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L74)
+[types/primitives.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L78)
 
 ___
 

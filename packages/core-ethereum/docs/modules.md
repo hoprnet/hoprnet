@@ -7,13 +7,13 @@
 ### Classes
 
 - [Channel](classes/channel.md)
+- [ChannelEntry](classes/channelentry.md)
 - [Indexer](classes/indexer.md)
 - [default](classes/default.md)
 
 ### Type aliases
 
 - [RedeemTicketResponse](modules.md#redeemticketresponse)
-- [RoutingChannel](modules.md#routingchannel)
 
 ## Type aliases
 
@@ -23,14 +23,4 @@
 
 #### Defined in
 
-[core-ethereum/src/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L25)
-
-___
-
-### RoutingChannel
-
-Ƭ **RoutingChannel**: [source: PeerId, destination: PeerId, stake: Balance]
-
-#### Defined in
-
-[core-ethereum/src/indexer/index.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L16)
+[core-ethereum/src/index.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L24)

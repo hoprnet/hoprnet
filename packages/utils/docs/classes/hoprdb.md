@@ -14,6 +14,7 @@
 
 ### Methods
 
+- [addBalance](hoprdb.md#addbalance)
 - [checkAndSetPacketTag](hoprdb.md#checkandsetpackettag)
 - [close](hoprdb.md#close)
 - [del](hoprdb.md#del)
@@ -32,6 +33,7 @@
 - [getLatestBlockNumber](hoprdb.md#getlatestblocknumber)
 - [getLatestConfirmedSnapshot](hoprdb.md#getlatestconfirmedsnapshot)
 - [getLosingTicketCount](hoprdb.md#getlosingticketcount)
+- [getPendingBalanceTo](hoprdb.md#getpendingbalanceto)
 - [getPendingTicketCount](hoprdb.md#getpendingticketcount)
 - [getRedeemedTicketsCount](hoprdb.md#getredeemedticketscount)
 - [getRedeemedTicketsValue](hoprdb.md#getredeemedticketsvalue)
@@ -42,6 +44,7 @@
 - [increment](hoprdb.md#increment)
 - [keyOf](hoprdb.md#keyof)
 - [markLosing](hoprdb.md#marklosing)
+- [markPending](hoprdb.md#markpending)
 - [markRedeemeed](hoprdb.md#markredeemeed)
 - [maybeGet](hoprdb.md#maybeget)
 - [put](hoprdb.md#put)
@@ -50,6 +53,7 @@
 - [setCurrentTicketIndex](hoprdb.md#setcurrentticketindex)
 - [storeHashIntermediaries](hoprdb.md#storehashintermediaries)
 - [storeUnacknowledgedTicket](hoprdb.md#storeunacknowledgedticket)
+- [subBalance](hoprdb.md#subbalance)
 - [touch](hoprdb.md#touch)
 - [updateAccount](hoprdb.md#updateaccount)
 - [updateChannel](hoprdb.md#updatechannel)
@@ -74,7 +78,7 @@
 
 #### Defined in
 
-[db.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L50)
+[db.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L52)
 
 ## Properties
 
@@ -84,9 +88,30 @@
 
 #### Defined in
 
-[db.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L50)
+[db.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L52)
 
 ## Methods
+
+### addBalance
+
+▸ `Private` **addBalance**(`key`, `amount`): `Promise`<void\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `key` | `Uint8Array` |
+| `amount` | [Balance](balance.md) |
+
+#### Returns
+
+`Promise`<void\>
+
+#### Defined in
+
+[db.ts:157](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L157)
+
+___
 
 ### checkAndSetPacketTag
 
@@ -104,7 +129,7 @@
 
 #### Defined in
 
-[db.ts:243](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L243)
+[db.ts:255](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L255)
 
 ___
 
@@ -118,7 +143,7 @@ ___
 
 #### Defined in
 
-[db.ts:253](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L253)
+[db.ts:265](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L265)
 
 ___
 
@@ -138,7 +163,7 @@ ___
 
 #### Defined in
 
-[db.ts:145](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L145)
+[db.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L147)
 
 ___
 
@@ -160,7 +185,7 @@ Delete acknowledged ticket in database
 
 #### Defined in
 
-[db.ts:208](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L208)
+[db.ts:220](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L220)
 
 ___
 
@@ -180,7 +205,7 @@ ___
 
 #### Defined in
 
-[db.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L98)
+[db.ts:100](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L100)
 
 ___
 
@@ -200,7 +225,7 @@ ___
 
 #### Defined in
 
-[db.ts:327](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L327)
+[db.ts:339](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L339)
 
 ___
 
@@ -220,7 +245,7 @@ ___
 
 #### Defined in
 
-[db.ts:336](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L336)
+[db.ts:348](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L348)
 
 ___
 
@@ -245,7 +270,7 @@ an array of all acknowledged tickets
 
 #### Defined in
 
-[db.ts:192](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L192)
+[db.ts:204](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L204)
 
 ___
 
@@ -273,7 +298,7 @@ ___
 
 #### Defined in
 
-[db.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L121)
+[db.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L123)
 
 ___
 
@@ -293,7 +318,7 @@ ___
 
 #### Defined in
 
-[db.ts:314](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L314)
+[db.ts:326](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L326)
 
 ___
 
@@ -313,7 +338,7 @@ ___
 
 #### Defined in
 
-[db.ts:318](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L318)
+[db.ts:330](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L330)
 
 ___
 
@@ -341,7 +366,7 @@ ___
 
 #### Defined in
 
-[db.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L113)
+[db.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L115)
 
 ___
 
@@ -362,7 +387,7 @@ ___
 
 #### Defined in
 
-[db.ts:267](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L267)
+[db.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L279)
 
 ___
 
@@ -382,7 +407,7 @@ ___
 
 #### Defined in
 
-[db.ts:271](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L271)
+[db.ts:283](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L283)
 
 ___
 
@@ -402,7 +427,7 @@ ___
 
 #### Defined in
 
-[db.ts:282](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L282)
+[db.ts:294](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L294)
 
 ___
 
@@ -416,7 +441,7 @@ ___
 
 #### Defined in
 
-[db.ts:297](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L297)
+[db.ts:309](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L309)
 
 ___
 
@@ -430,7 +455,7 @@ ___
 
 #### Defined in
 
-[db.ts:306](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L306)
+[db.ts:318](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L318)
 
 ___
 
@@ -444,7 +469,27 @@ ___
 
 #### Defined in
 
-[db.ts:352](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L352)
+[db.ts:368](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L368)
+
+___
+
+### getPendingBalanceTo
+
+▸ **getPendingBalanceTo**(`counterparty`): `Promise`<[Balance](balance.md)\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `counterparty` | [Address](address.md) |
+
+#### Returns
+
+`Promise`<[Balance](balance.md)\>
+
+#### Defined in
+
+[db.ts:364](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L364)
 
 ___
 
@@ -458,7 +503,7 @@ ___
 
 #### Defined in
 
-[db.ts:348](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L348)
+[db.ts:360](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L360)
 
 ___
 
@@ -472,7 +517,7 @@ ___
 
 #### Defined in
 
-[db.ts:344](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L344)
+[db.ts:356](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L356)
 
 ___
 
@@ -486,7 +531,7 @@ ___
 
 #### Defined in
 
-[db.ts:341](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L341)
+[db.ts:353](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L353)
 
 ___
 
@@ -511,7 +556,7 @@ an array of signed tickets
 
 #### Defined in
 
-[db.ts:233](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L233)
+[db.ts:245](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L245)
 
 ___
 
@@ -531,7 +576,7 @@ ___
 
 #### Defined in
 
-[db.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L176)
+[db.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L188)
 
 ___
 
@@ -556,7 +601,7 @@ an array of all unacknowledged tickets
 
 #### Defined in
 
-[db.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L160)
+[db.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L172)
 
 ___
 
@@ -576,7 +621,7 @@ ___
 
 #### Defined in
 
-[db.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L76)
+[db.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L78)
 
 ___
 
@@ -596,7 +641,7 @@ ___
 
 #### Defined in
 
-[db.ts:149](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L149)
+[db.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L151)
 
 ___
 
@@ -616,7 +661,7 @@ ___
 
 #### Defined in
 
-[db.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L72)
+[db.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L74)
 
 ___
 
@@ -636,7 +681,27 @@ ___
 
 #### Defined in
 
-[db.ts:362](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L362)
+[db.ts:383](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L383)
+
+___
+
+### markPending
+
+▸ **markPending**(`ticket`): `Promise`<void\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `ticket` | [Ticket](ticket.md) |
+
+#### Returns
+
+`Promise`<void\>
+
+#### Defined in
+
+[db.ts:372](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L372)
 
 ___
 
@@ -656,7 +721,7 @@ ___
 
 #### Defined in
 
-[db.ts:356](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L356)
+[db.ts:376](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L376)
 
 ___
 
@@ -676,7 +741,7 @@ ___
 
 #### Defined in
 
-[db.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L102)
+[db.ts:104](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L104)
 
 ___
 
@@ -697,7 +762,7 @@ ___
 
 #### Defined in
 
-[db.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L90)
+[db.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L92)
 
 ___
 
@@ -718,7 +783,7 @@ ___
 
 #### Defined in
 
-[db.ts:212](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L212)
+[db.ts:224](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L224)
 
 ___
 
@@ -739,7 +804,7 @@ ___
 
 #### Defined in
 
-[db.ts:275](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L275)
+[db.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L287)
 
 ___
 
@@ -760,7 +825,7 @@ ___
 
 #### Defined in
 
-[db.ts:290](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L290)
+[db.ts:302](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L302)
 
 ___
 
@@ -781,7 +846,7 @@ ___
 
 #### Defined in
 
-[db.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L257)
+[db.ts:269](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L269)
 
 ___
 
@@ -802,7 +867,28 @@ ___
 
 #### Defined in
 
-[db.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L180)
+[db.ts:192](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L192)
+
+___
+
+### subBalance
+
+▸ `Private` **subBalance**(`key`, `amount`): `Promise`<void\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `key` | `Uint8Array` |
+| `amount` | [Balance](balance.md) |
+
+#### Returns
+
+`Promise`<void\>
+
+#### Defined in
+
+[db.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L162)
 
 ___
 
@@ -822,7 +908,7 @@ ___
 
 #### Defined in
 
-[db.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L94)
+[db.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L96)
 
 ___
 
@@ -842,7 +928,7 @@ ___
 
 #### Defined in
 
-[db.ts:332](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L332)
+[db.ts:344](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L344)
 
 ___
 
@@ -863,7 +949,7 @@ ___
 
 #### Defined in
 
-[db.ts:323](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L323)
+[db.ts:335](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L335)
 
 ___
 
@@ -883,7 +969,7 @@ ___
 
 #### Defined in
 
-[db.ts:302](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L302)
+[db.ts:314](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L314)
 
 ___
 
@@ -903,7 +989,7 @@ ___
 
 #### Defined in
 
-[db.ts:310](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L310)
+[db.ts:322](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L322)
 
 ___
 
@@ -917,4 +1003,4 @@ ___
 
 #### Defined in
 
-[db.ts:367](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L367)
+[db.ts:389](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L389)
