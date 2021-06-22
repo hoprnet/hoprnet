@@ -12,7 +12,7 @@ source "${mydir}/../scripts/utils.sh"
 
 declare exit_code=0
 
-websocat --version > /dev/null || exit_code=$?
+which websocat > /dev/null || exit_code=$?
 
 if [ ${exit_code} -ne 0 ]; then
     log "websocat binary not found, trying to install Linux version"
