@@ -144,8 +144,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     announce: argv.announce,
     hosts: parseHosts(),
     announceLocalAddresses: argv.testAnnounceLocalAddresses,
-    preferLocalAddresses: argv.testPreferLocalAddresses,
-    apiToken: argv.apiToken
+    preferLocalAddresses: argv.testPreferLocalAddresses,    
   }
 
   if (argv.password !== undefined) {
