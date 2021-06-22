@@ -9,11 +9,12 @@ on:
 jobs:
   build_and_test:
     name: Build & Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     strategy:
       matrix:
         node-version: [14]
+        os: ['ubuntu-latest']
         package: ['core', 'ethereum', 'all', 'core-ethereum']
 
     steps:
