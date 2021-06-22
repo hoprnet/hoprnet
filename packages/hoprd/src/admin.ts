@@ -28,7 +28,7 @@ export class AdminServer {
 
   authenticate(req): boolean {
     if (this.apiToken === undefined) {
-      this.logs.log('ws connection authenticated: no token set')
+      this.logs.log('web client connected [ authentication DISABLED ]')
       return true
     }
 
@@ -40,10 +40,10 @@ export class AdminServer {
     }
 
     if (!cookies || cookies['X-Auth-Token'] !== this.apiToken) {
-      this.logs.log('ws connection authentication failed: wrong token')
+      this.logs.log('web client failed authentication')
       return false
     }
-    this.logs.log('ws connection authenticated with token')
+    this.logs.log('ws client connected [ authentication ENABLED ]')
     return true
   }
 

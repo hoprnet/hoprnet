@@ -67,6 +67,6 @@ fi
 
 log "Admin websocket should execute info command with correct token"
 ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=e2e-api-token")
-echo "${ws_response}" | grep -q "ws connection authenticated with token"
+echo "${ws_response}" | grep -q "ws client connected [ authentication ENABLED ]"
 
 log "Security tests finished successfully"
