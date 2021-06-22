@@ -196,7 +196,7 @@ async function main() {
   if (logs.isReadyForPublicLogging()) {
     const publicLogsId = await logs.enablePublicLoggingNode(argv.publicLogsProvider)
     logs.log(`Your unique Log Id is ${publicLogsId}`)
-    logs.log(`See logs via http://documint.net/${publicLogsId}`)
+    logs.log(`View logs at https://documint.net/${publicLogsId}`)
     logs.startLoggingQueue()
   }
 
