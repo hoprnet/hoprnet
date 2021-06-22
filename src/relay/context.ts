@@ -1,4 +1,4 @@
-import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 
 import Defer, { DeferredPromise } from 'p-defer'
@@ -10,15 +10,7 @@ const _log = Debug(`hopr-connect`)
 const _verbose = Debug(`hopr-connect:verbose`)
 const _error = Debug(`hopr-connect:error`)
 
-import {
-  RELAY_STATUS_PREFIX,
-  STOP,
-  RESTART,
-  RELAY_CONNECTION_STATUS_PREFIX,
-  PING,
-  PONG,
-  VALID_PREFIXES
-} from '../constants'
+import { RelayPrefix, StatusMessages, VALID_PREFIXES, ConnectionStatusMessages } from '../constants'
 
 const DEFAULT_PING_TIMEOUT = 300
 
@@ -82,22 +74,19 @@ class RelayContext {
       this._pingResponsePromise = Defer<void>()
 
       let timeoutDone = false
-      let timeout: NodeJS.Timeout
 
-      const timeoutPromise = new Promise<void>((resolve) => {
-        timeout = setTimeout(() => {
-          this.log(`ping timeout done`)
-          timeoutDone = true
-          resolve()
-        }, ms)
-      })
+      const timeoutPromise = Defer<void>()
+      const timeout = setTimeout(() => {
+        this.log(`ping timeout done`)
+        timeoutDone = true
+        timeoutPromise.resolve()
+      }, ms)
 
-      this._statusMessages.push(Uint8Array.from([...RELAY_STATUS_PREFIX, ...PING]))
-      this._statusMessagePromise.resolve()
+      this.queueStatusMessage(StatusMessages.PING)
 
       await Promise.race([
         // prettier-ignore
-        timeoutPromise,
+        timeoutPromise.promise,
         this._pingResponsePromise.promise
       ])
 
@@ -105,7 +94,9 @@ class RelayContext {
         return -1
       }
 
-      clearTimeout(timeout!)
+      // Make sure that we don't produce any hanging promises
+      timeoutPromise.resolve()
+      clearTimeout(timeout)
       return Date.now() - start
     }
 
@@ -180,7 +171,7 @@ class RelayContext {
           result = undefined
 
           this._streamSourceSwitchPromise = Defer<Stream['source']>()
-          yield Uint8Array.from([...RELAY_STATUS_PREFIX, ...RESTART])
+          yield Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
 
           this._sourcePromise = this._stream.source.next()
           continue
@@ -212,19 +203,15 @@ class RelayContext {
         }
 
         // Interprete relay sub-protocol
-        if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
-          if (u8aEquals(SUFFIX, PING)) {
+        if (PREFIX[0] == RelayPrefix.STATUS_MESSAGE) {
+          if (SUFFIX[0] == StatusMessages.PING) {
             this.verbose(`PING received`)
-            this._statusMessages.push(Uint8Array.from([...RELAY_STATUS_PREFIX, ...PONG]))
-
-            this._statusMessagePromise.resolve()
-
+            this.queueStatusMessage(StatusMessages.PONG)
             // Don't forward ping
-          } else if (u8aEquals(SUFFIX, PONG)) {
+          } else if (SUFFIX[0] == StatusMessages.PONG) {
             this.verbose(`PONG received`)
 
             this._pingResponsePromise?.resolve()
-
             // Don't forward pong message
           }
 
@@ -232,8 +219,8 @@ class RelayContext {
 
           continue
           // Interprete connection sub-protocol
-        } else if (u8aEquals(PREFIX, RELAY_CONNECTION_STATUS_PREFIX)) {
-          if (u8aEquals(SUFFIX, STOP)) {
+        } else if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS) {
+          if (SUFFIX[0] == ConnectionStatusMessages.STOP) {
             this.verbose(`STOP relayed`)
 
             // forward STOP message
@@ -241,7 +228,7 @@ class RelayContext {
 
             // close stream
             break
-          } else if (u8aEquals(SUFFIX, RESTART)) {
+          } else if ((SUFFIX[0] = ConnectionStatusMessages.RESTART)) {
             this.verbose(`RESTART relayed`)
           }
 
@@ -280,14 +267,6 @@ class RelayContext {
 
     let currentSource: Stream['source'] | undefined
 
-    let statusMessageAvailable = false
-
-    const statusSourceFunction = () => {
-      statusMessageAvailable = true
-    }
-
-    let statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
-
     let switchPromise = Defer<void>()
 
     async function* drain(this: RelayContext): Stream['source'] {
@@ -302,7 +281,7 @@ class RelayContext {
           promises.push(this._sinkSourceAttachedPromise.promise)
         }
 
-        promises.push(this._streamSinkSwitchPromise.promise, statusPromise)
+        promises.push(this._streamSinkSwitchPromise.promise, this._statusMessagePromise.promise)
 
         if (currentSource != undefined && (result == undefined || (result as StreamResult).done != true)) {
           sourcePromise = sourcePromise ?? currentSource.next()
@@ -324,18 +303,8 @@ class RelayContext {
           continue
         }
 
-        if (statusMessageAvailable) {
-          if (this._statusMessages.length > 0) {
-            yield this._statusMessages.shift() as Uint8Array
-          }
-
-          if (this._statusMessages.length == 0 || (result != undefined && (result as StreamResult).done != true)) {
-            statusMessageAvailable = false
-
-            this._statusMessagePromise = Defer<void>()
-
-            statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
-          }
+        if (this._statusMessages.length > 0) {
+          yield this.unqueueStatusMessage()
           continue
         }
 
@@ -362,7 +331,7 @@ class RelayContext {
         try {
           let [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
 
-          if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX) && u8aEquals(SUFFIX, STOP)) {
+          if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS && SUFFIX[0] == ConnectionStatusMessages.STOP) {
             yield received.value
             break
           }
@@ -383,6 +352,23 @@ class RelayContext {
       currentSink(drain.call(this))
 
       await switchPromise.promise
+    }
+  }
+
+  private queueStatusMessage(msg: StatusMessages) {
+    this._statusMessages.push(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, msg))
+
+    this._statusMessagePromise.resolve()
+  }
+
+  private unqueueStatusMessage(): Uint8Array {
+    switch (this._statusMessages.length) {
+      case 0:
+        throw Error(`Trying to unqueue empty status message queue`)
+      case 1:
+        return this._statusMessages.pop() as Uint8Array
+      default:
+        return this._statusMessages.shift() as Uint8Array
     }
   }
 }

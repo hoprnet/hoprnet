@@ -6,6 +6,14 @@ import type PeerId from 'peer-id'
 import { u8aCompare } from '@hoprnet/hopr-utils'
 import { RelayContext } from './context'
 
+import debug from 'debug'
+
+const DEBUG_PREFIX = 'hopr-connect:relay:state'
+
+// const log = debug(DEBUG_PREFIX)
+const error = debug(DEBUG_PREFIX.concat(':error'))
+// const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
+
 type State = {
   [id: string]: RelayContext
 }
@@ -34,7 +42,7 @@ class RelayState {
     try {
       latency = await context[destination.toB58String()].ping(timeout)
     } catch (err) {
-      // @TODO log error
+      error(err)
       return false
     }
 
