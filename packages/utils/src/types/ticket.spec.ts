@@ -5,6 +5,7 @@ import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256, Response
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
 import { Wallet } from 'ethers'
+import { INVERSE_TICKET_WIN_PROB, PRICE_PER_PACKET } from '../constants'
 
 const ACCOUNT_A = new Wallet('0x4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b')
 const ACCOUNT_B = new Wallet('0x18a664889e28a432495758f0522b53b2f04a35f810b78c6ea01db305141bcba2')
@@ -141,9 +142,6 @@ describe('test getPathPosition', function () {
   const userB = PublicKey.fromPrivKey(stringToU8a(ACCOUNT_B.privateKey)).toAddress()
   const userAPrivKey = stringToU8a(ACCOUNT_A.privateKey)
 
-  const INVERSE_TICKET_WIN_PROB = new BN(5)
-  const PRICE_PER_PACKET = new BN('10000000000000000')
-
   it('check that path position detection works on multiple positions', function () {
     for (let pathLength = 0; pathLength < 4; pathLength++) {
       const ticket = Ticket.create(
@@ -157,7 +155,7 @@ describe('test getPathPosition', function () {
         userAPrivKey
       )
 
-      assert(ticket.getPathPosition(PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB) == pathLength)
+      assert(ticket.getPathPosition() == pathLength)
     }
   })
 })

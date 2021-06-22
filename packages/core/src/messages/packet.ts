@@ -3,7 +3,6 @@ import {
   Ticket,
   UINT256,
   PublicKey,
-  Balance,
   UnacknowledgedTicket,
   HoprDB,
   getPacketLength,
@@ -20,7 +19,9 @@ import {
   HalfKeyChallenge,
   HalfKey,
   Challenge,
-  ChannelStatus
+  ChannelStatus,
+  PRICE_PER_PACKET,
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
@@ -29,7 +30,6 @@ import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
-import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants'
 
 export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
@@ -245,11 +245,7 @@ export class Packet {
     if (isDirectMessage) {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
-      ticket = await channel.createTicket(
-        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(path.length - 1)),
-        ticketChallenge,
-        new BN(INVERSE_TICKET_WIN_PROB)
-      )
+      ticket = await channel.createTicket(path.length, ticketChallenge)
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -350,8 +346,8 @@ export class Packet {
 
     return validateUnacknowledgedTicket(
       privKey,
-      new BN(PRICE_PER_PACKET),
-      new BN(INVERSE_TICKET_WIN_PROB),
+      PRICE_PER_PACKET,
+      INVERSE_TICKET_WIN_PROB,
       previousHop,
       this.ticket,
       channel,
@@ -384,15 +380,11 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    const pathPosition = this.ticket.getPathPosition(new BN(PRICE_PER_PACKET), new BN(INVERSE_TICKET_WIN_PROB))
+    const pathPosition = this.ticket.getPathPosition()
     if (pathPosition == 1) {
       this.ticket = channel.createDummyTicket(this.nextChallenge)
     } else {
-      this.ticket = await channel.createTicket(
-        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(pathPosition - 1)),
-        this.nextChallenge,
-        new BN(INVERSE_TICKET_WIN_PROB)
-      )
+      this.ticket = await channel.createTicket(pathPosition, this.nextChallenge)
     }
     this.oldChallenge = this.challenge.clone()
     this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)
