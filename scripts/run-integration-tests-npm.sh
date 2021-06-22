@@ -59,9 +59,9 @@ declare node4_id="${node4_dir}.id"
 declare hardhat_rpc_log="/tmp/hopr-npm-hardhat-rpc.log"
 
 function cleanup {
-  trap - SIGINT SIGTERM ERR EXIT
-
   local EXIT_CODE=$?
+
+  trap - SIGINT SIGTERM ERR EXIT
 
   # Cleaning up everything
   if [ "$EXIT_CODE" != "0" ]; then
@@ -82,7 +82,7 @@ function cleanup {
   log "Cleaning up processes"
   for port in 8545 3301 3302 3303 3304 9091 9092 9093 9094; do
     if lsof -i ":${port}" -s TCP:LISTEN; then
-      lsof -i ":${port}" -s TCP:LISTEN -t | xargs kill
+      lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
     fi
   done
 
