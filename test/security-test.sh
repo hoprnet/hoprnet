@@ -24,11 +24,8 @@ log "Security tests started"
 log "Rest API @ ${host}:${rest_port}"
 log "WS API @ ${host}:${admin_port}"
 
-# test REST port open
-nc -z ${host} ${rest_port}
-
-# test admin port open
-nc -z ${host} ${admin_port}
+wait_for_port ${rest_port}
+wait_for_port ${admin_port}
 
 # should fail REST authentication without proper token
 log "Testing REST rejecting null token"
