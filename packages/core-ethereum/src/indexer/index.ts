@@ -401,7 +401,6 @@ class Indexer extends EventEmitter {
       return undefined
     }
 
-    log('picking random from %d channels', channels.length)
     return randomChoice(channels)
   }
 

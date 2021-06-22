@@ -185,7 +185,7 @@ result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel"
 log "-- ${result}"
 
 log "Node 2 open channel to Node 3"
-result=$(run_command "${api1}" "open ${addr3} 0.1" "Successfully opened channel")
+result=$(run_command "${api2}" "open ${addr3} 0.1" "Successfully opened channel")
 log "-- ${result}"
 
 for i in `seq 1 10`; do
