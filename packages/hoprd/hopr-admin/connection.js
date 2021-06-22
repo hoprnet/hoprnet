@@ -2,6 +2,8 @@
  * Maintain a websocket connection
  */
 
+import Cookies from 'js-cookie'
+
 const MAX_MESSAGES_CACHED = 50
 
 export class Connection {
@@ -82,7 +84,16 @@ export class Connection {
           // Up Arrow
           e.target.value = this.prevLog
         }
-      }
+      } 
+      
+      document.querySelector('#token').onkeydown = (e) => {
+        if (e.keyCode == 13) {
+          // enter
+          var text = e.target.value
+          Cookies.set('X-Auth-Token', text)
+          e.target.style.display = 'none'
+        }        
+      } 
     }
 
     client.onmessage = (event) => {
