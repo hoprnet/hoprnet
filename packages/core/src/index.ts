@@ -85,7 +85,7 @@ export type HoprOptions = {
 
   // when true, addresses will be sorted local first
   // when false, addresses will be sorted public first
-  preferLocalAddresses?: boolean  
+  preferLocalAddresses?: boolean
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
