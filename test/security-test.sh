@@ -27,42 +27,46 @@ log "Admin websocket API @ ${host}:${admin_port}"
 wait_for_port ${rest_port}
 wait_for_port ${admin_port}
 
+declare http_status_code
+
 log "REST API should reject authentication without token"
-STATUS_CODE=$(curl -H "X-Auth-Token: bad-token" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
-if [ ${STATUS_CODE} -ne 403 ]; then
-  log "Didn't get 403 with bad token"
+http_status_code=$(curl -H "X-Auth-Token: bad-token" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
+if [ ${http_status_code} -ne 403 ]; then
+  log "⛔️ Expected 403 http status code, got ${http_status_code}"
   exit 1
 fi
 
 log "REST API should reject authentication with invalid token"
-STATUS_CODE=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
-if [ ${STATUS_CODE} -ne 403 ]; then
-  log "Didn't get 403 with no token"
+http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
+if [ ${http_status_code} -ne 403 ]; then
+  log "⛔️ Expected 403 http status code, got ${http_status_code}"
   exit 1
 fi
 
+declare ws_response
+
 log "Admin websocket should reject commands without token"
-WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/)
-if [ "${WS_RESPONSE}" != "authentication failed" ]; then
-  log "Didn't fail ws authentication with no token"
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/)
+if [ "${ws_response}" != "authentication failed" ]; then
+  log "⛔️ Didn't fail ws authentication"
   log "Expected response: 'authentication failed' "
   log "Actual response:"
-  log "${WS_RESPONSE}"
+  log "${ws_response}"
   exit 1
 fi
 
 log "Admin websocket should reject commands with invalid token"
-WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=bad-token")
-if [ "${WS_RESPONSE}" != "authentication failed" ]; then
-  log "Didn't fail ws authentication with bad token"
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=bad-token")
+if [ "${ws_response}" != "authentication failed" ]; then
+  log "⛔️ Didn't fail ws authentication"
   log "Expected response: 'authentication failed' "
   log "Actual response:"
-  log "${WS_RESPONSE}"
+  log "${ws_response}"
   exit 1
 fi
 
 log "Admin websocket should execute info command with correct token"
-WS_RESPONSE=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=e2e-api-token")
-echo "${WS_RESPONSE}" | grep -q "ws connection authenticated with token"
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=e2e-api-token")
+echo "${ws_response}" | grep -q "ws connection authenticated with token"
 
 log "Security tests finished successfully"
