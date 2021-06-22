@@ -198,13 +198,9 @@ result=$(run_command ${api2} "tickets" "Win Proportion:   100%" 10)
 log "-- ${result}"
 
 for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to node 2 via node 3"
-  run_command "${api1}" "send ${addr3},${addr2} 'hello, world'" "Message sent" 60
+  log "Node 1 send 1 hop message to node 3 via node 2"
+  run_command "${api1}" "send ${addr2},${addr3} 'hello, world'" "Message sent" 60
 done
-
-log "Node 3 should now have a ticket"
-result=$(run_command ${api3} "tickets" "Win Proportion:   100%" 10)
-log "-- ${result}"
 
 log "Node 3 open channel to Node 4"
 result=$(run_command "${api3}" "open ${addr4} 0.1" "Successfully opened channel")
