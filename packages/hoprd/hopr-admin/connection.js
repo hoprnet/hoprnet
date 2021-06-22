@@ -2,6 +2,8 @@
  * Maintain a websocket connection
  */
 
+import Cookies from "js-cookie"
+
 const MAX_MESSAGES_CACHED = 50
 
 export class Connection {
@@ -17,7 +19,11 @@ export class Connection {
   }
 
   appendMessage(event) {
-    try {
+    if(event.data === undefined) {
+      return
+    }
+    
+    try {      
       const msg = JSON.parse(event.data)
       if (msg.type == 'log') {
         if (this.logs.length > MAX_MESSAGES_CACHED) {
@@ -41,6 +47,9 @@ export class Connection {
         this.setMessages(this.logs.slice(0)) // Need a clone
       } else if (msg.type === 'status' && msg.msg === 'STARTED') {
         this.setStarted(true)
+      } else if (msg.type == 'auth-failed') {
+        this.logs.push(msg)
+        Cookies.remove('X-Auth-Token')
       }
     } catch (e) {
       console.log('ERR', e)
