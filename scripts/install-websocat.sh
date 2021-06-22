@@ -10,14 +10,17 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="e2e-setup"
 source "${mydir}/../scripts/utils.sh"
 
-declare exit_code
+declare exit_code=0
 
-exit_code=$(which websocat > /dev/null)
+websocat --version > /dev/null || exit_code=$?
+
 if [ ${exit_code} -ne 0 ]; then
     log "websocat binary not found, trying to install Linux version"
     sudo apt-get update 
     sudo apt-get install curl -y 
     curl -sLO https://github.com/vi/websocat/releases/download/v1.8.0/websocat_1.8.0_newer_amd64.deb 
     sudo dpkg -i websocat_1.8.0_newer_amd64.deb
+else
+    log "websocat found"
 fi
 
