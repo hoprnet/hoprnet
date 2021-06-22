@@ -70,7 +70,7 @@ const argv = yargs
   .option('apiToken', {
     describe: 'A REST API token and admin panel password for user authentication',
     string: true,
-    default: ''
+    default: undefined
   })
   .option('identity', {
     describe: 'The path to the identity file',
