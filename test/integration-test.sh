@@ -15,7 +15,7 @@ source "${mydir}/../scripts/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3>"
+  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4>"
   msg
 }
 
@@ -26,10 +26,12 @@ usage() {
 test -z "${1:-}" && { msg "Missing first parameter"; usage; exit 1; }
 test -z "${2:-}" && { msg "Missing second parameter"; usage; exit 1; }
 test -z "${3:-}" && { msg "Missing third parameter"; usage; exit 1; }
+test -z "${4:-}" && { msg "Missing fourth parameter"; usage; exit 1; }
 
 declare api1="${1}"
 declare api2="${2}"
 declare api3="${3}"
+declare api4="${4}"
 
 # $1 = endpoint
 # $2 = Hopr command
@@ -117,28 +119,32 @@ validate_node_balance_gt0() {
   fi
 }
 
-log "Running full E2E test with ${api1}, ${api2}, ${api3}"
+log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}"
 
 validate_node_eth_address "${api1}"
 validate_node_eth_address "${api2}"
 validate_node_eth_address "${api3}"
+validate_node_eth_address "${api4}"
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
 validate_node_balance_gt0 "${api2}"
 validate_node_balance_gt0 "${api3}"
+validate_node_balance_gt0 "${api4}"
 log "Nodes are funded"
 
 declare addr1 addr2 addr3 addr4 result
 addr1="$(get_hopr_address "${api1}")"
 addr2="$(get_hopr_address "${api2}")"
 addr3="$(get_hopr_address "${api3}")"
+addr4="$(get_hopr_address "${api4}")"
 log "hopr addr1: ${addr1}"
 log "hopr addr2: ${addr2}"
 log "hopr addr3: ${addr3}"
+log "hopr addr4: ${addr4}"
 
 log "Check peers"
-result=$(run_command ${api1} "peers" '3 peers have announced themselves' 60)
+result=$(run_command ${api1} "peers" '4 peers have announced themselves' 60)
 log "-- ${result}"
 
 log "Node 1 ping node 2"
