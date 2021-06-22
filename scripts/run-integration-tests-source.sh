@@ -200,7 +200,7 @@ wait_for_port 9094 "${node4_log}"
 
 # --- Run test --- {{{
 ${mydir}/../test/integration-test.sh \
-  "localhost:3301" "localhost:3302" "localhost:3303"
+  "localhost:3301" "localhost:3302" "localhost:3303" "localhost:3304"
 # }}}
 
 # -- Verify node4 has executed the commands {{{
