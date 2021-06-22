@@ -32,10 +32,12 @@ export class AdminServer {
       return true
     }
 
-    let cookies = {}
+    let cookies: ReturnType<typeof cookie.parse> | undefined = {}
     try {
       cookies = cookie.parse(req.headers.cookie)
-    } catch (_e) {}
+    } catch (e) {
+      this.logs.error(`failed parsing cookies`, e)
+    }
 
     if (!cookies || cookies['X-Auth-Token'] !== this.apiToken) {
       this.logs.log('ws connection authentication failed: wrong token')
