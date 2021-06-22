@@ -9,7 +9,7 @@ set -x
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-declare HOPR_LOG_ID="e2e-test"
+declare HOPR_LOG_ID="e2e-security-test"
 source "${mydir}/../scripts/utils.sh"
 
 usage() {

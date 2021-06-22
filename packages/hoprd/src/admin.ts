@@ -37,7 +37,7 @@ export class AdminServer {
       cookies = cookie.parse(req.headers.cookie)
     } catch (_e) {}
 
-    if (cookies['X-Auth-Token'] !== this.apiToken) {
+    if (!cookies || cookies['X-Auth-Token'] !== this.apiToken) {
       this.logs.log('ws connection authentication failed: wrong token')
       return false
     }
