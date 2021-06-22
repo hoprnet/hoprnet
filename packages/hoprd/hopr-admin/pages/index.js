@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, KeyboardEvent } from 'react'
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 import Logo from '../components/logo'
@@ -9,6 +9,30 @@ import Cookies from 'js-cookie';
 
 const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
 
+class TokenInput extends React.Component {
+  handleKeyPress(e) {
+    console.log('key down')
+    if (e.key == 'Enter') {
+      var text = e.target.value
+      console.log('setting cooiie', text)
+      Cookies.set('X-Auth-Token', text)        
+    }
+  } 
+  
+  render() {
+    const tokenCookie = Cookies.get('X-Auth-Token')
+    return 1 && 
+        <div className="send">
+          <input
+            onKeyPress={this.handleKeyPress}
+            id="token"
+            type="password"
+            placeholder="security token"
+          />
+        </div>
+    }
+  }
+
 export default function Home() {
   let connection
 
@@ -17,7 +41,6 @@ export default function Home() {
   const [started, setStarted] = useState(false)
   const [messages, setMessages] = useState([]) // The fetish for immutability in react means this will be slower than a mutable array..
   const [peers, setConnectedPeers] = useState([])
-  const authToken = Cookies.get('X-Auth-Token')
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -49,13 +72,7 @@ export default function Home() {
         />
       </div>
 
-      <div className="send">
-        <input
-          id="token"
-          type="password"
-          placeholder="security token"
-        />
-      </div>
+      <TokenInput/>
 
       {showConnected && (
         <div className={styles.connectedPeers}>
