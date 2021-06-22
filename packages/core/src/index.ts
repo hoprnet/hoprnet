@@ -345,12 +345,11 @@ class Hopr extends EventEmitter {
     for (let i = 0; i < 100; i++) {
       if (channels.size >= 10) break
 
-      const routingChannel = await chain.getRandomOpenChannel()
-      if (!routingChannel) break
+      const channel = await chain.getRandomOpenChannel()
+      if (!channel) break
 
-      const id = routingChannel[0].toB58String() + routingChannel[1].toB58String()
-      if (channels.has(id)) continue
-      channels.set(id, routingChannel)
+      if (channels.has(channel.getId().toHex())) continue
+      channels.set(channel.getId().toHex(), channel)
     }
 
     return Array.from(channels.values())
