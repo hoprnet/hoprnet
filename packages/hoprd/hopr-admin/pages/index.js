@@ -11,10 +11,8 @@ const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
 
 class TokenInput extends React.Component {
   handleKeyPress(e) {
-    console.log('key down')
     if (e.key == 'Enter') {
       var text = e.target.value
-      console.log('setting cooiie', text)
       Cookies.set('X-Auth-Token', text)        
     }
   } 
