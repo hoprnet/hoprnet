@@ -32,7 +32,7 @@ export class AdminServer {
       return true
     }
 
-    let cookies: ReturnType<typeof cookie.parse> | undefined = {}
+    let cookies: ReturnType<typeof cookie.parse> | undefined
     try {
       cookies = cookie.parse(req.headers.cookie)
     } catch (e) {
