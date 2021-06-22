@@ -110,3 +110,10 @@ is out of scope.
 ## Tracking pending state
 
 There is a delay between the time where we trigger an on-chain action and the time where the indexer registers it. We need to discuss how we are going to track _pending_ state.
+
+## Ticket Value and Win Probability
+
+At the moment these are global constants. At some point we want to adjust this.
+One point of view is that they are constants that are voted on by the DAO.
+Another is that they are variable and bidded on in a free market.
+All of this is out of scope for now.

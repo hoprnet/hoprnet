@@ -3,7 +3,6 @@ import {
   Ticket,
   UINT256,
   PublicKey,
-  Balance,
   UnacknowledgedTicket,
   HoprDB,
   getPacketLength,
@@ -20,7 +19,9 @@ import {
   HalfKeyChallenge,
   HalfKey,
   Challenge,
-  ChannelStatus
+  ChannelStatus,
+  PRICE_PER_PACKET,
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
@@ -29,11 +30,10 @@ import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
-import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants'
 
-export const MIN_HOPS_REQUIRED = 3 // 3 relayers and 1 destination
+export const INTERMEDIATE_HOPS = 3 // 3 relayers and 1 destination
 
-const PACKET_LENGTH = getPacketLength(MIN_HOPS_REQUIRED + 1, POR_STRING_LENGTH, 0)
+const PACKET_LENGTH = getPacketLength(INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, 0)
 
 const log = Debug('hopr-core:message:packet')
 
@@ -238,18 +238,14 @@ export class Packet {
     const challenge = AcknowledgementChallenge.create(ackChallenge, privKey)
     const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(path[0].pubKey.marshal())
-    const packet = createPacket(secrets, alpha, msg, path, MIN_HOPS_REQUIRED + 1, POR_STRING_LENGTH, porStrings)
+    const packet = createPacket(secrets, alpha, msg, path, INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, porStrings)
     const channel = chain.getChannel(self, nextPeer)
 
     let ticket: Ticket
     if (isDirectMessage) {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
-      ticket = await channel.createTicket(
-        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(path.length - 1)),
-        ticketChallenge,
-        new BN(INVERSE_TICKET_WIN_PROB)
-      )
+      ticket = await channel.createTicket(path.length, ticketChallenge)
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -281,7 +277,7 @@ export class Packet {
 
     const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, AcknowledgementChallenge.SIZE, Ticket.SIZE])
 
-    const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, MIN_HOPS_REQUIRED + 1)
+    const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, INTERMEDIATE_HOPS + 1)
 
     const ackKey = deriveAckKeyShare(transformedOutput.derivedSecret)
 
@@ -350,8 +346,8 @@ export class Packet {
 
     return validateUnacknowledgedTicket(
       privKey,
-      new BN(PRICE_PER_PACKET),
-      new BN(INVERSE_TICKET_WIN_PROB),
+      PRICE_PER_PACKET,
+      INVERSE_TICKET_WIN_PROB,
       previousHop,
       this.ticket,
       channel,
@@ -384,15 +380,11 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    const pathPosition = this.ticket.getPathPosition(new BN(PRICE_PER_PACKET), new BN(INVERSE_TICKET_WIN_PROB))
+    const pathPosition = this.ticket.getPathPosition()
     if (pathPosition == 1) {
       this.ticket = channel.createDummyTicket(this.nextChallenge)
     } else {
-      this.ticket = await channel.createTicket(
-        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(pathPosition - 1)),
-        this.nextChallenge,
-        new BN(INVERSE_TICKET_WIN_PROB)
-      )
+      this.ticket = await channel.createTicket(pathPosition, this.nextChallenge)
     }
     this.oldChallenge = this.challenge.clone()
     this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)

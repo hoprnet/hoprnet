@@ -1,4 +1,4 @@
-import Hopr, { SUGGESTED_BALANCE, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
+import Hopr from '@hoprnet/hopr-core'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
@@ -10,7 +10,7 @@ import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
 import { LogStream } from './logs'
 import { NODE_ENV } from './env'
-import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
+import { Balance, NativeBalance, SUGGESTED_BALANCE, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 
 let debugLog = debug('hoprd:admin')

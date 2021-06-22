@@ -1,5 +1,4 @@
 import type { Multiaddr } from 'multiaddr'
-import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import debug from 'debug'
@@ -14,11 +13,11 @@ import {
   ChannelEntry
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
-import { RoutingChannel } from './indexer'
 import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
+import { EventEmitter } from 'events'
 
 const log = debug('hopr-core-ethereum')
 
@@ -37,12 +36,13 @@ export type RedeemTicketResponse =
       error: Error | string
     }
 
-export default class HoprEthereum {
+export default class HoprEthereum extends EventEmitter {
   private privateKey: Uint8Array
   private publicKey: PublicKey
   private address: Address
 
   constructor(private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
+    super()
     this.privateKey = this.chain.getPrivateKey()
     this.publicKey = this.chain.getPublicKey()
     this.address = Address.fromString(this.chain.getWallet().address)
@@ -59,7 +59,7 @@ export default class HoprEthereum {
   }
 
   public getChannel(src: PublicKey, counterparty: PublicKey) {
-    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey)
+    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey, this)
   }
 
   async announce(multiaddr: Multiaddr): Promise<string> {
@@ -70,8 +70,8 @@ export default class HoprEthereum {
     return this.chain.withdraw(currency, recipient, amount)
   }
 
-  public getOpenRoutingChannelsFromPeer(p: PeerId) {
-    return this.indexer.getOpenRoutingChannelsFromPeer(p)
+  public getOpenChannelsFrom(p: PublicKey) {
+    return this.indexer.getOpenChannelsFrom(p)
   }
 
   public getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
@@ -90,8 +90,8 @@ export default class HoprEthereum {
     return this.indexer.getPublicKeyOf(addr)
   }
 
-  public getRandomOpenRoutingChannel() {
-    return this.indexer.getRandomOpenRoutingChannel()
+  public getRandomOpenChannel() {
+    return this.indexer.getRandomOpenChannel()
   }
 
   private uncachedGetBalance = () => this.chain.getBalance(this.address)
@@ -172,4 +172,4 @@ export default class HoprEthereum {
   }
 }
 
-export { Channel, Indexer, RoutingChannel }
+export { ChannelEntry, Channel, Indexer }

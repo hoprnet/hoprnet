@@ -5,6 +5,7 @@ import { ecdsaRecover, ecdsaSign } from 'secp256k1'
 import { ethers } from 'ethers'
 import { Challenge } from './challenge'
 import { EthereumChallenge } from './ethereumChallenge'
+import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants'
 
 // Prefix message with "\x19Ethereum Signed Message:\n {length} HOPRnet {message}" and return hash
 function toEthSignedMessageHash(message: Hash): Hash {
@@ -181,8 +182,8 @@ export class Ticket {
     return luck.toBN().lte(winProb.toBN())
   }
 
-  getPathPosition(pricePerTicket: BN, inverseTicketWinProb: BN): number {
-    const baseUnit = pricePerTicket.mul(inverseTicketWinProb)
+  getPathPosition(): number {
+    const baseUnit = PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB)
 
     if (!this.amount.toBN().mod(baseUnit).isZero()) {
       throw Error(`Invalid balance`)

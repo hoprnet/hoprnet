@@ -1,5 +1,14 @@
-import { Packet, MIN_HOPS_REQUIRED } from './packet'
-import { HoprDB, Ticket, UINT256, Balance, PublicKey, u8aEquals, Challenge } from '@hoprnet/hopr-utils'
+import { Packet, INTERMEDIATE_HOPS } from './packet'
+import {
+  HoprDB,
+  Ticket,
+  UINT256,
+  Balance,
+  PublicKey,
+  u8aEquals,
+  Challenge,
+  PRICE_PER_PACKET
+} from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import assert from 'assert'
@@ -9,14 +18,14 @@ function createMockTickets(privKey: Uint8Array) {
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket: async (amount: Balance, challenge: Challenge, _winProb: number) => {
+    createTicket: async (pathLength: number, challenge: Challenge) => {
       return Promise.resolve(
         Ticket.create(
           counterparty.toAddress(),
           challenge,
           new UINT256(new BN(0)),
           new UINT256(new BN(0)),
-          amount,
+          new Balance(PRICE_PER_PACKET.muln(pathLength)),
           UINT256.fromInverseProbability(new BN(1)),
           new UINT256(new BN(0)),
           privKey
@@ -41,7 +50,7 @@ function createMockTickets(privKey: Uint8Array) {
 
 describe('packet creation and transformation', function () {
   it('create packet and transform it', async function () {
-    const AMOUNT = MIN_HOPS_REQUIRED + 1
+    const AMOUNT = INTERMEDIATE_HOPS + 1
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
@@ -78,7 +87,7 @@ describe('packet creation and transformation', function () {
   })
 
   it('create packet and transform it - reduced path', async function () {
-    const AMOUNT = MIN_HOPS_REQUIRED
+    const AMOUNT = INTERMEDIATE_HOPS
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
@@ -152,7 +161,7 @@ describe('packet creation and transformation', function () {
   })
 
   it('create packet and transform it - false positives', async function () {
-    const AMOUNT = MIN_HOPS_REQUIRED + 1
+    const AMOUNT = INTERMEDIATE_HOPS + 1
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
