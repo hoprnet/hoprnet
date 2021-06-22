@@ -53,4 +53,8 @@ $ npm install @hoprnet/hoprd@1.72
 
 # run hoprd
 $ DEBUG=hopr* npx hoprd --admin --init --announce
+
+# add security
+$ DEBUG=hopr* npx hoprd --admin --init --announce --apiToken <YOU_SECRET_TOKEN>
 ```
+

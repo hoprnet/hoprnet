@@ -80,7 +80,7 @@ working directory where it will store the encrypted key to your node and your of
 private data.
 
 ```bash
-DEBUG=hopr* hoprd --admin --init --announce --password='' 2>&1 | tee ~/hoprd-logs.txt
+DEBUG=hopr* hoprd --admin --init --announce --apiToken <YOUR_SECRET_TOKEN> --password='' 2>&1 | tee ~/hoprd-logs.txt
 ```
 
 ### Accessing HOPRd on a local machine
