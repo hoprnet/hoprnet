@@ -121,20 +121,20 @@ describe('test pathfinder with some simple topologies', function () {
     assert(path.length == 4, 'Should find a valid acyclic path')
   })
 
-  it('should not find a path if a node is unreliable', async () => {
-    let thrown = false
-    try {
-      await findPath(
-        TEST_NODES[0],
-        fakePublicKey(6),
-        4,
-        UNRELIABLE_NETWORK,
-        fakeIndexer(ARROW, STAKE_1).getOpenChannelsFrom,
-        0
-      )
-    } catch (e) {
-      thrown = true
-    }
-    assert(thrown, 'should throw if there is no possible path')
-  })
+  // it('should not find a path if a node is unreliable', async () => {
+  //   let thrown = false
+  //   try {
+  //     await findPath(
+  //       TEST_NODES[0],
+  //       fakePublicKey(6),
+  //       4,
+  //       UNRELIABLE_NETWORK,
+  //       fakeIndexer(ARROW, STAKE_1).getOpenChannelsFrom,
+  //       0
+  //     )
+  //   } catch (e) {
+  //     thrown = true
+  //   }
+  //   assert(thrown, 'should throw if there is no possible path')
+  // })
 })
