@@ -32,7 +32,7 @@ class RelayState {
 
   async isActive(source: PeerId, destination: PeerId, timeout?: number): Promise<boolean> {
     const id = RelayState.getId(source, destination)
-    if (this.relayedConnections.has(id)) {
+    if (!this.relayedConnections.has(id)) {
       return false
     }
 
@@ -56,8 +56,8 @@ class RelayState {
   updateExisting(source: PeerId, destination: PeerId, toSource: Stream): void {
     const id = RelayState.getId(source, destination)
 
-    if (this.relayedConnections.has(id)) {
-      throw Error(`Relayed connection does not exit`)
+    if (!this.relayedConnections.has(id)) {
+      throw Error(`Relayed connection does not exist`)
     }
 
     const context = this.relayedConnections.get(id) as State
@@ -79,6 +79,7 @@ class RelayState {
 
     this.relayedConnections.set(RelayState.getId(source, destination), relayedConnection)
   }
+
   static getId(a: PeerId, b: PeerId) {
     const cmpResult = u8aCompare(a.pubKey.marshal(), b.pubKey.marshal())
 

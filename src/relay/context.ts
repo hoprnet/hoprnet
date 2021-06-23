@@ -51,7 +51,6 @@ class RelayContext {
     this._streamSinkSwitchPromise = Defer<Stream['sink']>()
 
     this.source = this._createSource()
-    // this.source.next()
 
     this.sink = (source: Stream['source']): Promise<void> => {
       // @TODO add support for Iterables such as Arrays
@@ -65,7 +64,6 @@ class RelayContext {
   }
 
   public async ping(ms = DEFAULT_PING_TIMEOUT): Promise<number> {
-    console.log(`ping called`)
     let start = Date.now()
     this._pingResponsePromise = Defer<void>()
 
@@ -361,6 +359,7 @@ class RelayContext {
       case 0:
         throw Error(`Trying to unqueue empty status message queue`)
       case 1:
+        this._statusMessagePromise = Defer<void>()
         return this._statusMessages.pop() as Uint8Array
       default:
         return this._statusMessages.shift() as Uint8Array
