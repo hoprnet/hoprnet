@@ -27,7 +27,7 @@ export const MAX_PACKET_DELAY = 200
 export const INTERMEDIATE_HOPS = 3 // require 3 intermediary nodes
 export const PATH_RANDOMNESS = 0.1
 export const MAX_PATH_ITERATIONS = 100
-export const NETWORK_QUALITY_THRESHOLD = 0.2
+export const NETWORK_QUALITY_THRESHOLD = 0.5
 export const MAX_NEW_CHANNELS_PER_TICK = 5
 
 export const CHECK_TIMEOUT = 60000

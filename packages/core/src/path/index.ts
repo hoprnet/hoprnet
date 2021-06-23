@@ -70,7 +70,7 @@ export async function findPath(
         networkPeers.register(c.destination.toPeerId())
         return (
           !destination.eq(c.destination) &&
-          networkPeers.qualityOf(c.destination.toPeerId()) > NETWORK_QUALITY_THRESHOLD &&
+          // networkPeers.qualityOf(c.destination.toPeerId()) > NETWORK_QUALITY_THRESHOLD &&
           filterCycles(c, currentPath) &&
           !deadEnds.has(c.destination.toHex())
         )
