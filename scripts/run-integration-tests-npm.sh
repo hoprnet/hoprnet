@@ -232,7 +232,7 @@ wait_for_port 19095 "${node5_log}"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 3301 9501
+  127.0.0.1 13301 19091
 #}}}
 
 # --- Run test --- {{{
