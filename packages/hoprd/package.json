@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.73.0-next.28",
+  "version": "1.73.0-next.29",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -30,12 +30,12 @@
   "dependencies": {
     "@ceramicnetwork/http-client": "^1.0.6",
     "@ceramicnetwork/stream-tile": "^1.0.6",
-    "@hoprnet/hopr-core": "1.73.0-next.28",
-    "@hoprnet/hopr-utils": "1.73.0-next.28",
+    "@hoprnet/hopr-core": "1.73.0-next.29",
+    "@hoprnet/hopr-utils": "1.73.0-next.29",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
-    "dids": "^2.1.0",
     "cookie": "^0.4.1",
+    "dids": "^2.1.0",
     "ethereumjs-wallet": "^1.0.1",
     "jazzicon": "^1.5.0",
     "key-did-provider-ed25519": "^1.1.0",
