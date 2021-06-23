@@ -188,12 +188,12 @@ wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 13302 19092 "${node2_dir}" "${node2_log}" "${node2_id}"
-setup_node 13303 19093 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 13304 19094 "${node4_dir}" "${node4_log}" "${node4_id}"
-setup_node 13305 19095 "${node5_dir}" "${node5_log}" "${node5_id}"
-setup_node 13306 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
+setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}"
+setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
+setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
+setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
+setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -216,7 +216,7 @@ wait_for_port 19095 "${node5_log}"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 19091
+  127.0.0.1 13301 19501
 #}}}
 
 # --- Run protocol test --- {{{
