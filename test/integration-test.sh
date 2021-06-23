@@ -23,11 +23,11 @@ usage() {
 ([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
 # verify and set parameters
-test -z "${1:-}" && { msg "Missing first parameter"; usage; exit 1; }
-test -z "${2:-}" && { msg "Missing second parameter"; usage; exit 1; }
-test -z "${3:-}" && { msg "Missing third parameter"; usage; exit 1; }
-test -z "${4:-}" && { msg "Missing fourth parameter"; usage; exit 1; }
-test -z "${5:-}" && { msg "Missing fifth parameter"; usage; exit 1; }
+test -z "${1:-}" && { msg "Missing 1st parameter"; usage; exit 1; }
+test -z "${2:-}" && { msg "Missing 2nd parameter"; usage; exit 1; }
+test -z "${3:-}" && { msg "Missing 3rd parameter"; usage; exit 1; }
+test -z "${4:-}" && { msg "Missing 4th parameter"; usage; exit 1; }
+test -z "${5:-}" && { msg "Missing 5th parameter"; usage; exit 1; }
 
 declare api1="${1}"
 declare api2="${2}"
@@ -137,7 +137,7 @@ validate_node_balance_gt0 "${api4}"
 validate_node_balance_gt0 "${api5}"
 log "Nodes are funded"
 
-declare addr1 addr2 addr3 addr4 result
+declare addr1 addr2 addr3 addr4 addr5 result
 addr1="$(get_hopr_address "${api1}")"
 addr2="$(get_hopr_address "${api2}")"
 addr3="$(get_hopr_address "${api3}")"
@@ -153,24 +153,14 @@ log "Check peers"
 result=$(run_command ${api1} "peers" '5 peers have announced themselves' 60)
 log "-- ${result}"
 
-log "Node 1 ping node 2"
-result=$(run_command ${api1} "ping ${addr2}" "Pong received in:")
-log "-- ${result}"
-
-log "Node 1 ping node 3"
-result=$(run_command ${api1} "ping ${addr3}" "Pong received in:")
-log "-- ${result}"
-
-log "Node 1 ping node 4"
-result=$(run_command ${api1} "ping ${addr4}" "Pong received in:")
-log "-- ${result}"
-
-log "Node 1 ping node 5"
-result=$(run_command ${api1} "ping ${addr5}" "Pong received in:")
-log "-- ${result}"
+for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
+  log "Node 1 ping other node ${node}"
+  result=$(run_command ${api1} "ping ${node}" "Pong received in:" 60)
+  log "-- ${result}"
+done
 
 log "Node 2 ping node 3"
-result=$(run_command ${api2} "ping ${addr3}" "Pong received in:")
+result=$(run_command ${api2} "ping ${addr3}" "Pong received in:" 60)
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
@@ -178,7 +168,7 @@ result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR" 10)
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
-run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent"
+run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 60
 
 log "Node 1 open channel to Node 2"
 result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel")
@@ -214,4 +204,4 @@ result=$(run_command ${api4} "tickets" "Win Proportion:   100%" 10)
 log "-- ${result}"
 
 log "Node 1 send message to node 5"
-run_command "${api1}" "send ${addr5} 'hello, world'" "Message sent"
+run_command "${api1}" "send ${addr5} 'hello, world'" "Message sent" 60
