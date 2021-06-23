@@ -153,24 +153,14 @@ log "Check peers"
 result=$(run_command ${api1} "peers" '5 peers have announced themselves' 60)
 log "-- ${result}"
 
-log "Node 1 ping node 2"
-result=$(run_command ${api1} "ping ${addr2}" "Pong received in:")
-log "-- ${result}"
-
-log "Node 1 ping node 3"
-result=$(run_command ${api1} "ping ${addr3}" "Pong received in:")
-log "-- ${result}"
-
-log "Node 1 ping node 4"
-result=$(run_command ${api1} "ping ${addr4}" "Pong received in:")
-log "-- ${result}"
-
-log "Node 1 ping node 5"
-result=$(run_command ${api1} "ping ${addr5}" "Pong received in:")
-log "-- ${result}"
+for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
+  log "Node 1 ping other node ${node}"
+  result=$(run_command ${api1} "ping ${node}" "Pong received in:" 60)
+  log "-- ${result}"
+done
 
 log "Node 2 ping node 3"
-result=$(run_command ${api2} "ping ${addr3}" "Pong received in:")
+result=$(run_command ${api2} "ping ${addr3}" "Pong received in:" 60)
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
