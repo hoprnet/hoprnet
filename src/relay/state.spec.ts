@@ -30,7 +30,7 @@ describe('relay state management', function () {
     assert.throws(() => RelayState.getId(initiator, initiator))
   })
 
-  it('state workflow', async function () {
+  it('check if active, create new and exchange messages', async function () {
     const state = new RelayState()
 
     assert(!state.exists(initiator, destination))
@@ -133,5 +133,53 @@ describe('relay state management', function () {
         Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHelloAfterUpdate])
       )
     )
+  })
+
+  it('check cleanup', async function () {
+    const state = new RelayState()
+
+    assert(!state.exists(initiator, destination))
+    const initiatorToRelay = Pair()
+    const relayToInitiator = Pair()
+
+    const destinationToRelay = Pair()
+    const relayToDestination = Pair()
+
+    const initiatorShaker = handshake<StreamType>({
+      source: relayToInitiator.source,
+      sink: initiatorToRelay.sink
+    })
+
+    const destinationShaker = handshake<StreamType>({
+      source: relayToDestination.source,
+      sink: destinationToRelay.sink
+    })
+
+    state.createNew(
+      initiator,
+      destination,
+      {
+        source: initiatorToRelay.source,
+        sink: relayToInitiator.sink
+      },
+      {
+        source: destinationToRelay.source,
+        sink: relayToDestination.sink
+      }
+    )
+
+    initiatorShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
+
+    assert(
+      u8aEquals(
+        (await destinationShaker.read()).slice(),
+        Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP)
+      )
+    )
+
+    // Let I/O operations happen
+    await new Promise((resolve) => setTimeout(resolve))
+
+    assert(!state.exists(initiator, destination))
   })
 })

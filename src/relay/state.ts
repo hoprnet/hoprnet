@@ -77,7 +77,26 @@ class RelayState {
       [destination.toB58String()]: toDestinationContext
     }
 
+    toSourceContext.once('close', this.cleanListener(source, destination))
+    toSourceContext.once('close', this.cleanListener(destination, source))
+
     this.relayedConnections.set(RelayState.getId(source, destination), relayedConnection)
+  }
+
+  private cleanListener(source: PeerId, destination: PeerId) {
+    return function (this: RelayState) {
+      const id = RelayState.getId(source, destination)
+
+      let found = this.relayedConnections.get(id)
+
+      if (found) {
+        delete found[source.toB58String()]
+
+        if (!found.hasOwnProperty(destination.toB58String())) {
+          this.relayedConnections.delete(id)
+        }
+      }
+    }.bind(this)
   }
 
   static getId(a: PeerId, b: PeerId) {

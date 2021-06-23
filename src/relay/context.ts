@@ -2,6 +2,7 @@ import { u8aToHex } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 
 import Defer, { DeferredPromise } from 'p-defer'
+import EventEmitter from 'events'
 
 import type { Stream, StreamResult } from 'libp2p'
 
@@ -14,8 +15,7 @@ import { RelayPrefix, StatusMessages, VALID_PREFIXES, ConnectionStatusMessages }
 
 export const DEFAULT_PING_TIMEOUT = 300
 
-class RelayContext {
-  // private _switchPromise: DeferredPromise<Stream>
+class RelayContext extends EventEmitter {
   private _streamSourceSwitchPromise: DeferredPromise<Stream['source']>
   private _streamSinkSwitchPromise: DeferredPromise<Stream['sink']>
 
@@ -36,6 +36,7 @@ class RelayContext {
   public sink: Stream['sink']
 
   constructor(stream: Stream) {
+    super()
     this._id = u8aToHex(randomBytes(4), false)
 
     this._statusMessagePromise = Defer<void>()
@@ -209,6 +210,7 @@ class RelayContext {
           if (SUFFIX[0] == ConnectionStatusMessages.STOP) {
             this.verbose(`STOP relayed`)
 
+            this.emit('close')
             // forward STOP message
             yield received.value
 
@@ -217,13 +219,6 @@ class RelayContext {
           } else if ((SUFFIX[0] = ConnectionStatusMessages.RESTART)) {
             this.verbose(`RESTART relayed`)
           }
-
-          this.log(`sourcing`, received.value)
-          yield received.value
-
-          next()
-
-          continue
         }
 
         yield received.value
