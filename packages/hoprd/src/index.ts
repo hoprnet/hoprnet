@@ -63,6 +63,15 @@ const argv = yargs
     describe: 'Updates the port for the healthcheck server',
     default: 8080
   })
+  .option('forwardLogs', {
+    boolean: true,
+    describe: 'Forwards all your node logs to a public available sink',
+    default: false
+  })
+  .option('forwardLogsProvider', {
+    describe: 'A provider url for the logging sink node to use',
+    default: 'https://ceramic-clay.3boxlabs.com'
+  })
   .option('password', {
     describe: 'A password to encrypt your keys',
     default: ''
@@ -173,7 +182,7 @@ async function main() {
   addUnhandledPromiseRejectionHandler()
 
   let node: Hopr
-  let logs = new LogStream()
+  let logs = new LogStream(argv.forwardLogs)
   let adminServer = undefined
   let cmds: Commands
 
@@ -187,6 +196,13 @@ async function main() {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())
     }
+  }
+
+  if (logs.isReadyForPublicLogging()) {
+    const publicLogsId = await logs.enablePublicLoggingNode(argv.forwardLogsProvider)
+    logs.log(`Your unique Log Id is ${publicLogsId}`)
+    logs.log(`View logs at https://documint.net/${publicLogsId}`)
+    logs.startLoggingQueue()
   }
 
   if (argv.admin) {
