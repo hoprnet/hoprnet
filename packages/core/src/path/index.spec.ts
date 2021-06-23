@@ -35,10 +35,10 @@ export function fakePublicKey(i: number | string): PublicKey {
 describe('test pathfinder with some simple topologies', function () {
   const TEST_NODES = Array.from({ length: 5 }).map((_, i) => fakePublicKey(i))
   const RELIABLE_NETWORK = { qualityOf: (_p: any) => 1, register: () => {} } as unknown as NetworkPeers
-  const UNRELIABLE_NETWORK = {
-    qualityOf: (p: any) => ((p.id as any) % 3 == 0 ? 0 : 1),
-    register: () => {}
-  } as unknown as NetworkPeers // Node 3 is down
+  // const UNRELIABLE_NETWORK = {
+  //   qualityOf: (p: any) => ((p.id as any) % 3 == 0 ? 0 : 1),
+  //   register: () => {}
+  // } as unknown as NetworkPeers // Node 3 is down
   const STAKE_1 = () => new Balance(new BN(1))
   // @ts-ignore
   const STAKE_N = (x: PublicKey) => new Balance(new BN(x.id + 0.1))
