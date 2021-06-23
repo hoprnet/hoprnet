@@ -19,6 +19,7 @@ mkShell {
   buildInputs = [
     ## base
     git
+    lsof
     unstable.niv
     shellcheck
 

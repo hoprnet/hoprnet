@@ -59,9 +59,9 @@ declare node4_id="${node4_dir}.id"
 declare hardhat_rpc_log="/tmp/hopr-npm-hardhat-rpc.log"
 
 function cleanup {
-  trap - SIGINT SIGTERM ERR EXIT
-
   local EXIT_CODE=$?
+
+  trap - SIGINT SIGTERM ERR EXIT
 
   # Cleaning up everything
   if [ "$EXIT_CODE" != "0" ]; then
@@ -82,7 +82,7 @@ function cleanup {
   log "Cleaning up processes"
   for port in 8545 3301 3302 3303 3304 9091 9092 9093 9094; do
     if lsof -i ":${port}" -s TCP:LISTEN; then
-      lsof -i ":${port}" -s TCP:LISTEN -t | xargs kill
+      lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
     fi
   done
 
@@ -92,20 +92,22 @@ function cleanup {
 trap cleanup SIGINT SIGTERM ERR EXIT
 
 # $1 = rest port
-# $2 = host port
-# $3 = node data directory
-# $4 = node log file
-# $5 = node id file
-# $6 = npm package version
-# $7 = OPTIONAL: additions args to hoprd
+# $2 = node port
+# $3 = admin port
+# $4 = node data directory
+# $5 = node log file
+# $6 = node id file
+# $7 = npm package version
+# $8 = OPTIONAL: additions args to hoprd
 function setup_node() {
-  local port=${1}
-  local host_port=${2}
-  local dir=${3}
-  local log=${4}
-  local id=${5}
-  local version=${6}
-  local additional_args=${7:-""}
+  local rest_port=${1}
+  local node_port=${2}
+  local admin_port=${3}
+  local dir=${4}
+  local log=${5}
+  local id=${6}
+  local version=${7}
+  local additional_args=${8:-""}
 
   if [ -n "${additional_args}" ]; then
     log "Additional args: \"${additional_args}\""
@@ -118,13 +120,15 @@ function setup_node() {
   DEBUG="hopr*" yarn --cwd "${npm_install_dir}" hoprd \
     --init --provider=http://127.0.0.1:8545/ \
     --testAnnounceLocalAddresses --identity="${id}" \
-    --host="127.0.0.1:${host_port}" --testPreferLocalAddresses \
-    --data="${dir}" --rest --restPort "${port}" --announce \
+    --host="127.0.0.1:${node_port}" --testPreferLocalAddresses \
+    --data="${dir}" --rest --restPort "${rest_port}" --announce \
+    --api-token "e2e-api-token" \
+    --admin --adminHost "127.0.0.1" --adminPort ${admin_port} \
     --password="e2e-test" --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
 
-  wait_for_http_port "${port}" "${log}" "${wait_delay}" "${wait_max_wait}"
+  wait_for_http_port "${rest_port}" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
 
 # $1 = port
@@ -181,6 +185,10 @@ ensure_port_is_free 9091
 ensure_port_is_free 9092
 ensure_port_is_free 9093
 ensure_port_is_free 9094
+ensure_port_is_free 9501
+ensure_port_is_free 9502
+ensure_port_is_free 9503
+ensure_port_is_free 9504
 # }}}
 
 # --- Running Mock Blockchain --- {{{
@@ -194,10 +202,10 @@ wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 3301 9091 "${node1_dir}" "${node1_log}" "${node1_id}" "${npm_package_version}"
-setup_node 3302 9092 "${node2_dir}" "${node2_log}" "${node2_id}" "${npm_package_version}"
-setup_node 3303 9093 "${node3_dir}" "${node3_log}" "${node3_id}" "${npm_package_version}"
-setup_node 3304 9094 "${node4_dir}" "${node4_log}" "${node4_id}" "${npm_package_version}" "--run \"info;balance\""
+setup_node 3301 9091 9501 "${node1_dir}" "${node1_log}" "${node1_id}" "${npm_package_version}"
+setup_node 3302 9092 9502 "${node2_dir}" "${node2_log}" "${node2_id}" "${npm_package_version}"
+setup_node 3303 9093 9503 "${node3_dir}" "${node3_log}" "${node3_id}" "${npm_package_version}"
+setup_node 3304 9094 9504 "${node4_dir}" "${node4_log}" "${node4_id}" "${npm_package_version}" "--run \"info;balance\""
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -214,9 +222,14 @@ wait_for_port 9093 "${node3_log}"
 wait_for_port 9094 "${node4_log}"
 # }}}
 
+# --- Run security tests --- {{{
+${mydir}/../test/security-test.sh \
+  127.0.0.1 3301 9501
+#}}}
+
 # --- Run test --- {{{
 ${mydir}/../test/integration-test.sh \
-  "localhost:3301" "localhost:3302" "localhost:3303"
+  "localhost:3301" "localhost:3302" "localhost:3303" "localhost:3304"
 # }}}
 
 # -- Verify node4 has executed the commands {{{

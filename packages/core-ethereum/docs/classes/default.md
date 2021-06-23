@@ -2,6 +2,12 @@
 
 # Class: default
 
+## Hierarchy
+
+- `EventEmitter`
+
+  ↳ **default**
+
 ## Table of contents
 
 ### Constructors
@@ -17,21 +23,40 @@
 - [indexer](default.md#indexer)
 - [privateKey](default.md#privatekey)
 - [publicKey](default.md#publickey)
+- [captureRejectionSymbol](default.md#capturerejectionsymbol)
+- [captureRejections](default.md#capturerejections)
+- [defaultMaxListeners](default.md#defaultmaxlisteners)
+- [errorMonitor](default.md#errormonitor)
 
 ### Methods
 
+- [addListener](default.md#addlistener)
 - [announce](default.md#announce)
+- [emit](default.md#emit)
+- [eventNames](default.md#eventnames)
 - [getAccount](default.md#getaccount)
 - [getAddress](default.md#getaddress)
 - [getBalance](default.md#getbalance)
 - [getChannel](default.md#getchannel)
 - [getChannelsFrom](default.md#getchannelsfrom)
 - [getChannelsTo](default.md#getchannelsto)
+- [getMaxListeners](default.md#getmaxlisteners)
 - [getNativeBalance](default.md#getnativebalance)
-- [getOpenRoutingChannelsFromPeer](default.md#getopenroutingchannelsfrompeer)
+- [getOpenChannelsFrom](default.md#getopenchannelsfrom)
 - [getPublicKey](default.md#getpublickey)
 - [getPublicKeyOf](default.md#getpublickeyof)
 - [getRandomChannel](default.md#getrandomchannel)
+- [listenerCount](default.md#listenercount)
+- [listeners](default.md#listeners)
+- [off](default.md#off)
+- [on](default.md#on)
+- [once](default.md#once)
+- [prependListener](default.md#prependlistener)
+- [prependOnceListener](default.md#prependoncelistener)
+- [rawListeners](default.md#rawlisteners)
+- [removeAllListeners](default.md#removealllisteners)
+- [removeListener](default.md#removelistener)
+- [setMaxListeners](default.md#setmaxlisteners)
 - [smartContractInfo](default.md#smartcontractinfo)
 - [stop](default.md#stop)
 - [uncachedGetBalance](default.md#uncachedgetbalance)
@@ -39,6 +64,9 @@
 - [waitForPublicNodes](default.md#waitforpublicnodes)
 - [withdraw](default.md#withdraw)
 - [create](default.md#create)
+- [listenerCount](default.md#listenercount)
+- [on](default.md#on)
+- [once](default.md#once)
 
 ## Constructors
 
@@ -76,9 +104,13 @@
 | `db` | `HoprDB` |
 | `indexer` | [Indexer](indexer.md) |
 
+#### Overrides
+
+EventEmitter.constructor
+
 #### Defined in
 
-[core-ethereum/src/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L43)
+[core-ethereum/src/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L42)
 
 ## Properties
 
@@ -98,7 +130,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L43)
+[core-ethereum/src/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L42)
 
 ___
 
@@ -150,7 +182,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/index.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L41)
+[core-ethereum/src/index.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L40)
 
 ___
 
@@ -160,9 +192,100 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L42)
+[core-ethereum/src/index.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L41)
+
+___
+
+### captureRejectionSymbol
+
+▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [captureRejectionSymbol](default.md#capturerejectionsymbol)
+
+#### Inherited from
+
+EventEmitter.captureRejectionSymbol
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:43
+
+___
+
+### captureRejections
+
+▪ `Static` **captureRejections**: `boolean`
+
+Sets or gets the default captureRejection value for all emitters.
+
+#### Inherited from
+
+EventEmitter.captureRejections
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:49
+
+___
+
+### defaultMaxListeners
+
+▪ `Static` **defaultMaxListeners**: `number`
+
+#### Inherited from
+
+EventEmitter.defaultMaxListeners
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:50
+
+___
+
+### errorMonitor
+
+▪ `Static` `Readonly` **errorMonitor**: typeof [errorMonitor](default.md#errormonitor)
+
+This symbol shall be used to install a listener for only monitoring `'error'`
+events. Listeners installed using this symbol are called before the regular
+`'error'` listeners are called.
+
+Installing a listener using this symbol does not change the behavior once an
+`'error'` event is emitted, therefore the process will still crash if no
+regular `'error'` listener is installed.
+
+#### Inherited from
+
+EventEmitter.errorMonitor
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:42
 
 ## Methods
+
+### addListener
+
+▸ **addListener**(`event`, `listener`): [default](default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+| `listener` | (...`args`: `any`[]) => `void` |
+
+#### Returns
+
+[default](default.md)
+
+#### Inherited from
+
+EventEmitter.addListener
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:62
+
+___
 
 ### announce
 
@@ -181,6 +304,49 @@ ___
 #### Defined in
 
 [core-ethereum/src/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L65)
+
+___
+
+### emit
+
+▸ **emit**(`event`, ...`args`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+| `...args` | `any`[] |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+EventEmitter.emit
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:72
+
+___
+
+### eventNames
+
+▸ **eventNames**(): (`string` \| `symbol`)[]
+
+#### Returns
+
+(`string` \| `symbol`)[]
+
+#### Inherited from
+
+EventEmitter.eventNames
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:77
 
 ___
 
@@ -265,7 +431,7 @@ ___
 
 ### getChannelsFrom
 
-▸ **getChannelsFrom**(`addr`): `Promise`<ChannelEntry[]\>
+▸ **getChannelsFrom**(`addr`): `Promise`<[ChannelEntry](channelentry.md)[]\>
 
 #### Parameters
 
@@ -275,7 +441,7 @@ ___
 
 #### Returns
 
-`Promise`<ChannelEntry[]\>
+`Promise`<[ChannelEntry](channelentry.md)[]\>
 
 #### Defined in
 
@@ -285,7 +451,7 @@ ___
 
 ### getChannelsTo
 
-▸ **getChannelsTo**(`addr`): `Promise`<ChannelEntry[]\>
+▸ **getChannelsTo**(`addr`): `Promise`<[ChannelEntry](channelentry.md)[]\>
 
 #### Parameters
 
@@ -295,11 +461,29 @@ ___
 
 #### Returns
 
-`Promise`<ChannelEntry[]\>
+`Promise`<[ChannelEntry](channelentry.md)[]\>
 
 #### Defined in
 
 [core-ethereum/src/index.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L81)
+
+___
+
+### getMaxListeners
+
+▸ **getMaxListeners**(): `number`
+
+#### Returns
+
+`number`
+
+#### Inherited from
+
+EventEmitter.getMaxListeners
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:69
 
 ___
 
@@ -323,19 +507,19 @@ ___
 
 ___
 
-### getOpenRoutingChannelsFromPeer
+### getOpenChannelsFrom
 
-▸ **getOpenRoutingChannelsFromPeer**(`p`): `Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
+▸ **getOpenChannelsFrom**(`p`): `Promise`<[ChannelEntry](channelentry.md)[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `p` | `PeerId` |
+| `p` | `PublicKey` |
 
 #### Returns
 
-`Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
+`Promise`<[ChannelEntry](channelentry.md)[]\>
 
 #### Defined in
 
@@ -379,15 +563,285 @@ ___
 
 ### getRandomChannel
 
-▸ **getRandomChannel**(): `Promise`<[RoutingChannel](../modules.md#routingchannel)\>
+▸ **getRandomChannel**(): `Promise`<[ChannelEntry](channelentry.md)\>
 
 #### Returns
 
-`Promise`<[RoutingChannel](../modules.md#routingchannel)\>
+`Promise`<[ChannelEntry](channelentry.md)\>
 
 #### Defined in
 
 [core-ethereum/src/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L93)
+
+___
+
+### listenerCount
+
+▸ **listenerCount**(`event`): `number`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+
+#### Returns
+
+`number`
+
+#### Inherited from
+
+EventEmitter.listenerCount
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:73
+
+___
+
+### listeners
+
+▸ **listeners**(`event`): `Function`[]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+
+#### Returns
+
+`Function`[]
+
+#### Inherited from
+
+EventEmitter.listeners
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:70
+
+___
+
+### off
+
+▸ **off**(`event`, `listener`): [default](default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+| `listener` | (...`args`: `any`[]) => `void` |
+
+#### Returns
+
+[default](default.md)
+
+#### Inherited from
+
+EventEmitter.off
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:66
+
+___
+
+### on
+
+▸ **on**(`event`, `listener`): [default](default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+| `listener` | (...`args`: `any`[]) => `void` |
+
+#### Returns
+
+[default](default.md)
+
+#### Inherited from
+
+EventEmitter.on
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:63
+
+___
+
+### once
+
+▸ **once**(`event`, `listener`): [default](default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+| `listener` | (...`args`: `any`[]) => `void` |
+
+#### Returns
+
+[default](default.md)
+
+#### Inherited from
+
+EventEmitter.once
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:64
+
+___
+
+### prependListener
+
+▸ **prependListener**(`event`, `listener`): [default](default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+| `listener` | (...`args`: `any`[]) => `void` |
+
+#### Returns
+
+[default](default.md)
+
+#### Inherited from
+
+EventEmitter.prependListener
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:75
+
+___
+
+### prependOnceListener
+
+▸ **prependOnceListener**(`event`, `listener`): [default](default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+| `listener` | (...`args`: `any`[]) => `void` |
+
+#### Returns
+
+[default](default.md)
+
+#### Inherited from
+
+EventEmitter.prependOnceListener
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:76
+
+___
+
+### rawListeners
+
+▸ **rawListeners**(`event`): `Function`[]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+
+#### Returns
+
+`Function`[]
+
+#### Inherited from
+
+EventEmitter.rawListeners
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:71
+
+___
+
+### removeAllListeners
+
+▸ **removeAllListeners**(`event?`): [default](default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event?` | `string` \| `symbol` |
+
+#### Returns
+
+[default](default.md)
+
+#### Inherited from
+
+EventEmitter.removeAllListeners
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:67
+
+___
+
+### removeListener
+
+▸ **removeListener**(`event`, `listener`): [default](default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `event` | `string` \| `symbol` |
+| `listener` | (...`args`: `any`[]) => `void` |
+
+#### Returns
+
+[default](default.md)
+
+#### Inherited from
+
+EventEmitter.removeListener
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:65
+
+___
+
+### setMaxListeners
+
+▸ **setMaxListeners**(`n`): [default](default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `n` | `number` |
+
+#### Returns
+
+[default](default.md)
+
+#### Inherited from
+
+EventEmitter.setMaxListeners
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:68
 
 ___
 
@@ -521,3 +975,101 @@ a promise resolved to the connector
 #### Defined in
 
 [core-ethereum/src/index.ts:149](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L149)
+
+___
+
+### listenerCount
+
+▸ `Static` **listenerCount**(`emitter`, `event`): `number`
+
+**`deprecated`** since v4.0.0
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `emitter` | `EventEmitter` |
+| `event` | `string` \| `symbol` |
+
+#### Returns
+
+`number`
+
+#### Inherited from
+
+EventEmitter.listenerCount
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:31
+
+___
+
+### on
+
+▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<any\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `emitter` | `EventEmitter` |
+| `event` | `string` |
+
+#### Returns
+
+`AsyncIterableIterator`<any\>
+
+#### Inherited from
+
+EventEmitter.on
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:28
+
+___
+
+### once
+
+▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `emitter` | `NodeEventTarget` |
+| `event` | `string` \| `symbol` |
+
+#### Returns
+
+`Promise`<any[]\>
+
+#### Inherited from
+
+EventEmitter.once
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:26
+
+▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `emitter` | `DOMEventTarget` |
+| `event` | `string` |
+
+#### Returns
+
+`Promise`<any[]\>
+
+#### Inherited from
+
+EventEmitter.once
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:27

@@ -11,13 +11,15 @@ import {
   AcknowledgedTicket,
   Response,
   generateChannelId,
-  HalfKey
+  HalfKey,
+  PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
 import { utils } from 'ethers'
 import { Channel } from './channel'
 import * as fixtures from './fixtures'
+import { EventEmitter } from 'events'
 
 const createChainMock = (): ChainWrapper => {
   return {
@@ -79,7 +81,8 @@ const createMocks = (from: string, to: string) => {
 
   const indexer = createIndexerMock(channelUsThem, channelThemUs)
   const chain = createChainMock()
-  const channel = new Channel(self, counterparty, db, chain, indexer, selfPrivateKey)
+  const ev = new EventEmitter()
+  const channel = new Channel(self, counterparty, db, chain, indexer, selfPrivateKey, ev)
 
   return {
     self,
@@ -124,11 +127,7 @@ describe('test channel', function () {
   })
 
   it("should validate ticket's response", async function () {
-    const ticket = await aliceMocks.channel.createTicket(
-      new Balance(new BN(1)),
-      aliceMocks.response.toChallenge(),
-      new BN(1)
-    )
+    const ticket = await aliceMocks.channel.createTicket(2, aliceMocks.response.toChallenge())
 
     const goodAck = new AcknowledgedTicket(
       ticket,
@@ -149,14 +148,13 @@ describe('test channel', function () {
 
     const badResponse = await bobMocks.channel.redeemTicket(badAck)
     assert(badResponse.status === 'FAILURE' && badResponse.message === 'Invalid response to acknowledgement')
+
+    const aBalances = await aliceMocks.channel.balanceToThem()
+    assert(aBalances.minimum.eq(aBalances.maximum.sub(PRICE_PER_PACKET)), 'max and min balance diverge')
   })
 
   it("should validate ticket's preimage", async function () {
-    const ticket = await aliceMocks.channel.createTicket(
-      new Balance(new BN(1)),
-      aliceMocks.response.toChallenge(),
-      new BN(1)
-    )
+    const ticket = await aliceMocks.channel.createTicket(2, aliceMocks.response.toChallenge())
 
     const acknowledgement = new AcknowledgedTicket(
       ticket,

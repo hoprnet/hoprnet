@@ -58,12 +58,17 @@
 - [A\_STRICLY\_LESS\_THAN\_B](modules.md#a_stricly_less_than_b)
 - [A\_STRICTLY\_GREATER\_THAN\_B](modules.md#a_strictly_greater_than_b)
 - [HASH\_LENGTH](modules.md#hash_length)
+- [INVERSE\_TICKET\_WIN\_PROB](modules.md#inverse_ticket_win_prob)
 - [LENGTH\_PREFIX\_LENGTH](modules.md#length_prefix_length)
+- [MAX\_AUTO\_CHANNELS](modules.md#max_auto_channels)
+- [MINIMUM\_REASONABLE\_CHANNEL\_STAKE](modules.md#minimum_reasonable_channel_stake)
+- [MIN\_NATIVE\_BALANCE](modules.md#min_native_balance)
 - [MULTI\_ADDR\_MAX\_LENGTH](modules.md#multi_addr_max_length)
 - [POR\_STRING\_LENGTH](modules.md#por_string_length)
 - [PRG\_COUNTER\_LENGTH](modules.md#prg_counter_length)
 - [PRG\_IV\_LENGTH](modules.md#prg_iv_length)
 - [PRG\_KEY\_LENGTH](modules.md#prg_key_length)
+- [PRICE\_PER\_PACKET](modules.md#price_per_packet)
 - [PRIVATE\_KEY\_LENGTH](modules.md#private_key_length)
 - [PRP\_IV\_LENGTH](modules.md#prp_iv_length)
 - [PRP\_KEY\_LENGTH](modules.md#prp_key_length)
@@ -72,6 +77,8 @@
 - [SECP256K1\_CONSTANTS](modules.md#secp256k1_constants)
 - [SIGNATURE\_LENGTH](modules.md#signature_length)
 - [SIGNATURE\_RECOVERY\_LENGTH](modules.md#signature_recovery_length)
+- [SUGGESTED\_BALANCE](modules.md#suggested_balance)
+- [SUGGESTED\_NATIVE\_BALANCE](modules.md#suggested_native_balance)
 - [UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH](modules.md#uncompressed_public_key_length)
 - [b58StringRegex](modules.md#b58stringregex)
 - [durations](modules.md#durations)
@@ -318,7 +325,7 @@ ___
 
 #### Defined in
 
-[constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L4)
+[constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L6)
 
 ___
 
@@ -358,7 +365,17 @@ ___
 
 #### Defined in
 
-[constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L5)
+[constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L7)
+
+___
+
+### INVERSE\_TICKET\_WIN\_PROB
+
+• `Const` **INVERSE\_TICKET\_WIN\_PROB**: `BN`
+
+#### Defined in
+
+[constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L15)
 
 ___
 
@@ -372,13 +389,43 @@ ___
 
 ___
 
+### MAX\_AUTO\_CHANNELS
+
+• `Const` **MAX\_AUTO\_CHANNELS**: ``5``
+
+#### Defined in
+
+[constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L19)
+
+___
+
+### MINIMUM\_REASONABLE\_CHANNEL\_STAKE
+
+• `Const` **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
+
+#### Defined in
+
+[constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L17)
+
+___
+
+### MIN\_NATIVE\_BALANCE
+
+• `Const` **MIN\_NATIVE\_BALANCE**: `BN`
+
+#### Defined in
+
+[constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L20)
+
+___
+
 ### MULTI\_ADDR\_MAX\_LENGTH
 
 • `Const` **MULTI\_ADDR\_MAX\_LENGTH**: ``200``
 
 #### Defined in
 
-[constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
+[constants.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L11)
 
 ___
 
@@ -422,13 +469,23 @@ ___
 
 ___
 
+### PRICE\_PER\_PACKET
+
+• `Const` **PRICE\_PER\_PACKET**: `BN`
+
+#### Defined in
+
+[constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L13)
+
+___
+
 ### PRIVATE\_KEY\_LENGTH
 
 • `Const` **PRIVATE\_KEY\_LENGTH**: ``32``
 
 #### Defined in
 
-[constants.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L1)
+[constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L3)
 
 ___
 
@@ -468,7 +525,7 @@ ___
 
 #### Defined in
 
-[constants.ts:2](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L2)
+[constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L4)
 
 ___
 
@@ -500,7 +557,7 @@ ___
 
 #### Defined in
 
-[constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L6)
+[constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L8)
 
 ___
 
@@ -510,7 +567,27 @@ ___
 
 #### Defined in
 
-[constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L7)
+[constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
+
+___
+
+### SUGGESTED\_BALANCE
+
+• `Const` **SUGGESTED\_BALANCE**: `BN`
+
+#### Defined in
+
+[constants.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L25)
+
+___
+
+### SUGGESTED\_NATIVE\_BALANCE
+
+• `Const` **SUGGESTED\_NATIVE\_BALANCE**: `BN`
+
+#### Defined in
+
+[constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L22)
 
 ___
 
@@ -520,7 +597,7 @@ ___
 
 #### Defined in
 
-[constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L3)
+[constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L5)
 
 ___
 

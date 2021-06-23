@@ -11,7 +11,9 @@ import {
   UnacknowledgedTicket,
   Challenge,
   generateChannelId,
-  ChannelStatus
+  ChannelStatus,
+  PRICE_PER_PACKET,
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import type { RedeemTicketResponse } from '.'
@@ -20,6 +22,7 @@ import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
 import type { HoprDB } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
+import { EventEmitter } from 'events'
 
 const log = Debug('hopr-core-ethereum:channel')
 
@@ -33,7 +36,8 @@ class Channel {
     private readonly db: HoprDB,
     private readonly chain: ChainWrapper,
     private readonly indexer: Indexer,
-    private readonly privateKey: Uint8Array
+    private readonly privateKey: Uint8Array,
+    private readonly events: EventEmitter
   ) {
     this.commitment = new Commitment(
       (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
@@ -72,6 +76,7 @@ class Channel {
       )
 
       await this.commitment.bumpCommitment()
+      this.events.emit('ticket:win', ack)
       return ack
     } else {
       log(`Got a ticket that is not a win. Dropping ticket.`)
@@ -170,11 +175,13 @@ class Channel {
    * @param winProb the winning probability to use
    * @returns a signed ticket
    */
-  async createTicket(amount: Balance, challenge: Challenge, winProb: BN) {
+  async createTicket(pathLength: number, challenge: Challenge) {
     const counterpartyAddress = this.counterparty.toAddress()
     const channelState = await this.usToThem()
     const id = generateChannelId(this.self.toAddress(), this.counterparty.toAddress())
     const currentTicketIndex = await this.bumpTicketIndex(id)
+    const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
+    const winProb = new BN(INVERSE_TICKET_WIN_PROB)
 
     const ticket = Ticket.create(
       counterpartyAddress,
@@ -186,6 +193,7 @@ class Channel {
       channelState.channelEpoch,
       this.privateKey
     )
+    await this.db.markPending(ticket)
 
     log(`Creating ticket in channel ${chalk.yellow(channelState.getId().toHex())}. Ticket data: \n${ticket.toString()}`)
 
@@ -210,6 +218,21 @@ class Channel {
       UINT256.fromString('0'),
       this.privateKey
     )
+  }
+
+  /*
+   * As we issue probabilistic tickets, we can't be sure of the exact balance
+   * of our channels, but we can see the bounds based on how many tickets are
+   * outstanding.
+   */
+  async balanceToThem(): Promise<{ maximum: BN; minimum: BN }> {
+    const stake = (await this.usToThem()).balance
+    const outstandingTicketBalance = await this.db.getPendingBalanceTo(this.counterparty.toAddress())
+
+    return {
+      minimum: stake.toBN().sub(outstandingTicketBalance.toBN()),
+      maximum: stake.toBN()
+    }
   }
 
   async getAcknowledgedTickets(): Promise<AcknowledgedTicket[]> {
@@ -255,9 +278,9 @@ class Channel {
       const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
 
       //this.commitment.updateChainState(ackTicket.preImage)
-
       log('Successfully submitted ticket', ackTicket.response.toHex())
       await this.db.markRedeemeed(ackTicket)
+      this.events.emit('ticket:redeemed', ackTicket)
       return {
         status: 'SUCCESS',
         receipt,

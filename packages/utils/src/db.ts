@@ -45,6 +45,8 @@ const CURRENT = encoder.encode('current')
 const REDEEMED_TICKETS_COUNT = encoder.encode('statistics:redeemed:count')
 const REDEEMED_TICKETS_VALUE = encoder.encode('statistics:redeemed:value')
 const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
+const PENDING_TICKETS_VALUE = (address: Address) =>
+  u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
 
 export class HoprDB {
   private db: LevelUp
@@ -150,6 +152,16 @@ export class HoprDB {
     let val = await this.getCoercedOrDefault<number>(key, u8aToNumber, 0)
     await this.put(key, Uint8Array.of(val + 1))
     return val + 1
+  }
+
+  private async addBalance(key: Uint8Array, amount: Balance): Promise<void> {
+    let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO())
+    await this.put(key, val.add(amount).serialize())
+  }
+
+  private async subBalance(key: Uint8Array, amount: Balance): Promise<void> {
+    let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO())
+    await this.put(key, new Balance(val.toBN().sub(amount.toBN())).serialize())
   }
 
   /**
@@ -349,19 +361,29 @@ export class HoprDB {
     return (await this.getUnacknowledgedTickets()).length
   }
 
+  public async getPendingBalanceTo(counterparty: Address): Promise<Balance> {
+    return await this.getCoercedOrDefault(PENDING_TICKETS_VALUE(counterparty), Balance.deserialize, Balance.ZERO())
+  }
+
   public async getLosingTicketCount(): Promise<number> {
     return this.getCoercedOrDefault(LOSING_TICKET_COUNT, u8aToNumber, 0)
+  }
+
+  public async markPending(ticket: Ticket) {
+    await this.addBalance(PENDING_TICKETS_VALUE(ticket.counterparty), ticket.amount)
   }
 
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
     await this.increment(REDEEMED_TICKETS_COUNT)
     await this.delAcknowledgedTicket(a)
-    //await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
+    await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
+    await this.subBalance(PENDING_TICKETS_VALUE(a.ticket.counterparty), a.ticket.amount)
   }
 
   public async markLosing(t: UnacknowledgedTicket): Promise<void> {
     await this.increment(LOSING_TICKET_COUNT)
     await this.del(unacknowledgedTicketKey(t.getChallenge()))
+    // sub pending_tickets_value
   }
 
   static createMock(): HoprDB {

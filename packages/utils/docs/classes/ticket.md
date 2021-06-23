@@ -58,7 +58,7 @@
 
 #### Defined in
 
-[types/ticket.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L48)
+[types/ticket.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L49)
 
 ## Properties
 
@@ -120,7 +120,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L139)
+[types/ticket.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L140)
 
 ## Methods
 
@@ -134,7 +134,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L135)
+[types/ticket.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L136)
 
 ___
 
@@ -155,20 +155,13 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L160)
+[types/ticket.ts:161](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L161)
 
 ___
 
 ### getPathPosition
 
-▸ **getPathPosition**(`pricePerTicket`, `inverseTicketWinProb`): `number`
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `pricePerTicket` | `BN` |
-| `inverseTicketWinProb` | `BN` |
+▸ **getPathPosition**(): `number`
 
 #### Returns
 
@@ -176,7 +169,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L184)
+[types/ticket.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L185)
 
 ___
 
@@ -204,7 +197,7 @@ a ticket before we submit it to the blockchain.
 
 #### Defined in
 
-[types/ticket.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L179)
+[types/ticket.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L180)
 
 ___
 
@@ -218,7 +211,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L152)
+[types/ticket.ts:153](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L153)
 
 ___
 
@@ -232,7 +225,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L90)
+[types/ticket.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L91)
 
 ___
 
@@ -246,7 +239,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L94)
+[types/ticket.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L95)
 
 ___
 
@@ -260,7 +253,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L121)
+[types/ticket.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L122)
 
 ___
 
@@ -280,7 +273,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:156](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L156)
+[types/ticket.ts:157](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L157)
 
 ___
 
@@ -307,7 +300,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L60)
+[types/ticket.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L61)
 
 ___
 
@@ -327,4 +320,4 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L98)
+[types/ticket.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L99)

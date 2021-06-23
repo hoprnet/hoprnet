@@ -106,3 +106,10 @@ is out of scope.
 
 - Shrinking packet size by removing derivable values (initially in #1523)
 - Bulk redeem tickets (originally #793)
+
+## Ticket Value and Win Probability
+
+At the moment these are global constants. At some point we want to adjust this.
+One point of view is that they are constants that are voted on by the DAO.
+Another is that they are variable and bidded on in a free market.
+All of this is out of scope for now.
