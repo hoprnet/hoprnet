@@ -70,17 +70,6 @@ function cleanup {
   trap - SIGINT SIGTERM ERR EXIT
 
   # Cleaning up everything
-  if [ "$EXIT_CODE" != "0" ]; then
-    log "Exited with fail, code $EXIT_CODE"
-    for log_file in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}"; do
-      if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
-        log "Printing last 100 lines from logs"
-        tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" | sed "s/^/\t/" || :
-        log "Printing last 100 lines from logs DONE"
-      fi
-    done
-  fi
-
   log "Wiping databases"
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${npm_install_dir}"
 
@@ -97,20 +86,22 @@ function cleanup {
 trap cleanup SIGINT SIGTERM ERR EXIT
 
 # $1 = rest port
-# $2 = host port
-# $3 = node data directory
-# $4 = node log file
-# $5 = node id file
-# $6 = npm package version
-# $7 = OPTIONAL: additions args to hoprd
+# $2 = node port
+# $3 = admin port
+# $4 = node data directory
+# $5 = node log file
+# $6 = node id file
+# $7 = npm package version
+# $8 = OPTIONAL: additions args to hoprd
 function setup_node() {
-  local port=${1}
-  local host_port=${2}
-  local dir=${3}
-  local log=${4}
-  local id=${5}
-  local version=${6}
-  local additional_args=${7:-""}
+  local rest_port=${1}
+  local node_port=${2}
+  local admin_port=${3}
+  local dir=${4}
+  local log=${5}
+  local id=${6}
+  local version=${7}
+  local additional_args=${8:-""}
 
   if [ -n "${additional_args}" ]; then
     log "Additional args: \"${additional_args}\""
@@ -123,13 +114,15 @@ function setup_node() {
   DEBUG="hopr*" yarn --cwd "${npm_install_dir}" hoprd \
     --init --provider=http://127.0.0.1:8545/ \
     --testAnnounceLocalAddresses --identity="${id}" \
-    --host="127.0.0.1:${host_port}" --testPreferLocalAddresses \
-    --data="${dir}" --rest --restPort "${port}" --announce \
+    --host="127.0.0.1:${node_port}" --testPreferLocalAddresses \
+    --data="${dir}" --rest --restPort "${rest_port}" --announce \
+    --api-token "e2e-api-token" \
+    --admin --adminHost "127.0.0.1" --adminPort ${admin_port} \
     --password="e2e-test" --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
 
-  wait_for_http_port "${port}" "${log}" "${wait_delay}" "${wait_max_wait}"
+  wait_for_http_port "${rest_port}" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
 
 # $1 = port
@@ -236,6 +229,11 @@ wait_for_port 19094 "${node4_log}"
 wait_for_port 19095 "${node5_log}"
 # no need to wait for node 6 since that will stop right away
 # }}}
+
+# --- Run security tests --- {{{
+${mydir}/../test/security-test.sh \
+  127.0.0.1 3301 9501
+#}}}
 
 # --- Run test --- {{{
 ${mydir}/../test/integration-test.sh \
