@@ -1,6 +1,6 @@
 import Heap from 'heap-js'
 import type NetworkPeers from '../network/network-peers'
-import { MAX_PATH_ITERATIONS } from '../constants'
+import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
 import Debug from 'debug'
 import type { ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
 
@@ -70,7 +70,7 @@ export async function findPath(
         networkPeers.register(c.destination.toPeerId())
         return (
           !destination.eq(c.destination) &&
-          // networkPeers.qualityOf(c.destination.toPeerId()) > NETWORK_QUALITY_THRESHOLD &&
+          networkPeers.qualityOf(c.destination.toPeerId()) > NETWORK_QUALITY_THRESHOLD &&
           filterCycles(c, currentPath) &&
           !deadEnds.has(c.destination.toHex())
         )
