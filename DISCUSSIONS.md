@@ -107,6 +107,10 @@ is out of scope.
 - Shrinking packet size by removing derivable values (initially in #1523)
 - Bulk redeem tickets (originally #793)
 
+## Tracking pending state
+
+There is a delay between the time where we trigger an on-chain action and the time where the indexer registers it. We need to discuss how we are going to track _pending_ state.
+
 ## Ticket Value and Win Probability
 
 At the moment these are global constants. At some point we want to adjust this.

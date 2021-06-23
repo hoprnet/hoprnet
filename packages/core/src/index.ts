@@ -7,7 +7,7 @@ import { NOISE } from 'libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 
-import { PACKET_SIZE, MAX_HOPS, VERSION, CHECK_TIMEOUT, PATH_RANDOMNESS, FULL_VERSION } from './constants'
+import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, CHECK_TIMEOUT, PATH_RANDOMNESS, FULL_VERSION } from './constants'
 
 import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
@@ -255,10 +255,10 @@ class Hopr extends EventEmitter {
     log('announced, starting heartbeat')
 
     this.heartbeat.start()
-    this.periodicCheck()
     this.setChannelStrategy(this.options.strategy || 'passive')
     this.status = 'RUNNING'
     this.emit('running')
+
     // Log information
     log('# STARTED NODE')
     log('ID', this.getId().toB58String())
@@ -266,6 +266,7 @@ class Hopr extends EventEmitter {
     log(`Available under the following addresses:`)
     libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
     this.maybeLogProfilingToGCloud()
+    this.periodicCheck()
   }
 
   private maybeLogProfilingToGCloud() {
@@ -287,26 +288,30 @@ class Hopr extends EventEmitter {
     }
   }
 
-  private async tickChannelStrategy(newChannels: ChannelEntry[]) {
+  private async tickChannelStrategy() {
     verbose('strategy tick', this.status)
     if (this.status != 'RUNNING') {
       return
     }
-    for (const channel of newChannels) {
-      this.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
+
+    // TODO: replace with newChannels
+    const rndChannels = await this.getRandomOpenChannels()
+
+    for (const channel of rndChannels) {
+      this.networkPeers.register(channel.source.toPeerId()) // Listen to nodes with outgoing stake
     }
     const currentChannels = await this.getOpenChannels()
     for (const channel of currentChannels) {
-      this.networkPeers.register(channel[1]) // Make sure current channels are 'interesting'
+      this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
     const balance = await this.getBalance()
     const chain = await this.paymentChannels
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance.toBN(),
-      newChannels,
+      rndChannels,
       currentChannels,
       this.networkPeers,
-      chain.getRandomChannel.bind(this.paymentChannels)
+      chain.getRandomOpenChannel.bind(this.paymentChannels)
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
@@ -327,6 +332,27 @@ class Hopr extends EventEmitter {
         log('error when trying to open strategy channels', e)
       }
     }
+  }
+
+  /**
+   * Randomly pick 10 open channels
+   * @returns maximum 10 open channels
+   */
+  private async getRandomOpenChannels(): Promise<ChannelEntry[]> {
+    const chain = await this.paymentChannels
+    const channels = new Map<string, ChannelEntry>()
+
+    for (let i = 0; i < 100; i++) {
+      if (channels.size >= 10) break
+
+      const channel = await chain.getRandomOpenChannel()
+      if (!channel) break
+
+      if (channels.has(channel.getId().toHex())) continue
+      channels.set(channel.getId().toHex(), channel)
+    }
+
+    return Array.from(channels.values())
   }
 
   private async getOpenChannels(): Promise<ChannelEntry[]> {
@@ -559,7 +585,7 @@ class Hopr extends EventEmitter {
     }
     try {
       await this.checkBalances()
-      await this.tickChannelStrategy([])
+      await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
     }
@@ -815,7 +841,7 @@ class Hopr extends EventEmitter {
     return await findPath(
       PublicKey.fromPeerId(this.getId()),
       destination,
-      MAX_HOPS - 1,
+      INTERMEDIATE_HOPS,
       this.networkPeers,
       ethereum.getOpenChannelsFrom.bind(ethereum),
       PATH_RANDOMNESS

@@ -7,7 +7,7 @@ import {
   PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, MAX_HOPS } from './constants'
+import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS } from './constants'
 import debug from 'debug'
 import type NetworkPeers from './network/network-peers'
 const log = debug('hopr-core:channel-strategy')
@@ -96,7 +96,7 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
           // Lets append channels with less balance than a full hop messageto toClose.
           // NB: This is based on channel balance, not expected balance so may not be
           // aggressive enough.
-          x.balance.toBN().lte(PRICE_PER_PACKET.muln(MAX_HOPS))
+          x.balance.toBN().lte(PRICE_PER_PACKET.muln(INTERMEDIATE_HOPS))
         )
       })
       .map((x) => x.destination)

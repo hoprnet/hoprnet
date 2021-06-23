@@ -30,7 +30,7 @@ export async function findPath(
   destination: PublicKey,
   hops: number,
   networkPeers: NetworkPeers,
-  getOpenRoutingChannelsFromPeer: (p: PublicKey) => Promise<ChannelEntry[]>,
+  getOpenChannelsFromPeer: (p: PublicKey) => Promise<ChannelEntry[]>,
   randomness: number // Proportion of randomness in stake.
 ): Promise<Path> {
   log('find path from', start.toString(), 'to ', destination.toString(), 'length', hops)
@@ -55,7 +55,7 @@ export async function findPath(
   let queue = new Heap<ChannelPath>(comparePath)
   let deadEnds = new Set<string>()
   let iterations = 0
-  queue.addAll((await getOpenRoutingChannelsFromPeer(start)).map((x) => [x]))
+  queue.addAll((await getOpenChannelsFromPeer(start)).map((x) => [x]))
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath = queue.peek()
@@ -65,7 +65,7 @@ export async function findPath(
     }
 
     const lastPeer = currentPath[currentPath.length - 1].destination
-    const newChannels = (await getOpenRoutingChannelsFromPeer(lastPeer))
+    const newChannels = (await getOpenChannelsFromPeer(lastPeer))
       .filter((c) => {
         networkPeers.register(c.destination.toPeerId())
         return (

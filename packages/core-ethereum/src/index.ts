@@ -90,8 +90,8 @@ export default class HoprEthereum extends EventEmitter {
     return this.indexer.getPublicKeyOf(addr)
   }
 
-  public getRandomChannel() {
-    return this.indexer.getRandomChannel()
+  public getRandomOpenChannel() {
+    return this.indexer.getRandomOpenChannel()
   }
 
   private uncachedGetBalance = () => this.chain.getBalance(this.address)

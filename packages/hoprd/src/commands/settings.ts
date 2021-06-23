@@ -1,5 +1,5 @@
-import { getPaddingLength, styleValue } from '../utils'
-import { AbstractCommand, GlobalState } from '../abstractCommand'
+import { getPaddingLength, styleValue } from './utils'
+import { AbstractCommand, GlobalState } from './abstractCommand'
 import type Hopr from '@hoprnet/hopr-core'
 
 function booleanSetter(name: string) {
@@ -27,7 +27,7 @@ export default class Settings extends AbstractCommand {
     }
   }
 
-  private async setStrategy(query: string): Promise<string> {
+  private setStrategy(query: string): string {
     try {
       this.node.setChannelStrategy(query as any)
       return 'Strategy was set'
@@ -93,7 +93,7 @@ export default class Settings extends AbstractCommand {
       return s === setting
     })
     if (typeof matchesASetting !== 'undefined') {
-      return this.settings[matchesASetting][1](option, state)
+      return log(this.settings[matchesASetting][1](option, state))
     }
 
     return log(styleValue(`Setting “${styleValue(setting)}” does not exist.`, 'failure'))

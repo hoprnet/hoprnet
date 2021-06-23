@@ -31,9 +31,9 @@ import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
 
-export const MAX_HOPS = 3 // 3 relayers and 1 destination
+export const INTERMEDIATE_HOPS = 3 // 3 relayers and 1 destination
 
-const PACKET_LENGTH = getPacketLength(MAX_HOPS + 1, POR_STRING_LENGTH, 0)
+const PACKET_LENGTH = getPacketLength(INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, 0)
 
 const log = Debug('hopr-core:message:packet')
 
@@ -238,7 +238,7 @@ export class Packet {
     const challenge = AcknowledgementChallenge.create(ackChallenge, privKey)
     const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(path[0].pubKey.marshal())
-    const packet = createPacket(secrets, alpha, msg, path, MAX_HOPS + 1, POR_STRING_LENGTH, porStrings)
+    const packet = createPacket(secrets, alpha, msg, path, INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, porStrings)
     const channel = chain.getChannel(self, nextPeer)
 
     let ticket: Ticket
@@ -277,7 +277,7 @@ export class Packet {
 
     const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, AcknowledgementChallenge.SIZE, Ticket.SIZE])
 
-    const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, MAX_HOPS + 1)
+    const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, INTERMEDIATE_HOPS + 1)
 
     const ackKey = deriveAckKeyShare(transformedOutput.derivedSecret)
 

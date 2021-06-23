@@ -1,4 +1,4 @@
-import { Packet, MAX_HOPS } from './packet'
+import { Packet, INTERMEDIATE_HOPS } from './packet'
 import {
   HoprDB,
   Ticket,
@@ -50,7 +50,7 @@ function createMockTickets(privKey: Uint8Array) {
 
 describe('packet creation and transformation', function () {
   it('create packet and transform it', async function () {
-    const AMOUNT = MAX_HOPS + 1
+    const AMOUNT = INTERMEDIATE_HOPS + 1
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
@@ -87,7 +87,7 @@ describe('packet creation and transformation', function () {
   })
 
   it('create packet and transform it - reduced path', async function () {
-    const AMOUNT = MAX_HOPS
+    const AMOUNT = INTERMEDIATE_HOPS
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
@@ -161,7 +161,7 @@ describe('packet creation and transformation', function () {
   })
 
   it('create packet and transform it - false positives', async function () {
-    const AMOUNT = MAX_HOPS + 1
+    const AMOUNT = INTERMEDIATE_HOPS + 1
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )

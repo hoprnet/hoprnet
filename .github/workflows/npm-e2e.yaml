@@ -50,12 +50,15 @@ jobs:
           yarn
           yarn build
 
+      - name: Install websocat
+        run: ./scripts/install-websocat.sh 
+
       - name: Test
         run: ./scripts/run-integration-tests-npm.sh
 
       - name: Upload node logs (Linux)
         uses: actions/upload-artifact@v2
-        if: ${{ runner.os }} == 'Linux' }}
+        if: ${{ runner.os == 'Linux' }}
         with:
           name: hopr-e2e-source-node-logs
           path: |
@@ -63,7 +66,7 @@ jobs:
 
       - name: Upload node logs (macOS)
         uses: actions/upload-artifact@v2
-        if: ${{ runner.os }} == 'macOS' }}
+        if: ${{ runner.os == 'macOS' }}
         with:
           name: hopr-e2e-source-node-logs
           path: |

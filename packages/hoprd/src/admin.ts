@@ -1,5 +1,4 @@
 import Hopr from '@hoprnet/hopr-core'
-import BN from 'bn.js'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
@@ -11,11 +10,14 @@ import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
 import { LogStream } from './logs'
 import { NODE_ENV } from './env'
-import { Balance, NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import { Balance, NativeBalance, SUGGESTED_BALANCE, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import cookie from 'cookie'
 
 let debugLog = debug('hoprd:admin')
+
+const MIN_BALANCE = new Balance(SUGGESTED_BALANCE).toFormattedString()
+const MIN_NATIVE_BALANCE = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
 export class AdminServer {
   private app: any
@@ -123,22 +125,18 @@ export class AdminServer {
     })
 
     this.node.on('hopr:warning:unfunded', (addr) => {
-      const min = new Balance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
-
       this.logs.log(
         `- The account associated with this node has no ${Balance.SYMBOL},\n` +
           `  in order to send messages, or open channels, you will need to send` +
-          `  at least ${min} to ${addr}`
+          `  at least ${MIN_BALANCE} to ${addr}`
       )
     })
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
-      const min = new NativeBalance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
-
       this.logs.log(
         `- The account associated with this node has no ${NativeBalance.SYMBOL},\n` +
           `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  ${min} to ${addr}`
+          `  ${MIN_NATIVE_BALANCE} to ${addr}`
       )
     })
 
@@ -152,7 +150,7 @@ export class AdminServer {
   }
 }
 
-const DISCLAIMER = `-- This software is still under development --\n\tFor testing, this node requires 1 xDAI, and at least 10 wxHOPR \n\tHowever, do NOT add assets to the node that you can't lose`
+const DISCLAIMER = `-- This software is still under development --\n\tFor testing, this node requires ${MIN_NATIVE_BALANCE}, and at least ${MIN_BALANCE} \n\tHowever, do NOT add assets to the node that you can't lose!`
 
 export function showDisclaimer(logs: LogStream) {
   logs.warn(DISCLAIMER)

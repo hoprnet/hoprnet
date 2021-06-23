@@ -15,7 +15,7 @@ source "${mydir}/../scripts/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4>"
+  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5>"
   msg
 }
 
@@ -23,15 +23,17 @@ usage() {
 ([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
 # verify and set parameters
-test -z "${1:-}" && { msg "Missing first parameter"; usage; exit 1; }
-test -z "${2:-}" && { msg "Missing second parameter"; usage; exit 1; }
-test -z "${3:-}" && { msg "Missing third parameter"; usage; exit 1; }
-test -z "${4:-}" && { msg "Missing fourth parameter"; usage; exit 1; }
+test -z "${1:-}" && { msg "Missing 1st parameter"; usage; exit 1; }
+test -z "${2:-}" && { msg "Missing 2nd parameter"; usage; exit 1; }
+test -z "${3:-}" && { msg "Missing 3rd parameter"; usage; exit 1; }
+test -z "${4:-}" && { msg "Missing 4th parameter"; usage; exit 1; }
+test -z "${5:-}" && { msg "Missing 5th parameter"; usage; exit 1; }
 
 declare api1="${1}"
 declare api2="${2}"
 declare api3="${3}"
 declare api4="${4}"
+declare api5="${5}"
 
 # $1 = endpoint
 # $2 = Hopr command
@@ -119,75 +121,89 @@ validate_node_balance_gt0() {
   fi
 }
 
-log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}"
+log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}"
 
 validate_node_eth_address "${api1}"
 validate_node_eth_address "${api2}"
 validate_node_eth_address "${api3}"
 validate_node_eth_address "${api4}"
+validate_node_eth_address "${api5}"
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
 validate_node_balance_gt0 "${api2}"
 validate_node_balance_gt0 "${api3}"
 validate_node_balance_gt0 "${api4}"
+validate_node_balance_gt0 "${api5}"
 log "Nodes are funded"
 
-declare addr1 addr2 addr3 addr4 result
+declare addr1 addr2 addr3 addr4 addr5 result
 addr1="$(get_hopr_address "${api1}")"
 addr2="$(get_hopr_address "${api2}")"
 addr3="$(get_hopr_address "${api3}")"
 addr4="$(get_hopr_address "${api4}")"
+addr5="$(get_hopr_address "${api5}")"
 log "hopr addr1: ${addr1}"
 log "hopr addr2: ${addr2}"
 log "hopr addr3: ${addr3}"
 log "hopr addr4: ${addr4}"
+log "hopr addr5: ${addr5}"
 
 log "Check peers"
-result=$(run_command ${api1} "peers" '4 peers have announced themselves' 60)
+result=$(run_command ${api1} "peers" 'peers have announced themselves' 120)
 log "-- ${result}"
 
-log "Node 1 ping node 2"
-result=$(run_command ${api1} "ping ${addr2}" "Pong received in:")
-log "-- ${result}"
-
-log "Node 1 ping node 3"
-result=$(run_command ${api1} "ping ${addr3}" "Pong received in:")
-log "-- ${result}"
+for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
+  log "Node 1 ping other node ${node}"
+  result=$(run_command ${api1} "ping ${node}" "Pong received in:" 120)
+  log "-- ${result}"
+done
 
 log "Node 2 ping node 3"
-result=$(run_command ${api2} "ping ${addr3}" "Pong received in:")
+result=$(run_command ${api2} "ping ${addr3}" "Pong received in:" 120)
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
-result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR")
+result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR" 10)
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
-run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent"
+run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 120
 
 log "Node 1 open channel to Node 2"
 result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel")
 log "-- ${result}"
 
 log "Node 2 open channel to Node 3"
-result=$(run_command "${api1}" "open ${addr3} 0.1" "Successfully opened channel")
+result=$(run_command "${api2}" "open ${addr3} 0.1" "Successfully opened channel")
 log "-- ${result}"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
-  run_command "${api1}" "send ${addr2},${addr1} 'hello, world'" "Message sent" 60
+  run_command "${api1}" "send ${addr2},${addr1} 'hello, world'" "Message sent" 120
 done
 
 log "Node 2 should now have a ticket"
-result=$(run_command ${api2} "tickets" "Win Proportion:   100%")
+result=$(run_command ${api2} "tickets" "Win Proportion:   100%" 10)
 log "-- ${result}"
 
 for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to node 2 via node 3"
-  run_command "${api1}" "send ${addr3},${addr2} 'hello, world'" "Message sent" 60
+  log "Node 1 send 1 hop message to node 3 via node 2"
+  run_command "${api1}" "send ${addr2},${addr3} 'hello, world'" "Message sent" 120
 done
 
-log "Node 3 should now have a ticket"
-result=$(run_command ${api3} "tickets" "Win Proportion:   100%")
+log "Node 3 open channel to Node 4"
+result=$(run_command "${api3}" "open ${addr4} 0.1" "Successfully opened channel")
 log "-- ${result}"
+
+log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
+run_command "${api1}" "send ${addr2},${addr3},${addr4},${addr5} 'hello, world'" "Message sent" 120
+
+log "Node 4 should now have a ticket"
+result=$(run_command ${api4} "tickets" "Win Proportion:   100%" 10)
+log "-- ${result}"
+
+# this works locally but fails in CI, the quality of the peers is lower than the
+# expected 0.5
+# log "Node 1 send message to node 5"
+# run_command "${api1}" "send ${addr5} 'hello, world'" "Message sent" 300

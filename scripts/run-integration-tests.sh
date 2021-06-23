@@ -17,7 +17,7 @@ declare RELEASE
 RELEASE=$(HOPR_PACKAGE=hoprd ./scripts/get-package-version.sh)
 
 TESTNET_NAME="integration-test$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
-TESTNET_SIZE=3
+TESTNET_SIZE=5
 
 #echo "Cleaning up before deploy"
 #cleanup
@@ -35,9 +35,13 @@ echo "Running integration test against testnet: $TESTNET_NAME"
 NODE1="$(vm_name 'node-1' $TESTNET_NAME)"
 NODE2="$(vm_name 'node-2' $TESTNET_NAME)"
 NODE3="$(vm_name 'node-3' $TESTNET_NAME)"
+NODE4="$(vm_name 'node-4' $TESTNET_NAME)"
+NODE5="$(vm_name 'node-5' $TESTNET_NAME)"
 API1="$(gcloud_get_ip $NODE1)"
 API2="$(gcloud_get_ip $NODE2)"
 API3="$(gcloud_get_ip $NODE3)"
+API4="$(gcloud_get_ip $NODE4)"
+API5="$(gcloud_get_ip $NODE5)"
 source $(realpath test/integration-test.sh)
 
 #echo "Cleaning up after deploy"
