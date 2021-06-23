@@ -150,7 +150,7 @@ log "hopr addr4: ${addr4}"
 log "hopr addr5: ${addr5}"
 
 log "Check peers"
-result=$(run_command ${api1} "peers" '5 peers have announced themselves' 60)
+result=$(run_command ${api1} "peers" 'peers have announced themselves' 60)
 log "-- ${result}"
 
 for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
