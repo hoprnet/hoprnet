@@ -1,6 +1,6 @@
 import Heap from 'heap-js'
 import type NetworkPeers from '../network/network-peers'
-import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
+import { MAX_PATH_ITERATIONS } from '../constants'
 import Debug from 'debug'
 import type { ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
 
