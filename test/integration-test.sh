@@ -150,17 +150,17 @@ log "hopr addr4: ${addr4}"
 log "hopr addr5: ${addr5}"
 
 log "Check peers"
-result=$(run_command ${api1} "peers" 'peers have announced themselves' 60)
+result=$(run_command ${api1} "peers" 'peers have announced themselves' 120)
 log "-- ${result}"
 
 for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
   log "Node 1 ping other node ${node}"
-  result=$(run_command ${api1} "ping ${node}" "Pong received in:" 60)
+  result=$(run_command ${api1} "ping ${node}" "Pong received in:" 120)
   log "-- ${result}"
 done
 
 log "Node 2 ping node 3"
-result=$(run_command ${api2} "ping ${addr3}" "Pong received in:" 60)
+result=$(run_command ${api2} "ping ${addr3}" "Pong received in:" 120)
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
@@ -168,7 +168,7 @@ result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR" 10)
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
-run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 60
+run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 120
 
 log "Node 1 open channel to Node 2"
 result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel")
@@ -180,7 +180,7 @@ log "-- ${result}"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
-  run_command "${api1}" "send ${addr2},${addr1} 'hello, world'" "Message sent" 60
+  run_command "${api1}" "send ${addr2},${addr1} 'hello, world'" "Message sent" 120
 done
 
 log "Node 2 should now have a ticket"
@@ -189,7 +189,7 @@ log "-- ${result}"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to node 3 via node 2"
-  run_command "${api1}" "send ${addr2},${addr3} 'hello, world'" "Message sent" 60
+  run_command "${api1}" "send ${addr2},${addr3} 'hello, world'" "Message sent" 120
 done
 
 log "Node 3 open channel to Node 4"
@@ -197,7 +197,7 @@ result=$(run_command "${api3}" "open ${addr4} 0.1" "Successfully opened channel"
 log "-- ${result}"
 
 log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
-run_command "${api1}" "send ${addr2},${addr3},${addr4},${addr5} 'hello, world'" "Message sent" 60
+run_command "${api1}" "send ${addr2},${addr3},${addr4},${addr5} 'hello, world'" "Message sent" 120
 
 log "Node 4 should now have a ticket"
 result=$(run_command ${api4} "tickets" "Win Proportion:   100%" 10)
