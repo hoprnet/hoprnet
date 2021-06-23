@@ -103,6 +103,8 @@ function setup_node() {
   local version=${7}
   local additional_args=${8:-""}
 
+  log "Run node ${id} on rest port ${rest_port}"
+
   if [ -n "${additional_args}" ]; then
     log "Additional args: \"${additional_args}\""
   fi
@@ -110,7 +112,6 @@ function setup_node() {
   mkdir -p "${npm_install_dir}"
   yarn --cwd "${npm_install_dir}" add @hoprnet/hoprd@${version}
 
-  log "Run node ${id} on rest port ${port}"
   DEBUG="hopr*" yarn --cwd "${npm_install_dir}" hoprd \
     --init --provider=http://127.0.0.1:8545/ \
     --testAnnounceLocalAddresses --identity="${id}" \
