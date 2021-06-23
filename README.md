@@ -26,8 +26,8 @@
   - [Using Docker](#using-docker)
   - [Using Nix package manager](#using-nix-package-manager)
 - [Usage](#usage)
-  - [Starting database](#starting-database)
-  - [Starting node with custom port](#starting-node-with-custom-port)
+  - [NPM](#npm)
+  - [Docker](#docker)
 - [Develop](#develop)
 - [Test](#test)
   - [Github Actions CI](#github-actions-ci)
@@ -44,6 +44,10 @@ instructions using GitPod.
 
 ## Install
 
+The following instructions show how the latest community release may be
+installed. The instructions should be adapted if you want to use the latest
+development release or any other older release.
+
 ### Using NPM
 
 Using the [hoprd npm package][6]:
@@ -51,44 +55,38 @@ Using the [hoprd npm package][6]:
 ```sh
 mkdir MY_NEW_HOPR_TEST_FOLDER
 cd MY_NEW_HOPR_TEST_FOLDER
-npm install @hoprnet/hoprd@1.72
+yarn add install @hoprnet/hoprd@1.72
 
-# run hoprd
-DEBUG=hopr* npx hoprd --admin --init --announce
+# define shell alias for later
+alias hoprd="yarn --cwd `pwd` hoprd"
 ```
 
 ### Using Docker
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `latest` tag represents the `master` branch.
-Stable releases are published on [Docker Hub][5].
+The `latest` tag represents the `master` branch, while the `latest-release` tag
+represents the most recent `release/*` branch.
 
-For ease of use you can set up a shell alias to run the latest docker container:
-
-```sh
-alias hoprd='docker run --pull always --rm -v $(pwd)/db:/app/db gcr.io/hoprassociation/hoprd:latest'
-```
-
-You can run `hoprd` using Docker with the same configuration we do on our infrastructure with this:
+You can pull the Docker image like so:
 
 ```sh
-docker run -v $(pwd)/db:/app/db \
-  -e NODE_OPTIONS=--max-old-space-size=4096 -e DEBUG=hopr\* \
-  -p 9091:9091 -p 3000:3000 -p 3001:3001 \
-  -it gcr.io/hoprassociation/hoprd \
-  --identity /app/db/.hopr-identity \
-  --password switzerland \
-  --init true \
-  --announce true \
-  --rest true \
-  --restHost 0.0.0.0 \
-  --healthCheck true \
-  --healthCheckHost 0.0.0.0 \
-  --admin true \
-  --adminHost 0.0.0.0 \
-  --run "cover-traffic start;daemonize"
+docker pull gcr.io/hoprassociation/hoprd:latest-release
 ```
+
+For ease of use you can set up a shell alias to run the latest release as a docker container:
+
+```sh
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest-release'
+```
+
+**IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
+
+```sh
+HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
+```
+
+Also all ports are mapped to your local host, assuming you stick to the default port numbers.
 
 ### Using [Nix package manager][1]
 
@@ -114,16 +112,87 @@ Now you may follow the instructions in [Develop](#develop).
 
 ## Usage
 
-### Starting database
+The `hoprd` provides various command-line switches to configure its behaviour. For reference these are documented here as well:
 
 ```sh
-hoprd --admin --init
+$ hoprd --help
+Options:
+  --help                        Show help  [boolean]
+  --version                     Show version number  [boolean]
+  --network                     Which network to run the HOPR node on  [choices: "ETHEREUM"] [default: "ETHEREUM"]
+  --provider                    A provider url for the Network you specified  [default: "wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"]
+  --host                        The network host to run the HOPR node on.  [default: "0.0.0.0:9091"]
+  --announce                    Announce public IP to the network  [boolean] [default: false]
+  --admin                       Run an admin interface on localhost:3000  [boolean] [default: false]
+  --rest                        Run a rest interface on localhost:3001  [boolean] [default: false]
+  --restHost                    Updates the host for the rest server  [default: "localhost"]
+  --restPort                    Updates the port for the rest server  [default: 3001]
+  --healthCheck                 Run a health check end point on localhost:8080  [boolean] [default: false]
+  --healthCheckHost             Updates the host for the healthcheck server  [default: "localhost"]
+  --healthCheckPort             Updates the port for the healthcheck server  [default: 8080]
+  --forwardLogs                 Forwards all your node logs to a public available sink  [boolean] [default: false]
+  --forwardLogsProvider         A provider url for the logging sink node to use  [default: "https://ceramic-clay.3boxlabs.com"]
+  --password                    A password to encrypt your keys  [default: ""]
+  --apiToken                    A REST API token and admin panel password for user authentication  [string]
+  --identity                    The path to the identity file  [default: "/home/tbr/.hopr-identity"]
+  --run                         Run a single hopr command, same syntax as in hopr-admin  [default: ""]
+  --dryRun                      List all the options used to run the HOPR node, but quit instead of starting  [boolean] [default: false]
+  --data                        manually specify the database directory to use  [default: ""]
+  --init                        initialize a database if it doesn't already exist  [boolean] [default: false]
+  --adminHost                   Host to listen to for admin console  [default: "localhost"]
+  --adminPort                   Port to listen to for admin console  [default: 3000]
+  --testAnnounceLocalAddresses  For testing local testnets. Announce local addresses.  [boolean] [default: false]
+  --testPreferLocalAddresses    For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
+  --testUseWeakCrypto           weaker crypto for faster node startup  [boolean] [default: false]
 ```
 
-### Starting node with custom port
+As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.
+
+### NPM
+
+The following command assumes you've setup an alias like described in [Using NPM](#using-npm).
 
 ```sh
-hoprd --admin --host="0.0.0.0:1291"
+hoprd --identity ${HOME}/.hopr-identity --password switzerland --init --announce --rest --admin --apiToken the_alps --forwardLogs
+```
+
+Here is a short break-down of each argument.
+
+```sh
+hoprd
+  --identity ${HOME}/.hopr-identity      # store your node identity information in your home folder
+  --password switzerland   		 # set the encryption password for your identity
+  --init 				 # initialize the database and identity if not present
+  --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
+  --rest   			         # enable the node's Rest API, available at localhost:3001
+  --admin   	                         # enable the node's admin UI, available at localhost:3000
+  --apiToken the_alps                    # set the security token used by the Rest API and admin UI
+  --forwardLogs                          # enable the node's log forwarding to the ceramic network
+```
+
+### Docker
+
+The following command assumes you've setup an alias like described in [Using Docker](#using-docker).
+
+```sh
+hoprd --identity /app/db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --rest --restHost 0.0.0.0 --admin --adminHost 0.0.0.0 --apiToken the_alps --forwardLogs
+```
+
+Here is a short break-down of each argument.
+
+```sh
+hoprd
+  --identity /app/db/.hopr-identity      # store your node identity information in the persisted database folder
+  --password switzerland   		 # set the encryption password for your identity
+  --init 				 # initialize the database and identity if not present
+  --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
+  --host "0.0.0.0:9091"   		 # set IP and port of the P2P API to the container's external IP so it can be reached on your host
+  --rest   			         # enable the node's Rest API
+  --restHost 0.0.0.0   		         # set IP of the Rest API to the container's external IP so it can be reached on your host
+  --admin   	                         # enable the node's admin UI
+  --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
+  --apiToken the_alps                    # set the security token used by the Rest API and admin UI
+  --forwardLogs                          # enable the node's log forwarding to the ceramic network
 ```
 
 ## Develop
@@ -198,7 +267,6 @@ whenever you need an issue about a particular tool.
 [2]: https://search.nixos.org/packages?channel=20.09&show=direnv&from=0&size=50&sort=relevance&query=direnv
 [3]: https://search.nixos.org/packages?channel=20.09&show=lorri&from=0&size=50&sort=relevance&query=lorri
 [4]: https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL
-[5]: https://hub.docker.com/u/hopr
 [6]: https://www.npmjs.com/package/@hoprnet/hoprd
 [7]: https://www.youtube.com/watch?v=d0Eb6haIUu4
 [8]: https://github.com/nektos/act
