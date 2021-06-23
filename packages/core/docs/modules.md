@@ -27,7 +27,7 @@
 - [HEARTBEAT\_INTERVAL](modules.md#heartbeat_interval)
 - [HEARTBEAT\_INTERVAL\_VARIANCE](modules.md#heartbeat_interval_variance)
 - [HEARTBEAT\_TIMEOUT](modules.md#heartbeat_timeout)
-- [MAX\_HOPS](modules.md#max_hops)
+- [INTERMEDIATE\_HOPS](modules.md#intermediate_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
 - [MAX\_PACKET\_DELAY](modules.md#max_packet_delay)
 - [MAX\_PARALLEL\_CONNECTIONS](modules.md#max_parallel_connections)
@@ -94,7 +94,7 @@ ___
 
 ### CHECK\_TIMEOUT
 
-• `Const` **CHECK\_TIMEOUT**: ``10000``
+• `Const` **CHECK\_TIMEOUT**: ``60000``
 
 #### Defined in
 
@@ -152,9 +152,9 @@ ___
 
 ___
 
-### MAX\_HOPS
+### INTERMEDIATE\_HOPS
 
-• `Const` **MAX\_HOPS**: ``2``
+• `Const` **INTERMEDIATE\_HOPS**: ``3``
 
 #### Defined in
 

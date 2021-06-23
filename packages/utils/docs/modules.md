@@ -415,7 +415,7 @@ ___
 
 #### Defined in
 
-[constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L20)
+[constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L22)
 
 ___
 
@@ -577,7 +577,7 @@ ___
 
 #### Defined in
 
-[constants.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L25)
+[constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L26)
 
 ___
 
@@ -587,7 +587,7 @@ ___
 
 #### Defined in
 
-[constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L22)
+[constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L23)
 
 ___
 

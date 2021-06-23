@@ -45,7 +45,7 @@ Also keeps track of the latest block number.
 - [getOpenChannelsFrom](indexer.md#getopenchannelsfrom)
 - [getPublicKeyOf](indexer.md#getpublickeyof)
 - [getPublicNodes](indexer.md#getpublicnodes)
-- [getRandomChannel](indexer.md#getrandomchannel)
+- [getRandomOpenChannel](indexer.md#getrandomopenchannel)
 - [listenerCount](indexer.md#listenercount)
 - [listeners](indexer.md#listeners)
 - [off](indexer.md#off)
@@ -457,7 +457,7 @@ peer's open channels
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:409](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L409)
+[core-ethereum/src/indexer/index.ts:413](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L413)
 
 ___
 
@@ -495,17 +495,22 @@ ___
 
 ___
 
-### getRandomChannel
+### getRandomOpenChannel
 
-▸ **getRandomChannel**(): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ **getRandomOpenChannel**(): `Promise`<[ChannelEntry](channelentry.md)\>
+
+Returns a random open channel.
+NOTE: channels with status 'PENDING_TO_CLOSE' are not included
 
 #### Returns
 
 `Promise`<[ChannelEntry](channelentry.md)\>
 
+an open channel
+
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:391](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L391)
+[core-ethereum/src/indexer/index.ts:396](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L396)
 
 ___
 

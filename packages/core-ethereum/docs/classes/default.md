@@ -45,7 +45,7 @@
 - [getOpenChannelsFrom](default.md#getopenchannelsfrom)
 - [getPublicKey](default.md#getpublickey)
 - [getPublicKeyOf](default.md#getpublickeyof)
-- [getRandomChannel](default.md#getrandomchannel)
+- [getRandomOpenChannel](default.md#getrandomopenchannel)
 - [listenerCount](default.md#listenercount)
 - [listeners](default.md#listeners)
 - [off](default.md#off)
@@ -561,9 +561,9 @@ ___
 
 ___
 
-### getRandomChannel
+### getRandomOpenChannel
 
-▸ **getRandomChannel**(): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ **getRandomOpenChannel**(): `Promise`<[ChannelEntry](channelentry.md)\>
 
 #### Returns
 
