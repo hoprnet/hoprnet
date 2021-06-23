@@ -54,18 +54,6 @@ function cleanup {
   trap - SIGINT SIGTERM ERR EXIT
 
   # Cleaning up everything
-  if [ "$EXIT_CODE" != "0" ]; then
-    log "Exited with fail, code $EXIT_CODE"
-    for log_file in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}"; do
-      if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
-        log "Printing last 100 lines from logs"
-        tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" \
-          "${node4_log}" | sed "s/^/\t/" || :
-        log "Printing last 100 lines from logs DONE"
-      fi
-    done
-  fi
-
   log "Wiping databases"
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}"
 

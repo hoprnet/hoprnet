@@ -4,6 +4,12 @@
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -Eeuo pipefail
+
+# need to pass an alias into sub-shells
+shopt -s expand_aliases
+
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
@@ -24,6 +30,11 @@ log "Security tests started"
 log "Rest API @ ${host}:${rest_port}"
 log "Admin websocket API @ ${host}:${admin_port}"
 
+# prefer local websocat binary over global version
+alias websocat=websocat
+[ -x "${mydir}/../.bin/websocat" ] && alias websocat="${mydir}/../.bin/websocat"
+
+# wait for input ports to be ready
 wait_for_port ${rest_port}
 wait_for_port ${admin_port}
 
@@ -66,7 +77,13 @@ if [ "${ws_response}" != "authentication failed" ]; then
 fi
 
 log "Admin websocket should execute info command with correct token"
-ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=e2e-api-token")
-echo "${ws_response}" | grep -q "ws client connected [ authentication ENABLED ]"
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=e2e-api-token")
+if [[ "${ws_response}" != *"ws client connected [ authentication ENABLED ]"* ]]; then
+  log "⛔️ Didn't succeed ws authentication"
+  log "Expected response should contain: 'ws client connected [ authentication ENABLED ]' "
+  log "Actual response:"
+  log "${ws_response}"
+  exit 1
+fi
 
 log "Security tests finished successfully"
