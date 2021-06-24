@@ -55,10 +55,7 @@ Using the [hoprd npm package][6]:
 ```sh
 mkdir MY_NEW_HOPR_TEST_FOLDER
 cd MY_NEW_HOPR_TEST_FOLDER
-yarn add install @hoprnet/hoprd@1.72
-
-# define shell alias for later
-alias hoprd="yarn --cwd `pwd` hoprd"
+npm install @hoprnet/hoprd@1.72
 ```
 
 ### Install via Docker
@@ -146,10 +143,11 @@ As you might have noticed running the node without any command-line argument mig
 
 ### Using NPM
 
-The following command assumes you've setup an alias like described in [Install via NPM](#install-via-npm).
+The following command assumes you've setup a local installation like described in [Install via NPM](#install-via-npm).
 
 ```sh
-hoprd --identity ${HOME}/.hopr-identity --password switzerland --init --announce --admin
+cd MY_NEW_HOPR_TEST_FOLDER
+npx hoprd --identity ${HOME}/.hopr-identity --password switzerland --init --announce --admin
 ```
 
 Here is a short break-down of each argument.
