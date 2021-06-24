@@ -147,7 +147,7 @@ The following command assumes you've setup a local installation like described i
 
 ```sh
 cd MY_NEW_HOPR_TEST_FOLDER
-npx hoprd --identity ${HOME}/.hopr-identity --password switzerland --init --announce --admin
+DEBUG=hopr* npx hoprd --identity ${HOME}/.hopr-identity --password switzerland --init --announce --admin
 ```
 
 Here is a short break-down of each argument.
