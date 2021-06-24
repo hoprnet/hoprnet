@@ -147,18 +147,16 @@ The following command assumes you've setup a local installation like described i
 
 ```sh
 cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --identity ${HOME}/.hopr-identity --password switzerland --init --announce --admin
+DEBUG=hopr* npx hoprd --admin --init --announce
 ```
 
 Here is a short break-down of each argument.
 
 ```sh
 hoprd
-  --identity ${HOME}/.hopr-identity      # store your node identity information in your home folder
-  --password switzerland   		 # set the encryption password for your identity
+  --admin   	                         # enable the node's admin UI, available at localhost:3000
   --init 				 # initialize the database and identity if not present
   --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
-  --admin   	                         # enable the node's admin UI, available at localhost:3000
 ```
 
 ### Docker
