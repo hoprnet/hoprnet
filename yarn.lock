@@ -4093,17 +4093,7 @@ cids@^0.7.1:
     multicodec "^1.0.0"
     multihashes "~0.4.15"
 
-cids@^1.0.0, cids@^1.1.5:
-  version "1.1.6"
-  resolved "https://registry.yarnpkg.com/cids/-/cids-1.1.6.tgz#ac7aea7dbcabaa64ca242b5d970d596a5c34d006"
-  integrity sha512-5P+Jas2bVpjiHibp/SOwKY+v7JhAjTChaAZN+vCIrsWXn/JZV0frX22Vp5zZgEyJRPco79pX+yNQ2S3LkRukHQ==
-  dependencies:
-    multibase "^4.0.1"
-    multicodec "^3.0.1"
-    multihashes "^4.0.1"
-    uint8arrays "^2.1.3"
-
-cids@^1.1.6, cids@~1.1.6:
+cids@^1.0.0, cids@^1.1.5, cids@^1.1.6, cids@~1.1.6:
   version "1.1.7"
   resolved "https://registry.yarnpkg.com/cids/-/cids-1.1.7.tgz#06aee89b9b5d615a7def86f2308a72bb642b7c7e"
   integrity sha512-dlh+K0hMwFAFFjWQ2ZzxOhgGVNVREPdmk8cqHFui2U4sOodcemLMxdE5Ujga4cDcDQhWfldEPThkfu6KWBt1eA==
@@ -5040,7 +5030,7 @@ dezalgo@^1.0.0:
     asap "^2.0.0"
     wrappy "1"
 
-did-jwt@^5.0.0, did-jwt@^5.0.1:
+did-jwt@^5.0.1, did-jwt@^5.6.1:
   version "5.6.1"
   resolved "https://registry.yarnpkg.com/did-jwt/-/did-jwt-5.6.1.tgz#229b63cfa82c80bf96704b96e32b2ad79b63b157"
   integrity sha512-p2IpvJmfc+2o23BD1e5LHGnNb9ZMd3rUTAjetmoPfZgMWpo+CgZzsz6Y9r5MCb3PQjUs/OOO+MiP2xGr0DyggQ==
@@ -5056,21 +5046,22 @@ did-jwt@^5.0.0, did-jwt@^5.0.1:
     js-sha3 "^0.8.0"
     uint8arrays "^2.1.3"
 
-did-resolver@^3.0.1, did-resolver@^3.1.0:
+did-resolver@^3.1.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/did-resolver/-/did-resolver-3.1.0.tgz#84f0e3d16abe9711dc04c34a5a0e2f63868c9611"
   integrity sha512-uf3/4LfHoDn3Ek8bFegO72OemHMytBhAkud6CA1HlB5I0iVwrCpG4oh+DA6DXUuBdhrA0cY4cGz1D0VNDTlgnw==
 
 dids@^2.1.0:
-  version "2.1.0"
-  resolved "https://registry.yarnpkg.com/dids/-/dids-2.1.0.tgz#0072377b0e974ddc9bc7432bf39635bf851e8c13"
-  integrity sha512-q3Uj+vHFK3Zwgfudz6+JYxPQ1sxKX/US1YGGmTjSz0/fuzeGJPMgfN0ByYYYPJtDWP3KVDhgnM6AW+gD7+C6iA==
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/dids/-/dids-2.2.0.tgz#10019c2b0d9058d5b1cb22935917c7384e97d90b"
+  integrity sha512-h9dRsTNrcInaLAlJlJBDZxmQ6eByBkoJ7z/UHDB/tCXEgbsvGhBdIwbgEbexxe0TifLCo5D8dfajftOp9F95yQ==
   dependencies:
-    "@stablelib/random" "^1.0.0"
+    "@stablelib/random" "^1.0.1"
     cids "^1.1.6"
     dag-jose-utils "^0.1.1"
-    did-jwt "^5.0.0"
-    did-resolver "^3.0.1"
+    did-jwt "^5.6.1"
+    did-resolver "^3.1.0"
+    query-string "^7.0.0"
     rpc-utils "^0.3.4"
     uint8arrays "^2.1.5"
 
@@ -11761,6 +11752,16 @@ query-string@^6.13.8:
   version "6.14.1"
   resolved "https://registry.yarnpkg.com/query-string/-/query-string-6.14.1.tgz#7ac2dca46da7f309449ba0f86b1fd28255b0c86a"
   integrity sha512-XDxAeVmpfu1/6IjyT/gXHOl+S0vQ9owggJ30hhWKdHAsNPOcasn5o9BW0eejZqL2e4vMjhAxoW3jVHcD6mbcYw==
+  dependencies:
+    decode-uri-component "^0.2.0"
+    filter-obj "^1.1.0"
+    split-on-first "^1.0.0"
+    strict-uri-encode "^2.0.0"
+
+query-string@^7.0.0:
+  version "7.0.1"
+  resolved "https://registry.yarnpkg.com/query-string/-/query-string-7.0.1.tgz#45bd149cf586aaa582dffc7ec7a8ad97dd02f75d"
+  integrity sha512-uIw3iRvHnk9to1blJCG3BTc+Ro56CBowJXKmNNAm3RulvPBzWLRqKSiiDk+IplJhsydwtuNMHi8UGQFcCLVfkA==
   dependencies:
     decode-uri-component "^0.2.0"
     filter-obj "^1.1.0"
