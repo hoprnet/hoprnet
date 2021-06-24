@@ -46,14 +46,16 @@ COPY --from=build /app .
 # permissions when mapped to a volume
 RUN mkdir db
 
+# DISABLED temporarily until a migration path has been tested
 # switch to normal user, to prevent dangerous root access
-RUN chown -R node:node .
+# RUN chown -R node:node .
 
 # set volume which can be mapped by users on the host system
 VOLUME ["/app/db"]
 
+# DISABLED temporarily until a migration path has been tested
 # finally set the non-root user so the process also run un-privilidged
-USER node
+# USER node
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
