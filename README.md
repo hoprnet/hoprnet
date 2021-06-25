@@ -213,7 +213,7 @@ yarn run:faucet:all
 
 ### Unit testing
 
-We use [mocha][9] for our tests. You can run our test suite across all our 
+We use [mocha][9] for our tests. You can run our test suite across all our
 multiple packages using the following command:
 
 ```sh

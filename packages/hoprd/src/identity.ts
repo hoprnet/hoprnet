@@ -68,7 +68,7 @@ export type IdentityOptions = {
   initialize: boolean
   idPath: string
   password: string
-  useWeakCrypto?: boolean,
+  useWeakCrypto?: boolean
   privateKey?: string
 }
 
