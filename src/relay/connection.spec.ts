@@ -97,15 +97,18 @@ describe('relay connection', function () {
       sink: alice.sink
     })
 
-    const relayHello = new TextEncoder().encode('Hello from Relay')
-    relayShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...relayHello]))
+    const AMOUNT = 5
+    for (let i = 0; i < AMOUNT; i++) {
+      const relayHello = new TextEncoder().encode('Hello from Relay')
+      relayShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...relayHello]))
 
-    assert(u8aEquals((await aliceShaker.read()).slice(), relayHello))
+      assert(u8aEquals((await aliceShaker.read()).slice(), relayHello))
 
-    const aliceHello = new TextEncoder().encode('Hello from Alice')
-    aliceShaker.write(aliceHello)
+      const aliceHello = new TextEncoder().encode('Hello from Alice')
+      aliceShaker.write(aliceHello)
 
-    assert(u8aEquals((await relayShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHello])))
+      assert(u8aEquals((await relayShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHello])))
+    }
   })
 
   it('stop a relayed connection from the relay', async function () {
@@ -170,7 +173,12 @@ describe('relay connection', function () {
 
     alice.close()
 
-    assert(u8aEquals((await relayShaker.read()).slice(), Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP)))
+    assert(
+      u8aEquals(
+        (await relayShaker.read()).slice(),
+        Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP)
+      )
+    )
 
     relayShaker.rest()
 
@@ -226,8 +234,6 @@ describe('relay connection', function () {
 
     await once(alice, 'restart')
 
-    console.log(green(`restarted`))
-
     aliceShakerBeforeReconnect.write(new TextEncoder().encode('a'))
 
     assert(aliceAfterReconnect != undefined)
@@ -282,19 +288,21 @@ describe('relay connection', function () {
     let aliceHelloBeforeReconnect = new TextEncoder().encode(`Hello from Alice before reconnecting`)
     aliceShakerBeforeReconnect.write(aliceHelloBeforeReconnect)
 
-    assert(u8aEquals((await relayShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHelloBeforeReconnect])))
+    assert(
+      u8aEquals(
+        (await relayShaker.read()).slice(),
+        Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHelloBeforeReconnect])
+      )
+    )
 
     let relayHelloBeforeReconnect = new TextEncoder().encode(`Hello from relay before reconnecting`)
     relayShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...relayHelloBeforeReconnect]))
 
     assert(u8aEquals((await aliceShakerBeforeReconnect.read()).slice(), relayHelloBeforeReconnect))
 
-    console.log(green(`writing restart`))
     relayShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART))
 
     await once(alice, 'restart')
-
-    console.log(green(`restarted`))
 
     aliceShakerBeforeReconnect.write(new TextEncoder().encode('a'))
 

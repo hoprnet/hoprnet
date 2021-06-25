@@ -228,15 +228,18 @@ class RelayContext extends EventEmitter {
     }.call(this)
 
     let result = iterator.next()
+    let received: any
 
     return (async function* () {
-      const received = await result
-      if (received.done) {
-        return
-      }
-      yield received.value
+      while (true) {
+        received = await result
 
-      yield* iterator
+        if (received.done) {
+          break
+        }
+        result = iterator.next()
+        yield received.value
+      }
     })()
   }
 

@@ -17,7 +17,7 @@ import PeerId from 'peer-id'
 
 import { RELAY_CIRCUIT_TIMEOUT, RELAY, DELIVERY } from '../constants'
 
-import { RelayConnection } from '../relayConnection'
+import { RelayConnection } from './connection'
 import { WebRTCConnection } from '../webRTCConnection'
 
 import type { Connection } from 'libp2p-interfaces'

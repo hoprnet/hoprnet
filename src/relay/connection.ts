@@ -228,8 +228,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       }
 
       while (this._iteration == drainIteration) {
-        console.log(`before promis.race`, drainIteration, this._iteration)
-
         const promises = []
 
         promises.push(closePromise)
@@ -241,8 +239,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         promises.push(streamPromise)
 
         result = (await Promise.race(promises)) as any
-
-        console.log(promises)
 
         if (this._iteration != drainIteration) {
           await migrationDone.promise
@@ -334,38 +330,23 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         }
 
         next()
-        console.log(`before SUFFIX`)
-
         yield SUFFIX
-
-        console.log(`after SUFFIX`)
       }
     }.call(this)
 
     let result = iterator.next()
+    let received: any
 
     return (async function* () {
-      let received = await result
-      if (received.done) {
-        return
-      }
-      result = iterator.next()
-      yield received.value
-
       while (true) {
         received = await result
 
         if (received.done) {
           break
         }
+        result = iterator.next()
         yield received.value
       }
-
-      // return
-      // for await (const msg of iterator) {
-      //   yield msg
-      // }
-      // yield* iterator
     })()
   }
 
@@ -408,22 +389,17 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         promises.push(streamPromise)
       }
 
-      console.log(promises)
-
       // (0. Handle source attach)
       // 1. Handle stream switch
       // 2. Handle status messages
       // 3. Handle payload messages
       result = await Promise.race(promises)
 
-      console.log(`after promise.race in sink`, promises)
-
       if (streamClosed && this._destroyed) {
         break
       }
 
       if (this._sinkSourceSwitched) {
-        console.log(`sink source switched`)
         this._sinkSourceSwitched = false
         this._sinkSwitchPromise = Defer<void>()
 
