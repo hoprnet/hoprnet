@@ -7,9 +7,7 @@ import { randomBytes } from 'crypto'
 import Defer, { DeferredPromise } from 'p-defer'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
-import BL, { BLInterface } from 'bl'
 import Heap from 'heap-js'
-import { green } from 'chalk'
 
 import type { Instance as SimplePeer } from 'simple-peer'
 
@@ -75,15 +73,11 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _sinkSourceSwitched: boolean
   private _sourceSwitched: boolean
 
-  private _msgPromise: DeferredPromise<void>
-  private _msgs: (StreamResult & { iteration: number })[]
-
   private _destroyedPromise: DeferredPromise<void>
 
   private _closePromise: DeferredPromise<void>
 
   private _statusMessagePromise: DeferredPromise<void>
-  // @TODO Turn into heap
   private statusMessages: Heap<Uint8Array>
 
   private _migrationDone: DeferredPromise<void> | undefined
@@ -126,11 +120,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       open: Date.now()
     }
 
-    this._msgPromise = Defer<void>()
-
     this._destroyedPromise = Defer<void>()
-
-    this._msgs = []
 
     this._statusMessagePromise = Defer<void>()
     this.statusMessages = new Heap()
