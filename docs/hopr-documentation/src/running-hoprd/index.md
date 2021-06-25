@@ -39,7 +39,3 @@ ssh -L 3000:127.0.0.1:3000 root@`<VPS ip address>`
 ```
 
 Then visit http://localhost:3000 on your browser.
-
-### Save logs from a VPS
-
-Please take a look over at [hopr-sh's README file](https://github.com/hoprnet/hopr-sh/blob/main/README.md) for instructions.
