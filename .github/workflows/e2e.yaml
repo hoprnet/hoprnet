@@ -53,6 +53,9 @@ jobs:
       - name: Install websocat
         run: ./scripts/install-websocat.sh 
 
+      - name: Install jq
+        run: ./scripts/install-jq.sh 
+
       - name: Test
         run: ./scripts/run-integration-tests-source.sh
 
