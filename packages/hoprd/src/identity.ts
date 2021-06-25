@@ -1,6 +1,6 @@
 // TODO - replace serialization with a library
 import PeerId from 'peer-id'
-import { privKeyToPeerId } from '@hoprnet/hopr-utils'
+import { privKeyToPeerId, SECP256K1_CONSTANTS } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 import { resolve } from 'path'
 import Debug from 'debug'
@@ -13,7 +13,8 @@ export enum IdentityErrors {
   EMPTY_PASSWORD = 'Password must not be empty',
   WRONG_USAGE_OF_WEAK_CRYPTO = 'Attempting to use a development key while not being in development mode',
   WRONG_PASSPHRASE = 'Key derivation failed - possibly wrong passphrase',
-  INVALID_PRIVATE_KEY_GIVEN = 'Invalid private key was given'
+  INVALID_PRIVATE_KEY_GIVEN = 'Invalid private key was given',
+  INVALID_SECPK256K1_PRIVATE_KEY_GIVEN = 'The key given was not at least 32 bytes long'
 }
 
 export enum IdentityLogs {
@@ -80,19 +81,24 @@ async function storeIdentity(path: string, id: Uint8Array) {
   fs.writeFileSync(resolve(path), id)
 }
 
-async function createIdentity(idPath: string, password: string, useWeakCrypto = false) {
-  const peerId = await PeerId.create({ keyType: 'secp256k1' })
+async function createIdentity(idPath: string, password: string, useWeakCrypto = false, privateKey?: Uint8Array) {
+  const peerId = privateKey ? privKeyToPeerId(privateKey) : await PeerId.create({ keyType: 'secp256k1' })
   const serializedKeyPair = await serializeKeyPair(peerId, password, useWeakCrypto)
   await storeIdentity(idPath, serializedKeyPair)
   return peerId
 }
 
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
+  let privateKey: Uint8Array | undefined
   if (options.privateKey) {
-    const key = Uint8Array.from(Buffer.from(options.privateKey, 'hex'));
-    if (key.length == 0) {
+    privateKey = Uint8Array.from(Buffer.from(options.privateKey, 'hex'))
+    if (privateKey.length == 0) {
       throw new Error(IdentityErrors.INVALID_PRIVATE_KEY_GIVEN)
     }
+    if (privateKey.length != SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH) {
+      throw new Error(IdentityErrors.INVALID_SECPK256K1_PRIVATE_KEY_GIVEN)
+    }
+    return await createIdentity(options.idPath, options.password, options.useWeakCrypto, privateKey)
   }
   if (typeof options.password !== 'string' || options.password.length == 0) {
     throw new Error(IdentityErrors.EMPTY_PASSWORD)

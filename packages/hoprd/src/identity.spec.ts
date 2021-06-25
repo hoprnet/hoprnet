@@ -8,6 +8,8 @@ describe('Identity', function () {
   const DUMMY_PASSWORD = 'hopr-unit-test-password'
   const WRONG_DUMMY_PASSWORD = 'hopr-unit-test-wrong-password'
   const INVALID_PRIVATE_KEY = 'invalid_hex_string'
+  const INVALID_SECP256K1_PRIVATE_KEY = 'cd09f9'
+  const DUMMY_PRIVATE_KEY = 'cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317'
 
   const mockIdentityOptions: IdentityOptions = {
     initialize: false,
@@ -47,6 +49,35 @@ describe('Identity', function () {
           message: IdentityErrors.INVALID_PRIVATE_KEY_GIVEN
         }
       )
+    })
+    it('fails to load a non-secp256k1 hex encoded value as private key', async () => {
+      await assert.rejects(
+        async () => {
+          await getIdentity({
+            ...mockIdentityOptions,
+            privateKey: INVALID_SECP256K1_PRIVATE_KEY
+          })
+        },
+        {
+          name: 'Error',
+          message: IdentityErrors.INVALID_SECPK256K1_PRIVATE_KEY_GIVEN
+        }
+      )
+    })
+    it('receives a private key and stores it on a given path serialized', async () => {
+      const testIdentity = await getIdentity({
+        ...initializedMockIdentity,
+        useWeakCrypto: true,
+        privateKey: DUMMY_PRIVATE_KEY
+      })
+
+      const deserializedIdentity = await getIdentity({
+        ...initializedMockIdentity,
+        useWeakCrypto: true,
+        privateKey: DUMMY_PRIVATE_KEY
+      })
+
+      assert(testIdentity.equals(deserializedIdentity))
     })
   })
 

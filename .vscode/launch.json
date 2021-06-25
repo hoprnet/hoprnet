@@ -12,6 +12,16 @@
       "program": "${workspaceFolder}/packages/hoprd/src/index.ts",
       "args": ["--admin", "--init", "--rest", "--password=''", "--data=/tmp/debug"],
       "outFiles": ["${workspaceFolder}/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Test HOPRd",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/node_modules/.bin/mocha",
+      "args": ["--reporter=tap", "--full-trace", "--exit"],
+      "cwd": "${workspaceFolder}/packages/hoprd",
+      "outFiles": ["${workspaceFolder}/**/*.js"]
     }
   ]
 }
