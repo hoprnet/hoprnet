@@ -15,19 +15,19 @@ class TokenInput extends React.Component {
     super(props)
     this.handleKeyPress = this.handleKeyPress.bind(this);
   }
-  
+
   handleKeyPress(e) {
     if (e.key == 'Enter') {
       var text = e.target.value
       Cookies.set('X-Auth-Token', text)  
-      this.forceUpdate()      
+      this.props.handleTokenSet()     
     }
   } 
   
   render() {
     const tokenCookie = Cookies.get('X-Auth-Token')
-    console.log(`cookie: ${tokenCookie}`)
-    return <div className="send">
+    console.log(tokenCookie)
+    return tokenCookie === undefined ? <div className="send">
           <input
             onKeyPress={this.handleKeyPress}
             id="token"
@@ -35,6 +35,7 @@ class TokenInput extends React.Component {
             placeholder="security token"
           />
         </div>
+        : null
     }
   }
 
@@ -51,9 +52,10 @@ export default function Home() {
       Cookies.remove('X-Auth-Token')
       updateState({})      
     }, []);
-
-    console.log('update')
-
+    const handleTokenSet = React.useCallback(() => {
+      updateState({})      
+    }, []);
+    
     useEffect(() => {
       if (typeof window !== 'undefined') {
         connection = new Connection(setConnecting, setStarted, setMessages, setConnectedPeers, handleAuthFailed)
@@ -84,7 +86,7 @@ export default function Home() {
           />
         </div>
 
-        <TokenInput/>
+        <TokenInput handleTokenSet={handleTokenSet}/>
 
         {showConnected && (
           <div className={styles.connectedPeers}>
