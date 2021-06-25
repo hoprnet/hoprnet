@@ -211,6 +211,15 @@ yarn run:faucet:all
 
 ## Test
 
+### Unit testing
+
+We use [mocha][9] for our tests. You can run our test suite across all our 
+multiple packages using the following command:
+
+```sh
+yarn test
+```
+
 ### Github Actions CI
 
 We run a fair amount of automation using Github Actions. To ease development
@@ -265,3 +274,4 @@ whenever you need an issue about a particular tool.
 [6]: https://www.npmjs.com/package/@hoprnet/hoprd
 [7]: https://www.youtube.com/watch?v=d0Eb6haIUu4
 [8]: https://github.com/nektos/act
+[9]: https://mochajs.org/
