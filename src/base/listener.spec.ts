@@ -1,7 +1,7 @@
 /// <reference path="../@types/libp2p.ts" />
 
 import assert from 'assert'
-import Listener from './listener'
+import { Listener } from './listener'
 import { Multiaddr } from 'multiaddr'
 import type { MultiaddrConnection, Upgrader } from 'libp2p'
 import dgram from 'dgram'

@@ -2,8 +2,7 @@
 /// <reference path="../@types/libp2p-interfaces.ts" />
 
 import { createServer, Socket } from 'net'
-import { TCPConnection } from './tcp'
-import Listener from './listener'
+import { TCPConnection, Listener } from '.'
 import Defer from 'p-defer'
 import { Multiaddr } from 'multiaddr'
 import { u8aEquals } from '@hoprnet/hopr-utils'

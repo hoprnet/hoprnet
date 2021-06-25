@@ -1,7 +1,6 @@
 /// <reference path="./@types/libp2p.ts" />
 
 import debug from 'debug'
-import Listener from './listener'
 import { CODE_IP4, CODE_IP6, CODE_P2P, USE_WEBRTC } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
@@ -10,7 +9,7 @@ import type libp2p from 'libp2p'
 import type { Upgrader, DialOptions, ConnHandler } from 'libp2p'
 import { Transport, Connection } from 'libp2p-interfaces'
 import chalk from 'chalk'
-import { TCPConnection } from './tcp'
+import { TCPConnection, Listener } from './base'
 import { WebRTCUpgrader } from './webrtc'
 import { Relay } from './relay'
 import { Discovery } from './discovery'

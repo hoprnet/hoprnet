@@ -641,4 +641,4 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 }
 
-export default Listener
+export { Listener }
