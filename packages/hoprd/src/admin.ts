@@ -82,7 +82,11 @@ export class AdminServer {
 
     this.wsServer.on('connection', (socket: any, req: any) => {
       if (!this.authenticate(req)) {
-        socket.send(JSON.stringify({ type: 'auth-failed' }))
+        socket.send(JSON.stringify({ 
+          type: 'auth-failed', 
+          msg: 'authentication failed',
+          ts: new Date().toISOString(),
+        }))
         socket.close()
         return
       }
