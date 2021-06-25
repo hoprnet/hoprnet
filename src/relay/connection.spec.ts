@@ -11,13 +11,6 @@ import Pair from 'it-pair'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
 import handshake from 'it-handshake'
 
-const TIMEOUT_LOWER_BOUND = 450
-const TIMEOUT_UPPER_BOUND = 650
-
-function createPeers(amount: number): Promise<PeerId[]> {
-  return Promise.all(Array.from({ length: amount }, (_) => PeerId.create({ keyType: 'secp256k1' })))
-}
-
 describe('test status message sorting', function () {
   it('sort status messages', function () {
     const arr = [
@@ -177,11 +170,11 @@ describe('relay connection', function () {
 
     relayShaker.rest()
 
-    for await (const msg of relayShaker.stream.source) {
+    for await (const _msg of relayShaker.stream.source) {
       assert.fail(`Stream must have ended`)
     }
 
-    for await (const msg of alice.source) {
+    for await (const _msg of alice.source) {
       assert.fail(`Stream must have ended`)
     }
 

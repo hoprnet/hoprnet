@@ -11,7 +11,7 @@ const _log = Debug(`hopr-connect`)
 const _verbose = Debug(`hopr-connect:verbose`)
 const _error = Debug(`hopr-connect:error`)
 
-import { RelayPrefix, StatusMessages, VALID_PREFIXES, ConnectionStatusMessages, isValidPrefix } from '../constants'
+import { RelayPrefix, StatusMessages, ConnectionStatusMessages, isValidPrefix } from '../constants'
 import { eagerIterator } from './utils'
 
 export const DEFAULT_PING_TIMEOUT = 300

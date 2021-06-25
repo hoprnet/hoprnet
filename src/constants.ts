@@ -32,8 +32,6 @@ const encoder = new TextEncoder()
 export const OK = encoder.encode('OK')
 export const FAIL = encoder.encode('FAIL')
 
-export const STOP = encoder.encode('STOP')
-export const RESTART = encoder.encode('RESTART')
 export enum StatusMessages {
   PING,
   PONG
@@ -41,7 +39,8 @@ export enum StatusMessages {
 
 export enum ConnectionStatusMessages {
   STOP,
-  RESTART
+  RESTART,
+  MIGRATED
 }
 
 export enum RelayPrefix {
