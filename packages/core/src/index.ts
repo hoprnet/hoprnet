@@ -680,7 +680,7 @@ class Hopr extends EventEmitter {
     const ethereum = await this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const myAvailableTokens = await ethereum.getBalance(false)
+    const myAvailableTokens = await ethereum.getBalance(true)
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
