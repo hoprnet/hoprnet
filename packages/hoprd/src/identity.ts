@@ -8,6 +8,18 @@ const log = Debug(`hoprd:identity`)
 
 import Wallet from 'ethereumjs-wallet'
 
+export enum IdentityErrors {
+  FAIL_TO_LOAD_IDENTITY = 'Could not load identity',
+  EMPTY_PASSWORD = 'Password must not be empty',
+  WRONG_USAGE_OF_WEAK_CRYPTO = 'Attempting to use a development key while not being in development mode',
+  WRONG_PASSPHRASE = 'Key derivation failed - possibly wrong passphrase',
+  INVALID_PRIVATE_KEY_GIVEN = 'Invalid private key was given'
+}
+
+export enum IdentityLogs {
+  USING_WEAK_CRYPTO = 'Using weaker key protection to accelerate node startup'
+}
+
 /**
  * Serializes a given peerId by serializing the included private key and public key.
  *
@@ -44,7 +56,7 @@ export async function deserializeKeyPair(serialized: Uint8Array, password: strin
   const decoded = JSON.parse(new TextDecoder().decode(serialized))
 
   if (decoded.crypto.kdfparams.n == 1 && useWeakCrypto != true) {
-    throw Error(`Attempting to use a development key while not being in development mode`)
+    throw Error(IdentityErrors.WRONG_USAGE_OF_WEAK_CRYPTO)
   }
 
   const w = await Wallet.fromV3(decoded, password)
@@ -56,7 +68,8 @@ export type IdentityOptions = {
   initialize: boolean
   idPath: string
   password: string
-  useWeakCrypto?: boolean
+  useWeakCrypto?: boolean,
+  privateKey?: string
 }
 
 function loadIdentity(path: string): Uint8Array {
@@ -76,18 +89,18 @@ async function createIdentity(idPath: string, password: string, useWeakCrypto = 
 
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
   if (typeof options.password !== 'string' || options.password.length == 0) {
-    throw new Error(`Password must not be empty`)
+    throw new Error(IdentityErrors.EMPTY_PASSWORD)
   }
 
   let storedIdentity: Uint8Array | undefined
   try {
     storedIdentity = loadIdentity(options.idPath)
   } catch {
-    log('Could not load identity', options.idPath)
+    log(IdentityErrors.FAIL_TO_LOAD_IDENTITY, options.idPath)
   }
 
   if (options.useWeakCrypto) {
-    log(`Using weaker key protection to accelerate node startup`)
+    log(IdentityLogs.USING_WEAK_CRYPTO)
   }
   if (storedIdentity != undefined) {
     return await deserializeKeyPair(storedIdentity, options.password, options.useWeakCrypto)
@@ -98,5 +111,5 @@ export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
     return await createIdentity(options.idPath, options.password, options.useWeakCrypto)
   }
 
-  throw new Error('Cannot load identity')
+  throw new Error(IdentityErrors.FAIL_TO_LOAD_IDENTITY)
 }

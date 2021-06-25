@@ -1,4 +1,4 @@
-import { getIdentity } from './identity'
+import { getIdentity, IdentityErrors, IdentityOptions } from './identity'
 import { unlinkSync, existsSync } from 'fs'
 import { resolve } from 'path'
 import assert from 'assert'
@@ -7,6 +7,16 @@ describe('Identity', function () {
   const DUMMY_PATH = resolve(__dirname, './hopr-test-identity')
   const DUMMY_PASSWORD = 'hopr-unit-test-password'
   const WRONG_DUMMY_PASSWORD = 'hopr-unit-test-wrong-password'
+  const INVALID_PRIVATE_KEY = '0x1234'
+
+  const mockIdentityOptions: IdentityOptions = {
+    initialize: false,
+    idPath: DUMMY_PATH,
+    password: DUMMY_PASSWORD
+  }
+
+  const initializedMockIdentity: IdentityOptions = { ...mockIdentityOptions, initialize: true }
+  const createInitializedMockIdentityWithPassword: (password: string) => IdentityOptions = (password) => ({ ...initializedMockIdentity, password })
 
   beforeEach(function () {
     if (existsSync(DUMMY_PATH)) {
@@ -20,18 +30,33 @@ describe('Identity', function () {
     }
   })
 
+  describe('Private Key', () => {
+    it('fails to load an invalid private key', async () => {
+      await assert.rejects(
+        async () => {
+          await getIdentity({
+            ...mockIdentityOptions,
+            privateKey: INVALID_PRIVATE_KEY
+          })
+        },
+        {
+          name: 'Error',
+          message: IdentityErrors.INVALID_PRIVATE_KEY_GIVEN
+        }
+      )
+    })
+  })
+
   it('fail to load non-existing key', async function () {
     await assert.rejects(
       async () => {
         await getIdentity({
-          initialize: false,
-          idPath: DUMMY_PATH,
-          password: DUMMY_PASSWORD
+          ...mockIdentityOptions,
         })
       },
       {
         name: 'Error',
-        message: 'Cannot load identity'
+        message: IdentityErrors.FAIL_TO_LOAD_IDENTITY
       }
     )
   })
@@ -39,24 +64,20 @@ describe('Identity', function () {
   it('fail to load non-existing key', async function () {
     // Store dummy identity
     await getIdentity({
-      initialize: true,
-      idPath: DUMMY_PATH,
-      password: DUMMY_PASSWORD,
+      ...initializedMockIdentity,
       useWeakCrypto: true
     })
 
     await assert.rejects(
       async () => {
         await getIdentity({
-          initialize: true,
-          idPath: DUMMY_PATH,
-          password: WRONG_DUMMY_PASSWORD,
+          ...createInitializedMockIdentityWithPassword(WRONG_DUMMY_PASSWORD),
           useWeakCrypto: true
         })
       },
       {
         name: 'Error',
-        message: 'Key derivation failed - possibly wrong passphrase'
+        message: IdentityErrors.WRONG_PASSPHRASE
       }
     )
   })
@@ -64,23 +85,19 @@ describe('Identity', function () {
   it('fail to unintentionally load weakly encrypted secret', async function () {
     // Store dummy development identity
     await getIdentity({
-      initialize: true,
-      idPath: DUMMY_PATH,
-      password: DUMMY_PASSWORD,
+      ...initializedMockIdentity,
       useWeakCrypto: true
     })
 
     await assert.rejects(
       async () => {
         await getIdentity({
-          initialize: false,
-          idPath: DUMMY_PATH,
-          password: DUMMY_PASSWORD
+          ...initializedMockIdentity
         })
       },
       {
         name: 'Error',
-        message: 'Attempting to use a development key while not being in development mode'
+        message: IdentityErrors.WRONG_USAGE_OF_WEAK_CRYPTO
       }
     )
   })
@@ -89,30 +106,24 @@ describe('Identity', function () {
     await assert.rejects(
       async () => {
         await getIdentity({
-          initialize: true,
-          idPath: DUMMY_PATH,
-          password: ''
+          ...createInitializedMockIdentityWithPassword('')
         })
       },
       {
         name: 'Error',
-        message: 'Password must not be empty'
+        message: IdentityErrors.EMPTY_PASSWORD
       }
     )
   })
 
   it('store and restore identity', async function () {
     const testIdentity = await getIdentity({
-      initialize: true,
-      idPath: DUMMY_PATH,
-      password: DUMMY_PASSWORD,
+      ...initializedMockIdentity,
       useWeakCrypto: true
     })
 
     const deserializedIdentity = await getIdentity({
-      initialize: false,
-      idPath: DUMMY_PATH,
-      password: DUMMY_PASSWORD,
+      ...initializedMockIdentity,
       useWeakCrypto: true
     })
 
