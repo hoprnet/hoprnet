@@ -2,19 +2,14 @@
 /// <reference path="../@types/it-handshake.ts" />
 
 import { RelayConnection, statusMessagesCompare } from './connection'
-import type { Stream, StreamResult } from 'libp2p'
 import assert from 'assert'
-import { randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
-import pipe from 'it-pipe'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import PeerId from 'peer-id'
 import { EventEmitter, once } from 'events'
-import type { Instance as SimplePeer } from 'simple-peer'
 import Pair from 'it-pair'
-import { ConnectionStatusMessages, RelayPrefix, RELAY_STATUS_PREFIX, RESTART, StatusMessages } from '../constants'
-import Defer from 'p-defer'
+import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
 import handshake from 'it-handshake'
-import { green } from 'chalk'
 
 const TIMEOUT_LOWER_BOUND = 450
 const TIMEOUT_UPPER_BOUND = 650
@@ -328,6 +323,148 @@ describe('relay connection', function () {
           (await relayShaker.read()).slice(),
           Uint8Array.from([RelayPrefix.PAYLOAD, ...aliceHelloAfterReconnect])
         )
+      )
+    }
+  })
+
+  it('forward and prefix WebRTC messages', async function () {
+    class WebRTC extends EventEmitter {
+      signal(args: any) {
+        this.emit('incoming msg', args)
+      }
+    }
+
+    const webRTC = new WebRTC()
+
+    const AliceRelay = Pair()
+    const RelayAlice = Pair()
+
+    new RelayConnection({
+      stream: {
+        sink: AliceRelay.sink,
+        source: RelayAlice.source
+      },
+      self: Alice,
+      relay: Relay,
+      counterparty: Bob,
+      onReconnect: async () => {},
+      webRTC: {
+        channel: webRTC as any,
+        upgradeInbound: (): any => {}
+      }
+    })
+
+    const relayShaker = handshake<Uint8Array>({
+      sink: RelayAlice.sink,
+      source: AliceRelay.source
+    })
+
+    const webRTCHello = 'WebRTC Hello'
+
+    relayShaker.write(
+      Uint8Array.from([
+        RelayPrefix.WEBRTC_SIGNALLING,
+        ...new TextEncoder().encode(
+          JSON.stringify({
+            message: webRTCHello
+          })
+        )
+      ])
+    )
+
+    const result = await once(webRTC, 'incoming msg')
+    assert(result != undefined && result.length > 0 && result[0]?.message === webRTCHello)
+
+    const webRTCResponse = 'webRTC hello back'
+    webRTC.emit('signal', {
+      message: webRTCResponse
+    })
+
+    assert(JSON.parse(new TextDecoder().decode((await relayShaker.read()).slice(1))).message === webRTCResponse)
+  })
+
+  it('forward and prefix WebRTC messages after reconnect', async function () {
+    class WebRTC extends EventEmitter {
+      signal(args: any) {
+        this.emit('incoming msg', args)
+      }
+    }
+
+    const webRTC = new WebRTC()
+
+    const AliceRelay = Pair()
+    const RelayAlice = Pair()
+
+    let webRTCAfterReconnect: WebRTC | undefined
+
+    const alice = new RelayConnection({
+      stream: {
+        sink: AliceRelay.sink,
+        source: RelayAlice.source
+      },
+      self: Alice,
+      relay: Relay,
+      counterparty: Bob,
+      onReconnect: async () => {},
+      webRTC: {
+        channel: webRTC as any,
+        upgradeInbound: (): any => {
+          webRTCAfterReconnect = new WebRTC()
+          return webRTCAfterReconnect
+        }
+      }
+    })
+
+    const relayShaker = handshake<Uint8Array>({
+      sink: RelayAlice.sink,
+      source: AliceRelay.source
+    })
+
+    const webRTCHello = 'WebRTC Hello'
+
+    relayShaker.write(
+      Uint8Array.from([
+        RelayPrefix.WEBRTC_SIGNALLING,
+        ...new TextEncoder().encode(
+          JSON.stringify({
+            message: webRTCHello
+          })
+        )
+      ])
+    )
+
+    const result = await once(webRTC, 'incoming msg')
+    assert(result != undefined && result.length > 0 && result[0]?.message === webRTCHello)
+
+    const webRTCResponse = 'webRTC hello back'
+    webRTC.emit('signal', {
+      message: webRTCResponse
+    })
+
+    assert(JSON.parse(new TextDecoder().decode((await relayShaker.read()).slice(1))).message === webRTCResponse)
+
+    const ATTEMPTS = 5
+    for (let i = 0; i < ATTEMPTS; i++) {
+      relayShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART))
+
+      await once(alice, 'restart')
+
+      webRTC.emit('signal', {
+        message: webRTCResponse
+      })
+
+      const correctWebRTCResponseAfterReconnect = 'webRTC hello back after response'
+
+      assert(webRTCAfterReconnect != undefined)
+
+      // Emitting unnecessary event that must not come through
+      webRTCAfterReconnect.emit('signal', {
+        message: correctWebRTCResponseAfterReconnect
+      })
+
+      assert(
+        JSON.parse(new TextDecoder().decode((await relayShaker.read()).slice(1))).message ===
+          correctWebRTCResponseAfterReconnect
       )
     }
   })

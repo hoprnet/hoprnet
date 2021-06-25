@@ -157,8 +157,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this.source = this.createSource()
 
-    this.attachWebRTCListeners()
-
     this._stream.sink(this.sinkFunction())
 
     this.sink = this._sink.bind(this)
@@ -211,6 +209,10 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         result = undefined
 
         streamPromise = this._stream.source.next()
+      }
+
+      if (this.webRTC != undefined) {
+        this.attachWebRTCListeners(drainIteration)
       }
 
       while (this._iteration == drainIteration) {
@@ -274,19 +276,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             this.log(`RESTART received. Ending stream ...`)
             this.emit(`restart`)
 
-            if (this.webRTC != undefined) {
-              this.webRTC?.channel.removeAllListeners('signal')
-              try {
-                this.webRTC.channel.destroy()
-              } catch {}
-
-              this.webRTC.channel = this.webRTC.upgradeInbound()
-
-              this.log(`resetting WebRTC stream`)
-              this.attachWebRTCListeners()
-              this.log(`resetting WebRTC stream done`)
-            }
-
             this._onReconnect(this.switch(), this._counterparty)
 
             continue
@@ -305,10 +294,19 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           next()
           continue
         } else if (PREFIX[0] == RelayPrefix.WEBRTC_SIGNALLING) {
+          let decoded: Object | undefined
           try {
-            this.webRTC?.channel.signal(JSON.parse(new TextDecoder().decode(SUFFIX)))
-          } catch (err) {
-            this.error(`WebRTC error:`, err)
+            decoded = JSON.parse(new TextDecoder().decode(SUFFIX))
+          } catch {
+            this.error(`Error while trying to decode JSON-encoded WebRTC message`)
+          }
+
+          if (decoded != undefined) {
+            try {
+              this.webRTC?.channel.signal(decoded as any)
+            } catch (err) {
+              this.error(`WebRTC error:`, err)
+            }
           }
 
           next()
@@ -426,26 +424,11 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     }
   }
 
-  private attachWebRTCListeners() {
-    // Cleanup potential previous signalling messages
-    // for (const [index, msg] of this.statusMessages.entries()) {
-    //   if (msg[0] == RelayPrefix.WEBRTC_SIGNALLING) {
-    //     let lastElement = this.statusMessages.pop() as Uint8Array
-
-    //     if (index != this.statusMessages.length - 1) {
-    //       this.statusMessages[index] = lastElement
-    //     }
-    //   }
-    // }
-
+  private attachWebRTCListeners(drainIteration: number) {
     const onSignal = (data: Object) => {
-      // if (
-      //   u8aEquals(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP), this.statusMessages[0])
-      // ) {
-      //   this.log(`Detected Stream close. Ending WebRTC upgrade`)
-      //   this.webRTC?.channel.removeListener('signal', onSignal)
-      //   return
-      // }
+      if (this._iteration != drainIteration) {
+        return
+      }
 
       this.queueStatusMessage(
         Uint8Array.from([RelayPrefix.WEBRTC_SIGNALLING, ...new TextEncoder().encode(JSON.stringify(data))])
@@ -455,12 +438,22 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   }
 
   switch(): RelayConnection {
+    if (this.webRTC != undefined) {
+      try {
+        this.webRTC.channel.destroy()
+      } catch {}
+    }
+
     this._migrationDone = Defer<void>()
     this._iteration++
     this._sinkSourceSwitched = true
     this._sinkSwitchPromise.resolve()
     this._sourceSwitched = true
     this._sourceSwitchPromise.resolve()
+
+    if (this.webRTC != undefined) {
+      this.webRTC.channel = this.webRTC.upgradeInbound()
+    }
 
     this.source = this.createSource()
 
