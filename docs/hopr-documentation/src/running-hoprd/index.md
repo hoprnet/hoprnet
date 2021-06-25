@@ -24,7 +24,7 @@ working directory where it will store the encrypted key to your node and your of
 private data.
 
 ```sh
-DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs --apiToken alpine_panorama
+DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs
 ```
 
 ### Accessing HOPRd on a local machine
