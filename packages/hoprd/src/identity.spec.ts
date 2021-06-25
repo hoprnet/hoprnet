@@ -16,7 +16,10 @@ describe('Identity', function () {
   }
 
   const initializedMockIdentity: IdentityOptions = { ...mockIdentityOptions, initialize: true }
-  const createInitializedMockIdentityWithPassword: (password: string) => IdentityOptions = (password) => ({ ...initializedMockIdentity, password })
+  const createInitializedMockIdentityWithPassword: (password: string) => IdentityOptions = (password) => ({
+    ...initializedMockIdentity,
+    password
+  })
 
   beforeEach(function () {
     if (existsSync(DUMMY_PATH)) {
@@ -51,7 +54,7 @@ describe('Identity', function () {
     await assert.rejects(
       async () => {
         await getIdentity({
-          ...mockIdentityOptions,
+          ...mockIdentityOptions
         })
       },
       {
