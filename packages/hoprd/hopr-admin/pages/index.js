@@ -28,7 +28,7 @@ class TokenInput extends React.Component {
     const tokenCookie = Cookies.get('X-Auth-Token')
     console.log(tokenCookie)
     return tokenCookie === undefined ? <div className="send">
-          <input
+          <input className="token"
             onKeyPress={this.handleKeyPress}
             id="token"
             type="password"
@@ -80,7 +80,7 @@ export default function Home() {
           <input
             id="command"
             type="text"
-            disabled={!isNodeReady}
+            // disabled={!isNodeReady}
             autoFocus
             placeholder="type 'help' for full list of commands"
           />
