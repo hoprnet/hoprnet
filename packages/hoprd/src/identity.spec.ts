@@ -10,6 +10,7 @@ describe('Identity', function () {
   const INVALID_PRIVATE_KEY = 'invalid_hex_string'
   const INVALID_SECP256K1_PRIVATE_KEY = 'cd09f9'
   const DUMMY_PRIVATE_KEY = 'cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317'
+  const DUMMY_PREFIXED_PRIVATE_KEY = '0xcd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317'
 
   const mockIdentityOptions: IdentityOptions = {
     initialize: false,
@@ -75,6 +76,21 @@ describe('Identity', function () {
         ...initializedMockIdentity,
         useWeakCrypto: true,
         privateKey: DUMMY_PRIVATE_KEY
+      })
+
+      assert(testIdentity.equals(deserializedIdentity))
+    })
+    it('receives a 0x-prefixed private key and stores it on a given path serialized', async () => {
+      const testIdentity = await getIdentity({
+        ...initializedMockIdentity,
+        useWeakCrypto: true,
+        privateKey: DUMMY_PREFIXED_PRIVATE_KEY
+      })
+
+      const deserializedIdentity = await getIdentity({
+        ...initializedMockIdentity,
+        useWeakCrypto: true,
+        privateKey: DUMMY_PREFIXED_PRIVATE_KEY
       })
 
       assert(testIdentity.equals(deserializedIdentity))
