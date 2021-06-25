@@ -81,6 +81,11 @@ const argv = yargs
     string: true,
     default: undefined
   })
+  .option('privateKey', {
+    describe: 'A private key to be used for your HOPR node',
+    string: true,
+    default: undefined
+  })
   .option('identity', {
     describe: 'The path to the identity file',
     default: DEFAULT_ID_PATH
@@ -224,7 +229,8 @@ async function main() {
     initialize: argv.init,
     idPath: argv.identity,
     password: argv.password,
-    useWeakCrypto: argv.testUseWeakCrypto
+    useWeakCrypto: argv.testUseWeakCrypto,
+    privateKey: argv.privateKey
   })
 
   // 2. Create node instance
