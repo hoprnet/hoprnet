@@ -72,6 +72,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _sinkSourceAttached: boolean
   private _sinkSourceSwitched: boolean
   private _sourceSwitched: boolean
+  private _streamClosed: boolean
 
   private statusMessages: Heap<Uint8Array>
 
@@ -145,6 +146,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._sinkSourceAttached = false
     this._sinkSourceSwitched = false
     this._sourceSwitched = false
+    this._streamClosed = false
 
     this._closePromise = Defer<void>()
     this._sinkSourceAttachedPromise = Defer<Stream['source']>()
@@ -201,11 +203,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       const drainIteration = parseInt(this._iteration.toString())
 
       let result: StreamResult | undefined
-      let streamClosed = false
-
-      const closePromise = this._closePromise.promise.then(() => {
-        streamClosed = true
-      })
 
       let streamPromise = this._stream.source.next()
 
@@ -218,7 +215,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       while (this._iteration == drainIteration) {
         const promises = []
 
-        promises.push(closePromise)
+        promises.push(this._closePromise.promise)
 
         if (!this._sourceSwitched) {
           promises.push(this._sourceSwitchPromise.promise)
@@ -241,7 +238,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           continue
         }
 
-        if (streamClosed) {
+        if (this._streamClosed) {
           break
         }
 
@@ -340,17 +337,12 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     let currentSource: Stream['source'] | undefined
     let streamPromise: Promise<StreamResult> | undefined
 
-    let streamClosed = false
-    let closePromise = this._closePromise.promise.then(() => {
-      streamClosed = true
-    })
-
     let result: SinkType
 
     while (true) {
       let promises: Promise<SinkType>[] = []
 
-      promises.push(closePromise, this._sinkSwitchPromise.promise)
+      promises.push(this._closePromise.promise, this._sinkSwitchPromise.promise)
 
       if (currentSource == undefined) {
         promises.push(this._sinkSourceAttachedPromise.promise)
@@ -370,7 +362,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       // 3. Handle payload messages
       result = await Promise.race(promises)
 
-      if (streamClosed && this.destroyed) {
+      if (this._streamClosed && this.destroyed) {
         break
       }
 
