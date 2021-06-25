@@ -191,6 +191,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   }
 
   private setClosed() {
+    this._streamClosed = true
     this._closePromise.resolve()
     this.timeline.close = Date.now()
   }
