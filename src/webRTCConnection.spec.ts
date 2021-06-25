@@ -8,9 +8,9 @@ import Peer from 'simple-peer'
 const wrtc = require('wrtc')
 
 import { durations, u8aEquals } from '@hoprnet/hopr-utils'
-import { RELAY_PAYLOAD_PREFIX } from './constants'
-import { RelayContext } from './relayContext'
-import { RelayConnection } from './relayConnection'
+import { RelayPrefix } from './constants'
+import { RelayContext } from './relay/context'
+import { RelayConnection } from './relay/connection'
 import type { Stream } from 'libp2p'
 import assert from 'assert'
 
@@ -60,7 +60,7 @@ describe('test overwritable connection', function () {
           )
 
           if (arg.usePrefix) {
-            yield Uint8Array.from([...RELAY_PAYLOAD_PREFIX, ...msg])
+            yield Uint8Array.from([RelayPrefix.PAYLOAD, ...msg])
           } else {
             yield msg
           }
@@ -147,7 +147,7 @@ describe('test overwritable connection', function () {
           sink: connectionA.sink,
           source: (async function* () {
             for await (const msg of connectionB.source) {
-              if (cutConnection && !u8aEquals(RELAY_PAYLOAD_PREFIX, msg.slice())) {
+              if (cutConnection && !u8aEquals(Uint8Array.of(RelayPrefix.PAYLOAD), msg.slice())) {
                 console.log(msg)
                 throw Error(`Connection must not be used`)
               }
@@ -181,7 +181,7 @@ describe('test overwritable connection', function () {
           sink: connectionB.sink,
           source: (async function* () {
             for await (const msg of connectionA.source) {
-              if (cutConnection && !u8aEquals(RELAY_PAYLOAD_PREFIX, msg.slice())) {
+              if (cutConnection && !u8aEquals(Uint8Array.of(RelayPrefix.PAYLOAD), msg.slice())) {
                 console.log(msg)
                 throw Error(`Connection must not be used`)
               }

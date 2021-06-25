@@ -11,7 +11,7 @@ const _log = Debug(`hopr-connect`)
 const _verbose = Debug(`hopr-connect:verbose`)
 const _error = Debug(`hopr-connect:error`)
 
-import { RelayPrefix, StatusMessages, VALID_PREFIXES, ConnectionStatusMessages } from '../constants'
+import { RelayPrefix, StatusMessages, VALID_PREFIXES, ConnectionStatusMessages, isValidPrefix } from '../constants'
 import { eagerIterator } from './utils'
 
 export const DEFAULT_PING_TIMEOUT = 300
@@ -181,7 +181,7 @@ class RelayContext extends EventEmitter {
 
         const [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
 
-        if (!VALID_PREFIXES.includes(PREFIX[0])) {
+        if (!isValidPrefix(PREFIX[0])) {
           this.error(`Invalid prefix: Got <${u8aToHex(PREFIX ?? new Uint8Array())}>. Dropping message in relayContext.`)
 
           next()
