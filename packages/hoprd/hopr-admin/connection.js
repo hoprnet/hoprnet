@@ -10,11 +10,12 @@ export class Connection {
   logs = []
   prevLog = ''
 
-  constructor(setConnecting, setStarted, setMessages, setConnectedPeers) {
+  constructor(setConnecting, setStarted, setMessages, setConnectedPeers, onAuthFailed) {
     this.setConnecting = setConnecting
     this.setStarted = setStarted
     this.setMessages = setMessages
     this.setConnectedPeers = setConnectedPeers
+    this.onAuthFailed = onAuthFailed
     this.connect()
   }
 
@@ -35,7 +36,7 @@ export class Connection {
       } else if (msg.type == 'connected') {
         this.setConnectedPeers(msg.msg.split(','))
       } else if (msg.type == 'fatal-error') {
-        this.setConnecting('true')
+        this.setConnecting(true)
         this.logs.push(msg)
 
         // Let's elaborate on certain error messages:
@@ -49,7 +50,8 @@ export class Connection {
         this.setStarted(true)
       } else if (msg.type == 'auth-failed') {
         this.logs.push(msg)
-        Cookies.remove('X-Auth-Token')
+        this.setConnecting(false)
+        this.onAuthFailed()        
       }
     } catch (e) {
       console.log('ERR', e)
@@ -95,8 +97,8 @@ export class Connection {
     }
 
     client.onmessage = (event) => {
-      this.appendMessage(event)
       console.log(event)
+      this.appendMessage(event)       
     }
 
     client.onerror = (error) => {

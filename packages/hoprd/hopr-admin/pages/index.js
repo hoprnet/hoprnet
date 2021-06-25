@@ -6,21 +6,28 @@ import { Logs } from '../components/log'
 import { Connection } from '../connection'
 import dynamic from 'next/dynamic'
 import Cookies from 'js-cookie';
+import { render } from 'react-dom'
 
 const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
 
 class TokenInput extends React.Component {
+  constructor(props) {
+    super(props)
+    this.handleKeyPress = this.handleKeyPress.bind(this);
+  }
+  
   handleKeyPress(e) {
     if (e.key == 'Enter') {
       var text = e.target.value
-      Cookies.set('X-Auth-Token', text)        
+      Cookies.set('X-Auth-Token', text)  
+      this.forceUpdate()      
     }
   } 
   
   render() {
     const tokenCookie = Cookies.get('X-Auth-Token')
-    return 1 && 
-        <div className="send">
+    console.log(`cookie: ${tokenCookie}`)
+    return <div className="send">
           <input
             onKeyPress={this.handleKeyPress}
             id="token"
@@ -32,59 +39,66 @@ class TokenInput extends React.Component {
   }
 
 export default function Home() {
-  let connection
+    let connection
 
-  const [showConnected, setShowConnected] = useState(false)
-  const [connecting, setConnecting] = useState(true)
-  const [started, setStarted] = useState(false)
-  const [messages, setMessages] = useState([]) // The fetish for immutability in react means this will be slower than a mutable array..
-  const [peers, setConnectedPeers] = useState([])
+    const [showConnected, setShowConnected] = useState(false)
+    const [connecting, setConnecting] = useState(true)
+    const [started, setStarted] = useState(false)
+    const [messages, setMessages] = useState([]) // The fetish for immutability in react means this will be slower than a mutable array..
+    const [peers, setConnectedPeers] = useState([])
+    const [, updateState] = React.useState();
+    const handleAuthFailed = React.useCallback(() => {
+      Cookies.remove('X-Auth-Token')
+      updateState({})      
+    }, []);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      connection = new Connection(setConnecting, setStarted, setMessages, setConnectedPeers)
-      return Connection.disconnect
-    }
-  }, [])
+    console.log('update')
 
-  const isNodeReady = !connecting && started
+    useEffect(() => {
+      if (typeof window !== 'undefined') {
+        connection = new Connection(setConnecting, setStarted, setMessages, setConnectedPeers, handleAuthFailed)
+        return Connection.disconnect
+      }
+    }, [])
 
-  return (
-    <div className={styles.container}>
-      <Head>
-        <title>HOPR Admin</title>
-      </Head>
+    const isNodeReady = !connecting && started
 
-      <Logo onClick={() => setShowConnected(!showConnected)} />
-      <h1>HOPR Logs</h1>
+    return (
+      <div className={styles.container}>
+        <Head>
+          <title>HOPR Admin</title>
+        </Head>
 
-      <Logs messages={messages} connecting={connecting} />
+        <Logo onClick={() => setShowConnected(!showConnected)} />
+        <h1>HOPR Logs</h1>
 
-      <div className="send">
-        <input
-          id="command"
-          type="text"
-          disabled={!isNodeReady}
-          autoFocus
-          placeholder="type 'help' for full list of commands"
-        />
-      </div>
+        <Logs messages={messages} connecting={connecting} />
 
-      <TokenInput/>
-
-      {showConnected && (
-        <div className={styles.connectedPeers}>
-          <h2>Connected Peers ({peers.length})</h2>
-          <div className={styles.connectedPeersList}>
-            {peers.map((x) => (
-              <div className={styles.peer} key={x}>
-                <Jazzicon diameter={40} address={x} className={styles.peerIcon} />
-                <div>{x}</div>
-              </div>
-            ))}
-          </div>
+        <div className="send">
+          <input
+            id="command"
+            type="text"
+            disabled={!isNodeReady}
+            autoFocus
+            placeholder="type 'help' for full list of commands"
+          />
         </div>
-      )}
-    </div>
-  )
+
+        <TokenInput/>
+
+        {showConnected && (
+          <div className={styles.connectedPeers}>
+            <h2>Connected Peers ({peers.length})</h2>
+            <div className={styles.connectedPeersList}>
+              {peers.map((x) => (
+                <div className={styles.peer} key={x}>
+                  <Jazzicon diameter={40} address={x} className={styles.peerIcon} />
+                  <div>{x}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
 }
