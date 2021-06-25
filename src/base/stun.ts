@@ -4,7 +4,7 @@ import type { Socket, RemoteInfo } from 'dgram'
 import { Multiaddr } from 'multiaddr'
 import debug from 'debug'
 import { randomSubset } from '@hoprnet/hopr-utils'
-import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from './constants'
+import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants'
 
 const log = debug('hopr-connect:stun:error')
 const error = debug('hopr-connect:stun:error')

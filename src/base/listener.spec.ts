@@ -1,4 +1,4 @@
-/// <reference path="./@types/libp2p.ts" />
+/// <reference path="../@types/libp2p.ts" />
 
 import assert from 'assert'
 import Listener from './listener'

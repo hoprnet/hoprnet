@@ -1,5 +1,5 @@
-/// <reference path="./@types/libp2p.ts" />
-/// <reference path="./@types/libp2p-interfaces.ts" />
+/// <reference path="../@types/libp2p.ts" />
+/// <reference path="../@types/libp2p-interfaces.ts" />
 
 import net, { AddressInfo, Socket as TCPSocket } from 'net'
 import dgram, { RemoteInfo } from 'dgram'
@@ -11,7 +11,7 @@ import { NetworkInterfaceInfo, networkInterfaces } from 'os'
 
 import AbortController from 'abort-controller'
 import type { AbortSignal } from 'abort-controller'
-import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, RELAY_CONTACT_TIMEOUT } from './constants'
+import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, RELAY_CONTACT_TIMEOUT } from '../constants'
 import type { Connection, ConnHandler } from 'libp2p'
 import { MultiaddrConnection, Upgrader } from 'libp2p'
 
@@ -21,7 +21,7 @@ import { Multiaddr } from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
-import { isAnyAddress } from './utils'
+import { isAnyAddress } from '../utils'
 import { TCPConnection } from './tcp'
 import { randomSubset } from '@hoprnet/hopr-utils'
 

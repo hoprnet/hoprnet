@@ -1,5 +1,5 @@
-/// <reference path="./@types/libp2p.ts" />
-/// <reference path="./@types/libp2p-interfaces.ts" />
+/// <reference path="../@types/libp2p.ts" />
+/// <reference path="../@types/libp2p-interfaces.ts" />
 
 import { createServer, Socket } from 'net'
 import { TCPConnection } from './tcp'
