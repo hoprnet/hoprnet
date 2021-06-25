@@ -2,7 +2,7 @@
  * Maintain a websocket connection
  */
 
-import Cookies from "js-cookie"
+import Cookies from 'js-cookie'
 
 const MAX_MESSAGES_CACHED = 50
 
@@ -20,11 +20,11 @@ export class Connection {
   }
 
   appendMessage(event) {
-    if(event.data === undefined) {
+    if (event.data === undefined) {
       return
     }
-    
-    try {      
+
+    try {
       const msg = JSON.parse(event.data)
       if (msg.type == 'log') {
         if (this.logs.length > MAX_MESSAGES_CACHED) {
@@ -49,10 +49,10 @@ export class Connection {
       } else if (msg.type === 'status' && msg.msg === 'STARTED') {
         this.setStarted(true)
       } else if (msg.type == 'auth-failed') {
-        console.log('!! auth failed')        
+        console.log('!! auth failed')
         this.logs.push(msg)
         this.setConnecting(false)
-        this.onAuthFailed()        
+        this.onAuthFailed()
       }
     } catch (e) {
       console.log('ERR', e)
@@ -94,11 +94,11 @@ export class Connection {
           // Up Arrow
           e.target.value = this.prevLog
         }
-      }       
+      }
     }
 
     client.onmessage = (event) => {
-      this.appendMessage(event)       
+      this.appendMessage(event)
     }
 
     client.onerror = (error) => {
