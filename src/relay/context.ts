@@ -12,6 +12,7 @@ const _verbose = Debug(`hopr-connect:verbose`)
 const _error = Debug(`hopr-connect:error`)
 
 import { RelayPrefix, StatusMessages, VALID_PREFIXES, ConnectionStatusMessages } from '../constants'
+import { eagerIterator } from './utils'
 
 export const DEFAULT_PING_TIMEOUT = 300
 
@@ -227,20 +228,7 @@ class RelayContext extends EventEmitter {
       }
     }.call(this)
 
-    let result = iterator.next()
-    let received: any
-
-    return (async function* () {
-      while (true) {
-        received = await result
-
-        if (received.done) {
-          break
-        }
-        result = iterator.next()
-        yield received.value
-      }
-    })()
+    return eagerIterator(iterator)
   }
 
   private async _createSink(): Promise<void> {
@@ -332,7 +320,6 @@ class RelayContext extends EventEmitter {
         }
 
         next()
-
         yield received.value
       }
     }

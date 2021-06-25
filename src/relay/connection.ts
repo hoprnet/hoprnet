@@ -16,6 +16,7 @@ import type PeerId from 'peer-id'
 import Debug from 'debug'
 import { EventEmitter } from 'events'
 import { toU8aStream } from '../utils'
+import { eagerIterator } from './utils'
 
 const _log = Debug('hopr-connect')
 const _verbose = Debug('hopr-connect:verbose')
@@ -68,19 +69,11 @@ export function statusMessagesCompare(a: Uint8Array, b: Uint8Array): -1 | 0 | 1 
 
 class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _stream: Stream
-  private _destroyed: boolean
   private _sinkSourceAttached: boolean
   private _sinkSourceSwitched: boolean
   private _sourceSwitched: boolean
 
-  private _destroyedPromise: DeferredPromise<void>
-
-  private _closePromise: DeferredPromise<void>
-
-  private _statusMessagePromise: DeferredPromise<void>
   private statusMessages: Heap<Uint8Array>
-
-  private _migrationDone: DeferredPromise<void> | undefined
 
   public _iteration: number
 
@@ -89,8 +82,14 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
   private _sinkSwitchPromise: DeferredPromise<void>
   private _sourceSwitchPromise: DeferredPromise<void>
+  private _migrationDone: DeferredPromise<void> | undefined
+  private _destroyedPromise: DeferredPromise<void>
+  private _statusMessagePromise: DeferredPromise<void>
+  private _closePromise: DeferredPromise<void>
 
   private _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
+
+  public destroyed: boolean
 
   public webRTC?: WebRTC
 
@@ -120,12 +119,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       open: Date.now()
     }
 
-    this._destroyedPromise = Defer<void>()
-
-    this._statusMessagePromise = Defer<void>()
     this.statusMessages = new Heap()
 
-    this._destroyed = false
+    this.destroyed = false
 
     this._stream = opts.stream
 
@@ -134,8 +130,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._onReconnect = opts.onReconnect
 
     this._counterparty = opts.counterparty
-
-    this._closePromise = Defer<void>()
 
     this._id = u8aToHex(randomBytes(4), false)
 
@@ -149,9 +143,13 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._iteration = 0
 
     this._sinkSourceAttached = false
-    this._sinkSourceAttachedPromise = Defer<Stream['source']>()
     this._sinkSourceSwitched = false
     this._sourceSwitched = false
+
+    this._closePromise = Defer<void>()
+    this._sinkSourceAttachedPromise = Defer<Stream['source']>()
+    this._destroyedPromise = Defer<void>()
+    this._statusMessagePromise = Defer<void>()
     this._sinkSwitchPromise = Defer<void>()
     this._sourceSwitchPromise = Defer<void>()
 
@@ -167,7 +165,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   public close(_err?: Error): Promise<void> {
     this.verbose(`close called`)
 
-    if (this._destroyed) {
+    if (this.destroyed) {
       return Promise.resolve()
     }
 
@@ -270,7 +268,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
         if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS) {
           if (SUFFIX[0] == ConnectionStatusMessages.STOP) {
-            this._destroyed = true
+            this.destroyed = true
             this._destroyedPromise.resolve()
             this.setClosed()
             break
@@ -324,20 +322,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       }
     }.call(this)
 
-    let result = iterator.next()
-    let received: any
-
-    return (async function* () {
-      while (true) {
-        received = await result
-
-        if (received.done) {
-          break
-        }
-        result = iterator.next()
-        yield received.value
-      }
-    })()
+    return eagerIterator(iterator)
   }
 
   public async _sink(_source: Stream['source']): Promise<void> {
@@ -385,7 +370,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       // 3. Handle payload messages
       result = await Promise.race(promises)
 
-      if (streamClosed && this._destroyed) {
+      if (streamClosed && this.destroyed) {
         break
       }
 
@@ -417,7 +402,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         const statusMsg = this.unqueueStatusMessage()
 
         if (u8aEquals(statusMsg, Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))) {
-          this._destroyed = true
+          this.destroyed = true
           this._destroyedPromise.resolve()
 
           yield statusMsg
@@ -431,10 +416,12 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
       const received = result as StreamResult
 
-      if (received == undefined || received.done) {
-        this.verbose(`##### EMPTY message #####`, received)
-        yield Uint8Array.of(RelayPrefix.PAYLOAD)
+      if (received == undefined) {
+        throw Error(`Received must not be undefined`)
+      }
 
+      if (received.done) {
+        currentSource = undefined
         streamPromise = undefined
         continue
       }
@@ -485,10 +472,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this.source = this.createSource()
 
     return this
-  }
-
-  get destroyed(): boolean {
-    return this._destroyed
   }
 
   private queueStatusMessage(msg: Uint8Array) {
