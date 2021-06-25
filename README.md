@@ -220,6 +220,22 @@ multiple packages using the following command:
 yarn test
 ```
 
+#### Test a feature
+
+By default, we run all our tests in parallel, but if you want to test a
+unique feature, you can run a specific package test by passing the `grep`
+flag to test command.
+
+For instance, to run only the `Identity` test suite in `hoprd`, you need to
+run the following:
+
+```sh
+yarn test:hoprd --grep "Identity"
+```
+
+In case a package you need to test is not included in our `package.json`,
+please feel free to update it as needed.
+
 ### Github Actions CI
 
 We run a fair amount of automation using Github Actions. To ease development
