@@ -55,24 +55,33 @@ if [ ${http_status_code} -ne 403 ]; then
 fi
 
 declare ws_response
+declare msg_type
 
 log "Admin websocket should reject commands without token"
 ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/)
-if [ "${ws_response}" != "authentication failed" ]; then
+msg_type=$(echo "${ws_response}" | jq .type --raw-output )
+
+if [ "${msg_type}" != "auth-failed" ]; then
   log "⛔️ Didn't fail ws authentication"
-  log "Expected response: 'authentication failed' "
+  log "Expected response: '{ type: 'auth-failed' } "
   log "Actual response:"
   log "${ws_response}"
+  log "Msg type:"
+  log ${msg_type}
   exit 1
 fi
 
 log "Admin websocket should reject commands with invalid token"
 ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=bad-token")
-if [ "${ws_response}" != "authentication failed" ]; then
+msg_type=$(echo "${ws_response}" | jq .type --raw-output )
+
+if [ "${msg_type}" != "auth-failed" ]; then
   log "⛔️ Didn't fail ws authentication"
-  log "Expected response: 'authentication failed' "
+  log "Expected response: '{ type: 'auth-failed' } "
   log "Actual response:"
   log "${ws_response}"
+  log "Msg type:"
+  log ${msg_type}
   exit 1
 fi
 
