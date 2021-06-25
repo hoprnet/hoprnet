@@ -7,7 +7,7 @@ describe('Identity', function () {
   const DUMMY_PATH = resolve(__dirname, './hopr-test-identity')
   const DUMMY_PASSWORD = 'hopr-unit-test-password'
   const WRONG_DUMMY_PASSWORD = 'hopr-unit-test-wrong-password'
-  const INVALID_PRIVATE_KEY = '0x1234'
+  const INVALID_PRIVATE_KEY = 'invalid_hex_string'
 
   const mockIdentityOptions: IdentityOptions = {
     initialize: false,
@@ -31,7 +31,7 @@ describe('Identity', function () {
   })
 
   describe('Private Key', () => {
-    it('fails to load an invalid private key', async () => {
+    it('fails to load a non-hexadecimal value as private key', async () => {
       await assert.rejects(
         async () => {
           await getIdentity({

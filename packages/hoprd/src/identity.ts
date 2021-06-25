@@ -88,6 +88,12 @@ async function createIdentity(idPath: string, password: string, useWeakCrypto = 
 }
 
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
+  if (options.privateKey) {
+    const key = Uint8Array.from(Buffer.from(options.privateKey, 'hex'));
+    if (key.length == 0) {
+      throw new Error(IdentityErrors.INVALID_PRIVATE_KEY_GIVEN)
+    }
+  }
   if (typeof options.password !== 'string' || options.password.length == 0) {
     throw new Error(IdentityErrors.EMPTY_PASSWORD)
   }
