@@ -55,7 +55,7 @@ Using the [hoprd npm package][6]:
 ```sh
 mkdir MY_NEW_HOPR_TEST_FOLDER
 cd MY_NEW_HOPR_TEST_FOLDER
-npm install @hoprnet/hoprd
+npm install @hoprnet/hoprd@1.73
 ```
 
 ### Install via Docker
@@ -262,6 +262,6 @@ whenever you need an issue about a particular tool.
 [2]: https://search.nixos.org/packages?channel=20.09&show=direnv&from=0&size=50&sort=relevance&query=direnv
 [3]: https://search.nixos.org/packages?channel=20.09&show=lorri&from=0&size=50&sort=relevance&query=lorri
 [4]: https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL
-[6]: https://www.npmjs.com/package/@hoprnet/hoprd
-[7]: https://www.youtube.com/watch?v=d0Eb6haIUu4
-[8]: https://github.com/nektos/act
+[5]: https://www.npmjs.com/package/@hoprnet/hoprd
+[6]: https://www.youtube.com/watch?v=d0Eb6haIUu4
+[7]: https://github.com/nektos/act

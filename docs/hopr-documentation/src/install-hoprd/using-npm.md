@@ -49,7 +49,7 @@ If everything was done properly, you can run `node --version` to see your curren
 ```bash
 $ mkdir MY_NEW_HOPR_TEST_FOLDER
 $ cd MY_NEW_HOPR_TEST_FOLDER
-$ npm install @hoprnet/hoprd@1.72
+$ npm install @hoprnet/hoprd@1.73
 
 # run hoprd
 $ DEBUG=hopr* npx hoprd --admin --init --announce
