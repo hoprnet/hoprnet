@@ -49,6 +49,7 @@ export class Connection {
       } else if (msg.type === 'status' && msg.msg === 'STARTED') {
         this.setStarted(true)
       } else if (msg.type == 'auth-failed') {
+        console.log('!! auth failed')        
         this.logs.push(msg)
         this.setConnecting(false)
         this.onAuthFailed()        
@@ -97,7 +98,6 @@ export class Connection {
     }
 
     client.onmessage = (event) => {
-      console.log(event)
       this.appendMessage(event)       
     }
 
