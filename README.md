@@ -236,6 +236,22 @@ yarn test:hoprd --grep "Identity"
 In case a package you need to test is not included in our `package.json`,
 please feel free to update it as needed.
 
+#### Test-driven development
+
+To make sure we add the least amount of untested code to our codebase,
+whenever possible all code should come accompanied by a test. To do so,
+locate the `.spec` or equivalent test file for your code. If it does not
+exist, create it within the same file your code will live in.
+
+Afterwards, ensure you create a breaking test for your feature. For example,
+the [following commit][10] added a test to a non-existing feature. The
+immediate [commit][11] provided the actual feature for that given test. Repeat
+this process for all the code you add to our codebase.
+
+_(The code was pushed as an example, but ideally, you only push code that has
+working tests on your machine, as to avoid overusing our CI pipeline with
+known broken tests.)_
+
 ### Github Actions CI
 
 We run a fair amount of automation using Github Actions. To ease development
@@ -291,3 +307,5 @@ whenever you need an issue about a particular tool.
 [7]: https://www.youtube.com/watch?v=d0Eb6haIUu4
 [8]: https://github.com/nektos/act
 [9]: https://mochajs.org/
+[10]: https://github.com/hoprnet/hoprnet/pull/1974/commits/331d6e99d1199250a302211be7b8dd9a22fa6e23#diff-83e70acfe04a8f13821ff96a1115f02a4b683a6370568ba9beea16da6d0c2cffR33-R49
+[11]: https://github.com/hoprnet/hoprnet/pull/1974/commits/53663517309d0f8918c5066fd98503afe8d8dd76#diff-9bf7c02325c8f5b6330a15a745a3ad736ee139a78c28a15d594756c406378884R91-R96
