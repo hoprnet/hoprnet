@@ -15,15 +15,6 @@ describe('test relay handshake', function () {
     ;[initiator, relay, destination] = await Promise.all(
       Array.from({ length: 3 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
     )
-
-    console.log(
-      `initiator`,
-      initiator.toB58String(),
-      `relay`,
-      relay.toB58String(),
-      `destination`,
-      destination.toB58String()
-    )
   })
 
   it('check initiating sequence', async function () {
@@ -47,7 +38,6 @@ describe('test relay handshake', function () {
     await relayHandshake.negotiate(
       initiator,
       async (pId: PeerId) => {
-        console.log(`attempting to establish connection to`, pId.toB58String())
         if (!pId.equals(destination)) {
           throw Error(`Invalid destination`)
         }
