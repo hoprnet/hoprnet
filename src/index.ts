@@ -5,8 +5,7 @@ import { CODE_IP4, CODE_IP6, CODE_P2P, USE_WEBRTC } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
-import type libp2p from 'libp2p'
-import type { Upgrader, DialOptions, ConnHandler } from 'libp2p'
+import type { Upgrader, DialOptions, ConnHandler, default as libp2p } from 'libp2p'
 import { Transport, Connection } from 'libp2p-interfaces'
 import chalk from 'chalk'
 import { TCPConnection, Listener } from './base'
@@ -14,6 +13,7 @@ import { WebRTCUpgrader } from './webrtc'
 import { Relay } from './relay'
 import { Discovery } from './discovery'
 import { Filter } from './filter'
+import { dialHelper } from './utils'
 
 const log = debug('hopr-connect')
 const verbose = debug('hopr-connect:verbose')
@@ -115,7 +115,18 @@ class HoprConnect implements Transport {
 
     this.discovery = new Discovery()
 
-    this._relay = new Relay(opts.libp2p, this._upgrader, this.connHandler, this._webRTCUpgrader, opts.__noWebRTCUpgrade)
+    this._relay = new Relay(
+      (peer: PeerId, protocol: string, options: { timeout: number } | { signal: AbortSignal }) =>
+        dialHelper(opts.libp2p, peer, protocol, options as any),
+      opts.libp2p.dialer,
+      opts.libp2p.connectionManager,
+      opts.libp2p.handle.bind(opts.libp2p),
+      this._peerId,
+      this._upgrader,
+      this.connHandler,
+      this._webRTCUpgrader,
+      opts.__noWebRTCUpgrade
+    )
 
     // Used for testing
     this.__noDirectConnections = opts.__noDirectConnections

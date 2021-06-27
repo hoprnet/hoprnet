@@ -7,9 +7,11 @@ import EventEmitter from 'events'
 import type { Stream, StreamResult } from 'libp2p'
 
 import Debug from 'debug'
-const _log = Debug(`hopr-connect`)
-const _verbose = Debug(`hopr-connect:verbose`)
-const _error = Debug(`hopr-connect:error`)
+
+const DEBUG_PREFIX = `hopr-connect`
+const _log = Debug(DEBUG_PREFIX)
+const _verbose = Debug(DEBUG_PREFIX.concat(`:verbose`))
+const _error = Debug(DEBUG_PREFIX.concat(`:error`))
 
 import { RelayPrefix, StatusMessages, ConnectionStatusMessages, isValidPrefix } from '../constants'
 import { eagerIterator } from './utils'

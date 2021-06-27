@@ -10,7 +10,6 @@ const log = debug(DEBUG_PREFIX.concat(':relay'))
 const error = debug(DEBUG_PREFIX.concat(':error'))
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 
-import libp2p from 'libp2p'
 import { WebRTCUpgrader } from '../webrtc'
 
 import PeerId from 'peer-id'
@@ -23,30 +22,32 @@ import { WebRTCConnection } from '../webRTCConnection'
 import type { Connection } from 'libp2p-interfaces'
 import type { DialOptions, Handler, Stream, ConnHandler, Dialer, ConnectionManager, Upgrader } from 'libp2p'
 import { AbortError } from 'abortable-iterator'
-import { dialHelper } from '../utils'
 import { RelayHandshake } from './handshake'
 import { RelayState } from './state'
 
 class Relay {
-  private _connectionManager: ConnectionManager
-  private _dialer: Dialer
   private relayState: RelayState
 
   constructor(
-    private libp2p: libp2p,
+    private dialHelper: (
+      peer: PeerId,
+      protocol: string,
+      opts: { timeout: number } | { signal: AbortSignal }
+    ) => Promise<Handler | undefined>,
+    private dialer: Dialer,
+    private connectionManager: ConnectionManager,
+    private handle: (protocol: string, handle: (handler: Handler) => void) => void,
+    private peerId: PeerId,
     private upgrader: Upgrader,
     private connHandler: ConnHandler | undefined,
     private webRTCUpgrader?: WebRTCUpgrader,
     private __noWebRTCUpgrade?: boolean
   ) {
-    this._connectionManager = libp2p.connectionManager
-    this._dialer = libp2p.dialer
-
     this.relayState = new RelayState()
 
-    libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
+    this.handle(DELIVERY, this.handleIncoming.bind(this))
 
-    libp2p.handle(RELAY, ({ stream, connection }) => {
+    this.handle(RELAY, ({ stream, connection }) => {
       if (connection == undefined || connection.remotePeer == undefined) {
         verbose(`Received incomplete connection object`)
         return
@@ -73,14 +74,14 @@ class Relay {
         ? { signal: options.signal }
         : { timeout: RELAY_CIRCUIT_TIMEOUT }
 
-    const relayConnection = await dialHelper(this.libp2p, relay, RELAY, opts)
+    const baseConnection = await this.dialHelper(relay, RELAY, opts)
 
-    if (relayConnection == undefined) {
+    if (baseConnection == undefined) {
       error(`Could not establish relayed conntection over ${relay.toB58String()} to ${destination.toB58String()}`)
       return
     }
 
-    const handshakeResult = await new RelayHandshake(relayConnection.stream).initiate(relay, destination)
+    const handshakeResult = await new RelayHandshake(baseConnection.stream).initiate(relay, destination)
 
     if (!handshakeResult.success) {
       error(`Handshake led to empty stream. Giving up.`)
@@ -96,7 +97,7 @@ class Relay {
 
       let newConn = new RelayConnection({
         stream: handshakeResult.stream,
-        self: this.libp2p.peerId,
+        self: this.peerId,
         relay,
         counterparty: destination,
         onReconnect: this.onReconnect.bind(this),
@@ -109,11 +110,11 @@ class Relay {
       return new WebRTCConnection(
         {
           conn: newConn,
-          self: this.libp2p.peerId,
+          self: this.peerId,
           counterparty: destination,
           channel,
           libp2p: {
-            connectionManager: this._connectionManager
+            connectionManager: this.connectionManager
           } as any
         },
         {
@@ -124,7 +125,7 @@ class Relay {
     } else {
       return new RelayConnection({
         stream: handshakeResult.stream,
-        self: this.libp2p.peerId,
+        self: this.peerId,
         relay,
         counterparty: destination,
         onReconnect: this.onReconnect.bind(this)
@@ -132,10 +133,7 @@ class Relay {
     }
   }
 
-  async handleRelayConnection(
-    conn: Handler,
-    onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
-  ): Promise<RelayConnection | WebRTCConnection | undefined> {
+  async handleRelayConnection(conn: Handler): Promise<RelayConnection | WebRTCConnection | undefined> {
     if (conn.stream == undefined || conn.connection == undefined) {
       error(
         `Dropping stream because ${conn.connection == undefined ? 'cannot determine relay address ' : ''}${
@@ -160,10 +158,10 @@ class Relay {
 
       let newConn = new RelayConnection({
         stream: handShakeResult.stream,
-        self: this.libp2p.peerId,
+        self: this.peerId,
         relay: conn.connection.remotePeer,
         counterparty: handShakeResult.counterparty,
-        onReconnect,
+        onReconnect: this.onReconnect.bind(this),
         webRTC: {
           channel,
           upgradeInbound: this.webRTCUpgrader.upgradeInbound.bind(this.webRTCUpgrader)
@@ -173,11 +171,11 @@ class Relay {
       return new WebRTCConnection(
         {
           conn: newConn,
-          self: this.libp2p.peerId,
+          self: this.peerId,
           counterparty: handShakeResult.counterparty,
           channel,
           libp2p: {
-            connectionManager: this._connectionManager
+            connectionManager: this.connectionManager
           } as any
         },
         { __noWebRTCUpgrade: this.__noWebRTCUpgrade }
@@ -185,10 +183,10 @@ class Relay {
     } else {
       return new RelayConnection({
         stream: handShakeResult.stream,
-        self: this.libp2p.peerId,
+        self: this.peerId,
         relay: conn.connection.remotePeer,
         counterparty: handShakeResult.counterparty,
-        onReconnect
+        onReconnect: this.onReconnect.bind(this)
       })
     }
   }
@@ -201,7 +199,7 @@ class Relay {
     let newConn: Connection
 
     try {
-      const relayConnection = await this.handleRelayConnection(handler, this.onReconnect.bind(this))
+      const relayConnection = await this.handleRelayConnection(handler)
 
       if (relayConnection == undefined) {
         return
@@ -234,11 +232,11 @@ class Relay {
           new WebRTCConnection(
             {
               conn: newStream,
-              self: this.libp2p.peerId,
+              self: this.peerId,
               counterparty,
               channel: newStream.webRTC!.channel,
               libp2p: {
-                connectionManager: this._connectionManager
+                connectionManager: this.connectionManager
               } as any
             },
             {
@@ -254,15 +252,15 @@ class Relay {
       return
     }
 
-    this._dialer._pendingDials[counterparty.toB58String()]?.destroy()
-    this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
+    this.dialer._pendingDials[counterparty.toB58String()]?.destroy()
+    this.connectionManager.connections.set(counterparty.toB58String(), [newConn])
 
     this.connHandler?.(newConn)
   }
 
   private async contactCounterparty(counterparty: PeerId): Promise<Stream | undefined> {
     // @TODO this produces struct with unset connection property
-    let newConn = await dialHelper(this.libp2p, counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
+    let newConn = await this.dialHelper(counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
 
     if (newConn != undefined && newConn.connection == undefined) {
       verbose(`DEBUG: Received incomplete connection object. Connection object:`, newConn)

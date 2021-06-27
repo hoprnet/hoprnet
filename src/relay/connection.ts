@@ -78,7 +78,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   public _iteration: number
 
-  public _id: string
+  private _id: string
 
   private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
   private _sinkSwitchPromise: DeferredPromise<void>
@@ -120,7 +120,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       open: Date.now()
     }
 
-    this.statusMessages = new Heap()
+    this.statusMessages = new Heap(statusMessagesCompare)
 
     this.destroyed = false
 
@@ -159,7 +159,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this._stream.sink(this.sinkFunction())
 
-    this.sink = this._sink.bind(this)
+    this.sink = this.attachSinkSource.bind(this)
   }
 
   public close(_err?: Error): Promise<void> {
@@ -188,10 +188,136 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     _error(`RC [${this._id}]`, ...arguments)
   }
 
+  public switch(): RelayConnection {
+    if (this.webRTC != undefined) {
+      try {
+        this.webRTC.channel.destroy()
+      } catch {}
+    }
+
+    this._migrationDone = Defer<void>()
+    this._iteration++
+    this._sinkSourceSwitched = true
+    this._sinkSwitchPromise.resolve()
+    this._sourceSwitched = true
+    this._sourceSwitchPromise.resolve()
+
+    if (this.webRTC != undefined) {
+      this.webRTC.channel = this.webRTC.upgradeInbound()
+    }
+
+    this.source = this.createSource()
+
+    return this
+  }
+
   private setClosed() {
     this._streamClosed = true
     this._closePromise.resolve()
     this.timeline.close = Date.now()
+  }
+
+  private async attachSinkSource(_source: Stream['source']): Promise<void> {
+    if (this._migrationDone != undefined) {
+      await this._migrationDone.promise
+    }
+
+    this._sinkSourceAttached = true
+    this._sinkSourceAttachedPromise.resolve(toU8aStream(_source))
+  }
+
+  private async *sinkFunction(this: RelayConnection): Stream['source'] {
+    type SinkType = Stream['source'] | StreamResult | undefined | void
+
+    let currentSource: Stream['source'] | undefined
+    let streamPromise: Promise<StreamResult> | undefined
+
+    let result: SinkType
+
+    while (true) {
+      let promises: Promise<SinkType>[] = []
+
+      promises.push(this._closePromise.promise, this._sinkSwitchPromise.promise)
+
+      if (currentSource == undefined) {
+        promises.push(this._sinkSourceAttachedPromise.promise)
+      }
+
+      promises.push(this._statusMessagePromise.promise)
+
+      if (currentSource != undefined) {
+        streamPromise = streamPromise ?? currentSource.next()
+
+        promises.push(streamPromise)
+      }
+
+      // (0. Handle source attach)
+      // 1. Handle stream switch
+      // 2. Handle status messages
+      // 3. Handle payload messages
+      result = await Promise.race(promises)
+
+      if (this._streamClosed && this.destroyed) {
+        break
+      }
+
+      if (this._sinkSourceSwitched) {
+        this._sinkSourceSwitched = false
+        this._sinkSwitchPromise = Defer<void>()
+
+        // Make sure that we don't create hanging promises
+        this._sinkSourceAttachedPromise.resolve()
+        this._sinkSourceAttachedPromise = Defer<Stream['source']>()
+        result = undefined
+        currentSource = undefined
+        streamPromise = undefined
+        this._migrationDone?.resolve()
+        continue
+      }
+
+      if (this._sinkSourceAttached) {
+        this._sinkSourceAttached = false
+
+        currentSource = result as Stream['source']
+
+        streamPromise = undefined
+        result = undefined
+        continue
+      }
+
+      if (this.statusMessages.length > 0) {
+        const statusMsg = this.unqueueStatusMessage()
+
+        if (u8aEquals(statusMsg, Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))) {
+          this.destroyed = true
+          this._destroyedPromise.resolve()
+
+          yield statusMsg
+          break
+        }
+
+        yield statusMsg
+
+        continue
+      }
+
+      const received = result as StreamResult
+
+      if (received == undefined) {
+        throw Error(`Received must not be undefined`)
+      }
+
+      if (received.done) {
+        currentSource = undefined
+        streamPromise = undefined
+        continue
+      }
+
+      result = undefined
+      streamPromise = (currentSource as Stream['source']).next()
+
+      yield Uint8Array.from([RelayPrefix.PAYLOAD, ...received.value.slice()])
+    }
   }
 
   private createSource() {
@@ -321,112 +447,16 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     return eagerIterator(iterator)
   }
 
-  public async _sink(_source: Stream['source']): Promise<void> {
-    if (this._migrationDone != undefined) {
-      await this._migrationDone.promise
-    }
-
-    this._sinkSourceAttached = true
-    this._sinkSourceAttachedPromise.resolve(toU8aStream(_source))
-  }
-
-  private async *sinkFunction(this: RelayConnection): Stream['source'] {
-    type SinkType = Stream['source'] | StreamResult | undefined | void
-    this.log(`sinkFunction`)
-    let currentSource: Stream['source'] | undefined
-    let streamPromise: Promise<StreamResult> | undefined
-
-    let result: SinkType
-
-    while (true) {
-      let promises: Promise<SinkType>[] = []
-
-      promises.push(this._closePromise.promise, this._sinkSwitchPromise.promise)
-
-      if (currentSource == undefined) {
-        promises.push(this._sinkSourceAttachedPromise.promise)
-      }
-
-      promises.push(this._statusMessagePromise.promise)
-
-      if (currentSource != undefined) {
-        streamPromise = streamPromise ?? currentSource.next()
-
-        promises.push(streamPromise)
-      }
-
-      // (0. Handle source attach)
-      // 1. Handle stream switch
-      // 2. Handle status messages
-      // 3. Handle payload messages
-      result = await Promise.race(promises)
-
-      if (this._streamClosed && this.destroyed) {
-        break
-      }
-
-      if (this._sinkSourceSwitched) {
-        this._sinkSourceSwitched = false
-        this._sinkSwitchPromise = Defer<void>()
-
-        // Make sure that we don't create hanging promises
-        this._sinkSourceAttachedPromise.resolve()
-        this._sinkSourceAttachedPromise = Defer<Stream['source']>()
-        result = undefined
-        currentSource = undefined
-        streamPromise = undefined
-        this._migrationDone?.resolve()
-        continue
-      }
-
-      if (this._sinkSourceAttached) {
-        this._sinkSourceAttached = false
-
-        currentSource = result as Stream['source']
-
-        streamPromise = undefined
-        result = undefined
-        continue
-      }
-
-      if (this.statusMessages.length > 0) {
-        const statusMsg = this.unqueueStatusMessage()
-
-        if (u8aEquals(statusMsg, Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))) {
-          this.destroyed = true
-          this._destroyedPromise.resolve()
-
-          yield statusMsg
-          break
-        }
-
-        yield statusMsg
-
-        continue
-      }
-
-      const received = result as StreamResult
-
-      if (received == undefined) {
-        throw Error(`Received must not be undefined`)
-      }
-
-      if (received.done) {
-        currentSource = undefined
-        streamPromise = undefined
-        continue
-      }
-
-      result = undefined
-      streamPromise = (currentSource as Stream['source']).next()
-
-      yield Uint8Array.from([RelayPrefix.PAYLOAD, ...received.value.slice()])
-    }
-  }
-
+  /**
+   * Attaches a listener to the WebRTC 'signal' events
+   * and removes it once class iteration increases
+   * @param drainIteration index of current iteration
+   */
   private attachWebRTCListeners(drainIteration: number) {
+    let currentChannel: SimplePeer
     const onSignal = (data: Object) => {
       if (this._iteration != drainIteration) {
+        currentChannel.removeListener('signal', onSignal)
         return
       }
 
@@ -434,38 +464,24 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         Uint8Array.from([RelayPrefix.WEBRTC_SIGNALLING, ...new TextEncoder().encode(JSON.stringify(data))])
       )
     }
-    this.webRTC?.channel.on('signal', onSignal.bind(this))
+    currentChannel = this.webRTC?.channel.on('signal', onSignal.bind(this)) as SimplePeer
   }
 
-  switch(): RelayConnection {
-    if (this.webRTC != undefined) {
-      try {
-        this.webRTC.channel.destroy()
-      } catch {}
-    }
-
-    this._migrationDone = Defer<void>()
-    this._iteration++
-    this._sinkSourceSwitched = true
-    this._sinkSwitchPromise.resolve()
-    this._sourceSwitched = true
-    this._sourceSwitchPromise.resolve()
-
-    if (this.webRTC != undefined) {
-      this.webRTC.channel = this.webRTC.upgradeInbound()
-    }
-
-    this.source = this.createSource()
-
-    return this
-  }
-
+  /**
+   * Adds a message to the message queue and notifies source
+   * that a message is available
+   * @param msg message to add
+   */
   private queueStatusMessage(msg: Uint8Array) {
     this.statusMessages.push(msg)
 
     this._statusMessagePromise.resolve()
   }
 
+  /**
+   * Removes the most recent status message from the queue
+   * @returns most recent status message
+   */
   private unqueueStatusMessage(): Uint8Array {
     switch (this.statusMessages.length) {
       case 0:
