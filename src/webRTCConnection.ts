@@ -1,3 +1,5 @@
+/// <reference path="./@types/stream-to-it.ts" />
+
 import { DialOptions, MultiaddrConnection, Stream, StreamResult } from 'libp2p'
 import Defer, { DeferredPromise } from 'p-defer'
 

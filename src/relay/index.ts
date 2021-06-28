@@ -13,6 +13,7 @@ const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 import { WebRTCUpgrader } from '../webrtc'
 
 import PeerId from 'peer-id'
+import { green } from 'chalk'
 
 import { RELAY_CIRCUIT_TIMEOUT, RELAY, DELIVERY } from '../constants'
 
@@ -24,6 +25,7 @@ import type { DialOptions, Handler, Stream, ConnHandler, Dialer, ConnectionManag
 import { AbortError } from 'abortable-iterator'
 import { RelayHandshake } from './handshake'
 import { RelayState } from './state'
+
 
 class Relay {
   private relayState: RelayState
@@ -77,7 +79,7 @@ class Relay {
     const baseConnection = await this.dialHelper(relay, RELAY, opts)
 
     if (baseConnection == undefined) {
-      error(`Could not establish relayed conntection over ${relay.toB58String()} to ${destination.toB58String()}`)
+      error(`Could not establish relayed conntection over ${green(relay.toB58String())} to ${green(destination.toB58String())}`)
       return
     }
 

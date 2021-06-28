@@ -114,7 +114,7 @@ class RelayHandshake {
     error(
       `Could not establish relayed connection to ${green(
         destination.toB58String()
-      )} over relay ${relay.toB58String()}. Answer was: <${yellow(handshakeMessageToString(answer))}>`
+      )} over relay ${green(relay.toB58String())}. Answer was: <${yellow(handshakeMessageToString(answer))}>`
     )
 
     return {
