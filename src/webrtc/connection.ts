@@ -20,8 +20,10 @@ const _error = Debug('hopr-connect:error')
 
 export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(3)
 
-const DONE = Uint8Array.from([1])
-const NOT_DONE = Uint8Array.from([0])
+enum MigrationStatus {
+  NOT_DONE,
+  DONE
+}
 
 class WebRTCConnection implements MultiaddrConnection {
   private _switchPromise: DeferredPromise<void>
@@ -118,64 +120,6 @@ class WebRTCConnection implements MultiaddrConnection {
     this.sink = this._sink.bind(this)
   }
 
-  private async *createSource(this: WebRTCConnection): Stream['source'] {
-    while (true) {
-      const result = await (this.conn as RelayConnection).source.next()
-
-      if (result.done) {
-        break
-      }
-
-      const [finished, payload] = [result.value.slice(0, 1), result.value.slice(1)]
-
-      if (finished[0] == DONE[0]) {
-        return
-      } else {
-        this.log(`getting ${result.value.slice().length} bytes from relayed connecton`)
-        yield payload
-      }
-    }
-
-    this.log(`webrtc source migrated but this._sinkMigrated`, this._sinkMigrated)
-
-    this._sourceMigrated = true
-    if (this._sinkMigrated) {
-      this.conn = this.channel
-    }
-
-    if (!this._webRTCStateKnown) {
-      await this._switchPromise.promise
-    }
-
-    if (this._webRTCAvailable) {
-      this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
-
-      const iterator = this.channel[Symbol.asyncIterator]() as Stream['source']
-
-      // @TODO `for await` does NOT work here -
-      // even if it SHOULD be the SAME functionality
-      // @dev `for await` produces a hanging promise
-      while (true) {
-        const result = await iterator.next()
-
-        if (result.done) {
-          break
-        }
-
-        const [finished, payload] = [result.value.slice(0, 1), result.value.slice(1)]
-
-        if (finished[0] == DONE[0]) {
-          this.log(`received DONE from WebRTC - ending stream`)
-          break
-        }
-
-        this.log(`Getting NOT_DONE from WebRTC - ${result.value.slice().length} bytes`)
-
-        yield payload
-      }
-    }
-  }
-
   private log(..._: any[]) {
     _log(`WRTC [${this._id}]`, ...arguments)
   }
@@ -256,13 +200,13 @@ class WebRTCConnection implements MultiaddrConnection {
           const received = result as StreamResult
 
           if (received == undefined || received.done) {
-            yield DONE
+            yield Uint8Array.of(MigrationStatus.DONE)
             break
           }
 
           this.log(`sinking ${received.value.slice().length} bytes into relayed connecton`)
 
-          yield Uint8Array.from([...NOT_DONE, ...received.value.slice()])
+          yield Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.slice()])
 
           sourcePromise = source.next()
         }
@@ -279,15 +223,15 @@ class WebRTCConnection implements MultiaddrConnection {
           }
 
           this.log(`sinking ${result.value.slice().length} bytes into fallback connection]`)
-          yield Uint8Array.from([...NOT_DONE, ...result.value.slice()])
+          yield Uint8Array.from([MigrationStatus.NOT_DONE, ...result.value.slice()])
 
           for await (const msg of source) {
             this.log(`sinking ${msg.slice().length} bytes into fallback connection]`)
-            yield Uint8Array.from([...NOT_DONE, ...msg.slice()])
+            yield Uint8Array.from([MigrationStatus.NOT_DONE, ...msg.slice()])
           }
 
           this.log(`sinking DONE into WebRTC`)
-          yield DONE
+          yield Uint8Array.of(MigrationStatus.DONE)
         }
 
         defer.resolve()
@@ -311,17 +255,17 @@ class WebRTCConnection implements MultiaddrConnection {
           result = await sourcePromise
 
           if (result == undefined || result.done) {
-            yield DONE
+            yield Uint8Array.of(MigrationStatus.DONE)
             return
           }
 
           if (this._destroyed || this.channel.destroyed) {
-            yield DONE
+            yield Uint8Array.of(MigrationStatus.DONE)
             return
           }
 
           this.log(`sinking ${result.value.slice().length} bytes into webrtc[${(this.channel as any)._id}]`)
-          yield Uint8Array.from([...NOT_DONE, ...result.value.slice()])
+          yield Uint8Array.from([MigrationStatus.NOT_DONE, ...result.value.slice()])
 
           for await (const msg of source) {
             if (this._destroyed || this.channel.destroyed) {
@@ -329,12 +273,74 @@ class WebRTCConnection implements MultiaddrConnection {
             }
 
             this.log(`sinking ${msg.slice().length} bytes into webrtc[${(this.channel as any)._id}]`)
-            yield Uint8Array.from([...NOT_DONE, ...msg.slice()])
+            yield Uint8Array.from([MigrationStatus.NOT_DONE, ...msg.slice()])
           }
 
-          yield DONE
+          yield Uint8Array.of(MigrationStatus.DONE)
         }.call(this)
       )
+    }
+  }
+
+  private async *createSource(this: WebRTCConnection): Stream['source'] {
+    while (true) {
+      const result = await (this.conn as RelayConnection).source.next()
+
+      if (result.done) {
+        break
+      }
+
+      const [migrationStatus, payload] = [result.value.slice(0, 1), result.value.slice(1)]
+
+      switch (migrationStatus[0] as MigrationStatus) {
+        case MigrationStatus.DONE:
+          return
+        case MigrationStatus.NOT_DONE:
+          this.log(`getting ${result.value.slice().length} bytes from relayed connecton`)
+          yield payload
+        default:
+          throw Error(`Invalid WebRTC migration status prefix. Got ${migrationStatus}`)
+      }
+    }
+
+    this.log(`webrtc source migrated but this._sinkMigrated`, this._sinkMigrated)
+
+    this._sourceMigrated = true
+    if (this._sinkMigrated) {
+      this.conn = this.channel
+    }
+
+    if (!this._webRTCStateKnown) {
+      await this._switchPromise.promise
+    }
+
+    if (this._webRTCAvailable) {
+      this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
+
+      const iterator = this.channel[Symbol.asyncIterator]() as Stream['source']
+
+      let done = false
+      // @TODO `for await` does NOT work here -
+      // even if it SHOULD be the SAME functionality
+      // @dev `for await` produces a hanging promise
+      while (!done) {
+        const result = await iterator.next()
+
+        if (result.done) {
+          break
+        }
+
+        const [finished, payload] = [result.value.slice(0, 1), result.value.slice(1)]
+
+        if (finished[0] == MigrationStatus.DONE) {
+          this.log(`received DONE from WebRTC - ending stream`)
+          break
+        }
+
+        this.log(`Getting NOT_DONE from WebRTC - ${result.value.slice().length} bytes`)
+
+        yield payload
+      }
     }
   }
 
