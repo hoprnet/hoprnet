@@ -40,7 +40,7 @@ declare api5="${5}"
 # $3 = OPTIONAL: positive assertion message
 # $4 = OPTIONAL: maximum wait time in seconds during which we busy try
 # afterwards we fail, defaults to 0
-# $4 = OPTIONAL: step time between retries in seconds, defaults to 2 seconds
+# $4 = OPTIONAL: step time between retries in seconds, defaults to 5 seconds
 # $5 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
 # priority than wait time, defaults to 0
 run_command(){
@@ -49,7 +49,7 @@ run_command(){
   local hopr_cmd="${2}"
   local assertion="${3:-}"
   local wait_time=${4:-0}
-  local step_time=${5:-2}
+  local step_time=${5:-5}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
   local cmd="curl --silent -X POST --header X-Auth-Token:e2e-api-token --url ${endpoint}/api/v1/command --data "
@@ -166,11 +166,11 @@ result=$(run_command ${api2} "ping ${addr3}" "Pong received in:" 120)
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
-result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR" 10)
+result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR" 60)
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
-run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 120
+run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 240
 
 log "Node 1 open channel to Node 2"
 result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel")
@@ -186,7 +186,7 @@ for i in `seq 1 10`; do
 done
 
 log "Node 2 should now have a ticket"
-result=$(run_command ${api2} "tickets" "Win Proportion:   100%" 10)
+result=$(run_command ${api2} "tickets" "Win Proportion:   100%" 60)
 log "-- ${result}"
 
 for i in `seq 1 10`; do
@@ -204,7 +204,7 @@ for i in `seq 1 10`; do
 done
 
 log "Node 4 should now have a ticket"
-result=$(run_command ${api4} "tickets" "Win Proportion:   100%" 10)
+result=$(run_command ${api4} "tickets" "Win Proportion:   100%" 60)
 log "-- ${result}"
 
 # this works locally but fails in CI, the quality of the peers is lower than the
