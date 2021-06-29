@@ -80,7 +80,6 @@ export default function Home() {
           <input
             id="command"
             type="text"
-            // disabled={!isNodeReady}
             autoFocus
             placeholder="type 'help' for full list of commands"
           />
