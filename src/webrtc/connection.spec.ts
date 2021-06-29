@@ -1,16 +1,16 @@
-/// <reference path="./@types/it-pair.ts" />
-/// <reference path="./@types/libp2p.ts" />
-/// <reference path="./@types/stream-to-it.ts" />
+/// <reference path="../@types/it-pair.ts" />
+/// <reference path="../@types/libp2p.ts" />
+/// <reference path="../@types/stream-to-it.ts" />
 
-import { WebRTCConnection, WEBRTC_UPGRADE_TIMEOUT } from './webRTCConnection'
+import { WebRTCConnection, WEBRTC_UPGRADE_TIMEOUT } from './connection'
 import Peer from 'simple-peer'
 
 const wrtc = require('wrtc')
 
 import { durations, u8aEquals } from '@hoprnet/hopr-utils'
-import { RelayPrefix } from './constants'
-import { RelayContext } from './relay/context'
-import { RelayConnection } from './relay/connection'
+import { RelayPrefix } from '../constants'
+import { RelayContext } from '../relay/context'
+import { RelayConnection } from '../relay/connection'
 import type { Stream } from 'libp2p'
 import assert from 'assert'
 

@@ -1,4 +1,4 @@
-/// <reference path="./@types/stream-to-it.ts" />
+/// <reference path="../@types/stream-to-it.ts" />
 
 import { DialOptions, MultiaddrConnection, Stream, StreamResult } from 'libp2p'
 import Defer, { DeferredPromise } from 'p-defer'
@@ -8,9 +8,9 @@ import type PeerId from 'peer-id'
 import { durations, u8aToHex } from '@hoprnet/hopr-utils'
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
-import { RelayConnection } from './relay/connection'
+import type { RelayConnection } from '../relay/connection'
 import { randomBytes } from 'crypto'
-import { toU8aStream } from './utils'
+import { toU8aStream } from '../utils'
 import abortable from 'abortable-iterator'
 import LibP2P from 'libp2p'
 

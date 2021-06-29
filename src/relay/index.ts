@@ -10,7 +10,7 @@ const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 
-import { WebRTCUpgrader } from '../webrtc'
+import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
 
 import PeerId from 'peer-id'
 import { green } from 'chalk'
@@ -18,7 +18,6 @@ import { green } from 'chalk'
 import { RELAY_CIRCUIT_TIMEOUT, RELAY, DELIVERY } from '../constants'
 
 import { RelayConnection } from './connection'
-import { WebRTCConnection } from '../webRTCConnection'
 
 import type { Connection } from 'libp2p-interfaces'
 import type { DialOptions, Handler, Stream, ConnHandler, Dialer, ConnectionManager, Upgrader } from 'libp2p'
@@ -268,10 +267,11 @@ class Relay {
     // @TODO this produces struct with unset connection property
     let newConn = await this.dialHelper(counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
 
-    if (newConn != undefined && newConn.connection == undefined) {
-      verbose(`DEBUG: Received incomplete connection object. Connection object:`, newConn)
-      return undefined
-    }
+    // @TODO
+    // if (newConn != undefined && newConn.connection == undefined) {
+    //   verbose(`DEBUG: Received incomplete connection object. Connection object:`, newConn)
+    //   return undefined
+    // }
 
     return newConn?.stream
   }
