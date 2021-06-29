@@ -57,4 +57,3 @@ $ DEBUG=hopr* npx hoprd --admin --init --announce
 # add security
 $ DEBUG=hopr* npx hoprd --admin --init --announce --apiToken <YOU_SECRET_TOKEN>
 ```
-
