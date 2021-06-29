@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **ERC777SenderRecipientMock__factory**
+  ↳ **`ERC777SenderRecipientMock__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
+▸ **attach**(`address`): [`ERC777SenderRecipientMock`](erc777senderrecipientmock.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
+[`ERC777SenderRecipientMock`](erc777senderrecipientmock.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [ERC777SenderRecipientMock\_\_factory](erc777senderrecipientmock__factory.md)
+▸ **connect**(`signer`): [`ERC777SenderRecipientMock__factory`](erc777senderrecipientmock__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[ERC777SenderRecipientMock\_\_factory](erc777senderrecipientmock__factory.md)
+[`ERC777SenderRecipientMock__factory`](erc777senderrecipientmock__factory.md)
 
 #### Overrides
 
@@ -146,17 +146,17 @@ ___
 
 ### deploy
 
-▸ **deploy**(`overrides?`): `Promise`<[ERC777SenderRecipientMock](erc777senderrecipientmock.md)\>
+▸ **deploy**(`overrides?`): `Promise`<[`ERC777SenderRecipientMock`](erc777senderrecipientmock.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[ERC777SenderRecipientMock](erc777senderrecipientmock.md)\>
+`Promise`<[`ERC777SenderRecipientMock`](erc777senderrecipientmock.md)\>
 
 #### Overrides
 
@@ -176,7 +176,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -194,7 +194,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ERC777SenderRecipientMock`](erc777senderrecipientmock.md)
 
 #### Parameters
 
@@ -205,7 +205,7 @@ ___
 
 #### Returns
 
-[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
+[`ERC777SenderRecipientMock`](erc777senderrecipientmock.md)
 
 #### Defined in
 

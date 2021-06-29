@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **HoprForwarder__factory**
+  ↳ **`HoprForwarder__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [HoprForwarder](hoprforwarder.md)
+▸ **attach**(`address`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [HoprForwarder\_\_factory](hoprforwarder__factory.md)
+▸ **connect**(`signer`): [`HoprForwarder__factory`](hoprforwarder__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[HoprForwarder\_\_factory](hoprforwarder__factory.md)
+[`HoprForwarder__factory`](hoprforwarder__factory.md)
 
 #### Overrides
 
@@ -146,17 +146,17 @@ ___
 
 ### deploy
 
-▸ **deploy**(`overrides?`): `Promise`<[HoprForwarder](hoprforwarder.md)\>
+▸ **deploy**(`overrides?`): `Promise`<[`HoprForwarder`](hoprforwarder.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[HoprForwarder](hoprforwarder.md)\>
+`Promise`<[`HoprForwarder`](hoprforwarder.md)\>
 
 #### Overrides
 
@@ -176,7 +176,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -194,7 +194,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [HoprForwarder](hoprforwarder.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Parameters
 
@@ -205,7 +205,7 @@ ___
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Defined in
 

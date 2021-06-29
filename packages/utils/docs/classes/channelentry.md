@@ -43,15 +43,15 @@
 
 | Name | Type |
 | :------ | :------ |
-| `source` | [PublicKey](publickey.md) |
-| `destination` | [PublicKey](publickey.md) |
-| `balance` | [Balance](balance.md) |
-| `commitment` | [Hash](hash.md) |
-| `ticketEpoch` | [UINT256](uint256.md) |
-| `ticketIndex` | [UINT256](uint256.md) |
-| `status` | [ChannelStatus](../enums/channelstatus.md) |
-| `channelEpoch` | [UINT256](uint256.md) |
-| `closureTime` | [UINT256](uint256.md) |
+| `source` | [`PublicKey`](publickey.md) |
+| `destination` | [`PublicKey`](publickey.md) |
+| `balance` | [`Balance`](balance.md) |
+| `commitment` | [`Hash`](hash.md) |
+| `ticketEpoch` | [`UINT256`](uint256.md) |
+| `ticketIndex` | [`UINT256`](uint256.md) |
+| `status` | [`ChannelStatus`](../enums/channelstatus.md) |
+| `channelEpoch` | [`UINT256`](uint256.md) |
+| `closureTime` | [`UINT256`](uint256.md) |
 
 #### Defined in
 
@@ -61,55 +61,55 @@
 
 ### balance
 
-• `Readonly` **balance**: [Balance](balance.md)
+• `Readonly` **balance**: [`Balance`](balance.md)
 
 ___
 
 ### channelEpoch
 
-• `Readonly` **channelEpoch**: [UINT256](uint256.md)
+• `Readonly` **channelEpoch**: [`UINT256`](uint256.md)
 
 ___
 
 ### closureTime
 
-• `Readonly` **closureTime**: [UINT256](uint256.md)
+• `Readonly` **closureTime**: [`UINT256`](uint256.md)
 
 ___
 
 ### commitment
 
-• `Readonly` **commitment**: [Hash](hash.md)
+• `Readonly` **commitment**: [`Hash`](hash.md)
 
 ___
 
 ### destination
 
-• `Readonly` **destination**: [PublicKey](publickey.md)
+• `Readonly` **destination**: [`PublicKey`](publickey.md)
 
 ___
 
 ### source
 
-• `Readonly` **source**: [PublicKey](publickey.md)
+• `Readonly` **source**: [`PublicKey`](publickey.md)
 
 ___
 
 ### status
 
-• `Readonly` **status**: [ChannelStatus](../enums/channelstatus.md)
+• `Readonly` **status**: [`ChannelStatus`](../enums/channelstatus.md)
 
 ___
 
 ### ticketEpoch
 
-• `Readonly` **ticketEpoch**: [UINT256](uint256.md)
+• `Readonly` **ticketEpoch**: [`UINT256`](uint256.md)
 
 ___
 
 ### ticketIndex
 
-• `Readonly` **ticketIndex**: [UINT256](uint256.md)
+• `Readonly` **ticketIndex**: [`UINT256`](uint256.md)
 
 ## Accessors
 
@@ -129,11 +129,11 @@ ___
 
 ### getId
 
-▸ **getId**(): [Hash](hash.md)
+▸ **getId**(): [`Hash`](hash.md)
 
 #### Returns
 
-[Hash](hash.md)
+[`Hash`](hash.md)
 
 #### Defined in
 
@@ -171,11 +171,11 @@ ___
 
 ### createMock
 
-▸ `Static` **createMock**(): [ChannelEntry](channelentry.md)
+▸ `Static` **createMock**(): [`ChannelEntry`](channelentry.md)
 
 #### Returns
 
-[ChannelEntry](channelentry.md)
+[`ChannelEntry`](channelentry.md)
 
 #### Defined in
 
@@ -185,7 +185,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [ChannelEntry](channelentry.md)
+▸ `Static` **deserialize**(`arr`): [`ChannelEntry`](channelentry.md)
 
 #### Parameters
 
@@ -195,7 +195,7 @@ ___
 
 #### Returns
 
-[ChannelEntry](channelentry.md)
+[`ChannelEntry`](channelentry.md)
 
 #### Defined in
 
@@ -205,18 +205,18 @@ ___
 
 ### fromSCEvent
 
-▸ `Static` **fromSCEvent**(`event`, `keyFor`): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ `Static` **fromSCEvent**(`event`, `keyFor`): `Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `event` | `any` |
-| `keyFor` | (`a`: [Address](address.md)) => `Promise`<[PublicKey](publickey.md)\> |
+| `keyFor` | (`a`: [`Address`](address.md)) => `Promise`<[`PublicKey`](publickey.md)\> |
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)\>
+`Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Defined in
 

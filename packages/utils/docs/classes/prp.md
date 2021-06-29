@@ -166,17 +166,17 @@ ___
 
 ### createPRP
 
-▸ `Static` **createPRP**(`params`): [PRP](prp.md)
+▸ `Static` **createPRP**(`params`): [`PRP`](prp.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `params` | [PRPParameters](../modules.md#prpparameters) |
+| `params` | [`PRPParameters`](../modules.md#prpparameters) |
 
 #### Returns
 
-[PRP](prp.md)
+[`PRP`](prp.md)
 
 #### Defined in
 

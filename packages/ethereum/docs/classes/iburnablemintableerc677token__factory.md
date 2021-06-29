@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [IBurnableMintableERC677Token](iburnablemintableerc677token.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`IBurnableMintableERC677Token`](iburnablemintableerc677token.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[IBurnableMintableERC677Token](iburnablemintableerc677token.md)
+[`IBurnableMintableERC677Token`](iburnablemintableerc677token.md)
 
 #### Defined in
 

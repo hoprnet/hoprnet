@@ -60,11 +60,11 @@
 
 ### clone
 
-▸ **clone**(): [HalfKeyChallenge](halfkeychallenge.md)
+▸ **clone**(): [`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Returns
 
-[HalfKeyChallenge](halfkeychallenge.md)
+[`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Defined in
 
@@ -80,7 +80,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [HalfKeyChallenge](halfkeychallenge.md) |
+| `b` | [`HalfKeyChallenge`](halfkeychallenge.md) |
 
 #### Returns
 
@@ -108,11 +108,11 @@ ___
 
 ### toAddress
 
-▸ **toAddress**(): [Address](address.md)
+▸ **toAddress**(): [`Address`](address.md)
 
 #### Returns
 
-[Address](address.md)
+[`Address`](address.md)
 
 #### Defined in
 
@@ -164,7 +164,7 @@ ___
 
 ### fromExponent
 
-▸ `Static` **fromExponent**(`exponent`): [HalfKeyChallenge](halfkeychallenge.md)
+▸ `Static` **fromExponent**(`exponent`): [`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Parameters
 
@@ -174,7 +174,7 @@ ___
 
 #### Returns
 
-[HalfKeyChallenge](halfkeychallenge.md)
+[`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Defined in
 
@@ -184,7 +184,7 @@ ___
 
 ### fromPeerId
 
-▸ `Static` **fromPeerId**(`peerId`): [HalfKeyChallenge](halfkeychallenge.md)
+▸ `Static` **fromPeerId**(`peerId`): [`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Parameters
 
@@ -194,7 +194,7 @@ ___
 
 #### Returns
 
-[HalfKeyChallenge](halfkeychallenge.md)
+[`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Defined in
 
@@ -204,7 +204,7 @@ ___
 
 ### fromString
 
-▸ `Static` **fromString**(`str`): [HalfKeyChallenge](halfkeychallenge.md)
+▸ `Static` **fromString**(`str`): [`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Parameters
 
@@ -214,7 +214,7 @@ ___
 
 #### Returns
 
-[HalfKeyChallenge](halfkeychallenge.md)
+[`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Defined in
 
@@ -224,7 +224,7 @@ ___
 
 ### fromUncompressedUncompressedCurvePoint
 
-▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`): [HalfKeyChallenge](halfkeychallenge.md)
+▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`): [`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Parameters
 
@@ -234,7 +234,7 @@ ___
 
 #### Returns
 
-[HalfKeyChallenge](halfkeychallenge.md)
+[`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Defined in
 

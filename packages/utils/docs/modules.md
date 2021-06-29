@@ -189,7 +189,7 @@ ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: [PromiseValue](modules.md#promisevalue)<ReturnType<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dht`: `boolean` ; `error`: `Error` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
+Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dht`: `boolean` ; `error`: `Error` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
 
 #### Defined in
 
@@ -205,8 +205,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ip4?` | [NetOptions](interfaces/netoptions.md) |
-| `ip6?` | [NetOptions](interfaces/netoptions.md) |
+| `ip4?` | [`NetOptions`](interfaces/netoptions.md) |
+| `ip6?` | [`NetOptions`](interfaces/netoptions.md) |
 
 #### Defined in
 
@@ -293,7 +293,7 @@ ___
 
 ### PromiseValue
 
-Ƭ **PromiseValue**<T\>: `T` extends `PromiseLike`<infer U\> ? `U` : `T`
+Ƭ **PromiseValue**<`T`\>: `T` extends `PromiseLike`<infer U\> ? `U` : `T`
 
 Infer the return value of a promise
 
@@ -634,7 +634,7 @@ ___
 
 ### cacheNoArgAsyncFunction
 
-▸ **cacheNoArgAsyncFunction**<T\>(`func`, `expiry`): () => `Promise`<T\>
+▸ **cacheNoArgAsyncFunction**<`T`\>(`func`, `expiry`): () => `Promise`<`T`\>
 
 #### Type parameters
 
@@ -646,18 +646,18 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `func` | () => `Promise`<T\> |
+| `func` | () => `Promise`<`T`\> |
 | `expiry` | `number` |
 
 #### Returns
 
 `fn`
 
-▸ (): `Promise`<T\>
+▸ (): `Promise`<`T`\>
 
 ##### Returns
 
-`Promise`<T\>
+`Promise`<`T`\>
 
 #### Defined in
 
@@ -667,7 +667,7 @@ ___
 
 ### convertPubKeyFromB58String
 
-▸ **convertPubKeyFromB58String**(`b58string`): `Promise`<PublicKey\>
+▸ **convertPubKeyFromB58String**(`b58string`): `Promise`<`PublicKey`\>
 
 Takes a B58String and converts them to a PublicKey
 
@@ -679,7 +679,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Returns
 
-`Promise`<PublicKey\>
+`Promise`<`PublicKey`\>
 
 #### Defined in
 
@@ -689,7 +689,7 @@ ___
 
 ### convertPubKeyFromPeerId
 
-▸ **convertPubKeyFromPeerId**(`peerId`): `Promise`<PublicKey\>
+▸ **convertPubKeyFromPeerId**(`peerId`): `Promise`<`PublicKey`\>
 
 Takes a peerId and returns its corresponding public key.
 
@@ -701,7 +701,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Returns
 
-`Promise`<PublicKey\>
+`Promise`<`PublicKey`\>
 
 #### Defined in
 
@@ -791,9 +791,9 @@ the challenge for the first ticket sent to the first relayer
 
 | Name | Type |
 | :------ | :------ |
-| `ackChallenge` | [HalfKeyChallenge](classes/halfkeychallenge.md) |
-| `ownKey` | [HalfKey](classes/halfkey.md) |
-| `ticketChallenge` | [Challenge](classes/challenge.md) |
+| `ackChallenge` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
+| `ownKey` | [`HalfKey`](classes/halfkey.md) |
+| `ticketChallenge` | [`Challenge`](classes/challenge.md) |
 
 #### Defined in
 
@@ -817,8 +817,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ackChallenge` | [HalfKeyChallenge](classes/halfkeychallenge.md) |
-| `nextTicketChallenge` | [Challenge](classes/challenge.md) |
+| `ackChallenge` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
+| `nextTicketChallenge` | [`Challenge`](classes/challenge.md) |
 
 #### Defined in
 
@@ -828,7 +828,7 @@ ___
 
 ### deriveAckKeyShare
 
-▸ **deriveAckKeyShare**(`secret`): [HalfKey](classes/halfkey.md)
+▸ **deriveAckKeyShare**(`secret`): [`HalfKey`](classes/halfkey.md)
 
 Comutes the key share that is embedded in the acknowledgement
 for a packet and thereby unlocks the incentive for the previous
@@ -842,7 +842,7 @@ relayer for transforming and delivering the packet
 
 #### Returns
 
-[HalfKey](classes/halfkey.md)
+[`HalfKey`](classes/halfkey.md)
 
 #### Defined in
 
@@ -852,7 +852,7 @@ ___
 
 ### dial
 
-▸ **dial**(`libp2p`, `destination`, `protocol`, `opts?`): `Promise`<[DialResponse](modules.md#dialresponse)\>
+▸ **dial**(`libp2p`, `destination`, `protocol`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
 
 Combines libp2p methods such as dialProtocol and peerRouting.findPeer
 to establish a connection.
@@ -865,11 +865,11 @@ Contains a baseline protection against dialing same addresses twice.
 | `libp2p` | `LibP2P` | a libp2p instance |
 | `destination` | `PeerId` | PeerId of the destination |
 | `protocol` | `string` | - |
-| `opts?` | [DialOpts](modules.md#dialopts) |  |
+| `opts?` | [`DialOpts`](modules.md#dialopts) |  |
 
 #### Returns
 
-`Promise`<[DialResponse](modules.md#dialresponse)\>
+`Promise`<[`DialResponse`](modules.md#dialresponse)\>
 
 #### Defined in
 
@@ -934,18 +934,18 @@ ___
 
 ### generateChannelId
 
-▸ **generateChannelId**(`source`, `destination`): [Hash](classes/hash.md)
+▸ **generateChannelId**(`source`, `destination`): [`Hash`](classes/hash.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `source` | [Address](classes/address.md) |
-| `destination` | [Address](classes/address.md) |
+| `source` | [`Address`](classes/address.md) |
+| `destination` | [`Address`](classes/address.md) |
 
 #### Returns
 
-[Hash](classes/hash.md)
+[`Hash`](classes/hash.md)
 
 #### Defined in
 
@@ -1130,7 +1130,7 @@ ___
 | `hashFunc` | (`preImage`: `Uint8Array`) => `Uint8Array` |
 | `iterations` | `number` |
 | `stepSize` | `number` |
-| `hint?` | (`index`: `number`) => `Uint8Array` \| `undefined` \| `Promise`<Uint8Array \| undefined\> |
+| `hint?` | (`index`: `number`) => `Uint8Array` \| `undefined` \| `Promise`<`Uint8Array` \| `undefined`\> |
 
 #### Returns
 
@@ -1168,7 +1168,7 @@ ___
 
 ### libp2pSendMessage
 
-▸ **libp2pSendMessage**(`libp2p`, `destination`, `protocol`, `message`, `opts?`): `Promise`<void\>
+▸ **libp2pSendMessage**(`libp2p`, `destination`, `protocol`, `message`, `opts?`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -1178,11 +1178,11 @@ ___
 | `destination` | `PeerId` |
 | `protocol` | `string` |
 | `message` | `Uint8Array` |
-| `opts?` | [DialOpts](modules.md#dialopts) |
+| `opts?` | [`DialOpts`](modules.md#dialopts) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1192,7 +1192,7 @@ ___
 
 ### libp2pSendMessageAndExpectResponse
 
-▸ **libp2pSendMessageAndExpectResponse**(`libp2p`, `destination`, `protocol`, `message`, `opts?`): `Promise`<Uint8Array[]\>
+▸ **libp2pSendMessageAndExpectResponse**(`libp2p`, `destination`, `protocol`, `message`, `opts?`): `Promise`<`Uint8Array`[]\>
 
 #### Parameters
 
@@ -1202,11 +1202,11 @@ ___
 | `destination` | `PeerId` |
 | `protocol` | `string` |
 | `message` | `Uint8Array` |
-| `opts?` | [DialOpts](modules.md#dialopts) |
+| `opts?` | [`DialOpts`](modules.md#dialopts) |
 
 #### Returns
 
-`Promise`<Uint8Array[]\>
+`Promise`<`Uint8Array`[]\>
 
 #### Defined in
 
@@ -1224,8 +1224,8 @@ ___
 | :------ | :------ | :------ |
 | `libp2p` | `LibP2P` | `undefined` |
 | `protocol` | `string` | `undefined` |
-| `handler` | [LibP2PHandlerFunction](modules.md#libp2phandlerfunction) | `undefined` |
-| `includeReply` | `boolean` | false |
+| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction) | `undefined` |
+| `includeReply` | `boolean` | `false` |
 
 #### Returns
 
@@ -1239,7 +1239,7 @@ ___
 
 ### limitConcurrency
 
-▸ **limitConcurrency**<T\>(`maxConcurrency`, `exitCond`, `createPromise`, `maxIterations?`): `Promise`<T[]\>
+▸ **limitConcurrency**<`T`\>(`maxConcurrency`, `exitCond`, `createPromise`, `maxIterations?`): `Promise`<`T`[]\>
 
 #### Type parameters
 
@@ -1253,12 +1253,12 @@ ___
 | :------ | :------ | :------ |
 | `maxConcurrency` | `number` | `undefined` |
 | `exitCond` | () => `boolean` | `undefined` |
-| `createPromise` | () => `Promise`<T\> | `undefined` |
-| `maxIterations` | `number` | 1e3 |
+| `createPromise` | () => `Promise`<`T`\> | `undefined` |
+| `maxIterations` | `number` | `1e3` |
 
 #### Returns
 
-`Promise`<T[]\>
+`Promise`<`T`[]\>
 
 #### Defined in
 
@@ -1309,23 +1309,23 @@ ___
 
 ### oneAtATime
 
-▸ **oneAtATime**(): (`cb`: () => `Promise`<void\>) => `Promise`<void\>
+▸ **oneAtATime**(): (`cb`: () => `Promise`<`void`\>) => `Promise`<`void`\>
 
 #### Returns
 
 `fn`
 
-▸ (`cb`): `Promise`<void\>
+▸ (`cb`): `Promise`<`void`\>
 
 ##### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `cb` | () => `Promise`<void\> |
+| `cb` | () => `Promise`<`void`\> |
 
 ##### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1335,11 +1335,11 @@ ___
 
 ### parseHosts
 
-▸ **parseHosts**(): [Hosts](modules.md#hosts)
+▸ **parseHosts**(): [`Hosts`](modules.md#hosts)
 
 #### Returns
 
-[Hosts](modules.md#hosts)
+[`Hosts`](modules.md#hosts)
 
 #### Defined in
 
@@ -1383,7 +1383,7 @@ incentive for relaying the packet
 | :------ | :------ | :------ |
 | `secret` | `Uint8Array` | shared secret with the creator of the packet |
 | `porBytes` | `Uint8Array` | PoR bitstring as included within the packet |
-| `challenge` | [EthereumChallenge](classes/ethereumchallenge.md) | ticket challenge of the incoming ticket |
+| `challenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) | ticket challenge of the incoming ticket |
 
 #### Returns
 
@@ -1451,7 +1451,7 @@ ___
 
 ### randomChoice
 
-▸ **randomChoice**<T\>(`collection`): `T`
+▸ **randomChoice**<`T`\>(`collection`): `T`
 
 #### Type parameters
 
@@ -1525,7 +1525,7 @@ ___
 
 ### randomPermutation
 
-▸ **randomPermutation**<T\>(`array`): `T`[]
+▸ **randomPermutation**<`T`\>(`array`): `T`[]
 
 Return a random permutation of the given `array`
 by using the (optimized) Fisher-Yates shuffling algorithm.
@@ -1563,7 +1563,7 @@ ___
 
 ### randomSubset
 
-▸ **randomSubset**<T\>(`array`, `subsetSize`, `filter?`): `T`[]
+▸ **randomSubset**<`T`\>(`array`, `subsetSize`, `filter?`): `T`[]
 
 Picks @param subsetSize elements at random from @param array .
 The order of the picked elements does not coincide with their
@@ -1601,7 +1601,7 @@ ___
 
 ### recoverIteratedHash
 
-▸ **recoverIteratedHash**(`hashValue`, `hashFunc`, `hint`, `maxIterations`, `stepSize?`, `indexHint?`): `Promise`<[Intermediate](interfaces/intermediate.md) \| undefined\>
+▸ **recoverIteratedHash**(`hashValue`, `hashFunc`, `hint`, `maxIterations`, `stepSize?`, `indexHint?`): `Promise`<[`Intermediate`](interfaces/intermediate.md) \| `undefined`\>
 
 #### Parameters
 
@@ -1609,14 +1609,14 @@ ___
 | :------ | :------ |
 | `hashValue` | `Uint8Array` |
 | `hashFunc` | (`preImage`: `Uint8Array`) => `Uint8Array` |
-| `hint` | (`index`: `number`) => `Promise`<Uint8Array\> |
+| `hint` | (`index`: `number`) => `Promise`<`Uint8Array`\> |
 | `maxIterations` | `number` |
 | `stepSize?` | `number` |
 | `indexHint?` | `number` |
 
 #### Returns
 
-`Promise`<[Intermediate](interfaces/intermediate.md) \| undefined\>
+`Promise`<[`Intermediate`](interfaces/intermediate.md) \| `undefined`\>
 
 #### Defined in
 
@@ -1637,7 +1637,7 @@ and the product of exponent and base-point.
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `compressed` | `boolean` | false |
+| `compressed` | `boolean` | `false` |
 
 #### Returns
 
@@ -1657,7 +1657,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `items` | [U8aAndSize](modules.md#u8aandsize)[] |
+| `items` | [`U8aAndSize`](modules.md#u8aandsize)[] |
 
 #### Returns
 
@@ -1700,7 +1700,7 @@ ___
 
 ### timeoutAfter
 
-▸ **timeoutAfter**<T\>(`body`, `timeout`): `Promise`<T\>
+▸ **timeoutAfter**<`T`\>(`body`, `timeout`): `Promise`<`T`\>
 
 #### Type parameters
 
@@ -1712,12 +1712,12 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `body` | (`abortSignal`: `AbortSignal`) => `Promise`<T\> |
+| `body` | (`abortSignal`: `AbortSignal`) => `Promise`<`T`\> |
 | `timeout` | `number` |
 
 #### Returns
 
-`Promise`<T\>
+`Promise`<`T`\>
 
 #### Defined in
 
@@ -1941,7 +1941,7 @@ Converts a Uint8Array to a hex string.
 | Name | Type | Default value | Description |
 | :------ | :------ | :------ | :------ |
 | `arr?` | `Uint8Array` | `undefined` | Uint8Array |
-| `prefixed` | `boolean` | true | if `true` add a `0x` in the beginning |
+| `prefixed` | `boolean` | `true` | if `true` add a `0x` in the beginning |
 
 #### Returns
 
@@ -2005,7 +2005,7 @@ Apply an XOR on a list of arrays.
 
 | Name | Type | Default value | Description |
 | :------ | :------ | :------ | :------ |
-| `inPlace` | `boolean` | false | if `true` overwrite first Array with result |
+| `inPlace` | `boolean` | `false` | if `true` overwrite first Array with result |
 | `...list` | `Uint8Array`[] | `undefined` | arrays to XOR |
 
 #### Returns
@@ -2026,7 +2026,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `halfKey` | [HalfKeyChallenge](classes/halfkeychallenge.md) |
+| `halfKey` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
 
 #### Returns
 
@@ -2046,9 +2046,9 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ethereumChallenge` | [EthereumChallenge](classes/ethereumchallenge.md) |
-| `ownKey` | [HalfKey](classes/halfkey.md) |
-| `ack` | [HalfKey](classes/halfkey.md) |
+| `ethereumChallenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) |
+| `ownKey` | [`HalfKey`](classes/halfkey.md) |
+| `ack` | [`HalfKey`](classes/halfkey.md) |
 
 #### Returns
 
@@ -2068,9 +2068,9 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ethereumChallenge` | [EthereumChallenge](classes/ethereumchallenge.md) |
-| `ownShare` | [HalfKeyChallenge](classes/halfkeychallenge.md) |
-| `ack` | [HalfKey](classes/halfkey.md) |
+| `ethereumChallenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) |
+| `ownShare` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
+| `ack` | [`HalfKey`](classes/halfkey.md) |
 
 #### Returns
 
@@ -2090,8 +2090,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ethereumChallenge` | [EthereumChallenge](classes/ethereumchallenge.md) |
-| `response` | [Response](classes/response.md) |
+| `ethereumChallenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) |
+| `response` | [`Response`](classes/response.md) |
 
 #### Returns
 

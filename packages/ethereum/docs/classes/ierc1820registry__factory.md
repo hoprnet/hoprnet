@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [IERC1820Registry](ierc1820registry.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Defined in
 

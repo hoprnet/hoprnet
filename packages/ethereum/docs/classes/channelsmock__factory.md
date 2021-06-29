@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **ChannelsMock__factory**
+  ↳ **`ChannelsMock__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [ChannelsMock](channelsmock.md)
+▸ **attach**(`address`): [`ChannelsMock`](channelsmock.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[ChannelsMock](channelsmock.md)
+[`ChannelsMock`](channelsmock.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [ChannelsMock\_\_factory](channelsmock__factory.md)
+▸ **connect**(`signer`): [`ChannelsMock__factory`](channelsmock__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[ChannelsMock\_\_factory](channelsmock__factory.md)
+[`ChannelsMock__factory`](channelsmock__factory.md)
 
 #### Overrides
 
@@ -146,7 +146,7 @@ ___
 
 ### deploy
 
-▸ **deploy**(`_token`, `_secsClosure`, `overrides?`): `Promise`<[ChannelsMock](channelsmock.md)\>
+▸ **deploy**(`_token`, `_secsClosure`, `overrides?`): `Promise`<[`ChannelsMock`](channelsmock.md)\>
 
 #### Parameters
 
@@ -154,11 +154,11 @@ ___
 | :------ | :------ |
 | `_token` | `string` |
 | `_secsClosure` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[ChannelsMock](channelsmock.md)\>
+`Promise`<[`ChannelsMock`](channelsmock.md)\>
 
 #### Overrides
 
@@ -180,7 +180,7 @@ ___
 | :------ | :------ |
 | `_token` | `string` |
 | `_secsClosure` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -198,7 +198,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ChannelsMock](channelsmock.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ChannelsMock`](channelsmock.md)
 
 #### Parameters
 
@@ -209,7 +209,7 @@ ___
 
 #### Returns
 
-[ChannelsMock](channelsmock.md)
+[`ChannelsMock`](channelsmock.md)
 
 #### Defined in
 

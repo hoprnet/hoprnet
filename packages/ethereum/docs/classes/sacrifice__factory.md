@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **Sacrifice__factory**
+  ↳ **`Sacrifice__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [Sacrifice](sacrifice.md)
+▸ **attach**(`address`): [`Sacrifice`](sacrifice.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [Sacrifice\_\_factory](sacrifice__factory.md)
+▸ **connect**(`signer`): [`Sacrifice__factory`](sacrifice__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[Sacrifice\_\_factory](sacrifice__factory.md)
+[`Sacrifice__factory`](sacrifice__factory.md)
 
 #### Overrides
 
@@ -146,18 +146,18 @@ ___
 
 ### deploy
 
-▸ **deploy**(`_recipient`, `overrides?`): `Promise`<[Sacrifice](sacrifice.md)\>
+▸ **deploy**(`_recipient`, `overrides?`): `Promise`<[`Sacrifice`](sacrifice.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_recipient` | `string` |
-| `overrides?` | `PayableOverrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `PayableOverrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[Sacrifice](sacrifice.md)\>
+`Promise`<[`Sacrifice`](sacrifice.md)\>
 
 #### Overrides
 
@@ -178,7 +178,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `_recipient` | `string` |
-| `overrides?` | `PayableOverrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `PayableOverrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -196,7 +196,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [Sacrifice](sacrifice.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`Sacrifice`](sacrifice.md)
 
 #### Parameters
 
@@ -207,7 +207,7 @@ ___
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Defined in
 

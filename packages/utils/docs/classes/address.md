@@ -64,7 +64,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [Address](address.md) |
+| `b` | [`Address`](address.md) |
 
 #### Returns
 
@@ -84,7 +84,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [Address](address.md) |
+| `b` | [`Address`](address.md) |
 
 #### Returns
 
@@ -104,7 +104,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [Address](address.md) |
+| `b` | [`Address`](address.md) |
 
 #### Returns
 
@@ -132,17 +132,17 @@ ___
 
 ### sortPair
 
-▸ **sortPair**(`b`): [[Address](address.md), [Address](address.md)]
+▸ **sortPair**(`b`): [[`Address`](address.md), [`Address`](address.md)]
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [Address](address.md) |
+| `b` | [`Address`](address.md) |
 
 #### Returns
 
-[[Address](address.md), [Address](address.md)]
+[[`Address`](address.md), [`Address`](address.md)]
 
 #### Defined in
 
@@ -166,11 +166,11 @@ ___
 
 ### createMock
 
-▸ `Static` **createMock**(): [Address](address.md)
+▸ `Static` **createMock**(): [`Address`](address.md)
 
 #### Returns
 
-[Address](address.md)
+[`Address`](address.md)
 
 #### Defined in
 
@@ -180,7 +180,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [Address](address.md)
+▸ `Static` **deserialize**(`arr`): [`Address`](address.md)
 
 #### Parameters
 
@@ -190,7 +190,7 @@ ___
 
 #### Returns
 
-[Address](address.md)
+[`Address`](address.md)
 
 #### Defined in
 
@@ -200,7 +200,7 @@ ___
 
 ### fromString
 
-▸ `Static` **fromString**(`str`): [Address](address.md)
+▸ `Static` **fromString**(`str`): [`Address`](address.md)
 
 #### Parameters
 
@@ -210,7 +210,7 @@ ___
 
 #### Returns
 
-[Address](address.md)
+[`Address`](address.md)
 
 #### Defined in
 

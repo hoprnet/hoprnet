@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **IERC1820Registry**
+  ↳ **`IERC1820Registry`**
 
 ## Table of contents
 
@@ -95,7 +95,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -165,22 +165,22 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `getInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `getInterfaceImplementer(address,bytes32)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `getManager` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `getManager(address)` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `implementsERC165Interface` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `implementsERC165Interface(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `implementsERC165InterfaceNoCache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `implementsERC165InterfaceNoCache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `interfaceHash` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `interfaceHash(string)` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `setInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `setInterfaceImplementer(address,bytes32,address)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `setManager` | (`account`: `string`, `newManager`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `setManager(address,address)` | (`account`: `string`, `newManager`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `updateERC165Cache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `updateERC165Cache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `getInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `getInterfaceImplementer(address,bytes32)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `getManager` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `getManager(address)` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `implementsERC165Interface` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `implementsERC165Interface(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `implementsERC165InterfaceNoCache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `implementsERC165InterfaceNoCache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `interfaceHash` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `interfaceHash(string)` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `setInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `setInterfaceImplementer(address,bytes32,address)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `setManager` | (`account`: `string`, `newManager`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `setManager(address,address)` | (`account`: `string`, `newManager`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `updateERC165Cache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `updateERC165Cache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
@@ -214,22 +214,22 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `getInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getInterfaceImplementer(address,bytes32)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getManager` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getManager(address)` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `implementsERC165Interface` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `implementsERC165Interface(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `implementsERC165InterfaceNoCache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `implementsERC165InterfaceNoCache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `interfaceHash` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `interfaceHash(string)` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `setInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `setInterfaceImplementer(address,bytes32,address)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `setManager` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `setManager(address,address)` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `updateERC165Cache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `updateERC165Cache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `getInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getInterfaceImplementer(address,bytes32)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getManager` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getManager(address)` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `implementsERC165Interface` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `implementsERC165Interface(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `implementsERC165InterfaceNoCache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `implementsERC165InterfaceNoCache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `interfaceHash` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `interfaceHash(string)` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `setInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `setInterfaceImplementer(address,bytes32,address)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `setManager` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `setManager(address,address)` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `updateERC165Cache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `updateERC165Cache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -249,8 +249,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `InterfaceImplementerSet` | (`account`: `string`, `interfaceHash`: `BytesLike`, `implementer`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `ManagerChanged` | (`account`: `string`, `newManager`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
+| `InterfaceImplementerSet` | (`account`: `string`, `interfaceHash`: `BytesLike`, `implementer`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
+| `ManagerChanged` | (`account`: `string`, `newManager`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
 
 #### Overrides
 
@@ -280,12 +280,12 @@ ___
 | `implementsERC165InterfaceNoCache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
 | `interfaceHash` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `interfaceHash(string)` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `setInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `setInterfaceImplementer(address,bytes32,address)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `setManager` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `setManager(address,address)` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `updateERC165Cache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `updateERC165Cache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `setInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `setInterfaceImplementer(address,bytes32,address)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `setManager` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `setManager(address,address)` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `updateERC165Cache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `updateERC165Cache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
@@ -319,22 +319,22 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `getInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getInterfaceImplementer(address,bytes32)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getManager` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getManager(address)` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `implementsERC165Interface` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `implementsERC165Interface(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `implementsERC165InterfaceNoCache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `implementsERC165InterfaceNoCache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `interfaceHash` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `interfaceHash(string)` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `setInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `setInterfaceImplementer(address,bytes32,address)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `setManager` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `setManager(address,address)` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `updateERC165Cache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `updateERC165Cache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `getInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getInterfaceImplementer(address,bytes32)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getManager` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getManager(address)` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `implementsERC165Interface` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `implementsERC165Interface(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `implementsERC165InterfaceNoCache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `implementsERC165InterfaceNoCache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `interfaceHash` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `interfaceHash(string)` | (`interfaceName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `setInterfaceImplementer` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `setInterfaceImplementer(address,bytes32,address)` | (`account`: `string`, `_interfaceHash`: `BytesLike`, `implementer`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `setManager` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `setManager(address,address)` | (`account`: `string`, `newManager`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `updateERC165Cache` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `updateERC165Cache(address,bytes4)` | (`account`: `string`, `interfaceId`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -362,7 +362,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -414,7 +414,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -424,7 +424,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -464,7 +464,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [IERC1820Registry](ierc1820registry.md)
+▸ **attach**(`addressOrName`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Parameters
 
@@ -474,7 +474,7 @@ ___
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -488,7 +488,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [IERC1820Registry](ierc1820registry.md)
+▸ **connect**(`signerOrProvider`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Parameters
 
@@ -498,7 +498,7 @@ ___
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -512,11 +512,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[IERC1820Registry](ierc1820registry.md)\>
+▸ **deployed**(): `Promise`<[`IERC1820Registry`](ierc1820registry.md)\>
 
 #### Returns
 
-`Promise`<[IERC1820Registry](ierc1820registry.md)\>
+`Promise`<[`IERC1820Registry`](ierc1820registry.md)\>
 
 #### Overrides
 
@@ -555,7 +555,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -565,7 +565,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -579,7 +579,7 @@ ___
 
 ### getInterfaceImplementer
 
-▸ **getInterfaceImplementer**(`account`, `_interfaceHash`, `overrides?`): `Promise`<string\>
+▸ **getInterfaceImplementer**(`account`, `_interfaceHash`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -591,7 +591,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -601,7 +601,7 @@ ___
 
 ### getInterfaceImplementer(address,bytes32)
 
-▸ **getInterfaceImplementer(address,bytes32)**(`account`, `_interfaceHash`, `overrides?`): `Promise`<string\>
+▸ **getInterfaceImplementer(address,bytes32)**(`account`, `_interfaceHash`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -613,7 +613,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -623,7 +623,7 @@ ___
 
 ### getManager
 
-▸ **getManager**(`account`, `overrides?`): `Promise`<string\>
+▸ **getManager**(`account`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -634,7 +634,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -644,7 +644,7 @@ ___
 
 ### getManager(address)
 
-▸ **getManager(address)**(`account`, `overrides?`): `Promise`<string\>
+▸ **getManager(address)**(`account`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -655,7 +655,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -665,7 +665,7 @@ ___
 
 ### implementsERC165Interface
 
-▸ **implementsERC165Interface**(`account`, `interfaceId`, `overrides?`): `Promise`<boolean\>
+▸ **implementsERC165Interface**(`account`, `interfaceId`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -677,7 +677,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -687,7 +687,7 @@ ___
 
 ### implementsERC165Interface(address,bytes4)
 
-▸ **implementsERC165Interface(address,bytes4)**(`account`, `interfaceId`, `overrides?`): `Promise`<boolean\>
+▸ **implementsERC165Interface(address,bytes4)**(`account`, `interfaceId`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -699,7 +699,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -709,7 +709,7 @@ ___
 
 ### implementsERC165InterfaceNoCache
 
-▸ **implementsERC165InterfaceNoCache**(`account`, `interfaceId`, `overrides?`): `Promise`<boolean\>
+▸ **implementsERC165InterfaceNoCache**(`account`, `interfaceId`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -721,7 +721,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -731,7 +731,7 @@ ___
 
 ### implementsERC165InterfaceNoCache(address,bytes4)
 
-▸ **implementsERC165InterfaceNoCache(address,bytes4)**(`account`, `interfaceId`, `overrides?`): `Promise`<boolean\>
+▸ **implementsERC165InterfaceNoCache(address,bytes4)**(`account`, `interfaceId`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -743,7 +743,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -753,7 +753,7 @@ ___
 
 ### interfaceHash
 
-▸ **interfaceHash**(`interfaceName`, `overrides?`): `Promise`<string\>
+▸ **interfaceHash**(`interfaceName`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -764,7 +764,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -774,7 +774,7 @@ ___
 
 ### interfaceHash(string)
 
-▸ **interfaceHash(string)**(`interfaceName`, `overrides?`): `Promise`<string\>
+▸ **interfaceHash(string)**(`interfaceName`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -785,7 +785,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -819,24 +819,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -870,25 +870,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC1820Registry](ierc1820registry.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -898,7 +898,7 @@ Contract.off
 
 packages/ethereum/types/IERC1820Registry.d.ts:108
 
-▸ **off**(`eventName`, `listener`): [IERC1820Registry](ierc1820registry.md)
+▸ **off**(`eventName`, `listener`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Parameters
 
@@ -909,7 +909,7 @@ packages/ethereum/types/IERC1820Registry.d.ts:108
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -923,25 +923,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC1820Registry](ierc1820registry.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -951,7 +951,7 @@ Contract.on
 
 packages/ethereum/types/IERC1820Registry.d.ts:112
 
-▸ **on**(`eventName`, `listener`): [IERC1820Registry](ierc1820registry.md)
+▸ **on**(`eventName`, `listener`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Parameters
 
@@ -962,7 +962,7 @@ packages/ethereum/types/IERC1820Registry.d.ts:112
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -976,25 +976,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC1820Registry](ierc1820registry.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -1004,7 +1004,7 @@ Contract.once
 
 packages/ethereum/types/IERC1820Registry.d.ts:116
 
-▸ **once**(`eventName`, `listener`): [IERC1820Registry](ierc1820registry.md)
+▸ **once**(`eventName`, `listener`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Parameters
 
@@ -1015,7 +1015,7 @@ packages/ethereum/types/IERC1820Registry.d.ts:116
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -1029,26 +1029,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -1062,24 +1062,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [IERC1820Registry](ierc1820registry.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -1089,7 +1089,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/IERC1820Registry.d.ts:124
 
-▸ **removeAllListeners**(`eventName?`): [IERC1820Registry](ierc1820registry.md)
+▸ **removeAllListeners**(`eventName?`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Parameters
 
@@ -1099,7 +1099,7 @@ packages/ethereum/types/IERC1820Registry.d.ts:124
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -1113,25 +1113,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC1820Registry](ierc1820registry.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -1141,7 +1141,7 @@ Contract.removeListener
 
 packages/ethereum/types/IERC1820Registry.d.ts:120
 
-▸ **removeListener**(`eventName`, `listener`): [IERC1820Registry](ierc1820registry.md)
+▸ **removeListener**(`eventName`, `listener`): [`IERC1820Registry`](ierc1820registry.md)
 
 #### Parameters
 
@@ -1152,7 +1152,7 @@ packages/ethereum/types/IERC1820Registry.d.ts:120
 
 #### Returns
 
-[IERC1820Registry](ierc1820registry.md)
+[`IERC1820Registry`](ierc1820registry.md)
 
 #### Overrides
 
@@ -1166,7 +1166,7 @@ ___
 
 ### setInterfaceImplementer
 
-▸ **setInterfaceImplementer**(`account`, `_interfaceHash`, `implementer`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **setInterfaceImplementer**(`account`, `_interfaceHash`, `implementer`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1175,11 +1175,11 @@ ___
 | `account` | `string` |
 | `_interfaceHash` | `BytesLike` |
 | `implementer` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1189,7 +1189,7 @@ ___
 
 ### setInterfaceImplementer(address,bytes32,address)
 
-▸ **setInterfaceImplementer(address,bytes32,address)**(`account`, `_interfaceHash`, `implementer`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **setInterfaceImplementer(address,bytes32,address)**(`account`, `_interfaceHash`, `implementer`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1198,11 +1198,11 @@ ___
 | `account` | `string` |
 | `_interfaceHash` | `BytesLike` |
 | `implementer` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1212,7 +1212,7 @@ ___
 
 ### setManager
 
-▸ **setManager**(`account`, `newManager`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **setManager**(`account`, `newManager`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1220,11 +1220,11 @@ ___
 | :------ | :------ |
 | `account` | `string` |
 | `newManager` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1234,7 +1234,7 @@ ___
 
 ### setManager(address,address)
 
-▸ **setManager(address,address)**(`account`, `newManager`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **setManager(address,address)**(`account`, `newManager`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1242,11 +1242,11 @@ ___
 | :------ | :------ |
 | `account` | `string` |
 | `newManager` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1256,7 +1256,7 @@ ___
 
 ### updateERC165Cache
 
-▸ **updateERC165Cache**(`account`, `interfaceId`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **updateERC165Cache**(`account`, `interfaceId`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1264,11 +1264,11 @@ ___
 | :------ | :------ |
 | `account` | `string` |
 | `interfaceId` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1278,7 +1278,7 @@ ___
 
 ### updateERC165Cache(address,bytes4)
 
-▸ **updateERC165Cache(address,bytes4)**(`account`, `interfaceId`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **updateERC165Cache(address,bytes4)**(`account`, `interfaceId`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1286,11 +1286,11 @@ ___
 | :------ | :------ |
 | `account` | `string` |
 | `interfaceId` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 

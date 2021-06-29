@@ -65,11 +65,11 @@ ___
 
 ### toChallenge
 
-▸ **toChallenge**(): [Challenge](challenge.md)
+▸ **toChallenge**(): [`Challenge`](challenge.md)
 
 #### Returns
 
-[Challenge](challenge.md)
+[`Challenge`](challenge.md)
 
 #### Defined in
 
@@ -93,11 +93,11 @@ ___
 
 ### createMock
 
-▸ `Static` **createMock**(): [Response](response.md)
+▸ `Static` **createMock**(): [`Response`](response.md)
 
 #### Returns
 
-[Response](response.md)
+[`Response`](response.md)
 
 #### Defined in
 
@@ -107,7 +107,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [Response](response.md)
+▸ `Static` **deserialize**(`arr`): [`Response`](response.md)
 
 #### Parameters
 
@@ -117,7 +117,7 @@ ___
 
 #### Returns
 
-[Response](response.md)
+[`Response`](response.md)
 
 #### Defined in
 
@@ -127,18 +127,18 @@ ___
 
 ### fromHalfKeys
 
-▸ `Static` **fromHalfKeys**(`firstHalfKey`, `secondHalfKey`): [Response](response.md)
+▸ `Static` **fromHalfKeys**(`firstHalfKey`, `secondHalfKey`): [`Response`](response.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `firstHalfKey` | [HalfKey](halfkey.md) |
-| `secondHalfKey` | [HalfKey](halfkey.md) |
+| `firstHalfKey` | [`HalfKey`](halfkey.md) |
+| `secondHalfKey` | [`HalfKey`](halfkey.md) |
 
 #### Returns
 
-[Response](response.md)
+[`Response`](response.md)
 
 #### Defined in
 

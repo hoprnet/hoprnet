@@ -52,11 +52,11 @@
 
 ### clone
 
-▸ **clone**(): [Hash](hash.md)
+▸ **clone**(): [`Hash`](hash.md)
 
 #### Returns
 
-[Hash](hash.md)
+[`Hash`](hash.md)
 
 #### Defined in
 
@@ -72,7 +72,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [Hash](hash.md) |
+| `b` | [`Hash`](hash.md) |
 
 #### Returns
 
@@ -86,11 +86,11 @@ ___
 
 ### hash
 
-▸ **hash**(): [Hash](hash.md)
+▸ **hash**(): [`Hash`](hash.md)
 
 #### Returns
 
-[Hash](hash.md)
+[`Hash`](hash.md)
 
 #### Defined in
 
@@ -128,7 +128,7 @@ ___
 
 ### create
 
-▸ `Static` **create**(...`inputs`): [Hash](hash.md)
+▸ `Static` **create**(...`inputs`): [`Hash`](hash.md)
 
 #### Parameters
 
@@ -138,7 +138,7 @@ ___
 
 #### Returns
 
-[Hash](hash.md)
+[`Hash`](hash.md)
 
 #### Defined in
 
@@ -148,7 +148,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [Hash](hash.md)
+▸ `Static` **deserialize**(`arr`): [`Hash`](hash.md)
 
 #### Parameters
 
@@ -158,7 +158,7 @@ ___
 
 #### Returns
 
-[Hash](hash.md)
+[`Hash`](hash.md)
 
 #### Defined in
 

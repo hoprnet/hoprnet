@@ -68,7 +68,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [PublicKey](publickey.md) |
+| `b` | [`PublicKey`](publickey.md) |
 
 #### Returns
 
@@ -96,11 +96,11 @@ ___
 
 ### toAddress
 
-▸ **toAddress**(): [Address](address.md)
+▸ **toAddress**(): [`Address`](address.md)
 
 #### Returns
 
-[Address](address.md)
+[`Address`](address.md)
 
 #### Defined in
 
@@ -166,11 +166,11 @@ ___
 
 ### createMock
 
-▸ `Static` **createMock**(): [PublicKey](publickey.md)
+▸ `Static` **createMock**(): [`PublicKey`](publickey.md)
 
 #### Returns
 
-[PublicKey](publickey.md)
+[`PublicKey`](publickey.md)
 
 #### Defined in
 
@@ -180,7 +180,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [PublicKey](publickey.md)
+▸ `Static` **deserialize**(`arr`): [`PublicKey`](publickey.md)
 
 #### Parameters
 
@@ -190,7 +190,7 @@ ___
 
 #### Returns
 
-[PublicKey](publickey.md)
+[`PublicKey`](publickey.md)
 
 #### Defined in
 
@@ -200,7 +200,7 @@ ___
 
 ### fromPeerId
 
-▸ `Static` **fromPeerId**(`peerId`): [PublicKey](publickey.md)
+▸ `Static` **fromPeerId**(`peerId`): [`PublicKey`](publickey.md)
 
 #### Parameters
 
@@ -210,7 +210,7 @@ ___
 
 #### Returns
 
-[PublicKey](publickey.md)
+[`PublicKey`](publickey.md)
 
 #### Defined in
 
@@ -220,7 +220,7 @@ ___
 
 ### fromPrivKey
 
-▸ `Static` **fromPrivKey**(`privKey`): [PublicKey](publickey.md)
+▸ `Static` **fromPrivKey**(`privKey`): [`PublicKey`](publickey.md)
 
 #### Parameters
 
@@ -230,7 +230,7 @@ ___
 
 #### Returns
 
-[PublicKey](publickey.md)
+[`PublicKey`](publickey.md)
 
 #### Defined in
 
@@ -240,7 +240,7 @@ ___
 
 ### fromString
 
-▸ `Static` **fromString**(`str`): [PublicKey](publickey.md)
+▸ `Static` **fromString**(`str`): [`PublicKey`](publickey.md)
 
 #### Parameters
 
@@ -250,7 +250,7 @@ ___
 
 #### Returns
 
-[PublicKey](publickey.md)
+[`PublicKey`](publickey.md)
 
 #### Defined in
 
@@ -260,7 +260,7 @@ ___
 
 ### fromUncompressedPubKey
 
-▸ `Static` **fromUncompressedPubKey**(`arr`): [PublicKey](publickey.md)
+▸ `Static` **fromUncompressedPubKey**(`arr`): [`PublicKey`](publickey.md)
 
 #### Parameters
 
@@ -270,7 +270,7 @@ ___
 
 #### Returns
 
-[PublicKey](publickey.md)
+[`PublicKey`](publickey.md)
 
 #### Defined in
 

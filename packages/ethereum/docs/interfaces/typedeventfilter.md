@@ -13,7 +13,7 @@
 
 - `EventFilter`
 
-  ↳ **TypedEventFilter**
+  ↳ **`TypedEventFilter`**
 
 ## Table of contents
 

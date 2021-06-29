@@ -41,7 +41,7 @@
 
 ### SIZE
 
-▪ `Static` **SIZE**: `number` = 32
+▪ `Static` **SIZE**: `number` = `32`
 
 #### Defined in
 
@@ -51,11 +51,11 @@
 
 ### clone
 
-▸ **clone**(): [HalfKey](halfkey.md)
+▸ **clone**(): [`HalfKey`](halfkey.md)
 
 #### Returns
 
-[HalfKey](halfkey.md)
+[`HalfKey`](halfkey.md)
 
 #### Defined in
 
@@ -71,7 +71,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `halfKey` | [HalfKey](halfkey.md) |
+| `halfKey` | [`HalfKey`](halfkey.md) |
 
 #### Returns
 
@@ -99,11 +99,11 @@ ___
 
 ### toChallenge
 
-▸ **toChallenge**(): [HalfKeyChallenge](halfkeychallenge.md)
+▸ **toChallenge**(): [`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Returns
 
-[HalfKeyChallenge](halfkeychallenge.md)
+[`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Defined in
 
@@ -127,7 +127,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [HalfKey](halfkey.md)
+▸ `Static` **deserialize**(`arr`): [`HalfKey`](halfkey.md)
 
 #### Parameters
 
@@ -137,7 +137,7 @@ ___
 
 #### Returns
 
-[HalfKey](halfkey.md)
+[`HalfKey`](halfkey.md)
 
 #### Defined in
 

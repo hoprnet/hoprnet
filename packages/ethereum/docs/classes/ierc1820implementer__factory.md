@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [IERC1820Implementer](ierc1820implementer.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`IERC1820Implementer`](ierc1820implementer.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[IERC1820Implementer](ierc1820implementer.md)
+[`IERC1820Implementer`](ierc1820implementer.md)
 
 #### Defined in
 

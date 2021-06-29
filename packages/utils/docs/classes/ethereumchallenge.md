@@ -39,7 +39,7 @@
 
 ### SIZE
 
-▪ `Static` **SIZE**: `number` = 20
+▪ `Static` **SIZE**: `number` = `20`
 
 #### Defined in
 
@@ -55,7 +55,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `ethCallenge` | [EthereumChallenge](ethereumchallenge.md) |
+| `ethCallenge` | [`EthereumChallenge`](ethereumchallenge.md) |
 
 #### Returns
 
@@ -97,7 +97,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [EthereumChallenge](ethereumchallenge.md)
+▸ `Static` **deserialize**(`arr`): [`EthereumChallenge`](ethereumchallenge.md)
 
 #### Parameters
 
@@ -107,7 +107,7 @@ ___
 
 #### Returns
 
-[EthereumChallenge](ethereumchallenge.md)
+[`EthereumChallenge`](ethereumchallenge.md)
 
 #### Defined in
 

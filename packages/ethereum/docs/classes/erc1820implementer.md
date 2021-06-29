@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **ERC1820Implementer**
+  ↳ **`ERC1820Implementer`**
 
 ## Table of contents
 
@@ -81,7 +81,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -151,8 +151,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 
 #### Overrides
 
@@ -186,8 +186,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -256,8 +256,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -285,7 +285,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -337,7 +337,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -347,7 +347,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -387,7 +387,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [ERC1820Implementer](erc1820implementer.md)
+▸ **attach**(`addressOrName`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Parameters
 
@@ -397,7 +397,7 @@ ___
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -411,7 +411,7 @@ ___
 
 ### canImplementInterfaceForAddress
 
-▸ **canImplementInterfaceForAddress**(`interfaceHash`, `account`, `overrides?`): `Promise`<string\>
+▸ **canImplementInterfaceForAddress**(`interfaceHash`, `account`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -423,7 +423,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -433,7 +433,7 @@ ___
 
 ### canImplementInterfaceForAddress(bytes32,address)
 
-▸ **canImplementInterfaceForAddress(bytes32,address)**(`interfaceHash`, `account`, `overrides?`): `Promise`<string\>
+▸ **canImplementInterfaceForAddress(bytes32,address)**(`interfaceHash`, `account`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -445,7 +445,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -455,7 +455,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [ERC1820Implementer](erc1820implementer.md)
+▸ **connect**(`signerOrProvider`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Parameters
 
@@ -465,7 +465,7 @@ ___
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -479,11 +479,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[ERC1820Implementer](erc1820implementer.md)\>
+▸ **deployed**(): `Promise`<[`ERC1820Implementer`](erc1820implementer.md)\>
 
 #### Returns
 
-`Promise`<[ERC1820Implementer](erc1820implementer.md)\>
+`Promise`<[`ERC1820Implementer`](erc1820implementer.md)\>
 
 #### Overrides
 
@@ -522,7 +522,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -532,7 +532,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -570,24 +570,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -621,25 +621,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [ERC1820Implementer](erc1820implementer.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -649,7 +649,7 @@ Contract.off
 
 packages/ethereum/types/ERC1820Implementer.d.ts:47
 
-▸ **off**(`eventName`, `listener`): [ERC1820Implementer](erc1820implementer.md)
+▸ **off**(`eventName`, `listener`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Parameters
 
@@ -660,7 +660,7 @@ packages/ethereum/types/ERC1820Implementer.d.ts:47
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -674,25 +674,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [ERC1820Implementer](erc1820implementer.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -702,7 +702,7 @@ Contract.on
 
 packages/ethereum/types/ERC1820Implementer.d.ts:51
 
-▸ **on**(`eventName`, `listener`): [ERC1820Implementer](erc1820implementer.md)
+▸ **on**(`eventName`, `listener`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Parameters
 
@@ -713,7 +713,7 @@ packages/ethereum/types/ERC1820Implementer.d.ts:51
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -727,25 +727,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [ERC1820Implementer](erc1820implementer.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -755,7 +755,7 @@ Contract.once
 
 packages/ethereum/types/ERC1820Implementer.d.ts:55
 
-▸ **once**(`eventName`, `listener`): [ERC1820Implementer](erc1820implementer.md)
+▸ **once**(`eventName`, `listener`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Parameters
 
@@ -766,7 +766,7 @@ packages/ethereum/types/ERC1820Implementer.d.ts:55
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -780,26 +780,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -813,24 +813,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [ERC1820Implementer](erc1820implementer.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -840,7 +840,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/ERC1820Implementer.d.ts:63
 
-▸ **removeAllListeners**(`eventName?`): [ERC1820Implementer](erc1820implementer.md)
+▸ **removeAllListeners**(`eventName?`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Parameters
 
@@ -850,7 +850,7 @@ packages/ethereum/types/ERC1820Implementer.d.ts:63
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -864,25 +864,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [ERC1820Implementer](erc1820implementer.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -892,7 +892,7 @@ Contract.removeListener
 
 packages/ethereum/types/ERC1820Implementer.d.ts:59
 
-▸ **removeListener**(`eventName`, `listener`): [ERC1820Implementer](erc1820implementer.md)
+▸ **removeListener**(`eventName`, `listener`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Parameters
 
@@ -903,7 +903,7 @@ packages/ethereum/types/ERC1820Implementer.d.ts:59
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 

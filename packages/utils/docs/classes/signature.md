@@ -120,7 +120,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `msg` | `Uint8Array` |
-| `pubKey` | [PublicKey](publickey.md) |
+| `pubKey` | [`PublicKey`](publickey.md) |
 
 #### Returns
 
@@ -134,7 +134,7 @@ ___
 
 ### create
 
-▸ `Static` **create**(`msg`, `privKey`): [Signature](signature.md)
+▸ `Static` **create**(`msg`, `privKey`): [`Signature`](signature.md)
 
 #### Parameters
 
@@ -145,7 +145,7 @@ ___
 
 #### Returns
 
-[Signature](signature.md)
+[`Signature`](signature.md)
 
 #### Defined in
 
@@ -155,7 +155,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [Signature](signature.md)
+▸ `Static` **deserialize**(`arr`): [`Signature`](signature.md)
 
 #### Parameters
 
@@ -165,7 +165,7 @@ ___
 
 #### Returns
 
-[Signature](signature.md)
+[`Signature`](signature.md)
 
 #### Defined in
 
@@ -175,7 +175,7 @@ ___
 
 ### deserializeEthereum
 
-▸ `Static` **deserializeEthereum**(`arr`): [Signature](signature.md)
+▸ `Static` **deserializeEthereum**(`arr`): [`Signature`](signature.md)
 
 Deserializes Ethereum-specific signature with
 non-standard recovery values 27 and 28
@@ -188,7 +188,7 @@ non-standard recovery values 27 and 28
 
 #### Returns
 
-[Signature](signature.md)
+[`Signature`](signature.md)
 
 deserialized Ethereum signature
 

@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **MintableToken__factory**
+  ↳ **`MintableToken__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [MintableToken](mintabletoken.md)
+▸ **attach**(`address`): [`MintableToken`](mintabletoken.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[MintableToken](mintabletoken.md)
+[`MintableToken`](mintabletoken.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [MintableToken\_\_factory](mintabletoken__factory.md)
+▸ **connect**(`signer`): [`MintableToken__factory`](mintabletoken__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[MintableToken\_\_factory](mintabletoken__factory.md)
+[`MintableToken__factory`](mintabletoken__factory.md)
 
 #### Overrides
 
@@ -146,17 +146,17 @@ ___
 
 ### deploy
 
-▸ **deploy**(`overrides?`): `Promise`<[MintableToken](mintabletoken.md)\>
+▸ **deploy**(`overrides?`): `Promise`<[`MintableToken`](mintabletoken.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[MintableToken](mintabletoken.md)\>
+`Promise`<[`MintableToken`](mintabletoken.md)\>
 
 #### Overrides
 
@@ -176,7 +176,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -194,7 +194,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [MintableToken](mintabletoken.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`MintableToken`](mintabletoken.md)
 
 #### Parameters
 
@@ -205,7 +205,7 @@ ___
 
 #### Returns
 
-[MintableToken](mintabletoken.md)
+[`MintableToken`](mintabletoken.md)
 
 #### Defined in
 

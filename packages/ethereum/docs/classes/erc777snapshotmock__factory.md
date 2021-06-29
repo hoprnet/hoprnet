@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **ERC777SnapshotMock__factory**
+  ↳ **`ERC777SnapshotMock__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [ERC777SnapshotMock](erc777snapshotmock.md)
+▸ **attach**(`address`): [`ERC777SnapshotMock`](erc777snapshotmock.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[ERC777SnapshotMock](erc777snapshotmock.md)
+[`ERC777SnapshotMock`](erc777snapshotmock.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [ERC777SnapshotMock\_\_factory](erc777snapshotmock__factory.md)
+▸ **connect**(`signer`): [`ERC777SnapshotMock__factory`](erc777snapshotmock__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[ERC777SnapshotMock\_\_factory](erc777snapshotmock__factory.md)
+[`ERC777SnapshotMock__factory`](erc777snapshotmock__factory.md)
 
 #### Overrides
 
@@ -146,7 +146,7 @@ ___
 
 ### deploy
 
-▸ **deploy**(`name`, `symbol`, `initialAccount`, `initialBalance`, `overrides?`): `Promise`<[ERC777SnapshotMock](erc777snapshotmock.md)\>
+▸ **deploy**(`name`, `symbol`, `initialAccount`, `initialBalance`, `overrides?`): `Promise`<[`ERC777SnapshotMock`](erc777snapshotmock.md)\>
 
 #### Parameters
 
@@ -156,11 +156,11 @@ ___
 | `symbol` | `string` |
 | `initialAccount` | `string` |
 | `initialBalance` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[ERC777SnapshotMock](erc777snapshotmock.md)\>
+`Promise`<[`ERC777SnapshotMock`](erc777snapshotmock.md)\>
 
 #### Overrides
 
@@ -184,7 +184,7 @@ ___
 | `symbol` | `string` |
 | `initialAccount` | `string` |
 | `initialBalance` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -202,7 +202,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC777SnapshotMock](erc777snapshotmock.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ERC777SnapshotMock`](erc777snapshotmock.md)
 
 #### Parameters
 
@@ -213,7 +213,7 @@ ___
 
 #### Returns
 
-[ERC777SnapshotMock](erc777snapshotmock.md)
+[`ERC777SnapshotMock`](erc777snapshotmock.md)
 
 #### Defined in
 

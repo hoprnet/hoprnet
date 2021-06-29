@@ -10,7 +10,7 @@ Also keeps track of the latest block number.
 
 - `EventEmitter`
 
-  ↳ **Indexer**
+  ↳ **`Indexer`**
 
 ## Table of contents
 
@@ -85,28 +85,28 @@ Also keeps track of the latest block number.
 | `genesisBlock` | `number` |
 | `db` | `HoprDB` |
 | `chain` | `Object` |
-| `chain.announce` | (`multiaddr`: `Multiaddr`) => `Promise`<string\> |
-| `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
-| `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<string\> |
-| `chain.getBalance` | (`address`: `Address`) => `Promise`<Balance\> |
+| `chain.announce` | (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> |
+| `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
+| `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> |
+| `chain.getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
 | `chain.getChannels` | () => `HoprChannels` |
 | `chain.getGenesisBlock` | () => `number` |
 | `chain.getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `Networks`  } |
-| `chain.getLatestBlockNumber` | () => `Promise`<number\> |
-| `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<NativeBalance\> |
+| `chain.getLatestBlockNumber` | () => `Promise`<`number`\> |
+| `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `chain.getPrivateKey` | () => `Uint8Array` |
 | `chain.getPublicKey` | () => `PublicKey` |
 | `chain.getWallet` | () => `Wallet` |
-| `chain.initiateChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
-| `chain.openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<string\> |
-| `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<string\> |
-| `chain.setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<string\> |
+| `chain.initiateChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
+| `chain.openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<`string`\> |
+| `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> |
+| `chain.setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> |
 | `chain.subscribeBlock` | (`cb`: `any`) => `JsonRpcProvider` \| `WebSocketProvider` |
 | `chain.subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
 | `chain.subscribeError` | (`cb`: `any`) => `void` |
 | `chain.unsubscribe` | () => `void` |
-| `chain.waitUntilReady` | () => `Promise`<Network\> |
-| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<string\> |
+| `chain.waitUntilReady` | () => `Promise`<`Network`\> |
+| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\> |
 | `maxConfirmations` | `number` |
 | `blockRange` | `number` |
 
@@ -132,7 +132,7 @@ ___
 
 ### latestBlock
 
-• **latestBlock**: `number` = 0
+• **latestBlock**: `number` = `0`
 
 #### Defined in
 
@@ -142,7 +142,7 @@ ___
 
 ### pendingCommitments
 
-• `Private` **pendingCommitments**: `Map`<string, DeferredPromise<void\>\>
+• `Private` **pendingCommitments**: `Map`<`string`, `DeferredPromise`<`void`\>\>
 
 #### Defined in
 
@@ -152,7 +152,7 @@ ___
 
 ### status
 
-• **status**: ``"started"`` \| ``"restarting"`` \| ``"stopped"`` = 'stopped'
+• **status**: ``"started"`` \| ``"restarting"`` \| ``"stopped"`` = `'stopped'`
 
 #### Defined in
 
@@ -162,7 +162,7 @@ ___
 
 ### unconfirmedEvents
 
-• `Private` **unconfirmedEvents**: `Heap`<Event<any\>\>
+• `Private` **unconfirmedEvents**: `Heap`<`Event`<`any`\>\>
 
 #### Defined in
 
@@ -172,7 +172,7 @@ ___
 
 ### captureRejectionSymbol
 
-▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [captureRejectionSymbol](default.md#capturerejectionsymbol)
+▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [`captureRejectionSymbol`](default.md#capturerejectionsymbol)
 
 #### Inherited from
 
@@ -216,7 +216,7 @@ ___
 
 ### errorMonitor
 
-▪ `Static` `Readonly` **errorMonitor**: typeof [errorMonitor](default.md#errormonitor)
+▪ `Static` `Readonly` **errorMonitor**: typeof [`errorMonitor`](default.md#errormonitor)
 
 This symbol shall be used to install a listener for only monitoring `'error'`
 events. Listeners installed using this symbol are called before the regular
@@ -238,7 +238,7 @@ core-ethereum/node_modules/@types/node/events.d.ts:42
 
 ### addListener
 
-▸ **addListener**(`event`, `listener`): [Indexer](indexer.md)
+▸ **addListener**(`event`, `listener`): [`Indexer`](indexer.md)
 
 #### Parameters
 
@@ -249,7 +249,7 @@ core-ethereum/node_modules/@types/node/events.d.ts:42
 
 #### Returns
 
-[Indexer](indexer.md)
+[`Indexer`](indexer.md)
 
 #### Inherited from
 
@@ -306,7 +306,7 @@ ___
 
 ### getAccount
 
-▸ **getAccount**(`address`): `Promise`<AccountEntry\>
+▸ **getAccount**(`address`): `Promise`<`AccountEntry`\>
 
 #### Parameters
 
@@ -316,7 +316,7 @@ ___
 
 #### Returns
 
-`Promise`<AccountEntry\>
+`Promise`<`AccountEntry`\>
 
 #### Defined in
 
@@ -326,11 +326,11 @@ ___
 
 ### getAnnouncedAddresses
 
-▸ **getAnnouncedAddresses**(): `Promise`<Multiaddr[]\>
+▸ **getAnnouncedAddresses**(): `Promise`<`Multiaddr`[]\>
 
 #### Returns
 
-`Promise`<Multiaddr[]\>
+`Promise`<`Multiaddr`[]\>
 
 #### Defined in
 
@@ -340,7 +340,7 @@ ___
 
 ### getChannel
 
-▸ **getChannel**(`channelId`): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ **getChannel**(`channelId`): `Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Parameters
 
@@ -350,7 +350,7 @@ ___
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)\>
+`Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Defined in
 
@@ -360,17 +360,17 @@ ___
 
 ### getChannels
 
-▸ **getChannels**(`filter?`): `Promise`<[ChannelEntry](channelentry.md)[]\>
+▸ **getChannels**(`filter?`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `filter?` | (`channel`: [ChannelEntry](channelentry.md)) => `boolean` |
+| `filter?` | (`channel`: [`ChannelEntry`](channelentry.md)) => `boolean` |
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Defined in
 
@@ -380,7 +380,7 @@ ___
 
 ### getChannelsFrom
 
-▸ **getChannelsFrom**(`address`): `Promise`<[ChannelEntry](channelentry.md)[]\>
+▸ **getChannelsFrom**(`address`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Parameters
 
@@ -390,7 +390,7 @@ ___
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Defined in
 
@@ -400,7 +400,7 @@ ___
 
 ### getChannelsTo
 
-▸ **getChannelsTo**(`address`): `Promise`<[ChannelEntry](channelentry.md)[]\>
+▸ **getChannelsTo**(`address`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Parameters
 
@@ -410,7 +410,7 @@ ___
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Defined in
 
@@ -438,7 +438,7 @@ ___
 
 ### getOpenChannelsFrom
 
-▸ **getOpenChannelsFrom**(`source`): `Promise`<[ChannelEntry](channelentry.md)[]\>
+▸ **getOpenChannelsFrom**(`source`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 Returns peer's open channels.
 NOTE: channels with status 'PENDING_TO_CLOSE' are not included
@@ -451,7 +451,7 @@ NOTE: channels with status 'PENDING_TO_CLOSE' are not included
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 peer's open channels
 
@@ -463,7 +463,7 @@ ___
 
 ### getPublicKeyOf
 
-▸ **getPublicKeyOf**(`address`): `Promise`<PublicKey\>
+▸ **getPublicKeyOf**(`address`): `Promise`<`PublicKey`\>
 
 #### Parameters
 
@@ -473,7 +473,7 @@ ___
 
 #### Returns
 
-`Promise`<PublicKey\>
+`Promise`<`PublicKey`\>
 
 #### Defined in
 
@@ -483,11 +483,11 @@ ___
 
 ### getPublicNodes
 
-▸ **getPublicNodes**(): `Promise`<Multiaddr[]\>
+▸ **getPublicNodes**(): `Promise`<`Multiaddr`[]\>
 
 #### Returns
 
-`Promise`<Multiaddr[]\>
+`Promise`<`Multiaddr`[]\>
 
 #### Defined in
 
@@ -497,14 +497,14 @@ ___
 
 ### getRandomOpenChannel
 
-▸ **getRandomOpenChannel**(): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ **getRandomOpenChannel**(): `Promise`<[`ChannelEntry`](channelentry.md)\>
 
 Returns a random open channel.
 NOTE: channels with status 'PENDING_TO_CLOSE' are not included
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)\>
+`Promise`<[`ChannelEntry`](channelentry.md)\>
 
 an open channel
 
@@ -564,7 +564,7 @@ ___
 
 ### off
 
-▸ **off**(`event`, `listener`): [Indexer](indexer.md)
+▸ **off**(`event`, `listener`): [`Indexer`](indexer.md)
 
 #### Parameters
 
@@ -575,7 +575,7 @@ ___
 
 #### Returns
 
-[Indexer](indexer.md)
+[`Indexer`](indexer.md)
 
 #### Inherited from
 
@@ -589,7 +589,7 @@ ___
 
 ### on
 
-▸ **on**(`event`, `listener`): [Indexer](indexer.md)
+▸ **on**(`event`, `listener`): [`Indexer`](indexer.md)
 
 #### Parameters
 
@@ -600,7 +600,7 @@ ___
 
 #### Returns
 
-[Indexer](indexer.md)
+[`Indexer`](indexer.md)
 
 #### Inherited from
 
@@ -614,7 +614,7 @@ ___
 
 ### onAnnouncement
 
-▸ `Private` **onAnnouncement**(`event`, `blockNumber`): `Promise`<void\>
+▸ `Private` **onAnnouncement**(`event`, `blockNumber`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -625,7 +625,7 @@ ___
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -635,7 +635,7 @@ ___
 
 ### onChannelUpdated
 
-▸ `Private` **onChannelUpdated**(`event`): `Promise`<void\>
+▸ `Private` **onChannelUpdated**(`event`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -645,7 +645,7 @@ ___
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -655,7 +655,7 @@ ___
 
 ### onNewBlock
 
-▸ `Private` **onNewBlock**(`blockNumber`): `Promise`<void\>
+▸ `Private` **onNewBlock**(`blockNumber`): `Promise`<`void`\>
 
 Called whenever a new block found.
 This will update {this.latestBlock},
@@ -670,7 +670,7 @@ confirmed blocks.
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -688,7 +688,7 @@ Called whenever we receive new events.
 
 | Name | Type |
 | :------ | :------ |
-| `events` | `Event`<any\>[] |
+| `events` | `Event`<`any`\>[] |
 
 #### Returns
 
@@ -702,17 +702,17 @@ ___
 
 ### onOwnUnsetCommitment
 
-▸ `Private` **onOwnUnsetCommitment**(`channel`): `Promise`<void\>
+▸ `Private` **onOwnUnsetCommitment**(`channel`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channel` | [ChannelEntry](channelentry.md) |
+| `channel` | [`ChannelEntry`](channelentry.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -722,7 +722,7 @@ ___
 
 ### once
 
-▸ **once**(`event`, `listener`): [Indexer](indexer.md)
+▸ **once**(`event`, `listener`): [`Indexer`](indexer.md)
 
 #### Parameters
 
@@ -733,7 +733,7 @@ ___
 
 #### Returns
 
-[Indexer](indexer.md)
+[`Indexer`](indexer.md)
 
 #### Inherited from
 
@@ -747,7 +747,7 @@ ___
 
 ### prependListener
 
-▸ **prependListener**(`event`, `listener`): [Indexer](indexer.md)
+▸ **prependListener**(`event`, `listener`): [`Indexer`](indexer.md)
 
 #### Parameters
 
@@ -758,7 +758,7 @@ ___
 
 #### Returns
 
-[Indexer](indexer.md)
+[`Indexer`](indexer.md)
 
 #### Inherited from
 
@@ -772,7 +772,7 @@ ___
 
 ### prependOnceListener
 
-▸ **prependOnceListener**(`event`, `listener`): [Indexer](indexer.md)
+▸ **prependOnceListener**(`event`, `listener`): [`Indexer`](indexer.md)
 
 #### Parameters
 
@@ -783,7 +783,7 @@ ___
 
 #### Returns
 
-[Indexer](indexer.md)
+[`Indexer`](indexer.md)
 
 #### Inherited from
 
@@ -797,7 +797,7 @@ ___
 
 ### processPastEvents
 
-▸ `Private` **processPastEvents**(`fromBlock`, `maxToBlock`, `maxBlockRange`): `Promise`<number\>
+▸ `Private` **processPastEvents**(`fromBlock`, `maxToBlock`, `maxBlockRange`): `Promise`<`number`\>
 
 Query past events, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
 If we exceed response pull limit, we switch into quering smaller chunks.
@@ -813,7 +813,7 @@ TODO: optimize DB and fetch requests
 
 #### Returns
 
-`Promise`<number\>
+`Promise`<`number`\>
 
 past events and last queried block
 
@@ -849,7 +849,7 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**(`event?`): [Indexer](indexer.md)
+▸ **removeAllListeners**(`event?`): [`Indexer`](indexer.md)
 
 #### Parameters
 
@@ -859,7 +859,7 @@ ___
 
 #### Returns
 
-[Indexer](indexer.md)
+[`Indexer`](indexer.md)
 
 #### Inherited from
 
@@ -873,7 +873,7 @@ ___
 
 ### removeListener
 
-▸ **removeListener**(`event`, `listener`): [Indexer](indexer.md)
+▸ **removeListener**(`event`, `listener`): [`Indexer`](indexer.md)
 
 #### Parameters
 
@@ -884,7 +884,7 @@ ___
 
 #### Returns
 
-[Indexer](indexer.md)
+[`Indexer`](indexer.md)
 
 #### Inherited from
 
@@ -918,11 +918,11 @@ ___
 
 ### restart
 
-▸ `Private` **restart**(): `Promise`<void\>
+▸ `Private` **restart**(): `Promise`<`void`\>
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -932,7 +932,7 @@ ___
 
 ### setMaxListeners
 
-▸ **setMaxListeners**(`n`): [Indexer](indexer.md)
+▸ **setMaxListeners**(`n`): [`Indexer`](indexer.md)
 
 #### Parameters
 
@@ -942,7 +942,7 @@ ___
 
 #### Returns
 
-[Indexer](indexer.md)
+[`Indexer`](indexer.md)
 
 #### Inherited from
 
@@ -956,13 +956,13 @@ ___
 
 ### start
 
-▸ **start**(): `Promise`<void\>
+▸ **start**(): `Promise`<`void`\>
 
 Starts indexing.
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -972,13 +972,13 @@ ___
 
 ### stop
 
-▸ **stop**(): `Promise`<void\>
+▸ **stop**(): `Promise`<`void`\>
 
 Stops indexing.
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -988,7 +988,7 @@ ___
 
 ### waitForCommitment
 
-▸ **waitForCommitment**(`channelId`): `Promise`<void\>
+▸ **waitForCommitment**(`channelId`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -998,7 +998,7 @@ ___
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1035,7 +1035,7 @@ ___
 
 ### on
 
-▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<any\>
+▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<`any`\>
 
 #### Parameters
 
@@ -1046,7 +1046,7 @@ ___
 
 #### Returns
 
-`AsyncIterableIterator`<any\>
+`AsyncIterableIterator`<`any`\>
 
 #### Inherited from
 
@@ -1060,7 +1060,7 @@ ___
 
 ### once
 
-▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
 
 #### Parameters
 
@@ -1071,7 +1071,7 @@ ___
 
 #### Returns
 
-`Promise`<any[]\>
+`Promise`<`any`[]\>
 
 #### Inherited from
 
@@ -1081,7 +1081,7 @@ EventEmitter.once
 
 core-ethereum/node_modules/@types/node/events.d.ts:26
 
-▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
 
 #### Parameters
 
@@ -1092,7 +1092,7 @@ core-ethereum/node_modules/@types/node/events.d.ts:26
 
 #### Returns
 
-`Promise`<any[]\>
+`Promise`<`any`[]\>
 
 #### Inherited from
 

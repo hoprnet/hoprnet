@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **ERC777Mock__factory**
+  ↳ **`ERC777Mock__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [ERC777Mock](erc777mock.md)
+▸ **attach**(`address`): [`ERC777Mock`](erc777mock.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[ERC777Mock](erc777mock.md)
+[`ERC777Mock`](erc777mock.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [ERC777Mock\_\_factory](erc777mock__factory.md)
+▸ **connect**(`signer`): [`ERC777Mock__factory`](erc777mock__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[ERC777Mock\_\_factory](erc777mock__factory.md)
+[`ERC777Mock__factory`](erc777mock__factory.md)
 
 #### Overrides
 
@@ -146,7 +146,7 @@ ___
 
 ### deploy
 
-▸ **deploy**(`initialHolder`, `initialBalance`, `name`, `symbol`, `defaultOperators`, `overrides?`): `Promise`<[ERC777Mock](erc777mock.md)\>
+▸ **deploy**(`initialHolder`, `initialBalance`, `name`, `symbol`, `defaultOperators`, `overrides?`): `Promise`<[`ERC777Mock`](erc777mock.md)\>
 
 #### Parameters
 
@@ -157,11 +157,11 @@ ___
 | `name` | `string` |
 | `symbol` | `string` |
 | `defaultOperators` | `string`[] |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[ERC777Mock](erc777mock.md)\>
+`Promise`<[`ERC777Mock`](erc777mock.md)\>
 
 #### Overrides
 
@@ -186,7 +186,7 @@ ___
 | `name` | `string` |
 | `symbol` | `string` |
 | `defaultOperators` | `string`[] |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -204,7 +204,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC777Mock](erc777mock.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ERC777Mock`](erc777mock.md)
 
 #### Parameters
 
@@ -215,7 +215,7 @@ ___
 
 #### Returns
 
-[ERC777Mock](erc777mock.md)
+[`ERC777Mock`](erc777mock.md)
 
 #### Defined in
 

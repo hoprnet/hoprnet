@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **HoprDistributor**
+  ↳ **`HoprDistributor`**
 
 ## Table of contents
 
@@ -115,7 +115,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -185,42 +185,42 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `MULTIPLIER` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `MULTIPLIER()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `addAllocations` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `addAllocations(address[],uint128[],string)` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `addSchedule` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `addSchedule(uint128[],uint128[],string)` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `MULTIPLIER` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `MULTIPLIER()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `addAllocations` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `addAllocations(address[],uint128[],string)` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `addSchedule` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `addSchedule(uint128[],uint128[],string)` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `allocations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`, `boolean`] & { `amount`: `BigNumber` ; `claimed`: `BigNumber` ; `lastClaim`: `BigNumber` ; `revoked`: `boolean`  }\> |
 | `allocations(address,string)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`, `boolean`] & { `amount`: `BigNumber` ; `claimed`: `BigNumber` ; `lastClaim`: `BigNumber` ; `revoked`: `boolean`  }\> |
-| `claim` | (`scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `claim(string)` | (`scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `claimFor` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `claimFor(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `getClaimable` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getClaimable(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `claim` | (`scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `claim(string)` | (`scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `claimFor` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `claimFor(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `getClaimable` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getClaimable(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `getSchedule` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`[], `BigNumber`[]]\> |
 | `getSchedule(string)` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`[], `BigNumber`[]]\> |
-| `maxMintAmount` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `maxMintAmount()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `renounceOwnership` | (`overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `renounceOwnership()` | (`overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `revokeAccount` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `revokeAccount(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `startTime` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `startTime()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `token` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `totalMinted` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalToBeMinted` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalToBeMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `transferOwnership(address)` | (`newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `updateStartTime` | (`_startTime`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `updateStartTime(uint128)` | (`_startTime`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `maxMintAmount` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `maxMintAmount()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `renounceOwnership` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `renounceOwnership()` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `revokeAccount` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `revokeAccount(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `startTime` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `startTime()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `token` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `totalMinted` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalToBeMinted` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalToBeMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `transferOwnership(address)` | (`newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `updateStartTime` | (`_startTime`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `updateStartTime(uint128)` | (`_startTime`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
@@ -254,42 +254,42 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `MULTIPLIER` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `MULTIPLIER()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `addAllocations` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `addAllocations(address[],uint128[],string)` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `addSchedule` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `addSchedule(uint128[],uint128[],string)` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `allocations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `allocations(address,string)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `claim` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `claim(string)` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `claimFor` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `claimFor(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `getClaimable` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getClaimable(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getSchedule` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getSchedule(string)` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `maxMintAmount` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `maxMintAmount()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `revokeAccount` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `revokeAccount(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `startTime` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `startTime()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `token` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalMinted` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalToBeMinted` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalToBeMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferOwnership(address)` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `updateStartTime` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `updateStartTime(uint128)` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `MULTIPLIER` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `MULTIPLIER()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `addAllocations` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `addAllocations(address[],uint128[],string)` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `addSchedule` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `addSchedule(uint128[],uint128[],string)` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `allocations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `allocations(address,string)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `claim` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `claim(string)` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `claimFor` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `claimFor(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `getClaimable` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getClaimable(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getSchedule` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getSchedule(string)` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `maxMintAmount` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `maxMintAmount()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `revokeAccount` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `revokeAccount(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `startTime` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `startTime()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `token` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalMinted` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalToBeMinted` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalToBeMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferOwnership(address)` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `updateStartTime` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `updateStartTime(uint128)` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -309,10 +309,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `AllocationAdded` | (`account`: `string`, `amount`: ``null``, `scheduleName`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
-| `Claimed` | (`account`: `string`, `amount`: ``null``, `scheduleName`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
-| `OwnershipTransferred` | (`previousOwner`: `string`, `newOwner`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
-| `ScheduleAdded` | (`durations`: ``null``, `percents`: ``null``, `name`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`BigNumber`[], `BigNumber`[], `string`], `Object`\> |
+| `AllocationAdded` | (`account`: `string`, `amount`: ``null``, `scheduleName`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
+| `Claimed` | (`account`: `string`, `amount`: ``null``, `scheduleName`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
+| `OwnershipTransferred` | (`previousOwner`: `string`, `newOwner`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
+| `ScheduleAdded` | (`durations`: ``null``, `percents`: ``null``, `name`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`BigNumber`[], `BigNumber`[], `string`], `Object`\> |
 
 #### Overrides
 
@@ -334,16 +334,16 @@ ___
 | :------ | :------ |
 | `MULTIPLIER` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `MULTIPLIER()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `addAllocations` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `addAllocations(address[],uint128[],string)` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `addSchedule` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `addSchedule(uint128[],uint128[],string)` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `addAllocations` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `addAllocations(address[],uint128[],string)` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `addSchedule` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `addSchedule(uint128[],uint128[],string)` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `allocations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`, `boolean`] & { `amount`: `BigNumber` ; `claimed`: `BigNumber` ; `lastClaim`: `BigNumber` ; `revoked`: `boolean`  }\> |
 | `allocations(address,string)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`, `boolean`] & { `amount`: `BigNumber` ; `claimed`: `BigNumber` ; `lastClaim`: `BigNumber` ; `revoked`: `boolean`  }\> |
-| `claim` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `claim(string)` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `claimFor` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `claimFor(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `claim` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `claim(string)` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `claimFor` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `claimFor(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `getClaimable` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `getClaimable(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `getSchedule` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`[], `BigNumber`[]]\> |
@@ -352,10 +352,10 @@ ___
 | `maxMintAmount()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `revokeAccount` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `revokeAccount(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `revokeAccount` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `revokeAccount(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `startTime` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `startTime()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `token` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
@@ -364,10 +364,10 @@ ___
 | `totalMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `totalToBeMinted` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `totalToBeMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferOwnership(address)` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `updateStartTime` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `updateStartTime(uint128)` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferOwnership(address)` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `updateStartTime` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `updateStartTime(uint128)` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
@@ -401,42 +401,42 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `MULTIPLIER` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `MULTIPLIER()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `addAllocations` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `addAllocations(address[],uint128[],string)` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `addSchedule` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `addSchedule(uint128[],uint128[],string)` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `allocations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `allocations(address,string)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `claim` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `claim(string)` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `claimFor` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `claimFor(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `getClaimable` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getClaimable(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getSchedule` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getSchedule(string)` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `maxMintAmount` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `maxMintAmount()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `revokeAccount` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `revokeAccount(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `startTime` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `startTime()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `token` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `totalMinted` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `totalMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `totalToBeMinted` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `totalToBeMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferOwnership(address)` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `updateStartTime` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `updateStartTime(uint128)` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `MULTIPLIER` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `MULTIPLIER()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `addAllocations` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `addAllocations(address[],uint128[],string)` | (`accounts`: `string`[], `amounts`: `BigNumberish`[], `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `addSchedule` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `addSchedule(uint128[],uint128[],string)` | (`durations`: `BigNumberish`[], `percents`: `BigNumberish`[], `name`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `allocations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `allocations(address,string)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `claim` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `claim(string)` | (`scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `claimFor` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `claimFor(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `getClaimable` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getClaimable(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getSchedule` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getSchedule(string)` | (`name`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `maxMintAmount` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `maxMintAmount()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `revokeAccount` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `revokeAccount(address,string)` | (`account`: `string`, `scheduleName`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `startTime` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `startTime()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `token` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `totalMinted` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `totalMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `totalToBeMinted` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `totalToBeMinted()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferOwnership(address)` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `updateStartTime` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `updateStartTime(uint128)` | (`_startTime`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -464,7 +464,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -492,7 +492,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 ### MULTIPLIER
 
-▸ **MULTIPLIER**(`overrides?`): `Promise`<BigNumber\>
+▸ **MULTIPLIER**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -502,7 +502,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -512,7 +512,7 @@ ___
 
 ### MULTIPLIER()
 
-▸ **MULTIPLIER()**(`overrides?`): `Promise`<BigNumber\>
+▸ **MULTIPLIER()**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -522,7 +522,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -556,7 +556,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -566,7 +566,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -606,7 +606,7 @@ ___
 
 ### addAllocations
 
-▸ **addAllocations**(`accounts`, `amounts`, `scheduleName`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **addAllocations**(`accounts`, `amounts`, `scheduleName`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -615,11 +615,11 @@ ___
 | `accounts` | `string`[] |
 | `amounts` | `BigNumberish`[] |
 | `scheduleName` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -629,7 +629,7 @@ ___
 
 ### addAllocations(address[],uint128[],string)
 
-▸ **addAllocations(address[],uint128[],string)**(`accounts`, `amounts`, `scheduleName`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **addAllocations(address[],uint128[],string)**(`accounts`, `amounts`, `scheduleName`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -638,11 +638,11 @@ ___
 | `accounts` | `string`[] |
 | `amounts` | `BigNumberish`[] |
 | `scheduleName` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -652,7 +652,7 @@ ___
 
 ### addSchedule
 
-▸ **addSchedule**(`durations`, `percents`, `name`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **addSchedule**(`durations`, `percents`, `name`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -661,11 +661,11 @@ ___
 | `durations` | `BigNumberish`[] |
 | `percents` | `BigNumberish`[] |
 | `name` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -675,7 +675,7 @@ ___
 
 ### addSchedule(uint128[],uint128[],string)
 
-▸ **addSchedule(uint128[],uint128[],string)**(`durations`, `percents`, `name`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **addSchedule(uint128[],uint128[],string)**(`durations`, `percents`, `name`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -684,11 +684,11 @@ ___
 | `durations` | `BigNumberish`[] |
 | `percents` | `BigNumberish`[] |
 | `name` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -742,7 +742,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [HoprDistributor](hoprdistributor.md)
+▸ **attach**(`addressOrName`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Parameters
 
@@ -752,7 +752,7 @@ ___
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -766,18 +766,18 @@ ___
 
 ### claim
 
-▸ **claim**(`scheduleName`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **claim**(`scheduleName`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `scheduleName` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -787,18 +787,18 @@ ___
 
 ### claim(string)
 
-▸ **claim(string)**(`scheduleName`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **claim(string)**(`scheduleName`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `scheduleName` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -808,7 +808,7 @@ ___
 
 ### claimFor
 
-▸ **claimFor**(`account`, `scheduleName`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **claimFor**(`account`, `scheduleName`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -816,11 +816,11 @@ ___
 | :------ | :------ |
 | `account` | `string` |
 | `scheduleName` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -830,7 +830,7 @@ ___
 
 ### claimFor(address,string)
 
-▸ **claimFor(address,string)**(`account`, `scheduleName`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **claimFor(address,string)**(`account`, `scheduleName`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -838,11 +838,11 @@ ___
 | :------ | :------ |
 | `account` | `string` |
 | `scheduleName` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -852,7 +852,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [HoprDistributor](hoprdistributor.md)
+▸ **connect**(`signerOrProvider`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Parameters
 
@@ -862,7 +862,7 @@ ___
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -876,11 +876,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[HoprDistributor](hoprdistributor.md)\>
+▸ **deployed**(): `Promise`<[`HoprDistributor`](hoprdistributor.md)\>
 
 #### Returns
 
-`Promise`<[HoprDistributor](hoprdistributor.md)\>
+`Promise`<[`HoprDistributor`](hoprdistributor.md)\>
 
 #### Overrides
 
@@ -919,7 +919,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -929,7 +929,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -943,7 +943,7 @@ ___
 
 ### getClaimable
 
-▸ **getClaimable**(`account`, `scheduleName`, `overrides?`): `Promise`<BigNumber\>
+▸ **getClaimable**(`account`, `scheduleName`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -955,7 +955,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -965,7 +965,7 @@ ___
 
 ### getClaimable(address,string)
 
-▸ **getClaimable(address,string)**(`account`, `scheduleName`, `overrides?`): `Promise`<BigNumber\>
+▸ **getClaimable(address,string)**(`account`, `scheduleName`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -977,7 +977,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1053,24 +1053,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -1104,7 +1104,7 @@ ___
 
 ### maxMintAmount
 
-▸ **maxMintAmount**(`overrides?`): `Promise`<BigNumber\>
+▸ **maxMintAmount**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1114,7 +1114,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1124,7 +1124,7 @@ ___
 
 ### maxMintAmount()
 
-▸ **maxMintAmount()**(`overrides?`): `Promise`<BigNumber\>
+▸ **maxMintAmount()**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1134,7 +1134,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1144,25 +1144,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprDistributor](hoprdistributor.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1172,7 +1172,7 @@ Contract.off
 
 packages/ethereum/types/HoprDistributor.d.ts:178
 
-▸ **off**(`eventName`, `listener`): [HoprDistributor](hoprdistributor.md)
+▸ **off**(`eventName`, `listener`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Parameters
 
@@ -1183,7 +1183,7 @@ packages/ethereum/types/HoprDistributor.d.ts:178
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1197,25 +1197,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprDistributor](hoprdistributor.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1225,7 +1225,7 @@ Contract.on
 
 packages/ethereum/types/HoprDistributor.d.ts:182
 
-▸ **on**(`eventName`, `listener`): [HoprDistributor](hoprdistributor.md)
+▸ **on**(`eventName`, `listener`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Parameters
 
@@ -1236,7 +1236,7 @@ packages/ethereum/types/HoprDistributor.d.ts:182
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1250,25 +1250,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprDistributor](hoprdistributor.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1278,7 +1278,7 @@ Contract.once
 
 packages/ethereum/types/HoprDistributor.d.ts:186
 
-▸ **once**(`eventName`, `listener`): [HoprDistributor](hoprdistributor.md)
+▸ **once**(`eventName`, `listener`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Parameters
 
@@ -1289,7 +1289,7 @@ packages/ethereum/types/HoprDistributor.d.ts:186
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1303,7 +1303,7 @@ ___
 
 ### owner
 
-▸ **owner**(`overrides?`): `Promise`<string\>
+▸ **owner**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1313,7 +1313,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1323,7 +1323,7 @@ ___
 
 ### owner()
 
-▸ **owner()**(`overrides?`): `Promise`<string\>
+▸ **owner()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1333,7 +1333,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1343,26 +1343,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -1376,24 +1376,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [HoprDistributor](hoprdistributor.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1403,7 +1403,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/HoprDistributor.d.ts:194
 
-▸ **removeAllListeners**(`eventName?`): [HoprDistributor](hoprdistributor.md)
+▸ **removeAllListeners**(`eventName?`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Parameters
 
@@ -1413,7 +1413,7 @@ packages/ethereum/types/HoprDistributor.d.ts:194
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1427,25 +1427,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprDistributor](hoprdistributor.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1455,7 +1455,7 @@ Contract.removeListener
 
 packages/ethereum/types/HoprDistributor.d.ts:190
 
-▸ **removeListener**(`eventName`, `listener`): [HoprDistributor](hoprdistributor.md)
+▸ **removeListener**(`eventName`, `listener`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Parameters
 
@@ -1466,7 +1466,7 @@ packages/ethereum/types/HoprDistributor.d.ts:190
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -1480,17 +1480,17 @@ ___
 
 ### renounceOwnership
 
-▸ **renounceOwnership**(`overrides?`): `Promise`<ContractTransaction\>
+▸ **renounceOwnership**(`overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1500,17 +1500,17 @@ ___
 
 ### renounceOwnership()
 
-▸ **renounceOwnership()**(`overrides?`): `Promise`<ContractTransaction\>
+▸ **renounceOwnership()**(`overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1520,7 +1520,7 @@ ___
 
 ### revokeAccount
 
-▸ **revokeAccount**(`account`, `scheduleName`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **revokeAccount**(`account`, `scheduleName`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1528,11 +1528,11 @@ ___
 | :------ | :------ |
 | `account` | `string` |
 | `scheduleName` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1542,7 +1542,7 @@ ___
 
 ### revokeAccount(address,string)
 
-▸ **revokeAccount(address,string)**(`account`, `scheduleName`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **revokeAccount(address,string)**(`account`, `scheduleName`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1550,11 +1550,11 @@ ___
 | :------ | :------ |
 | `account` | `string` |
 | `scheduleName` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1564,7 +1564,7 @@ ___
 
 ### startTime
 
-▸ **startTime**(`overrides?`): `Promise`<BigNumber\>
+▸ **startTime**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1574,7 +1574,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1584,7 +1584,7 @@ ___
 
 ### startTime()
 
-▸ **startTime()**(`overrides?`): `Promise`<BigNumber\>
+▸ **startTime()**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1594,7 +1594,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1604,7 +1604,7 @@ ___
 
 ### token
 
-▸ **token**(`overrides?`): `Promise`<string\>
+▸ **token**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1614,7 +1614,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1624,7 +1624,7 @@ ___
 
 ### token()
 
-▸ **token()**(`overrides?`): `Promise`<string\>
+▸ **token()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1634,7 +1634,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1644,7 +1644,7 @@ ___
 
 ### totalMinted
 
-▸ **totalMinted**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalMinted**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1654,7 +1654,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1664,7 +1664,7 @@ ___
 
 ### totalMinted()
 
-▸ **totalMinted()**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalMinted()**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1674,7 +1674,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1684,7 +1684,7 @@ ___
 
 ### totalToBeMinted
 
-▸ **totalToBeMinted**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalToBeMinted**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1694,7 +1694,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1704,7 +1704,7 @@ ___
 
 ### totalToBeMinted()
 
-▸ **totalToBeMinted()**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalToBeMinted()**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1714,7 +1714,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1724,18 +1724,18 @@ ___
 
 ### transferOwnership
 
-▸ **transferOwnership**(`newOwner`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferOwnership**(`newOwner`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `newOwner` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1745,18 +1745,18 @@ ___
 
 ### transferOwnership(address)
 
-▸ **transferOwnership(address)**(`newOwner`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferOwnership(address)**(`newOwner`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `newOwner` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1766,18 +1766,18 @@ ___
 
 ### updateStartTime
 
-▸ **updateStartTime**(`_startTime`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **updateStartTime**(`_startTime`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_startTime` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1787,18 +1787,18 @@ ___
 
 ### updateStartTime(uint128)
 
-▸ **updateStartTime(uint128)**(`_startTime`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **updateStartTime(uint128)**(`_startTime`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_startTime` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 

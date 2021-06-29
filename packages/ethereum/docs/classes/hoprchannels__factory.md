@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **HoprChannels__factory**
+  ↳ **`HoprChannels__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [HoprChannels](hoprchannels.md)
+▸ **attach**(`address`): [`HoprChannels`](hoprchannels.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[HoprChannels](hoprchannels.md)
+[`HoprChannels`](hoprchannels.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [HoprChannels\_\_factory](hoprchannels__factory.md)
+▸ **connect**(`signer`): [`HoprChannels__factory`](hoprchannels__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[HoprChannels\_\_factory](hoprchannels__factory.md)
+[`HoprChannels__factory`](hoprchannels__factory.md)
 
 #### Overrides
 
@@ -146,7 +146,7 @@ ___
 
 ### deploy
 
-▸ **deploy**(`_token`, `_secsClosure`, `overrides?`): `Promise`<[HoprChannels](hoprchannels.md)\>
+▸ **deploy**(`_token`, `_secsClosure`, `overrides?`): `Promise`<[`HoprChannels`](hoprchannels.md)\>
 
 #### Parameters
 
@@ -154,11 +154,11 @@ ___
 | :------ | :------ |
 | `_token` | `string` |
 | `_secsClosure` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[HoprChannels](hoprchannels.md)\>
+`Promise`<[`HoprChannels`](hoprchannels.md)\>
 
 #### Overrides
 
@@ -180,7 +180,7 @@ ___
 | :------ | :------ |
 | `_token` | `string` |
 | `_secsClosure` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -198,7 +198,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [HoprChannels](hoprchannels.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`HoprChannels`](hoprchannels.md)
 
 #### Parameters
 
@@ -209,7 +209,7 @@ ___
 
 #### Returns
 
-[HoprChannels](hoprchannels.md)
+[`HoprChannels`](hoprchannels.md)
 
 #### Defined in
 

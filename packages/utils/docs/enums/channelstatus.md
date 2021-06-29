@@ -15,7 +15,7 @@
 
 ### Closed
 
-• **Closed** = 0
+• **Closed** = `0`
 
 #### Defined in
 
@@ -25,7 +25,7 @@ ___
 
 ### Open
 
-• **Open** = 2
+• **Open** = `2`
 
 #### Defined in
 
@@ -35,7 +35,7 @@ ___
 
 ### PendingToClose
 
-• **PendingToClose** = 3
+• **PendingToClose** = `3`
 
 #### Defined in
 
@@ -45,7 +45,7 @@ ___
 
 ### WaitingForCommitment
 
-• **WaitingForCommitment** = 1
+• **WaitingForCommitment** = `1`
 
 #### Defined in
 

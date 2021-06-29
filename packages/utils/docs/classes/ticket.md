@@ -47,14 +47,14 @@
 
 | Name | Type |
 | :------ | :------ |
-| `counterparty` | [Address](address.md) |
-| `challenge` | [EthereumChallenge](ethereumchallenge.md) |
-| `epoch` | [UINT256](uint256.md) |
-| `index` | [UINT256](uint256.md) |
-| `amount` | [Balance](balance.md) |
-| `winProb` | [UINT256](uint256.md) |
-| `channelIteration` | [UINT256](uint256.md) |
-| `signature` | [Signature](signature.md) |
+| `counterparty` | [`Address`](address.md) |
+| `challenge` | [`EthereumChallenge`](ethereumchallenge.md) |
+| `epoch` | [`UINT256`](uint256.md) |
+| `index` | [`UINT256`](uint256.md) |
+| `amount` | [`Balance`](balance.md) |
+| `winProb` | [`UINT256`](uint256.md) |
+| `channelIteration` | [`UINT256`](uint256.md) |
+| `signature` | [`Signature`](signature.md) |
 
 #### Defined in
 
@@ -64,49 +64,49 @@
 
 ### amount
 
-• `Readonly` **amount**: [Balance](balance.md)
+• `Readonly` **amount**: [`Balance`](balance.md)
 
 ___
 
 ### challenge
 
-• `Readonly` **challenge**: [EthereumChallenge](ethereumchallenge.md)
+• `Readonly` **challenge**: [`EthereumChallenge`](ethereumchallenge.md)
 
 ___
 
 ### channelIteration
 
-• `Readonly` **channelIteration**: [UINT256](uint256.md)
+• `Readonly` **channelIteration**: [`UINT256`](uint256.md)
 
 ___
 
 ### counterparty
 
-• `Readonly` **counterparty**: [Address](address.md)
+• `Readonly` **counterparty**: [`Address`](address.md)
 
 ___
 
 ### epoch
 
-• `Readonly` **epoch**: [UINT256](uint256.md)
+• `Readonly` **epoch**: [`UINT256`](uint256.md)
 
 ___
 
 ### index
 
-• `Readonly` **index**: [UINT256](uint256.md)
+• `Readonly` **index**: [`UINT256`](uint256.md)
 
 ___
 
 ### signature
 
-• `Readonly` **signature**: [Signature](signature.md)
+• `Readonly` **signature**: [`Signature`](signature.md)
 
 ___
 
 ### winProb
 
-• `Readonly` **winProb**: [UINT256](uint256.md)
+• `Readonly` **winProb**: [`UINT256`](uint256.md)
 
 ## Accessors
 
@@ -126,11 +126,11 @@ ___
 
 ### getHash
 
-▸ **getHash**(): [Hash](hash.md)
+▸ **getHash**(): [`Hash`](hash.md)
 
 #### Returns
 
-[Hash](hash.md)
+[`Hash`](hash.md)
 
 #### Defined in
 
@@ -140,18 +140,18 @@ ___
 
 ### getLuck
 
-▸ **getLuck**(`preImage`, `challengeResponse`): [UINT256](uint256.md)
+▸ **getLuck**(`preImage`, `challengeResponse`): [`UINT256`](uint256.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `preImage` | [Hash](hash.md) |
-| `challengeResponse` | [Response](response.md) |
+| `preImage` | [`Hash`](hash.md) |
+| `challengeResponse` | [`Response`](response.md) |
 
 #### Returns
 
-[UINT256](uint256.md)
+[`UINT256`](uint256.md)
 
 #### Defined in
 
@@ -187,9 +187,9 @@ a ticket before we submit it to the blockchain.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `preImage` | [Hash](hash.md) | preImage of the current onChainSecret |
-| `challengeResponse` | [Response](response.md) | response that solves the signed challenge |
-| `winProb` | [UINT256](uint256.md) | winning probability of the ticket |
+| `preImage` | [`Hash`](hash.md) | preImage of the current onChainSecret |
+| `challengeResponse` | [`Response`](response.md) | response that solves the signed challenge |
+| `winProb` | [`UINT256`](uint256.md) | winning probability of the ticket |
 
 #### Returns
 
@@ -203,11 +203,11 @@ ___
 
 ### recoverSigner
 
-▸ **recoverSigner**(): [PublicKey](publickey.md)
+▸ **recoverSigner**(): [`PublicKey`](publickey.md)
 
 #### Returns
 
-[PublicKey](publickey.md)
+[`PublicKey`](publickey.md)
 
 #### Defined in
 
@@ -265,7 +265,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `pubKey` | [PublicKey](publickey.md) |
+| `pubKey` | [`PublicKey`](publickey.md) |
 
 #### Returns
 
@@ -279,24 +279,24 @@ ___
 
 ### create
 
-▸ `Static` **create**(`counterparty`, `challenge`, `epoch`, `index`, `amount`, `winProb`, `channelIteration`, `signPriv`): [Ticket](ticket.md)
+▸ `Static` **create**(`counterparty`, `challenge`, `epoch`, `index`, `amount`, `winProb`, `channelIteration`, `signPriv`): [`Ticket`](ticket.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `counterparty` | [Address](address.md) |
-| `challenge` | [Challenge](challenge.md) |
-| `epoch` | [UINT256](uint256.md) |
-| `index` | [UINT256](uint256.md) |
-| `amount` | [Balance](balance.md) |
-| `winProb` | [UINT256](uint256.md) |
-| `channelIteration` | [UINT256](uint256.md) |
+| `counterparty` | [`Address`](address.md) |
+| `challenge` | [`Challenge`](challenge.md) |
+| `epoch` | [`UINT256`](uint256.md) |
+| `index` | [`UINT256`](uint256.md) |
+| `amount` | [`Balance`](balance.md) |
+| `winProb` | [`UINT256`](uint256.md) |
+| `channelIteration` | [`UINT256`](uint256.md) |
 | `signPriv` | `Uint8Array` |
 
 #### Returns
 
-[Ticket](ticket.md)
+[`Ticket`](ticket.md)
 
 #### Defined in
 
@@ -306,7 +306,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [Ticket](ticket.md)
+▸ `Static` **deserialize**(`arr`): [`Ticket`](ticket.md)
 
 #### Parameters
 
@@ -316,7 +316,7 @@ ___
 
 #### Returns
 
-[Ticket](ticket.md)
+[`Ticket`](ticket.md)
 
 #### Defined in
 

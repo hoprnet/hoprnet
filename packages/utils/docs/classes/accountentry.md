@@ -37,7 +37,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `address` | [Address](address.md) |
+| `address` | [`Address`](address.md) |
 | `multiAddr` | `Multiaddr` |
 | `updatedBlock` | `BN` |
 
@@ -49,7 +49,7 @@
 
 ### address
 
-• `Readonly` **address**: [Address](address.md)
+• `Readonly` **address**: [`Address`](address.md)
 
 ___
 
@@ -109,11 +109,11 @@ ___
 
 ### getPublicKey
 
-▸ **getPublicKey**(): [PublicKey](publickey.md)
+▸ **getPublicKey**(): [`PublicKey`](publickey.md)
 
 #### Returns
 
-[PublicKey](publickey.md)
+[`PublicKey`](publickey.md)
 
 #### Defined in
 
@@ -151,7 +151,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [AccountEntry](accountentry.md)
+▸ `Static` **deserialize**(`arr`): [`AccountEntry`](accountentry.md)
 
 #### Parameters
 
@@ -161,7 +161,7 @@ ___
 
 #### Returns
 
-[AccountEntry](accountentry.md)
+[`AccountEntry`](accountentry.md)
 
 #### Defined in
 

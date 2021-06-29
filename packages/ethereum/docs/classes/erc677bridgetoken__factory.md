@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **ERC677BridgeToken__factory**
+  ↳ **`ERC677BridgeToken__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [ERC677BridgeToken](erc677bridgetoken.md)
+▸ **attach**(`address`): [`ERC677BridgeToken`](erc677bridgetoken.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[ERC677BridgeToken](erc677bridgetoken.md)
+[`ERC677BridgeToken`](erc677bridgetoken.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [ERC677BridgeToken\_\_factory](erc677bridgetoken__factory.md)
+▸ **connect**(`signer`): [`ERC677BridgeToken__factory`](erc677bridgetoken__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[ERC677BridgeToken\_\_factory](erc677bridgetoken__factory.md)
+[`ERC677BridgeToken__factory`](erc677bridgetoken__factory.md)
 
 #### Overrides
 
@@ -146,7 +146,7 @@ ___
 
 ### deploy
 
-▸ **deploy**(`_name`, `_symbol`, `_decimals`, `overrides?`): `Promise`<[ERC677BridgeToken](erc677bridgetoken.md)\>
+▸ **deploy**(`_name`, `_symbol`, `_decimals`, `overrides?`): `Promise`<[`ERC677BridgeToken`](erc677bridgetoken.md)\>
 
 #### Parameters
 
@@ -155,11 +155,11 @@ ___
 | `_name` | `string` |
 | `_symbol` | `string` |
 | `_decimals` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[ERC677BridgeToken](erc677bridgetoken.md)\>
+`Promise`<[`ERC677BridgeToken`](erc677bridgetoken.md)\>
 
 #### Overrides
 
@@ -182,7 +182,7 @@ ___
 | `_name` | `string` |
 | `_symbol` | `string` |
 | `_decimals` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -200,7 +200,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC677BridgeToken](erc677bridgetoken.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ERC677BridgeToken`](erc677bridgetoken.md)
 
 #### Parameters
 
@@ -211,7 +211,7 @@ ___
 
 #### Returns
 
-[ERC677BridgeToken](erc677bridgetoken.md)
+[`ERC677BridgeToken`](erc677bridgetoken.md)
 
 #### Defined in
 

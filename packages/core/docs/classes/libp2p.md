@@ -110,7 +110,7 @@
 
 - `EventEmitter`
 
-  ↳ **LibP2P**
+  ↳ **`LibP2P`**
 
 ## Table of contents
 
@@ -205,7 +205,7 @@ Libp2p node.
 
 | Name | Type |
 | :------ | :------ |
-| `_options` | [Libp2pOptions](../modules/libp2p.md#libp2poptions) & [constructorOptions](../modules/libp2p.md#constructoroptions) |
+| `_options` | [`Libp2pOptions`](../modules/libp2p.md#libp2poptions) & [`constructorOptions`](../modules/libp2p.md#constructoroptions) |
 
 #### Overrides
 
@@ -219,7 +219,7 @@ node_modules/libp2p/dist/src/index.d.ts:105
 
 ### \_config
 
-• **\_config**: { `dht`: { `enabled`: `boolean` ; `kBucketSize`: `number` ; `randomWalk`: { `enabled`: `boolean` ; `interval`: `number` ; `queriesPerPeriod`: `number` ; `timeout`: `number`  }  } ; `nat`: { `enabled`: `boolean` ; `externalIp`: ``null`` ; `gateway`: ``null`` ; `keepAlive`: `boolean` ; `pmp`: { `enabled`: `boolean`  } ; `ttl`: `number`  } ; `peerDiscovery`: { `autoDial`: `boolean`  } ; `pubsub`: { `enabled`: `boolean`  } ; `relay`: { `advertise`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `ttl`: `number`  } ; `autoRelay`: { `enabled`: `boolean` ; `maxListeners`: `number`  } ; `enabled`: `boolean` ; `hop`: { `active`: `boolean` ; `enabled`: `boolean`  }  } ; `transport`: {}  } & [Libp2pConfig](../modules/libp2p.md#libp2pconfig)
+• **\_config**: { `dht`: { `enabled`: `boolean` ; `kBucketSize`: `number` ; `randomWalk`: { `enabled`: `boolean` ; `interval`: `number` ; `queriesPerPeriod`: `number` ; `timeout`: `number`  }  } ; `nat`: { `enabled`: `boolean` ; `externalIp`: ``null`` ; `gateway`: ``null`` ; `keepAlive`: `boolean` ; `pmp`: { `enabled`: `boolean`  } ; `ttl`: `number`  } ; `peerDiscovery`: { `autoDial`: `boolean`  } ; `pubsub`: { `enabled`: `boolean`  } ; `relay`: { `advertise`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `ttl`: `number`  } ; `autoRelay`: { `enabled`: `boolean` ; `maxListeners`: `number`  } ; `enabled`: `boolean` ; `hop`: { `active`: `boolean` ; `enabled`: `boolean`  }  } ; `transport`: {}  } & [`Libp2pConfig`](../modules/libp2p.md#libp2pconfig)
 
 #### Defined in
 
@@ -239,7 +239,7 @@ ___
 
 ### \_discovery
 
-• **\_discovery**: `Map`<any, any\>
+• **\_discovery**: `Map`<`any`, `any`\>
 
 #### Defined in
 
@@ -275,7 +275,7 @@ ___
 
 ### \_modules
 
-• **\_modules**: [Libp2pModules](../modules/libp2p.md#libp2pmodules)
+• **\_modules**: [`Libp2pModules`](../modules/libp2p.md#libp2pmodules)
 
 #### Defined in
 
@@ -312,7 +312,7 @@ ___
 
 ### \_options
 
-• **\_options**: { `addresses`: { `announce`: `never`[] ; `announceFilter`: (`multiaddrs`: `Multiaddr`[]) => `Multiaddr`[] ; `listen`: `never`[] ; `noAnnounce`: `never`[]  } ; `config`: { `dht`: { `enabled`: `boolean` ; `kBucketSize`: `number` ; `randomWalk`: { `enabled`: `boolean` ; `interval`: `number` ; `queriesPerPeriod`: `number` ; `timeout`: `number`  }  } ; `nat`: { `enabled`: `boolean` ; `externalIp`: ``null`` ; `gateway`: ``null`` ; `keepAlive`: `boolean` ; `pmp`: { `enabled`: `boolean`  } ; `ttl`: `number`  } ; `peerDiscovery`: { `autoDial`: `boolean`  } ; `pubsub`: { `enabled`: `boolean`  } ; `relay`: { `advertise`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `ttl`: `number`  } ; `autoRelay`: { `enabled`: `boolean` ; `maxListeners`: `number`  } ; `enabled`: `boolean` ; `hop`: { `active`: `boolean` ; `enabled`: `boolean`  }  } ; `transport`: {}  } ; `connectionManager`: { `minConnections`: `number`  } ; `dialer`: { `addressSorter`: (`addresses`: `Address`[]) => `Address`[] ; `dialTimeout`: `number` ; `maxDialsPerPeer`: `number` ; `maxParallelDials`: `number` ; `resolvers`: { `dnsaddr`: `any`  }  } ; `host`: { `agentVersion`: `string`  } ; `metrics`: { `enabled`: `boolean`  } ; `peerRouting`: { `refreshManager`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `interval`: `number`  }  } ; `peerStore`: { `persistence`: `boolean` ; `threshold`: `number`  } ; `transportManager`: { `faultTolerance`: `number`  }  } & [Libp2pOptions](../modules/libp2p.md#libp2poptions) & [constructorOptions](../modules/libp2p.md#constructoroptions)
+• **\_options**: { `addresses`: { `announce`: `never`[] ; `announceFilter`: (`multiaddrs`: `Multiaddr`[]) => `Multiaddr`[] ; `listen`: `never`[] ; `noAnnounce`: `never`[]  } ; `config`: { `dht`: { `enabled`: `boolean` ; `kBucketSize`: `number` ; `randomWalk`: { `enabled`: `boolean` ; `interval`: `number` ; `queriesPerPeriod`: `number` ; `timeout`: `number`  }  } ; `nat`: { `enabled`: `boolean` ; `externalIp`: ``null`` ; `gateway`: ``null`` ; `keepAlive`: `boolean` ; `pmp`: { `enabled`: `boolean`  } ; `ttl`: `number`  } ; `peerDiscovery`: { `autoDial`: `boolean`  } ; `pubsub`: { `enabled`: `boolean`  } ; `relay`: { `advertise`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `ttl`: `number`  } ; `autoRelay`: { `enabled`: `boolean` ; `maxListeners`: `number`  } ; `enabled`: `boolean` ; `hop`: { `active`: `boolean` ; `enabled`: `boolean`  }  } ; `transport`: {}  } ; `connectionManager`: { `minConnections`: `number`  } ; `dialer`: { `addressSorter`: (`addresses`: `Address`[]) => `Address`[] ; `dialTimeout`: `number` ; `maxDialsPerPeer`: `number` ; `maxParallelDials`: `number` ; `resolvers`: { `dnsaddr`: `any`  }  } ; `host`: { `agentVersion`: `string`  } ; `metrics`: { `enabled`: `boolean`  } ; `peerRouting`: { `refreshManager`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `interval`: `number`  }  } ; `peerStore`: { `persistence`: `boolean` ; `threshold`: `number`  } ; `transportManager`: { `faultTolerance`: `number`  }  } & [`Libp2pOptions`](../modules/libp2p.md#libp2poptions) & [`constructorOptions`](../modules/libp2p.md#constructoroptions)
 
 #### Defined in
 
@@ -526,7 +526,7 @@ ___
 
 ### captureRejectionSymbol
 
-▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [captureRejectionSymbol](default.md#capturerejectionsymbol)
+▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [`captureRejectionSymbol`](default.md#capturerejectionsymbol)
 
 #### Inherited from
 
@@ -570,7 +570,7 @@ ___
 
 ### errorMonitor
 
-▪ `Static` `Readonly` **errorMonitor**: typeof [errorMonitor](default.md#errormonitor)
+▪ `Static` `Readonly` **errorMonitor**: typeof [`errorMonitor`](default.md#errormonitor)
 
 This symbol shall be used to install a listener for only monitoring `'error'`
 events. Listeners installed using this symbol are called before the regular
@@ -592,14 +592,14 @@ packages/core/node_modules/@types/node/events.d.ts:42
 
 ### connections
 
-• `get` **connections**(): `Map`<string, Connection[]\>
+• `get` **connections**(): `Map`<`string`, `Connection`[]\>
 
 Gets a Map of the current connections. The keys are the stringified
 `PeerId` of the peer. The value is an array of Connections to that peer.
 
 #### Returns
 
-`Map`<string, Connection[]\>
+`Map`<`string`, `Connection`[]\>
 
 #### Defined in
 
@@ -630,7 +630,7 @@ node_modules/libp2p/dist/src/index.d.ts:363
 
 ### \_dial
 
-▸ **_dial**(`peer`, `options?`): `Promise`<Connection\>
+▸ **_dial**(`peer`, `options?`): `Promise`<`Connection`\>
 
 **`async`**
 
@@ -643,7 +643,7 @@ node_modules/libp2p/dist/src/index.d.ts:363
 
 #### Returns
 
-`Promise`<Connection\>
+`Promise`<`Connection`\>
 
 #### Defined in
 
@@ -653,11 +653,11 @@ ___
 
 ### \_onStarting
 
-▸ **_onStarting**(): `Promise`<void\>
+▸ **_onStarting**(): `Promise`<`void`\>
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -667,7 +667,7 @@ ___
 
 ### addListener
 
-▸ **addListener**(`event`, `listener`): [LibP2P](libp2p.md)
+▸ **addListener**(`event`, `listener`): [`LibP2P`](libp2p.md)
 
 #### Parameters
 
@@ -678,7 +678,7 @@ ___
 
 #### Returns
 
-[LibP2P](libp2p.md)
+[`LibP2P`](libp2p.md)
 
 #### Inherited from
 
@@ -692,7 +692,7 @@ ___
 
 ### dial
 
-▸ **dial**(`peer`, `options?`): `Promise`<Connection\>
+▸ **dial**(`peer`, `options?`): `Promise`<`Connection`\>
 
 Dials to the provided peer. If successful, the known metadata of the
 peer will be added to the nodes `peerStore`
@@ -707,7 +707,7 @@ peer will be added to the nodes `peerStore`
 
 #### Returns
 
-`Promise`<Connection\>
+`Promise`<`Connection`\>
 
 #### Defined in
 
@@ -816,7 +816,7 @@ Registers the `handler` for each protocol
 | Name | Type |
 | :------ | :------ |
 | `protocols` | `string` \| `string`[] |
-| `handler` | (`props`: [HandlerProps](../modules/libp2p.md#handlerprops)) => `void` |
+| `handler` | (`props`: [`HandlerProps`](../modules/libp2p.md#handlerprops)) => `void` |
 
 #### Returns
 
@@ -830,7 +830,7 @@ ___
 
 ### hangUp
 
-▸ **hangUp**(`peer`): `Promise`<void\>
+▸ **hangUp**(`peer`): `Promise`<`void`\>
 
 Disconnects all connections to the given `peer`
 
@@ -842,7 +842,7 @@ Disconnects all connections to the given `peer`
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -914,7 +914,7 @@ ___
 
 ### loadKeychain
 
-▸ **loadKeychain**(): `Promise`<void\>
+▸ **loadKeychain**(): `Promise`<`void`\>
 
 Load keychain keys from the datastore.
 Imports the private key as 'self', if needed.
@@ -923,7 +923,7 @@ Imports the private key as 'self', if needed.
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -933,7 +933,7 @@ ___
 
 ### off
 
-▸ **off**(`event`, `listener`): [LibP2P](libp2p.md)
+▸ **off**(`event`, `listener`): [`LibP2P`](libp2p.md)
 
 #### Parameters
 
@@ -944,7 +944,7 @@ ___
 
 #### Returns
 
-[LibP2P](libp2p.md)
+[`LibP2P`](libp2p.md)
 
 #### Inherited from
 
@@ -958,7 +958,7 @@ ___
 
 ### on
 
-▸ **on**(`event`, `listener`): [LibP2P](libp2p.md)
+▸ **on**(`event`, `listener`): [`LibP2P`](libp2p.md)
 
 #### Parameters
 
@@ -969,7 +969,7 @@ ___
 
 #### Returns
 
-[LibP2P](libp2p.md)
+[`LibP2P`](libp2p.md)
 
 #### Inherited from
 
@@ -983,7 +983,7 @@ ___
 
 ### once
 
-▸ **once**(`event`, `listener`): [LibP2P](libp2p.md)
+▸ **once**(`event`, `listener`): [`LibP2P`](libp2p.md)
 
 #### Parameters
 
@@ -994,7 +994,7 @@ ___
 
 #### Returns
 
-[LibP2P](libp2p.md)
+[`LibP2P`](libp2p.md)
 
 #### Inherited from
 
@@ -1008,7 +1008,7 @@ ___
 
 ### ping
 
-▸ **ping**(`peer`): `Promise`<number\>
+▸ **ping**(`peer`): `Promise`<`number`\>
 
 Pings the given peer in order to obtain the operation latency.
 
@@ -1020,7 +1020,7 @@ Pings the given peer in order to obtain the operation latency.
 
 #### Returns
 
-`Promise`<number\>
+`Promise`<`number`\>
 
 #### Defined in
 
@@ -1030,7 +1030,7 @@ ___
 
 ### prependListener
 
-▸ **prependListener**(`event`, `listener`): [LibP2P](libp2p.md)
+▸ **prependListener**(`event`, `listener`): [`LibP2P`](libp2p.md)
 
 #### Parameters
 
@@ -1041,7 +1041,7 @@ ___
 
 #### Returns
 
-[LibP2P](libp2p.md)
+[`LibP2P`](libp2p.md)
 
 #### Inherited from
 
@@ -1055,7 +1055,7 @@ ___
 
 ### prependOnceListener
 
-▸ **prependOnceListener**(`event`, `listener`): [LibP2P](libp2p.md)
+▸ **prependOnceListener**(`event`, `listener`): [`LibP2P`](libp2p.md)
 
 #### Parameters
 
@@ -1066,7 +1066,7 @@ ___
 
 #### Returns
 
-[LibP2P](libp2p.md)
+[`LibP2P`](libp2p.md)
 
 #### Inherited from
 
@@ -1104,7 +1104,7 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**(`event?`): [LibP2P](libp2p.md)
+▸ **removeAllListeners**(`event?`): [`LibP2P`](libp2p.md)
 
 #### Parameters
 
@@ -1114,7 +1114,7 @@ ___
 
 #### Returns
 
-[LibP2P](libp2p.md)
+[`LibP2P`](libp2p.md)
 
 #### Inherited from
 
@@ -1128,7 +1128,7 @@ ___
 
 ### removeListener
 
-▸ **removeListener**(`event`, `listener`): [LibP2P](libp2p.md)
+▸ **removeListener**(`event`, `listener`): [`LibP2P`](libp2p.md)
 
 #### Parameters
 
@@ -1139,7 +1139,7 @@ ___
 
 #### Returns
 
-[LibP2P](libp2p.md)
+[`LibP2P`](libp2p.md)
 
 #### Inherited from
 
@@ -1153,7 +1153,7 @@ ___
 
 ### setMaxListeners
 
-▸ **setMaxListeners**(`n`): [LibP2P](libp2p.md)
+▸ **setMaxListeners**(`n`): [`LibP2P`](libp2p.md)
 
 #### Parameters
 
@@ -1163,7 +1163,7 @@ ___
 
 #### Returns
 
-[LibP2P](libp2p.md)
+[`LibP2P`](libp2p.md)
 
 #### Inherited from
 
@@ -1177,13 +1177,13 @@ ___
 
 ### start
 
-▸ **start**(): `Promise`<void\>
+▸ **start**(): `Promise`<`void`\>
 
 Starts the libp2p node and all its subsystems
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1193,7 +1193,7 @@ ___
 
 ### stop
 
-▸ **stop**(): `Promise`<void\>
+▸ **stop**(): `Promise`<`void`\>
 
 Stop the libp2p node by closing its listeners and open connections
 
@@ -1201,7 +1201,7 @@ Stop the libp2p node by closing its listeners and open connections
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1234,7 +1234,7 @@ ___
 
 ### create
 
-▸ `Static` **create**(`options`): `Promise`<[LibP2P](libp2p.md)\>
+▸ `Static` **create**(`options`): `Promise`<[`LibP2P`](libp2p.md)\>
 
 Like `new Libp2p(options)` except it will create a `PeerId`
 instance if one is not provided in options.
@@ -1243,11 +1243,11 @@ instance if one is not provided in options.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `options` | [Libp2pOptions](../modules/libp2p.md#libp2poptions) & [CreateOptions](../modules/libp2p.md#createoptions) | Libp2p configuration options |
+| `options` | [`Libp2pOptions`](../modules/libp2p.md#libp2poptions) & [`CreateOptions`](../modules/libp2p.md#createoptions) | Libp2p configuration options |
 
 #### Returns
 
-`Promise`<[LibP2P](libp2p.md)\>
+`Promise`<[`LibP2P`](libp2p.md)\>
 
 #### Defined in
 
@@ -1284,7 +1284,7 @@ ___
 
 ### on
 
-▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<any\>
+▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<`any`\>
 
 #### Parameters
 
@@ -1295,7 +1295,7 @@ ___
 
 #### Returns
 
-`AsyncIterableIterator`<any\>
+`AsyncIterableIterator`<`any`\>
 
 #### Inherited from
 
@@ -1309,7 +1309,7 @@ ___
 
 ### once
 
-▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
 
 #### Parameters
 
@@ -1320,7 +1320,7 @@ ___
 
 #### Returns
 
-`Promise`<any[]\>
+`Promise`<`any`[]\>
 
 #### Inherited from
 
@@ -1330,7 +1330,7 @@ EventEmitter.once
 
 packages/core/node_modules/@types/node/events.d.ts:26
 
-▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
 
 #### Parameters
 
@@ -1341,7 +1341,7 @@ packages/core/node_modules/@types/node/events.d.ts:26
 
 #### Returns
 
-`Promise`<any[]\>
+`Promise`<`any`[]\>
 
 #### Inherited from
 

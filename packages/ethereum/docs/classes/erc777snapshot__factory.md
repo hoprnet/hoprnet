@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC777Snapshot](erc777snapshot.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ERC777Snapshot`](erc777snapshot.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[ERC777Snapshot](erc777snapshot.md)
+[`ERC777Snapshot`](erc777snapshot.md)
 
 #### Defined in
 

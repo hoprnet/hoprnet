@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **StandardToken__factory**
+  ↳ **`StandardToken__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [StandardToken](standardtoken.md)
+▸ **attach**(`address`): [`StandardToken`](standardtoken.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[StandardToken](standardtoken.md)
+[`StandardToken`](standardtoken.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [StandardToken\_\_factory](standardtoken__factory.md)
+▸ **connect**(`signer`): [`StandardToken__factory`](standardtoken__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[StandardToken\_\_factory](standardtoken__factory.md)
+[`StandardToken__factory`](standardtoken__factory.md)
 
 #### Overrides
 
@@ -146,17 +146,17 @@ ___
 
 ### deploy
 
-▸ **deploy**(`overrides?`): `Promise`<[StandardToken](standardtoken.md)\>
+▸ **deploy**(`overrides?`): `Promise`<[`StandardToken`](standardtoken.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[StandardToken](standardtoken.md)\>
+`Promise`<[`StandardToken`](standardtoken.md)\>
 
 #### Overrides
 
@@ -176,7 +176,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -194,7 +194,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [StandardToken](standardtoken.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`StandardToken`](standardtoken.md)
 
 #### Parameters
 
@@ -205,7 +205,7 @@ ___
 
 #### Returns
 
-[StandardToken](standardtoken.md)
+[`StandardToken`](standardtoken.md)
 
 #### Defined in
 

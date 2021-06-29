@@ -71,7 +71,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `id` | [Address](address.md) |
+| `id` | [`Address`](address.md) |
 | `initialize` | `boolean` |
 | `version` | `string` |
 | `dbPath?` | `string` |
@@ -84,7 +84,7 @@
 
 ### db
 
-• `Private` **db**: `LevelUp`<AbstractLevelDOWN<any, any\>, AbstractIterator<any, any\>\>
+• `Private` **db**: `LevelUp`<`AbstractLevelDOWN`<`any`, `any`\>, `AbstractIterator`<`any`, `any`\>\>
 
 #### Defined in
 
@@ -94,18 +94,18 @@
 
 ### addBalance
 
-▸ `Private` **addBalance**(`key`, `amount`): `Promise`<void\>
+▸ `Private` **addBalance**(`key`, `amount`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `key` | `Uint8Array` |
-| `amount` | [Balance](balance.md) |
+| `amount` | [`Balance`](balance.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -115,7 +115,7 @@ ___
 
 ### checkAndSetPacketTag
 
-▸ **checkAndSetPacketTag**(`packetTag`): `Promise`<boolean\>
+▸ **checkAndSetPacketTag**(`packetTag`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -125,7 +125,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -135,11 +135,11 @@ ___
 
 ### close
 
-▸ **close**(): `Promise`<void\>
+▸ **close**(): `Promise`<`void`\>
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -149,7 +149,7 @@ ___
 
 ### del
 
-▸ `Private` **del**(`key`): `Promise`<void\>
+▸ `Private` **del**(`key`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -159,7 +159,7 @@ ___
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -169,7 +169,7 @@ ___
 
 ### delAcknowledgedTicket
 
-▸ **delAcknowledgedTicket**(`ack`): `Promise`<void\>
+▸ **delAcknowledgedTicket**(`ack`): `Promise`<`void`\>
 
 Delete acknowledged ticket in database
 
@@ -177,11 +177,11 @@ Delete acknowledged ticket in database
 
 | Name | Type |
 | :------ | :------ |
-| `ack` | [AcknowledgedTicket](acknowledgedticket.md) |
+| `ack` | [`AcknowledgedTicket`](acknowledgedticket.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -191,7 +191,7 @@ ___
 
 ### get
 
-▸ `Private` **get**(`key`): `Promise`<Uint8Array\>
+▸ `Private` **get**(`key`): `Promise`<`Uint8Array`\>
 
 #### Parameters
 
@@ -201,7 +201,7 @@ ___
 
 #### Returns
 
-`Promise`<Uint8Array\>
+`Promise`<`Uint8Array`\>
 
 #### Defined in
 
@@ -211,17 +211,17 @@ ___
 
 ### getAccount
 
-▸ **getAccount**(`address`): `Promise`<[AccountEntry](accountentry.md)\>
+▸ **getAccount**(`address`): `Promise`<[`AccountEntry`](accountentry.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | [Address](address.md) |
+| `address` | [`Address`](address.md) |
 
 #### Returns
 
-`Promise`<[AccountEntry](accountentry.md)\>
+`Promise`<[`AccountEntry`](accountentry.md)\>
 
 #### Defined in
 
@@ -231,17 +231,17 @@ ___
 
 ### getAccounts
 
-▸ **getAccounts**(`filter?`): `Promise`<[AccountEntry](accountentry.md)[]\>
+▸ **getAccounts**(`filter?`): `Promise`<[`AccountEntry`](accountentry.md)[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `filter?` | (`account`: [AccountEntry](accountentry.md)) => `boolean` |
+| `filter?` | (`account`: [`AccountEntry`](accountentry.md)) => `boolean` |
 
 #### Returns
 
-`Promise`<[AccountEntry](accountentry.md)[]\>
+`Promise`<[`AccountEntry`](accountentry.md)[]\>
 
 #### Defined in
 
@@ -251,7 +251,7 @@ ___
 
 ### getAcknowledgedTickets
 
-▸ **getAcknowledgedTickets**(`filter?`): `Promise`<[AcknowledgedTicket](acknowledgedticket.md)[]\>
+▸ **getAcknowledgedTickets**(`filter?`): `Promise`<[`AcknowledgedTicket`](acknowledgedticket.md)[]\>
 
 Get acknowledged tickets
 
@@ -260,11 +260,11 @@ Get acknowledged tickets
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `filter?` | `Object` | optionally filter by signer |
-| `filter.signer` | [PublicKey](publickey.md) | - |
+| `filter.signer` | [`PublicKey`](publickey.md) | - |
 
 #### Returns
 
-`Promise`<[AcknowledgedTicket](acknowledgedticket.md)[]\>
+`Promise`<[`AcknowledgedTicket`](acknowledgedticket.md)[]\>
 
 an array of all acknowledged tickets
 
@@ -276,7 +276,7 @@ ___
 
 ### getAll
 
-▸ `Private` **getAll**<T\>(`prefix`, `deserialize`, `filter`): `Promise`<T[]\>
+▸ `Private` **getAll**<`T`\>(`prefix`, `deserialize`, `filter`): `Promise`<`T`[]\>
 
 #### Type parameters
 
@@ -294,7 +294,7 @@ ___
 
 #### Returns
 
-`Promise`<T[]\>
+`Promise`<`T`[]\>
 
 #### Defined in
 
@@ -304,17 +304,17 @@ ___
 
 ### getChannel
 
-▸ **getChannel**(`channelId`): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ **getChannel**(`channelId`): `Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channelId` | [Hash](hash.md) |
+| `channelId` | [`Hash`](hash.md) |
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)\>
+`Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Defined in
 
@@ -324,17 +324,17 @@ ___
 
 ### getChannels
 
-▸ **getChannels**(`filter?`): `Promise`<[ChannelEntry](channelentry.md)[]\>
+▸ **getChannels**(`filter?`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `filter?` | (`channel`: [ChannelEntry](channelentry.md)) => `boolean` |
+| `filter?` | (`channel`: [`ChannelEntry`](channelentry.md)) => `boolean` |
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Defined in
 
@@ -344,7 +344,7 @@ ___
 
 ### getCoercedOrDefault
 
-▸ `Private` **getCoercedOrDefault**<T\>(`key`, `coerce`, `defaultVal`): `Promise`<T\>
+▸ `Private` **getCoercedOrDefault**<`T`\>(`key`, `coerce`, `defaultVal`): `Promise`<`T`\>
 
 #### Type parameters
 
@@ -362,7 +362,7 @@ ___
 
 #### Returns
 
-`Promise`<T\>
+`Promise`<`T`\>
 
 #### Defined in
 
@@ -372,18 +372,18 @@ ___
 
 ### getCommitment
 
-▸ **getCommitment**(`channelId`, `iteration`): `Promise`<Uint8Array\>
+▸ **getCommitment**(`channelId`, `iteration`): `Promise`<`Uint8Array`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channelId` | [Hash](hash.md) |
+| `channelId` | [`Hash`](hash.md) |
 | `iteration` | `number` |
 
 #### Returns
 
-`Promise`<Uint8Array\>
+`Promise`<`Uint8Array`\>
 
 #### Defined in
 
@@ -393,17 +393,17 @@ ___
 
 ### getCurrentCommitment
 
-▸ **getCurrentCommitment**(`channelId`): `Promise`<[Hash](hash.md)\>
+▸ **getCurrentCommitment**(`channelId`): `Promise`<[`Hash`](hash.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channelId` | [Hash](hash.md) |
+| `channelId` | [`Hash`](hash.md) |
 
 #### Returns
 
-`Promise`<[Hash](hash.md)\>
+`Promise`<[`Hash`](hash.md)\>
 
 #### Defined in
 
@@ -413,17 +413,17 @@ ___
 
 ### getCurrentTicketIndex
 
-▸ **getCurrentTicketIndex**(`channelId`): `Promise`<[UINT256](uint256.md)\>
+▸ **getCurrentTicketIndex**(`channelId`): `Promise`<[`UINT256`](uint256.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channelId` | [Hash](hash.md) |
+| `channelId` | [`Hash`](hash.md) |
 
 #### Returns
 
-`Promise`<[UINT256](uint256.md)\>
+`Promise`<[`UINT256`](uint256.md)\>
 
 #### Defined in
 
@@ -433,11 +433,11 @@ ___
 
 ### getLatestBlockNumber
 
-▸ **getLatestBlockNumber**(): `Promise`<number\>
+▸ **getLatestBlockNumber**(): `Promise`<`number`\>
 
 #### Returns
 
-`Promise`<number\>
+`Promise`<`number`\>
 
 #### Defined in
 
@@ -447,11 +447,11 @@ ___
 
 ### getLatestConfirmedSnapshot
 
-▸ **getLatestConfirmedSnapshot**(): `Promise`<[Snapshot](snapshot.md)\>
+▸ **getLatestConfirmedSnapshot**(): `Promise`<[`Snapshot`](snapshot.md)\>
 
 #### Returns
 
-`Promise`<[Snapshot](snapshot.md)\>
+`Promise`<[`Snapshot`](snapshot.md)\>
 
 #### Defined in
 
@@ -461,11 +461,11 @@ ___
 
 ### getLosingTicketCount
 
-▸ **getLosingTicketCount**(): `Promise`<number\>
+▸ **getLosingTicketCount**(): `Promise`<`number`\>
 
 #### Returns
 
-`Promise`<number\>
+`Promise`<`number`\>
 
 #### Defined in
 
@@ -475,17 +475,17 @@ ___
 
 ### getPendingBalanceTo
 
-▸ **getPendingBalanceTo**(`counterparty`): `Promise`<[Balance](balance.md)\>
+▸ **getPendingBalanceTo**(`counterparty`): `Promise`<[`Balance`](balance.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `counterparty` | [Address](address.md) |
+| `counterparty` | [`Address`](address.md) |
 
 #### Returns
 
-`Promise`<[Balance](balance.md)\>
+`Promise`<[`Balance`](balance.md)\>
 
 #### Defined in
 
@@ -495,11 +495,11 @@ ___
 
 ### getPendingTicketCount
 
-▸ **getPendingTicketCount**(): `Promise`<number\>
+▸ **getPendingTicketCount**(): `Promise`<`number`\>
 
 #### Returns
 
-`Promise`<number\>
+`Promise`<`number`\>
 
 #### Defined in
 
@@ -509,11 +509,11 @@ ___
 
 ### getRedeemedTicketsCount
 
-▸ **getRedeemedTicketsCount**(): `Promise`<number\>
+▸ **getRedeemedTicketsCount**(): `Promise`<`number`\>
 
 #### Returns
 
-`Promise`<number\>
+`Promise`<`number`\>
 
 #### Defined in
 
@@ -523,11 +523,11 @@ ___
 
 ### getRedeemedTicketsValue
 
-▸ **getRedeemedTicketsValue**(): `Promise`<[Balance](balance.md)\>
+▸ **getRedeemedTicketsValue**(): `Promise`<[`Balance`](balance.md)\>
 
 #### Returns
 
-`Promise`<[Balance](balance.md)\>
+`Promise`<[`Balance`](balance.md)\>
 
 #### Defined in
 
@@ -537,7 +537,7 @@ ___
 
 ### getTickets
 
-▸ **getTickets**(`filter?`): `Promise`<[Ticket](ticket.md)[]\>
+▸ **getTickets**(`filter?`): `Promise`<[`Ticket`](ticket.md)[]\>
 
 Get tickets, both unacknowledged and acknowledged
 
@@ -546,11 +546,11 @@ Get tickets, both unacknowledged and acknowledged
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `filter?` | `Object` | optionally filter by signer |
-| `filter.signer` | [PublicKey](publickey.md) | - |
+| `filter.signer` | [`PublicKey`](publickey.md) | - |
 
 #### Returns
 
-`Promise`<[Ticket](ticket.md)[]\>
+`Promise`<[`Ticket`](ticket.md)[]\>
 
 an array of signed tickets
 
@@ -562,17 +562,17 @@ ___
 
 ### getUnacknowledgedTicket
 
-▸ **getUnacknowledgedTicket**(`halfKeyChallenge`): `Promise`<[UnacknowledgedTicket](unacknowledgedticket.md)\>
+▸ **getUnacknowledgedTicket**(`halfKeyChallenge`): `Promise`<[`UnacknowledgedTicket`](unacknowledgedticket.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `halfKeyChallenge` | [HalfKeyChallenge](halfkeychallenge.md) |
+| `halfKeyChallenge` | [`HalfKeyChallenge`](halfkeychallenge.md) |
 
 #### Returns
 
-`Promise`<[UnacknowledgedTicket](unacknowledgedticket.md)\>
+`Promise`<[`UnacknowledgedTicket`](unacknowledgedticket.md)\>
 
 #### Defined in
 
@@ -582,7 +582,7 @@ ___
 
 ### getUnacknowledgedTickets
 
-▸ **getUnacknowledgedTickets**(`filter?`): `Promise`<[UnacknowledgedTicket](unacknowledgedticket.md)[]\>
+▸ **getUnacknowledgedTickets**(`filter?`): `Promise`<[`UnacknowledgedTicket`](unacknowledgedticket.md)[]\>
 
 Get unacknowledged tickets.
 
@@ -591,11 +591,11 @@ Get unacknowledged tickets.
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `filter?` | `Object` | optionally filter by signer |
-| `filter.signer` | [PublicKey](publickey.md) | - |
+| `filter.signer` | [`PublicKey`](publickey.md) | - |
 
 #### Returns
 
-`Promise`<[UnacknowledgedTicket](unacknowledgedticket.md)[]\>
+`Promise`<[`UnacknowledgedTicket`](unacknowledgedticket.md)[]\>
 
 an array of all unacknowledged tickets
 
@@ -607,7 +607,7 @@ ___
 
 ### has
 
-▸ `Private` **has**(`key`): `Promise`<boolean\>
+▸ `Private` **has**(`key`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -617,7 +617,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -627,7 +627,7 @@ ___
 
 ### increment
 
-▸ `Private` **increment**(`key`): `Promise`<number\>
+▸ `Private` **increment**(`key`): `Promise`<`number`\>
 
 #### Parameters
 
@@ -637,7 +637,7 @@ ___
 
 #### Returns
 
-`Promise`<number\>
+`Promise`<`number`\>
 
 #### Defined in
 
@@ -667,17 +667,17 @@ ___
 
 ### markLosing
 
-▸ **markLosing**(`t`): `Promise`<void\>
+▸ **markLosing**(`t`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `t` | [UnacknowledgedTicket](unacknowledgedticket.md) |
+| `t` | [`UnacknowledgedTicket`](unacknowledgedticket.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -687,17 +687,17 @@ ___
 
 ### markPending
 
-▸ **markPending**(`ticket`): `Promise`<void\>
+▸ **markPending**(`ticket`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `ticket` | [Ticket](ticket.md) |
+| `ticket` | [`Ticket`](ticket.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -707,17 +707,17 @@ ___
 
 ### markRedeemeed
 
-▸ **markRedeemeed**(`a`): `Promise`<void\>
+▸ **markRedeemeed**(`a`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `a` | [AcknowledgedTicket](acknowledgedticket.md) |
+| `a` | [`AcknowledgedTicket`](acknowledgedticket.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -727,7 +727,7 @@ ___
 
 ### maybeGet
 
-▸ `Private` **maybeGet**(`key`): `Promise`<Uint8Array\>
+▸ `Private` **maybeGet**(`key`): `Promise`<`Uint8Array`\>
 
 #### Parameters
 
@@ -737,7 +737,7 @@ ___
 
 #### Returns
 
-`Promise`<Uint8Array\>
+`Promise`<`Uint8Array`\>
 
 #### Defined in
 
@@ -747,7 +747,7 @@ ___
 
 ### put
 
-▸ `Private` **put**(`key`, `value`): `Promise`<void\>
+▸ `Private` **put**(`key`, `value`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -758,7 +758,7 @@ ___
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -768,18 +768,18 @@ ___
 
 ### replaceUnAckWithAck
 
-▸ **replaceUnAckWithAck**(`halfKeyChallenge`, `ackTicket`): `Promise`<void\>
+▸ **replaceUnAckWithAck**(`halfKeyChallenge`, `ackTicket`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `halfKeyChallenge` | [HalfKeyChallenge](halfkeychallenge.md) |
-| `ackTicket` | [AcknowledgedTicket](acknowledgedticket.md) |
+| `halfKeyChallenge` | [`HalfKeyChallenge`](halfkeychallenge.md) |
+| `ackTicket` | [`AcknowledgedTicket`](acknowledgedticket.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -789,18 +789,18 @@ ___
 
 ### setCurrentCommitment
 
-▸ **setCurrentCommitment**(`channelId`, `commitment`): `Promise`<void\>
+▸ **setCurrentCommitment**(`channelId`, `commitment`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channelId` | [Hash](hash.md) |
-| `commitment` | [Hash](hash.md) |
+| `channelId` | [`Hash`](hash.md) |
+| `commitment` | [`Hash`](hash.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -810,18 +810,18 @@ ___
 
 ### setCurrentTicketIndex
 
-▸ **setCurrentTicketIndex**(`channelId`, `ticketIndex`): `Promise`<void\>
+▸ **setCurrentTicketIndex**(`channelId`, `ticketIndex`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channelId` | [Hash](hash.md) |
-| `ticketIndex` | [UINT256](uint256.md) |
+| `channelId` | [`Hash`](hash.md) |
+| `ticketIndex` | [`UINT256`](uint256.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -831,18 +831,18 @@ ___
 
 ### storeHashIntermediaries
 
-▸ **storeHashIntermediaries**(`channelId`, `intermediates`): `Promise`<void\>
+▸ **storeHashIntermediaries**(`channelId`, `intermediates`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channelId` | [Hash](hash.md) |
-| `intermediates` | [Intermediate](../interfaces/intermediate.md)[] |
+| `channelId` | [`Hash`](hash.md) |
+| `intermediates` | [`Intermediate`](../interfaces/intermediate.md)[] |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -852,18 +852,18 @@ ___
 
 ### storeUnacknowledgedTicket
 
-▸ **storeUnacknowledgedTicket**(`halfKeyChallenge`, `unackTicket`): `Promise`<void\>
+▸ **storeUnacknowledgedTicket**(`halfKeyChallenge`, `unackTicket`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `halfKeyChallenge` | [HalfKeyChallenge](halfkeychallenge.md) |
-| `unackTicket` | [UnacknowledgedTicket](unacknowledgedticket.md) |
+| `halfKeyChallenge` | [`HalfKeyChallenge`](halfkeychallenge.md) |
+| `unackTicket` | [`UnacknowledgedTicket`](unacknowledgedticket.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -873,18 +873,18 @@ ___
 
 ### subBalance
 
-▸ `Private` **subBalance**(`key`, `amount`): `Promise`<void\>
+▸ `Private` **subBalance**(`key`, `amount`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `key` | `Uint8Array` |
-| `amount` | [Balance](balance.md) |
+| `amount` | [`Balance`](balance.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -894,7 +894,7 @@ ___
 
 ### touch
 
-▸ `Private` **touch**(`key`): `Promise`<void\>
+▸ `Private` **touch**(`key`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -904,7 +904,7 @@ ___
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -914,17 +914,17 @@ ___
 
 ### updateAccount
 
-▸ **updateAccount**(`account`): `Promise`<void\>
+▸ **updateAccount**(`account`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `account` | [AccountEntry](accountentry.md) |
+| `account` | [`AccountEntry`](accountentry.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -934,18 +934,18 @@ ___
 
 ### updateChannel
 
-▸ **updateChannel**(`channelId`, `channel`): `Promise`<void\>
+▸ **updateChannel**(`channelId`, `channel`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channelId` | [Hash](hash.md) |
-| `channel` | [ChannelEntry](channelentry.md) |
+| `channelId` | [`Hash`](hash.md) |
+| `channel` | [`ChannelEntry`](channelentry.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -955,7 +955,7 @@ ___
 
 ### updateLatestBlockNumber
 
-▸ **updateLatestBlockNumber**(`blockNumber`): `Promise`<void\>
+▸ **updateLatestBlockNumber**(`blockNumber`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -965,7 +965,7 @@ ___
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -975,17 +975,17 @@ ___
 
 ### updateLatestConfirmedSnapshot
 
-▸ **updateLatestConfirmedSnapshot**(`snapshot`): `Promise`<void\>
+▸ **updateLatestConfirmedSnapshot**(`snapshot`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `snapshot` | [Snapshot](snapshot.md) |
+| `snapshot` | [`Snapshot`](snapshot.md) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -995,11 +995,11 @@ ___
 
 ### createMock
 
-▸ `Static` **createMock**(): [HoprDB](hoprdb.md)
+▸ `Static` **createMock**(): [`HoprDB`](hoprdb.md)
 
 #### Returns
 
-[HoprDB](hoprdb.md)
+[`HoprDB`](hoprdb.md)
 
 #### Defined in
 

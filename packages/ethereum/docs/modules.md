@@ -142,7 +142,7 @@ ___
 
 ### NetworkTag
 
-Ƭ **NetworkTag**: [DeploymentTypes](modules.md#deploymenttypes) \| ``"etherscan"``
+Ƭ **NetworkTag**: [`DeploymentTypes`](modules.md#deploymenttypes) \| ``"etherscan"``
 
 #### Defined in
 
@@ -152,7 +152,7 @@ ___
 
 ### Networks
 
-Ƭ **Networks**: ``"hardhat"`` \| ``"localhost"`` \| [PublicNetworks](modules.md#publicnetworks)
+Ƭ **Networks**: ``"hardhat"`` \| ``"localhost"`` \| [`PublicNetworks`](modules.md#publicnetworks)
 
 #### Defined in
 
@@ -172,13 +172,13 @@ ___
 
 ### TypedListener
 
-Ƭ **TypedListener**<EventArgsArray, EventArgsObject\>: (...`listenerArg`: [...EventArgsArray, [TypedEvent](interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>]) => `void`
+Ƭ **TypedListener**<`EventArgsArray`, `EventArgsObject`\>: (...`listenerArg`: [...EventArgsArray, [`TypedEvent`](interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>]) => `void`
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Type declaration
@@ -189,7 +189,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `...listenerArg` | [...EventArgsArray, [TypedEvent](interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>] |
+| `...listenerArg` | [...EventArgsArray, [`TypedEvent`](interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>] |
 
 ##### Returns
 
@@ -213,18 +213,18 @@ packages/ethereum/types/commons.ts:15
 
 ### getContractData
 
-▸ `Const` **getContractData**(`network`, `contract`): [ContractData](modules.md#contractdata)
+▸ `Const` **getContractData**(`network`, `contract`): [`ContractData`](modules.md#contractdata)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `network` | [Networks](modules.md#networks) |
-| `contract` | [ContractNames](modules.md#contractnames) |
+| `network` | [`Networks`](modules.md#networks) |
+| `contract` | [`ContractNames`](modules.md#contractnames) |
 
 #### Returns
 
-[ContractData](modules.md#contractdata)
+[`ContractData`](modules.md#contractdata)
 
 #### Defined in
 

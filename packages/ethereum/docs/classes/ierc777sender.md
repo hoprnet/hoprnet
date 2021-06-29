@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **IERC777Sender**
+  ↳ **`IERC777Sender`**
 
 ## Table of contents
 
@@ -81,7 +81,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -151,8 +151,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
@@ -186,8 +186,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -221,8 +221,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
@@ -256,8 +256,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -285,7 +285,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -337,7 +337,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -347,7 +347,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -387,7 +387,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [IERC777Sender](ierc777sender.md)
+▸ **attach**(`addressOrName`): [`IERC777Sender`](ierc777sender.md)
 
 #### Parameters
 
@@ -397,7 +397,7 @@ ___
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -411,7 +411,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [IERC777Sender](ierc777sender.md)
+▸ **connect**(`signerOrProvider`): [`IERC777Sender`](ierc777sender.md)
 
 #### Parameters
 
@@ -421,7 +421,7 @@ ___
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -435,11 +435,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[IERC777Sender](ierc777sender.md)\>
+▸ **deployed**(): `Promise`<[`IERC777Sender`](ierc777sender.md)\>
 
 #### Returns
 
-`Promise`<[IERC777Sender](ierc777sender.md)\>
+`Promise`<[`IERC777Sender`](ierc777sender.md)\>
 
 #### Overrides
 
@@ -478,7 +478,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -488,7 +488,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -526,24 +526,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -577,25 +577,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC777Sender](ierc777sender.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC777Sender`](ierc777sender.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -605,7 +605,7 @@ Contract.off
 
 packages/ethereum/types/IERC777Sender.d.ts:48
 
-▸ **off**(`eventName`, `listener`): [IERC777Sender](ierc777sender.md)
+▸ **off**(`eventName`, `listener`): [`IERC777Sender`](ierc777sender.md)
 
 #### Parameters
 
@@ -616,7 +616,7 @@ packages/ethereum/types/IERC777Sender.d.ts:48
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -630,25 +630,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC777Sender](ierc777sender.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC777Sender`](ierc777sender.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -658,7 +658,7 @@ Contract.on
 
 packages/ethereum/types/IERC777Sender.d.ts:52
 
-▸ **on**(`eventName`, `listener`): [IERC777Sender](ierc777sender.md)
+▸ **on**(`eventName`, `listener`): [`IERC777Sender`](ierc777sender.md)
 
 #### Parameters
 
@@ -669,7 +669,7 @@ packages/ethereum/types/IERC777Sender.d.ts:52
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -683,25 +683,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC777Sender](ierc777sender.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC777Sender`](ierc777sender.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -711,7 +711,7 @@ Contract.once
 
 packages/ethereum/types/IERC777Sender.d.ts:56
 
-▸ **once**(`eventName`, `listener`): [IERC777Sender](ierc777sender.md)
+▸ **once**(`eventName`, `listener`): [`IERC777Sender`](ierc777sender.md)
 
 #### Parameters
 
@@ -722,7 +722,7 @@ packages/ethereum/types/IERC777Sender.d.ts:56
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -736,26 +736,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -769,24 +769,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [IERC777Sender](ierc777sender.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`IERC777Sender`](ierc777sender.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -796,7 +796,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/IERC777Sender.d.ts:64
 
-▸ **removeAllListeners**(`eventName?`): [IERC777Sender](ierc777sender.md)
+▸ **removeAllListeners**(`eventName?`): [`IERC777Sender`](ierc777sender.md)
 
 #### Parameters
 
@@ -806,7 +806,7 @@ packages/ethereum/types/IERC777Sender.d.ts:64
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -820,25 +820,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC777Sender](ierc777sender.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC777Sender`](ierc777sender.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -848,7 +848,7 @@ Contract.removeListener
 
 packages/ethereum/types/IERC777Sender.d.ts:60
 
-▸ **removeListener**(`eventName`, `listener`): [IERC777Sender](ierc777sender.md)
+▸ **removeListener**(`eventName`, `listener`): [`IERC777Sender`](ierc777sender.md)
 
 #### Parameters
 
@@ -859,7 +859,7 @@ packages/ethereum/types/IERC777Sender.d.ts:60
 
 #### Returns
 
-[IERC777Sender](ierc777sender.md)
+[`IERC777Sender`](ierc777sender.md)
 
 #### Overrides
 
@@ -873,7 +873,7 @@ ___
 
 ### tokensToSend
 
-▸ **tokensToSend**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **tokensToSend**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -885,11 +885,11 @@ ___
 | `amount` | `BigNumberish` |
 | `userData` | `BytesLike` |
 | `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -899,7 +899,7 @@ ___
 
 ### tokensToSend(address,address,address,uint256,bytes,bytes)
 
-▸ **tokensToSend(address,address,address,uint256,bytes,bytes)**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **tokensToSend(address,address,address,uint256,bytes,bytes)**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -911,11 +911,11 @@ ___
 | `amount` | `BigNumberish` |
 | `userData` | `BytesLike` |
 | `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 

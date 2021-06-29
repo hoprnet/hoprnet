@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **ERC1820Implementer__factory**
+  ↳ **`ERC1820Implementer__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [ERC1820Implementer](erc1820implementer.md)
+▸ **attach**(`address`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [ERC1820Implementer\_\_factory](erc1820implementer__factory.md)
+▸ **connect**(`signer`): [`ERC1820Implementer__factory`](erc1820implementer__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[ERC1820Implementer\_\_factory](erc1820implementer__factory.md)
+[`ERC1820Implementer__factory`](erc1820implementer__factory.md)
 
 #### Overrides
 
@@ -146,17 +146,17 @@ ___
 
 ### deploy
 
-▸ **deploy**(`overrides?`): `Promise`<[ERC1820Implementer](erc1820implementer.md)\>
+▸ **deploy**(`overrides?`): `Promise`<[`ERC1820Implementer`](erc1820implementer.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[ERC1820Implementer](erc1820implementer.md)\>
+`Promise`<[`ERC1820Implementer`](erc1820implementer.md)\>
 
 #### Overrides
 
@@ -176,7 +176,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -194,7 +194,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC1820Implementer](erc1820implementer.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ERC1820Implementer`](erc1820implementer.md)
 
 #### Parameters
 
@@ -205,7 +205,7 @@ ___
 
 #### Returns
 
-[ERC1820Implementer](erc1820implementer.md)
+[`ERC1820Implementer`](erc1820implementer.md)
 
 #### Defined in
 

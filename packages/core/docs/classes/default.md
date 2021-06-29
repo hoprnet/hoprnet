@@ -6,7 +6,7 @@
 
 - `EventEmitter`
 
-  ↳ **default**
+  ↳ **`default`**
 
 ## Table of contents
 
@@ -103,7 +103,7 @@ Create an uninitialized Hopr Node
 | Name | Type |
 | :------ | :------ |
 | `id` | `PeerId` |
-| `options` | [HoprOptions](../modules.md#hoproptions) |
+| `options` | [`HoprOptions`](../modules.md#hoproptions) |
 
 #### Overrides
 
@@ -167,7 +167,7 @@ ___
 
 ### libp2p
 
-• `Private` **libp2p**: [LibP2P](libp2p.md)
+• `Private` **libp2p**: [`LibP2P`](libp2p.md)
 
 #### Defined in
 
@@ -187,7 +187,7 @@ ___
 
 ### paymentChannels
 
-• `Private` **paymentChannels**: `Promise`<default\>
+• `Private` **paymentChannels**: `Promise`<`default`\>
 
 #### Defined in
 
@@ -197,7 +197,7 @@ ___
 
 ### status
 
-• **status**: [NodeStatus](../modules.md#nodestatus) = 'UNINITIALIZED'
+• **status**: [`NodeStatus`](../modules.md#nodestatus) = `'UNINITIALIZED'`
 
 #### Defined in
 
@@ -217,7 +217,7 @@ ___
 
 ### captureRejectionSymbol
 
-▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [captureRejectionSymbol](default.md#capturerejectionsymbol)
+▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [`captureRejectionSymbol`](default.md#capturerejectionsymbol)
 
 #### Inherited from
 
@@ -261,7 +261,7 @@ ___
 
 ### errorMonitor
 
-▪ `Static` `Readonly` **errorMonitor**: typeof [errorMonitor](default.md#errormonitor)
+▪ `Static` `Readonly` **errorMonitor**: typeof [`errorMonitor`](default.md#errormonitor)
 
 This symbol shall be used to install a listener for only monitoring `'error'`
 events. Listeners installed using this symbol are called before the regular
@@ -283,7 +283,7 @@ packages/core/node_modules/@types/node/events.d.ts:42
 
 ### addListener
 
-▸ **addListener**(`event`, `listener`): [default](default.md)
+▸ **addListener**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -294,7 +294,7 @@ packages/core/node_modules/@types/node/events.d.ts:42
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -308,17 +308,17 @@ ___
 
 ### announce
 
-▸ `Private` **announce**(`includeRouting?`): `Promise`<void\>
+▸ `Private` **announce**(`includeRouting?`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `includeRouting` | `boolean` | false |
+| `includeRouting` | `boolean` | `false` |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -328,11 +328,11 @@ ___
 
 ### checkBalances
 
-▸ `Private` **checkBalances**(): `Promise`<void\>
+▸ `Private` **checkBalances**(): `Promise`<`void`\>
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -362,11 +362,11 @@ ___
 
 ### connectionReport
 
-▸ **connectionReport**(): `Promise`<string\>
+▸ **connectionReport**(): `Promise`<`string`\>
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -443,11 +443,11 @@ ___
 
 ### getAcknowledgedTickets
 
-▸ **getAcknowledgedTickets**(): `Promise`<AcknowledgedTicket[]\>
+▸ **getAcknowledgedTickets**(): `Promise`<`AcknowledgedTicket`[]\>
 
 #### Returns
 
-`Promise`<AcknowledgedTicket[]\>
+`Promise`<`AcknowledgedTicket`[]\>
 
 #### Defined in
 
@@ -457,7 +457,7 @@ ___
 
 ### getAnnouncedAddresses
 
-▸ **getAnnouncedAddresses**(`peer?`): `Promise`<Multiaddr[]\>
+▸ **getAnnouncedAddresses**(`peer?`): `Promise`<`Multiaddr`[]\>
 
 Lists the addresses which the given node announces to other nodes
 
@@ -469,7 +469,7 @@ Lists the addresses which the given node announces to other nodes
 
 #### Returns
 
-`Promise`<Multiaddr[]\>
+`Promise`<`Multiaddr`[]\>
 
 #### Defined in
 
@@ -479,11 +479,11 @@ ___
 
 ### getBalance
 
-▸ **getBalance**(): `Promise`<Balance\>
+▸ **getBalance**(): `Promise`<`Balance`\>
 
 #### Returns
 
-`Promise`<Balance\>
+`Promise`<`Balance`\>
 
 #### Defined in
 
@@ -507,7 +507,7 @@ ___
 
 ### getChannelsFrom
 
-▸ **getChannelsFrom**(`addr`): `Promise`<ChannelEntry[]\>
+▸ **getChannelsFrom**(`addr`): `Promise`<`ChannelEntry`[]\>
 
 #### Parameters
 
@@ -517,7 +517,7 @@ ___
 
 #### Returns
 
-`Promise`<ChannelEntry[]\>
+`Promise`<`ChannelEntry`[]\>
 
 #### Defined in
 
@@ -527,7 +527,7 @@ ___
 
 ### getChannelsTo
 
-▸ **getChannelsTo**(`addr`): `Promise`<ChannelEntry[]\>
+▸ **getChannelsTo**(`addr`): `Promise`<`ChannelEntry`[]\>
 
 #### Parameters
 
@@ -537,7 +537,7 @@ ___
 
 #### Returns
 
-`Promise`<ChannelEntry[]\>
+`Promise`<`ChannelEntry`[]\>
 
 #### Defined in
 
@@ -561,11 +561,11 @@ ___
 
 ### getEthereumAddress
 
-▸ **getEthereumAddress**(): `Promise`<Address\>
+▸ **getEthereumAddress**(): `Promise`<`Address`\>
 
 #### Returns
 
-`Promise`<Address\>
+`Promise`<`Address`\>
 
 #### Defined in
 
@@ -589,7 +589,7 @@ ___
 
 ### getIntermediateNodes
 
-▸ `Private` **getIntermediateNodes**(`destination`): `Promise`<PublicKey[]\>
+▸ `Private` **getIntermediateNodes**(`destination`): `Promise`<`PublicKey`[]\>
 
 Takes a destination and samples randomly intermediate nodes
 that will relay that message before it reaches its destination.
@@ -602,7 +602,7 @@ that will relay that message before it reaches its destination.
 
 #### Returns
 
-`Promise`<PublicKey[]\>
+`Promise`<`PublicKey`[]\>
 
 #### Defined in
 
@@ -646,11 +646,11 @@ ___
 
 ### getNativeBalance
 
-▸ **getNativeBalance**(): `Promise`<NativeBalance\>
+▸ **getNativeBalance**(): `Promise`<`NativeBalance`\>
 
 #### Returns
 
-`Promise`<NativeBalance\>
+`Promise`<`NativeBalance`\>
 
 #### Defined in
 
@@ -682,11 +682,11 @@ ___
 
 ### getOpenChannels
 
-▸ `Private` **getOpenChannels**(): `Promise`<ChannelEntry[]\>
+▸ `Private` **getOpenChannels**(): `Promise`<`ChannelEntry`[]\>
 
 #### Returns
 
-`Promise`<ChannelEntry[]\>
+`Promise`<`ChannelEntry`[]\>
 
 #### Defined in
 
@@ -696,7 +696,7 @@ ___
 
 ### getPublicKeyOf
 
-▸ **getPublicKeyOf**(`addr`): `Promise`<PublicKey\>
+▸ **getPublicKeyOf**(`addr`): `Promise`<`PublicKey`\>
 
 #### Parameters
 
@@ -706,7 +706,7 @@ ___
 
 #### Returns
 
-`Promise`<PublicKey\>
+`Promise`<`PublicKey`\>
 
 #### Defined in
 
@@ -716,13 +716,13 @@ ___
 
 ### getRandomOpenChannels
 
-▸ `Private` **getRandomOpenChannels**(): `Promise`<ChannelEntry[]\>
+▸ `Private` **getRandomOpenChannels**(): `Promise`<`ChannelEntry`[]\>
 
 Randomly pick 10 open channels
 
 #### Returns
 
-`Promise`<ChannelEntry[]\>
+`Promise`<`ChannelEntry`[]\>
 
 maximum 10 open channels
 
@@ -826,7 +826,7 @@ ___
 
 ### off
 
-▸ **off**(`event`, `listener`): [default](default.md)
+▸ **off**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -837,7 +837,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -851,7 +851,7 @@ ___
 
 ### on
 
-▸ **on**(`event`, `listener`): [default](default.md)
+▸ **on**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -862,7 +862,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -876,7 +876,7 @@ ___
 
 ### once
 
-▸ **once**(`event`, `listener`): [default](default.md)
+▸ **once**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -887,7 +887,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -924,11 +924,11 @@ ___
 
 ### periodicCheck
 
-▸ `Private` **periodicCheck**(): `Promise`<void\>
+▸ `Private` **periodicCheck**(): `Promise`<`void`\>
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -962,7 +962,7 @@ ___
 
 ### prependListener
 
-▸ **prependListener**(`event`, `listener`): [default](default.md)
+▸ **prependListener**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -973,7 +973,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -987,7 +987,7 @@ ___
 
 ### prependOnceListener
 
-▸ **prependOnceListener**(`event`, `listener`): [default](default.md)
+▸ **prependOnceListener**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -998,7 +998,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -1036,7 +1036,7 @@ ___
 
 ### redeemAcknowledgedTicket
 
-▸ **redeemAcknowledgedTicket**(`ackTicket`): `Promise`<RedeemTicketResponse\>
+▸ **redeemAcknowledgedTicket**(`ackTicket`): `Promise`<`RedeemTicketResponse`\>
 
 #### Parameters
 
@@ -1046,7 +1046,7 @@ ___
 
 #### Returns
 
-`Promise`<RedeemTicketResponse\>
+`Promise`<`RedeemTicketResponse`\>
 
 #### Defined in
 
@@ -1070,7 +1070,7 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**(`event?`): [default](default.md)
+▸ **removeAllListeners**(`event?`): [`default`](default.md)
 
 #### Parameters
 
@@ -1080,7 +1080,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -1094,7 +1094,7 @@ ___
 
 ### removeListener
 
-▸ **removeListener**(`event`, `listener`): [default](default.md)
+▸ **removeListener**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -1105,7 +1105,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -1119,7 +1119,7 @@ ___
 
 ### sendMessage
 
-▸ **sendMessage**(`msg`, `destination`, `intermediatePath?`): `Promise`<void\>
+▸ **sendMessage**(`msg`, `destination`, `intermediatePath?`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -1131,7 +1131,7 @@ ___
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1141,17 +1141,17 @@ ___
 
 ### setChannelStrategy
 
-▸ **setChannelStrategy**(`strategy`): `Promise`<void\>
+▸ **setChannelStrategy**(`strategy`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `strategy` | [ChannelStrategyNames](../modules.md#channelstrategynames) |
+| `strategy` | [`ChannelStrategyNames`](../modules.md#channelstrategynames) |
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1161,7 +1161,7 @@ ___
 
 ### setMaxListeners
 
-▸ **setMaxListeners**(`n`): [default](default.md)
+▸ **setMaxListeners**(`n`): [`default`](default.md)
 
 #### Parameters
 
@@ -1171,7 +1171,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -1199,7 +1199,7 @@ ___
 
 ### start
 
-▸ **start**(): `Promise`<void\>
+▸ **start**(): `Promise`<`void`\>
 
 Start node
 
@@ -1223,7 +1223,7 @@ If the node is not funded, it will throw.
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1233,13 +1233,13 @@ ___
 
 ### stop
 
-▸ **stop**(): `Promise`<void\>
+▸ **stop**(): `Promise`<`void`\>
 
 Shuts down the node and saves keys and peerBook in the database
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1249,11 +1249,11 @@ ___
 
 ### tickChannelStrategy
 
-▸ `Private` **tickChannelStrategy**(): `Promise`<void\>
+▸ `Private` **tickChannelStrategy**(): `Promise`<`void`\>
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1263,11 +1263,11 @@ ___
 
 ### waitForFunds
 
-▸ **waitForFunds**(): `Promise`<void\>
+▸ **waitForFunds**(): `Promise`<`void`\>
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1277,11 +1277,11 @@ ___
 
 ### waitForRunning
 
-▸ **waitForRunning**(): `Promise`<void\>
+▸ **waitForRunning**(): `Promise`<`void`\>
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -1291,7 +1291,7 @@ ___
 
 ### withdraw
 
-▸ **withdraw**(`currency`, `recipient`, `amount`): `Promise`<string\>
+▸ **withdraw**(`currency`, `recipient`, `amount`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1303,7 +1303,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1340,7 +1340,7 @@ ___
 
 ### on
 
-▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<any\>
+▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<`any`\>
 
 #### Parameters
 
@@ -1351,7 +1351,7 @@ ___
 
 #### Returns
 
-`AsyncIterableIterator`<any\>
+`AsyncIterableIterator`<`any`\>
 
 #### Inherited from
 
@@ -1365,7 +1365,7 @@ ___
 
 ### once
 
-▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
 
 #### Parameters
 
@@ -1376,7 +1376,7 @@ ___
 
 #### Returns
 
-`Promise`<any[]\>
+`Promise`<`any`[]\>
 
 #### Inherited from
 
@@ -1386,7 +1386,7 @@ EventEmitter.once
 
 packages/core/node_modules/@types/node/events.d.ts:26
 
-▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
 
 #### Parameters
 
@@ -1397,7 +1397,7 @@ packages/core/node_modules/@types/node/events.d.ts:26
 
 #### Returns
 
-`Promise`<any[]\>
+`Promise`<`any`[]\>
 
 #### Inherited from
 

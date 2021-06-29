@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **BasicToken__factory**
+  ↳ **`BasicToken__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [BasicToken](basictoken.md)
+▸ **attach**(`address`): [`BasicToken`](basictoken.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[BasicToken](basictoken.md)
+[`BasicToken`](basictoken.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [BasicToken\_\_factory](basictoken__factory.md)
+▸ **connect**(`signer`): [`BasicToken__factory`](basictoken__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[BasicToken\_\_factory](basictoken__factory.md)
+[`BasicToken__factory`](basictoken__factory.md)
 
 #### Overrides
 
@@ -146,17 +146,17 @@ ___
 
 ### deploy
 
-▸ **deploy**(`overrides?`): `Promise`<[BasicToken](basictoken.md)\>
+▸ **deploy**(`overrides?`): `Promise`<[`BasicToken`](basictoken.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[BasicToken](basictoken.md)\>
+`Promise`<[`BasicToken`](basictoken.md)\>
 
 #### Overrides
 
@@ -176,7 +176,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -194,7 +194,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [BasicToken](basictoken.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`BasicToken`](basictoken.md)
 
 #### Parameters
 
@@ -205,7 +205,7 @@ ___
 
 #### Returns
 
-[BasicToken](basictoken.md)
+[`BasicToken`](basictoken.md)
 
 #### Defined in
 

@@ -80,17 +80,17 @@ ___
 
 ### createPRG
 
-▸ `Static` **createPRG**(`params`): [PRG](prg.md)
+▸ `Static` **createPRG**(`params`): [`PRG`](prg.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `params` | [PRGParameters](../modules.md#prgparameters) |
+| `params` | [`PRGParameters`](../modules.md#prgparameters) |
 
 #### Returns
 
-[PRG](prg.md)
+[`PRG`](prg.md)
 
 #### Defined in
 

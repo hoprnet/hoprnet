@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **HoprToken__factory**
+  ↳ **`HoprToken__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [HoprToken](hoprtoken.md)
+▸ **attach**(`address`): [`HoprToken`](hoprtoken.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[HoprToken](hoprtoken.md)
+[`HoprToken`](hoprtoken.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [HoprToken\_\_factory](hoprtoken__factory.md)
+▸ **connect**(`signer`): [`HoprToken__factory`](hoprtoken__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[HoprToken\_\_factory](hoprtoken__factory.md)
+[`HoprToken__factory`](hoprtoken__factory.md)
 
 #### Overrides
 
@@ -146,17 +146,17 @@ ___
 
 ### deploy
 
-▸ **deploy**(`overrides?`): `Promise`<[HoprToken](hoprtoken.md)\>
+▸ **deploy**(`overrides?`): `Promise`<[`HoprToken`](hoprtoken.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[HoprToken](hoprtoken.md)\>
+`Promise`<[`HoprToken`](hoprtoken.md)\>
 
 #### Overrides
 
@@ -176,7 +176,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -194,7 +194,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [HoprToken](hoprtoken.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`HoprToken`](hoprtoken.md)
 
 #### Parameters
 
@@ -205,7 +205,7 @@ ___
 
 #### Returns
 
-[HoprToken](hoprtoken.md)
+[`HoprToken`](hoprtoken.md)
 
 #### Defined in
 

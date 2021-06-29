@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **LegacyERC20**
+  ↳ **`LegacyERC20`**
 
 ## Table of contents
 
@@ -83,7 +83,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -153,10 +153,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
@@ -190,10 +190,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -227,10 +227,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
@@ -264,10 +264,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -295,7 +295,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -347,7 +347,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -357,7 +357,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -397,7 +397,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [LegacyERC20](legacyerc20.md)
+▸ **attach**(`addressOrName`): [`LegacyERC20`](legacyerc20.md)
 
 #### Parameters
 
@@ -407,7 +407,7 @@ ___
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -421,7 +421,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [LegacyERC20](legacyerc20.md)
+▸ **connect**(`signerOrProvider`): [`LegacyERC20`](legacyerc20.md)
 
 #### Parameters
 
@@ -431,7 +431,7 @@ ___
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -445,11 +445,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[LegacyERC20](legacyerc20.md)\>
+▸ **deployed**(): `Promise`<[`LegacyERC20`](legacyerc20.md)\>
 
 #### Returns
 
-`Promise`<[LegacyERC20](legacyerc20.md)\>
+`Promise`<[`LegacyERC20`](legacyerc20.md)\>
 
 #### Overrides
 
@@ -488,7 +488,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -498,7 +498,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -536,24 +536,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -587,25 +587,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [LegacyERC20](legacyerc20.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`LegacyERC20`](legacyerc20.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -615,7 +615,7 @@ Contract.off
 
 packages/ethereum/types/LegacyERC20.d.ts:54
 
-▸ **off**(`eventName`, `listener`): [LegacyERC20](legacyerc20.md)
+▸ **off**(`eventName`, `listener`): [`LegacyERC20`](legacyerc20.md)
 
 #### Parameters
 
@@ -626,7 +626,7 @@ packages/ethereum/types/LegacyERC20.d.ts:54
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -640,25 +640,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [LegacyERC20](legacyerc20.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`LegacyERC20`](legacyerc20.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -668,7 +668,7 @@ Contract.on
 
 packages/ethereum/types/LegacyERC20.d.ts:58
 
-▸ **on**(`eventName`, `listener`): [LegacyERC20](legacyerc20.md)
+▸ **on**(`eventName`, `listener`): [`LegacyERC20`](legacyerc20.md)
 
 #### Parameters
 
@@ -679,7 +679,7 @@ packages/ethereum/types/LegacyERC20.d.ts:58
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -693,25 +693,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [LegacyERC20](legacyerc20.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`LegacyERC20`](legacyerc20.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -721,7 +721,7 @@ Contract.once
 
 packages/ethereum/types/LegacyERC20.d.ts:62
 
-▸ **once**(`eventName`, `listener`): [LegacyERC20](legacyerc20.md)
+▸ **once**(`eventName`, `listener`): [`LegacyERC20`](legacyerc20.md)
 
 #### Parameters
 
@@ -732,7 +732,7 @@ packages/ethereum/types/LegacyERC20.d.ts:62
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -746,26 +746,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -779,24 +779,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [LegacyERC20](legacyerc20.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`LegacyERC20`](legacyerc20.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -806,7 +806,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/LegacyERC20.d.ts:70
 
-▸ **removeAllListeners**(`eventName?`): [LegacyERC20](legacyerc20.md)
+▸ **removeAllListeners**(`eventName?`): [`LegacyERC20`](legacyerc20.md)
 
 #### Parameters
 
@@ -816,7 +816,7 @@ packages/ethereum/types/LegacyERC20.d.ts:70
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -830,25 +830,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [LegacyERC20](legacyerc20.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`LegacyERC20`](legacyerc20.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -858,7 +858,7 @@ Contract.removeListener
 
 packages/ethereum/types/LegacyERC20.d.ts:66
 
-▸ **removeListener**(`eventName`, `listener`): [LegacyERC20](legacyerc20.md)
+▸ **removeListener**(`eventName`, `listener`): [`LegacyERC20`](legacyerc20.md)
 
 #### Parameters
 
@@ -869,7 +869,7 @@ packages/ethereum/types/LegacyERC20.d.ts:66
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Overrides
 
@@ -883,7 +883,7 @@ ___
 
 ### transfer
 
-▸ **transfer**(`_spender`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transfer**(`_spender`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -891,11 +891,11 @@ ___
 | :------ | :------ |
 | `_spender` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -905,7 +905,7 @@ ___
 
 ### transfer(address,uint256)
 
-▸ **transfer(address,uint256)**(`_spender`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transfer(address,uint256)**(`_spender`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -913,11 +913,11 @@ ___
 | :------ | :------ |
 | `_spender` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -927,7 +927,7 @@ ___
 
 ### transferFrom
 
-▸ **transferFrom**(`_owner`, `_spender`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferFrom**(`_owner`, `_spender`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -936,11 +936,11 @@ ___
 | `_owner` | `string` |
 | `_spender` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -950,7 +950,7 @@ ___
 
 ### transferFrom(address,address,uint256)
 
-▸ **transferFrom(address,address,uint256)**(`_owner`, `_spender`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferFrom(address,address,uint256)**(`_owner`, `_spender`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -959,11 +959,11 @@ ___
 | `_owner` | `string` |
 | `_spender` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 

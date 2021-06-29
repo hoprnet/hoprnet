@@ -42,11 +42,11 @@
 
 ### DUMMY\_INVERSE\_PROBABILITY
 
-• `Static` `get` **DUMMY_INVERSE_PROBABILITY**(): [UINT256](uint256.md)
+• `Static` `get` **DUMMY_INVERSE_PROBABILITY**(): [`UINT256`](uint256.md)
 
 #### Returns
 
-[UINT256](uint256.md)
+[`UINT256`](uint256.md)
 
 #### Defined in
 
@@ -112,7 +112,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [UINT256](uint256.md)
+▸ `Static` **deserialize**(`arr`): [`UINT256`](uint256.md)
 
 #### Parameters
 
@@ -122,7 +122,7 @@ ___
 
 #### Returns
 
-[UINT256](uint256.md)
+[`UINT256`](uint256.md)
 
 #### Defined in
 
@@ -132,7 +132,7 @@ ___
 
 ### fromInverseProbability
 
-▸ `Static` **fromInverseProbability**(`inverseProb`): [UINT256](uint256.md)
+▸ `Static` **fromInverseProbability**(`inverseProb`): [`UINT256`](uint256.md)
 
 #### Parameters
 
@@ -142,7 +142,7 @@ ___
 
 #### Returns
 
-[UINT256](uint256.md)
+[`UINT256`](uint256.md)
 
 #### Defined in
 
@@ -152,7 +152,7 @@ ___
 
 ### fromString
 
-▸ `Static` **fromString**(`str`): [UINT256](uint256.md)
+▸ `Static` **fromString**(`str`): [`UINT256`](uint256.md)
 
 #### Parameters
 
@@ -162,7 +162,7 @@ ___
 
 #### Returns
 
-[UINT256](uint256.md)
+[`UINT256`](uint256.md)
 
 #### Defined in
 

@@ -86,17 +86,17 @@ ___
 
 ### add
 
-▸ **add**(`b`): [Balance](balance.md)
+▸ **add**(`b`): [`Balance`](balance.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [Balance](balance.md) |
+| `b` | [`Balance`](balance.md) |
 
 #### Returns
 
-[Balance](balance.md)
+[`Balance`](balance.md)
 
 #### Defined in
 
@@ -162,11 +162,11 @@ ___
 
 ### ZERO
 
-▸ `Static` **ZERO**(): [Balance](balance.md)
+▸ `Static` **ZERO**(): [`Balance`](balance.md)
 
 #### Returns
 
-[Balance](balance.md)
+[`Balance`](balance.md)
 
 #### Defined in
 
@@ -176,7 +176,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [Balance](balance.md)
+▸ `Static` **deserialize**(`arr`): [`Balance`](balance.md)
 
 #### Parameters
 
@@ -186,7 +186,7 @@ ___
 
 #### Returns
 
-[Balance](balance.md)
+[`Balance`](balance.md)
 
 #### Defined in
 

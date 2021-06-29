@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **ERC777__factory**
+  ↳ **`ERC777__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [ERC777](erc777.md)
+▸ **attach**(`address`): [`ERC777`](erc777.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[ERC777](erc777.md)
+[`ERC777`](erc777.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [ERC777\_\_factory](erc777__factory.md)
+▸ **connect**(`signer`): [`ERC777__factory`](erc777__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[ERC777\_\_factory](erc777__factory.md)
+[`ERC777__factory`](erc777__factory.md)
 
 #### Overrides
 
@@ -146,7 +146,7 @@ ___
 
 ### deploy
 
-▸ **deploy**(`name_`, `symbol_`, `defaultOperators_`, `overrides?`): `Promise`<[ERC777](erc777.md)\>
+▸ **deploy**(`name_`, `symbol_`, `defaultOperators_`, `overrides?`): `Promise`<[`ERC777`](erc777.md)\>
 
 #### Parameters
 
@@ -155,11 +155,11 @@ ___
 | `name_` | `string` |
 | `symbol_` | `string` |
 | `defaultOperators_` | `string`[] |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[ERC777](erc777.md)\>
+`Promise`<[`ERC777`](erc777.md)\>
 
 #### Overrides
 
@@ -182,7 +182,7 @@ ___
 | `name_` | `string` |
 | `symbol_` | `string` |
 | `defaultOperators_` | `string`[] |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -200,7 +200,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC777](erc777.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ERC777`](erc777.md)
 
 #### Parameters
 
@@ -211,7 +211,7 @@ ___
 
 #### Returns
 
-[ERC777](erc777.md)
+[`ERC777`](erc777.md)
 
 #### Defined in
 

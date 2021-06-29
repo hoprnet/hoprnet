@@ -140,7 +140,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [NativeBalance](nativebalance.md)
+▸ `Static` **deserialize**(`arr`): [`NativeBalance`](nativebalance.md)
 
 #### Parameters
 
@@ -150,7 +150,7 @@ ___
 
 #### Returns
 
-[NativeBalance](nativebalance.md)
+[`NativeBalance`](nativebalance.md)
 
 #### Defined in
 

@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ReentrancyGuard](reentrancyguard.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ReentrancyGuard`](reentrancyguard.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[ReentrancyGuard](reentrancyguard.md)
+[`ReentrancyGuard`](reentrancyguard.md)
 
 #### Defined in
 

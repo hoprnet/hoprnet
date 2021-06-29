@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **PermittableToken**
+  ↳ **`PermittableToken`**
 
 ## Table of contents
 
@@ -149,7 +149,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -219,76 +219,76 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `DOMAIN_SEPARATOR` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `DOMAIN_SEPARATOR()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `PERMIT_TYPEHASH` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `PERMIT_TYPEHASH()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `approve` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `approve(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `bridgeContract` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `bridgeContract()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `burn` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<number\> |
-| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<number\> |
-| `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `expirations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `expirations(address,address)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `finishMinting` | (`overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `finishMinting()` | (`overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `DOMAIN_SEPARATOR` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `DOMAIN_SEPARATOR()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `PERMIT_TYPEHASH` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `PERMIT_TYPEHASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `approve` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `approve(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `bridgeContract` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `bridgeContract()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `burn` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<`number`\> |
+| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<`number`\> |
+| `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `expirations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `expirations(address,address)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `finishMinting` | (`overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `finishMinting()` | (`overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 | `getTokenInterfacesVersion` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`] & { `major`: `BigNumber` ; `minor`: `BigNumber` ; `patch`: `BigNumber`  }\> |
 | `getTokenInterfacesVersion()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`] & { `major`: `BigNumber` ; `minor`: `BigNumber` ; `patch`: `BigNumber`  }\> |
-| `increaseAllowance` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `increaseAllowance(address,uint256)` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `isBridge` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `isBridge(address)` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `mintingFinished` | (`overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `mintingFinished()` | (`overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `move` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `move(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `name` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `nonces` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `nonces(address)` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `permit` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `pull` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `pull(address,uint256)` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `push` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `push(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `renounceOwnership` | (`overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `renounceOwnership()` | (`overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `setBridgeContract` | (`_bridgeContract`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `setBridgeContract(address)` | (`_bridgeContract`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `transferAndCall` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `transferAndCall(address,uint256,bytes)` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `transferFrom` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `transferFrom(address,address,uint256)` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `version` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `version()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `increaseAllowance` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `increaseAllowance(address,uint256)` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `isBridge` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `isBridge(address)` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `mintingFinished` | (`overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `mintingFinished()` | (`overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `move` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `move(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `nonces` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `nonces(address)` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `permit` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `pull` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `pull(address,uint256)` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `push` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `push(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `renounceOwnership` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `renounceOwnership()` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `setBridgeContract` | (`_bridgeContract`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `setBridgeContract(address)` | (`_bridgeContract`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `transferAndCall` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `transferAndCall(address,uint256,bytes)` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `transferFrom` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `transferFrom(address,address,uint256)` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `version` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `version()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 
 #### Overrides
 
@@ -322,76 +322,76 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `DOMAIN_SEPARATOR` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `DOMAIN_SEPARATOR()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `PERMIT_TYPEHASH` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `PERMIT_TYPEHASH()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `approve` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `approve(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `bridgeContract` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `bridgeContract()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `expirations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `expirations(address,address)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `finishMinting` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `finishMinting()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `getTokenInterfacesVersion` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getTokenInterfacesVersion()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `increaseAllowance` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `increaseAllowance(address,uint256)` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `isBridge` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `isBridge(address)` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `mintingFinished` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `mintingFinished()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `move` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `move(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `name` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `nonces` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `nonces(address)` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `permit` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `pull` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `pull(address,uint256)` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `push` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `push(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `setBridgeContract` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `setBridgeContract(address)` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferAndCall` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferAndCall(address,uint256,bytes)` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferFrom` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferFrom(address,address,uint256)` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `version` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `version()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `DOMAIN_SEPARATOR` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `DOMAIN_SEPARATOR()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `PERMIT_TYPEHASH` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `PERMIT_TYPEHASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `approve` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `approve(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `bridgeContract` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `bridgeContract()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `expirations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `expirations(address,address)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `finishMinting` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `finishMinting()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `getTokenInterfacesVersion` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getTokenInterfacesVersion()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `increaseAllowance` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `increaseAllowance(address,uint256)` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `isBridge` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `isBridge(address)` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `mintingFinished` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `mintingFinished()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `move` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `move(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `nonces` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `nonces(address)` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `permit` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `pull` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `pull(address,uint256)` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `push` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `push(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `setBridgeContract` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `setBridgeContract(address)` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferAndCall` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferAndCall(address,uint256,bytes)` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferFrom` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferFrom(address,address,uint256)` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `version` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `version()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -411,13 +411,13 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Approval` | (`owner`: `string`, `spender`: `string`, `value`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Burn` | (`burner`: `string`, `value`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `Mint` | (`to`: `string`, `amount`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `MintFinished` | () => [TypedEventFilter](../interfaces/typedeventfilter.md)<[], `Object`\> |
-| `OwnershipRenounced` | (`previousOwner`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`], `Object`\> |
-| `OwnershipTransferred` | (`previousOwner`: `string`, `newOwner`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
-| `Transfer` | (`from`: `string`, `to`: `string`, `value`: ``null``, `data`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`, `string`], `Object`\> |
+| `Approval` | (`owner`: `string`, `spender`: `string`, `value`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Burn` | (`burner`: `string`, `value`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`], `Object`\> |
+| `Mint` | (`to`: `string`, `amount`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`], `Object`\> |
+| `MintFinished` | () => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[], `Object`\> |
+| `OwnershipRenounced` | (`previousOwner`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`], `Object`\> |
+| `OwnershipTransferred` | (`previousOwner`: `string`, `newOwner`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
+| `Transfer` | (`from`: `string`, `to`: `string`, `value`: ``null``, `data`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`, `string`], `Object`\> |
 
 #### Overrides
 
@@ -443,68 +443,68 @@ ___
 | `PERMIT_TYPEHASH()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `approve` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `approve(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `approve` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `approve(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `bridgeContract` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `bridgeContract()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<[`number`]\> |
 | `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<[`number`]\> |
-| `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `expirations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `expirations(address,address)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `finishMinting` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `finishMinting()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `finishMinting` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `finishMinting()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `getTokenInterfacesVersion` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`] & { `major`: `BigNumber` ; `minor`: `BigNumber` ; `patch`: `BigNumber`  }\> |
 | `getTokenInterfacesVersion()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`] & { `major`: `BigNumber` ; `minor`: `BigNumber` ; `patch`: `BigNumber`  }\> |
-| `increaseAllowance` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `increaseAllowance(address,uint256)` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `increaseAllowance` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `increaseAllowance(address,uint256)` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `isBridge` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
 | `isBridge(address)` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
-| `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `mintingFinished` | (`overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
 | `mintingFinished()` | (`overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
-| `move` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `move(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `move` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `move(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `name` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `name()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `nonces` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `nonces(address)` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `permit` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `pull` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `pull(address,uint256)` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `push` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `push(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `setBridgeContract` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `setBridgeContract(address)` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `permit` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `pull` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `pull(address,uint256)` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `push` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `push(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `setBridgeContract` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `setBridgeContract(address)` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferAndCall` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferAndCall(address,uint256,bytes)` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferFrom` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferFrom(address,address,uint256)` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferAndCall` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferAndCall(address,uint256,bytes)` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferFrom` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferFrom(address,address,uint256)` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `version` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `version()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 
@@ -540,76 +540,76 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `DOMAIN_SEPARATOR` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `DOMAIN_SEPARATOR()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `PERMIT_TYPEHASH` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `PERMIT_TYPEHASH()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `approve` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `approve(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `bridgeContract` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `bridgeContract()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `expirations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `expirations(address,address)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `finishMinting` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `finishMinting()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `getTokenInterfacesVersion` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getTokenInterfacesVersion()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `increaseAllowance` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `increaseAllowance(address,uint256)` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `isBridge` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `isBridge(address)` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `mintingFinished` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `mintingFinished()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `move` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `move(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `name` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `nonces` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `nonces(address)` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `permit` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `pull` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `pull(address,uint256)` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `push` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `push(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `setBridgeContract` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `setBridgeContract(address)` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferAndCall` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferAndCall(address,uint256,bytes)` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferFrom` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferFrom(address,address,uint256)` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `version` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `version()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `DOMAIN_SEPARATOR` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `DOMAIN_SEPARATOR()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `PERMIT_TYPEHASH` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `PERMIT_TYPEHASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `approve` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `approve(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `bridgeContract` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `bridgeContract()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `expirations` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `expirations(address,address)` | (`arg0`: `string`, `arg1`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `finishMinting` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `finishMinting()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `getTokenInterfacesVersion` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getTokenInterfacesVersion()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `increaseAllowance` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `increaseAllowance(address,uint256)` | (`_to`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `isBridge` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `isBridge(address)` | (`_address`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `mintingFinished` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `mintingFinished()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `move` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `move(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `nonces` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `nonces(address)` | (`arg0`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `permit` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)` | (`_holder`: `string`, `_spender`: `string`, `_nonce`: `BigNumberish`, `_expiry`: `BigNumberish`, `_allowed`: `boolean`, `_v`: `BigNumberish`, `_r`: `BytesLike`, `_s`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `pull` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `pull(address,uint256)` | (`_from`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `push` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `push(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `setBridgeContract` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `setBridgeContract(address)` | (`_bridgeContract`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferAndCall` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferAndCall(address,uint256,bytes)` | (`_to`: `string`, `_value`: `BigNumberish`, `_data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferFrom` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferFrom(address,address,uint256)` | (`_sender`: `string`, `_recipient`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `version` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `version()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -637,7 +637,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -665,7 +665,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 ### DOMAIN\_SEPARATOR
 
-▸ **DOMAIN_SEPARATOR**(`overrides?`): `Promise`<string\>
+▸ **DOMAIN_SEPARATOR**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -675,7 +675,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -685,7 +685,7 @@ ___
 
 ### DOMAIN\_SEPARATOR()
 
-▸ **DOMAIN_SEPARATOR()**(`overrides?`): `Promise`<string\>
+▸ **DOMAIN_SEPARATOR()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -695,7 +695,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -705,7 +705,7 @@ ___
 
 ### PERMIT\_TYPEHASH
 
-▸ **PERMIT_TYPEHASH**(`overrides?`): `Promise`<string\>
+▸ **PERMIT_TYPEHASH**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -715,7 +715,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -725,7 +725,7 @@ ___
 
 ### PERMIT\_TYPEHASH()
 
-▸ **PERMIT_TYPEHASH()**(`overrides?`): `Promise`<string\>
+▸ **PERMIT_TYPEHASH()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -735,7 +735,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -769,7 +769,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -779,7 +779,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -819,7 +819,7 @@ ___
 
 ### allowance
 
-▸ **allowance**(`_owner`, `_spender`, `overrides?`): `Promise`<BigNumber\>
+▸ **allowance**(`_owner`, `_spender`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -831,7 +831,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -841,7 +841,7 @@ ___
 
 ### allowance(address,address)
 
-▸ **allowance(address,address)**(`_owner`, `_spender`, `overrides?`): `Promise`<BigNumber\>
+▸ **allowance(address,address)**(`_owner`, `_spender`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -853,7 +853,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -863,7 +863,7 @@ ___
 
 ### approve
 
-▸ **approve**(`_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **approve**(`_to`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -871,11 +871,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -885,7 +885,7 @@ ___
 
 ### approve(address,uint256)
 
-▸ **approve(address,uint256)**(`_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **approve(address,uint256)**(`_to`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -893,11 +893,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -907,7 +907,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [PermittableToken](permittabletoken.md)
+▸ **attach**(`addressOrName`): [`PermittableToken`](permittabletoken.md)
 
 #### Parameters
 
@@ -917,7 +917,7 @@ ___
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -931,7 +931,7 @@ ___
 
 ### balanceOf
 
-▸ **balanceOf**(`_owner`, `overrides?`): `Promise`<BigNumber\>
+▸ **balanceOf**(`_owner`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -942,7 +942,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -952,7 +952,7 @@ ___
 
 ### balanceOf(address)
 
-▸ **balanceOf(address)**(`_owner`, `overrides?`): `Promise`<BigNumber\>
+▸ **balanceOf(address)**(`_owner`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -963,7 +963,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -973,7 +973,7 @@ ___
 
 ### bridgeContract
 
-▸ **bridgeContract**(`overrides?`): `Promise`<string\>
+▸ **bridgeContract**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -983,7 +983,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -993,7 +993,7 @@ ___
 
 ### bridgeContract()
 
-▸ **bridgeContract()**(`overrides?`): `Promise`<string\>
+▸ **bridgeContract()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1003,7 +1003,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1013,18 +1013,18 @@ ___
 
 ### burn
 
-▸ **burn**(`_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **burn**(`_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1034,18 +1034,18 @@ ___
 
 ### burn(uint256)
 
-▸ **burn(uint256)**(`_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **burn(uint256)**(`_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1055,7 +1055,7 @@ ___
 
 ### claimTokens
 
-▸ **claimTokens**(`_token`, `_to`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **claimTokens**(`_token`, `_to`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1063,11 +1063,11 @@ ___
 | :------ | :------ |
 | `_token` | `string` |
 | `_to` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1077,7 +1077,7 @@ ___
 
 ### claimTokens(address,address)
 
-▸ **claimTokens(address,address)**(`_token`, `_to`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **claimTokens(address,address)**(`_token`, `_to`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1085,11 +1085,11 @@ ___
 | :------ | :------ |
 | `_token` | `string` |
 | `_to` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1099,7 +1099,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [PermittableToken](permittabletoken.md)
+▸ **connect**(`signerOrProvider`): [`PermittableToken`](permittabletoken.md)
 
 #### Parameters
 
@@ -1109,7 +1109,7 @@ ___
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -1123,7 +1123,7 @@ ___
 
 ### decimals
 
-▸ **decimals**(`overrides?`): `Promise`<number\>
+▸ **decimals**(`overrides?`): `Promise`<`number`\>
 
 #### Parameters
 
@@ -1133,7 +1133,7 @@ ___
 
 #### Returns
 
-`Promise`<number\>
+`Promise`<`number`\>
 
 #### Defined in
 
@@ -1143,7 +1143,7 @@ ___
 
 ### decimals()
 
-▸ **decimals()**(`overrides?`): `Promise`<number\>
+▸ **decimals()**(`overrides?`): `Promise`<`number`\>
 
 #### Parameters
 
@@ -1153,7 +1153,7 @@ ___
 
 #### Returns
 
-`Promise`<number\>
+`Promise`<`number`\>
 
 #### Defined in
 
@@ -1163,7 +1163,7 @@ ___
 
 ### decreaseAllowance
 
-▸ **decreaseAllowance**(`spender`, `subtractedValue`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **decreaseAllowance**(`spender`, `subtractedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1171,11 +1171,11 @@ ___
 | :------ | :------ |
 | `spender` | `string` |
 | `subtractedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1185,7 +1185,7 @@ ___
 
 ### decreaseAllowance(address,uint256)
 
-▸ **decreaseAllowance(address,uint256)**(`spender`, `subtractedValue`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **decreaseAllowance(address,uint256)**(`spender`, `subtractedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1193,11 +1193,11 @@ ___
 | :------ | :------ |
 | `spender` | `string` |
 | `subtractedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1207,7 +1207,7 @@ ___
 
 ### decreaseApproval
 
-▸ **decreaseApproval**(`_spender`, `_subtractedValue`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **decreaseApproval**(`_spender`, `_subtractedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1215,11 +1215,11 @@ ___
 | :------ | :------ |
 | `_spender` | `string` |
 | `_subtractedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1229,7 +1229,7 @@ ___
 
 ### decreaseApproval(address,uint256)
 
-▸ **decreaseApproval(address,uint256)**(`_spender`, `_subtractedValue`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **decreaseApproval(address,uint256)**(`_spender`, `_subtractedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1237,11 +1237,11 @@ ___
 | :------ | :------ |
 | `_spender` | `string` |
 | `_subtractedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1251,11 +1251,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[PermittableToken](permittabletoken.md)\>
+▸ **deployed**(): `Promise`<[`PermittableToken`](permittabletoken.md)\>
 
 #### Returns
 
-`Promise`<[PermittableToken](permittabletoken.md)\>
+`Promise`<[`PermittableToken`](permittabletoken.md)\>
 
 #### Overrides
 
@@ -1294,7 +1294,7 @@ ___
 
 ### expirations
 
-▸ **expirations**(`arg0`, `arg1`, `overrides?`): `Promise`<BigNumber\>
+▸ **expirations**(`arg0`, `arg1`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1306,7 +1306,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1316,7 +1316,7 @@ ___
 
 ### expirations(address,address)
 
-▸ **expirations(address,address)**(`arg0`, `arg1`, `overrides?`): `Promise`<BigNumber\>
+▸ **expirations(address,address)**(`arg0`, `arg1`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1328,7 +1328,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1338,7 +1338,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -1348,7 +1348,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -1362,17 +1362,17 @@ ___
 
 ### finishMinting
 
-▸ **finishMinting**(`overrides?`): `Promise`<ContractTransaction\>
+▸ **finishMinting**(`overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1382,17 +1382,17 @@ ___
 
 ### finishMinting()
 
-▸ **finishMinting()**(`overrides?`): `Promise`<ContractTransaction\>
+▸ **finishMinting()**(`overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1442,7 +1442,7 @@ ___
 
 ### increaseAllowance
 
-▸ **increaseAllowance**(`_to`, `_addedValue`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **increaseAllowance**(`_to`, `_addedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1450,11 +1450,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_addedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1464,7 +1464,7 @@ ___
 
 ### increaseAllowance(address,uint256)
 
-▸ **increaseAllowance(address,uint256)**(`_to`, `_addedValue`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **increaseAllowance(address,uint256)**(`_to`, `_addedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1472,11 +1472,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_addedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1486,7 +1486,7 @@ ___
 
 ### increaseApproval
 
-▸ **increaseApproval**(`_spender`, `_addedValue`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **increaseApproval**(`_spender`, `_addedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1494,11 +1494,11 @@ ___
 | :------ | :------ |
 | `_spender` | `string` |
 | `_addedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1508,7 +1508,7 @@ ___
 
 ### increaseApproval(address,uint256)
 
-▸ **increaseApproval(address,uint256)**(`_spender`, `_addedValue`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **increaseApproval(address,uint256)**(`_spender`, `_addedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1516,11 +1516,11 @@ ___
 | :------ | :------ |
 | `_spender` | `string` |
 | `_addedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1530,7 +1530,7 @@ ___
 
 ### isBridge
 
-▸ **isBridge**(`_address`, `overrides?`): `Promise`<boolean\>
+▸ **isBridge**(`_address`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -1541,7 +1541,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -1551,7 +1551,7 @@ ___
 
 ### isBridge(address)
 
-▸ **isBridge(address)**(`_address`, `overrides?`): `Promise`<boolean\>
+▸ **isBridge(address)**(`_address`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -1562,7 +1562,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -1596,24 +1596,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -1647,7 +1647,7 @@ ___
 
 ### mint
 
-▸ **mint**(`_to`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **mint**(`_to`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1655,11 +1655,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1669,7 +1669,7 @@ ___
 
 ### mint(address,uint256)
 
-▸ **mint(address,uint256)**(`_to`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **mint(address,uint256)**(`_to`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1677,11 +1677,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1691,7 +1691,7 @@ ___
 
 ### mintingFinished
 
-▸ **mintingFinished**(`overrides?`): `Promise`<boolean\>
+▸ **mintingFinished**(`overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -1701,7 +1701,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -1711,7 +1711,7 @@ ___
 
 ### mintingFinished()
 
-▸ **mintingFinished()**(`overrides?`): `Promise`<boolean\>
+▸ **mintingFinished()**(`overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -1721,7 +1721,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -1731,7 +1731,7 @@ ___
 
 ### move
 
-▸ **move**(`_from`, `_to`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **move**(`_from`, `_to`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1740,11 +1740,11 @@ ___
 | `_from` | `string` |
 | `_to` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1754,7 +1754,7 @@ ___
 
 ### move(address,address,uint256)
 
-▸ **move(address,address,uint256)**(`_from`, `_to`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **move(address,address,uint256)**(`_from`, `_to`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1763,11 +1763,11 @@ ___
 | `_from` | `string` |
 | `_to` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1777,7 +1777,7 @@ ___
 
 ### name
 
-▸ **name**(`overrides?`): `Promise`<string\>
+▸ **name**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1787,7 +1787,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1797,7 +1797,7 @@ ___
 
 ### name()
 
-▸ **name()**(`overrides?`): `Promise`<string\>
+▸ **name()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1807,7 +1807,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1817,7 +1817,7 @@ ___
 
 ### nonces
 
-▸ **nonces**(`arg0`, `overrides?`): `Promise`<BigNumber\>
+▸ **nonces**(`arg0`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1828,7 +1828,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1838,7 +1838,7 @@ ___
 
 ### nonces(address)
 
-▸ **nonces(address)**(`arg0`, `overrides?`): `Promise`<BigNumber\>
+▸ **nonces(address)**(`arg0`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1849,7 +1849,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1859,25 +1859,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [PermittableToken](permittabletoken.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`PermittableToken`](permittabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -1887,7 +1887,7 @@ Contract.off
 
 packages/ethereum/types/PermittableToken.d.ts:301
 
-▸ **off**(`eventName`, `listener`): [PermittableToken](permittabletoken.md)
+▸ **off**(`eventName`, `listener`): [`PermittableToken`](permittabletoken.md)
 
 #### Parameters
 
@@ -1898,7 +1898,7 @@ packages/ethereum/types/PermittableToken.d.ts:301
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -1912,25 +1912,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [PermittableToken](permittabletoken.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`PermittableToken`](permittabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -1940,7 +1940,7 @@ Contract.on
 
 packages/ethereum/types/PermittableToken.d.ts:305
 
-▸ **on**(`eventName`, `listener`): [PermittableToken](permittabletoken.md)
+▸ **on**(`eventName`, `listener`): [`PermittableToken`](permittabletoken.md)
 
 #### Parameters
 
@@ -1951,7 +1951,7 @@ packages/ethereum/types/PermittableToken.d.ts:305
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -1965,25 +1965,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [PermittableToken](permittabletoken.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`PermittableToken`](permittabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -1993,7 +1993,7 @@ Contract.once
 
 packages/ethereum/types/PermittableToken.d.ts:309
 
-▸ **once**(`eventName`, `listener`): [PermittableToken](permittabletoken.md)
+▸ **once**(`eventName`, `listener`): [`PermittableToken`](permittabletoken.md)
 
 #### Parameters
 
@@ -2004,7 +2004,7 @@ packages/ethereum/types/PermittableToken.d.ts:309
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -2018,7 +2018,7 @@ ___
 
 ### owner
 
-▸ **owner**(`overrides?`): `Promise`<string\>
+▸ **owner**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -2028,7 +2028,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -2038,7 +2038,7 @@ ___
 
 ### owner()
 
-▸ **owner()**(`overrides?`): `Promise`<string\>
+▸ **owner()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -2048,7 +2048,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -2058,7 +2058,7 @@ ___
 
 ### permit
 
-▸ **permit**(`_holder`, `_spender`, `_nonce`, `_expiry`, `_allowed`, `_v`, `_r`, `_s`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **permit**(`_holder`, `_spender`, `_nonce`, `_expiry`, `_allowed`, `_v`, `_r`, `_s`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2072,11 +2072,11 @@ ___
 | `_v` | `BigNumberish` |
 | `_r` | `BytesLike` |
 | `_s` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2086,7 +2086,7 @@ ___
 
 ### permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)
 
-▸ **permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)**(`_holder`, `_spender`, `_nonce`, `_expiry`, `_allowed`, `_v`, `_r`, `_s`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **permit(address,address,uint256,uint256,bool,uint8,bytes32,bytes32)**(`_holder`, `_spender`, `_nonce`, `_expiry`, `_allowed`, `_v`, `_r`, `_s`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2100,11 +2100,11 @@ ___
 | `_v` | `BigNumberish` |
 | `_r` | `BytesLike` |
 | `_s` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2114,7 +2114,7 @@ ___
 
 ### pull
 
-▸ **pull**(`_from`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **pull**(`_from`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2122,11 +2122,11 @@ ___
 | :------ | :------ |
 | `_from` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2136,7 +2136,7 @@ ___
 
 ### pull(address,uint256)
 
-▸ **pull(address,uint256)**(`_from`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **pull(address,uint256)**(`_from`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2144,11 +2144,11 @@ ___
 | :------ | :------ |
 | `_from` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2158,7 +2158,7 @@ ___
 
 ### push
 
-▸ **push**(`_to`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **push**(`_to`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2166,11 +2166,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2180,7 +2180,7 @@ ___
 
 ### push(address,uint256)
 
-▸ **push(address,uint256)**(`_to`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **push(address,uint256)**(`_to`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2188,11 +2188,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2202,26 +2202,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -2235,24 +2235,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [PermittableToken](permittabletoken.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`PermittableToken`](permittabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -2262,7 +2262,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/PermittableToken.d.ts:317
 
-▸ **removeAllListeners**(`eventName?`): [PermittableToken](permittabletoken.md)
+▸ **removeAllListeners**(`eventName?`): [`PermittableToken`](permittabletoken.md)
 
 #### Parameters
 
@@ -2272,7 +2272,7 @@ packages/ethereum/types/PermittableToken.d.ts:317
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -2286,25 +2286,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [PermittableToken](permittabletoken.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`PermittableToken`](permittabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -2314,7 +2314,7 @@ Contract.removeListener
 
 packages/ethereum/types/PermittableToken.d.ts:313
 
-▸ **removeListener**(`eventName`, `listener`): [PermittableToken](permittabletoken.md)
+▸ **removeListener**(`eventName`, `listener`): [`PermittableToken`](permittabletoken.md)
 
 #### Parameters
 
@@ -2325,7 +2325,7 @@ packages/ethereum/types/PermittableToken.d.ts:313
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -2339,17 +2339,17 @@ ___
 
 ### renounceOwnership
 
-▸ **renounceOwnership**(`overrides?`): `Promise`<ContractTransaction\>
+▸ **renounceOwnership**(`overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2359,17 +2359,17 @@ ___
 
 ### renounceOwnership()
 
-▸ **renounceOwnership()**(`overrides?`): `Promise`<ContractTransaction\>
+▸ **renounceOwnership()**(`overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2379,18 +2379,18 @@ ___
 
 ### setBridgeContract
 
-▸ **setBridgeContract**(`_bridgeContract`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **setBridgeContract**(`_bridgeContract`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_bridgeContract` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2400,18 +2400,18 @@ ___
 
 ### setBridgeContract(address)
 
-▸ **setBridgeContract(address)**(`_bridgeContract`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **setBridgeContract(address)**(`_bridgeContract`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_bridgeContract` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2421,7 +2421,7 @@ ___
 
 ### symbol
 
-▸ **symbol**(`overrides?`): `Promise`<string\>
+▸ **symbol**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -2431,7 +2431,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -2441,7 +2441,7 @@ ___
 
 ### symbol()
 
-▸ **symbol()**(`overrides?`): `Promise`<string\>
+▸ **symbol()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -2451,7 +2451,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -2461,7 +2461,7 @@ ___
 
 ### totalSupply
 
-▸ **totalSupply**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalSupply**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -2471,7 +2471,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -2481,7 +2481,7 @@ ___
 
 ### totalSupply()
 
-▸ **totalSupply()**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalSupply()**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -2491,7 +2491,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -2501,7 +2501,7 @@ ___
 
 ### transfer
 
-▸ **transfer**(`_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transfer**(`_to`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2509,11 +2509,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2523,7 +2523,7 @@ ___
 
 ### transfer(address,uint256)
 
-▸ **transfer(address,uint256)**(`_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transfer(address,uint256)**(`_to`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2531,11 +2531,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2545,7 +2545,7 @@ ___
 
 ### transferAndCall
 
-▸ **transferAndCall**(`_to`, `_value`, `_data`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferAndCall**(`_to`, `_value`, `_data`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2554,11 +2554,11 @@ ___
 | `_to` | `string` |
 | `_value` | `BigNumberish` |
 | `_data` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2568,7 +2568,7 @@ ___
 
 ### transferAndCall(address,uint256,bytes)
 
-▸ **transferAndCall(address,uint256,bytes)**(`_to`, `_value`, `_data`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferAndCall(address,uint256,bytes)**(`_to`, `_value`, `_data`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2577,11 +2577,11 @@ ___
 | `_to` | `string` |
 | `_value` | `BigNumberish` |
 | `_data` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2591,7 +2591,7 @@ ___
 
 ### transferFrom
 
-▸ **transferFrom**(`_sender`, `_recipient`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferFrom**(`_sender`, `_recipient`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2600,11 +2600,11 @@ ___
 | `_sender` | `string` |
 | `_recipient` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2614,7 +2614,7 @@ ___
 
 ### transferFrom(address,address,uint256)
 
-▸ **transferFrom(address,address,uint256)**(`_sender`, `_recipient`, `_amount`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferFrom(address,address,uint256)**(`_sender`, `_recipient`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -2623,11 +2623,11 @@ ___
 | `_sender` | `string` |
 | `_recipient` | `string` |
 | `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2637,18 +2637,18 @@ ___
 
 ### transferOwnership
 
-▸ **transferOwnership**(`_newOwner`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferOwnership**(`_newOwner`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_newOwner` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2658,18 +2658,18 @@ ___
 
 ### transferOwnership(address)
 
-▸ **transferOwnership(address)**(`_newOwner`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferOwnership(address)**(`_newOwner`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_newOwner` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -2679,7 +2679,7 @@ ___
 
 ### version
 
-▸ **version**(`overrides?`): `Promise`<string\>
+▸ **version**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -2689,7 +2689,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -2699,7 +2699,7 @@ ___
 
 ### version()
 
-▸ **version()**(`overrides?`): `Promise`<string\>
+▸ **version()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -2709,7 +2709,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 

@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **Sacrifice**
+  ↳ **`Sacrifice`**
 
 ## Table of contents
 
@@ -79,7 +79,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -255,7 +255,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -307,7 +307,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -317,7 +317,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -357,7 +357,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [Sacrifice](sacrifice.md)
+▸ **attach**(`addressOrName`): [`Sacrifice`](sacrifice.md)
 
 #### Parameters
 
@@ -367,7 +367,7 @@ ___
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -381,7 +381,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [Sacrifice](sacrifice.md)
+▸ **connect**(`signerOrProvider`): [`Sacrifice`](sacrifice.md)
 
 #### Parameters
 
@@ -391,7 +391,7 @@ ___
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -405,11 +405,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[Sacrifice](sacrifice.md)\>
+▸ **deployed**(): `Promise`<[`Sacrifice`](sacrifice.md)\>
 
 #### Returns
 
-`Promise`<[Sacrifice](sacrifice.md)\>
+`Promise`<[`Sacrifice`](sacrifice.md)\>
 
 #### Overrides
 
@@ -448,7 +448,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -458,7 +458,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -496,24 +496,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -547,25 +547,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [Sacrifice](sacrifice.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`Sacrifice`](sacrifice.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -575,7 +575,7 @@ Contract.off
 
 packages/ethereum/types/Sacrifice.d.ts:34
 
-▸ **off**(`eventName`, `listener`): [Sacrifice](sacrifice.md)
+▸ **off**(`eventName`, `listener`): [`Sacrifice`](sacrifice.md)
 
 #### Parameters
 
@@ -586,7 +586,7 @@ packages/ethereum/types/Sacrifice.d.ts:34
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -600,25 +600,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [Sacrifice](sacrifice.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`Sacrifice`](sacrifice.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -628,7 +628,7 @@ Contract.on
 
 packages/ethereum/types/Sacrifice.d.ts:38
 
-▸ **on**(`eventName`, `listener`): [Sacrifice](sacrifice.md)
+▸ **on**(`eventName`, `listener`): [`Sacrifice`](sacrifice.md)
 
 #### Parameters
 
@@ -639,7 +639,7 @@ packages/ethereum/types/Sacrifice.d.ts:38
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -653,25 +653,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [Sacrifice](sacrifice.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`Sacrifice`](sacrifice.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -681,7 +681,7 @@ Contract.once
 
 packages/ethereum/types/Sacrifice.d.ts:42
 
-▸ **once**(`eventName`, `listener`): [Sacrifice](sacrifice.md)
+▸ **once**(`eventName`, `listener`): [`Sacrifice`](sacrifice.md)
 
 #### Parameters
 
@@ -692,7 +692,7 @@ packages/ethereum/types/Sacrifice.d.ts:42
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -706,26 +706,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -739,24 +739,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [Sacrifice](sacrifice.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`Sacrifice`](sacrifice.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -766,7 +766,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/Sacrifice.d.ts:50
 
-▸ **removeAllListeners**(`eventName?`): [Sacrifice](sacrifice.md)
+▸ **removeAllListeners**(`eventName?`): [`Sacrifice`](sacrifice.md)
 
 #### Parameters
 
@@ -776,7 +776,7 @@ packages/ethereum/types/Sacrifice.d.ts:50
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -790,25 +790,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [Sacrifice](sacrifice.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`Sacrifice`](sacrifice.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 
@@ -818,7 +818,7 @@ Contract.removeListener
 
 packages/ethereum/types/Sacrifice.d.ts:46
 
-▸ **removeListener**(`eventName`, `listener`): [Sacrifice](sacrifice.md)
+▸ **removeListener**(`eventName`, `listener`): [`Sacrifice`](sacrifice.md)
 
 #### Parameters
 
@@ -829,7 +829,7 @@ packages/ethereum/types/Sacrifice.d.ts:46
 
 #### Returns
 
-[Sacrifice](sacrifice.md)
+[`Sacrifice`](sacrifice.md)
 
 #### Overrides
 

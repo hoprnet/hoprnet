@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [LegacyERC20](legacyerc20.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`LegacyERC20`](legacyerc20.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[LegacyERC20](legacyerc20.md)
+[`LegacyERC20`](legacyerc20.md)
 
 #### Defined in
 

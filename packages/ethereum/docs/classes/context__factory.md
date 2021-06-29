@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [Context](context.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`Context`](context.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[Context](context.md)
+[`Context`](context.md)
 
 #### Defined in
 

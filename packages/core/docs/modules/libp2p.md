@@ -36,7 +36,7 @@
 
 ### Connection
 
-Ƭ **Connection**: `\_\_module`
+Ƭ **Connection**: `__module`
 
 #### Defined in
 
@@ -101,7 +101,7 @@ ___
 | `clientMode?` | `boolean` |
 | `enabled?` | `boolean` |
 | `kBucketSize?` | `number` |
-| `randomWalk?` | [RandomWalkOptions](libp2p.md#randomwalkoptions) |
+| `randomWalk?` | [`RandomWalkOptions`](libp2p.md#randomwalkoptions) |
 | `selectors?` | `DhtSelectors` |
 | `validators?` | `DhtValidators` |
 
@@ -119,9 +119,9 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `connection` | [Connection](libp2p.md#connection) |
+| `connection` | [`Connection`](libp2p.md#connection) |
 | `protocol` | `string` |
-| `stream` | [MuxedStream](libp2p.md#muxedstream) |
+| `stream` | [`MuxedStream`](libp2p.md#muxedstream) |
 
 #### Defined in
 
@@ -153,12 +153,12 @@ ___
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `dht?` | [DhtOptions](libp2p.md#dhtoptions) | dht module options |
+| `dht?` | [`DhtOptions`](libp2p.md#dhtoptions) | dht module options |
 | `nat?` | `NatManager.NatManagerOptions` | - |
-| `peerDiscovery?` | `Record`<string, boolean \| Object\> | - |
-| `pubsub?` | [PubsubLocalOptions](libp2p.md#pubsublocaloptions) & `PubsubOptions` | pubsub module options |
-| `relay?` | [RelayOptions](libp2p.md#relayoptions) | - |
-| `transport?` | `Record`<string, Object\> | transport options indexed by transport key |
+| `peerDiscovery?` | `Record`<`string`, `boolean` \| `Object`\> | - |
+| `pubsub?` | [`PubsubLocalOptions`](libp2p.md#pubsublocaloptions) & `PubsubOptions` | pubsub module options |
+| `relay?` | [`RelayOptions`](libp2p.md#relayoptions) | - |
+| `transport?` | `Record`<`string`, `Object`\> | transport options indexed by transport key |
 
 #### Defined in
 
@@ -174,14 +174,14 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `connEncryption` | [Crypto](libp2p.md#crypto)[] |
-| `connProtector?` | `\_\_module` |
+| `connEncryption` | [`Crypto`](libp2p.md#crypto)[] |
+| `connProtector?` | `__module` |
 | `contentRouting?` | `ContentRouting`[] |
 | `dht?` | `Object` |
 | `peerDiscovery?` | `PeerDiscoveryFactory`[] |
 | `peerRouting?` | `PeerRouting`[] |
-| `pubsub?` | (...`args`: `any`[]) => [Pubsub](libp2p.md#pubsub) |
-| `streamMuxer` | [MuxerFactory](libp2p.md#muxerfactory)[] |
+| `pubsub?` | (...`args`: `any`[]) => [`Pubsub`](libp2p.md#pubsub) |
+| `streamMuxer` | [`MuxerFactory`](libp2p.md#muxerfactory)[] |
 | `transport` | `TransportFactory`[] |
 
 #### Defined in
@@ -199,16 +199,16 @@ ___
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `addresses?` | `AddressManager.AddressManagerOptions` | - |
-| `config?` | [Libp2pConfig](libp2p.md#libp2pconfig) | - |
+| `config?` | [`Libp2pConfig`](libp2p.md#libp2pconfig) | - |
 | `connectionManager?` | `ConnectionManager.ConnectionManagerOptions` | - |
 | `datastore?` | `Datastore` | - |
 | `dialer?` | `Dialer.DialerOptions` | - |
 | `host?` | `IdentifyService.HostProperties` | libp2p host |
-| `keychain?` | [KeychainOptions](libp2p.md#keychainoptions) & `Keychain.KeychainOptions` | - |
-| `metrics?` | [MetricsOptions](libp2p.md#metricsoptions) & `Metrics.MetricsOptions` | - |
-| `modules` | [Libp2pModules](libp2p.md#libp2pmodules) | libp2p modules to use |
+| `keychain?` | [`KeychainOptions`](libp2p.md#keychainoptions) & `Keychain.KeychainOptions` | - |
+| `metrics?` | [`MetricsOptions`](libp2p.md#metricsoptions) & `Metrics.MetricsOptions` | - |
+| `modules` | [`Libp2pModules`](libp2p.md#libp2pmodules) | libp2p modules to use |
 | `peerRouting?` | `PeerRouting.PeerRoutingOptions` | - |
-| `peerStore?` | [PeerStoreOptions](libp2p.md#peerstoreoptions) & `PersistentPeerStore.PersistentPeerStoreOptions` | - |
+| `peerStore?` | [`PeerStoreOptions`](libp2p.md#peerstoreoptions) & `PersistentPeerStore.PersistentPeerStoreOptions` | - |
 | `transportManager?` | `TransportManager.TransportManagerOptions` | - |
 
 #### Defined in
@@ -291,7 +291,7 @@ ___
 
 ### Protector
 
-Ƭ **Protector**: `\_\_module`
+Ƭ **Protector**: `__module`
 
 #### Defined in
 
@@ -301,7 +301,7 @@ ___
 
 ### Pubsub
 
-Ƭ **Pubsub**: `\_\_module`
+Ƭ **Pubsub**: `__module`
 
 #### Defined in
 

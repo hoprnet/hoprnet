@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **AccessControl**
+  ↳ **`AccessControl`**
 
 ## Table of contents
 
@@ -95,7 +95,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -165,22 +165,22 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
@@ -214,22 +214,22 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -249,8 +249,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `RoleGranted` | (`role`: `BytesLike`, `account`: `string`, `sender`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `RoleRevoked` | (`role`: `BytesLike`, `account`: `string`, `sender`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
+| `RoleGranted` | (`role`: `BytesLike`, `account`: `string`, `sender`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
+| `RoleRevoked` | (`role`: `BytesLike`, `account`: `string`, `sender`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
 
 #### Overrides
 
@@ -278,14 +278,14 @@ ___
 | `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
 | `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
-| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
@@ -319,22 +319,22 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -362,7 +362,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -390,7 +390,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 ### DEFAULT\_ADMIN\_ROLE
 
-▸ **DEFAULT_ADMIN_ROLE**(`overrides?`): `Promise`<string\>
+▸ **DEFAULT_ADMIN_ROLE**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -400,7 +400,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -410,7 +410,7 @@ ___
 
 ### DEFAULT\_ADMIN\_ROLE()
 
-▸ **DEFAULT_ADMIN_ROLE()**(`overrides?`): `Promise`<string\>
+▸ **DEFAULT_ADMIN_ROLE()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -420,7 +420,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -454,7 +454,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -464,7 +464,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -504,7 +504,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [AccessControl](accesscontrol.md)
+▸ **attach**(`addressOrName`): [`AccessControl`](accesscontrol.md)
 
 #### Parameters
 
@@ -514,7 +514,7 @@ ___
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -528,7 +528,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [AccessControl](accesscontrol.md)
+▸ **connect**(`signerOrProvider`): [`AccessControl`](accesscontrol.md)
 
 #### Parameters
 
@@ -538,7 +538,7 @@ ___
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -552,11 +552,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[AccessControl](accesscontrol.md)\>
+▸ **deployed**(): `Promise`<[`AccessControl`](accesscontrol.md)\>
 
 #### Returns
 
-`Promise`<[AccessControl](accesscontrol.md)\>
+`Promise`<[`AccessControl`](accesscontrol.md)\>
 
 #### Overrides
 
@@ -595,7 +595,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -605,7 +605,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -619,7 +619,7 @@ ___
 
 ### getRoleAdmin
 
-▸ **getRoleAdmin**(`role`, `overrides?`): `Promise`<string\>
+▸ **getRoleAdmin**(`role`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -630,7 +630,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -640,7 +640,7 @@ ___
 
 ### getRoleAdmin(bytes32)
 
-▸ **getRoleAdmin(bytes32)**(`role`, `overrides?`): `Promise`<string\>
+▸ **getRoleAdmin(bytes32)**(`role`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -651,7 +651,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -661,7 +661,7 @@ ___
 
 ### getRoleMember
 
-▸ **getRoleMember**(`role`, `index`, `overrides?`): `Promise`<string\>
+▸ **getRoleMember**(`role`, `index`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -673,7 +673,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -683,7 +683,7 @@ ___
 
 ### getRoleMember(bytes32,uint256)
 
-▸ **getRoleMember(bytes32,uint256)**(`role`, `index`, `overrides?`): `Promise`<string\>
+▸ **getRoleMember(bytes32,uint256)**(`role`, `index`, `overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -695,7 +695,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -705,7 +705,7 @@ ___
 
 ### getRoleMemberCount
 
-▸ **getRoleMemberCount**(`role`, `overrides?`): `Promise`<BigNumber\>
+▸ **getRoleMemberCount**(`role`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -716,7 +716,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -726,7 +726,7 @@ ___
 
 ### getRoleMemberCount(bytes32)
 
-▸ **getRoleMemberCount(bytes32)**(`role`, `overrides?`): `Promise`<BigNumber\>
+▸ **getRoleMemberCount(bytes32)**(`role`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -737,7 +737,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -747,7 +747,7 @@ ___
 
 ### grantRole
 
-▸ **grantRole**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **grantRole**(`role`, `account`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -755,11 +755,11 @@ ___
 | :------ | :------ |
 | `role` | `BytesLike` |
 | `account` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -769,7 +769,7 @@ ___
 
 ### grantRole(bytes32,address)
 
-▸ **grantRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **grantRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -777,11 +777,11 @@ ___
 | :------ | :------ |
 | `role` | `BytesLike` |
 | `account` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -791,7 +791,7 @@ ___
 
 ### hasRole
 
-▸ **hasRole**(`role`, `account`, `overrides?`): `Promise`<boolean\>
+▸ **hasRole**(`role`, `account`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -803,7 +803,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -813,7 +813,7 @@ ___
 
 ### hasRole(bytes32,address)
 
-▸ **hasRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<boolean\>
+▸ **hasRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -825,7 +825,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -859,24 +859,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -910,25 +910,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [AccessControl](accesscontrol.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`AccessControl`](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -938,7 +938,7 @@ Contract.off
 
 packages/ethereum/types/AccessControl.d.ts:108
 
-▸ **off**(`eventName`, `listener`): [AccessControl](accesscontrol.md)
+▸ **off**(`eventName`, `listener`): [`AccessControl`](accesscontrol.md)
 
 #### Parameters
 
@@ -949,7 +949,7 @@ packages/ethereum/types/AccessControl.d.ts:108
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -963,25 +963,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [AccessControl](accesscontrol.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`AccessControl`](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -991,7 +991,7 @@ Contract.on
 
 packages/ethereum/types/AccessControl.d.ts:112
 
-▸ **on**(`eventName`, `listener`): [AccessControl](accesscontrol.md)
+▸ **on**(`eventName`, `listener`): [`AccessControl`](accesscontrol.md)
 
 #### Parameters
 
@@ -1002,7 +1002,7 @@ packages/ethereum/types/AccessControl.d.ts:112
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -1016,25 +1016,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [AccessControl](accesscontrol.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`AccessControl`](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -1044,7 +1044,7 @@ Contract.once
 
 packages/ethereum/types/AccessControl.d.ts:116
 
-▸ **once**(`eventName`, `listener`): [AccessControl](accesscontrol.md)
+▸ **once**(`eventName`, `listener`): [`AccessControl`](accesscontrol.md)
 
 #### Parameters
 
@@ -1055,7 +1055,7 @@ packages/ethereum/types/AccessControl.d.ts:116
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -1069,26 +1069,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -1102,24 +1102,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [AccessControl](accesscontrol.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`AccessControl`](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -1129,7 +1129,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/AccessControl.d.ts:124
 
-▸ **removeAllListeners**(`eventName?`): [AccessControl](accesscontrol.md)
+▸ **removeAllListeners**(`eventName?`): [`AccessControl`](accesscontrol.md)
 
 #### Parameters
 
@@ -1139,7 +1139,7 @@ packages/ethereum/types/AccessControl.d.ts:124
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -1153,25 +1153,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [AccessControl](accesscontrol.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`AccessControl`](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -1181,7 +1181,7 @@ Contract.removeListener
 
 packages/ethereum/types/AccessControl.d.ts:120
 
-▸ **removeListener**(`eventName`, `listener`): [AccessControl](accesscontrol.md)
+▸ **removeListener**(`eventName`, `listener`): [`AccessControl`](accesscontrol.md)
 
 #### Parameters
 
@@ -1192,7 +1192,7 @@ packages/ethereum/types/AccessControl.d.ts:120
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Overrides
 
@@ -1206,7 +1206,7 @@ ___
 
 ### renounceRole
 
-▸ **renounceRole**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **renounceRole**(`role`, `account`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1214,11 +1214,11 @@ ___
 | :------ | :------ |
 | `role` | `BytesLike` |
 | `account` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1228,7 +1228,7 @@ ___
 
 ### renounceRole(bytes32,address)
 
-▸ **renounceRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **renounceRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1236,11 +1236,11 @@ ___
 | :------ | :------ |
 | `role` | `BytesLike` |
 | `account` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1250,7 +1250,7 @@ ___
 
 ### revokeRole
 
-▸ **revokeRole**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **revokeRole**(`role`, `account`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1258,11 +1258,11 @@ ___
 | :------ | :------ |
 | `role` | `BytesLike` |
 | `account` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1272,7 +1272,7 @@ ___
 
 ### revokeRole(bytes32,address)
 
-▸ **revokeRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **revokeRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1280,11 +1280,11 @@ ___
 | :------ | :------ |
 | `role` | `BytesLike` |
 | `account` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 

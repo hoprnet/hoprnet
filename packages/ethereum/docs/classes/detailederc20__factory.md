@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [DetailedERC20](detailederc20.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`DetailedERC20`](detailederc20.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[DetailedERC20](detailederc20.md)
+[`DetailedERC20`](detailederc20.md)
 
 #### Defined in
 

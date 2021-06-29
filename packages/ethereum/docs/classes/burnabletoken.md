@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **BurnableToken**
+  ↳ **`BurnableToken`**
 
 ## Table of contents
 
@@ -87,7 +87,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -157,14 +157,14 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `burn` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `burn` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 
 #### Overrides
 
@@ -198,14 +198,14 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -225,8 +225,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Burn` | (`burner`: `string`, `value`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `Transfer` | (`from`: `string`, `to`: `string`, `value`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Burn` | (`burner`: `string`, `value`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `BigNumber`], `Object`\> |
+| `Transfer` | (`from`: `string`, `to`: `string`, `value`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
 
 #### Overrides
 
@@ -248,12 +248,12 @@ ___
 | :------ | :------ |
 | `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
@@ -287,14 +287,14 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -322,7 +322,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -374,7 +374,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -384,7 +384,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -424,7 +424,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [BurnableToken](burnabletoken.md)
+▸ **attach**(`addressOrName`): [`BurnableToken`](burnabletoken.md)
 
 #### Parameters
 
@@ -434,7 +434,7 @@ ___
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -448,7 +448,7 @@ ___
 
 ### balanceOf
 
-▸ **balanceOf**(`_owner`, `overrides?`): `Promise`<BigNumber\>
+▸ **balanceOf**(`_owner`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -459,7 +459,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -469,7 +469,7 @@ ___
 
 ### balanceOf(address)
 
-▸ **balanceOf(address)**(`_owner`, `overrides?`): `Promise`<BigNumber\>
+▸ **balanceOf(address)**(`_owner`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -480,7 +480,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -490,18 +490,18 @@ ___
 
 ### burn
 
-▸ **burn**(`_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **burn**(`_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -511,18 +511,18 @@ ___
 
 ### burn(uint256)
 
-▸ **burn(uint256)**(`_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **burn(uint256)**(`_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -532,7 +532,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [BurnableToken](burnabletoken.md)
+▸ **connect**(`signerOrProvider`): [`BurnableToken`](burnabletoken.md)
 
 #### Parameters
 
@@ -542,7 +542,7 @@ ___
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -556,11 +556,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[BurnableToken](burnabletoken.md)\>
+▸ **deployed**(): `Promise`<[`BurnableToken`](burnabletoken.md)\>
 
 #### Returns
 
-`Promise`<[BurnableToken](burnabletoken.md)\>
+`Promise`<[`BurnableToken`](burnabletoken.md)\>
 
 #### Overrides
 
@@ -599,7 +599,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -609,7 +609,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -647,24 +647,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -698,25 +698,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [BurnableToken](burnabletoken.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`BurnableToken`](burnabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -726,7 +726,7 @@ Contract.off
 
 packages/ethereum/types/BurnableToken.d.ts:66
 
-▸ **off**(`eventName`, `listener`): [BurnableToken](burnabletoken.md)
+▸ **off**(`eventName`, `listener`): [`BurnableToken`](burnabletoken.md)
 
 #### Parameters
 
@@ -737,7 +737,7 @@ packages/ethereum/types/BurnableToken.d.ts:66
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -751,25 +751,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [BurnableToken](burnabletoken.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`BurnableToken`](burnabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -779,7 +779,7 @@ Contract.on
 
 packages/ethereum/types/BurnableToken.d.ts:70
 
-▸ **on**(`eventName`, `listener`): [BurnableToken](burnabletoken.md)
+▸ **on**(`eventName`, `listener`): [`BurnableToken`](burnabletoken.md)
 
 #### Parameters
 
@@ -790,7 +790,7 @@ packages/ethereum/types/BurnableToken.d.ts:70
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -804,25 +804,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [BurnableToken](burnabletoken.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`BurnableToken`](burnabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -832,7 +832,7 @@ Contract.once
 
 packages/ethereum/types/BurnableToken.d.ts:74
 
-▸ **once**(`eventName`, `listener`): [BurnableToken](burnabletoken.md)
+▸ **once**(`eventName`, `listener`): [`BurnableToken`](burnabletoken.md)
 
 #### Parameters
 
@@ -843,7 +843,7 @@ packages/ethereum/types/BurnableToken.d.ts:74
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -857,26 +857,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -890,24 +890,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [BurnableToken](burnabletoken.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`BurnableToken`](burnabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -917,7 +917,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/BurnableToken.d.ts:82
 
-▸ **removeAllListeners**(`eventName?`): [BurnableToken](burnabletoken.md)
+▸ **removeAllListeners**(`eventName?`): [`BurnableToken`](burnabletoken.md)
 
 #### Parameters
 
@@ -927,7 +927,7 @@ packages/ethereum/types/BurnableToken.d.ts:82
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -941,25 +941,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [BurnableToken](burnabletoken.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`BurnableToken`](burnabletoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -969,7 +969,7 @@ Contract.removeListener
 
 packages/ethereum/types/BurnableToken.d.ts:78
 
-▸ **removeListener**(`eventName`, `listener`): [BurnableToken](burnabletoken.md)
+▸ **removeListener**(`eventName`, `listener`): [`BurnableToken`](burnabletoken.md)
 
 #### Parameters
 
@@ -980,7 +980,7 @@ packages/ethereum/types/BurnableToken.d.ts:78
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -994,7 +994,7 @@ ___
 
 ### totalSupply
 
-▸ **totalSupply**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalSupply**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1004,7 +1004,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1014,7 +1014,7 @@ ___
 
 ### totalSupply()
 
-▸ **totalSupply()**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalSupply()**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1024,7 +1024,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1034,7 +1034,7 @@ ___
 
 ### transfer
 
-▸ **transfer**(`_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transfer**(`_to`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1042,11 +1042,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1056,7 +1056,7 @@ ___
 
 ### transfer(address,uint256)
 
-▸ **transfer(address,uint256)**(`_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transfer(address,uint256)**(`_to`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1064,11 +1064,11 @@ ___
 | :------ | :------ |
 | `_to` | `string` |
 | `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 

@@ -93,7 +93,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [Snapshot](snapshot.md)
+▸ `Static` **deserialize**(`arr`): [`Snapshot`](snapshot.md)
 
 #### Parameters
 
@@ -103,7 +103,7 @@ ___
 
 #### Returns
 
-[Snapshot](snapshot.md)
+[`Snapshot`](snapshot.md)
 
 #### Defined in
 

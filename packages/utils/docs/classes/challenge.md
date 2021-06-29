@@ -4,9 +4,9 @@
 
 ## Hierarchy
 
-- [CurvePoint](curvepoint.md)
+- [`CurvePoint`](curvepoint.md)
 
-  ↳ **Challenge**
+  ↳ **`Challenge`**
 
 ## Table of contents
 
@@ -78,7 +78,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [CurvePoint](curvepoint.md) |
+| `b` | [`CurvePoint`](curvepoint.md) |
 
 #### Returns
 
@@ -114,11 +114,11 @@ ___
 
 ### toAddress
 
-▸ **toAddress**(): [Address](address.md)
+▸ **toAddress**(): [`Address`](address.md)
 
 #### Returns
 
-[Address](address.md)
+[`Address`](address.md)
 
 #### Inherited from
 
@@ -132,11 +132,11 @@ ___
 
 ### toEthereumChallenge
 
-▸ **toEthereumChallenge**(): [EthereumChallenge](ethereumchallenge.md)
+▸ **toEthereumChallenge**(): [`EthereumChallenge`](ethereumchallenge.md)
 
 #### Returns
 
-[EthereumChallenge](ethereumchallenge.md)
+[`EthereumChallenge`](ethereumchallenge.md)
 
 #### Defined in
 
@@ -200,7 +200,7 @@ ___
 
 ### fromExponent
 
-▸ `Static` **fromExponent**(`exponent`): [Challenge](challenge.md)
+▸ `Static` **fromExponent**(`exponent`): [`Challenge`](challenge.md)
 
 #### Parameters
 
@@ -210,7 +210,7 @@ ___
 
 #### Returns
 
-[Challenge](challenge.md)
+[`Challenge`](challenge.md)
 
 #### Overrides
 
@@ -224,18 +224,18 @@ ___
 
 ### fromHintAndShare
 
-▸ `Static` **fromHintAndShare**(`ownShare`, `hint`): [Challenge](challenge.md)
+▸ `Static` **fromHintAndShare**(`ownShare`, `hint`): [`Challenge`](challenge.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `ownShare` | [HalfKeyChallenge](halfkeychallenge.md) |
-| `hint` | [HalfKeyChallenge](halfkeychallenge.md) |
+| `ownShare` | [`HalfKeyChallenge`](halfkeychallenge.md) |
+| `hint` | [`HalfKeyChallenge`](halfkeychallenge.md) |
 
 #### Returns
 
-[Challenge](challenge.md)
+[`Challenge`](challenge.md)
 
 #### Defined in
 
@@ -245,18 +245,18 @@ ___
 
 ### fromOwnShareAndHalfKey
 
-▸ `Static` **fromOwnShareAndHalfKey**(`ownShare`, `halfKey`): [Challenge](challenge.md)
+▸ `Static` **fromOwnShareAndHalfKey**(`ownShare`, `halfKey`): [`Challenge`](challenge.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `ownShare` | [HalfKeyChallenge](halfkeychallenge.md) |
-| `halfKey` | [HalfKey](halfkey.md) |
+| `ownShare` | [`HalfKeyChallenge`](halfkeychallenge.md) |
+| `halfKey` | [`HalfKey`](halfkey.md) |
 
 #### Returns
 
-[Challenge](challenge.md)
+[`Challenge`](challenge.md)
 
 #### Defined in
 
@@ -266,7 +266,7 @@ ___
 
 ### fromPeerId
 
-▸ `Static` **fromPeerId**(`peerId`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromPeerId**(`peerId`): [`CurvePoint`](curvepoint.md)
 
 #### Parameters
 
@@ -276,7 +276,7 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
+[`CurvePoint`](curvepoint.md)
 
 #### Inherited from
 
@@ -290,7 +290,7 @@ ___
 
 ### fromString
 
-▸ `Static` **fromString**(`str`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromString**(`str`): [`CurvePoint`](curvepoint.md)
 
 #### Parameters
 
@@ -300,7 +300,7 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
+[`CurvePoint`](curvepoint.md)
 
 #### Inherited from
 
@@ -314,7 +314,7 @@ ___
 
 ### fromUncompressedUncompressedCurvePoint
 
-▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`): [`CurvePoint`](curvepoint.md)
 
 #### Parameters
 
@@ -324,7 +324,7 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
+[`CurvePoint`](curvepoint.md)
 
 #### Inherited from
 

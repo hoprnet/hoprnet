@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **IERC777**
+  ↳ **`IERC777`**
 
 ## Table of contents
 
@@ -105,7 +105,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -175,32 +175,32 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `authorizeOperator` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `balanceOf` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `balanceOf(address)` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<string[]\> |
-| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<string[]\> |
-| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
-| `name` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `revokeOperator` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `authorizeOperator` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `balanceOf` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `balanceOf(address)` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<`string`[]\> |
+| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`[]\> |
+| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `revokeOperator` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -234,32 +234,32 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `authorizeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `balanceOf` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `balanceOf(address)` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `name` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `revokeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `authorizeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `balanceOf` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `balanceOf(address)` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `revokeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -279,11 +279,11 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `AuthorizedOperator` | (`operator`: `string`, `tokenHolder`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
-| `Burned` | (`operator`: `string`, `from`: `string`, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
-| `Minted` | (`operator`: `string`, `to`: `string`, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
-| `RevokedOperator` | (`operator`: `string`, `tokenHolder`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
-| `Sent` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `AuthorizedOperator` | (`operator`: `string`, `tokenHolder`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
+| `Burned` | (`operator`: `string`, `from`: `string`, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `Minted` | (`operator`: `string`, `to`: `string`, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `RevokedOperator` | (`operator`: `string`, `tokenHolder`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
+| `Sent` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
 
 #### Overrides
 
@@ -303,12 +303,12 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `authorizeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `authorizeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `balanceOf` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `balanceOf(address)` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`[]]\> |
 | `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`[]]\> |
 | `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
@@ -317,14 +317,14 @@ ___
 | `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
 | `name` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `name()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `revokeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `revokeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
@@ -362,32 +362,32 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `authorizeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `balanceOf` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `balanceOf(address)` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `name` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `revokeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `authorizeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `balanceOf` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `balanceOf(address)` | (`owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `revokeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -415,7 +415,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -467,7 +467,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -477,7 +477,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -517,7 +517,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [IERC777](ierc777.md)
+▸ **attach**(`addressOrName`): [`IERC777`](ierc777.md)
 
 #### Parameters
 
@@ -527,7 +527,7 @@ ___
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -541,18 +541,18 @@ ___
 
 ### authorizeOperator
 
-▸ **authorizeOperator**(`operator`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **authorizeOperator**(`operator`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `operator` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -562,18 +562,18 @@ ___
 
 ### authorizeOperator(address)
 
-▸ **authorizeOperator(address)**(`operator`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **authorizeOperator(address)**(`operator`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `operator` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -583,7 +583,7 @@ ___
 
 ### balanceOf
 
-▸ **balanceOf**(`owner`, `overrides?`): `Promise`<BigNumber\>
+▸ **balanceOf**(`owner`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -594,7 +594,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -604,7 +604,7 @@ ___
 
 ### balanceOf(address)
 
-▸ **balanceOf(address)**(`owner`, `overrides?`): `Promise`<BigNumber\>
+▸ **balanceOf(address)**(`owner`, `overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -615,7 +615,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -625,7 +625,7 @@ ___
 
 ### burn
 
-▸ **burn**(`amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **burn**(`amount`, `data`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -633,11 +633,11 @@ ___
 | :------ | :------ |
 | `amount` | `BigNumberish` |
 | `data` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -647,7 +647,7 @@ ___
 
 ### burn(uint256,bytes)
 
-▸ **burn(uint256,bytes)**(`amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **burn(uint256,bytes)**(`amount`, `data`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -655,11 +655,11 @@ ___
 | :------ | :------ |
 | `amount` | `BigNumberish` |
 | `data` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -669,7 +669,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [IERC777](ierc777.md)
+▸ **connect**(`signerOrProvider`): [`IERC777`](ierc777.md)
 
 #### Parameters
 
@@ -679,7 +679,7 @@ ___
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -693,7 +693,7 @@ ___
 
 ### defaultOperators
 
-▸ **defaultOperators**(`overrides?`): `Promise`<string[]\>
+▸ **defaultOperators**(`overrides?`): `Promise`<`string`[]\>
 
 #### Parameters
 
@@ -703,7 +703,7 @@ ___
 
 #### Returns
 
-`Promise`<string[]\>
+`Promise`<`string`[]\>
 
 #### Defined in
 
@@ -713,7 +713,7 @@ ___
 
 ### defaultOperators()
 
-▸ **defaultOperators()**(`overrides?`): `Promise`<string[]\>
+▸ **defaultOperators()**(`overrides?`): `Promise`<`string`[]\>
 
 #### Parameters
 
@@ -723,7 +723,7 @@ ___
 
 #### Returns
 
-`Promise`<string[]\>
+`Promise`<`string`[]\>
 
 #### Defined in
 
@@ -733,11 +733,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[IERC777](ierc777.md)\>
+▸ **deployed**(): `Promise`<[`IERC777`](ierc777.md)\>
 
 #### Returns
 
-`Promise`<[IERC777](ierc777.md)\>
+`Promise`<[`IERC777`](ierc777.md)\>
 
 #### Overrides
 
@@ -776,7 +776,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -786,7 +786,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -800,7 +800,7 @@ ___
 
 ### granularity
 
-▸ **granularity**(`overrides?`): `Promise`<BigNumber\>
+▸ **granularity**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -810,7 +810,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -820,7 +820,7 @@ ___
 
 ### granularity()
 
-▸ **granularity()**(`overrides?`): `Promise`<BigNumber\>
+▸ **granularity()**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -830,7 +830,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -840,7 +840,7 @@ ___
 
 ### isOperatorFor
 
-▸ **isOperatorFor**(`operator`, `tokenHolder`, `overrides?`): `Promise`<boolean\>
+▸ **isOperatorFor**(`operator`, `tokenHolder`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -852,7 +852,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -862,7 +862,7 @@ ___
 
 ### isOperatorFor(address,address)
 
-▸ **isOperatorFor(address,address)**(`operator`, `tokenHolder`, `overrides?`): `Promise`<boolean\>
+▸ **isOperatorFor(address,address)**(`operator`, `tokenHolder`, `overrides?`): `Promise`<`boolean`\>
 
 #### Parameters
 
@@ -874,7 +874,7 @@ ___
 
 #### Returns
 
-`Promise`<boolean\>
+`Promise`<`boolean`\>
 
 #### Defined in
 
@@ -908,24 +908,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -959,7 +959,7 @@ ___
 
 ### name
 
-▸ **name**(`overrides?`): `Promise`<string\>
+▸ **name**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -969,7 +969,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -979,7 +979,7 @@ ___
 
 ### name()
 
-▸ **name()**(`overrides?`): `Promise`<string\>
+▸ **name()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -989,7 +989,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -999,25 +999,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC777](ierc777.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC777`](ierc777.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1027,7 +1027,7 @@ Contract.off
 
 packages/ethereum/types/IERC777.d.ts:144
 
-▸ **off**(`eventName`, `listener`): [IERC777](ierc777.md)
+▸ **off**(`eventName`, `listener`): [`IERC777`](ierc777.md)
 
 #### Parameters
 
@@ -1038,7 +1038,7 @@ packages/ethereum/types/IERC777.d.ts:144
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1052,25 +1052,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC777](ierc777.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC777`](ierc777.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1080,7 +1080,7 @@ Contract.on
 
 packages/ethereum/types/IERC777.d.ts:148
 
-▸ **on**(`eventName`, `listener`): [IERC777](ierc777.md)
+▸ **on**(`eventName`, `listener`): [`IERC777`](ierc777.md)
 
 #### Parameters
 
@@ -1091,7 +1091,7 @@ packages/ethereum/types/IERC777.d.ts:148
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1105,25 +1105,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC777](ierc777.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC777`](ierc777.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1133,7 +1133,7 @@ Contract.once
 
 packages/ethereum/types/IERC777.d.ts:152
 
-▸ **once**(`eventName`, `listener`): [IERC777](ierc777.md)
+▸ **once**(`eventName`, `listener`): [`IERC777`](ierc777.md)
 
 #### Parameters
 
@@ -1144,7 +1144,7 @@ packages/ethereum/types/IERC777.d.ts:152
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1158,7 +1158,7 @@ ___
 
 ### operatorBurn
 
-▸ **operatorBurn**(`account`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **operatorBurn**(`account`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1168,11 +1168,11 @@ ___
 | `amount` | `BigNumberish` |
 | `data` | `BytesLike` |
 | `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1182,7 +1182,7 @@ ___
 
 ### operatorBurn(address,uint256,bytes,bytes)
 
-▸ **operatorBurn(address,uint256,bytes,bytes)**(`account`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **operatorBurn(address,uint256,bytes,bytes)**(`account`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1192,11 +1192,11 @@ ___
 | `amount` | `BigNumberish` |
 | `data` | `BytesLike` |
 | `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1206,7 +1206,7 @@ ___
 
 ### operatorSend
 
-▸ **operatorSend**(`sender`, `recipient`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **operatorSend**(`sender`, `recipient`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1217,11 +1217,11 @@ ___
 | `amount` | `BigNumberish` |
 | `data` | `BytesLike` |
 | `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1231,7 +1231,7 @@ ___
 
 ### operatorSend(address,address,uint256,bytes,bytes)
 
-▸ **operatorSend(address,address,uint256,bytes,bytes)**(`sender`, `recipient`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **operatorSend(address,address,uint256,bytes,bytes)**(`sender`, `recipient`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1242,11 +1242,11 @@ ___
 | `amount` | `BigNumberish` |
 | `data` | `BytesLike` |
 | `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1256,26 +1256,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -1289,24 +1289,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [IERC777](ierc777.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`IERC777`](ierc777.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1316,7 +1316,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/IERC777.d.ts:160
 
-▸ **removeAllListeners**(`eventName?`): [IERC777](ierc777.md)
+▸ **removeAllListeners**(`eventName?`): [`IERC777`](ierc777.md)
 
 #### Parameters
 
@@ -1326,7 +1326,7 @@ packages/ethereum/types/IERC777.d.ts:160
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1340,25 +1340,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [IERC777](ierc777.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`IERC777`](ierc777.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1368,7 +1368,7 @@ Contract.removeListener
 
 packages/ethereum/types/IERC777.d.ts:156
 
-▸ **removeListener**(`eventName`, `listener`): [IERC777](ierc777.md)
+▸ **removeListener**(`eventName`, `listener`): [`IERC777`](ierc777.md)
 
 #### Parameters
 
@@ -1379,7 +1379,7 @@ packages/ethereum/types/IERC777.d.ts:156
 
 #### Returns
 
-[IERC777](ierc777.md)
+[`IERC777`](ierc777.md)
 
 #### Overrides
 
@@ -1393,18 +1393,18 @@ ___
 
 ### revokeOperator
 
-▸ **revokeOperator**(`operator`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **revokeOperator**(`operator`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `operator` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1414,18 +1414,18 @@ ___
 
 ### revokeOperator(address)
 
-▸ **revokeOperator(address)**(`operator`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **revokeOperator(address)**(`operator`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `operator` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1435,7 +1435,7 @@ ___
 
 ### send
 
-▸ **send**(`recipient`, `amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **send**(`recipient`, `amount`, `data`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1444,11 +1444,11 @@ ___
 | `recipient` | `string` |
 | `amount` | `BigNumberish` |
 | `data` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1458,7 +1458,7 @@ ___
 
 ### send(address,uint256,bytes)
 
-▸ **send(address,uint256,bytes)**(`recipient`, `amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **send(address,uint256,bytes)**(`recipient`, `amount`, `data`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1467,11 +1467,11 @@ ___
 | `recipient` | `string` |
 | `amount` | `BigNumberish` |
 | `data` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1481,7 +1481,7 @@ ___
 
 ### symbol
 
-▸ **symbol**(`overrides?`): `Promise`<string\>
+▸ **symbol**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1491,7 +1491,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1501,7 +1501,7 @@ ___
 
 ### symbol()
 
-▸ **symbol()**(`overrides?`): `Promise`<string\>
+▸ **symbol()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -1511,7 +1511,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -1521,7 +1521,7 @@ ___
 
 ### totalSupply
 
-▸ **totalSupply**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalSupply**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1531,7 +1531,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 
@@ -1541,7 +1541,7 @@ ___
 
 ### totalSupply()
 
-▸ **totalSupply()**(`overrides?`): `Promise`<BigNumber\>
+▸ **totalSupply()**(`overrides?`): `Promise`<`BigNumber`\>
 
 #### Parameters
 
@@ -1551,7 +1551,7 @@ ___
 
 #### Returns
 
-`Promise`<BigNumber\>
+`Promise`<`BigNumber`\>
 
 #### Defined in
 

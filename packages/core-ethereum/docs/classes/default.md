@@ -6,7 +6,7 @@
 
 - `EventEmitter`
 
-  ↳ **default**
+  ↳ **`default`**
 
 ## Table of contents
 
@@ -79,30 +79,30 @@
 | Name | Type |
 | :------ | :------ |
 | `chain` | `Object` |
-| `chain.announce` | (`multiaddr`: `Multiaddr`) => `Promise`<string\> |
-| `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
-| `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<string\> |
-| `chain.getBalance` | (`address`: `Address`) => `Promise`<Balance\> |
+| `chain.announce` | (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> |
+| `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
+| `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> |
+| `chain.getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
 | `chain.getChannels` | () => `HoprChannels` |
 | `chain.getGenesisBlock` | () => `number` |
 | `chain.getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `Networks`  } |
-| `chain.getLatestBlockNumber` | () => `Promise`<number\> |
-| `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<NativeBalance\> |
+| `chain.getLatestBlockNumber` | () => `Promise`<`number`\> |
+| `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `chain.getPrivateKey` | () => `Uint8Array` |
 | `chain.getPublicKey` | () => `PublicKey` |
 | `chain.getWallet` | () => `Wallet` |
-| `chain.initiateChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
-| `chain.openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<string\> |
-| `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<string\> |
-| `chain.setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<string\> |
+| `chain.initiateChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
+| `chain.openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<`string`\> |
+| `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> |
+| `chain.setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> |
 | `chain.subscribeBlock` | (`cb`: `any`) => `JsonRpcProvider` \| `WebSocketProvider` |
 | `chain.subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
 | `chain.subscribeError` | (`cb`: `any`) => `void` |
 | `chain.unsubscribe` | () => `void` |
-| `chain.waitUntilReady` | () => `Promise`<Network\> |
-| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<string\> |
+| `chain.waitUntilReady` | () => `Promise`<`Network`\> |
+| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\> |
 | `db` | `HoprDB` |
-| `indexer` | [Indexer](indexer.md) |
+| `indexer` | [`Indexer`](indexer.md) |
 
 #### Overrides
 
@@ -136,15 +136,15 @@ ___
 
 ### cachedGetBalance
 
-• `Private` **cachedGetBalance**: () => `Promise`<Balance\>
+• `Private` **cachedGetBalance**: () => `Promise`<`Balance`\>
 
 #### Type declaration
 
-▸ (): `Promise`<Balance\>
+▸ (): `Promise`<`Balance`\>
 
 ##### Returns
 
-`Promise`<Balance\>
+`Promise`<`Balance`\>
 
 #### Defined in
 
@@ -154,15 +154,15 @@ ___
 
 ### cachedGetNativeBalance
 
-• `Private` **cachedGetNativeBalance**: () => `Promise`<NativeBalance\>
+• `Private` **cachedGetNativeBalance**: () => `Promise`<`NativeBalance`\>
 
 #### Type declaration
 
-▸ (): `Promise`<NativeBalance\>
+▸ (): `Promise`<`NativeBalance`\>
 
 ##### Returns
 
-`Promise`<NativeBalance\>
+`Promise`<`NativeBalance`\>
 
 #### Defined in
 
@@ -172,7 +172,7 @@ ___
 
 ### indexer
 
-• **indexer**: [Indexer](indexer.md)
+• **indexer**: [`Indexer`](indexer.md)
 
 ___
 
@@ -198,7 +198,7 @@ ___
 
 ### captureRejectionSymbol
 
-▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [captureRejectionSymbol](default.md#capturerejectionsymbol)
+▪ `Static` `Readonly` **captureRejectionSymbol**: typeof [`captureRejectionSymbol`](default.md#capturerejectionsymbol)
 
 #### Inherited from
 
@@ -242,7 +242,7 @@ ___
 
 ### errorMonitor
 
-▪ `Static` `Readonly` **errorMonitor**: typeof [errorMonitor](default.md#errormonitor)
+▪ `Static` `Readonly` **errorMonitor**: typeof [`errorMonitor`](default.md#errormonitor)
 
 This symbol shall be used to install a listener for only monitoring `'error'`
 events. Listeners installed using this symbol are called before the regular
@@ -264,7 +264,7 @@ core-ethereum/node_modules/@types/node/events.d.ts:42
 
 ### addListener
 
-▸ **addListener**(`event`, `listener`): [default](default.md)
+▸ **addListener**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -275,7 +275,7 @@ core-ethereum/node_modules/@types/node/events.d.ts:42
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -289,7 +289,7 @@ ___
 
 ### announce
 
-▸ **announce**(`multiaddr`): `Promise`<string\>
+▸ **announce**(`multiaddr`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -299,7 +299,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -352,7 +352,7 @@ ___
 
 ### getAccount
 
-▸ **getAccount**(`addr`): `Promise`<AccountEntry\>
+▸ **getAccount**(`addr`): `Promise`<`AccountEntry`\>
 
 #### Parameters
 
@@ -362,7 +362,7 @@ ___
 
 #### Returns
 
-`Promise`<AccountEntry\>
+`Promise`<`AccountEntry`\>
 
 #### Defined in
 
@@ -386,7 +386,7 @@ ___
 
 ### getBalance
 
-▸ **getBalance**(`useCache?`): `Promise`<Balance\>
+▸ **getBalance**(`useCache?`): `Promise`<`Balance`\>
 
 Retrieves HOPR balance, optionally uses the cache.
 
@@ -394,11 +394,11 @@ Retrieves HOPR balance, optionally uses the cache.
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `useCache` | `boolean` | false |
+| `useCache` | `boolean` | `false` |
 
 #### Returns
 
-`Promise`<Balance\>
+`Promise`<`Balance`\>
 
 HOPR balance
 
@@ -410,7 +410,7 @@ ___
 
 ### getChannel
 
-▸ **getChannel**(`src`, `counterparty`): [Channel](channel.md)
+▸ **getChannel**(`src`, `counterparty`): [`Channel`](channel.md)
 
 #### Parameters
 
@@ -421,7 +421,7 @@ ___
 
 #### Returns
 
-[Channel](channel.md)
+[`Channel`](channel.md)
 
 #### Defined in
 
@@ -431,7 +431,7 @@ ___
 
 ### getChannelsFrom
 
-▸ **getChannelsFrom**(`addr`): `Promise`<[ChannelEntry](channelentry.md)[]\>
+▸ **getChannelsFrom**(`addr`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Parameters
 
@@ -441,7 +441,7 @@ ___
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Defined in
 
@@ -451,7 +451,7 @@ ___
 
 ### getChannelsTo
 
-▸ **getChannelsTo**(`addr`): `Promise`<[ChannelEntry](channelentry.md)[]\>
+▸ **getChannelsTo**(`addr`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Parameters
 
@@ -461,7 +461,7 @@ ___
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Defined in
 
@@ -489,17 +489,17 @@ ___
 
 ### getNativeBalance
 
-▸ **getNativeBalance**(`useCache?`): `Promise`<NativeBalance\>
+▸ **getNativeBalance**(`useCache?`): `Promise`<`NativeBalance`\>
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `useCache` | `boolean` | false |
+| `useCache` | `boolean` | `false` |
 
 #### Returns
 
-`Promise`<NativeBalance\>
+`Promise`<`NativeBalance`\>
 
 #### Defined in
 
@@ -509,7 +509,7 @@ ___
 
 ### getOpenChannelsFrom
 
-▸ **getOpenChannelsFrom**(`p`): `Promise`<[ChannelEntry](channelentry.md)[]\>
+▸ **getOpenChannelsFrom**(`p`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Parameters
 
@@ -519,7 +519,7 @@ ___
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](channelentry.md)[]\>
 
 #### Defined in
 
@@ -543,7 +543,7 @@ ___
 
 ### getPublicKeyOf
 
-▸ **getPublicKeyOf**(`addr`): `Promise`<PublicKey\>
+▸ **getPublicKeyOf**(`addr`): `Promise`<`PublicKey`\>
 
 #### Parameters
 
@@ -553,7 +553,7 @@ ___
 
 #### Returns
 
-`Promise`<PublicKey\>
+`Promise`<`PublicKey`\>
 
 #### Defined in
 
@@ -563,11 +563,11 @@ ___
 
 ### getRandomOpenChannel
 
-▸ **getRandomOpenChannel**(): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ **getRandomOpenChannel**(): `Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)\>
+`Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Defined in
 
@@ -625,7 +625,7 @@ ___
 
 ### off
 
-▸ **off**(`event`, `listener`): [default](default.md)
+▸ **off**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -636,7 +636,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -650,7 +650,7 @@ ___
 
 ### on
 
-▸ **on**(`event`, `listener`): [default](default.md)
+▸ **on**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -661,7 +661,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -675,7 +675,7 @@ ___
 
 ### once
 
-▸ **once**(`event`, `listener`): [default](default.md)
+▸ **once**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -686,7 +686,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -700,7 +700,7 @@ ___
 
 ### prependListener
 
-▸ **prependListener**(`event`, `listener`): [default](default.md)
+▸ **prependListener**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -711,7 +711,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -725,7 +725,7 @@ ___
 
 ### prependOnceListener
 
-▸ **prependOnceListener**(`event`, `listener`): [default](default.md)
+▸ **prependOnceListener**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -736,7 +736,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -774,7 +774,7 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**(`event?`): [default](default.md)
+▸ **removeAllListeners**(`event?`): [`default`](default.md)
 
 #### Parameters
 
@@ -784,7 +784,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -798,7 +798,7 @@ ___
 
 ### removeListener
 
-▸ **removeListener**(`event`, `listener`): [default](default.md)
+▸ **removeListener**(`event`, `listener`): [`default`](default.md)
 
 #### Parameters
 
@@ -809,7 +809,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -823,7 +823,7 @@ ___
 
 ### setMaxListeners
 
-▸ **setMaxListeners**(`n`): [default](default.md)
+▸ **setMaxListeners**(`n`): [`default`](default.md)
 
 #### Parameters
 
@@ -833,7 +833,7 @@ ___
 
 #### Returns
 
-[default](default.md)
+[`default`](default.md)
 
 #### Inherited from
 
@@ -868,13 +868,13 @@ ___
 
 ### stop
 
-▸ **stop**(): `Promise`<void\>
+▸ **stop**(): `Promise`<`void`\>
 
 Stops the connector.
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -884,11 +884,11 @@ ___
 
 ### uncachedGetBalance
 
-▸ `Private` **uncachedGetBalance**(): `Promise`<Balance\>
+▸ `Private` **uncachedGetBalance**(): `Promise`<`Balance`\>
 
 #### Returns
 
-`Promise`<Balance\>
+`Promise`<`Balance`\>
 
 #### Defined in
 
@@ -898,13 +898,13 @@ ___
 
 ### uncachedGetNativeBalance
 
-▸ `Private` **uncachedGetNativeBalance**(): `Promise`<NativeBalance\>
+▸ `Private` **uncachedGetNativeBalance**(): `Promise`<`NativeBalance`\>
 
 Retrieves ETH balance, optionally uses the cache.
 
 #### Returns
 
-`Promise`<NativeBalance\>
+`Promise`<`NativeBalance`\>
 
 ETH balance
 
@@ -916,11 +916,11 @@ ___
 
 ### waitForPublicNodes
 
-▸ **waitForPublicNodes**(): `Promise`<Multiaddr[]\>
+▸ **waitForPublicNodes**(): `Promise`<`Multiaddr`[]\>
 
 #### Returns
 
-`Promise`<Multiaddr[]\>
+`Promise`<`Multiaddr`[]\>
 
 #### Defined in
 
@@ -930,7 +930,7 @@ ___
 
 ### withdraw
 
-▸ **withdraw**(`currency`, `recipient`, `amount`): `Promise`<string\>
+▸ **withdraw**(`currency`, `recipient`, `amount`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -942,7 +942,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -952,7 +952,7 @@ ___
 
 ### create
 
-▸ `Static` **create**(`db`, `privateKey`, `options?`): `Promise`<[default](default.md)\>
+▸ `Static` **create**(`db`, `privateKey`, `options?`): `Promise`<[`default`](default.md)\>
 
 Creates an uninitialised instance.
 
@@ -968,7 +968,7 @@ Creates an uninitialised instance.
 
 #### Returns
 
-`Promise`<[default](default.md)\>
+`Promise`<[`default`](default.md)\>
 
 a promise resolved to the connector
 
@@ -1007,7 +1007,7 @@ ___
 
 ### on
 
-▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<any\>
+▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<`any`\>
 
 #### Parameters
 
@@ -1018,7 +1018,7 @@ ___
 
 #### Returns
 
-`AsyncIterableIterator`<any\>
+`AsyncIterableIterator`<`any`\>
 
 #### Inherited from
 
@@ -1032,7 +1032,7 @@ ___
 
 ### once
 
-▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
 
 #### Parameters
 
@@ -1043,7 +1043,7 @@ ___
 
 #### Returns
 
-`Promise`<any[]\>
+`Promise`<`any`[]\>
 
 #### Inherited from
 
@@ -1053,7 +1053,7 @@ EventEmitter.once
 
 core-ethereum/node_modules/@types/node/events.d.ts:26
 
-▸ `Static` **once**(`emitter`, `event`): `Promise`<any[]\>
+▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
 
 #### Parameters
 
@@ -1064,7 +1064,7 @@ core-ethereum/node_modules/@types/node/events.d.ts:26
 
 #### Returns
 
-`Promise`<any[]\>
+`Promise`<`any`[]\>
 
 #### Inherited from
 

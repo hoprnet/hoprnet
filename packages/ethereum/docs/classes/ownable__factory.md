@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [Ownable](ownable.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`Ownable`](ownable.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Defined in
 

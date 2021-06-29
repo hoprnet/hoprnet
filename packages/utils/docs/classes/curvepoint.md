@@ -4,9 +4,9 @@
 
 ## Hierarchy
 
-- **CurvePoint**
+- **`CurvePoint`**
 
-  ↳ [Challenge](challenge.md)
+  ↳ [`Challenge`](challenge.md)
 
 ## Table of contents
 
@@ -71,7 +71,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [CurvePoint](curvepoint.md) |
+| `b` | [`CurvePoint`](curvepoint.md) |
 
 #### Returns
 
@@ -99,11 +99,11 @@ ___
 
 ### toAddress
 
-▸ **toAddress**(): [Address](address.md)
+▸ **toAddress**(): [`Address`](address.md)
 
 #### Returns
 
-[Address](address.md)
+[`Address`](address.md)
 
 #### Defined in
 
@@ -155,7 +155,7 @@ ___
 
 ### fromExponent
 
-▸ `Static` **fromExponent**(`exponent`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromExponent**(`exponent`): [`CurvePoint`](curvepoint.md)
 
 #### Parameters
 
@@ -165,7 +165,7 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
+[`CurvePoint`](curvepoint.md)
 
 #### Defined in
 
@@ -175,7 +175,7 @@ ___
 
 ### fromPeerId
 
-▸ `Static` **fromPeerId**(`peerId`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromPeerId**(`peerId`): [`CurvePoint`](curvepoint.md)
 
 #### Parameters
 
@@ -185,7 +185,7 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
+[`CurvePoint`](curvepoint.md)
 
 #### Defined in
 
@@ -195,7 +195,7 @@ ___
 
 ### fromString
 
-▸ `Static` **fromString**(`str`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromString**(`str`): [`CurvePoint`](curvepoint.md)
 
 #### Parameters
 
@@ -205,7 +205,7 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
+[`CurvePoint`](curvepoint.md)
 
 #### Defined in
 
@@ -215,7 +215,7 @@ ___
 
 ### fromUncompressedUncompressedCurvePoint
 
-▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`): [`CurvePoint`](curvepoint.md)
 
 #### Parameters
 
@@ -225,7 +225,7 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
+[`CurvePoint`](curvepoint.md)
 
 #### Defined in
 

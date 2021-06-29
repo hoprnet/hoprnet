@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **HoprWrapper__factory**
+  ↳ **`HoprWrapper__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [HoprWrapper](hoprwrapper.md)
+▸ **attach**(`address`): [`HoprWrapper`](hoprwrapper.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[HoprWrapper](hoprwrapper.md)
+[`HoprWrapper`](hoprwrapper.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [HoprWrapper\_\_factory](hoprwrapper__factory.md)
+▸ **connect**(`signer`): [`HoprWrapper__factory`](hoprwrapper__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[HoprWrapper\_\_factory](hoprwrapper__factory.md)
+[`HoprWrapper__factory`](hoprwrapper__factory.md)
 
 #### Overrides
 
@@ -146,7 +146,7 @@ ___
 
 ### deploy
 
-▸ **deploy**(`_xHOPR`, `_wxHOPR`, `overrides?`): `Promise`<[HoprWrapper](hoprwrapper.md)\>
+▸ **deploy**(`_xHOPR`, `_wxHOPR`, `overrides?`): `Promise`<[`HoprWrapper`](hoprwrapper.md)\>
 
 #### Parameters
 
@@ -154,11 +154,11 @@ ___
 | :------ | :------ |
 | `_xHOPR` | `string` |
 | `_wxHOPR` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[HoprWrapper](hoprwrapper.md)\>
+`Promise`<[`HoprWrapper`](hoprwrapper.md)\>
 
 #### Overrides
 
@@ -180,7 +180,7 @@ ___
 | :------ | :------ |
 | `_xHOPR` | `string` |
 | `_wxHOPR` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -198,7 +198,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [HoprWrapper](hoprwrapper.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`HoprWrapper`](hoprwrapper.md)
 
 #### Parameters
 
@@ -209,7 +209,7 @@ ___
 
 #### Returns
 
-[HoprWrapper](hoprwrapper.md)
+[`HoprWrapper`](hoprwrapper.md)
 
 #### Defined in
 

@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **HoprForwarder**
+  ↳ **`HoprForwarder`**
 
 ## Table of contents
 
@@ -91,7 +91,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -161,18 +161,18 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `recoverTokens` | (`token`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `recoverTokens` | (`token`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
@@ -206,18 +206,18 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `recoverTokens` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `recoverTokens` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -259,10 +259,10 @@ ___
 | `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `recoverTokens` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `recoverTokens` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
@@ -296,18 +296,18 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `recoverTokens` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `recoverTokens` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -335,7 +335,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -363,7 +363,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 ### ERC1820\_REGISTRY
 
-▸ **ERC1820_REGISTRY**(`overrides?`): `Promise`<string\>
+▸ **ERC1820_REGISTRY**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -373,7 +373,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -383,7 +383,7 @@ ___
 
 ### ERC1820\_REGISTRY()
 
-▸ **ERC1820_REGISTRY()**(`overrides?`): `Promise`<string\>
+▸ **ERC1820_REGISTRY()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -393,7 +393,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -403,7 +403,7 @@ ___
 
 ### HOPR\_TOKEN
 
-▸ **HOPR_TOKEN**(`overrides?`): `Promise`<string\>
+▸ **HOPR_TOKEN**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -413,7 +413,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -423,7 +423,7 @@ ___
 
 ### HOPR\_TOKEN()
 
-▸ **HOPR_TOKEN()**(`overrides?`): `Promise`<string\>
+▸ **HOPR_TOKEN()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -433,7 +433,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -443,7 +443,7 @@ ___
 
 ### MULTISIG
 
-▸ **MULTISIG**(`overrides?`): `Promise`<string\>
+▸ **MULTISIG**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -453,7 +453,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -463,7 +463,7 @@ ___
 
 ### MULTISIG()
 
-▸ **MULTISIG()**(`overrides?`): `Promise`<string\>
+▸ **MULTISIG()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -473,7 +473,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -483,7 +483,7 @@ ___
 
 ### TOKENS\_RECIPIENT\_INTERFACE\_HASH
 
-▸ **TOKENS_RECIPIENT_INTERFACE_HASH**(`overrides?`): `Promise`<string\>
+▸ **TOKENS_RECIPIENT_INTERFACE_HASH**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -493,7 +493,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -503,7 +503,7 @@ ___
 
 ### TOKENS\_RECIPIENT\_INTERFACE\_HASH()
 
-▸ **TOKENS_RECIPIENT_INTERFACE_HASH()**(`overrides?`): `Promise`<string\>
+▸ **TOKENS_RECIPIENT_INTERFACE_HASH()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -513,7 +513,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -547,7 +547,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -557,7 +557,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -597,7 +597,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [HoprForwarder](hoprforwarder.md)
+▸ **attach**(`addressOrName`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Parameters
 
@@ -607,7 +607,7 @@ ___
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -621,7 +621,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [HoprForwarder](hoprforwarder.md)
+▸ **connect**(`signerOrProvider`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Parameters
 
@@ -631,7 +631,7 @@ ___
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -645,11 +645,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[HoprForwarder](hoprforwarder.md)\>
+▸ **deployed**(): `Promise`<[`HoprForwarder`](hoprforwarder.md)\>
 
 #### Returns
 
-`Promise`<[HoprForwarder](hoprforwarder.md)\>
+`Promise`<[`HoprForwarder`](hoprforwarder.md)\>
 
 #### Overrides
 
@@ -688,7 +688,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -698,7 +698,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -736,24 +736,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -787,25 +787,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprForwarder](hoprforwarder.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -815,7 +815,7 @@ Contract.off
 
 packages/ethereum/types/HoprForwarder.d.ts:84
 
-▸ **off**(`eventName`, `listener`): [HoprForwarder](hoprforwarder.md)
+▸ **off**(`eventName`, `listener`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Parameters
 
@@ -826,7 +826,7 @@ packages/ethereum/types/HoprForwarder.d.ts:84
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -840,25 +840,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprForwarder](hoprforwarder.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -868,7 +868,7 @@ Contract.on
 
 packages/ethereum/types/HoprForwarder.d.ts:88
 
-▸ **on**(`eventName`, `listener`): [HoprForwarder](hoprforwarder.md)
+▸ **on**(`eventName`, `listener`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Parameters
 
@@ -879,7 +879,7 @@ packages/ethereum/types/HoprForwarder.d.ts:88
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -893,25 +893,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprForwarder](hoprforwarder.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -921,7 +921,7 @@ Contract.once
 
 packages/ethereum/types/HoprForwarder.d.ts:92
 
-▸ **once**(`eventName`, `listener`): [HoprForwarder](hoprforwarder.md)
+▸ **once**(`eventName`, `listener`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Parameters
 
@@ -932,7 +932,7 @@ packages/ethereum/types/HoprForwarder.d.ts:92
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -946,26 +946,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -979,18 +979,18 @@ ___
 
 ### recoverTokens
 
-▸ **recoverTokens**(`token`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **recoverTokens**(`token`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `token` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1000,18 +1000,18 @@ ___
 
 ### recoverTokens(address)
 
-▸ **recoverTokens(address)**(`token`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **recoverTokens(address)**(`token`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `token` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1021,24 +1021,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [HoprForwarder](hoprforwarder.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -1048,7 +1048,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/HoprForwarder.d.ts:100
 
-▸ **removeAllListeners**(`eventName?`): [HoprForwarder](hoprforwarder.md)
+▸ **removeAllListeners**(`eventName?`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Parameters
 
@@ -1058,7 +1058,7 @@ packages/ethereum/types/HoprForwarder.d.ts:100
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -1072,25 +1072,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprForwarder](hoprforwarder.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -1100,7 +1100,7 @@ Contract.removeListener
 
 packages/ethereum/types/HoprForwarder.d.ts:96
 
-▸ **removeListener**(`eventName`, `listener`): [HoprForwarder](hoprforwarder.md)
+▸ **removeListener**(`eventName`, `listener`): [`HoprForwarder`](hoprforwarder.md)
 
 #### Parameters
 
@@ -1111,7 +1111,7 @@ packages/ethereum/types/HoprForwarder.d.ts:96
 
 #### Returns
 
-[HoprForwarder](hoprforwarder.md)
+[`HoprForwarder`](hoprforwarder.md)
 
 #### Overrides
 
@@ -1125,7 +1125,7 @@ ___
 
 ### tokensReceived
 
-▸ **tokensReceived**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **tokensReceived**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1137,11 +1137,11 @@ ___
 | `amount` | `BigNumberish` |
 | `userData` | `BytesLike` |
 | `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1151,7 +1151,7 @@ ___
 
 ### tokensReceived(address,address,address,uint256,bytes,bytes)
 
-▸ **tokensReceived(address,address,address,uint256,bytes,bytes)**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **tokensReceived(address,address,address,uint256,bytes,bytes)**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
@@ -1163,11 +1163,11 @@ ___
 | `amount` | `BigNumberish` |
 | `userData` | `BytesLike` |
 | `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 

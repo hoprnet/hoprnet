@@ -35,10 +35,10 @@
 
 | Name | Type |
 | :------ | :------ |
-| `ticket` | [Ticket](ticket.md) |
-| `response` | [Response](response.md) |
-| `preImage` | [Hash](hash.md) |
-| `signer` | [PublicKey](publickey.md) |
+| `ticket` | [`Ticket`](ticket.md) |
+| `response` | [`Response`](response.md) |
+| `preImage` | [`Hash`](hash.md) |
+| `signer` | [`PublicKey`](publickey.md) |
 
 #### Defined in
 
@@ -48,25 +48,25 @@
 
 ### preImage
 
-• `Readonly` **preImage**: [Hash](hash.md)
+• `Readonly` **preImage**: [`Hash`](hash.md)
 
 ___
 
 ### response
 
-• `Readonly` **response**: [Response](response.md)
+• `Readonly` **response**: [`Response`](response.md)
 
 ___
 
 ### signer
 
-• `Readonly` **signer**: [PublicKey](publickey.md)
+• `Readonly` **signer**: [`PublicKey`](publickey.md)
 
 ___
 
 ### ticket
 
-• `Readonly` **ticket**: [Ticket](ticket.md)
+• `Readonly` **ticket**: [`Ticket`](ticket.md)
 
 ## Accessors
 
@@ -106,7 +106,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ticketIssuer` | [PublicKey](publickey.md) |
+| `ticketIssuer` | [`PublicKey`](publickey.md) |
 
 #### Returns
 
@@ -120,7 +120,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [AcknowledgedTicket](acknowledgedticket.md)
+▸ `Static` **deserialize**(`arr`): [`AcknowledgedTicket`](acknowledgedticket.md)
 
 #### Parameters
 
@@ -130,7 +130,7 @@ ___
 
 #### Returns
 
-[AcknowledgedTicket](acknowledgedticket.md)
+[`AcknowledgedTicket`](acknowledgedticket.md)
 
 #### Defined in
 

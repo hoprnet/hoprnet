@@ -6,7 +6,7 @@
 
 - `Contract`
 
-  ↳ **Ownable**
+  ↳ **`Ownable`**
 
 ## Table of contents
 
@@ -85,7 +85,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: `Promise`<Contract\>
+• **\_deployedPromise**: `Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -155,12 +155,12 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
-| `renounceOwnership` | (`overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `renounceOwnership()` | (`overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
+| `renounceOwnership` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `renounceOwnership()` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
@@ -194,12 +194,12 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
-| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
+| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
@@ -219,8 +219,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `OwnershipRenounced` | (`previousOwner`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`], `Object`\> |
-| `OwnershipTransferred` | (`previousOwner`: `string`, `newOwner`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
+| `OwnershipRenounced` | (`previousOwner`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`], `Object`\> |
+| `OwnershipTransferred` | (`previousOwner`: `string`, `newOwner`: `string`) => [`TypedEventFilter`](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
 
 #### Overrides
 
@@ -242,10 +242,10 @@ ___
 | :------ | :------ |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
@@ -279,12 +279,12 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
-| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
+| `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
@@ -312,7 +312,7 @@ ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: `Promise`<string\>
+• `Readonly` **resolvedAddress**: `Promise`<`string`\>
 
 #### Inherited from
 
@@ -364,7 +364,7 @@ ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<`Contract`\>
 
 #### Parameters
 
@@ -374,7 +374,7 @@ ___
 
 #### Returns
 
-`Promise`<Contract\>
+`Promise`<`Contract`\>
 
 #### Inherited from
 
@@ -414,7 +414,7 @@ ___
 
 ### attach
 
-▸ **attach**(`addressOrName`): [Ownable](ownable.md)
+▸ **attach**(`addressOrName`): [`Ownable`](ownable.md)
 
 #### Parameters
 
@@ -424,7 +424,7 @@ ___
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -438,7 +438,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`): [Ownable](ownable.md)
+▸ **connect**(`signerOrProvider`): [`Ownable`](ownable.md)
 
 #### Parameters
 
@@ -448,7 +448,7 @@ ___
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -462,11 +462,11 @@ ___
 
 ### deployed
 
-▸ **deployed**(): `Promise`<[Ownable](ownable.md)\>
+▸ **deployed**(): `Promise`<[`Ownable`](ownable.md)\>
 
 #### Returns
 
-`Promise`<[Ownable](ownable.md)\>
+`Promise`<[`Ownable`](ownable.md)\>
 
 #### Overrides
 
@@ -505,7 +505,7 @@ ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<`TransactionResponse`\>
 
 #### Parameters
 
@@ -515,7 +515,7 @@ ___
 
 #### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -553,24 +553,24 @@ ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -604,25 +604,25 @@ ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [Ownable](ownable.md)
+▸ **off**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`Ownable`](ownable.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -632,7 +632,7 @@ Contract.off
 
 packages/ethereum/types/Ownable.d.ts:66
 
-▸ **off**(`eventName`, `listener`): [Ownable](ownable.md)
+▸ **off**(`eventName`, `listener`): [`Ownable`](ownable.md)
 
 #### Parameters
 
@@ -643,7 +643,7 @@ packages/ethereum/types/Ownable.d.ts:66
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -657,25 +657,25 @@ ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [Ownable](ownable.md)
+▸ **on**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`Ownable`](ownable.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -685,7 +685,7 @@ Contract.on
 
 packages/ethereum/types/Ownable.d.ts:70
 
-▸ **on**(`eventName`, `listener`): [Ownable](ownable.md)
+▸ **on**(`eventName`, `listener`): [`Ownable`](ownable.md)
 
 #### Parameters
 
@@ -696,7 +696,7 @@ packages/ethereum/types/Ownable.d.ts:70
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -710,25 +710,25 @@ ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [Ownable](ownable.md)
+▸ **once**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`Ownable`](ownable.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -738,7 +738,7 @@ Contract.once
 
 packages/ethereum/types/Ownable.d.ts:74
 
-▸ **once**(`eventName`, `listener`): [Ownable](ownable.md)
+▸ **once**(`eventName`, `listener`): [`Ownable`](ownable.md)
 
 #### Parameters
 
@@ -749,7 +749,7 @@ packages/ethereum/types/Ownable.d.ts:74
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -763,7 +763,7 @@ ___
 
 ### owner
 
-▸ **owner**(`overrides?`): `Promise`<string\>
+▸ **owner**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -773,7 +773,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -783,7 +783,7 @@ ___
 
 ### owner()
 
-▸ **owner()**(`overrides?`): `Promise`<string\>
+▸ **owner()**(`overrides?`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -793,7 +793,7 @@ ___
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -803,26 +803,26 @@ ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+▸ **queryFilter**<`EventArgsArray`, `EventArgsObject`\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `event` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 | `fromBlockOrBlockhash?` | `string` \| `number` |
 | `toBlock?` | `string` \| `number` |
 
 #### Returns
 
-`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
+`Promise`<[`TypedEvent`](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Overrides
 
@@ -836,24 +836,24 @@ ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [Ownable](ownable.md)
+▸ **removeAllListeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`): [`Ownable`](ownable.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -863,7 +863,7 @@ Contract.removeAllListeners
 
 packages/ethereum/types/Ownable.d.ts:82
 
-▸ **removeAllListeners**(`eventName?`): [Ownable](ownable.md)
+▸ **removeAllListeners**(`eventName?`): [`Ownable`](ownable.md)
 
 #### Parameters
 
@@ -873,7 +873,7 @@ packages/ethereum/types/Ownable.d.ts:82
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -887,25 +887,25 @@ ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [Ownable](ownable.md)
+▸ **removeListener**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter`, `listener`): [`Ownable`](ownable.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsArray` | extends `any`[] |
 | `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [`TypedEventFilter`](../interfaces/typedeventfilter.md)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -915,7 +915,7 @@ Contract.removeListener
 
 packages/ethereum/types/Ownable.d.ts:78
 
-▸ **removeListener**(`eventName`, `listener`): [Ownable](ownable.md)
+▸ **removeListener**(`eventName`, `listener`): [`Ownable`](ownable.md)
 
 #### Parameters
 
@@ -926,7 +926,7 @@ packages/ethereum/types/Ownable.d.ts:78
 
 #### Returns
 
-[Ownable](ownable.md)
+[`Ownable`](ownable.md)
 
 #### Overrides
 
@@ -940,17 +940,17 @@ ___
 
 ### renounceOwnership
 
-▸ **renounceOwnership**(`overrides?`): `Promise`<ContractTransaction\>
+▸ **renounceOwnership**(`overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -960,17 +960,17 @@ ___
 
 ### renounceOwnership()
 
-▸ **renounceOwnership()**(`overrides?`): `Promise`<ContractTransaction\>
+▸ **renounceOwnership()**(`overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -980,18 +980,18 @@ ___
 
 ### transferOwnership
 
-▸ **transferOwnership**(`_newOwner`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferOwnership**(`_newOwner`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_newOwner` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 
@@ -1001,18 +1001,18 @@ ___
 
 ### transferOwnership(address)
 
-▸ **transferOwnership(address)**(`_newOwner`, `overrides?`): `Promise`<ContractTransaction\>
+▸ **transferOwnership(address)**(`_newOwner`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `_newOwner` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<ContractTransaction\>
+`Promise`<`ContractTransaction`\>
 
 #### Defined in
 

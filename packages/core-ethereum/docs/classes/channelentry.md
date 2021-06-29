@@ -207,11 +207,11 @@ ___
 
 ### createMock
 
-▸ `Static` **createMock**(): [ChannelEntry](channelentry.md)
+▸ `Static` **createMock**(): [`ChannelEntry`](channelentry.md)
 
 #### Returns
 
-[ChannelEntry](channelentry.md)
+[`ChannelEntry`](channelentry.md)
 
 #### Defined in
 
@@ -221,7 +221,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [ChannelEntry](channelentry.md)
+▸ `Static` **deserialize**(`arr`): [`ChannelEntry`](channelentry.md)
 
 #### Parameters
 
@@ -231,7 +231,7 @@ ___
 
 #### Returns
 
-[ChannelEntry](channelentry.md)
+[`ChannelEntry`](channelentry.md)
 
 #### Defined in
 
@@ -241,18 +241,18 @@ ___
 
 ### fromSCEvent
 
-▸ `Static` **fromSCEvent**(`event`, `keyFor`): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ `Static` **fromSCEvent**(`event`, `keyFor`): `Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `event` | `any` |
-| `keyFor` | (`a`: `Address`) => `Promise`<PublicKey\> |
+| `keyFor` | (`a`: `Address`) => `Promise`<`PublicKey`\> |
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)\>
+`Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Defined in
 

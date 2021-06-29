@@ -74,7 +74,7 @@ ___
 | `password?` | `string` |
 | `preferLocalAddresses?` | `boolean` |
 | `provider` | `string` |
-| `strategy?` | [ChannelStrategyNames](modules.md#channelstrategynames) |
+| `strategy?` | [`ChannelStrategyNames`](modules.md#channelstrategynames) |
 
 #### Defined in
 

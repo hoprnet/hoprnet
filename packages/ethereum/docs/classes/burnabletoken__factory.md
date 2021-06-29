@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **BurnableToken__factory**
+  ↳ **`BurnableToken__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [BurnableToken](burnabletoken.md)
+▸ **attach**(`address`): [`BurnableToken`](burnabletoken.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [BurnableToken\_\_factory](burnabletoken__factory.md)
+▸ **connect**(`signer`): [`BurnableToken__factory`](burnabletoken__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[BurnableToken\_\_factory](burnabletoken__factory.md)
+[`BurnableToken__factory`](burnabletoken__factory.md)
 
 #### Overrides
 
@@ -146,17 +146,17 @@ ___
 
 ### deploy
 
-▸ **deploy**(`overrides?`): `Promise`<[BurnableToken](burnabletoken.md)\>
+▸ **deploy**(`overrides?`): `Promise`<[`BurnableToken`](burnabletoken.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[BurnableToken](burnabletoken.md)\>
+`Promise`<[`BurnableToken`](burnabletoken.md)\>
 
 #### Overrides
 
@@ -176,7 +176,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -194,7 +194,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [BurnableToken](burnabletoken.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`BurnableToken`](burnabletoken.md)
 
 #### Parameters
 
@@ -205,7 +205,7 @@ ___
 
 #### Returns
 
-[BurnableToken](burnabletoken.md)
+[`BurnableToken`](burnabletoken.md)
 
 #### Defined in
 

@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **PermittableToken__factory**
+  ↳ **`PermittableToken__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [PermittableToken](permittabletoken.md)
+▸ **attach**(`address`): [`PermittableToken`](permittabletoken.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [PermittableToken\_\_factory](permittabletoken__factory.md)
+▸ **connect**(`signer`): [`PermittableToken__factory`](permittabletoken__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[PermittableToken\_\_factory](permittabletoken__factory.md)
+[`PermittableToken__factory`](permittabletoken__factory.md)
 
 #### Overrides
 
@@ -146,7 +146,7 @@ ___
 
 ### deploy
 
-▸ **deploy**(`_name`, `_symbol`, `_decimals`, `_chainId`, `overrides?`): `Promise`<[PermittableToken](permittabletoken.md)\>
+▸ **deploy**(`_name`, `_symbol`, `_decimals`, `_chainId`, `overrides?`): `Promise`<[`PermittableToken`](permittabletoken.md)\>
 
 #### Parameters
 
@@ -156,11 +156,11 @@ ___
 | `_symbol` | `string` |
 | `_decimals` | `BigNumberish` |
 | `_chainId` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[PermittableToken](permittabletoken.md)\>
+`Promise`<[`PermittableToken`](permittabletoken.md)\>
 
 #### Overrides
 
@@ -184,7 +184,7 @@ ___
 | `_symbol` | `string` |
 | `_decimals` | `BigNumberish` |
 | `_chainId` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -202,7 +202,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [PermittableToken](permittabletoken.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`PermittableToken`](permittabletoken.md)
 
 #### Parameters
 
@@ -213,7 +213,7 @@ ___
 
 #### Returns
 
-[PermittableToken](permittabletoken.md)
+[`PermittableToken`](permittabletoken.md)
 
 #### Defined in
 

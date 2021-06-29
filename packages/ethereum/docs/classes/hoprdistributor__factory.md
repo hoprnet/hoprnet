@@ -6,7 +6,7 @@
 
 - `ContractFactory`
 
-  ↳ **HoprDistributor__factory**
+  ↳ **`HoprDistributor__factory`**
 
 ## Table of contents
 
@@ -98,7 +98,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ### attach
 
-▸ **attach**(`address`): [HoprDistributor](hoprdistributor.md)
+▸ **attach**(`address`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Parameters
 
@@ -108,7 +108,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ ___
 
 ### connect
 
-▸ **connect**(`signer`): [HoprDistributor\_\_factory](hoprdistributor__factory.md)
+▸ **connect**(`signer`): [`HoprDistributor__factory`](hoprdistributor__factory.md)
 
 #### Parameters
 
@@ -132,7 +132,7 @@ ___
 
 #### Returns
 
-[HoprDistributor\_\_factory](hoprdistributor__factory.md)
+[`HoprDistributor__factory`](hoprdistributor__factory.md)
 
 #### Overrides
 
@@ -146,7 +146,7 @@ ___
 
 ### deploy
 
-▸ **deploy**(`_token`, `_startTime`, `_maxMintAmount`, `overrides?`): `Promise`<[HoprDistributor](hoprdistributor.md)\>
+▸ **deploy**(`_token`, `_startTime`, `_maxMintAmount`, `overrides?`): `Promise`<[`HoprDistributor`](hoprdistributor.md)\>
 
 #### Parameters
 
@@ -155,11 +155,11 @@ ___
 | `_token` | `string` |
 | `_startTime` | `BigNumberish` |
 | `_maxMintAmount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
-`Promise`<[HoprDistributor](hoprdistributor.md)\>
+`Promise`<[`HoprDistributor`](hoprdistributor.md)\>
 
 #### Overrides
 
@@ -182,7 +182,7 @@ ___
 | `_token` | `string` |
 | `_startTime` | `BigNumberish` |
 | `_maxMintAmount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
 
@@ -200,7 +200,7 @@ ___
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [HoprDistributor](hoprdistributor.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`HoprDistributor`](hoprdistributor.md)
 
 #### Parameters
 
@@ -211,7 +211,7 @@ ___
 
 #### Returns
 
-[HoprDistributor](hoprdistributor.md)
+[`HoprDistributor`](hoprdistributor.md)
 
 #### Defined in
 

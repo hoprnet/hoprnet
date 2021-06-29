@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [AccessControl](accesscontrol.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`AccessControl`](accesscontrol.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[AccessControl](accesscontrol.md)
+[`AccessControl`](accesscontrol.md)
 
 #### Defined in
 

@@ -45,29 +45,29 @@
 | `counterparty` | `PublicKey` |
 | `db` | `HoprDB` |
 | `chain` | `Object` |
-| `chain.announce` | (`multiaddr`: `Multiaddr`) => `Promise`<string\> |
-| `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
-| `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<string\> |
-| `chain.getBalance` | (`address`: `Address`) => `Promise`<Balance\> |
+| `chain.announce` | (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> |
+| `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
+| `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> |
+| `chain.getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
 | `chain.getChannels` | () => `HoprChannels` |
 | `chain.getGenesisBlock` | () => `number` |
 | `chain.getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `Networks`  } |
-| `chain.getLatestBlockNumber` | () => `Promise`<number\> |
-| `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<NativeBalance\> |
+| `chain.getLatestBlockNumber` | () => `Promise`<`number`\> |
+| `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `chain.getPrivateKey` | () => `Uint8Array` |
 | `chain.getPublicKey` | () => `PublicKey` |
 | `chain.getWallet` | () => `Wallet` |
-| `chain.initiateChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
-| `chain.openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<string\> |
-| `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<string\> |
-| `chain.setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<string\> |
+| `chain.initiateChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
+| `chain.openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<`string`\> |
+| `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> |
+| `chain.setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> |
 | `chain.subscribeBlock` | (`cb`: `any`) => `JsonRpcProvider` \| `WebSocketProvider` |
 | `chain.subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
 | `chain.subscribeError` | (`cb`: `any`) => `void` |
 | `chain.unsubscribe` | () => `void` |
-| `chain.waitUntilReady` | () => `Promise`<Network\> |
-| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<string\> |
-| `indexer` | [Indexer](indexer.md) |
+| `chain.waitUntilReady` | () => `Promise`<`Network`\> |
+| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\> |
+| `indexer` | [`Indexer`](indexer.md) |
 | `privateKey` | `Uint8Array` |
 | `events` | `EventEmitter` |
 
@@ -89,7 +89,7 @@
 
 ### acknowledge
 
-▸ **acknowledge**(`unacknowledgedTicket`, `acknowledgement`): `Promise`<AcknowledgedTicket\>
+▸ **acknowledge**(`unacknowledgedTicket`, `acknowledgement`): `Promise`<`AcknowledgedTicket`\>
 
 Reserve a preImage for the given ticket if it is a winning ticket.
 
@@ -102,7 +102,7 @@ Reserve a preImage for the given ticket if it is a winning ticket.
 
 #### Returns
 
-`Promise`<AcknowledgedTicket\>
+`Promise`<`AcknowledgedTicket`\>
 
 #### Defined in
 
@@ -126,7 +126,7 @@ ___
 
 ### bumpTicketIndex
 
-▸ `Private` **bumpTicketIndex**(`channelId`): `Promise`<UINT256\>
+▸ `Private` **bumpTicketIndex**(`channelId`): `Promise`<`UINT256`\>
 
 #### Parameters
 
@@ -136,7 +136,7 @@ ___
 
 #### Returns
 
-`Promise`<UINT256\>
+`Promise`<`UINT256`\>
 
 #### Defined in
 
@@ -170,7 +170,7 @@ ___
 
 ### createTicket
 
-▸ **createTicket**(`pathLength`, `challenge`): `Promise`<Ticket\>
+▸ **createTicket**(`pathLength`, `challenge`): `Promise`<`Ticket`\>
 
 Creates a signed ticket that includes the given amount of
 tokens
@@ -188,7 +188,7 @@ recovery algorithm is used to perform an EC-point multiplication.
 
 #### Returns
 
-`Promise`<Ticket\>
+`Promise`<`Ticket`\>
 
 a signed ticket
 
@@ -200,11 +200,11 @@ ___
 
 ### finalizeClosure
 
-▸ **finalizeClosure**(): `Promise`<string\>
+▸ **finalizeClosure**(): `Promise`<`string`\>
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -214,7 +214,7 @@ ___
 
 ### fund
 
-▸ **fund**(`myFund`, `counterpartyFund`): `Promise`<void\>
+▸ **fund**(`myFund`, `counterpartyFund`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -225,7 +225,7 @@ ___
 
 #### Returns
 
-`Promise`<void\>
+`Promise`<`void`\>
 
 #### Defined in
 
@@ -235,11 +235,11 @@ ___
 
 ### getAcknowledgedTickets
 
-▸ **getAcknowledgedTickets**(): `Promise`<AcknowledgedTicket[]\>
+▸ **getAcknowledgedTickets**(): `Promise`<`AcknowledgedTicket`[]\>
 
 #### Returns
 
-`Promise`<AcknowledgedTicket[]\>
+`Promise`<`AcknowledgedTicket`[]\>
 
 #### Defined in
 
@@ -249,11 +249,11 @@ ___
 
 ### getBalances
 
-▸ **getBalances**(): `Promise`<Balance[]\>
+▸ **getBalances**(): `Promise`<`Balance`[]\>
 
 #### Returns
 
-`Promise`<Balance[]\>
+`Promise`<`Balance`[]\>
 
 #### Defined in
 
@@ -263,11 +263,11 @@ ___
 
 ### getChainCommitment
 
-▸ **getChainCommitment**(): `Promise`<Hash\>
+▸ **getChainCommitment**(): `Promise`<`Hash`\>
 
 #### Returns
 
-`Promise`<Hash\>
+`Promise`<`Hash`\>
 
 #### Defined in
 
@@ -277,11 +277,11 @@ ___
 
 ### initializeClosure
 
-▸ **initializeClosure**(): `Promise`<string\>
+▸ **initializeClosure**(): `Promise`<`string`\>
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -291,7 +291,7 @@ ___
 
 ### open
 
-▸ **open**(`fundAmount`): `Promise`<Hash\>
+▸ **open**(`fundAmount`): `Promise`<`Hash`\>
 
 #### Parameters
 
@@ -301,7 +301,7 @@ ___
 
 #### Returns
 
-`Promise`<Hash\>
+`Promise`<`Hash`\>
 
 #### Defined in
 
@@ -311,11 +311,11 @@ ___
 
 ### redeemAllTickets
 
-▸ **redeemAllTickets**(): `Promise`<[RedeemTicketResponse](../modules.md#redeemticketresponse)[]\>
+▸ **redeemAllTickets**(): `Promise`<[`RedeemTicketResponse`](../modules.md#redeemticketresponse)[]\>
 
 #### Returns
 
-`Promise`<[RedeemTicketResponse](../modules.md#redeemticketresponse)[]\>
+`Promise`<[`RedeemTicketResponse`](../modules.md#redeemticketresponse)[]\>
 
 #### Defined in
 
@@ -325,7 +325,7 @@ ___
 
 ### redeemTicket
 
-▸ **redeemTicket**(`ackTicket`): `Promise`<[RedeemTicketResponse](../modules.md#redeemticketresponse)\>
+▸ **redeemTicket**(`ackTicket`): `Promise`<[`RedeemTicketResponse`](../modules.md#redeemticketresponse)\>
 
 #### Parameters
 
@@ -335,7 +335,7 @@ ___
 
 #### Returns
 
-`Promise`<[RedeemTicketResponse](../modules.md#redeemticketresponse)\>
+`Promise`<[`RedeemTicketResponse`](../modules.md#redeemticketresponse)\>
 
 #### Defined in
 
@@ -345,11 +345,11 @@ ___
 
 ### themToUs
 
-▸ **themToUs**(): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ **themToUs**(): `Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)\>
+`Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Defined in
 
@@ -359,11 +359,11 @@ ___
 
 ### usToThem
 
-▸ **usToThem**(): `Promise`<[ChannelEntry](channelentry.md)\>
+▸ **usToThem**(): `Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Returns
 
-`Promise`<[ChannelEntry](channelentry.md)\>
+`Promise`<[`ChannelEntry`](channelentry.md)\>
 
 #### Defined in
 

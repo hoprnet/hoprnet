@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC20Basic](erc20basic.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ERC20Basic`](erc20basic.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[ERC20Basic](erc20basic.md)
+[`ERC20Basic`](erc20basic.md)
 
 #### Defined in
 

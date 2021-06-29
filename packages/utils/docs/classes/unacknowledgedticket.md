@@ -34,9 +34,9 @@
 
 | Name | Type |
 | :------ | :------ |
-| `ticket` | [Ticket](ticket.md) |
-| `ownKey` | [HalfKey](halfkey.md) |
-| `signer` | [PublicKey](publickey.md) |
+| `ticket` | [`Ticket`](ticket.md) |
+| `ownKey` | [`HalfKey`](halfkey.md) |
+| `signer` | [`PublicKey`](publickey.md) |
 
 #### Defined in
 
@@ -46,29 +46,29 @@
 
 ### ownKey
 
-• `Readonly` **ownKey**: [HalfKey](halfkey.md)
+• `Readonly` **ownKey**: [`HalfKey`](halfkey.md)
 
 ___
 
 ### signer
 
-• `Readonly` **signer**: [PublicKey](publickey.md)
+• `Readonly` **signer**: [`PublicKey`](publickey.md)
 
 ___
 
 ### ticket
 
-• `Readonly` **ticket**: [Ticket](ticket.md)
+• `Readonly` **ticket**: [`Ticket`](ticket.md)
 
 ## Methods
 
 ### getChallenge
 
-▸ **getChallenge**(): [HalfKeyChallenge](halfkeychallenge.md)
+▸ **getChallenge**(): [`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Returns
 
-[HalfKeyChallenge](halfkeychallenge.md)
+[`HalfKeyChallenge`](halfkeychallenge.md)
 
 #### Defined in
 
@@ -78,17 +78,17 @@ ___
 
 ### getResponse
 
-▸ **getResponse**(`acknowledgement`): [Response](response.md)
+▸ **getResponse**(`acknowledgement`): [`Response`](response.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `acknowledgement` | [HalfKey](halfkey.md) |
+| `acknowledgement` | [`HalfKey`](halfkey.md) |
 
 #### Returns
 
-[Response](response.md)
+[`Response`](response.md)
 
 #### Defined in
 
@@ -118,7 +118,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `acknowledgement` | [HalfKey](halfkey.md) |
+| `acknowledgement` | [`HalfKey`](halfkey.md) |
 
 #### Returns
 
@@ -160,7 +160,7 @@ ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`): [UnacknowledgedTicket](unacknowledgedticket.md)
+▸ `Static` **deserialize**(`arr`): [`UnacknowledgedTicket`](unacknowledgedticket.md)
 
 #### Parameters
 
@@ -170,7 +170,7 @@ ___
 
 #### Returns
 
-[UnacknowledgedTicket](unacknowledgedticket.md)
+[`UnacknowledgedTicket`](unacknowledgedticket.md)
 
 #### Defined in
 

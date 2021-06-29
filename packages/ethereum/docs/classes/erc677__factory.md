@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC677](erc677.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`ERC677`](erc677.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[ERC677](erc677.md)
+[`ERC677`](erc677.md)
 
 #### Defined in
 

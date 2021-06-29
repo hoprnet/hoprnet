@@ -22,7 +22,7 @@
 
 ### connect
 
-▸ `Static` **connect**(`address`, `signerOrProvider`): [IERC777Recipient](ierc777recipient.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [`IERC777Recipient`](ierc777recipient.md)
 
 #### Parameters
 
@@ -33,7 +33,7 @@
 
 #### Returns
 
-[IERC777Recipient](ierc777recipient.md)
+[`IERC777Recipient`](ierc777recipient.md)
 
 #### Defined in
 

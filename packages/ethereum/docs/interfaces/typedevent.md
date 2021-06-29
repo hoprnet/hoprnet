@@ -6,13 +6,13 @@
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgs` | `EventArgs`: `Result` |
+| `EventArgs` | extends `Result` |
 
 ## Hierarchy
 
 - `Event`
 
-  ↳ **TypedEvent**
+  ↳ **`TypedEvent`**
 
 ## Table of contents
 
@@ -182,15 +182,15 @@ ___
 
 ### getBlock
 
-• **getBlock**: () => `Promise`<Block\>
+• **getBlock**: () => `Promise`<`Block`\>
 
 #### Type declaration
 
-▸ (): `Promise`<Block\>
+▸ (): `Promise`<`Block`\>
 
 ##### Returns
 
-`Promise`<Block\>
+`Promise`<`Block`\>
 
 #### Inherited from
 
@@ -204,15 +204,15 @@ ___
 
 ### getTransaction
 
-• **getTransaction**: () => `Promise`<TransactionResponse\>
+• **getTransaction**: () => `Promise`<`TransactionResponse`\>
 
 #### Type declaration
 
-▸ (): `Promise`<TransactionResponse\>
+▸ (): `Promise`<`TransactionResponse`\>
 
 ##### Returns
 
-`Promise`<TransactionResponse\>
+`Promise`<`TransactionResponse`\>
 
 #### Inherited from
 
@@ -226,15 +226,15 @@ ___
 
 ### getTransactionReceipt
 
-• **getTransactionReceipt**: () => `Promise`<TransactionReceipt\>
+• **getTransactionReceipt**: () => `Promise`<`TransactionReceipt`\>
 
 #### Type declaration
 
-▸ (): `Promise`<TransactionReceipt\>
+▸ (): `Promise`<`TransactionReceipt`\>
 
 ##### Returns
 
-`Promise`<TransactionReceipt\>
+`Promise`<`TransactionReceipt`\>
 
 #### Inherited from
 
