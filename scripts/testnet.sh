@@ -142,7 +142,7 @@ start_testnode_vm() {
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--provider" --container-arg="${rpc}" \
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
-      --container-restart-policy=always \
+      --container-restart-policy=always
   fi
 }
 
