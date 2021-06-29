@@ -383,6 +383,18 @@ jobs:
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
 
+      - name: Set rpc network to xdai on release branches or goerli on master branch
+        id: set-rpc-network
+        run: |
+          declare network
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
+            network="xdai"
+          fi
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/master ]]; then
+            network="goerli"
+          fi
+          echo "::set-output name=network::${network}"
+
       - name: Run start script
         if: ${{ !env.ACT }}
         run: |
@@ -393,3 +405,4 @@ jobs:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           GITHUB_REF: ${{ github.ref }}
           BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          RPC_NETWORK: ${{ steps.set-rpc-network.outputs.network }}
