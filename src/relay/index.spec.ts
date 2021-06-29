@@ -83,10 +83,9 @@ describe('test relay', function () {
     )
   }
 
-  //   after(function () {
-  //       connEvents.removeAllListeners()
-  //       connections.clear()
-  //   })
+  afterEach(function () {
+    connEvents.removeAllListeners()
+  })
 
   it('connect to a relay, close the connection and reconnect', async function () {
     const Alice = createPeer(initiator)
@@ -101,7 +100,7 @@ describe('test relay', function () {
       assert(conn != undefined, `Should be able to connect`)
       const shaker = handshake<StreamType>(conn)
 
-      const msg = 'foo'
+      const msg = '<Hello>, that should be sent and echoed through relayed connection'
       shaker.write(new TextEncoder().encode(msg))
 
       assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
@@ -109,6 +108,31 @@ describe('test relay', function () {
       shaker.rest()
 
       await conn.close()
+
+      // Let I/O happen
+      await new Promise((resolve) => setTimeout(resolve))
+    }
+  })
+
+  it('connect to a relay and reconnect', async function () {
+    const Alice = createPeer(initiator)
+
+    const Bob = createPeer(relay)
+
+    const Charly = createPeer(counterparty)
+
+    for (let i = 0; i < 3; i++) {
+      const conn = await Alice.connect(Bob.peerId, Charly.peerId)
+
+      assert(conn != undefined, `Should be able to connect`)
+      const shaker = handshake<StreamType>(conn)
+
+      const msg = '<Hello>, that should be sent and echoed through relayed connection'
+      shaker.write(new TextEncoder().encode(msg))
+
+      assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
+
+      shaker.rest()
 
       // Let I/O happen
       await new Promise((resolve) => setTimeout(resolve))

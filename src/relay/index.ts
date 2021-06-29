@@ -259,6 +259,7 @@ class Relay {
       return
     }
 
+    // @TODO remove this
     this.dialer._pendingDials?.[counterparty.toB58String()]?.destroy()
     this.connectionManager.connections?.set(counterparty.toB58String(), [newConn])
 
