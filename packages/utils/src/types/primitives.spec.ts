@@ -139,6 +139,10 @@ describe('test Balance primitive', function () {
   it('should correctly serialize & deserialize', function () {
     assert.strictEqual(Balance.deserialize(new Balance(balance).serialize()).toBN().toString(), balance.toString())
   })
+
+  it('should format Balance', function () {
+    assert.strictEqual(new Balance(balance).toFormattedString(), '0.000000000000000001 HOPR')
+  })
 })
 
 describe('test NativeBalance primitive', function () {
@@ -161,6 +165,10 @@ describe('test NativeBalance primitive', function () {
       NativeBalance.deserialize(new NativeBalance(balance).serialize()).toBN().toString(),
       balance.toString()
     )
+  })
+
+  it('should format NativeBalance', function () {
+    assert.strictEqual(new NativeBalance(balance).toFormattedString(), '0.000000000000000001 xDAI')
   })
 })
 

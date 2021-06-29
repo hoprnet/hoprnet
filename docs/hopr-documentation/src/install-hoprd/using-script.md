@@ -71,31 +71,3 @@ bash -c "$(curl -s https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setu
 ```
 
 (we even removed the `$` so you can copy and paste that on your terminal, you savage).
-
-## Running HOPRd
-
-With this command, we will run hoprd and store logs,
-when running this command the first time, it will create folder `db` in the current
-working directory where it will store the encrypted key to your node and your off-chain
-private data.
-
-```bash
-DEBUG=hopr* hoprd --admin --init --announce --password='' 2>&1 | tee ~/hoprd-logs.txt
-```
-
-### Accessing HOPRd on a local machine
-
-Visit [http://localhost:3000](http://localhost:3000).
-
-### Accessing HOPRd on a VPS
-
-```bash
-$ ssh -L 3000:127.0.0.1:3000 root@`<VPS ip address>`
-# you'll then be prompted to enter your password
-```
-
-Then visit http://localhost:3000 on your browser.
-
-### Save logs from a VPS
-
-Please take a look over at [hopr-sh's README file](https://github.com/hoprnet/hopr-sh/blob/main/README.md) for instructions.

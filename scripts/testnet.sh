@@ -25,35 +25,53 @@ disk_name() {
   echo "$1-dsk"
 }
 
-# $1=account (hex)
+# $1 = account (hex)
+# $2 = chain provider
 balance() {
-  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
+  local address=${1}
+  local rpc=${2}
+
+  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('$1').then(b => formatEther(b))"
 }
 
+# $1 = chain provider
 funding_wallet_balance() {
-  yarn run --silent ethers --rpc "$RPC" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getBalance().then(b => formatEther(b))'
+  local rpc=${1}
+
+  yarn run --silent ethers --rpc "${rpc}" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getBalance().then(b => formatEther(b))'
 }
 
+# $1 = chain provider
 funding_wallet_address() {
-  yarn run --silent ethers --rpc "$RPC" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getAddress().then(a => a)'
+  local rpc=${1}
+
+  yarn run --silent ethers --rpc "${rpc}" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getAddress().then(a => a)'
 }
 
-# $1=account (hex)
+# $1 = account (hex)
+# $2 = chain provider
 fund_if_empty() {
+  local address=${1}
+  local rpc=${2}
+
   echo "Starting funding wallet process"
-  local FUNDING_WALLET_ADDRESS=$(funding_wallet_address)
-  echo "Checking balance of funding wallet $FUNDING_WALLET_ADDRESS using RPC $RPC"
-  local FUNDING_WALLET_BALANCE="$(funding_wallet_balance)"
+  local FUNDING_WALLET_ADDRESS=$(funding_wallet_address "${rpc}")
+
+  echo "Checking balance of funding wallet $FUNDING_WALLET_ADDRESS using RPC ${rpc}"
+  local FUNDING_WALLET_BALANCE="$(funding_wallet_balance "${rpc}")"
+
   if [ "$FUNDING_WALLET_BALANCE" = '0.0' ]; then
-    echo "Wallet $FUNDING_WALLET_ADDRESS has zero balance and cannot fund node $1"
+    echo "Wallet $FUNDING_WALLET_ADDRESS has zero balance and cannot fund node ${address}"
   else
     echo "Funding wallet $FUNDING_WALLET_ADDRESS has enough: $FUNDING_WALLET_BALANCE"
-    echo "Checking balance of the wallet $1 to be funded"
-    local BALANCE="$(balance $1)"
-    echo "Balance of $1 is $BALANCE"
+    echo "Checking balance of the wallet ${address} to be funded"
+    local BALANCE="$(balance ${address} "${rpc}")"
+
+    echo "Balance of ${address} is $BALANCE"
     if [ "$BALANCE" = '0.0' ]; then
-      echo "Funding account ... $RPC -> $1 $MIN_FUNDS"
-      yarn ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
+      echo "Funding account ... ${rpc} -> ${address} $MIN_FUNDS"
+      yarn ethers send --rpc "${rpc}" --account "$FUNDING_PRIV_KEY" "${address}" $MIN_FUNDS --yes
+
       sleep 60
     fi
   fi
@@ -100,13 +118,12 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
-# $3 = OPTIONAL chain provider
+# $3 = chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  local additional_flags=""
-  if [ -n "${3:-}" ]; then
-    additional_flags="--container-arg=--provider --container-arg=$RPC"
-  fi
+  # make sure we pass the websocket endpoint url, not the http endpoint url
+  local rpc=${3/https:/wss:/}
+
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
@@ -123,9 +140,9 @@ start_testnode_vm() {
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--admin" --container-arg="true" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
+      --container-arg="--provider" --container-arg="${rpc}" \
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
-      --container-restart-policy=always \
-      ${additional_flags}
+      --container-restart-policy=always
   fi
 }
 
@@ -139,23 +156,23 @@ start_chain_provider(){
   #hardhat node --config packages/ethereum/hardhat.config.ts
 }
 
-# $1 network name
-# $2 docker image
-# $3 node number
-# $4 = OPTIONAL chain provider
+# $1 = network name
+# $2 = docker image
+# $3 = node number
+# $4 = chain provider
 start_testnode() {
   local vm ip eth_address
 
   # start or update vm
   vm=$(vm_name "node-$3" $1)
-  echo "- Starting test node $vm with $2 ${4:-}"
-  start_testnode_vm $vm $2 ${4:-}
+  echo "- Starting test node $vm with $2 ${4}"
+  start_testnode_vm $vm $2 ${4}
 
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
   wait_until_node_is_ready $ip
   eth_address=$(get_eth_address "${ip}")
-  fund_if_empty "${eth_address}"
+  fund_if_empty "${eth_address}" "${4}"
 }
 
 # $1 authorized keys file
@@ -174,17 +191,16 @@ add_keys() {
 # either update or start VM's to create a network of
 # N nodes
 
-# $1 network name
-# $2 number of nodes
-# $3 docker image
-# $4 = OPTIONAL chain provider
+# $1 = network name
+# $2 = number of nodes
+# $3 = docker image
+# $4 = chain provider
 start_testnet() {
   for i in $(seq 1 $2);
   do
     echo "Start node $i"
-    start_testnode $1 $3 $i ${4:-}
+    start_testnode $1 $3 $i ${4}
   done
   # @jose can you fix this pls.
   # add_keys scripts/keys/authorized_keys
 }
-
