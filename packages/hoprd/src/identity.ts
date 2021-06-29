@@ -1,6 +1,6 @@
 // TODO - replace serialization with a library
 import PeerId from 'peer-id'
-import { privKeyToPeerId, SECP256K1_CONSTANTS } from '@hoprnet/hopr-utils'
+import { privKeyToPeerId, SECP256K1_CONSTANTS, stringToU8a } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 import { resolve } from 'path'
 import Debug from 'debug'
@@ -91,12 +91,10 @@ async function createIdentity(idPath: string, password: string, useWeakCrypto = 
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
   let privateKey: Uint8Array | undefined
   if (options.privateKey) {
-    privateKey = Uint8Array.from(
-      Buffer.from(options.privateKey.substr(0, 2) === '0x' ? options.privateKey.substr(2) : options.privateKey, 'hex')
-    )
-    if (privateKey.length == 0) {
+    if (isNaN(parseInt(options.privateKey, 16))) {
       throw new Error(IdentityErrors.INVALID_PRIVATE_KEY_GIVEN)
     }
+    privateKey = stringToU8a(options.privateKey)
     if (privateKey.length != SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH) {
       throw new Error(IdentityErrors.INVALID_SECPK256K1_PRIVATE_KEY_GIVEN)
     }
