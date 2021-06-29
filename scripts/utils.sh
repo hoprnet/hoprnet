@@ -64,9 +64,9 @@ function wait_for_port() {
   i=0
   until ${cmd}; do
     log "Waiting (${delay}) seconds for port ${port}"
-    if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
+    if [ -s "${log_file}" ]; then
       log "Last 5 logs:"
-      tail -n 5 "${log_file}" | sed "s/^/\t/"
+      tail -n 5 "${log_file}" | sed "s/^/\\t/"
     fi
     sleep ${delay}
     ((i=i+1))
@@ -88,7 +88,10 @@ setup_colors() {
 }
 
 log() {
-  echo >&2 -e "[${HOPR_LOG_ID:-}] ${1-}"
+  local time
+  # second-precision is enough
+  time=$(date -u +%y-%m-%dT%H:%M:%SZ)
+  echo >&2 -e "$CYAN${time} [${HOPR_LOG_ID:-}]$NOFORMAT ${1-}"
 }
 
 msg() {

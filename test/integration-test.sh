@@ -40,7 +40,7 @@ declare api5="${5}"
 # $3 = OPTIONAL: positive assertion message
 # $4 = OPTIONAL: maximum wait time in seconds during which we busy try
 # afterwards we fail, defaults to 0
-# $4 = OPTIONAL: step time between retries in seconds, defaults to 1 second
+# $4 = OPTIONAL: step time between retries in seconds, defaults to 2 seconds
 # $5 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
 # priority than wait time, defaults to 0
 run_command(){
@@ -49,9 +49,10 @@ run_command(){
   local hopr_cmd="${2}"
   local assertion="${3:-}"
   local wait_time=${4:-0}
-  local step_time=${5:-1}
+  local step_time=${5:-2}
   local end_time_ns=${6:-0}
-  local cmd="curl --silent --max-time 360 -X POST --header X-Auth-Token:e2e-api-token --url ${endpoint}/api/v1/command --data "
+  # no timeout set since the test execution environment should cancel the test if it takes too long
+  local cmd="curl --silent -X POST --header X-Auth-Token:e2e-api-token --url ${endpoint}/api/v1/command --data "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -71,6 +72,7 @@ run_command(){
       log "${RED}run_command (${cmd} \"${hopr_cmd}\") FAILED, received: ${result}${NOFORMAT}"
       exit 1
     else
+      log "${YELLOW}run_command (${cmd} \"${hopr_cmd}\") FAILED, retrying in ${step_time} seconds${NOFORMAT}"
       sleep ${step_time}
       run_command "${endpoint}" "${hopr_cmd}" "${assertion}" "${wait_time}" \
         "${step_time}" "${end_time_ns}"
@@ -180,7 +182,7 @@ log "-- ${result}"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
-  run_command "${api1}" "send ${addr2},${addr1} 'hello, world'" "Message sent" 120
+  run_command "${api1}" "send ${addr2},${addr1} 'hello, world'" "Message sent" 240
 done
 
 log "Node 2 should now have a ticket"
@@ -189,7 +191,7 @@ log "-- ${result}"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to node 3 via node 2"
-  run_command "${api1}" "send ${addr2},${addr3} 'hello, world'" "Message sent" 120
+  run_command "${api1}" "send ${addr2},${addr3} 'hello, world'" "Message sent" 240
 done
 
 log "Node 3 open channel to Node 4"
