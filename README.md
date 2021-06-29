@@ -136,6 +136,7 @@ Options:
   --dryRun                      List all the options used to run the HOPR node, but quit instead of starting  [boolean] [default: false]
   --data                        manually specify the database directory to use  [default: ""]
   --init                        initialize a database if it doesn't already exist  [boolean] [default: false]
+  --privateKey                  A private key to be used for your node wallet, to quickly boot your node [string] [default: undefined]
   --adminHost                   Host to listen to for admin console  [default: "localhost"]
   --adminPort                   Port to listen to for admin console  [default: 3000]
   --testAnnounceLocalAddresses  For testing local testnets. Announce local addresses.  [boolean] [default: false]
