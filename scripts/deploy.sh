@@ -15,11 +15,17 @@ source scripts/cleanup.sh
 # ENV Variables:
 # - GITHUB_REF: ie. `/refs/heads/mybranch`
 # - RPC: provider address, ie `https://rpc-mainnet.matic.network`
+# - RPC_NETWORK: provider network id, e.g. xdai
 # - FUNDING_PRIV_KEY: funding private key, raw
 # - BS_PASSWORD: database password
 
-if [ -z "${RPC:-}" ]; then
+if [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "goerli" ]; then
   RPC=https://eth-goerli.gateway.pokt.network/v1/6021a2b6928ff9002e6c7f2f
+elif [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "xdai" ]; then
+  RPC=https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/
+elif [ "${RPC_NETWORK:-}" != "xdai" ] && [ "${RPC_NETWORK:-}" != "goerli" ]; then
+  echo "Missing supported RPC_NETWORK"
+  exit 1
 fi
 
 # Get version from package.json
@@ -35,4 +41,4 @@ echo "Cleaning up before deploy"
 cleanup
 
 echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes and image hoprd:$RELEASE"
-start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE"
+start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" "${RPC}"
