@@ -3,6 +3,14 @@ import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
 import { PublicKey, ChannelStatus } from '@hoprnet/hopr-utils'
 
+const channelStatusToString = (status: ChannelStatus): string => {
+  if (status === 0) return 'Closed'
+  else if (status === 1) return 'WaitingForCommitment'
+  else if (status === 2) return 'Open'
+  else if (status === 3) return 'PendingToClose'
+  return 'Unknown'
+}
+
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr) {
     super()
@@ -35,7 +43,7 @@ export default class ListOpenChannels extends AbstractCommand {
         log(`
 Outgoing Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
 To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
-Status:                 ${styleValue(channel.status, 'highlight')}
+Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)
       }
@@ -51,7 +59,7 @@ Balance:                ${styleValue(channel.balance.toFormattedString(), 'numbe
         log(`
 Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
 To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
-Status:                 ${styleValue(channel.status, 'highlight')}
+Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)
       }

@@ -55,4 +55,5 @@ At the time of writing, HOPR is also able to implement a [Polkadot-enabled payme
    src/running-hoprd/funding/native-tokens.md
    src/running-hoprd/funding/hopr-tokens.md
    src/running-hoprd/commands.md
+   src/running-hoprd/flags.md
 ```

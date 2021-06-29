@@ -55,7 +55,7 @@ Using the [hoprd npm package][6]:
 ```sh
 mkdir MY_NEW_HOPR_TEST_FOLDER
 cd MY_NEW_HOPR_TEST_FOLDER
-npm install @hoprnet/hoprd
+npm install @hoprnet/hoprd@1.73
 ```
 
 ### Install via Docker
@@ -68,13 +68,13 @@ represents the most recent `release/*` branch.
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:latest
+docker pull gcr.io/hoprassociation/hoprd:latest-release
 ```
 
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest-release'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -130,7 +130,7 @@ Options:
   --forwardLogs                 Forwards all your node logs to a public available sink  [boolean] [default: false]
   --forwardLogsProvider         A provider url for the logging sink node to use  [default: "https://ceramic-clay.3boxlabs.com"]
   --password                    A password to encrypt your keys  [default: ""]
-  --apiToken                    A REST API token and admin panel password for user authentication  [string]
+  --apiToken                    (experimental) A REST API token and admin panel password for user authentication  [string]
   --identity                    The path to the identity file  [default: "/home/tbr/.hopr-identity"]
   --run                         Run a single hopr command, same syntax as in hopr-admin  [default: ""]
   --dryRun                      List all the options used to run the HOPR node, but quit instead of starting  [boolean] [default: false]
@@ -152,7 +152,7 @@ The following command assumes you've setup a local installation like described i
 
 ```sh
 cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs --apiToken alpine_panorama
+DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs
 ```
 
 Here is a short break-down of each argument.
@@ -165,7 +165,6 @@ hoprd
   --identity .hopr-identity              # store your node identity information in your test folder
   --password switzerland   		 # set the encryption password for your identity
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
-  --apiToken alpine_panorama             # set the api token used as a secret by the Rest API and Admin UI
 ```
 
 ### Using Docker
@@ -173,7 +172,7 @@ hoprd
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs --apiToken alpine_panorama
+hoprd --identity /app/db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs
 ```
 
 Here is a short break-down of each argument.
@@ -188,7 +187,6 @@ hoprd
   --admin   	                         # enable the node's admin UI
   --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
-  --apiToken alpine_panorama             # set the api token used as a secret by the Rest API and Admin UI
 ```
 
 ## Develop
