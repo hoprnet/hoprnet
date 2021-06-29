@@ -59,7 +59,7 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
-"@ceramicnetwork/common@^1.0.6", "@ceramicnetwork/common@^1.1.0":
+"@ceramicnetwork/common@^1.1.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@ceramicnetwork/common/-/common-1.1.0.tgz#a970d352634e4e7f2d9fc142ec1aa5464823865a"
   integrity sha512-+bfGB8UwG/S5proYLReR4rK0ZKJ3OFTR/ZVbvGwJUzLr93C7+JqYZ70TV1SC9V3DSV71jbN5gq0ejbXRZ8OJPA==
@@ -75,27 +75,27 @@
     uint8arrays "^2.0.5"
 
 "@ceramicnetwork/http-client@^1.0.6":
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/@ceramicnetwork/http-client/-/http-client-1.0.6.tgz#1f84a2d634d6796383e680217c8d12d1dcfb5f1c"
-  integrity sha512-ahmFCNEzQ8BpyPa5g+vHYo3/gyzz3e5AGnGs7NVeY2e28YoZdnNw5z1X2pHK/eD4WIN+mVViM81TQk9mprKstQ==
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/@ceramicnetwork/http-client/-/http-client-1.0.7.tgz#892650c3ac3b91a926a76ea1b71035acdc79c0a4"
+  integrity sha512-nPr/eTPjaK1MXQ+UHLv0qNX9KC+LAT6Apu/kp7F1Ctu4eXK8xbL6R5vwbjnPqXwMiempfzNN//g+RLrdB+FDBA==
   dependencies:
-    "@ceramicnetwork/common" "^1.0.6"
-    "@ceramicnetwork/stream-caip10-link" "^1.0.6"
-    "@ceramicnetwork/stream-tile" "^1.0.6"
+    "@ceramicnetwork/common" "^1.1.0"
+    "@ceramicnetwork/stream-caip10-link" "^1.0.7"
+    "@ceramicnetwork/stream-tile" "^1.0.7"
     "@ceramicnetwork/streamid" "^1.0.2"
     query-string "7.0.0"
     rxjs "^7.0.0"
 
-"@ceramicnetwork/stream-caip10-link@^1.0.6":
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/@ceramicnetwork/stream-caip10-link/-/stream-caip10-link-1.0.6.tgz#6a1adc997b6a0cc19db1f94cd0cb7b5ef1b41485"
-  integrity sha512-VNxRrto2n3fMXt798H3rrhHUp+bvWtKNDUhSfWbcl57iEnmXq6GN1jUw3U+t7iPxd6Irp3Qx2dIq9j0tz3iHOQ==
+"@ceramicnetwork/stream-caip10-link@^1.0.7":
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/@ceramicnetwork/stream-caip10-link/-/stream-caip10-link-1.0.7.tgz#bf3dc724ee6f2c30d92269bb8514f24032a04780"
+  integrity sha512-bqBtWuBhd5h3cwQ+g3TNwf/DWD/vMbm4DY3U3mNxr720EBNIgts8lGJtHBwzWMoymGo1BA8kSmDWT2XESCGKCw==
   dependencies:
-    "@ceramicnetwork/common" "^1.0.6"
+    "@ceramicnetwork/common" "^1.1.0"
     "@ceramicnetwork/streamid" "^1.0.2"
     caip "~0.9.2"
 
-"@ceramicnetwork/stream-tile@^1.0.6":
+"@ceramicnetwork/stream-tile@^1.0.6", "@ceramicnetwork/stream-tile@^1.0.7":
   version "1.0.7"
   resolved "https://registry.yarnpkg.com/@ceramicnetwork/stream-tile/-/stream-tile-1.0.7.tgz#ff74358d85533597ae35373bf45ad5e39ef38bb6"
   integrity sha512-GttIUvOArZPf4D1NwbyfJtwblMhx9GMMcK/YzVNxHn0gUJmj4bOwaOohQ7nhCqxYlzq050tbUW1HB6VSttnRHw==
