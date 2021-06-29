@@ -79,13 +79,7 @@ export default function Home() {
       <Logs messages={messages} connecting={connecting} />
 
       <div className="send">
-        <input
-          id="command"
-          type="text"
-          // disabled={!isNodeReady}
-          autoFocus
-          placeholder="type 'help' for full list of commands"
-        />
+        <input id="command" type="text" autoFocus placeholder="type 'help' for full list of commands" />
       </div>
 
       <TokenInput handleTokenSet={handleTokenSet} />

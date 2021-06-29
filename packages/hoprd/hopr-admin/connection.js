@@ -26,33 +26,40 @@ export class Connection {
 
     try {
       const msg = JSON.parse(event.data)
-      if (msg.type == 'log') {
-        if (this.logs.length > MAX_MESSAGES_CACHED) {
-          // Avoid memory leak
-          this.logs.splice(0, this.logs.length - MAX_MESSAGES_CACHED) // delete elements from start
-        }
-        this.logs.push(msg)
-        this.setMessages(this.logs.slice(0)) // Need a clone
-      } else if (msg.type == 'connected') {
-        this.setConnectedPeers(msg.msg.split(','))
-      } else if (msg.type == 'fatal-error') {
-        this.setConnecting(true)
-        this.logs.push(msg)
+      switch (msg.type) {
+        case 'log':
+          if (this.logs.length > MAX_MESSAGES_CACHED) {
+            // Avoid memory leak
+            this.logs.splice(0, this.logs.length - MAX_MESSAGES_CACHED) // delete elements from start
+          }
+          this.logs.push(msg)
+          this.setMessages(this.logs.slice(0)) // Need a clone
+          break
+        case 'connected':
+          this.setConnectedPeers(msg.msg.split(','))
+          break
+        case 'fatal-error':
+          this.setConnecting(true)
+          this.logs.push(msg)
 
-        // Let's elaborate on certain error messages:
-        if (msg.msg.indexOf('account has no funds') > -1) {
-          this.logs.push({ msg: '- Please send 0.1 gETH to the account', ts: new Date().toISOString() })
-          this.logs.push({ msg: '- Then restart the node', ts: new Date().toISOString() })
-        }
+          // Let's elaborate on certain error messages:
+          if (msg.msg.indexOf('account has no funds') > -1) {
+            this.logs.push({ msg: '- Please send 0.1 gETH to the account', ts: new Date().toISOString() })
+            this.logs.push({ msg: '- Then restart the node', ts: new Date().toISOString() })
+          }
 
-        this.setMessages(this.logs.slice(0)) // Need a clone
-      } else if (msg.type === 'status' && msg.msg === 'STARTED') {
-        this.setStarted(true)
-      } else if (msg.type == 'auth-failed') {
-        console.log('!! auth failed')
-        this.logs.push(msg)
-        this.setConnecting(false)
-        this.onAuthFailed()
+          this.setMessages(this.logs.slice(0)) // Need a clone
+          break
+        case 'status':
+          if (msg.msg === 'STARTED') {
+            this.setStarted(true)
+          }
+          break
+        case 'auth-failed':
+          this.logs.push(msg)
+          this.setConnecting(false)
+          this.onAuthFailed()
+          break
       }
     } catch (e) {
       console.log('ERR', e)
