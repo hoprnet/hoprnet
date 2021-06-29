@@ -138,8 +138,6 @@ class Relay {
     }
   }
 
-
-
   private async handleRelayConnection(conn: Handler): Promise<RelayConnection | WebRTCConnection | undefined> {
     if (conn.stream == undefined || conn.connection == undefined) {
       error(
