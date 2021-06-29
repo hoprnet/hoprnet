@@ -75,7 +75,7 @@ Contract.constructor
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:98
+node_modules/@ethersproject/contracts/lib/index.d.ts:102
 
 ## Properties
 
@@ -89,7 +89,7 @@ Contract.\_deployedPromise
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:92
+node_modules/@ethersproject/contracts/lib/index.d.ts:96
 
 ___
 
@@ -107,7 +107,7 @@ Contract.\_runningEvents
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:93
+node_modules/@ethersproject/contracts/lib/index.d.ts:97
 
 ___
 
@@ -125,7 +125,7 @@ Contract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
@@ -139,7 +139,7 @@ Contract.address
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:71
+node_modules/@ethersproject/contracts/lib/index.d.ts:75
 
 ___
 
@@ -174,7 +174,7 @@ Contract.deployTransaction
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:91
+node_modules/@ethersproject/contracts/lib/index.d.ts:95
 
 ___
 
@@ -279,7 +279,7 @@ Contract.provider
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:74
+node_modules/@ethersproject/contracts/lib/index.d.ts:78
 
 ___
 
@@ -293,7 +293,7 @@ Contract.resolvedAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:90
+node_modules/@ethersproject/contracts/lib/index.d.ts:94
 
 ___
 
@@ -307,7 +307,7 @@ Contract.signer
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:73
+node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 ## Methods
 
@@ -331,7 +331,7 @@ Contract.\_checkRunningEvents
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:113
+node_modules/@ethersproject/contracts/lib/index.d.ts:117
 
 ___
 
@@ -355,7 +355,7 @@ Contract.\_deployed
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:106
+node_modules/@ethersproject/contracts/lib/index.d.ts:110
 
 ___
 
@@ -381,7 +381,7 @@ Contract.\_wrapEvent
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:114
+node_modules/@ethersproject/contracts/lib/index.d.ts:118
 
 ___
 
@@ -472,7 +472,7 @@ Contract.emit
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:119
+node_modules/@ethersproject/contracts/lib/index.d.ts:123
 
 ___
 
@@ -496,7 +496,7 @@ Contract.fallback
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:107
+node_modules/@ethersproject/contracts/lib/index.d.ts:111
 
 ___
 
@@ -520,7 +520,7 @@ Contract.listenerCount
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:120
+node_modules/@ethersproject/contracts/lib/index.d.ts:124
 
 ___
 
@@ -945,7 +945,7 @@ Contract.getContractAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:100
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
@@ -969,7 +969,7 @@ Contract.getInterface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:104
+node_modules/@ethersproject/contracts/lib/index.d.ts:108
 
 ___
 
@@ -993,4 +993,4 @@ Contract.isIndexed
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:110
+node_modules/@ethersproject/contracts/lib/index.d.ts:114

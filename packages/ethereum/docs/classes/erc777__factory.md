@@ -64,7 +64,7 @@ ContractFactory.bytecode
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:131
+node_modules/@ethersproject/contracts/lib/index.d.ts:135
 
 ___
 
@@ -78,7 +78,7 @@ ContractFactory.interface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:130
+node_modules/@ethersproject/contracts/lib/index.d.ts:134
 
 ___
 
@@ -92,7 +92,7 @@ ContractFactory.signer
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:132
+node_modules/@ethersproject/contracts/lib/index.d.ts:136
 
 ## Methods
 
@@ -240,7 +240,7 @@ ContractFactory.fromSolidity
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:140
+node_modules/@ethersproject/contracts/lib/index.d.ts:144
 
 ___
 
@@ -266,7 +266,7 @@ ContractFactory.getContract
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:146
+node_modules/@ethersproject/contracts/lib/index.d.ts:150
 
 ___
 
@@ -292,7 +292,7 @@ ContractFactory.getContractAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:142
+node_modules/@ethersproject/contracts/lib/index.d.ts:146
 
 ___
 
@@ -316,4 +316,4 @@ ContractFactory.getInterface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:141
+node_modules/@ethersproject/contracts/lib/index.d.ts:145
