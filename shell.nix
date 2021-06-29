@@ -33,6 +33,9 @@ mkShell {
     # test Github automation
     unstable.act
 
+    # testing utilities
+    websocat
+
     # custom pkg groups
     macosPkgs
     linuxPkgs
