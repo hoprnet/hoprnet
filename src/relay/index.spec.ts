@@ -13,45 +13,29 @@ import { RelayConnection } from './connection'
 import assert from 'assert'
 
 const initiator = privKeyToPeerId(stringToU8a('0xa889bad3e2a31cceff4faccdd374af67db485ac0e05e7e654530aff0da5199f7'))
-console.log(`initiator`, initiator.toB58String())
 const relay = privKeyToPeerId(stringToU8a('0xcd1fb76053833d9bb5b3ff243b2d17b96dc5ad7cc09b33c4cf77ba83c297443f'))
-console.log(`relay`, relay.toB58String())
 const counterparty = privKeyToPeerId(stringToU8a('0x4090ca3740b1fe0f6da22befc4f7cba26389c51808d245dd29a2076fc66103aa'))
-console.log(`counterparty`, counterparty.toB58String())
 
 function msgToEchoedMessage(message: string) {
   return new TextEncoder().encode(`Echo: <${message}>`)
 }
 
 describe('test relay', function () {
-  const connections = new Map<string, Stream>()
-
   const connEvents = new EventEmitter()
 
   async function dialHelper(source: PeerId, peer: PeerId, protocol: string, _opts: any): Promise<Handler> {
-    const aToB = `${source.toB58String()}${peer.toB58String()}${protocol}`
-    const bToA = `${peer.toB58String()}${source.toB58String()}${protocol}`
-
     let sourceToPeer: Stream
     let peerToSource: Stream
 
-    if (connections.has(aToB) && connections.has(bToA)) {
-      sourceToPeer = connections.get(aToB) as Stream
-      peerToSource = connections.get(bToA) as Stream
-    } else {
-      const [connA, connB] = [Pair(), Pair()]
-      sourceToPeer = {
-        source: connB.source,
-        sink: connA.sink
-      }
+    const [connA, connB] = [Pair(), Pair()]
+    sourceToPeer = {
+      source: connB.source,
+      sink: connA.sink
+    }
 
-      peerToSource = {
-        source: connA.source,
-        sink: connB.sink
-      }
-
-      connections.set(aToB, sourceToPeer)
-      connections.set(bToA, peerToSource)
+    peerToSource = {
+      source: connA.source,
+      sink: connB.sink
     }
 
     connEvents.emit(`${peer.toB58String()}${protocol}`, {
@@ -104,25 +88,30 @@ describe('test relay', function () {
   //       connections.clear()
   //   })
 
-  it('connect to a relay', async function () {
+  it('connect to a relay, close the connection and reconnect', async function () {
     const Alice = createPeer(initiator)
 
     const Bob = createPeer(relay)
 
     const Charly = createPeer(counterparty)
 
-    const conn = await Alice.connect(relay, counterparty)
+    for (let i = 0; i < 5; i++) {
+      const conn = await Alice.connect(Bob.peerId, Charly.peerId)
 
-    assert(conn != undefined, `Should be able to connect`)
-    const shaker = handshake<StreamType>(conn)
+      assert(conn != undefined, `Should be able to connect`)
+      const shaker = handshake<StreamType>(conn)
 
-    const msg = 'foo'
-    shaker.write(new TextEncoder().encode(msg))
+      const msg = 'foo'
+      shaker.write(new TextEncoder().encode(msg))
 
-    assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
+      assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
 
-    shaker.rest()
+      shaker.rest()
 
-    await conn.close()
+      await conn.close()
+
+      // Let I/O happen
+      await new Promise((resolve) => setTimeout(resolve))
+    }
   })
 })

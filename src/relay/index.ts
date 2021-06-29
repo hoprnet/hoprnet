@@ -6,7 +6,7 @@ import debug from 'debug'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 
-const log = debug(DEBUG_PREFIX.concat(':relay'))
+const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 
@@ -39,7 +39,7 @@ class Relay {
     private dialer: Dialer,
     private connectionManager: ConnectionManager,
     private handle: (protocol: string, handle: (handler: Handler) => void) => void,
-    private peerId: PeerId,
+    public peerId: PeerId,
     private upgrader: Upgrader,
     private connHandler: ConnHandler | undefined,
     private webRTCUpgrader?: WebRTCUpgrader,
@@ -66,7 +66,7 @@ class Relay {
     })
   }
 
-  async connect(
+  public async connect(
     relay: PeerId,
     destination: PeerId,
     options?: DialOptions
@@ -135,7 +135,9 @@ class Relay {
     }
   }
 
-  async handleRelayConnection(conn: Handler): Promise<RelayConnection | WebRTCConnection | undefined> {
+
+
+  private async handleRelayConnection(conn: Handler): Promise<RelayConnection | WebRTCConnection | undefined> {
     if (conn.stream == undefined || conn.connection == undefined) {
       error(
         `Dropping stream because ${conn.connection == undefined ? 'cannot determine relay address ' : ''}${
@@ -254,8 +256,8 @@ class Relay {
       return
     }
 
-    this.dialer._pendingDials[counterparty.toB58String()]?.destroy()
-    this.connectionManager.connections.set(counterparty.toB58String(), [newConn])
+    this.dialer._pendingDials?.[counterparty.toB58String()]?.destroy()
+    this.connectionManager.connections?.set(counterparty.toB58String(), [newConn])
 
     this.connHandler?.(newConn)
   }

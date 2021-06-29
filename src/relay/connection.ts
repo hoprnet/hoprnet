@@ -394,6 +394,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
         if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS) {
           if (SUFFIX[0] == ConnectionStatusMessages.STOP) {
+            this.log(`STOP received. Ending stream ...`)
             this.destroyed = true
             this._destroyedPromise.resolve()
             this.setClosed()
