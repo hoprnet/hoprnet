@@ -26,16 +26,19 @@ export class Connection {
     
     try {      
       const msg = JSON.parse(event.data)
-      if (msg.type == 'log') {
-        if (this.logs.length > MAX_MESSAGES_CACHED) {
-          // Avoid memory leak
-          this.logs.splice(0, this.logs.length - MAX_MESSAGES_CACHED) // delete elements from start
-        }
-        this.logs.push(msg)
-        this.setMessages(this.logs.slice(0)) // Need a clone
-      } else if (msg.type == 'connected') {
+      switch(msg.type) {
+        case 'log':
+          if (this.logs.length > MAX_MESSAGES_CACHED) {
+            // Avoid memory leak
+            this.logs.splice(0, this.logs.length - MAX_MESSAGES_CACHED) // delete elements from start
+          }
+          this.logs.push(msg)
+          this.setMessages(this.logs.slice(0)) // Need a clone
+          break
+      case 'connected':
         this.setConnectedPeers(msg.msg.split(','))
-      } else if (msg.type == 'fatal-error') {
+        break
+      case 'fatal-error':
         this.setConnecting(true)
         this.logs.push(msg)
 
@@ -46,14 +49,18 @@ export class Connection {
         }
 
         this.setMessages(this.logs.slice(0)) // Need a clone
-      } else if (msg.type === 'status' && msg.msg === 'STARTED') {
-        this.setStarted(true)
-      } else if (msg.type == 'auth-failed') {
-        console.log('!! auth failed')        
+        break
+      case 'status':
+        if(msg.msg === 'STARTED') {
+          this.setStarted(true)
+        }
+        break
+      case 'auth-failed':
         this.logs.push(msg)
         this.setConnecting(false)
         this.onAuthFailed()        
-      }
+        break
+      }      
     } catch (e) {
       console.log('ERR', e)
     }
