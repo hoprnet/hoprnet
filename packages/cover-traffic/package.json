@@ -1,0 +1,40 @@
+{
+  "name": "@hoprnet/cover-traffic",
+  "description": "Generate chaffing traffic",
+  "version": "1.74.0-next.8",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
+  "license": "GPL-3.0",
+  "types": "lib/index.d.ts",
+  "main": "lib/index.js",
+  "scripts": {
+    "clean": "rimraf ./lib",
+    "test": "mocha --parallel",
+    "dev": "yarn clean && tsc -w",
+    "build": "yarn clean && tsc -p .",
+    "prepublishOnly": "yarn build",
+    "docs:generate": "yarn typedoc",
+    "docs:watch": "yarn typedoc --watch"
+  },
+  "engines": {
+    "node": "14"
+  },
+  "files": [
+    "lib",
+    "!**/*.spec.ts",
+    "!**/*.spec.d.ts",
+    "!**/*.spec.js",
+    "!**/*.spec.js.map"
+  ],
+  "dependencies": {
+  },
+  "devDependencies": {
+  },
+  "mocha": {
+    "extension": [
+      "ts"
+    ],
+    "spec": "src/**/*.spec.ts",
+    "require": "ts-node/register"
+  }
+}
