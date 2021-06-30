@@ -29,8 +29,7 @@ export class Connection {
       const msg = JSON.parse(event.data)
       
       this.authFailed = false
-      console.log('auth failed - false')
-
+      
       switch (msg.type) {
         case 'log':
           if (this.logs.length > MAX_MESSAGES_CACHED) {
@@ -44,7 +43,6 @@ export class Connection {
           this.setConnectedPeers(msg.msg.split(','))
           break
         case 'fatal-error':
-          this.setConnecting(true)
           this.logs.push(msg)
 
           // Let's elaborate on certain error messages:
@@ -62,8 +60,7 @@ export class Connection {
           break
         case 'auth-failed':
           this.logs.push(msg)
-          this.authFailed = true
-          console.log('auth failed - true')
+          this.authFailed = true          
           this.setConnecting(false)
           this.onAuthFailed()
           break
@@ -117,17 +114,18 @@ export class Connection {
 
     client.onerror = (error) => {
       console.log('Connection error:', error)
+      this.setConnecting(false)          
     }
 
     client.onclose = () => {
       console.log('Web socket closed')
-      this.setConnecting(true)
       this.appendMessage(' --- < Lost Connection, attempting to reconnect... > ---')
       var self = this
       
       setTimeout(function () {
         try {
           if(!self.authFailed) {
+            this.setConnecting(true)      
             self.connect()          
           }
         } catch (e) {

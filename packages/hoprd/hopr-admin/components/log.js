@@ -61,6 +61,7 @@ export function Logs(props) {
   })
 
   let cls = styles.logs + ' ' + (props.connecting ? styles.connecting : '')
+  console.log(props.messages)
   return (
     <div className={cls}>
       <div ref={container}>
