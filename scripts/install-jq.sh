@@ -15,9 +15,34 @@ declare exit_code=0
 which jq > /dev/null || exit_code=$?
 
 if [ "${exit_code}" = "0" ]; then
-  log "jq binary found"
+  log "jq already installed"
   exit 0
 fi
 
-apt-get update
-apt-get intall jq -y
+declare kernel arch download_url bin_path
+
+bin_path="${mydir}/../.bin"
+download_url=https://github.com/vi/websocat/releases/download/v1.8.0/websocat
+kernel=$(uname -s)
+arch=$(uname -m)
+
+if [ "${kernel}" = "Linux" ]; then
+  apt-get update
+  apt-get install jq -y
+elif [ "${kernel}" = "Darwin" ]; then
+  exit_code=0
+  which brew > /dev/null || exit_code=$?
+  if [ "${exit_code}" != "0" ]; then
+    log "⛔️ Homebrew not found. Please install Homebrew manually first"
+    exit 1
+  fi
+  log "Installing jq..."
+  brew install jq
+else
+  log "cannot install jq binary for unsupported platform ${kernel}"
+  exit 1
+fi
+
+log "Checking jq is installed..."
+which jq > /dev/null
+log "jq succesfully installed"
