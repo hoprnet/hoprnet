@@ -1,4 +1,4 @@
-import { encodeWithLengthPrefix, decodeWithLengthPrefix, LENGTH_PREFIX_SIZE } from './lengthPrefix'
+import { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import assert from 'assert'
