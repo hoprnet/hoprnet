@@ -39,7 +39,7 @@ elif [ "${kernel}" = "Darwin" ]; then
   log "Installing jq..."
   brew install jq
 else
-  log "cannot install jq binary for unsupported platform ${kernel}"
+  log "⛔️ cannot install jq binary for unsupported platform ${kernel}"
   exit 1
 fi
 
