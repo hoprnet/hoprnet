@@ -13,6 +13,7 @@ const verbose = Debug('hopr-connect:dialer:verbose')
 const error = Debug('hopr-connect:dialer:error')
 
 export * from './network'
+export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
 
 type MyStream = AsyncGenerator<StreamType | Buffer | string, void>
 

@@ -310,7 +310,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       if (received.done) {
         currentSource = undefined
         streamPromise = undefined
-        continue
+        break
       }
 
       result = undefined
@@ -428,7 +428,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             this.error(`Error while trying to decode JSON-encoded WebRTC message`)
           }
 
-          if (decoded != undefined) {
+          if (decoded != undefined && this.webRTC != undefined && !this.webRTC.channel.connected) {
             try {
               this.webRTC?.channel.signal(decoded as any)
             } catch (err) {
