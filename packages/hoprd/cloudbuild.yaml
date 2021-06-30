@@ -4,8 +4,8 @@ steps:
       - 'build'
       - '.'
       - '--tag=gcr.io/$PROJECT_ID/hoprd:$_HOPR_IMAGE_VERSION'
+      - '--build-arg=HOPRD_VERSION=$_HOPR_PACKAGE_VERSION'
 options:
-  env:
-    - 'HOPRD_VERSION=$_HOPR_PACKAGE_VERSION'
+  logStreamingOption: STREAM_ON
 images:
   - 'gcr.io/$PROJECT_ID/hoprd'
