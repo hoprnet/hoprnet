@@ -1,5 +1,5 @@
 import { deployments, ethers } from 'hardhat'
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import { expect } from 'chai'
 import BN from 'bn.js'
 import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory, HoprChannels, HoprToken } from '../types'
@@ -118,7 +118,7 @@ export const WIN_PROB_100 = percentToUint256(100)
 export const WIN_PROB_0 = percentToUint256(0)
 const ENOUGH_TIME_FOR_CLOSURE = 100
 const MULTI_ADDR = ethers.utils.hexlify(
-  Multiaddr('/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg').bytes
+  new Multiaddr('/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg').bytes
 )
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
@@ -435,7 +435,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
         TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
         TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
       )
-    ).to.be.revertedWith('revert ticket epoch must match')
+    ).to.be.revertedWith('ticket epoch must match')
   })
 
   it('should fail to redeem ticket when signer is not the issuer', async function () {
