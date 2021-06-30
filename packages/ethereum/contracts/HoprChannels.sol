@@ -309,13 +309,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
             require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
 
-            //require(from == account1 || from == account2, "funder must be either account1 or account2");
-
             if (amount1 > 0){
-            _fundChannel(account1, account2, amount1);
+                _fundChannel(account1, account2, amount1);
             }
             if (amount2 > 0){
-            _fundChannel(account2, account1, amount2);
+                _fundChannel(account2, account1, amount2);
             }
         }
     }
