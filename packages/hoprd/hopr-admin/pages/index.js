@@ -26,7 +26,6 @@ class TokenInput extends React.Component {
 
   render() {
     const tokenCookie = Cookies.get('X-Auth-Token')
-    console.log(tokenCookie)
     return tokenCookie === undefined ? (
       <div className="send">
         <input
@@ -55,6 +54,7 @@ export default function Home() {
     updateState({})
   }, [])
   const handleTokenSet = React.useCallback(() => {
+    connection.connect()
     updateState({})
   }, [])
 

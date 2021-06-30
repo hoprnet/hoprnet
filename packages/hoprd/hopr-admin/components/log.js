@@ -17,7 +17,6 @@ export function AbbreviatedId({ id }) {
 }
 
 export function LogLine(props) {
-  console.log(props)
   let raw = props.value.msg
   let msg = []
   let ids = []

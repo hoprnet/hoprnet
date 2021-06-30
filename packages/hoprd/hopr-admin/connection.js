@@ -9,6 +9,7 @@ const MAX_MESSAGES_CACHED = 50
 export class Connection {
   logs = []
   prevLog = ''
+  authFailed = false
 
   constructor(setConnecting, setStarted, setMessages, setConnectedPeers, onAuthFailed) {
     this.setConnecting = setConnecting
@@ -26,6 +27,10 @@ export class Connection {
 
     try {
       const msg = JSON.parse(event.data)
+      
+      this.authFailed = false
+      console.log('auth failed - false')
+
       switch (msg.type) {
         case 'log':
           if (this.logs.length > MAX_MESSAGES_CACHED) {
@@ -57,6 +62,8 @@ export class Connection {
           break
         case 'auth-failed':
           this.logs.push(msg)
+          this.authFailed = true
+          console.log('auth failed - true')
           this.setConnecting(false)
           this.onAuthFailed()
           break
@@ -117,14 +124,17 @@ export class Connection {
       this.setConnecting(true)
       this.appendMessage(' --- < Lost Connection, attempting to reconnect... > ---')
       var self = this
+      
       setTimeout(function () {
         try {
-          self.connect()
-          console.log('connection')
+          if(!self.authFailed) {
+            self.connect()          
+          }
         } catch (e) {
           console.log('Error connecting', e)
         }
       }, 1000)
+
     }
   }
 
