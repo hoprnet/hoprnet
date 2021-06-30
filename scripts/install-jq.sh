@@ -19,16 +19,19 @@ if [ "${exit_code}" = "0" ]; then
   exit 0
 fi
 
-declare kernel arch download_url bin_path
+declare kernel 
 
-bin_path="${mydir}/../.bin"
-download_url=https://github.com/vi/websocat/releases/download/v1.8.0/websocat
 kernel=$(uname -s)
-arch=$(uname -m)
 
 if [ "${kernel}" = "Linux" ]; then
-  apt-get update
-  apt-get install jq -y
+  exit_code=0
+  which apt-get > /dev/null || exit_code=$?
+  if [ "${exit_code}" != "0" ]; then
+    log "⛔️ apt-get not found"
+    exit 1
+  fi
+  sudo apt-get update
+  sudo apt-get install jq -y
 elif [ "${kernel}" = "Darwin" ]; then
   exit_code=0
   which brew > /dev/null || exit_code=$?
