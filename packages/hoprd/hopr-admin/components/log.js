@@ -61,11 +61,11 @@ export function Logs(props) {
   })
 
   let cls = styles.logs + ' ' + (props.connecting ? styles.connecting : '')
-  console.log(props.messages)
   return (
     <div className={cls}>
       <div ref={container}>
         {props.connecting && <span>Attempting to connect</span>}
+        {props.authRequired && <span>Auth Required</span>}
         {props.messages.map((x) => (
           <LogLine value={x} />
         ))}

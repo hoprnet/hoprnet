@@ -50,11 +50,13 @@ export default function Home() {
   const [peers, setConnectedPeers] = useState([])
   const [, updateState] = React.useState()
   const handleAuthFailed = React.useCallback(() => {
-    Cookies.remove('X-Auth-Token')
-    updateState({})
+    Cookies.remove('X-Auth-Token')    
+    setAuthFailed(true)
   }, [])
+  const [ authFailed, setAuthFailed ] = useState(false)
   const handleTokenSet = React.useCallback(() => {
     connection.connect()
+    setAuthFailed(false)
     updateState({})
   }, [])
 
@@ -65,7 +67,8 @@ export default function Home() {
     }
   }, [])
 
-  const isNodeReady = !connecting && started
+  const isNodeReady = !connecting && started && !authFailed
+  const cookie = Cookies.get('X-Auth-Token')
 
   return (
     <div className={styles.container}>
@@ -76,13 +79,15 @@ export default function Home() {
       <Logo onClick={() => setShowConnected(!showConnected)} />
       <h1>HOPR Logs</h1>
 
-      <Logs messages={messages} connecting={connecting} />
+      <Logs messages={messages} connecting={connecting} authRequired={authFailed} />
 
       <div className="send">
         <input id="command" type="text" autoFocus placeholder="type 'help' for full list of commands" />
-      </div>
-
-      <TokenInput handleTokenSet={handleTokenSet} />
+      </div> 
+      
+      { (authFailed || cookie === null) && 
+       <TokenInput handleTokenSet={handleTokenSet} />
+      }
 
       {showConnected && (
         <div className={styles.connectedPeers}>
