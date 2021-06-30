@@ -27,9 +27,9 @@ export class Connection {
 
     try {
       const msg = JSON.parse(event.data)
-      
+
       this.authFailed = false
-      
+
       switch (msg.type) {
         case 'log':
           if (this.logs.length > MAX_MESSAGES_CACHED) {
@@ -60,7 +60,7 @@ export class Connection {
           break
         case 'auth-failed':
           this.logs.push(msg)
-          this.authFailed = true          
+          this.authFailed = true
           this.setConnecting(false)
           this.onAuthFailed()
           break
@@ -114,25 +114,24 @@ export class Connection {
 
     client.onerror = (error) => {
       console.log('Connection error:', error)
-      this.setConnecting(false)          
+      this.setConnecting(false)
     }
 
     client.onclose = () => {
       console.log('Web socket closed')
       this.appendMessage(' --- < Lost Connection, attempting to reconnect... > ---')
       var self = this
-      
+
       setTimeout(function () {
         try {
-          if(!self.authFailed) {
-            this.setConnecting(true)      
-            self.connect()          
+          if (!self.authFailed) {
+            this.setConnecting(true)
+            self.connect()
           }
         } catch (e) {
           console.log('Error connecting', e)
         }
       }, 1000)
-
     }
   }
 

@@ -50,10 +50,10 @@ export default function Home() {
   const [peers, setConnectedPeers] = useState([])
   const [, updateState] = React.useState()
   const handleAuthFailed = React.useCallback(() => {
-    Cookies.remove('X-Auth-Token')    
+    Cookies.remove('X-Auth-Token')
     setAuthFailed(true)
   }, [])
-  const [ authFailed, setAuthFailed ] = useState(false)
+  const [authFailed, setAuthFailed] = useState(false)
   const handleTokenSet = React.useCallback(() => {
     connection.connect()
     setAuthFailed(false)
@@ -83,11 +83,9 @@ export default function Home() {
 
       <div className="send">
         <input id="command" type="text" autoFocus placeholder="type 'help' for full list of commands" />
-      </div> 
-      
-      { (authFailed || cookie === null) && 
-       <TokenInput handleTokenSet={handleTokenSet} />
-      }
+      </div>
+
+      {(authFailed || cookie === null) && <TokenInput handleTokenSet={handleTokenSet} />}
 
       {showConnected && (
         <div className={styles.connectedPeers}>
