@@ -336,12 +336,12 @@
     "@ethersproject/logger" "^5.4.0"
     "@ethersproject/rlp" "^5.4.0"
 
-"@ethersproject/asm@^5.3.0":
-  version "5.3.0"
-  resolved "https://registry.yarnpkg.com/@ethersproject/asm/-/asm-5.3.0.tgz#5d61cc9b6b89fea2c69d8257e218ccccab58893d"
-  integrity sha512-pfrzHpZ+N9S50rhlnd89Wf/irVMHUgk9xEerDCNJ+PqBJzuslI3DRkeMp8mCPBp02WOsI0/IDV3B8FVWAWhXuA==
+"@ethersproject/asm@^5.4.0":
+  version "5.4.0"
+  resolved "https://registry.yarnpkg.com/@ethersproject/asm/-/asm-5.4.0.tgz#215b66ea0c3bca17674ff07750b47ad26da39aec"
+  integrity sha512-WSw6aWNabacmlqANvU2/G00JHWmXyuQXRaT34+NiGIN3buU9o4rIp5TrEYpzipwPqHdDa/6H2OHpSsilfHdj0g==
   dependencies:
-    ethers "^5.3.0"
+    ethers "^5.4.0"
 
 "@ethersproject/base64@5.4.0", "@ethersproject/base64@^5.4.0":
   version "5.4.0"
@@ -350,7 +350,7 @@
   dependencies:
     "@ethersproject/bytes" "^5.4.0"
 
-"@ethersproject/basex@5.4.0", "@ethersproject/basex@^5.3.0", "@ethersproject/basex@^5.4.0":
+"@ethersproject/basex@5.4.0", "@ethersproject/basex@^5.4.0":
   version "5.4.0"
   resolved "https://registry.yarnpkg.com/@ethersproject/basex/-/basex-5.4.0.tgz#0a2da0f4e76c504a94f2b21d3161ed9438c7f8a6"
   integrity sha512-J07+QCVJ7np2bcpxydFVf/CuYo9mZ7T73Pe7KQY4c1lRlrixMeblauMxHXD0MPwFmUHZIILDNViVkykFBZylbg==
@@ -375,15 +375,15 @@
     "@ethersproject/logger" "^5.4.0"
 
 "@ethersproject/cli@^5.2.0":
-  version "5.3.0"
-  resolved "https://registry.yarnpkg.com/@ethersproject/cli/-/cli-5.3.0.tgz#38d0307b2d76476a7c9da7631aa82a2164402014"
-  integrity sha512-xVRfxEdzRO2E36ann03MhQGxaNNtHeB4vCrKa15fn6EEg2tXQ3GhJnLJ4fCYyaXzAIcBcf5mrO7EwCmERJ6mbw==
+  version "5.4.0"
+  resolved "https://registry.yarnpkg.com/@ethersproject/cli/-/cli-5.4.0.tgz#ac14e16e4ae7a8a64d4c47949cfd9bc071df541a"
+  integrity sha512-gs+Fe8PL4s5FLGwlo3N+jRCcDH/3yiFV+r6h8Cduzy2A3+amL/dO1kqDgfJCh1IVDTSdHiFLALdoaND+Kl3pUQ==
   dependencies:
     "@babel/parser" "7.8.4"
     "@babel/types" "7.8.3"
-    "@ethersproject/asm" "^5.3.0"
-    "@ethersproject/basex" "^5.3.0"
-    ethers "^5.3.0"
+    "@ethersproject/asm" "^5.4.0"
+    "@ethersproject/basex" "^5.4.0"
+    ethers "^5.4.0"
     scrypt-js "3.0.1"
     solc "0.7.1"
 
@@ -6001,7 +6001,7 @@ ethereumjs-wallet@^1.0.1:
     utf8 "^3.0.0"
     uuid "^3.3.2"
 
-ethers@5.4.0, ethers@^5.0.0, ethers@^5.0.1, ethers@^5.0.2, ethers@^5.1.3, ethers@^5.2.0, ethers@^5.3.0:
+ethers@5.4.0, ethers@^5.0.0, ethers@^5.0.1, ethers@^5.0.2, ethers@^5.1.3, ethers@^5.2.0, ethers@^5.4.0:
   version "5.4.0"
   resolved "https://registry.yarnpkg.com/ethers/-/ethers-5.4.0.tgz#e9fe4b39350bcce5edd410c70bd57ba328ecf474"
   integrity sha512-hqN1x0CV8VMpQ25WnNEjaMqtB3nA4DRAb2FSmmNaUbD1dF6kWbHs8YaXbVvD37FCg3GTEyc4rV9Pxafk1ByHKw==
