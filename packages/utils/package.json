@@ -39,7 +39,7 @@
     "libp2p": "0.31.7",
     "libp2p-crypto": "0.19.4",
     "memdown": "^6.0.0",
-    "multiaddr": "9.0.1",
+    "multiaddr": "^9.0.1",
     "multihashes": "~4.0.1",
     "peer-id": "0.14.8",
     "private-ip": "^2.2.1",
@@ -54,7 +54,7 @@
     "rewiremock": "^3.14.3",
     "rimraf": "^3.0.2",
     "sinon": "^11.0.0",
-    "ts-node": "^9.0.0",
+    "ts-node": "^9.1.1",
     "typedoc": "0.21.2",
     "typedoc-plugin-markdown": "3.10.2",
     "typescript": "4.3.4"

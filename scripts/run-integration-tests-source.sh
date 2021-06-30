@@ -180,7 +180,7 @@ ensure_port_is_free 19096
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
 DEVELOPMENT=true yarn hardhat node --config packages/ethereum/hardhat.config.ts \
-  --network hardhat --as-network localhost --show-stack-traces > \
+  --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
 log "Hardhat node started (127.0.0.1:8545)"

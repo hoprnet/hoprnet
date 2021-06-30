@@ -6,14 +6,15 @@ import { decode } from 'rlp'
 import { Commands } from './commands'
 import { LogStream } from './logs'
 import { AdminServer } from './admin'
-import * as yargs from 'yargs'
+import yargs from 'yargs/yargs'
+import { terminalWidth} from 'yargs'
 import setupAPI from './api'
 import { getIdentity } from './identity'
 import path from 'path'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
-const argv = yargs
+const argv = yargs(process.argv.slice(2))
   .option('network', {
     describe: 'Which network to run the HOPR node on',
     default: 'ETHEREUM',
@@ -131,7 +132,8 @@ const argv = yargs
     describe: 'weaker crypto for faster node startup',
     default: false
   })
-  .wrap(Math.min(120, yargs.terminalWidth())).argv
+  .wrap(Math.min(120, terminalWidth()))
+  .parseSync()
 
 function parseHosts(): HoprOptions['hosts'] {
   const hosts: HoprOptions['hosts'] = {}
