@@ -15,7 +15,9 @@ WORKDIR /app
 # environment variable
 # if its not given, yarn will install the latest version of the package
 ARG HOPRD_VERSION
+RUN echo "ARG HOPRD_VERSION=${HOPRD_VERSION}"
 ENV HOPRD_VERSION=${HOPRD_VERSION:-}
+RUN echo "ENV HOPRD_VERSION=${HOPRD_VERSION}"
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
