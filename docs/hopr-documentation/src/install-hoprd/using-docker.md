@@ -41,10 +41,28 @@ Before doing anything else, you need to install [Docker Desktop](https://hub.doc
 
 ## Downloading HOPRd image using Docker
 
-To use **HOPRd,** run `docker pull gcr.io/hoprassociation/hoprd` from your terminal. This process may take some time depending on your internet connection.
+All our docker images can be found in [our Google Cloud Container Registry][4].
+Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
+The `latest` tag represents the `master` branch, while the `latest-*` tags
+represent the most recent builds for `release/*` branches.
 
 ![Currently HOPRd is about ~1.25 GB, please be patient.](../../images/docker_install_macos.gif)
 
-To ensure your machine has successfully downloaded **HOPRd,** run `docker images`.You will be shown the **HOPRd** image being installed locally, ready to be run.
+```sh
+docker pull gcr.io/hoprassociation/hoprd:latest-kiautschou
+```
+
+For ease of use you can set up a shell alias to run the latest release as a docker container:
+
+```sh
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest-paphos'
+```
+
+**IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
+
+```sh
+HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
+```
+>>>>>>> d62c3e8da (Change Docker tag latest-release to latest-SOMERELEASENAME)
 
 ![HOPR Chat distributed as a Docker image](../../images/docker_images.gif)
