@@ -169,82 +169,83 @@ class WebRTCConnection implements MultiaddrConnection {
 
     await new Promise<void>((resolve) =>
       this.relayConn.sink(
-        eagerIterator(async function* (this: WebRTCConnection): Stream['source'] {
-          let result: SinkType
-
-          if (this._webRTCAvailable) {
-            yield Uint8Array.of(MigrationStatus.DONE)
-            return
-          }
-
-          while (true) {
-            console.log(`iteration`)
-            const promises: Promise<SinkType>[] = []
-
-            if (source == undefined) {
-              console.log(`sinkSourceAttached`)
-              promises.push(this._sinkSourceAttachedPromise.promise)
-            }
-
-            if (!webRTCFinished) {
-              console.log(`webrtc state`)
-              promises.push(this._switchPromise.promise)
-            }
-
-            if (source != undefined) {
-              console.log(`source`)
-              sourcePromise ??= source.next()
-              promises.push(sourcePromise)
-            }
-
-            console.log(promises)
-            // 1. Handle stream handover
-            // 2. Handle stream messages
-            result = await Promise.race(promises)
-
-            if (this._sinkSourceAttached && source == undefined) {
-              source = result as Stream['source']
-              continue
-            }
+        eagerIterator(
+          async function* (this: WebRTCConnection): Stream['source'] {
+            let result: SinkType
 
             if (this._webRTCAvailable) {
-              webRTCFinished = true
-
               yield Uint8Array.of(MigrationStatus.DONE)
-
-              break
+              return
             }
 
-            if (result == undefined && this._webRTCStateKnown) {
-              webRTCFinished = true
-              // WebRTC upgrade finished but no connection
-              // possible
-              continue
+            while (true) {
+              console.log(`iteration`)
+              const promises: Promise<SinkType>[] = []
+
+              if (source == undefined) {
+                console.log(`sinkSourceAttached`)
+                promises.push(this._sinkSourceAttachedPromise.promise)
+              }
+
+              if (!webRTCFinished) {
+                console.log(`webrtc state`)
+                promises.push(this._switchPromise.promise)
+              }
+
+              if (source != undefined) {
+                console.log(`source`)
+                sourcePromise ??= source.next()
+                promises.push(sourcePromise)
+              }
+
+              console.log(promises)
+              // 1. Handle stream handover
+              // 2. Handle stream messages
+              result = await Promise.race(promises)
+
+              if (this._sinkSourceAttached && source == undefined) {
+                source = result as Stream['source']
+                continue
+              }
+
+              if (this._webRTCAvailable) {
+                webRTCFinished = true
+
+                yield Uint8Array.of(MigrationStatus.DONE)
+
+                break
+              }
+
+              if (result == undefined && this._webRTCStateKnown) {
+                webRTCFinished = true
+                // WebRTC upgrade finished but no connection
+                // possible
+                continue
+              }
+
+              const received = result as StreamResult
+
+              if (received == undefined) {
+                this.log(`received empty message. skipping`)
+                continue
+              }
+
+              if (received.done) {
+                break
+              }
+
+              this.log(`sinking ${received.value.slice().length} bytes into relayed connection`)
+
+              sourcePromise = source!.next()
+
+              yield Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.slice()])
             }
 
-            const received = result as StreamResult
-
-            if (received == undefined) {
-              this.log(`received empty message. skipping`)
-              continue
-            }
-
-            if (received.done) {
-              break
-            }
-
-            this.log(`sinking ${received.value.slice().length} bytes into relayed connection`)
-
-            sourcePromise = source!.next()
-
-            yield Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.slice()])
-          }
-
-          resolve()
-        }.call(this)
-      ))
+            resolve()
+          }.call(this)
+        )
+      )
     )
-
 
     // Either stream is finished or WebRTC is available
 

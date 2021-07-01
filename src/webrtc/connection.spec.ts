@@ -226,6 +226,11 @@ describe('test webrtc connection', function () {
     AliceShaker.write(msgSentBackThroughWebRTC)
 
     // @ts-ignore
-    assert(u8aEquals((await pushToBob.next()).value, encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentBackThroughWebRTC]))))
+    assert(
+      u8aEquals(
+        (await pushToBob.next()).value,
+        encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentBackThroughWebRTC]))
+      )
+    )
   })
 })
