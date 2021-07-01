@@ -1,6 +1,7 @@
 /// <reference path="../@types/stream-to-it.ts" />
+/// <reference path="../@types/libp2p.ts" />
 
-import { DialOptions, MultiaddrConnection, Stream, StreamResult } from 'libp2p'
+import type { ConnectionManager, DialOptions, MultiaddrConnection, Stream, StreamResult } from 'libp2p'
 import Defer, { DeferredPromise } from 'p-defer'
 
 import type { Instance as SimplePeer } from 'simple-peer'
@@ -12,11 +13,11 @@ import type { RelayConnection } from '../relay/connection'
 import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix } from '../utils'
 import abortable from 'abortable-iterator'
-import LibP2P from 'libp2p'
 
-const _log = Debug('hopr-connect')
-const _error = Debug('hopr-connect:error')
-// const _verbose = Debug('hopr-connect:verbose')
+const DEBUG_PREFIX = `hopr-connect`
+
+const _log = Debug(DEBUG_PREFIX)
+const _error = Debug(DEBUG_PREFIX.concat(`error`))
 
 export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(3)
 
@@ -25,22 +26,27 @@ enum MigrationStatus {
   DONE
 }
 
+function getAbortableSource(source: Stream['source'], signal?: AbortSignal) {
+  if (signal != undefined) {
+    source = abortable(source, signal) as Stream['source']
+  }
+
+  return source
+}
+
 class WebRTCConnection implements MultiaddrConnection {
   private _switchPromise: DeferredPromise<void>
   private _webRTCStateKnown: boolean
   private _webRTCAvailable: boolean
-  private _destroyed: boolean
-  private _webRTCTimeout?: NodeJS.Timeout
+  private webRTCUpgradeTimeout?: NodeJS.Timeout
 
   private _sourceMigrated: boolean
   private _sinkMigrated: boolean
 
-  private _counterparty: PeerId
+  public destroyed: boolean
 
   public remoteAddr: MultiaddrConnection['remoteAddr']
   public localAddr: MultiaddrConnection['remoteAddr']
-
-  private channel: SimplePeer
 
   public sink: Stream['sink']
   public source: Stream['source']
@@ -50,21 +56,21 @@ class WebRTCConnection implements MultiaddrConnection {
   private _id: string
   private _signal?: AbortSignal
 
-  private _libp2p: LibP2P
-
   public timeline: MultiaddrConnection['timeline']
 
   // used for testing
   private __noWebRTCUpgrade?: boolean
 
   constructor(
-    opts: { conn: RelayConnection; channel: SimplePeer; self: PeerId; counterparty: PeerId; libp2p: LibP2P },
+    private counterparty: PeerId,
+    private connectionManager: ConnectionManager,
+    private relayConn: RelayConnection,
+    private channel: SimplePeer,
     options?: DialOptions & { __noWebRTCUpgrade?: boolean }
   ) {
-    this.channel = opts.channel
-    this.conn = opts.conn
+    this.conn = relayConn
 
-    this._destroyed = false
+    this.destroyed = false
     this._switchPromise = Defer<void>()
     this._webRTCStateKnown = false
     this._webRTCAvailable = false
@@ -72,12 +78,8 @@ class WebRTCConnection implements MultiaddrConnection {
     this._sourceMigrated = false
     this._sinkMigrated = false
 
-    this._libp2p = opts.libp2p
-
-    this._counterparty = opts.counterparty
-
-    this.remoteAddr = opts.conn.remoteAddr
-    this.localAddr = opts.conn.localAddr
+    this.remoteAddr = relayConn.remoteAddr
+    this.localAddr = relayConn.localAddr
 
     this._signal = options?.signal
 
@@ -95,47 +97,36 @@ class WebRTCConnection implements MultiaddrConnection {
     this.channel.once('error', errListener)
     this.channel.once('connect', () => {
       this.channel.removeListener('error', errListener)
-      this.onConnect.call(this)
+      this.onConnect()
     })
 
     this.channel.on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
       if (iceConnectionState === 'disconnected' && iceGatheringState === 'complete') {
         this.timeline.close = Date.now()
-        this._destroyed = true
+        this.destroyed = true
         // HACK, @TODO remove this
-        this._libp2p.connectionManager.connections.delete(this._counterparty.toB58String())
+        this.connectionManager.connections.delete(this.counterparty.toB58String())
       }
     })
 
-    this.source =
-      this._signal != undefined
-        ? (abortable(this.createSource(), this._signal) as Stream['source'])
-        : this.createSource()
+    this.source = getAbortableSource(this.createSource(), this._signal)
 
     this.sink = this._sink.bind(this)
 
-    this._webRTCTimeout = setTimeout(this.endWebRTCUpgrade.bind(this), WEBRTC_UPGRADE_TIMEOUT)
+    this.webRTCUpgradeTimeout = setTimeout(this.endWebRTCUpgrade.bind(this), WEBRTC_UPGRADE_TIMEOUT)
   }
 
   private log(..._: any[]) {
     _log(`WRTC [${this._id}]`, ...arguments)
   }
 
-  // private verbose(..._: any[]) {
-  //   _verbose(`RX [${this._id}]`, ...arguments)
-  // }
-
   private error(..._: any[]) {
     _error(`WRTC [${this._id}]`, ...arguments)
   }
 
-  get destroyed(): boolean {
-    return this._destroyed
-  }
-
   private endWebRTCUpgrade(err?: any) {
-    if (this._webRTCTimeout != undefined) {
-      clearTimeout(this._webRTCTimeout)
+    if (this.webRTCUpgradeTimeout != undefined) {
+      clearTimeout(this.webRTCUpgradeTimeout)
     }
 
     this.error(`ending WebRTC upgrade due error: ${err}`)
@@ -149,8 +140,8 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   private async onConnect() {
-    if (this._webRTCTimeout != undefined) {
-      clearTimeout(this._webRTCTimeout)
+    if (this.webRTCUpgradeTimeout != undefined) {
+      clearTimeout(this.webRTCUpgradeTimeout)
     }
 
     this._webRTCStateKnown = true
@@ -167,17 +158,13 @@ class WebRTCConnection implements MultiaddrConnection {
 
   private async _sink(_source: Stream['source']): Promise<void> {
     type SinkType = StreamResult | void
-    let source =
-      this._signal != undefined
-        ? (abortable(toU8aStream(_source), this._signal) as Stream['source'])
-        : toU8aStream(_source)
+
+    let source = getAbortableSource(toU8aStream(_source), this._signal)
 
     let sourcePromise = source.next()
 
-    const baseConn = this.conn as RelayConnection
-
     await new Promise<void>((resolve) =>
-      baseConn.sink(
+      this.relayConn.sink(
         async function* (this: WebRTCConnection): Stream['source'] {
           let result: SinkType
 
@@ -243,7 +230,7 @@ class WebRTCConnection implements MultiaddrConnection {
               break
             }
 
-            if (this._destroyed || this.channel.destroyed) {
+            if (this.destroyed || this.channel.destroyed) {
               yield encodeWithLengthPrefix(Uint8Array.of(MigrationStatus.DONE))
               break
             }
@@ -264,9 +251,7 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   private async *createSource(this: WebRTCConnection): Stream['source'] {
-    const baseConn = this.conn as RelayConnection
-
-    for await (const msg of baseConn.source) {
+    for await (const msg of this.relayConn.source) {
       const [migrationStatus, payload] = [msg.slice(0, 1), msg.slice(1)]
 
       if (migrationStatus[0] == MigrationStatus.DONE) {
@@ -278,8 +263,6 @@ class WebRTCConnection implements MultiaddrConnection {
         throw Error(`Invalid WebRTC migration status prefix. Got ${JSON.stringify(migrationStatus)}`)
       }
     }
-
-    this.log(`webrtc source migrated but this._sinkMigrated`, this._sinkMigrated)
 
     this._sourceMigrated = true
 
@@ -306,8 +289,6 @@ class WebRTCConnection implements MultiaddrConnection {
             done = true
             break
           }
-
-          console.log(`Getting from webRTC`, msg.slice())
 
           this.log(`Getting NOT_DONE from WebRTC - ${msg.length} bytes`)
           yield payload
@@ -337,7 +318,7 @@ class WebRTCConnection implements MultiaddrConnection {
       this.error(err)
     }
 
-    this._destroyed = true
+    this.destroyed = true
   }
 }
 
