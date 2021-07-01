@@ -274,6 +274,15 @@ jobs:
         env:
           HOPR_PACKAGE: hoprd
 
+      - name: Set latest release tag
+        id: set-latest-release-tag
+        run: |
+          # we must set the tag specific to the release to prevent overrides
+          # from other release branches
+          declare release_name=${HOPR_GITHUB_REF##refs/heads/release/}
+          declare tag="latest-${release_name}"
+          echo "::set-output name=tag::${tag}"
+
       - name: Building Docker image using Google Cloud Build
         working-directory: packages/hoprd
         run: | # TODO - actually parse semver to tag v1
@@ -302,13 +311,22 @@ jobs:
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
           HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
 
-      - name: Add tag latest-release to new Docker image on release branches
+      - name: Add tag for latest release to new Docker image on release branches
         if: ${{ !env.ACT &&  startsWith(github.ref, 'refs/heads/release/') }}
         run: |
-          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:latest-release
+          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${TAG}
         env:
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
           HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          TAG: ${{ steps.set-latest-release-tag.outputs.tag }}
+
+      - name: Verify the correct hoprd package version has been bundled
+        run: |
+          declare v=$(docker run --pull always gcr.io/hoprassociation/hoprd:${TAG} --version 2> /dev/null | sed -n '3p')
+          [ "${v}" = "${HOPR_PACKAGE_VERSION}" ]
+        env:
+          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+          TAG: ${{ steps.set-latest-release-tag.outputs.tag }}
 
   avado:
     name: Build Avado (master or release pushes)
