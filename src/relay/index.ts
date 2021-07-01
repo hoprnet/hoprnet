@@ -111,21 +111,10 @@ class Relay {
         }
       })
 
-      return new WebRTCConnection(
-        {
-          conn: newConn,
-          self: this.peerId,
-          counterparty: destination,
-          channel,
-          libp2p: {
-            connectionManager: this.connectionManager
-          } as any
-        },
-        {
-          __noWebRTCUpgrade: this.__noWebRTCUpgrade,
-          ...options
-        }
-      )
+      return new WebRTCConnection(destination, this.connectionManager, newConn, channel, {
+        __noWebRTCUpgrade: this.__noWebRTCUpgrade,
+        ...options
+      })
     } else {
       return new RelayConnection({
         stream: handshakeResult.stream,
@@ -172,18 +161,9 @@ class Relay {
         }
       })
 
-      return new WebRTCConnection(
-        {
-          conn: newConn,
-          self: this.peerId,
-          counterparty: handShakeResult.counterparty,
-          channel,
-          libp2p: {
-            connectionManager: this.connectionManager
-          } as any
-        },
-        { __noWebRTCUpgrade: this.__noWebRTCUpgrade }
-      )
+      return new WebRTCConnection(handShakeResult.counterparty, this.connectionManager, newConn, channel, {
+        __noWebRTCUpgrade: this.__noWebRTCUpgrade
+      })
     } else {
       return new RelayConnection({
         stream: handShakeResult.stream,
@@ -233,20 +213,9 @@ class Relay {
     try {
       if (this.webRTCUpgrader != undefined) {
         newConn = await this.upgrader.upgradeInbound(
-          new WebRTCConnection(
-            {
-              conn: newStream,
-              self: this.peerId,
-              counterparty,
-              channel: newStream.webRTC!.channel,
-              libp2p: {
-                connectionManager: this.connectionManager
-              } as any
-            },
-            {
-              __noWebRTCUpgrade: this.__noWebRTCUpgrade
-            }
-          )
+          new WebRTCConnection(counterparty, this.connectionManager, newStream, newStream.webRTC!.channel, {
+            __noWebRTCUpgrade: this.__noWebRTCUpgrade
+          })
         )
       } else {
         newConn = await this.upgrader.upgradeInbound(newStream)
