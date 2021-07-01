@@ -14,7 +14,7 @@ const _verbose = Debug(DEBUG_PREFIX.concat(`:verbose`))
 const _error = Debug(DEBUG_PREFIX.concat(`:error`))
 
 import { RelayPrefix, StatusMessages, ConnectionStatusMessages, isValidPrefix } from '../constants'
-import { eagerIterator } from './utils'
+import { eagerIterator } from '../utils'
 
 export const DEFAULT_PING_TIMEOUT = 300
 

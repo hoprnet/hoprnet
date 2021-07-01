@@ -1,557 +1,231 @@
+/// <reference path="../@types/it-handshake.ts" />
 /// <reference path="../@types/it-pair.ts" />
-/// <reference path="../@types/libp2p.ts" />
-/// <reference path="../@types/stream-to-it.ts" />
 
-import { WebRTCConnection, WEBRTC_UPGRADE_TIMEOUT } from './connection'
-import Peer from 'simple-peer'
+import handshake from 'it-handshake'
+import Pair from 'it-pair'
+import { Multiaddr } from 'multiaddr'
 
-const wrtc = require('wrtc')
+import { WebRTCConnection, MigrationStatus } from './connection'
+import { encodeWithLengthPrefix } from '../utils'
+import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import pushable from 'it-pushable'
 
-import { durations, u8aEquals } from '@hoprnet/hopr-utils'
-import { RelayPrefix } from '../constants'
-import { RelayContext } from '../relay/context'
-import { RelayConnection } from '../relay/connection'
-import type { Stream } from 'libp2p'
+import { EventEmitter, once } from 'events'
 import assert from 'assert'
 
-import Pair from 'it-pair'
+const Alice = privKeyToPeerId(stringToU8a(`0xf8860ccb336f4aad751f55765b4adbefc538f8560c21eed6fbc9940d0584eeca`))
+const Bob = privKeyToPeerId(stringToU8a(`0xf8860ccb336f4aad751f55765b4adbefc538f8560c21eed6fbc9940d0584eeca`))
 
-import PeerId from 'peer-id'
-import { EventEmitter } from 'events'
+describe('test webrtc connection', function () {
+  it('exchange messages without upgrade', async function () {
+    const AliceBob = Pair()
+    const BobAlice = Pair()
 
-interface DebugMessage {
-  messageId: number
-  iteration: number
-}
-
-function createPeers(amount: number): Promise<PeerId[]> {
-  return Promise.all(Array.from({ length: amount }, (_) => PeerId.create({ keyType: 'secp256k1' })))
-}
-
-describe('test overwritable connection', function () {
-  this.timeout(10000)
-  let iteration = 0
-
-  /**
-   * Starts a duplex stream that sends numbered messages and checks
-   * whether the received messages came from the same sender and in
-   * expected order.
-   * @param arg options
-   */
-  function getStream(arg: { usePrefix: boolean; designatedReceiverId?: number }): Stream {
-    let _iteration = iteration
-
-    // let lastId = -1
-    // let receiver = arg.designatedReceiverId
-
-    return {
-      source: (async function* () {
-        let i = 0
-        let msg: Uint8Array
-
-        let MSG_TIMEOUT = 10
-
-        for (; i < WEBRTC_UPGRADE_TIMEOUT / MSG_TIMEOUT + 5; i++) {
-          msg = new TextEncoder().encode(
-            JSON.stringify({
-              iteration: _iteration,
-              messageId: i
-            })
-          )
-
-          if (arg.usePrefix) {
-            yield Uint8Array.from([RelayPrefix.PAYLOAD, ...msg])
-          } else {
-            yield msg
-          }
-
-          await new Promise<void>((resolve) => setTimeout(resolve, 10))
-        }
-      })(),
-      sink: async (source: Stream['source']) => {
-        let msg: Uint8Array
-
-        for await (const _msg of source) {
-          if (_msg != null) {
-            if (arg.usePrefix) {
-              msg = _msg.slice(1)
-            } else {
-              msg = _msg.slice()
-            }
-
-            // let decoded: DebugMessage
-            try {
-              JSON.parse(new TextDecoder().decode(msg)) as DebugMessage
-            } catch {
-              console.log(msg)
-            }
-
-            // assert(decoded.messageId == lastId + 1)
-
-            // if (receiver == null) {
-            //   receiver = decoded.iteration
-            // } else {
-            //   // assert(receiver == decoded.iteration)
-            // }
-
-            // lastId = decoded.messageId
-          } else {
-            assert.fail(`received empty message`)
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Returns a SimplePeer instance that has mocks for all methods that are
-   * required by the transport module.
-   */
-  function fakeWebRTC(): Peer.Instance {
-    const peer = new EventEmitter()
-
-    // @ts-ignore
-    peer.connected = false
-
-    // @ts-ignore
-    peer.destroyed = false
-
-    // @ts-ignore
-    peer.signal = () => {}
-
-    // @ts-ignore
-    peer.destroy = () => {
-      // @ts-ignore
-      peer.destroyed = true
-    }
-
-    return peer as Peer.Instance
-  }
-
-  it('establish a WebRTC connection', async function () {
-    // Sample two parties
-    const [partyA, relay, partyB] = await createPeers(3)
-
-    const connectionA = Pair()
-    const connectionB = Pair()
-
-    // Get WebRTC instances
-    const PeerA = new Peer({ wrtc, initiator: true, trickle: true })
-    const PeerB = new Peer({ wrtc, trickle: true })
-
-    let cutConnection = false
-    // Simulated partyA
-    const ctxA = new WebRTCConnection({
-      conn: new RelayConnection({
-        stream: {
-          sink: connectionA.sink,
-          source: (async function* () {
-            for await (const msg of connectionB.source) {
-              if (cutConnection && !u8aEquals(Uint8Array.of(RelayPrefix.PAYLOAD), msg.slice())) {
-                console.log(msg)
-                throw Error(`Connection must not be used`)
-              }
-
-              yield msg
-            }
-          })()
-        },
-        self: partyA,
-        relay,
-        counterparty: partyB,
-        webRTC: {
-          channel: PeerA,
-          upgradeInbound: () => new Peer({ wrtc, trickle: true })
-        },
-        onReconnect: async () => {}
-      }),
-      libp2p: {
-        connectionManager: {
-          connections: new Map()
-        }
+    const conn = new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: BobAlice.source,
+        sink: AliceBob.sink
       } as any,
-      self: partyA,
-      counterparty: partyB,
-      channel: PeerA
-    })
-
-    const ctxB = new WebRTCConnection({
-      conn: new RelayConnection({
-        stream: {
-          sink: connectionB.sink,
-          source: (async function* () {
-            for await (const msg of connectionA.source) {
-              if (cutConnection && !u8aEquals(Uint8Array.of(RelayPrefix.PAYLOAD), msg.slice())) {
-                console.log(msg)
-                throw Error(`Connection must not be used`)
-              }
-
-              yield msg
-            }
-          })()
-        },
-        self: partyB,
-        relay,
-        counterparty: partyB,
-        webRTC: {
-          channel: PeerB,
-          upgradeInbound: () => new Peer({ wrtc, trickle: true })
-        },
-        onReconnect: async () => {}
-      }),
-      libp2p: {
-        connectionManager: {
-          connections: new Map()
-        }
-      } as any,
-      self: partyB,
-      counterparty: partyA,
-      channel: PeerB
-    })
-
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const TEST_MESSAGES = ['first', 'second', 'third'].map((x) => new TextEncoder().encode(x))
-
-    ctxA.sink(
-      (async function* () {
-        yield* TEST_MESSAGES
-      })()
+      new EventEmitter() as any
     )
 
-    cutConnection = true
+    const AliceShaker = handshake<Uint8Array>(conn)
+    const BobShaker = handshake<Uint8Array>({
+      source: AliceBob.source,
+      sink: BobAlice.sink
+    })
 
-    for await (const msg of ctxB.source) {
-      console.log(`msg received throug WebRTC`, msg)
+    const ATTEMPTS = 5
+
+    for (let i = 0; i < ATTEMPTS; i++) {
+      const firstMessage = new TextEncoder().encode(`first message`)
+      AliceShaker.write(firstMessage)
+
+      assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])))
+
+      const secondMessage = new TextEncoder().encode(`second message`)
+      BobShaker.write(Uint8Array.from([MigrationStatus.NOT_DONE, ...secondMessage]))
+
+      assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
     }
-
-    await ctxA.close()
   })
 
-  it.skip('should simulate a reconnect after a WebRTC upgrade', async function () {
-    // Sample two parties
-    const [partyA, relay, partyB] = await createPeers(3)
+  it('send DONE after webRTC connect event', async function () {
+    const AliceBob = Pair()
+    const BobAlice = Pair()
 
-    const connectionA = [Pair(), Pair()]
-    const connectionB = [Pair(), Pair()]
+    const webRTCInstance = new EventEmitter()
 
-    // Define relay - one side for A, one side for B
-    const relaySideA = new RelayContext({
-      sink: connectionA[0].sink,
-      source: connectionA[1].source
-    })
-    const relaySideB = new RelayContext({
-      sink: connectionB[0].sink,
-      source: connectionB[1].source
-    })
-
-    // Wire both sides of the relay
-    relaySideA.sink(relaySideB.source)
-    relaySideB.sink(relaySideA.source)
-
-    // Get WebRTC instances
-    const PeerA = new Peer({ wrtc, initiator: true, trickle: true })
-    const PeerB = new Peer({ wrtc, trickle: true })
-
-    // Store the id of the new sender after a reconnect
-    // @ts-ignore
-    let newSenderId: number
-
-    // Simulated partyA
-    const ctxA = new WebRTCConnection({
-      conn: new RelayConnection({
-        stream: {
-          sink: connectionA[1].sink,
-          source: connectionA[0].source
-        },
-        self: partyA,
-        relay,
-        counterparty: partyB,
-        webRTC: {
-          channel: PeerA,
-          upgradeInbound: () => new Peer({ wrtc, trickle: true })
-        },
-        onReconnect: async () => {}
-      }),
-      libp2p: {
-        connectionManager: {
-          connections: new Map()
-        }
+    new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: BobAlice.source,
+        sink: AliceBob.sink
       } as any,
-      self: partyA,
-      counterparty: partyB,
-      channel: PeerA
+      webRTCInstance as any
+    )
+
+    const BobShaker = handshake<Uint8Array>({
+      source: AliceBob.source,
+      sink: BobAlice.sink
     })
 
-    const ctx = new RelayConnection({
-      stream: {
-        sink: connectionB[1].sink,
-        source: connectionB[0].source
+    webRTCInstance.emit(`connect`)
+
+    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
+  })
+
+  it('sending messages after webRTC error event', async function () {
+    const AliceBob = Pair()
+    const BobAlice = Pair()
+
+    const webRTCInstance = new EventEmitter()
+
+    Object.assign(webRTCInstance, {
+      destroy: () => {}
+    })
+
+    const conn = new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: BobAlice.source,
+        sink: AliceBob.sink
+      } as any,
+      webRTCInstance as any
+    )
+
+    const AliceShaker = handshake<Uint8Array>(conn)
+    const BobShaker = handshake<Uint8Array>({
+      source: AliceBob.source,
+      sink: BobAlice.sink
+    })
+
+    webRTCInstance.emit(`error`)
+
+    const firstMessage = new TextEncoder().encode(`first message`)
+    AliceShaker.write(firstMessage)
+
+    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])))
+
+    const secondMessage = new TextEncoder().encode(`second message`)
+    BobShaker.write(Uint8Array.from([MigrationStatus.NOT_DONE, ...secondMessage]))
+
+    assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
+  })
+
+  it('exchange messages and send DONE after webRTC connect event', async function () {
+    const AliceBob = Pair()
+    const BobAlice = Pair()
+
+    const webRTCInstance = new EventEmitter()
+
+    const conn = new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: BobAlice.source,
+        sink: AliceBob.sink
+      } as any,
+      webRTCInstance as any
+    )
+
+    const AliceShaker = handshake<Uint8Array>(conn)
+    const BobShaker = handshake<Uint8Array>({
+      source: AliceBob.source,
+      sink: BobAlice.sink
+    })
+
+    const firstMessage = new TextEncoder().encode(`first message`)
+    AliceShaker.write(firstMessage)
+
+    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])))
+
+    const secondMessage = new TextEncoder().encode(`second message`)
+    BobShaker.write(Uint8Array.from([MigrationStatus.NOT_DONE, ...secondMessage]))
+
+    assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
+
+    console.log(`connected`)
+    webRTCInstance.emit(`connect`)
+
+    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
+  })
+
+  it.only('exchange messages through webRTC', async function () {
+    const AliceBob = Pair()
+    const BobAlice = Pair()
+
+    const push = pushable()
+    const pushToBob = pushable()
+
+    const webRTCInstance = new EventEmitter()
+
+    // Turn faked WebRTC instance into an async iterator (read) and writable stream (write)
+    Object.assign(webRTCInstance, {
+      [Symbol.asyncIterator]() {
+        return (async function* () {
+          for await (const msg of push) {
+            yield msg
+          }
+        })()
       },
-      self: partyB,
-      relay,
-      counterparty: partyB,
-      webRTC: {
-        channel: PeerB,
-        upgradeInbound: () => new Peer({ wrtc, trickle: true })
+      write(msg: Uint8Array) {
+        pushToBob.push(msg)
       },
-      onReconnect: async (newStream: RelayConnection, counterparty: PeerId) => {
-        iteration++
-
-        const demoStream = getStream({ usePrefix: false, designatedReceiverId: newSenderId })
-
-        const newConn = new WebRTCConnection({
-          conn: newStream,
-          self: partyA,
-          counterparty,
-          channel: newStream.webRTC!.channel,
-          libp2p: {
-            connectionManager: {
-              connections: new Map()
-            }
-          } as any
-        })
-
-        newConn.sink(demoStream.source)
-        demoStream.sink(newConn.source)
+      writable: true,
+      destroy() {
+        pushToBob.end()
       }
     })
 
-    // Simulated partyB
-    const ctxB = new WebRTCConnection({
-      conn: ctx,
-      self: partyB,
-      counterparty: partyA,
-      channel: PeerB,
-      libp2p: {
-        connectionManager: {
-          connections: new Map()
-        }
-      } as any
+    const conn = new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: BobAlice.source,
+        sink: AliceBob.sink,
+        remoteAddr: new Multiaddr(`/p2p/${Bob.toB58String()}`)
+      } as any,
+      webRTCInstance as any
+    )
+
+    const AliceShaker = handshake<Uint8Array>(conn)
+    const BobShaker = handshake<Uint8Array>({
+      source: AliceBob.source,
+      sink: BobAlice.sink
     })
 
-    // Start duplex streams in both directions
-    // A -> B
-    // B -> A
-    const streamA = getStream({ usePrefix: false })
-    iteration++
-    const streamB = getStream({ usePrefix: false })
+    const firstMessage = new TextEncoder().encode(`first message`)
+    AliceShaker.write(firstMessage)
 
-    // Pipe the streams
-    ctxA.sink(streamA.source)
-    streamA.sink(ctxA.source)
+    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.from([MigrationStatus.NOT_DONE, ...firstMessage])))
 
-    ctxB.sink(streamB.source)
-    streamB.sink(ctxB.source)
+    const secondMessage = new TextEncoder().encode(`second message`)
+    BobShaker.write(Uint8Array.from([MigrationStatus.NOT_DONE, ...secondMessage]))
 
-    // Initiate a reconnect after a timeout
-    // Note that this will interrupt the previous stream
-    setTimeout(async () => {
-      await ctxA.close()
-      const newConnectionA = [Pair(), Pair()]
+    assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
 
-      const newPeerA = new Peer({ wrtc, initiator: true, trickle: true })
+    console.log(`connected`)
+    webRTCInstance.emit(`connect`)
 
-      iteration++
-      const newStreamA = getStream({ usePrefix: false })
+    assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
 
-      const newConn = new WebRTCConnection({
-        conn: new RelayConnection({
-          stream: {
-            sink: newConnectionA[1].sink,
-            source: newConnectionA[0].source
-          },
-          self: partyA,
-          relay,
-          counterparty: partyB,
-          webRTC: {
-            channel: newPeerA,
-            upgradeInbound: () => new Peer({ wrtc, trickle: true })
-          },
-          onReconnect: async () => {}
-        }),
-        libp2p: {
-          connectionManager: {
-            connections: new Map()
-          }
-        } as any,
-        self: partyA,
-        counterparty: partyB,
-        channel: newPeerA
-      })
+    BobShaker.write(Uint8Array.of(MigrationStatus.DONE))
 
-      relaySideA.update({
-        sink: newConnectionA[0].sink,
-        source: newConnectionA[1].source
-      })
+    const msgSentThroughWebRTC = new TextEncoder().encode(`message that is sent through faked WebRTC`)
+    push.push(encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentThroughWebRTC])))
 
-      newSenderId = iteration
+    assert(u8aEquals((await AliceShaker.read()).slice(), msgSentThroughWebRTC))
 
-      newConn.sink(newStreamA.source)
-      newStreamA.sink(newConn.source)
-    }, 200)
+    const msgSentBackThroughWebRTC = new TextEncoder().encode(`message that is sent back through faked WebRTC`)
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 4000))
-  })
-
-  it.skip('should simulate a fallback to a relayed connection', async function () {
-    this.timeout(durations.seconds(10))
-
-    // Sample two parties
-    const [partyA, relay, partyB] = await createPeers(3)
-
-    const connectionA = [Pair(), Pair()]
-    const connectionB = [Pair(), Pair()]
-
-    // Initiate both sides of the relay - sideA, sideB
-    const relaySideA = new RelayContext({
-      sink: connectionA[0].sink,
-      source: connectionA[1].source
-    })
-
-    const relaySideB = new RelayContext({
-      sink: connectionB[0].sink,
-      source: connectionB[1].source
-    })
-
-    // Wire relay internally
-    relaySideA.sink(relaySideB.source)
-    relaySideB.sink(relaySideA.source)
-
-    // Get fake WebRTC instances to trigger a WebRTC timeout
-    const PeerA = new Peer({ wrtc, initiator: true, trickle: true })
-    const PeerB = fakeWebRTC()
+    AliceShaker.write(msgSentBackThroughWebRTC)
 
     // @ts-ignore
-    let newSenderId = -1
-
-    const ctxA = new WebRTCConnection({
-      conn: new RelayConnection({
-        stream: {
-          sink: connectionA[1].sink,
-          source: connectionA[0].source
-        },
-        self: partyA,
-        relay,
-        counterparty: partyB,
-        webRTC: {
-          channel: PeerA,
-          upgradeInbound: () => new Peer({ wrtc, trickle: true })
-        },
-        onReconnect: async () => {}
-      }),
-      libp2p: {
-        connectionManager: {
-          connections: new Map()
-        }
-      } as any,
-      self: partyA,
-      counterparty: partyB,
-      channel: PeerA
-    })
-
-    const ctx = new RelayConnection({
-      stream: {
-        sink: connectionB[1].sink,
-        source: connectionB[0].source
-      },
-      self: partyB,
-      relay,
-      counterparty: partyB,
-      webRTC: {
-        channel: PeerB,
-        upgradeInbound: () => fakeWebRTC()
-      },
-      onReconnect: async (newStream: RelayConnection, counterparty: PeerId) => {
-        iteration++
-        const demoStream = getStream({ usePrefix: false, designatedReceiverId: newSenderId })
-
-        const newConn = new WebRTCConnection({
-          conn: newStream,
-          self: partyA,
-          counterparty,
-          channel: newStream.webRTC!.channel,
-          libp2p: {
-            connectionManager: {
-              connections: new Map()
-            }
-          } as any
-        })
-
-        newConn.sink(demoStream.source)
-        demoStream.sink(newConn.source)
-
-        newStream.sink(demoStream.source)
-        demoStream.sink(newStream.source)
-      }
-    })
-
-    const ctxB = new WebRTCConnection({
-      conn: ctx,
-      self: partyB,
-      counterparty: partyA,
-      channel: PeerB,
-      libp2p: {
-        connectionManager: {
-          connections: new Map()
-        }
-      } as any
-    })
-
-    const streamA = getStream({ usePrefix: false })
-    iteration++
-    const streamB = getStream({ usePrefix: false })
-
-    ctxA.sink(streamA.source)
-    streamA.sink(ctxA.source)
-
-    ctxB.sink(streamB.source)
-    streamB.sink(ctxB.source)
-
-    setTimeout(() => {
-      const newConnectionA = [Pair(), Pair()]
-
-      const newPeerA = fakeWebRTC()
-
-      iteration++
-      const newStreamA = getStream({ usePrefix: false })
-
-      newSenderId = iteration
-
-      const newConn = new WebRTCConnection({
-        conn: new RelayConnection({
-          stream: {
-            sink: newConnectionA[1].sink,
-            source: newConnectionA[0].source
-          },
-          self: partyA,
-          relay,
-          counterparty: partyB,
-          webRTC: {
-            channel: newPeerA,
-            upgradeInbound: () => fakeWebRTC()
-          },
-          onReconnect: async () => {}
-        }),
-        libp2p: {
-          connectionManager: {
-            connections: new Map()
-          }
-        } as any,
-        self: partyA,
-        counterparty: partyB,
-        channel: newPeerA
-      })
-
-      relaySideA.update({
-        sink: newConnectionA[0].sink,
-        source: newConnectionA[1].source
-      })
-
-      newConn.sink(newStreamA.source)
-      newStreamA.sink(newConn.source)
-    }, WEBRTC_UPGRADE_TIMEOUT + 400)
-
-    await new Promise((resolve) => setTimeout(resolve, 4000))
+    assert(u8aEquals((await pushToBob.next()).value, encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentBackThroughWebRTC]))))
   })
 })

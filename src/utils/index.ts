@@ -33,6 +33,23 @@ export function toU8aStream(source: MyStream): Stream['source'] {
   })()
 }
 
+export function eagerIterator<T>(iterator: AsyncIterator<T>): AsyncGenerator<T> {
+  let result = iterator.next()
+  let received: IteratorResult<T>
+
+  return (async function* () {
+    while (true) {
+      received = await result
+
+      if (received.done) {
+        break
+      }
+      result = iterator.next()
+      yield received.value
+    }
+  })()
+}
+
 export async function dialHelper(
   libp2p: LibP2P,
   destination: PeerId,

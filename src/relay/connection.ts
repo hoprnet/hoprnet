@@ -15,8 +15,7 @@ import type PeerId from 'peer-id'
 
 import Debug from 'debug'
 import { EventEmitter } from 'events'
-import { toU8aStream } from '../utils'
-import { eagerIterator } from './utils'
+import { toU8aStream, eagerIterator } from '../utils'
 
 const _log = Debug('hopr-connect')
 const _verbose = Debug('hopr-connect:verbose')
