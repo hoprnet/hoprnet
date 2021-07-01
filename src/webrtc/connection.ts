@@ -46,7 +46,7 @@ class WebRTCConnection implements MultiaddrConnection {
   public destroyed: boolean
 
   public remoteAddr: MultiaddrConnection['remoteAddr']
-  public localAddr: MultiaddrConnection['remoteAddr']
+  public localAddr: MultiaddrConnection['localAddr']
 
   public sink: Stream['sink']
   public source: Stream['source']
@@ -54,19 +54,15 @@ class WebRTCConnection implements MultiaddrConnection {
   public conn: RelayConnection | SimplePeer
 
   private _id: string
-  private _signal?: AbortSignal
 
   public timeline: MultiaddrConnection['timeline']
-
-  // used for testing
-  private __noWebRTCUpgrade?: boolean
 
   constructor(
     private counterparty: PeerId,
     private connectionManager: ConnectionManager,
     private relayConn: RelayConnection,
     private channel: SimplePeer,
-    options?: DialOptions & { __noWebRTCUpgrade?: boolean }
+    private options?: DialOptions & { __noWebRTCUpgrade?: boolean }
   ) {
     this.conn = relayConn
 
@@ -81,17 +77,11 @@ class WebRTCConnection implements MultiaddrConnection {
     this.remoteAddr = relayConn.remoteAddr
     this.localAddr = relayConn.localAddr
 
-    this._signal = options?.signal
-
     this.timeline = {
       open: Date.now()
     }
 
     this._id = u8aToHex(randomBytes(4), false)
-
-    // used for testing
-    this.__noWebRTCUpgrade = options?.__noWebRTCUpgrade
-
     const errListener = this.endWebRTCUpgrade.bind(this)
 
     this.channel.once('error', errListener)
@@ -109,7 +99,7 @@ class WebRTCConnection implements MultiaddrConnection {
       }
     })
 
-    this.source = getAbortableSource(this.createSource(), this._signal)
+    this.source = getAbortableSource(this.createSource(), this.options?.signal)
 
     this.sink = this._sink.bind(this)
 
@@ -146,7 +136,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this._webRTCStateKnown = true
 
-    if (this.__noWebRTCUpgrade) {
+    if (this.options?.__noWebRTCUpgrade) {
       this._webRTCAvailable = false
     } else {
       this._webRTCAvailable = true
@@ -159,7 +149,7 @@ class WebRTCConnection implements MultiaddrConnection {
   private async _sink(_source: Stream['source']): Promise<void> {
     type SinkType = StreamResult | void
 
-    let source = getAbortableSource(toU8aStream(_source), this._signal)
+    let source = getAbortableSource(toU8aStream(_source), this.options?.signal)
 
     let sourcePromise = source.next()
 
