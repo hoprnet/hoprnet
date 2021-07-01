@@ -2131,6 +2131,11 @@
     "@types/minimatch" "*"
     "@types/node" "*"
 
+"@types/level-errors@*":
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/@types/level-errors/-/level-errors-3.0.0.tgz#15c1f4915a5ef763b51651b15e90f6dc081b96a8"
+  integrity sha512-/lMtoq/Cf/2DVOm6zE6ORyOM+3ZVm/BvzEZVxUhf6bgh8ZHglXlBqxbxSlJeVp8FCbD3IVvk/VbsaNmDjrQvqQ==
+
 "@types/leveldown@^4.0.2":
   version "4.0.2"
   resolved "https://registry.yarnpkg.com/@types/leveldown/-/leveldown-4.0.2.tgz#edb44a33668ae58656721bb1852345e6a2f2e42a"
@@ -2140,11 +2145,12 @@
     "@types/node" "*"
 
 "@types/levelup@^4.3.0":
-  version "4.3.1"
-  resolved "https://registry.yarnpkg.com/@types/levelup/-/levelup-4.3.1.tgz#7a53b9fd510716e11b2065332790fdf5f9b950b9"
-  integrity sha512-n//PeTpbHLjMLTIgW5B/g06W/6iuTBHuvUka2nFL9APMSVMNe2r4enADfu3CIE9IyV9E+uquf9OEQQqrDeg24A==
+  version "4.3.2"
+  resolved "https://registry.yarnpkg.com/@types/levelup/-/levelup-4.3.2.tgz#a185ecc30118bd7ee48b2d8d57de566a08d24cb2"
+  integrity sha512-5Su1Dkl6nMjkXqUb2z72gbroG0WFLs+6nMH+wQt4GWIrDwR/IconLTojHtC0klLJODCJ64Cr6P5cWqVeuxAbSg==
   dependencies:
     "@types/abstract-leveldown" "*"
+    "@types/level-errors" "*"
     "@types/node" "*"
 
 "@types/lodash@^4.14.168":
