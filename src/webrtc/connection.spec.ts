@@ -149,13 +149,12 @@ describe('test webrtc connection', function () {
 
     assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
 
-    console.log(`connected`)
     webRTCInstance.emit(`connect`)
 
     assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
   })
 
-  it.only('exchange messages through webRTC', async function () {
+  it('exchange messages through webRTC', async function () {
     const AliceBob = Pair()
     const BobAlice = Pair()
 
@@ -209,7 +208,6 @@ describe('test webrtc connection', function () {
 
     assert(u8aEquals((await AliceShaker.read()).slice(), secondMessage))
 
-    console.log(`connected`)
     webRTCInstance.emit(`connect`)
 
     assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
@@ -225,9 +223,9 @@ describe('test webrtc connection', function () {
 
     AliceShaker.write(msgSentBackThroughWebRTC)
 
-    // @ts-ignore
     assert(
       u8aEquals(
+        // @ts-ignore
         (await pushToBob.next()).value,
         encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentBackThroughWebRTC]))
       )

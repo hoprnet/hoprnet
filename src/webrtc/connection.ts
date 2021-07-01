@@ -148,8 +148,6 @@ class WebRTCConnection implements MultiaddrConnection {
       this._webRTCAvailable = true
     }
 
-    console.log(`inside connect`)
-    // @TODO could be mixed up
     this._switchPromise.resolve()
   }
 
@@ -159,7 +157,6 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   private async sinkFunction(): Promise<void> {
-    console.log(`sink called`)
     type SinkType = Stream['source'] | StreamResult | void
 
     let source: Stream['source'] | undefined
@@ -179,26 +176,21 @@ class WebRTCConnection implements MultiaddrConnection {
             }
 
             while (true) {
-              console.log(`iteration`)
               const promises: Promise<SinkType>[] = []
 
               if (source == undefined) {
-                console.log(`sinkSourceAttached`)
                 promises.push(this._sinkSourceAttachedPromise.promise)
               }
 
               if (!webRTCFinished) {
-                console.log(`webrtc state`)
                 promises.push(this._switchPromise.promise)
               }
 
               if (source != undefined) {
-                console.log(`source`)
                 sourcePromise ??= source.next()
                 promises.push(sourcePromise)
               }
 
-              console.log(promises)
               // 1. Handle stream handover
               // 2. Handle stream messages
               result = await Promise.race(promises)
@@ -308,8 +300,6 @@ class WebRTCConnection implements MultiaddrConnection {
     }
 
     if (this._webRTCAvailable) {
-      console.log(`after`)
-
       if (this._sinkMigrated) {
         this.conn = this.channel
       }
