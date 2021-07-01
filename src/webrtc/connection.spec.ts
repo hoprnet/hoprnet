@@ -10,10 +10,10 @@ import { encodeWithLengthPrefix } from '../utils'
 import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import pushable from 'it-pushable'
 
-import { EventEmitter, once } from 'events'
+import { EventEmitter } from 'events'
 import assert from 'assert'
 
-const Alice = privKeyToPeerId(stringToU8a(`0xf8860ccb336f4aad751f55765b4adbefc538f8560c21eed6fbc9940d0584eeca`))
+// const Alice = privKeyToPeerId(stringToU8a(`0xf8860ccb336f4aad751f55765b4adbefc538f8560c21eed6fbc9940d0584eeca`))
 const Bob = privKeyToPeerId(stringToU8a(`0xf8860ccb336f4aad751f55765b4adbefc538f8560c21eed6fbc9940d0584eeca`))
 
 describe('test webrtc connection', function () {

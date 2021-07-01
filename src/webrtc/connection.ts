@@ -166,7 +166,6 @@ class WebRTCConnection implements MultiaddrConnection {
     let sourcePromise: Promise<StreamResult> | undefined
 
     let webRTCFinished = false
-    let sourceAttached = false
 
     await new Promise<void>((resolve) =>
       this.relayConn.sink(
