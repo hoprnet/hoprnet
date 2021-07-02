@@ -407,7 +407,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
-    "@hoprnet/hopr-utils": 1.73
+    "@hoprnet/hopr-utils": 1.74.0-next.16
     "@types/debug": ^4.1.6
     "@types/mocha": ^8.2.2
     "@types/node": 14
@@ -440,13 +440,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-utils@npm:1.73":
-  version: 1.73.6
-  resolution: "@hoprnet/hopr-utils@npm:1.73.6"
+"@hoprnet/hopr-utils@npm:1.74.0-next.16":
+  version: 1.74.0-next.16
+  resolution: "@hoprnet/hopr-utils@npm:1.74.0-next.16"
   dependencies:
     abort-controller: ~3.0.0
     bignumber.js: ^9.0.0
     bn.js: ^5.2.0
+    bs58: ^4.0.1
     chalk: ^4.1.1
     ethers: ^5.1.3
     futoin-hkdf: ~1.3.2
@@ -456,12 +457,12 @@ __metadata:
     libp2p: 0.31.7
     libp2p-crypto: 0.19.4
     memdown: ^6.0.0
-    multiaddr: 9.0.1
+    multiaddr: ^9.0.1
     multihashes: ~4.0.1
     peer-id: 0.14.8
     private-ip: ^2.2.1
     secp256k1: ^4.0.2
-  checksum: 5368c8995972b8e2d1191a9bd3e7ecce15bd3d4e7fae88acf625159d63921416965c2feeb6a721a18ac526a4d4d798d2639a6aca7f696731e25abcc390b641f1
+  checksum: c7d29e5c41058d6cc78080f48c7c5ac81aad03ef6160e7eb803be86c44ac143b8b344d0fb768c145733252a2f366bf20a4d26f7280f2b83414ffc5160a15e98b
   languageName: node
   linkType: hard
 
@@ -952,6 +953,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"base-x@npm:^3.0.2":
+  version: 3.0.8
+  resolution: "base-x@npm:3.0.8"
+  dependencies:
+    safe-buffer: ^5.0.1
+  checksum: 9e5832ab00f4413d63f8227901c18b2a9db5f379525f70b627e6e284007dc5e7940a765ef4ab03974b4c14a664153208758656ebb86979451d1995d13e3fa29b
+  languageName: node
+  linkType: hard
+
 "base64-js@npm:^1.3.1":
   version: 1.5.1
   resolution: "base64-js@npm:1.5.1"
@@ -1082,6 +1092,15 @@ __metadata:
   version: 1.3.1
   resolution: "browser-stdout@npm:1.3.1"
   checksum: 2f91b1ad26f3401ae68801d901754331811e257aeed4ee0eb287cc2ff375c8fffadb2d14a16654eeb0729e3b1ae6d84642ba7a3119880843d774ee1db2b898b3
+  languageName: node
+  linkType: hard
+
+"bs58@npm:^4.0.1":
+  version: 4.0.1
+  resolution: "bs58@npm:4.0.1"
+  dependencies:
+    base-x: ^3.0.2
+  checksum: 0da897a0e527b31ec0fd7ce4d84a86278196acb4fa4f5010dce38a7b83b8b0bbe26909843878c2aa32bdbe00b93a68408d42c74a1cfaa05ca64f29bd5dff4187
   languageName: node
   linkType: hard
 
@@ -3256,7 +3275,7 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"multiaddr@npm:9.0.1, multiaddr@npm:^9.0.1":
+"multiaddr@npm:^9.0.1":
   version: 9.0.1
   resolution: "multiaddr@npm:9.0.1"
   dependencies:

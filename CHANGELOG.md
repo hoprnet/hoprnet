@@ -1,3 +1,17 @@
+<a name="0.2.30"></a>
+
+## [0.2.30](https://github.com/hoprnet/hopr-connect/compare/v0.2.29...v0.2.30) (2021-07-02)
+
+Bugfix release
+
+- see (#193) for improvements and bugfixes
+- stricter testing
+- improved socket tracking
+- show meaningful message when connecting to wrong node
+- show available addresses (#187)
+- limit STUN request to reasonable amount (#185)
+- package upgrades (#204)
+
 <a name="0.2.29"></a>
 
 ## [0.2.29](https://github.com/hoprnet/hopr-connect/compare/v0.2.28...v0.2.29) (2021-06-15)
