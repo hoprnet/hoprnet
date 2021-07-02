@@ -17,7 +17,6 @@ Hopr-ethereum contains the on-chain logic that is used to process payments for [
 - [Testing](#testing)
 - [Coverage](#coverage)
 - [Migrating](#migrating)
-- [Audit status](#audit-status)
 - [HoprToken](#hoprtoken)
 - [HoprChannel](#hoprchannel)
 - [Linting](#linting)
@@ -71,12 +70,6 @@ yarn network
 # public migration
 yarn migrate --network matic
 ```
-
-# Audit status
-
-- ✅ [HoprToken](./contracts/HoprToken.sol)
-- ✅ [HoprDistributor](./contracts/HoprDistributor.sol)
-- [HoprChannels](./contracts/HoprChannels.sol)
 
 # HoprToken
 
