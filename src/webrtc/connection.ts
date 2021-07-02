@@ -306,7 +306,7 @@ class WebRTCConnection implements MultiaddrConnection {
         break
       }
     }
-    
+
     if (!this._webRTCHandshakeFinished) {
       await this._switchPromise.promise
     }
