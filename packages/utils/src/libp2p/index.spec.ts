@@ -11,7 +11,7 @@ import {
   LibP2PHandlerArgs
 } from '.'
 import BL from 'bl'
-import Defer from 'p-defer'
+import { Defer } from '../defer'
 import { u8aEquals } from '../u8a'
 import { Multiaddr } from 'multiaddr'
 
@@ -80,7 +80,7 @@ describe(`test libp2pSendMessage`, function () {
     const msgToReceive = new TextEncoder().encode(`This message should be received.`)
 
     const desintation = await PeerId.create({ keyType: 'secp256k1' })
-    const msgReceived = Defer()
+    const msgReceived = new Defer()
 
     const fakeLibp2p = {
       dialProtocol(destination: Multiaddr, protocol: string, ..._opts: any[]): Promise<LibP2PHandlerArgs> {
@@ -129,9 +129,9 @@ describe(`test libp2pSendMessageAndExpectResponse`, function () {
 
     const desintation = await PeerId.create({ keyType: 'secp256k1' })
 
-    const msgReceived = Defer()
+    const msgReceived = new Defer()
 
-    const waitUntilSend = Defer()
+    const waitUntilSend = new Defer()
 
     const fakeLibp2p = {
       dialProtocol(destination: Multiaddr, protocol: string, ..._opts: any[]): Promise<LibP2PHandlerArgs> {
@@ -192,8 +192,8 @@ describe(`test libp2pSubscribe`, async function () {
 
     const remotePeer = await PeerId.create({ keyType: 'secp256k1' })
 
-    let msgReceived = Defer()
-    let msgReplied = Defer()
+    let msgReceived = new Defer()
+    let msgReplied = new Defer()
 
     const fakeOnMessage = async (msg: Uint8Array) => {
       if (u8aEquals(msg, msgToReceive)) {
@@ -242,7 +242,7 @@ describe(`test libp2pSubscribe`, async function () {
 
     const remotePeer = await PeerId.create({ keyType: 'secp256k1' })
 
-    let msgReceived = Defer()
+    let msgReceived = new Defer()
 
     const fakeOnMessage = async (msg: Uint8Array) => {
       await new Promise((resolve) => setTimeout(resolve, 50))

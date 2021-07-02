@@ -64,15 +64,16 @@ function cleanup {
 
   trap - SIGINT SIGTERM ERR EXIT
 
+  # at this point we don't want to fail hard anymore
+  set +Eeuo pipefail
+
   # Cleaning up everything
   log "Wiping databases"
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}"
 
   log "Cleaning up processes"
   for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096; do
-    if lsof -i ":${port}" -s TCP:LISTEN; then
-      lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
-    fi
+    lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
   exit $EXIT_CODE

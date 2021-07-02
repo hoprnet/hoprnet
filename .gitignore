@@ -20,3 +20,12 @@ packages/ethereum/types/
 packages/ethereum/lib/types/
 packages/utils/lib/types/
 /types/
+
+# yarn v2 specific
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*

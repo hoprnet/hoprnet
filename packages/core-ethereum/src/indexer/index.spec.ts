@@ -5,9 +5,8 @@ import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
 import Indexer from '.'
-import { stringToU8a, Address, ChannelEntry, Hash, HoprDB, generateChannelId, ChannelStatus } from '@hoprnet/hopr-utils'
+import { stringToU8a, Address, ChannelEntry, Defer, Hash, HoprDB, generateChannelId, ChannelStatus } from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
-import Defer from 'p-defer'
 import * as fixtures from './fixtures'
 import { CHANNEL_ID, PARTY_A, PARTY_B } from '../fixtures'
 import { BigNumber } from 'ethers'
@@ -226,7 +225,7 @@ describe('test indexer', function () {
     newEvent(fixtures.OPENED_EVENT)
     newBlock()
 
-    const blockMined = Defer()
+    const blockMined = new Defer()
 
     indexer.on('block-processed', (blockNumber: number) => {
       if (blockNumber === 4) blockMined.resolve()
@@ -288,7 +287,7 @@ describe('test indexer', function () {
 
     assert.strictEqual(indexer.status, 'stopped')
 
-    const started = Defer()
+    const started = new Defer()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
@@ -306,7 +305,7 @@ describe('test indexer', function () {
 
     hoprChannels.emit('error', new Error('MOCK'))
 
-    const started = Defer()
+    const started = new Defer()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
@@ -321,10 +320,10 @@ describe('test indexer', function () {
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
 
-    const opened = Defer()
-    const commitmentSet = Defer()
-    const pendingIniated = Defer()
-    const closed = Defer()
+    const opened = new Defer()
+    const commitmentSet = new Defer()
+    const pendingIniated = new Defer()
+    const closed = new Defer()
 
     indexer.on('own-channel-updated', (channel: ChannelEntry) => {
       switch (channel.status) {

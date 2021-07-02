@@ -192,7 +192,7 @@ hoprd
 ## Develop
 
 ```sh
-yarn          # Install lerna and sets project up
+yarn          # Install dependencies and sets up workspces
 yarn build    # Builds contracts, clients, etc
 
 # starting network
