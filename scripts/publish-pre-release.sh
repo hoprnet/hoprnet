@@ -20,6 +20,10 @@ npm_package=$(${mydir}/get-npm-package-info.sh)
 # identify version type
 test -n "${npm_package}" && version_type="preminor" || version_type="prerelease"
 
+# ensure the build is up-to-date
+yarn
+yarn build
+
 # create new version in each package, and tag in Git
 npx lerna version "${version_type}" --yes --exact --no-push --no-changelog \
   --preid next -m "chore(release): publish %s"

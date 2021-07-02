@@ -34,10 +34,11 @@ jobs:
         run: ./scripts/configure-git-info.sh
 
       - name: '[SETUP] Use Node.js'
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v2.3.0
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
+          cache: yarn
 
       - name: '[SETUP] Install Yarn (only when using ACT)'
         if: ${{ env.ACT == 'true' }}
@@ -46,23 +47,6 @@ jobs:
           echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
           apt update
           apt install --no-install-recommends yarn
-
-      - name: '[SETUP] Get yarn cache directory path'
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
-
-      - name: '[SETUP] Restore cache of node modules and yarn cache'
-        uses: actions/cache@v2
-        if: ${{ !env.ACT }}
-        id: nodejs-cache
-        with:
-          path: |
-            node_modules
-            */*/node_modules
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-nodejs-
 
       - name: '[BUILD] Install dependencies / link / build'
         run: |
@@ -317,7 +301,7 @@ jobs:
           cat ./dappnode_package.json | grep 'version'
           sudo avadosdk build --provider http://80.208.229.228:5001
           git add dappnode_package.json docker-compose.yml releases.json
-          git commit -m "Avado CI: new release"
+          git commit -m "chore(release): publish Avado ${AVADO_VERSION}"
           # http://go.ava.do/install/<IPFS HASH>
 
       - name: Commit & Push changes
@@ -346,10 +330,11 @@ jobs:
         run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js 16
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v2.3.0
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
+          cache: yarn
 
       - name: Setup Google Cloud Credentials
         uses: google-github-actions/setup-gcloud@v0.2.1

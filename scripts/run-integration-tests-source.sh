@@ -68,6 +68,9 @@ function cleanup {
   trap - SIGINT SIGTERM ERR EXIT
   set +Eeuo pipefail
 
+  # at this point we don't want to fail hard anymore
+  set +Eeuo pipefail
+
   # Cleaning up everything
   log "Wiping databases"
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}"
@@ -145,7 +148,7 @@ function fund_node() {
   fi
 
   log "Funding 1 ETH and 1 HOPR to ${eth_address}"
-  yarn hardhat faucet --config packages/ethereum/hardhat.config.ts \
+  yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
     --address "${eth_address}" --network localhost --ishopraddress true
 }
 
@@ -197,7 +200,7 @@ ensure_port_is_free 19096
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-DEVELOPMENT=true yarn hardhat node --config packages/ethereum/hardhat.config.ts \
+DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
