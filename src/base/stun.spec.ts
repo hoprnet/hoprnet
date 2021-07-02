@@ -1,7 +1,7 @@
 import dgram from 'dgram'
 import type { Socket, RemoteInfo } from 'dgram'
 import { getExternalIp, handleStunRequest, DEFAULT_PARALLEL_STUN_CALLS, PUBLIC_STUN_SERVERS } from './stun'
-import { nodeToMultiaddr } from './utils'
+import { nodeToMultiaddr } from '../utils'
 import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
 import { once } from 'events'

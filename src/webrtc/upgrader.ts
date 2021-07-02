@@ -8,6 +8,9 @@ const wrtc = require('wrtc')
 const error = debug('hopr-connect:error')
 const verbose = debug('hopr-connect:verbose:webrtc')
 
+/**
+ * Encapsulate configuration used to create WebRTC instances
+ */
 class WebRTCUpgrader {
   private _stunServers?: {
     iceServers?: {
@@ -24,14 +27,30 @@ class WebRTCUpgrader {
     }
   }
 
+  /**
+   * Creates an outbound instance of WebRTC
+   * @param _signal @TODO implement this
+   * @returns the WebRTC instance
+   */
   upgradeOutbound(_signal?: AbortSignal) {
     return this._connect(true)
   }
 
+  /**
+   * Creates an inbound instance of WebRTC
+   * @param _signal @TODO implement this
+   * @returns the WebRTC instance
+   */
   upgradeInbound(_signal?: AbortSignal) {
     return this._connect(false)
   }
 
+  /**
+   * Creates a configured WebRTC
+   * @param initiator true if initiator
+   * @param signal abort signal
+   * @returns a configured WebRTC instance
+   */
   private _connect(initiator: boolean, signal?: AbortSignal) {
     const channel = new SimplePeer({
       wrtc,

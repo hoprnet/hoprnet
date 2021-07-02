@@ -1,11 +1,11 @@
-/// <reference path="./@types/stream-to-it.ts" />
-/// <reference path="./@types/libp2p.ts" />
+/// <reference path="../@types/stream-to-it.ts" />
+/// <reference path="../@types/libp2p.ts" />
 
 import net from 'net'
 import abortable, { AbortError } from 'abortable-iterator'
 import type { Socket, AddressInfo } from 'net'
 import Debug from 'debug'
-import { nodeToMultiaddr } from './utils'
+import { nodeToMultiaddr } from '../utils'
 import { once } from 'events'
 
 const log = Debug('hopr-connect:tcp')
@@ -17,7 +17,7 @@ export const SOCKET_CLOSE_TIMEOUT = 1000
 import type { MultiaddrConnection, Stream, DialOptions, StreamType } from 'libp2p'
 import { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
-import { toU8aStream } from './utils'
+import { toU8aStream } from '../utils'
 import { PeerId } from 'libp2p-interfaces'
 
 /**

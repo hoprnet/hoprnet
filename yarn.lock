@@ -416,9 +416,11 @@ __metadata:
     abortable-iterator: ^3.0.0
     bl: ^5.0
     debug: ^4.3.1
+    heap-js: ^2.1.5
     it-handshake: ^2.0.0
     it-pair: ^1.0.0
     it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
     libp2p: ^0.31.6
     libp2p-interfaces: ^0.11
     libp2p-mplex: 0.10
@@ -1978,6 +1980,13 @@ fsevents@~2.3.1:
   bin:
     he: bin/he
   checksum: 212122003c20c8c17ac0c83a419b4c8e835411ff6ab9195d053ea6e4a0597cc005b5b8eabcbd57b0b0c0fe676f0049e09315845fff4e051198845491cbba260e
+  languageName: node
+  linkType: hard
+
+"heap-js@npm:^2.1.5":
+  version: 2.1.5
+  resolution: "heap-js@npm:2.1.5"
+  checksum: 11b094e1062f0c8223cc6f0b9067f77a71b5428f90bbc741c2d28162655859e3a9abde802e82e9cb12c54de45600bc12f3906c62e3cf5afe132eed2b1516abfc
   languageName: node
   linkType: hard
 

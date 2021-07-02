@@ -31,26 +31,35 @@ const encoder = new TextEncoder()
 
 export const OK = encoder.encode('OK')
 export const FAIL = encoder.encode('FAIL')
-export const FAIL_COULD_NOT_REACH_COUNTERPARTY = encoder.encode('FAIL_COULD_NOT_REACH_COUNTERPARTY')
-export const FAIL_COULD_NOT_IDENTIFY_PEER = encoder.encode('FAIL_COULD_NOT_IDENTIFY_INITIATOR')
-export const FAIL_LOOPBACKS_ARE_NOT_ALLOWED = encoder.encode('FAIL_LOOPBACKS_ARE_NOT_ALLOWED')
-export const FAIL_INVALID_PUBLIC_KEY = encoder.encode('FAIL_INVALID_PUBLIC_KEY')
 
-export const STOP = encoder.encode('STOP')
-export const RESTART = encoder.encode('RESTART')
-export const PING = encoder.encode('PING')
-export const PONG = encoder.encode('PONG')
+export enum StatusMessages {
+  PING,
+  PONG
+}
 
-export const RELAY_PAYLOAD_PREFIX = Uint8Array.from([0])
-export const RELAY_STATUS_PREFIX = Uint8Array.from([1])
-export const RELAY_WEBRTC_PREFIX = Uint8Array.from([2])
-export const RELAY_CONNECTION_STATUS_PREFIX = Uint8Array.from([3])
-export const VALID_PREFIXES = [
-  ...RELAY_PAYLOAD_PREFIX,
-  ...RELAY_STATUS_PREFIX,
-  ...RELAY_WEBRTC_PREFIX,
-  ...RELAY_CONNECTION_STATUS_PREFIX
-]
+export enum ConnectionStatusMessages {
+  STOP,
+  RESTART
+}
+
+export enum RelayPrefix {
+  PAYLOAD,
+  STATUS_MESSAGE,
+  CONNECTION_STATUS,
+  WEBRTC_SIGNALLING
+}
+
+export function isValidPrefix(prefix: RelayPrefix): boolean {
+  switch (prefix) {
+    case RelayPrefix.PAYLOAD:
+    case RelayPrefix.STATUS_MESSAGE:
+    case RelayPrefix.CONNECTION_STATUS:
+    case RelayPrefix.WEBRTC_SIGNALLING:
+      return true
+    default:
+      return false
+  }
+}
 
 export const RELAY = `/${NAME}/relay/${version}`
 export const DELIVERY = `/${NAME}/delivery/${version}`

@@ -1,25 +1,21 @@
 /// <reference path="./@types/libp2p.ts" />
 
 import debug from 'debug'
-import Listener from './listener'
-import { CODE_IP4, CODE_IP6, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
+import { CODE_IP4, CODE_IP6, CODE_P2P, USE_WEBRTC } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
-import type libp2p from 'libp2p'
-import type { Dialer, Upgrader, DialOptions, ConnHandler, Handler, ConnectionManager } from 'libp2p'
+import type { Upgrader, DialOptions, ConnHandler, default as libp2p } from 'libp2p'
 import { Transport, Connection } from 'libp2p-interfaces'
 import chalk from 'chalk'
-import { TCPConnection } from './tcp'
+import { TCPConnection, Listener } from './base'
 import { WebRTCUpgrader } from './webrtc'
-import Relay from './relay'
-import { WebRTCConnection } from './webRTCConnection'
-import type { RelayConnection } from './relayConnection'
+import { Relay } from './relay'
 import { Discovery } from './discovery'
 import { Filter } from './filter'
+import { dialHelper } from './utils'
 
 const log = debug('hopr-connect')
-const error = debug('hopr-connect:error')
 const verbose = debug('hopr-connect:verbose')
 
 /**
@@ -39,8 +35,6 @@ class HoprConnect implements Transport {
   private relays?: Multiaddr[]
   private stunServers?: Multiaddr[]
   private _relay: Relay
-  private _connectionManager: ConnectionManager
-  private _dialer: Dialer
   private _webRTCUpgrader?: WebRTCUpgrader
   private _interface?: string
   private _addressFilter: Filter
@@ -113,8 +107,6 @@ class HoprConnect implements Transport {
     this._addressFilter = new Filter(this._peerId)
 
     this._upgrader = opts.upgrader
-    this._connectionManager = opts.libp2p.connectionManager
-    this._dialer = opts.libp2p.dialer
     this._interface = opts.interface
 
     if (USE_WEBRTC) {
@@ -123,9 +115,18 @@ class HoprConnect implements Transport {
 
     this.discovery = new Discovery()
 
-    opts.libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
-
-    this._relay = new Relay(opts.libp2p, this._webRTCUpgrader, opts.__noWebRTCUpgrade)
+    this._relay = new Relay(
+      (peer: PeerId, protocol: string, options: { timeout: number } | { signal: AbortSignal }) =>
+        dialHelper(opts.libp2p, peer, protocol, options as any),
+      opts.libp2p.dialer,
+      opts.libp2p.connectionManager,
+      opts.libp2p.handle.bind(opts.libp2p),
+      this._peerId,
+      this._upgrader,
+      this.connHandler,
+      this._webRTCUpgrader,
+      opts.__noWebRTCUpgrade
+    )
 
     // Used for testing
     this.__noDirectConnections = opts.__noDirectConnections
@@ -135,7 +136,10 @@ class HoprConnect implements Transport {
       const { version } = require('../package.json')
 
       log(`HoprConnect:`, version)
-    } catch {}
+    } catch {
+      console.error(`Cannot find package.json to load version tag. Exitting.`)
+      return
+    }
 
     if (this.__noDirectConnections) {
       verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
@@ -151,6 +155,18 @@ class HoprConnect implements Transport {
         .join(',')})`
     )
   }
+
+  /**
+   * Adds a relay to the list of usable relays
+   * @TODO to be implemented
+   */
+  addRelay() {}
+
+  /**
+   * Removes a relay from the list of usable relays
+   * @TODO to be implemented
+   */
+  removeRelay() {}
 
   /**
    * Tries to establish a connection to the given destination
@@ -170,7 +186,7 @@ class HoprConnect implements Transport {
     // This works because destination peerId is for both address
     // types at the third place.
     // Other addresses are not supported.
-    const destination = PeerId.createFromBytes((maTuples[2][1] as unknown as Uint8Array).slice(1))
+    const destination = PeerId.createFromBytes((maTuples[2][1] as Uint8Array).slice(1))
 
     if (destination.equals(this._peerId)) {
       throw new AbortError(`Cannot dial ourself`)
@@ -185,11 +201,11 @@ class HoprConnect implements Transport {
 
         return await this.dialDirectly(ma, options)
       case CODE_P2P:
-        const relay = PeerId.createFromBytes((maTuples[0][1] as unknown as Uint8Array).slice(1))
+        const relay = PeerId.createFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
         return await this.dialWithRelay(relay, destination, options)
       default:
-        throw new AbortError(`Protocol not supported`)
+        throw new AbortError(`Protocol not supported. Given address: ${ma.toString()}`)
     }
   }
 
@@ -245,7 +261,7 @@ class HoprConnect implements Transport {
    * @param options optional dial options
    */
   private async dialWithRelay(relay: PeerId, destination: PeerId, options?: DialOptions): Promise<Connection> {
-    let conn = await this._relay.connect(relay, destination, this.onReconnect.bind(this), options)
+    let conn = await this._relay.connect(relay, destination, options)
 
     if (conn == undefined) {
       throw Error(`Could not establish relayed connection.`)
@@ -266,73 +282,6 @@ class HoprConnect implements Transport {
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
     return await this._upgrader.upgradeOutbound(maConn)
-  }
-
-  /**
-   * Dialed once a reconnect happens
-   * @param newStream new relayed connection
-   * @param counterparty counterparty of the relayed connection
-   */
-  private async onReconnect(this: HoprConnect, newStream: RelayConnection, counterparty: PeerId): Promise<void> {
-    log(`####### inside reconnect #######`)
-
-    let newConn: Connection
-
-    try {
-      if (this._webRTCUpgrader != undefined) {
-        newConn = await this._upgrader.upgradeInbound(
-          new WebRTCConnection(
-            {
-              conn: newStream,
-              self: this._peerId,
-              counterparty,
-              channel: newStream.webRTC!.channel,
-              libp2p: {
-                connectionManager: this._connectionManager
-              } as any
-            },
-            {
-              __noWebRTCUpgrade: this.__noWebRTCUpgrade
-            }
-          )
-        )
-      } else {
-        newConn = await this._upgrader.upgradeInbound(newStream)
-      }
-    } catch (err) {
-      error(err)
-      return
-    }
-
-    this._dialer._pendingDials[counterparty.toB58String()]?.destroy()
-    this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
-
-    this.connHandler?.(newConn)
-  }
-
-  /**
-   * Called once a relayed connection is establishing
-   * @param handler handles the relayed connection
-   */
-  private async handleIncoming(this: HoprConnect, handler: Handler): Promise<void> {
-    let newConn: Connection
-
-    try {
-      const relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect.bind(this))
-
-      if (relayConnection == undefined) {
-        return
-      }
-
-      newConn = await this._upgrader.upgradeInbound(relayConnection)
-    } catch (err) {
-      error(`Could not upgrade relayed connection. Error was: ${err}`)
-      return
-    }
-
-    this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])
-
-    this.connHandler?.(newConn)
   }
 
   /**
