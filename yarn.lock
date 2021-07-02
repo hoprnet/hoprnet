@@ -407,8 +407,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
-    "@hoprnet/hopr-utils": 1.71.0-next.145
-    "@types/debug": ^4.1.5
+    "@hoprnet/hopr-utils": 1.73
+    "@types/debug": ^4.1.6
     "@types/mocha": ^8.2.2
     "@types/node": 14
     "@types/simple-peer": ^9.11
@@ -426,23 +426,23 @@ __metadata:
     libp2p-mplex: 0.10
     libp2p-noise: ^3.0
     mocha: ^9.0
-    multiaddr: ~9.0.1
+    multiaddr: ~9.0.2
     multihashes: ^4.0.2
     p-defer: 3
     peer-id: ~0.14.8
-    prettier: ~2.3.1
+    prettier: ~2.3.2
     simple-peer: 9.11
     stream-to-it: ^0.2.3
-    ts-node: ~9.1.1
-    typescript: ^4.2
+    ts-node: ~10.0.0
+    typescript: ^4.3
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-utils@npm:1.71.0-next.145":
-  version: 1.71.0-next.145
-  resolution: "@hoprnet/hopr-utils@npm:1.71.0-next.145"
+"@hoprnet/hopr-utils@npm:1.73":
+  version: 1.73.6
+  resolution: "@hoprnet/hopr-utils@npm:1.73.6"
   dependencies:
     abort-controller: ~3.0.0
     bignumber.js: ^9.0.0
@@ -453,15 +453,15 @@ __metadata:
     it-pipe: ^1.1.0
     leveldown: ^6.0.0
     levelup: ^5.0.0
-    libp2p: 0.31.3
+    libp2p: 0.31.7
     libp2p-crypto: 0.19.4
     memdown: ^6.0.0
     multiaddr: 9.0.1
     multihashes: ~4.0.1
     peer-id: 0.14.8
+    private-ip: ^2.2.1
     secp256k1: ^4.0.2
-    strip-ansi: ^7.0.0
-  checksum: 729c74d362999bc8f5446ea57dacf4bc65f34b83f2845c327bdef9784445a287fdb1b402b96490abab74be0238926240dc05cb1b4903f79bda878d05d87bc408
+  checksum: 5368c8995972b8e2d1191a9bd3e7ecce15bd3d4e7fae88acf625159d63921416965c2feeb6a721a18ac526a4d4d798d2639a6aca7f696731e25abcc390b641f1
   languageName: node
   linkType: hard
 
@@ -595,6 +595,34 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tsconfig/node10@npm:^1.0.7":
+  version: 1.0.8
+  resolution: "@tsconfig/node10@npm:1.0.8"
+  checksum: 0336493b89fb7c06409a1247a3fb00fac2755f21f3f8ae4b9dd2457859abfc5e8ca42b6d9ca5a279fe81bc70fe1f3450eef61e5dd5a63a7b4a6946ff31874816
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node12@npm:^1.0.7":
+  version: 1.0.9
+  resolution: "@tsconfig/node12@npm:1.0.9"
+  checksum: 5532bfb5df47ed3a507da533c731a2fb80ee2e886edadbf20e664dcd3172d5c159577a281d15733b8d0c30bfa4e6b48496bef0704192c085520bc76bb9938068
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node14@npm:^1.0.0":
+  version: 1.0.1
+  resolution: "@tsconfig/node14@npm:1.0.1"
+  checksum: d0068287dba46dc98e7d49c229b0fee034fbac2bb4bc2efe12cc67227a1c68ec0728ca1e535dff7f033f7455de6c67e9b8f9d90f4fc3bb07c0d9ac08186fe65c
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node16@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "@tsconfig/node16@npm:1.0.1"
+  checksum: c389a4a81c291a27b96705de7fbe46d29aa4eb771450a41dfc075d89e1fdd63141898043a0d9f627460a1c409d06635a044dc4b3a4516173769a7d0a1558c51d
+  languageName: node
+  linkType: hard
+
 "@types/bl@npm:^2.1.0":
   version: 2.1.0
   resolution: "@types/bl@npm:2.1.0"
@@ -613,10 +641,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/debug@npm:^4.1.5":
-  version: 4.1.5
-  resolution: "@types/debug@npm:4.1.5"
-  checksum: 416ad24bc589be0fb8c78bea972aa7d4ffdf6b136239701b1792674463b2dbf8c6707f6055ec484f79ec1f2b528ffef90c87e55df7e4a0f458184cad5bf0cfc8
+"@types/debug@npm:^4.1.6":
+  version: 4.1.6
+  resolution: "@types/debug@npm:4.1.6"
+  checksum: f2816703a81f2cecb9fe575ed73f69378f190f92e49aab01b5b1832166cd89b19d4e85999c955f8993d3dba36e78ffd1ac5f697449eff13a6a13de309dc6e0f5
   languageName: node
   linkType: hard
 
@@ -784,13 +812,6 @@ __metadata:
   version: 5.0.0
   resolution: "ansi-regex@npm:5.0.0"
   checksum: cbd9b5c9dbbb4a949c2a6e93f1c6cc19f0683d8a4724d08d2158627be6d373f0f3ba1f4ada01dce7ee141f2ba2628fbbd29932c7d49926e3b630c7f329f3178b
-  languageName: node
-  linkType: hard
-
-"ansi-regex@npm:^6.0.0":
-  version: 6.0.0
-  resolution: "ansi-regex@npm:6.0.0"
-  checksum: 69b395ba2c6b38957a0540561c5db0dc1a7f55d9432752628a59942645c0f145dabe2963bc4e57a1c921cd15a90722a46be2cea0b556ae74e16e09548c3f7ffc
   languageName: node
   linkType: hard
 
@@ -2855,9 +2876,9 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.31.3":
-  version: 0.31.3
-  resolution: "libp2p@npm:0.31.3"
+"libp2p@npm:0.31.7":
+  version: 0.31.7
+  resolution: "libp2p@npm:0.31.7"
   dependencies:
     "@motrix/nat-api": ^0.3.1
     "@vascosantos/moving-average": ^1.1.0
@@ -2873,7 +2894,6 @@ fsevents@~2.3.1:
     events: ^3.3.0
     hashlru: ^2.3.0
     interface-datastore: ^4.0.0
-    ipfs-utils: ^7.0.0
     it-all: ^1.0.4
     it-buffer: ^0.1.2
     it-drain: ^1.0.3
@@ -2909,8 +2929,9 @@ fsevents@~2.3.1:
     streaming-iterables: ^5.0.2
     timeout-abort-controller: ^1.1.1
     varint: ^6.0.0
+    wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: bd2808542b0dd1674e81a58886d3588adebcda60c0d82f2dbf8d4c540722f04590d0d396ba72ed9e07b0f4b2eefead2931c16510eaa6eff94415b64c61db8a05
+  checksum: a749b8098c9e8a5346b1429cc1b42a374cca3dd5f4ff4a1a0d635d197d099e24b1ecd0cbdd0a713230f9dfa09a9889aa129349412ef1cad87ddc6c0193116707
   languageName: node
   linkType: hard
 
@@ -3235,7 +3256,7 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"multiaddr@npm:9.0.1, multiaddr@npm:^9.0.1, multiaddr@npm:~9.0.1":
+"multiaddr@npm:9.0.1, multiaddr@npm:^9.0.1":
   version: 9.0.1
   resolution: "multiaddr@npm:9.0.1"
   dependencies:
@@ -3247,6 +3268,21 @@ fsevents@~2.3.1:
     uint8arrays: ^2.1.3
     varint: ^6.0.0
   checksum: 02bf29e6baf6dd3eae2def81da00e171de28c35f7ed8e4383d67207045f1da93c300304713a36e9f275046cb80b84c30fb0215e9a3eb390deb759bab5a71c594
+  languageName: node
+  linkType: hard
+
+"multiaddr@npm:~9.0.2":
+  version: 9.0.2
+  resolution: "multiaddr@npm:9.0.2"
+  dependencies:
+    cids: ^1.0.0
+    dns-over-http-resolver: ^1.0.0
+    err-code: ^3.0.1
+    is-ip: ^3.1.0
+    multibase: ^4.0.2
+    uint8arrays: ^2.1.3
+    varint: ^6.0.0
+  checksum: f63ba1b17b20bf474736b7503576d5224a6929dd741eb01f53f5b4346ff8facc47557b5fed9ae1f689312bafe6a7e4610eeb2395b001d20a6692162c7a418d84
   languageName: node
   linkType: hard
 
@@ -3904,16 +3940,16 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"prettier@npm:~2.3.1":
-  version: 2.3.1
-  resolution: "prettier@npm:2.3.1"
+"prettier@npm:~2.3.2":
+  version: 2.3.2
+  resolution: "prettier@npm:2.3.2"
   bin:
     prettier: bin-prettier.js
-  checksum: 9b4a695b87ce5f510fc20feec01cce7371f0fa0b92ffe79d543f6be52e2004c532861629de4d7ab1c577e1f649dce3cfccd62cb2ca6526b1da8d9c63eb84bf36
+  checksum: 4fd89a7f6a12b13456d359fba2b1dd0fc0a17cf33f8f15953ab9f43b21ea9b09b5a2861d63b558ca0577274ce606d390e70628cf93e26d19d6cb7f19c9eebc31
   languageName: node
   linkType: hard
 
-"private-ip@npm:^2.1.0":
+"private-ip@npm:^2.1.0, private-ip@npm:^2.2.1":
   version: 2.2.1
   resolution: "private-ip@npm:2.2.1"
   dependencies:
@@ -4494,15 +4530,6 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"strip-ansi@npm:^7.0.0":
-  version: 7.0.0
-  resolution: "strip-ansi@npm:7.0.0"
-  dependencies:
-    ansi-regex: ^6.0.0
-  checksum: f6f5f89d5f8e80e0b24c7f3e8775bf6c98a7111fbd22dc35d051903de4bcf66b6e4e222b60962383d66542fdd37b4a9a9d18f65689cd7d7fa7e5a89459e9135b
-  languageName: node
-  linkType: hard
-
 "strip-final-newline@npm:^2.0.0":
   version: 2.0.0
   resolution: "strip-final-newline@npm:2.0.0"
@@ -4609,10 +4636,14 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"ts-node@npm:~9.1.1":
-  version: 9.1.1
-  resolution: "ts-node@npm:9.1.1"
+"ts-node@npm:~10.0.0":
+  version: 10.0.0
+  resolution: "ts-node@npm:10.0.0"
   dependencies:
+    "@tsconfig/node10": ^1.0.7
+    "@tsconfig/node12": ^1.0.7
+    "@tsconfig/node14": ^1.0.0
+    "@tsconfig/node16": ^1.0.1
     arg: ^4.1.0
     create-require: ^1.1.0
     diff: ^4.0.1
@@ -4620,13 +4651,22 @@ fsevents@~2.3.1:
     source-map-support: ^0.5.17
     yn: 3.1.1
   peerDependencies:
+    "@swc/core": ">=1.2.45"
+    "@swc/wasm": ">=1.2.45"
+    "@types/node": "*"
     typescript: ">=2.7"
+  peerDependenciesMeta:
+    "@swc/core":
+      optional: true
+    "@swc/wasm":
+      optional: true
   bin:
     ts-node: dist/bin.js
+    ts-node-cwd: dist/bin-cwd.js
     ts-node-script: dist/bin-script.js
     ts-node-transpile-only: dist/bin-transpile.js
     ts-script: dist/bin-script-deprecated.js
-  checksum: a90db4a342872cd0e7a80babdfcb15d2f7c06e700d735003098f7cc79db575c3380580c58a19ae0d0eaab553af083651d4237060c92170e6f8ac4e64693113ea
+  checksum: dc461e2b9b931b00ff065530a0247f86da1d035e72a7ef6d7ed072dd8e6b236d1879f113dcc73a354d240c81b6b845445c3d32b16eeb68022ed27ab6d130c049
   languageName: node
   linkType: hard
 
@@ -4653,23 +4693,23 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-typescript@^4.2:
-  version: 4.2.4
-  resolution: "typescript@npm:4.2.4"
+typescript@^4.3:
+  version: 4.3.5
+  resolution: "typescript@npm:4.3.5"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: edaede2fa77f56b7fba80ee624a2368ab1216e75b0434d968ccb47ab0a5e2f6d94f848b3b111c1237dd71e988cd376af26370dcdad3b94355c76e759f0dd0a1e
+  checksum: d9a8e78d72dd19896e6bfa73ab2a0fcea6eca2700d1d6e7c33f67a970af54a3e0fed8f715a8c4e6a0ff7fc0995067b394b2003518ab0aa84cd396377e54b760c
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@^4.2#builtin<compat/typescript>":
-  version: 4.2.4
-  resolution: "typescript@patch:typescript@npm%3A4.2.4#builtin<compat/typescript>::version=4.2.4&hash=a45b0e"
+"typescript@patch:typescript@^4.3#builtin<compat/typescript>":
+  version: 4.3.5
+  resolution: "typescript@patch:typescript@npm%3A4.3.5#builtin<compat/typescript>::version=4.3.5&hash=ddfc1b"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 3be44317593182e8ce494c114e7ad9b0bb2553a22f3085cc6da4f0a36912c20850daa9be4c898af2ab6fc8b12f430c1c9e46ac715721867cd38643f2350d3ef9
+  checksum: 7f0b8343f71ecac18095be1476b398aca420ab60dc207cc1efe078f381eef5527b80a518297720257114cdbda65612f8839e4b63e85dc95e67ac5cbbade8bdf0
   languageName: node
   linkType: hard
 
@@ -4810,6 +4850,15 @@ typescript@^4.2:
     buffer-crc32: ^0.2.13
     ip: ^1.1.5
   checksum: 39e1038a87f06e068e1a9299d8e728b1a22618bd9cae4777f85326cfb9f852bf8eafe77c487c99e5e56ceb12a0dff81413362b69c3fda19bb241db78534c749a
+  languageName: node
+  linkType: hard
+
+"wherearewe@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "wherearewe@npm:1.0.0"
+  dependencies:
+    is-electron: ^2.2.0
+  checksum: 87a19370c7a608e683edea68cf49ff621d878f449f7b56e2a116e1f7f043b92978686b6471fee1f514ae3ddb3600529f5bef08e4b1c192d105de9c45d8c08593
   languageName: node
   linkType: hard
 
