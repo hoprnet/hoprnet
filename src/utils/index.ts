@@ -40,7 +40,7 @@ export function toU8aStream(source: MyStream): Stream['source'] {
 
 /**
  * Changes the behavior of the given iterator such that it
- * fetches new messages before they are consumed by the 
+ * fetches new messages before they are consumed by the
  * consumer.
  * @param iterator an async iterator
  * @returns given iterator that eagerly fetches messages
