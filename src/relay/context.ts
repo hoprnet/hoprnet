@@ -18,6 +18,9 @@ import { eagerIterator } from '../utils'
 
 export const DEFAULT_PING_TIMEOUT = 300
 
+/**
+ * Encapsulate the relay-side state management of a relayed connecion
+ */
 class RelayContext extends EventEmitter {
   private _streamSourceSwitchPromise: DeferredPromise<Stream['source']>
   private _streamSinkSwitchPromise: DeferredPromise<Stream['sink']>
@@ -54,19 +57,24 @@ class RelayContext extends EventEmitter {
     this._streamSourceSwitchPromise = Defer<Stream['source']>()
     this._streamSinkSwitchPromise = Defer<Stream['sink']>()
 
-    this.source = this._createSource()
+    this.source = this.createSource()
 
     this.sink = (source: Stream['source']): Promise<void> => {
-      // @TODO add support for Iterables such as Arrays
       this._sinkSourceAttached = true
       this._sinkSourceAttachedPromise.resolve(source)
 
       return Promise.resolve()
     }
 
-    this._createSink()
+    this.createSink()
   }
 
+  /**
+   * Sends a low-level ping to the client.
+   * Used to test if connection is active.
+   * @param ms timeout in miliseconds
+   * @returns a Promise that resolves to measured latency
+   */
   public async ping(ms = DEFAULT_PING_TIMEOUT): Promise<number> {
     let start = Date.now()
     this._pingResponsePromise = Defer<void>()
@@ -101,6 +109,10 @@ class RelayContext extends EventEmitter {
     return Date.now() - start
   }
 
+  /**
+   * Attaches a new stream to an existing context
+   * @param newStream the new stream to use
+   */
   public update(newStream: Stream) {
     this._sourceSwitched = true
 
@@ -110,32 +122,48 @@ class RelayContext extends EventEmitter {
     this.log(`updating`)
   }
 
+  /**
+   * Log messages and add identity tag to distinguish multiple instances
+   */
   private log(..._: any[]) {
     _log(`RX [${this._id}]`, ...arguments)
   }
 
+  /**
+   * Log verbose messages and add identity tag to distinguish multiple instances
+   */
   private verbose(..._: any[]) {
     _verbose(`RX [${this._id}]`, ...arguments)
   }
 
+  /**
+   * Log errors and add identity tag to distinguish multiple instances
+   */
   private error(..._: any[]) {
     _error(`RX [${this._id}]`, ...arguments)
   }
 
-  private _createSource(): Stream['source'] {
+  /**
+   * Forwards incoming messages from current incoming stream
+   * @returns an async iterator
+   */
+  private createSource(): Stream['source'] {
     const iterator: Stream['source'] = async function* (this: RelayContext) {
       this.log(`source called`)
       let result: Stream['source'] | StreamResult | undefined
 
       const next = () => {
         result = undefined
-
         this._sourcePromise = this._stream.source.next()
       }
 
       while (true) {
-        const promises: Promise<Stream['source'] | StreamResult>[] = [this._streamSourceSwitchPromise.promise]
+        const promises: Promise<Stream['source'] | StreamResult>[] = []
 
+        // Wait for stream switches
+        promises.push(this._streamSourceSwitchPromise.promise)
+
+        // Wait for payload messages
         if (result == undefined || (result as StreamResult).done != true) {
           this._sourcePromise = this._sourcePromise ?? this._stream.source.next()
 
@@ -151,19 +179,16 @@ class RelayContext extends EventEmitter {
           throw Error(`source result == undefined. Should not happen.`)
         }
 
+        // If source switched, get messages from new source
         if (this._sourceSwitched) {
           this._sourceSwitched = false
-
           this._stream.source = result as Stream['source']
-
-          result = undefined
 
           this._streamSourceSwitchPromise = Defer<Stream['source']>()
 
-          this._sourcePromise = this._stream.source.next()
+          next()
 
           yield Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
-
           continue
         }
 
@@ -173,6 +198,7 @@ class RelayContext extends EventEmitter {
           continue
         }
 
+        // Anything can happen
         if (received.value.length == 0) {
           this.log(`got empty message`)
           next()
@@ -233,7 +259,10 @@ class RelayContext extends EventEmitter {
     return eagerIterator(iterator)
   }
 
-  private async _createSink(): Promise<void> {
+  /**
+   * Passes messages from source into current outgoing stream
+   */
+  private async createSink(): Promise<void> {
     this.log(`createSink called`)
     let currentSink = this._stream.sink
 
@@ -335,12 +364,21 @@ class RelayContext extends EventEmitter {
     }
   }
 
+  /**
+   * Add status and control messages to queue
+   * @param msg msg to add
+   */
   private queueStatusMessage(msg: StatusMessages) {
     this._statusMessages.push(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, msg))
 
     this._statusMessagePromise.resolve()
   }
 
+  /**
+   * Removes latest message from queue and returns it.
+   * Resets the waiting mutex if queue is empty. 
+   * @returns latest status or control message
+   */
   private unqueueStatusMessage(): Uint8Array {
     switch (this._statusMessages.length) {
       case 0:

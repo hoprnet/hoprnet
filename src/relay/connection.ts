@@ -66,6 +66,9 @@ export function statusMessagesCompare(a: Uint8Array, b: Uint8Array): -1 | 0 | 1 
   }
 }
 
+/**
+ * Encapsulates the client-side state management of a relayed connection
+ */
 class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _stream: Stream
   private _sinkSourceAttached: boolean
@@ -79,6 +82,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   private _id: string
 
+  // Mutexes
   private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
   private _sinkSwitchPromise: DeferredPromise<void>
   private _sourceSwitchPromise: DeferredPromise<void>
@@ -161,32 +165,54 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this.sink = this.attachSinkSource.bind(this)
   }
 
-  public close(_err?: Error): Promise<void> {
-    this.verbose(`close called`)
+  /**
+   * Closes the connection
+   * @param err Pass an error if necessary
+   */
+  public async close(err?: Error): Promise<void> {
+    if (err) {
+      this.error(`closed called: Error:`, err)
+    } else {
+      this.verbose(`close called. No error`)
+    }
 
     if (this.destroyed) {
-      return Promise.resolve()
+      return
     }
 
     this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
 
     this.setClosed()
 
-    return this._destroyedPromise.promise
+    await this._destroyedPromise.promise
   }
 
+  /**
+   * Log messages and add identity tag to distinguish multiple instances
+   */
   private log(..._: any[]) {
     _log(`RC [${this._id}]`, ...arguments)
   }
 
+  /**
+   * Log verbose messages and add identity tag to distinguish multiple instances
+   */
   private verbose(..._: any[]) {
     _verbose(`RC [${this._id}]`, ...arguments)
   }
 
+  /**
+   * Log errors and add identity tag to distinguish multiple instances
+   */
   private error(..._: any[]) {
     _error(`RC [${this._id}]`, ...arguments)
   }
 
+  /**
+   * Creates a new connection and initiates a handover to the
+   * new connection end
+   * @returns a new connection end
+   */
   public switch(): RelayConnection {
     if (this.webRTC != undefined) {
       try {
@@ -210,22 +236,35 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     return this
   }
 
+  /**
+   * Marks the stream internally as closed
+   */
   private setClosed() {
     this._streamClosed = true
     this._closePromise.resolve()
     this.timeline.close = Date.now()
   }
 
-  private async attachSinkSource(_source: Stream['source']): Promise<void> {
+  /**
+   * Attaches a source to the stream sink. Called once
+   * the stream is used to send messages
+   * @param source the source that is attached
+   */
+  private async attachSinkSource(source: Stream['source']): Promise<void> {
     if (this._migrationDone != undefined) {
       await this._migrationDone.promise
     }
 
     this._sinkSourceAttached = true
-    this._sinkSourceAttachedPromise.resolve(toU8aStream(_source))
+    this._sinkSourceAttachedPromise.resolve(toU8aStream(source))
   }
 
-  private async *sinkFunction(this: RelayConnection): Stream['source'] {
+  /**
+   * Starts the communication with the relay and exchanges status information
+   * and control messages.
+   * Once a source is attached, forward the messages from the source to the relay.
+   */
+  private async *sinkFunction(): Stream['source'] {
     type SinkType = Stream['source'] | StreamResult | undefined | void
 
     let currentSource: Stream['source'] | undefined
@@ -236,30 +275,38 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     while (true) {
       let promises: Promise<SinkType>[] = []
 
+      // Wait for stream close and stream switch signals
       promises.push(this._closePromise.promise, this._sinkSwitchPromise.promise)
 
+      // Wait for source being attached to sink
       if (currentSource == undefined) {
         promises.push(this._sinkSourceAttachedPromise.promise)
       }
 
+      // Wait for status messages
       promises.push(this._statusMessagePromise.promise)
 
+      // Wait for payload messages
       if (currentSource != undefined) {
         streamPromise = streamPromise ?? currentSource.next()
 
         promises.push(streamPromise)
       }
 
-      // (0. Handle source attach)
-      // 1. Handle stream switch
-      // 2. Handle status messages
-      // 3. Handle payload messages
+      // 1. Handle stream close
+      // 2. Handle stream switch
+      // 3. Handle source attach
+      // 4. Handle status messages
+      // 5. Handle payload messages
       result = await Promise.race(promises)
 
+      // Stream is done, nothing to do
       if (this._streamClosed && this.destroyed) {
         break
       }
 
+      // Stream switched and currently no source available,
+      // wait until new source gets attached
       if (this._sinkSourceSwitched) {
         this._sinkSourceSwitched = false
         this._sinkSwitchPromise = Defer<void>()
@@ -274,6 +321,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         continue
       }
 
+      // Source got attached, start forwarding messages
       if (this._sinkSourceAttached) {
         this._sinkSourceAttached = false
 
@@ -284,6 +332,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         continue
       }
 
+      // Status messages are available, take the first one and forward it
       if (this.statusMessages.length > 0) {
         const statusMsg = this.unqueueStatusMessage()
 
@@ -319,8 +368,14 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     }
   }
 
+  /**
+   * Returns incoming payload messages and handles status and control messages.
+   * @returns an async iterator yielding incoming payload messages
+   */
   private createSource() {
+    // migration mutex
     let migrationDone = Defer<void>()
+
     const iterator = async function* (this: RelayConnection) {
       // deep-clone number
       // @TOOD make sure that the compiler does not notice
@@ -332,7 +387,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
       const next = () => {
         result = undefined
-
         streamPromise = this._stream.source.next()
       }
 
@@ -343,16 +397,20 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       while (this._iteration == drainIteration) {
         const promises = []
 
+        // Wait for stream close attempts
         promises.push(this._closePromise.promise)
 
+        // Wait for stream switches
         if (!this._sourceSwitched) {
           promises.push(this._sourceSwitchPromise.promise)
         }
 
+        // Wait for payload messages
         promises.push(streamPromise)
 
         result = (await Promise.race(promises)) as any
 
+        // End stream once new instance is used
         if (this._iteration != drainIteration) {
           await migrationDone.promise
           migrationDone = Defer<void>()
@@ -391,6 +449,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           continue
         }
 
+        // Handle relay sub-protocol
         if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS) {
           if (SUFFIX[0] == ConnectionStatusMessages.STOP) {
             this.log(`STOP received. Ending stream ...`)
@@ -439,6 +498,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           continue
         }
 
+        // Forward payload message
         next()
         yield SUFFIX
       }
@@ -479,7 +539,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    */
   private queueStatusMessage(msg: Uint8Array) {
     this.statusMessages.push(msg)
-
     this._statusMessagePromise.resolve()
   }
 

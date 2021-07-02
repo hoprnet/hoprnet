@@ -25,6 +25,9 @@ import { AbortError } from 'abortable-iterator'
 import { RelayHandshake } from './handshake'
 import { RelayState } from './state'
 
+/**
+ * API interface for relayed connections
+ */
 class Relay {
   private relayState: RelayState
 
@@ -64,6 +67,13 @@ class Relay {
     })
   }
 
+  /**
+   * Attempts to connect to `destination` by using `relay` as a relay
+   * @param relay relay to use
+   * @param destination destination to connect to
+   * @param options options, e.g. timeout
+   * @returns a connection object if possible, otherwise undefined
+   */
   public async connect(
     relay: PeerId,
     destination: PeerId,
@@ -96,6 +106,7 @@ class Relay {
       throw new AbortError()
     }
 
+    // Attempt to upgrade to WebRTC if available
     if (this.webRTCUpgrader != undefined) {
       let channel = this.webRTCUpgrader.upgradeOutbound()
 
@@ -126,6 +137,11 @@ class Relay {
     }
   }
 
+  /**
+   * Handle an incoming relayed connection and perfom handshake
+   * @param conn base connection to use
+   * @returns the relayed connection if the handshake were successful
+   */
   private async handleRelayConnection(conn: Handler): Promise<RelayConnection | WebRTCConnection | undefined> {
     if (conn.stream == undefined || conn.connection == undefined) {
       error(
@@ -176,7 +192,8 @@ class Relay {
   }
 
   /**
-   * Called once a relayed connection is establishing
+   * Called once a relayed connection is about to get established.
+   * Forwards the connection to libp2p if no errors happened
    * @param handler handles the relayed connection
    */
   private async handleIncoming(handler: Handler): Promise<void> {
@@ -195,6 +212,7 @@ class Relay {
       return
     }
 
+    // @TODO
     // this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])
 
     this.connHandler?.(newConn)
@@ -232,6 +250,11 @@ class Relay {
     this.connHandler?.(newConn)
   }
 
+  /**
+   * Attempts to establish a direct connection to counterparty
+   * @param counterparty peerId of counterparty
+   * @returns a duplex stream to counterparty, if connection is possible
+   */
   private async contactCounterparty(counterparty: PeerId): Promise<Stream | undefined> {
     // @TODO this produces struct with unset connection property
     let newConn = await this.dialHelper(counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })

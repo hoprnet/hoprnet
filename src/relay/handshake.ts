@@ -69,6 +69,9 @@ type HandleResponse =
 
 export type StreamResult = Buffer | Uint8Array | BLInterface
 
+/**
+ * Encapsulates the relay handshake procedure
+ */
 class RelayHandshake {
   private shaker: Handshake<StreamResult>
 
@@ -76,6 +79,12 @@ class RelayHandshake {
     this.shaker = handshake<StreamResult>(stream)
   }
 
+  /**
+   * Tries to establish a relayed connection to the given destination
+   * @param relay relay to use
+   * @param destination destination to connect to trough relay
+   * @returns a relayed connection to `destination`
+   */
   async initiate(relay: PeerId, destination: PeerId): Promise<Response> {
     this.shaker.write(destination.pubKey.marshal())
 
@@ -99,30 +108,42 @@ class RelayHandshake {
 
     this.shaker.rest()
 
-    if (answer == RelayHandshakeMessage.OK) {
-      log(
-        `Successfully established outbound relayed connection with ${green(
-          destination.toB58String()
-        )} over relay ${green(relay.toB58String())}`
-      )
-      return {
-        success: true,
-        stream: this.shaker.stream
-      }
-    }
+    // Anything can happen
+    switch (answer as RelayHandshakeMessage) {
+      case RelayHandshakeMessage.OK:
+        log(
+          `Successfully established outbound relayed connection with ${green(
+            destination.toB58String()
+          )} over relay ${green(relay.toB58String())}`
+        )
+        return {
+          success: true,
+          stream: this.shaker.stream
+        }
+      default:
+        error(
+          `Could not establish relayed connection to ${green(destination.toB58String())} over relay ${green(
+            relay.toB58String()
+          )}. Answer was: <${yellow(handshakeMessageToString(answer))}>`
+        )
 
-    error(
-      `Could not establish relayed connection to ${green(destination.toB58String())} over relay ${green(
-        relay.toB58String()
-      )}. Answer was: <${yellow(handshakeMessageToString(answer))}>`
-    )
-
-    return {
-      success: false,
-      code: 'FAIL'
+        return {
+          success: false,
+          code: 'FAIL'
+        }
     }
   }
 
+  /**
+   * Negotiates between initiator and destination whether they can establish
+   * a relayed connection.
+   * @param source peerId of the initiator
+   * @param getStreamToCounterparty used to connect to counterparty
+   * @param exists to check if relay state exists
+   * @param isActive to check if existing relay state can be used
+   * @param updateExisting to update existing connection with new stream if not active
+   * @param createNew to establish a whole-new instance
+   */
   async negotiate(
     source: PeerId,
     getStreamToCounterparty: (peerId: PeerId) => Promise<Stream | undefined>,
@@ -175,6 +196,7 @@ class RelayHandshake {
     const relayedConnectionExists = exists(source, destination)
 
     if (relayedConnectionExists) {
+      // Relay could exist but connection is dead
       const connectionIsActive = await isActive(source, destination)
 
       if (connectionIsActive) {
@@ -194,6 +216,7 @@ class RelayHandshake {
       error(err)
     }
 
+    // Anything can happen while attempting to connect
     if (toDestination == null) {
       error(`Cannot establish a relayed connection from ${source.toB58String()} to ${destination.toB58String()}`)
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
@@ -223,21 +246,28 @@ class RelayHandshake {
 
     const destinationAnswer = destinationChunk.slice(0, 1)[0]
 
-    if (destinationAnswer != RelayHandshakeMessage.OK) {
-      this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
-      this.shaker.rest()
+    switch (destinationAnswer as RelayHandshakeMessage) {
+      case RelayHandshakeMessage.OK:
+        this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
+        this.shaker.rest()
+        destinationShaker.rest()
 
-      destinationShaker.rest()
-      return
+        createNew(source, destination, this.shaker.stream, destinationShaker.stream)
+        break
+      default:
+        this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
+        this.shaker.rest()
+
+        destinationShaker.rest()
+        return
     }
-
-    this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
-    this.shaker.rest()
-    destinationShaker.rest()
-
-    createNew(source, destination, this.shaker.stream, destinationShaker.stream)
   }
 
+  /**
+   * Handles an incoming request from a relay
+   * @param source peerId of the relay
+   * @returns a duplex stream with the initiator
+   */
   async handle(source: PeerId): Promise<HandleResponse> {
     let chunk: Uint8Array | BLInterface | undefined
     try {
@@ -246,6 +276,7 @@ class RelayHandshake {
       error(err)
     }
 
+    // Anything can happen
     if (chunk == null || chunk.length == 0) {
       error(`Received empty message. Ignoring request`)
       this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL))

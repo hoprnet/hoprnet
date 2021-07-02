@@ -16,6 +16,9 @@ type State = {
   [id: string]: RelayContext
 }
 
+/**
+ * Encapsulates open relayed connections
+ */
 class RelayState {
   private relayedConnections: Map<string, State>
 
@@ -23,12 +26,26 @@ class RelayState {
     this.relayedConnections = new Map()
   }
 
+  /**
+   * Checks if there is a relayed connection. Liveness is not checked,
+   * so connection might be dead.
+   * @param source initiator of the relayed connection
+   * @param destination other party of the relayed connection
+   * @returns if there is already a relayed connection
+   */
   exists(source: PeerId, destination: PeerId) {
     const id = RelayState.getId(source, destination)
 
     return this.relayedConnections.has(id)
   }
 
+  /**
+   * Performs a liveness test on the connection
+   * @param source initiator of the relayed connection
+   * @param destination other party of the relayed connection
+   * @param timeout timeout in miliseconds before connection is considered dead
+   * @returns a promise that resolves to true if connection is active
+   */
   async isActive(source: PeerId, destination: PeerId, timeout?: number): Promise<boolean> {
     const id = RelayState.getId(source, destination)
     if (!this.relayedConnections.has(id)) {
@@ -52,6 +69,13 @@ class RelayState {
     return false
   }
 
+  /**
+   * Attaches (and thereby overwrites) an existing stream to source.
+   * Initiates a stream handover.
+   * @param source initiator of the relayed connection
+   * @param destination other party of the relayed connection
+   * @param toSource new stream to source
+   */
   updateExisting(source: PeerId, destination: PeerId, toSource: Stream): void {
     const id = RelayState.getId(source, destination)
 
@@ -64,6 +88,13 @@ class RelayState {
     context[source.toB58String()].update(toSource)
   }
 
+  /**
+   * Creates and stores a new relayed connection
+   * @param source initiator of the relayed connection
+   * @param destination other party of the relayed connection
+   * @param toSource duplex stream to source
+   * @param toDestination duplex stream to destination
+   */
   createNew(source: PeerId, destination: PeerId, toSource: Stream, toDestination: Stream) {
     const toSourceContext = new RelayContext(toSource)
     const toDestinationContext = new RelayContext(toDestination)
@@ -82,7 +113,13 @@ class RelayState {
     this.relayedConnections.set(RelayState.getId(source, destination), relayedConnection)
   }
 
-  private cleanListener(source: PeerId, destination: PeerId) {
+  /**
+   * Creates a listener that cleans the relayed state once connection is closed
+   * @param source initiator of the relayed connection
+   * @param destination other party of the relayed connection
+   * @returns a listener
+   */
+  private cleanListener(source: PeerId, destination: PeerId): () => void {
     return function (this: RelayState) {
       const id = RelayState.getId(source, destination)
 
@@ -98,7 +135,14 @@ class RelayState {
     }.bind(this)
   }
 
-  static getId(a: PeerId, b: PeerId) {
+  /**
+   * Creates an identifier that is used to store the relayed connection
+   * instance.
+   * @param a peerId of first party
+   * @param b peerId of second party
+   * @returns the identifier
+   */
+  static getId(a: PeerId, b: PeerId): string {
     const cmpResult = u8aCompare(a.pubKey.marshal(), b.pubKey.marshal())
 
     switch (cmpResult) {
