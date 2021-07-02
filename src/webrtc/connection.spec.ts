@@ -154,7 +154,7 @@ describe('test webrtc connection', function () {
     assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
   })
 
-  it.only('exchange messages through webRTC', async function () {
+  it('exchange messages through webRTC', async function () {
     const AliceBob = Pair()
     const BobAlice = Pair()
 
