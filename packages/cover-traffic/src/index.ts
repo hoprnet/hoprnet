@@ -9,6 +9,8 @@ import { createChainWrapper, Indexer, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from 
 import blessed from 'blessed'
 import contrib from 'blessed-contrib'
 
+const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
+
 const addBN = (a: BN, b: BN): BN => a.add(b)
 const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
 const findChannelsFrom = (p: PublicKey): ChannelEntry[] =>
@@ -25,6 +27,25 @@ const importance = (p: PublicKey): BN =>
     )
     .reduce(addBN, new BN('0'))
 
+const weightedRandomChoice = (): PublicKey => {
+  const weights: Record<string, BN> = {}
+  let total = new BN('0')
+  Object.values(STATE.nodes).forEach(p => {
+    weights[p.pub.toHex()] = importance(p.pub)
+    total = total.add(weights[p.pub.toHex()])
+  })
+
+  const ind = Math.random()
+  let interval = total.muln(ind)
+  for (let node of Object.keys(weights)){
+    interval = interval.sub(weights[node])
+    if (interval.lte(new BN('0'))) {
+      return PublicKey.fromString(node)
+    }
+  }
+  throw new Error('wtf')
+}
+
 
 type PeerData = {
   id: any, //PeerId,
@@ -35,12 +56,14 @@ type State = {
   nodes: Record<string, PeerData>
   channels: Record<string, ChannelEntry>
   log: string[]
+  ctChannels: PublicKey[]
 }
 
 const STATE: State = {
   nodes: {},
   channels: {},
-  log: []
+  log: [],
+  ctChannels: []
 }
 
 function setupDashboard() {
@@ -59,7 +82,7 @@ function setupDashboard() {
      , columnWidth: [55, 12, 6, 12] /*in chars*/ } as any)
    table.focus()
 
-  const inspect = grid.set(0, 2, 3, 2, contrib.table, {
+  const inspect = grid.set(0, 2, 2, 2, contrib.table, {
       fg: 'white', label: 'Selected'
     , keys: false
     , interactive: false
@@ -68,6 +91,10 @@ function setupDashboard() {
      , columnWidth: [6, 90] /*in chars*/ } as any)
 
   const logs = grid.set(3,0, 1, 4, contrib.log, {label: 'logs'})
+
+  const ctChan = grid.set(2,2,1,2, contrib.table, {
+    label: 'Cover Traffic channels', columnWidth: [60, 20]
+  })
 
   table.rows.on('select item', (item) => {
     const id = item.content.split(' ')[0].trim()
@@ -107,11 +134,29 @@ function setupDashboard() {
       logs.log(l)
     }
 
+    ctChan.setData({
+      headers: ['Dest', 'Status'],
+      data: STATE.ctChannels.map( (p:PublicKey) => [p.toPeerId().toB58String(), 'PENDING'])
+    })
+
     screen.render()
   }
   update()
 
   return update
+}
+
+
+async function tick(update){
+  if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE){
+    const toOpen = weightedRandomChoice()
+    if (!STATE.ctChannels.find(x => x.eq(toOpen))) {
+      STATE.ctChannels.push(toOpen)
+      // await channel.open
+    }
+  }
+  update()
+  setTimeout(() => tick(update), 1000)
 }
 
 async function main() {
@@ -158,6 +203,8 @@ async function main() {
   await indexer.start()
   STATE.log.push('done')
   update()
+
+  tick(update)
 }
 
 main()
