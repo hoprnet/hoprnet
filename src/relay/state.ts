@@ -10,13 +10,12 @@ import debug from 'debug'
 
 const DEBUG_PREFIX = 'hopr-connect:relay:state'
 
-// const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
-// const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 
 type State = {
   [id: string]: RelayContext
 }
+
 class RelayState {
   private relayedConnections: Map<string, State>
 

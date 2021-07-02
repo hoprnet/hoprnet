@@ -222,7 +222,7 @@ describe('relay connection', function () {
 
     await once(alice, 'restart')
 
-    aliceShakerBeforeReconnect.write(new TextEncoder().encode('a'))
+    aliceShakerBeforeReconnect.write(new TextEncoder().encode('Hello from Alice before reconnect'))
 
     assert(aliceAfterReconnect != undefined)
 
@@ -294,7 +294,7 @@ describe('relay connection', function () {
 
       await once(alice, 'restart')
 
-      aliceShakerBeforeReconnect.write(new TextEncoder().encode('a'))
+      aliceShakerBeforeReconnect.write(new TextEncoder().encode('Hello from Alice before reconnect'))
 
       assert(aliceAfterReconnect != undefined)
 
