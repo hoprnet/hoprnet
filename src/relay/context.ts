@@ -376,7 +376,7 @@ class RelayContext extends EventEmitter {
 
   /**
    * Removes latest message from queue and returns it.
-   * Resets the waiting mutex if queue is empty. 
+   * Resets the waiting mutex if queue is empty.
    * @returns latest status or control message
    */
   private unqueueStatusMessage(): Uint8Array {
