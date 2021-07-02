@@ -27,7 +27,9 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-core": "1.74.0-next.8"
+    "@hoprnet/hopr-core": "1.74.0-next.8",
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.10.0"
   },
   "devDependencies": {},
   "mocha": {

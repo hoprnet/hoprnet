@@ -6,6 +6,9 @@ import { BigNumber } from 'bignumber.js'
 import { PublicKey, HoprDB, ChannelEntry } from '@hoprnet/hopr-utils'
 import { createChainWrapper, Indexer, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from '@hoprnet/hopr-core-ethereum'
 
+import blessed from 'blessed'
+import contrib from 'blessed-contrib'
+
 const addBN = (a: BN, b: BN): BN => a.add(b)
 const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
 const findChannelsFrom = (p: PublicKey): ChannelEntry[] =>
@@ -22,29 +25,84 @@ const importance = (p: PublicKey): BN =>
     )
     .reduce(addBN, new BN('0'))
 
+
+type PeerData = {
+  id: any, //PeerId,
+  pub: PublicKey,
+  multiaddrs: any
+}
 type State = {
-  nodes: any
+  nodes: Record<string, PeerData>
   channels: Record<string, ChannelEntry>
+  log: string[]
 }
 
 const STATE: State = {
   nodes: {},
-  channels: {}
+  channels: {},
+  log: []
 }
 
-const onChannelUpdate = (newChannel) => {
-  STATE.channels[newChannel.getId().toHex()] = newChannel
-}
+function setupDashboard() {
+  const screen = blessed.screen()
+  const grid = new contrib.grid({rows: 4, cols: 2, screen: screen})
+  screen.key(['escape', 'q', 'C-c'], function() {
+    return process.exit(0);
+  });
 
-const peerUpdate = (peer) => {
-  STATE.nodes[PublicKey.fromPeerId(peer.id).toAddress().toHex()] = {
-    id: peer.id,
-    multiaddrs: peer.multiaddrs,
-    pub: PublicKey.fromPeerId(peer.id)
+  const table = grid.set(0, 0, 3, 2, contrib.table, {
+      fg: 'white', label: 'Nodes'
+    , keys: true
+    , interactive: true
+     , border: {type: "line", fg: "cyan"}
+     , columnSpacing: 10 //in chars
+     , columnWidth: [50, 40, 12] /*in chars*/ } as any)
+   table.focus()
+
+  const logs = grid.set(3,0, 1, 2, contrib.log, {})
+
+  screen.render()
+
+  const update = () => {
+    table.setData(
+     { headers: ['ID', 'Address', 'Importance']
+     , data: Object.values(STATE.nodes)
+              .sort((a: any, b: any) => importance(b.pub).cmp(importance(a.pub)))
+               .map(p => [
+        p.id.toB58String(), p.pub.toAddress().toHex(),
+        new BigNumber(importance(p.pub).toString()).toPrecision(4, 0)
+     ])
+    })
+
+    var l
+    while (l = STATE.log.pop()){
+      logs.log(l)
+    }
+
+    screen.render()
   }
+  update()
+
+  return update
 }
 
 async function main() {
+  const update = setupDashboard()
+
+  const onChannelUpdate = (newChannel) => {
+    STATE.channels[newChannel.getId().toHex()] = newChannel
+    update()
+  }
+
+  const peerUpdate = (peer) => {
+    STATE.nodes[PublicKey.fromPeerId(peer.id).toAddress().toHex()] = {
+      id: peer.id,
+      multiaddrs: peer.multiaddrs,
+      pub: PublicKey.fromPeerId(peer.id)
+    }
+    update()
+  }
+
   const priv = process.argv[2]
   const peerId = privKeyToPeerId(priv)
   const options: HoprOptions = {
@@ -68,33 +126,10 @@ async function main() {
   const indexer = new Indexer(chain.getGenesisBlock(), db, chain, CONFIRMATIONS, INDEXER_BLOCK_RANGE)
   indexer.on('channel-update', onChannelUpdate)
   indexer.on('peer', peerUpdate)
-  console.log('indexing...')
+  STATE.log.push('indexing...')
   await indexer.start()
-  console.log('done')
-
-  console.log('PEERS')
-  Object.values(STATE.nodes)
-    .sort((a: any, b: any) => importance(b.pub).cmp(importance(a.pub)))
-    .forEach((peer: any) => {
-      console.log(
-        peer.pub.toAddress().toHex(),
-        importance(peer.pub).toString()
-        /*totalChannelBalanceFor(peer.pub).toString(),  peer.multiaddrs.map(m => m.toString()).join(',')*/
-      )
-    })
-
-  /*
-  console.log("CHANNELS")
-  Object.keys(STATE.channels).forEach((c) => {
-    const channel = STATE.channels[c]
-    console.log(c, ':', 
-      channel.source.toAddress().toHex(), '(' + totalChannelBalanceFor(channel.source).toString() + ')',
-      '->',
-      channel.destination.toAddress().toHex(), '(' + totalChannelBalanceFor(channel.destination).toString() + ')',
-      channel.balance.toFormattedString(), channel.balance.toBN().toString() 
-               )
-  })
-  */
+  STATE.log.push('done')
+  update()
 }
 
 main()
