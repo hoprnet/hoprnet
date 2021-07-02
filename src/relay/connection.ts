@@ -454,9 +454,12 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    */
   private attachWebRTCListeners(drainIteration: number) {
     let currentChannel: SimplePeer
+    let onSignalListener: (data: Object) => void
+
     const onSignal = (data: Object) => {
       if (this._iteration != drainIteration) {
-        currentChannel.removeListener('signal', onSignal)
+        currentChannel.removeListener('signal', onSignalListener)
+
         return
       }
 
@@ -464,7 +467,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         Uint8Array.from([RelayPrefix.WEBRTC_SIGNALLING, ...new TextEncoder().encode(JSON.stringify(data))])
       )
     }
-    currentChannel = this.webRTC?.channel.on('signal', onSignal.bind(this)) as SimplePeer
+    // Store bound listener instance
+    onSignalListener = onSignal.bind(this)
+    currentChannel = this.webRTC?.channel.on('signal', onSignalListener) as SimplePeer
   }
 
   /**
