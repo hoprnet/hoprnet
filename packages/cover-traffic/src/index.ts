@@ -30,14 +30,14 @@ const importance = (p: PublicKey): BN =>
 const weightedRandomChoice = (): PublicKey => {
   const weights: Record<string, BN> = {}
   let total = new BN('0')
-  Object.values(STATE.nodes).forEach(p => {
+  Object.values(STATE.nodes).forEach((p) => {
     weights[p.pub.toHex()] = importance(p.pub)
     total = total.add(weights[p.pub.toHex()])
   })
 
   const ind = Math.random()
   let interval = total.muln(ind)
-  for (let node of Object.keys(weights)){
+  for (let node of Object.keys(weights)) {
     interval = interval.sub(weights[node])
     if (interval.lte(new BN('0'))) {
       return PublicKey.fromString(node)
@@ -46,10 +46,9 @@ const weightedRandomChoice = (): PublicKey => {
   throw new Error('wtf')
 }
 
-
 type PeerData = {
-  id: any, //PeerId,
-  pub: PublicKey,
+  id: any //PeerId,
+  pub: PublicKey
   multiaddrs: any
 }
 type State = {
@@ -68,32 +67,37 @@ const STATE: State = {
 
 function setupDashboard() {
   const screen = blessed.screen()
-  const grid = new contrib.grid({rows: 4, cols: 4, screen: screen})
-  screen.key(['escape', 'q', 'C-c'], function() {
-    return process.exit(0);
-  });
+  const grid = new contrib.grid({ rows: 4, cols: 4, screen: screen })
+  screen.key(['escape', 'q', 'C-c'], function () {
+    return process.exit(0)
+  })
 
   const table = grid.set(0, 0, 3, 2, contrib.table, {
-      fg: 'white', label: 'Nodes'
-    , keys: true
-    , interactive: true
-     , border: {type: "line", fg: "cyan"}
-     , columnSpacing: 2
-     , columnWidth: [55, 12, 6, 12] /*in chars*/ } as any)
-   table.focus()
+    fg: 'white',
+    label: 'Nodes',
+    keys: true,
+    interactive: true,
+    border: { type: 'line', fg: 'cyan' },
+    columnSpacing: 2,
+    columnWidth: [55, 12, 6, 12] /*in chars*/
+  } as any)
+  table.focus()
 
   const inspect = grid.set(0, 2, 2, 2, contrib.table, {
-      fg: 'white', label: 'Selected'
-    , keys: false
-    , interactive: false
-     , border: {type: "line", fg: "cyan"}
-     , columnSpacing: 2 //in chars
-     , columnWidth: [6, 90] /*in chars*/ } as any)
+    fg: 'white',
+    label: 'Selected',
+    keys: false,
+    interactive: false,
+    border: { type: 'line', fg: 'cyan' },
+    columnSpacing: 2, //in chars
+    columnWidth: [6, 90] /*in chars*/
+  } as any)
 
-  const logs = grid.set(3,0, 1, 4, contrib.log, {label: 'logs'})
+  const logs = grid.set(3, 0, 1, 4, contrib.log, { label: 'logs' })
 
-  const ctChan = grid.set(2,2,1,2, contrib.table, {
-    label: 'Cover Traffic channels', columnWidth: [60, 20]
+  const ctChan = grid.set(2, 2, 1, 2, contrib.table, {
+    label: 'Cover Traffic channels',
+    columnWidth: [60, 20]
   })
 
   table.rows.on('select item', (item) => {
@@ -101,42 +105,45 @@ function setupDashboard() {
     const node = STATE.nodes[id]
     if (node) {
       const data = [
-          ['id', node.id.toB58String()],
-          ['pubkey', node.pub.toHex()],
-          ['addr', node.pub.toAddress().toHex()],
-          ['ma', node.multiaddrs.map(x => x.toString()).join(',')],
-        ]
+        ['id', node.id.toB58String()],
+        ['pubkey', node.pub.toHex()],
+        ['addr', node.pub.toAddress().toHex()],
+        ['ma', node.multiaddrs.map((x) => x.toString()).join(',')]
+      ]
       findChannelsFrom(node.pub).forEach((c, i) => {
-        data.push(['ch.' + i, c.destination.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status])
+        data.push([
+          'ch.' + i,
+          c.destination.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status
+        ])
       })
 
-      inspect.setData({headers: ['', ''], data })
-    } 
+      inspect.setData({ headers: ['', ''], data })
+    }
   })
 
   screen.render()
 
   const update = () => {
-    table.setData(
-     { headers: ['ID', 'Importance', '#Chans', 'Tot.Stk']
-     , data: Object.values(STATE.nodes)
-              .sort((a: any, b: any) => importance(b.pub).cmp(importance(a.pub)))
-               .map(p => [
-        p.id.toB58String(), 
-        new BigNumber(importance(p.pub).toString()).toPrecision(4, 0),
-        findChannelsFrom(p.pub).length,
-        new BigNumber(totalChannelBalanceFor(p.pub).toString()).toPrecision(4, 0)
-     ])
+    table.setData({
+      headers: ['ID', 'Importance', '#Chans', 'Tot.Stk'],
+      data: Object.values(STATE.nodes)
+        .sort((a: any, b: any) => importance(b.pub).cmp(importance(a.pub)))
+        .map((p) => [
+          p.id.toB58String(),
+          new BigNumber(importance(p.pub).toString()).toPrecision(4, 0),
+          findChannelsFrom(p.pub).length,
+          new BigNumber(totalChannelBalanceFor(p.pub).toString()).toPrecision(4, 0)
+        ])
     })
 
     var l
-    while (l = STATE.log.pop()){
+    while ((l = STATE.log.pop())) {
       logs.log(l)
     }
 
     ctChan.setData({
       headers: ['Dest', 'Status'],
-      data: STATE.ctChannels.map( (p:PublicKey) => [p.toPeerId().toB58String(), 'PENDING'])
+      data: STATE.ctChannels.map((p: PublicKey) => [p.toPeerId().toB58String(), 'PENDING'])
     })
 
     screen.render()
@@ -146,11 +153,10 @@ function setupDashboard() {
   return update
 }
 
-
-async function tick(update){
-  if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE){
+async function tick(update) {
+  if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE) {
     const toOpen = weightedRandomChoice()
-    if (!STATE.ctChannels.find(x => x.eq(toOpen))) {
+    if (!STATE.ctChannels.find((x) => x.eq(toOpen))) {
       STATE.ctChannels.push(toOpen)
       // await channel.open
     }
