@@ -172,4 +172,4 @@ export default class HoprEthereum extends EventEmitter {
   }
 }
 
-export { ChannelEntry, Channel, Indexer }
+export { ChannelEntry, Channel, Indexer, createChainWrapper, INDEXER_BLOCK_RANGE, CONFIRMATIONS }

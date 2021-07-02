@@ -14,11 +14,6 @@ import path from 'path'
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
 const argv = yargs
-  .option('network', {
-    describe: 'Which network to run the HOPR node on',
-    default: 'ETHEREUM',
-    choices: ['ETHEREUM']
-  })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
     default: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/'
@@ -153,7 +148,6 @@ function parseHosts(): HoprOptions['hosts'] {
 async function generateNodeOptions(): Promise<HoprOptions> {
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
-    network: argv.network,
     provider: argv.provider,
     announce: argv.announce,
     hosts: parseHosts(),

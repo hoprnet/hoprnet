@@ -300,6 +300,7 @@ class Indexer extends EventEmitter {
 
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
+    this.emit('channel-update', channel)
 
     if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       this.emit('own-channel-updated', channel)

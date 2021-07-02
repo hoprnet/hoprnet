@@ -60,11 +60,11 @@ interface NetOptions {
 export type ChannelStrategyNames = 'passive' | 'promiscuous'
 
 export type HoprOptions = {
-  network: string
   provider: string
   announce?: boolean
   dbPath?: string
   createDbIfNotExist?: boolean
+  forceCreateDB?: boolean
   password?: string
   connector?: HoprCoreEthereum
   strategy?: ChannelStrategyNames
@@ -115,7 +115,8 @@ class Hopr extends EventEmitter {
       PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(),
       options.createDbIfNotExist,
       VERSION,
-      options.dbPath
+      options.dbPath,
+      options.forceCreateDB
     )
     this.paymentChannels = HoprCoreEthereum.create(this.db, this.id.privKey.marshal(), {
       provider: this.options.provider
