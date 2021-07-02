@@ -154,12 +154,12 @@ describe('test webrtc connection', function () {
     assert(u8aEquals((await BobShaker.read()).slice(), Uint8Array.of(MigrationStatus.DONE)))
   })
 
-  it('exchange messages through webRTC', async function () {
+  it.only('exchange messages through webRTC', async function () {
     const AliceBob = Pair()
     const BobAlice = Pair()
 
-    const push = pushable()
-    const pushToBob = pushable()
+    const BobAliceWebRTC = pushable<Uint8Array>()
+    const AliceBobWebRTC = pushable<Uint8Array>()
 
     const webRTCInstance = new EventEmitter()
 
@@ -167,17 +167,17 @@ describe('test webrtc connection', function () {
     Object.assign(webRTCInstance, {
       [Symbol.asyncIterator]() {
         return (async function* () {
-          for await (const msg of push) {
+          for await (const msg of BobAliceWebRTC) {
             yield msg
           }
         })()
       },
       write(msg: Uint8Array) {
-        pushToBob.push(msg)
+        AliceBobWebRTC.push(msg)
       },
       writable: true,
       destroy() {
-        pushToBob.end()
+        AliceBobWebRTC.end()
       }
     })
 
@@ -215,7 +215,7 @@ describe('test webrtc connection', function () {
     BobShaker.write(Uint8Array.of(MigrationStatus.DONE))
 
     const msgSentThroughWebRTC = new TextEncoder().encode(`message that is sent through faked WebRTC`)
-    push.push(encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentThroughWebRTC])))
+    BobAliceWebRTC.push(encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentThroughWebRTC])))
 
     assert(u8aEquals((await AliceShaker.read()).slice(), msgSentThroughWebRTC))
 
@@ -225,8 +225,7 @@ describe('test webrtc connection', function () {
 
     assert(
       u8aEquals(
-        // @ts-ignore
-        (await pushToBob.next()).value,
+        (await (AliceBobWebRTC as any).next()).value,
         encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentBackThroughWebRTC]))
       )
     )
