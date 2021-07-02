@@ -45,7 +45,7 @@ const STATE: State = {
 
 function setupDashboard() {
   const screen = blessed.screen()
-  const grid = new contrib.grid({rows: 4, cols: 2, screen: screen})
+  const grid = new contrib.grid({rows: 4, cols: 4, screen: screen})
   screen.key(['escape', 'q', 'C-c'], function() {
     return process.exit(0);
   });
@@ -55,22 +55,50 @@ function setupDashboard() {
     , keys: true
     , interactive: true
      , border: {type: "line", fg: "cyan"}
-     , columnSpacing: 10 //in chars
-     , columnWidth: [50, 40, 12] /*in chars*/ } as any)
+     , columnSpacing: 2
+     , columnWidth: [55, 12, 6, 12] /*in chars*/ } as any)
    table.focus()
 
-  const logs = grid.set(3,0, 1, 2, contrib.log, {})
+  const inspect = grid.set(0, 2, 3, 2, contrib.table, {
+      fg: 'white', label: 'Selected'
+    , keys: false
+    , interactive: false
+     , border: {type: "line", fg: "cyan"}
+     , columnSpacing: 2 //in chars
+     , columnWidth: [6, 90] /*in chars*/ } as any)
+
+  const logs = grid.set(3,0, 1, 4, contrib.log, {label: 'logs'})
+
+  table.rows.on('select item', (item) => {
+    const id = item.content.split(' ')[0].trim()
+    const node = STATE.nodes[id]
+    if (node) {
+      const data = [
+          ['id', node.id.toB58String()],
+          ['pubkey', node.pub.toHex()],
+          ['addr', node.pub.toAddress().toHex()],
+          ['ma', node.multiaddrs.map(x => x.toString()).join(',')],
+        ]
+      findChannelsFrom(node.pub).forEach((c, i) => {
+        data.push(['ch.' + i, c.destination.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status])
+      })
+
+      inspect.setData({headers: ['', ''], data })
+    } 
+  })
 
   screen.render()
 
   const update = () => {
     table.setData(
-     { headers: ['ID', 'Address', 'Importance']
+     { headers: ['ID', 'Importance', '#Chans', 'Tot.Stk']
      , data: Object.values(STATE.nodes)
               .sort((a: any, b: any) => importance(b.pub).cmp(importance(a.pub)))
                .map(p => [
-        p.id.toB58String(), p.pub.toAddress().toHex(),
-        new BigNumber(importance(p.pub).toString()).toPrecision(4, 0)
+        p.id.toB58String(), 
+        new BigNumber(importance(p.pub).toString()).toPrecision(4, 0),
+        findChannelsFrom(p.pub).length,
+        new BigNumber(totalChannelBalanceFor(p.pub).toString()).toPrecision(4, 0)
      ])
     })
 
@@ -95,7 +123,7 @@ async function main() {
   }
 
   const peerUpdate = (peer) => {
-    STATE.nodes[PublicKey.fromPeerId(peer.id).toAddress().toHex()] = {
+    STATE.nodes[peer.id.toB58String()] = {
       id: peer.id,
       multiaddrs: peer.multiaddrs,
       pub: PublicKey.fromPeerId(peer.id)
