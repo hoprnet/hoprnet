@@ -156,8 +156,16 @@ class HoprConnect implements Transport {
     )
   }
 
+  /**
+   * Adds a relay to the list of usable relays
+   * @TODO to be implemented
+   */
   addRelay() {}
 
+  /**
+   * Removes a relay from the list of usable relays
+   * @TODO to be implemented
+   */
   removeRelay() {}
 
   /**
