@@ -1,5 +1,6 @@
 //import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
+import Hopr from '@hoprnet/hopr-core'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
@@ -26,6 +27,10 @@ const importance = (p: PublicKey): BN =>
       sqrtBN(totalChannelBalanceFor(p).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination)))
     )
     .reduce(addBN, new BN('0'))
+
+const findChannel = (src: PublicKey, dest: PublicKey): ChannelEntry =>
+  Object.values(STATE.channels).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
+
 
 const weightedRandomChoice = (): PublicKey => {
   if (Object.keys(STATE.nodes).length == 0) {
@@ -68,7 +73,7 @@ const STATE: State = {
   ctChannels: []
 }
 
-function setupDashboard() {
+function setupDashboard(selfPub: PublicKey) {
   const screen = blessed.screen()
   const grid = new contrib.grid({ rows: 4, cols: 4, screen: screen })
   screen.key(['escape', 'q', 'C-c'], function () {
@@ -146,7 +151,14 @@ function setupDashboard() {
 
     ctChan.setData({
       headers: ['Dest', 'Status'],
-      data: STATE.ctChannels.map((p: PublicKey) => [p.toPeerId().toB58String(), 'PENDING'])
+      data: STATE.ctChannels.map((p: PublicKey) => {
+        const chan = findChannel(selfPub, p)
+        let status = 'PENDING'
+        if (chan) {
+          status = chan.status.toString()
+        }
+        return [p.toPeerId().toB58String(), status]
+      })
     })
 
     screen.render()
@@ -169,7 +181,12 @@ async function tick(update) {
 }
 
 async function main() {
-  const update = setupDashboard()
+  const priv = process.argv[2]
+  const peerId = privKeyToPeerId(priv)
+  const selfPub = PublicKey.fromPeerId(peerId)
+  const selfAddr = selfPub.toAddress()
+
+  const update = setupDashboard(selfPub)
 
   const onChannelUpdate = (newChannel) => {
     STATE.channels[newChannel.getId().toHex()] = newChannel
@@ -185,8 +202,6 @@ async function main() {
     update()
   }
 
-  const priv = process.argv[2]
-  const peerId = privKeyToPeerId(priv)
   const options: HoprOptions = {
     provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
     createDbIfNotExist: true,
@@ -212,6 +227,19 @@ async function main() {
   update()
   await indexer.start()
   STATE.log.push('done')
+  update()
+  STATE.log.push('creating a node...')
+  update()
+  const node = new Hopr(peerId, options)
+  STATE.log.push('waiting for node to be funded ...')
+  update()
+  await node.waitForFunds()
+  STATE.log.push('starting node ...')
+  update()
+  await node.start()
+  STATE.log.push('node is running')
+  const channels = await node.getChannelsFrom(selfAddr) 
+  channels.forEach(c => STATE.ctChannels.push(c.destination))
   update()
 
   tick(update)
