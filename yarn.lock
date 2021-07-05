@@ -6679,6 +6679,11 @@ futoin-hkdf@~1.3.2:
   resolved "https://registry.yarnpkg.com/futoin-hkdf/-/futoin-hkdf-1.3.3.tgz#6ee1c9c105dfa0995ba4f80633cf1c0c32defcb2"
   integrity sha512-oR75fYk3B3X9/B02Y6vusrBKucrpC6VjxhRL+C6B7FwUpuSRHbhBNG3AZbcE/xPyJmEQWsyqUFp3VeNNbA3S7A==
 
+futoin-hkdf@~1.4.1:
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/futoin-hkdf/-/futoin-hkdf-1.4.1.tgz#88fce471aa3ec0e81f5be6f922797bb6d357a3e1"
+  integrity sha512-16pxP6/BnUeVzlt9lW8MzgN9fUcKqDpxwI4xvV2Wx1GdYa1LdYldcJezxWjxxMSIhRLACleebcAWSFRGI34YcA==
+
 ganache-cli@^6.11.0:
   version "6.12.2"
   resolved "https://registry.yarnpkg.com/ganache-cli/-/ganache-cli-6.12.2.tgz#c0920f7db0d4ac062ffe2375cb004089806f627a"
