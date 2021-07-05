@@ -11,6 +11,7 @@ import { terminalWidth } from 'yargs'
 import setupAPI from './api'
 import { getIdentity } from './identity'
 import path from 'path'
+import { passwordStrength } from 'check-password-strength'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -170,6 +171,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   if (argv.data && argv.data !== '') {
     options.dbPath = argv.data
   }
+
   return options
 }
 
@@ -210,6 +212,21 @@ async function main() {
     logs.log(`Your unique Log Id is ${publicLogsId}`)
     logs.log(`View logs at https://documint.net/${publicLogsId}`)
     logs.startLoggingQueue()
+  }
+
+  if (argv.rest || argv.admin) {
+    if (argv.apiToken == null) {
+      throw Error(`Must provide --apiToken when --admin or --rest is specified`)
+    }
+    const { contains: hasSymbolTypes, length }: { contains: string[], length: number } = passwordStrength(argv.apiToken)
+    for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
+      if (!hasSymbolTypes.includes(requiredSymbolType)) {
+        throw new Error(`API token must include a ${requiredSymbolType}`)
+      }
+      if (length < 8) {
+        throw new Error(`API token be at least 8 characters long`)
+      }
+    }
   }
 
   if (argv.admin) {
