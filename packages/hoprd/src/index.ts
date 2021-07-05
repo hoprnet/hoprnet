@@ -224,7 +224,7 @@ async function main() {
       }
     }
     if (length < 8) {
-      throw new Error(`API token be at least 8 characters long`)
+      throw new Error(`API token must be at least 8 characters long`)
     }
   }
 
