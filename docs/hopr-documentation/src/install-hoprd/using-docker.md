@@ -55,7 +55,7 @@ docker pull gcr.io/hoprassociation/hoprd:latest-kiautschou
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest-paphos'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest-kiautschou'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -63,6 +63,5 @@ alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:
 ```sh
 HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
 ```
->>>>>>> d62c3e8da (Change Docker tag latest-release to latest-SOMERELEASENAME)
 
 ![HOPR Chat distributed as a Docker image](../../images/docker_images.gif)
