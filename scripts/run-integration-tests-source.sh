@@ -31,12 +31,17 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   wait_max_wait=10
 fi
 
-declare node1_dir="/tmp/hopr-source-node-1"
-declare node2_dir="/tmp/hopr-source-node-2"
-declare node3_dir="/tmp/hopr-source-node-3"
-declare node4_dir="/tmp/hopr-source-node-4"
-declare node5_dir="/tmp/hopr-source-node-5"
-declare node6_dir="/tmp/hopr-source-node-6"
+# find usable tmp dir
+declare tmp="/tmp"
+[[ -d "${tmp}" && -h "${tmp}" ]] && tmp="/var/tmp"
+[[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
+
+declare node1_dir="${tmp}/hopr-source-node-1"
+declare node2_dir="${tmp}/hopr-source-node-2"
+declare node3_dir="${tmp}/hopr-source-node-3"
+declare node4_dir="${tmp}/hopr-source-node-4"
+declare node5_dir="${tmp}/hopr-source-node-5"
+declare node6_dir="${tmp}/hopr-source-node-6"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -52,7 +57,7 @@ declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
 
-declare hardhat_rpc_log="/tmp/hopr-source-hardhat-rpc.log"
+declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -180,7 +185,7 @@ ensure_port_is_free 19096
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
 DEVELOPMENT=true yarn hardhat node --config packages/ethereum/hardhat.config.ts \
-  --network hardhat --as-network localhost --show-stack-traces > \
+  --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
 log "Hardhat node started (127.0.0.1:8545)"
