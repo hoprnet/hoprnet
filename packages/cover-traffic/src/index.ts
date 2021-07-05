@@ -28,6 +28,9 @@ const importance = (p: PublicKey): BN =>
     .reduce(addBN, new BN('0'))
 
 const weightedRandomChoice = (): PublicKey => {
+  if (Object.keys(STATE.nodes).length == 0) {
+    throw new Error('no nodes to pick from')
+  }
   const weights: Record<string, BN> = {}
   let total = new BN('0')
   Object.values(STATE.nodes).forEach((p) => {
@@ -154,7 +157,7 @@ function setupDashboard() {
 }
 
 async function tick(update) {
-  if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE) {
+  if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(STATE.nodes).length > 0) {
     const toOpen = weightedRandomChoice()
     if (!STATE.ctChannels.find((x) => x.eq(toOpen))) {
       STATE.ctChannels.push(toOpen)
@@ -206,6 +209,7 @@ async function main() {
   indexer.on('channel-update', onChannelUpdate)
   indexer.on('peer', peerUpdate)
   STATE.log.push('indexing...')
+  update()
   await indexer.start()
   STATE.log.push('done')
   update()
