@@ -34,3 +34,8 @@ body {
 .send input:disabled::placeholder {
   color: transparent;
 }
+
+input.token::placeholder {
+  color: red;
+  opacity: 1;
+}

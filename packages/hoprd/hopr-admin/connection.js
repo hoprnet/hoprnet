@@ -2,45 +2,68 @@
  * Maintain a websocket connection
  */
 
+import Cookies from 'js-cookie'
+
 const MAX_MESSAGES_CACHED = 50
 
 export class Connection {
   logs = []
   prevLog = ''
+  authFailed = false
 
-  constructor(setConnecting, setStarted, setMessages, setConnectedPeers) {
+  constructor(setConnecting, setStarted, setMessages, setConnectedPeers, onAuthFailed) {
     this.setConnecting = setConnecting
     this.setStarted = setStarted
     this.setMessages = setMessages
     this.setConnectedPeers = setConnectedPeers
+    this.onAuthFailed = onAuthFailed
     this.connect()
   }
 
   appendMessage(event) {
+    if (event.data === undefined) {
+      return
+    }
+
     try {
       const msg = JSON.parse(event.data)
-      if (msg.type == 'log') {
-        if (this.logs.length > MAX_MESSAGES_CACHED) {
-          // Avoid memory leak
-          this.logs.splice(0, this.logs.length - MAX_MESSAGES_CACHED) // delete elements from start
-        }
-        this.logs.push(msg)
-        this.setMessages(this.logs.slice(0)) // Need a clone
-      } else if (msg.type == 'connected') {
-        this.setConnectedPeers(msg.msg.split(','))
-      } else if (msg.type == 'fatal-error') {
-        this.setConnecting('true')
-        this.logs.push(msg)
 
-        // Let's elaborate on certain error messages:
-        if (msg.msg.indexOf('account has no funds') > -1) {
-          this.logs.push({ msg: '- Please send 0.1 gETH to the account', ts: new Date().toISOString() })
-          this.logs.push({ msg: '- Then restart the node', ts: new Date().toISOString() })
-        }
+      this.authFailed = false
 
-        this.setMessages(this.logs.slice(0)) // Need a clone
-      } else if (msg.type === 'status' && msg.msg === 'STARTED') {
-        this.setStarted(true)
+      switch (msg.type) {
+        case 'log':
+          if (this.logs.length > MAX_MESSAGES_CACHED) {
+            // Avoid memory leak
+            this.logs.splice(0, this.logs.length - MAX_MESSAGES_CACHED) // delete elements from start
+          }
+          this.logs.push(msg)
+          this.setMessages(this.logs.slice(0)) // Need a clone
+          break
+        case 'connected':
+          this.setConnectedPeers(msg.msg.split(','))
+          break
+        case 'fatal-error':
+          this.logs.push(msg)
+
+          // Let's elaborate on certain error messages:
+          if (msg.msg.indexOf('account has no funds') > -1) {
+            this.logs.push({ msg: '- Please send 0.1 gETH to the account', ts: new Date().toISOString() })
+            this.logs.push({ msg: '- Then restart the node', ts: new Date().toISOString() })
+          }
+
+          this.setMessages(this.logs.slice(0)) // Need a clone
+          break
+        case 'status':
+          if (msg.msg === 'STARTED') {
+            this.setStarted(true)
+          }
+          break
+        case 'auth-failed':
+          this.logs.push(msg)
+          this.authFailed = true
+          this.setConnecting(false)
+          this.onAuthFailed()
+          break
       }
     } catch (e) {
       console.log('ERR', e)
@@ -87,22 +110,24 @@ export class Connection {
 
     client.onmessage = (event) => {
       this.appendMessage(event)
-      console.log(event)
     }
 
     client.onerror = (error) => {
       console.log('Connection error:', error)
+      this.setConnecting(false)
     }
 
     client.onclose = () => {
       console.log('Web socket closed')
-      this.setConnecting(true)
       this.appendMessage(' --- < Lost Connection, attempting to reconnect... > ---')
       var self = this
+
       setTimeout(function () {
         try {
-          self.connect()
-          console.log('connection')
+          if (!self.authFailed) {
+            this.setConnecting(true)
+            self.connect()
+          }
         } catch (e) {
           console.log('Error connecting', e)
         }
