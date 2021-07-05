@@ -78,10 +78,27 @@ gcloud_get_image_running_on_vm() {
 # $2 = container-image
 # $3 = disk name
 # $4 = mount path
+# $5 = chain provider
 gcloud_update_container_with_image() {
+  # make sure we pass the websocket endpoint url, not the http endpoint url
+  local rpc=${5/https:/wss:/}
+
   echo "Updating container on vm:$1 - $2 (disk: $3:$4)"
   gcloud compute instances update-container $1 $ZONE \
-    --container-image=$2 --container-mount-disk name=$3,mount-path="$4"
+    --container-image=$2 --container-mount-disk name=$3,mount-path="$4" \
+    --container-arg="--identity" --container-arg="${4}/.hopr-identity" \
+    --container-arg="--password" --container-arg="$BS_PASSWORD" \
+    --container-arg="--init" --container-arg="true" \
+    --container-arg="--announce" --container-arg="true" \
+    --container-arg="--rest" --container-arg="true" \
+    --container-arg="--restHost" --container-arg="0.0.0.0" \
+    --container-arg="--healthCheck" --container-arg="true" \
+    --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
+    --container-arg="--admin" --container-arg="true" \
+    --container-arg="--adminHost" --container-arg="0.0.0.0" \
+    --container-arg="--provider" --container-arg="${rpc}" \
+    --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
+    --container-restart-policy=always
   sleep 30s
 }
 
