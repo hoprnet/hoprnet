@@ -178,8 +178,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
 function addUnhandledPromiseRejectionHandler() {
   process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason)
-    // @TODO uncomment next line
-    // process.exit(1)
+    process.exit(1)
   })
 }
 
@@ -223,9 +222,9 @@ async function main() {
       if (!hasSymbolTypes.includes(requiredSymbolType)) {
         throw new Error(`API token must include a ${requiredSymbolType}`)
       }
-      if (length < 8) {
-        throw new Error(`API token be at least 8 characters long`)
-      }
+    }
+    if (length < 8) {
+      throw new Error(`API token be at least 8 characters long`)
     }
   }
 
