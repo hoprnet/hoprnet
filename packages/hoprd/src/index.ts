@@ -217,7 +217,7 @@ async function main() {
     if (argv.apiToken == null) {
       throw Error(`Must provide --apiToken when --admin or --rest is specified`)
     }
-    const { contains: hasSymbolTypes, length }: { contains: string[], length: number } = passwordStrength(argv.apiToken)
+    const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
     for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
       if (!hasSymbolTypes.includes(requiredSymbolType)) {
         throw new Error(`API token must include a ${requiredSymbolType}`)
