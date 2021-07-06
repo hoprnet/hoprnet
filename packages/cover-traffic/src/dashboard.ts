@@ -42,7 +42,7 @@ function setupDashboard(selfPub: PublicKey) {
 
   table.rows.on('select item', (item) => {
     const id = item.content.split(' ')[0].trim()
-    const node = getNode(id) 
+    const node = getNode(id)
     if (node) {
       const data = [
         ['id', node.id.toB58String()],
@@ -98,14 +98,8 @@ function setupDashboard(selfPub: PublicKey) {
   return update
 }
 
-
-
 const priv = process.argv[2]
 const peerId = privKeyToPeerId(priv)
 const selfPub = PublicKey.fromPeerId(peerId)
 const update = setupDashboard(selfPub)
 main(update, peerId)
-
-
-
-

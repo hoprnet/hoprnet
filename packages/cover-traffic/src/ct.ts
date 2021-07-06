@@ -60,10 +60,9 @@ export const weightedRandomChoice = (): PublicKey => {
   throw new Error('wtf')
 }
 
-
 class CoverTrafficStrategy extends SaneDefaults {
-  name = "covertraffic"
-  constructor(private update:(State) => void, private selfPub: PublicKey) {
+  name = 'covertraffic'
+  constructor(private update: (State) => void, private selfPub: PublicKey) {
     super()
   }
 
@@ -74,13 +73,12 @@ class CoverTrafficStrategy extends SaneDefaults {
     _peers: any,
     _getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
-
     const toOpen = []
     const toClose = []
 
-    STATE.ctChannels.forEach(dest => {
-      const c = findChannel(this.selfPub, dest) 
-      if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)){
+    STATE.ctChannels.forEach((dest) => {
+      const c = findChannel(this.selfPub, dest)
+      if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
         toClose.push(dest)
       }
     })

@@ -39,7 +39,14 @@ import BN from 'bn.js'
 import { getAddrs } from './identity'
 
 import EventEmitter from 'events'
-import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy, SaneDefaults, ChannelsToOpen, ChannelsToClose } from './channel-strategy'
+import {
+  ChannelStrategy,
+  PassiveStrategy,
+  PromiscuousStrategy,
+  SaneDefaults,
+  ChannelsToOpen,
+  ChannelsToClose
+} from './channel-strategy'
 import Debug from 'debug'
 import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
 
