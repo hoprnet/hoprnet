@@ -451,6 +451,9 @@ jobs:
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/master ]]; then
             network="goerli"
           fi
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/*]]; then
+            network="goerli"
+          fi
           echo "::set-output name=network::${network}"
 
       - name: Run start script
