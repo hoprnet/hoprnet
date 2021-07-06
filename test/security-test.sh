@@ -95,4 +95,21 @@ if [[ "${ws_response}" != *"ws client connected [ authentication ENABLED ]"* ]];
   exit 1
 fi
 
+log "Admin websocket should lock after 5 failed attempts"
+for i in {1..5} 
+do
+  ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=bad-token")
+done
+
+declare msg
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=e2e-api-token")
+msg=$(echo "${ws_response}" | jq .msg --raw-output )
+if [[ "${msg}" != "try again later" ]]; then
+  log "⛔️ Didn't time-lock ws authentication after 5 failed login attempts"
+  log "Expected response should contain msg: try again later"
+  log "Actual response:"
+  log "${ws_response}"
+  exit 1
+fi
+
 log "Security tests finished successfully"
