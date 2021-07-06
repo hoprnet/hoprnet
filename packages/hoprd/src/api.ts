@@ -3,6 +3,36 @@ import { Commands } from './commands'
 import bodyParser from 'body-parser'
 
 export default function setupAPI(node: Hopr, logs: any, options: any) {
+  const MAX_FAILED_LOGINS = 5
+  const LOCK_TIMEOUT_MS = 5 * 60 * 1000
+
+  let failedLogins: number = 0
+  let failedLoginTimeout: ReturnType<typeof setTimeout>
+
+  function isLoginLocked(): boolean {
+    return failedLogins >= MAX_FAILED_LOGINS
+  }
+
+  function unlockLogin() {
+    if (isLoginLocked()) {
+      logs.log(`Unlocking REST interface`)
+    }
+    failedLogins = 0
+  }
+
+  function registerFailedLogin() {
+    failedLogins++
+    if (isLoginLocked()) {
+      logs.log(`Locking REST interface for ${LOCK_TIMEOUT_MS} ms due to ${failedLogins} bad auth attempts`)
+      if (failedLoginTimeout) {
+        clearTimeout(failedLoginTimeout)
+      }
+      failedLoginTimeout = setTimeout(() => {
+        unlockLogin()
+      }, LOCK_TIMEOUT_MS)
+    }
+  }
+
   const http = require('http')
   const service = require('restana')()
   service.use(bodyParser.text({ type: '*/*' }))
@@ -16,14 +46,17 @@ export default function setupAPI(node: Hopr, logs: any, options: any) {
     await node.waitForRunning()
     logs.log('Node is running')
     if (options.apiToken !== undefined) {
-      if (req.headers['x-auth-token'] !== options.apiToken) {
+      if (req.headers['x-auth-token'] !== options.apiToken || isLoginLocked()) {
         logs.log('command rejected: authentication failed')
         res.send('authentication failed', 403)
+        registerFailedLogin()
         return
       }
       logs.log('command accepted: authentication succeeded')
+      unlockLogin()
     } else {
       logs.log('command accepted: authentication DISABLED')
+      unlockLogin()
     }
 
     let response = ''
