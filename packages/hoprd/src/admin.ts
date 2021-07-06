@@ -18,6 +18,8 @@ let debugLog = debug('hoprd:admin')
 
 const MIN_BALANCE = new Balance(SUGGESTED_BALANCE).toFormattedString()
 const MIN_NATIVE_BALANCE = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
+const MAX_FAILED_LOGINS = 5
+const LOCK_TIMEOUT_MS = 10 * 1000
 
 export class AdminServer {
   private app: any
@@ -25,8 +27,10 @@ export class AdminServer {
   private node: Hopr | undefined
   private wsServer: any
   private cmds: Commands
+  private failedLogins: number = 0
+  private failedLoginTimeout?: ReturnType<typeof setTimeout>
 
-  constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) {}
+  constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) { }
 
   authenticate(req): boolean {
     if (this.apiToken === undefined) {
@@ -85,6 +89,18 @@ export class AdminServer {
     this.wsServer = new ws.Server({ server: this.server })
 
     this.wsServer.on('connection', (socket: any, req: any) => {
+      if (this.failedLogins >= MAX_FAILED_LOGINS) {
+        socket.send(
+          JSON.stringify({
+            type: 'auth-failed',
+            msg: 'try again later',
+            ts: new Date().toISOString()
+          })
+        )
+        socket.close()
+        return
+      }
+
       if (!this.authenticate(req)) {
         socket.send(
           JSON.stringify({
@@ -94,7 +110,20 @@ export class AdminServer {
           })
         )
         socket.close()
-        return
+
+        this.failedLogins++
+        if (this.failedLogins >= MAX_FAILED_LOGINS) {
+          this.logs.log(`Locking websocket interface due to ${this.failedLogins} bad auth attempts`)
+          if (this.failedLoginTimeout) {
+            clearTimeout(this.failedLoginTimeout)
+          }
+          const self = this
+          this.failedLoginTimeout = setTimeout(() => {
+            self.failedLogins = 0
+            self.logs.log(`Unlocking websocket interface`)
+          }, LOCK_TIMEOUT_MS)
+          return
+        }
       }
 
       socket.on('message', (message: string) => {
@@ -137,16 +166,16 @@ export class AdminServer {
     this.node.on('hopr:warning:unfunded', (addr) => {
       this.logs.log(
         `- The account associated with this node has no ${Balance.SYMBOL},\n` +
-          `  in order to send messages, or open channels, you will need to send` +
-          `  at least ${MIN_BALANCE} to ${addr}`
+        `  in order to send messages, or open channels, you will need to send` +
+        `  at least ${MIN_BALANCE} to ${addr}`
       )
     })
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       this.logs.log(
         `- The account associated with this node has no ${NativeBalance.SYMBOL},\n` +
-          `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  ${MIN_NATIVE_BALANCE} to ${addr}`
+        `  in order to fund gas for protocol overhead you will need to send\n` +
+        `  ${MIN_NATIVE_BALANCE} to ${addr}`
       )
     })
 
@@ -156,7 +185,7 @@ export class AdminServer {
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
 
-    this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
+    this.cmds.execute(() => { }, `alias ${node.getId().toB58String()} me`)
   }
 }
 
