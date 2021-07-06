@@ -57,6 +57,31 @@ export class AdminServer {
     return true
   }
 
+  isLoginLocked(): boolean {
+    return this.failedLogins >= MAX_FAILED_LOGINS
+  }
+
+  unlockLogin() {
+    if (this.isLoginLocked()) {
+      this.logs.log(`Unlocking websocket interface`)
+    }
+    this.failedLogins = 0
+  }
+
+  registerFailedLogin() {
+    this.failedLogins++
+    if (this.isLoginLocked()) {
+      this.logs.log(`Locking websocket interface for ${LOCK_TIMEOUT_MS} ms due to ${this.failedLogins} bad auth attempts`)
+      if (this.failedLoginTimeout) {
+        clearTimeout(this.failedLoginTimeout)
+      }
+      const self = this
+      this.failedLoginTimeout = setTimeout(() => {
+        self.unlockLogin()
+      }, LOCK_TIMEOUT_MS)
+    }
+  }
+
   async setup() {
     let adminPath = path.resolve(__dirname, '../hopr-admin/')
     if (!fs.existsSync(adminPath)) {
@@ -89,7 +114,7 @@ export class AdminServer {
     this.wsServer = new ws.Server({ server: this.server })
 
     this.wsServer.on('connection', (socket: any, req: any) => {
-      if (this.failedLogins >= MAX_FAILED_LOGINS) {
+      if (this.isLoginLocked()) {
         socket.send(
           JSON.stringify({
             type: 'auth-failed',
@@ -98,6 +123,7 @@ export class AdminServer {
           })
         )
         socket.close()
+        this.registerFailedLogin()
         return
       }
 
@@ -110,21 +136,10 @@ export class AdminServer {
           })
         )
         socket.close()
-
-        this.failedLogins++
-        if (this.failedLogins >= MAX_FAILED_LOGINS) {
-          this.logs.log(`Locking websocket interface due to ${this.failedLogins} bad auth attempts`)
-          if (this.failedLoginTimeout) {
-            clearTimeout(this.failedLoginTimeout)
-          }
-          const self = this
-          this.failedLoginTimeout = setTimeout(() => {
-            self.failedLogins = 0
-            self.logs.log(`Unlocking websocket interface`)
-          }, LOCK_TIMEOUT_MS)
-          return
-        }
+        this.registerFailedLogin()
+        return
       }
+      this.unlockLogin()
 
       socket.on('message', (message: string) => {
         debugLog('Message from client', message)
