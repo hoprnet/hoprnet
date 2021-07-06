@@ -86,7 +86,7 @@ if [ "${msg_type}" != "auth-failed" ]; then
 fi
 
 log "Admin websocket should execute info command with correct token"
-ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=e2e-api-token")
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=e2e-API-token^^")
 if [[ "${ws_response}" != *"ws client connected [ authentication ENABLED ]"* ]]; then
   log "⛔️ Didn't succeed ws authentication"
   log "Expected response should contain: 'ws client connected [ authentication ENABLED ]' "

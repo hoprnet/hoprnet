@@ -52,7 +52,7 @@ run_command(){
   local step_time=${5:-5}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl --silent -X POST --header X-Auth-Token:e2e-api-token --url ${endpoint}/api/v1/command --data "
+  local cmd="curl --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v1/command --data "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
