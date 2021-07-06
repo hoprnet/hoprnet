@@ -20,14 +20,14 @@ Initially, each payment channel in HOPR is \textit{closed} which means that in o
 A calls the method \textit{fundChannel()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is emited. The channel is now \textit{open}.
 
 
-$$fundChannel(A: <\lambda>, B: <\mu>)$$ where $\lambda$ is the amount to be staked by A and $\mu$ is the amount to be staked by B. Both values can also be equal or any of them could be zero. A is also able to fund other channels which A is not part of.
+$$fundChannel(A: <\lambda>, B: <\mu>)$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender (sender can be the same as A or B) for A and B. Both values can also be equal or any of them could be zero. The sender is also able to fund other channels which the sender is not part of.
 The destination address of the address must now commit in order for the channel between both parties is opened. Channel state is either open or waiting for commitment.
 
 \paragraph{Redeem tickets}
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
 \paragraph{Closing a channel}
 Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
-A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}. When channel is closed, funds (stake) are transfered automatically back to the sender. Every ticket that wasn't redeemed while channel was open can't be redeemed after closure.
+A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}. When channel is closed, funds (stake) are transfered automatically back to both A and B. Every ticket that wasn't redeemed while channel was open can't be redeemed after closure.
 
 \begin{comment}
     
