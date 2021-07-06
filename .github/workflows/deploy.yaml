@@ -330,8 +330,8 @@ jobs:
           HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
           HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
 
-      - name: Add additional tags to new Docker image
-        if: ${{ !env.ACT }}
+      - name: Add additional tags to new Docker image (on master and release branches)
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: |
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION}
         env:
@@ -465,6 +465,7 @@ jobs:
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
             export RELEASE=${{ steps.set-image-version.outputs.vsn }}
           fi
+          echo "Pre-deploy env var RELEASE=${RELEASE}"
           ./scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
