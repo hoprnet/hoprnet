@@ -28,8 +28,10 @@ elif [ "${RPC_NETWORK:-}" != "xdai" ] && [ "${RPC_NETWORK:-}" != "goerli" ]; the
   exit 1
 fi
 
-# Get version from package.json
-RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
+# Get version from package.json if not already set
+if [ -z "${RELEASE:-}" ]; then
+  RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
+fi
 
 # Get RELEASE_NAME, from environment
 get_environment

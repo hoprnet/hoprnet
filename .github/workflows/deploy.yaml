@@ -461,6 +461,10 @@ jobs:
         run: |
           # need to install tools first which may be used during deployment
           yarn
+          # set release to intermediate docker build for debugging PRs
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
+            export RELEASE=${{ steps.set-image-version.outputs.vsn }}
+          fi
           ./scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
