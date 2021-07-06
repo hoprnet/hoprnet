@@ -22,6 +22,15 @@ usage() {
   msg
 }
 
+test_status_code() {
+  declare received=$1
+  declare expected=$2
+  if [ "${received}" -ne "${expected}" ]; then
+    log "⛔️ Expected ${expected} http status code, got ${received}"
+    exit 1
+  fi
+}
+
 declare host="${1}"
 declare rest_port="${2}"
 declare admin_port="${3}"
@@ -47,39 +56,24 @@ log "Testing REST API security"
 
 log "REST API should reject authentication without token"
 http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
-  exit 1
-fi
+test_status_code ${http_status_code} 403
 
 log "REST API should reject authentication with invalid token"
 http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
-  exit 1
-fi
+test_status_code ${http_status_code} 403
 
 log "REST API should auth with correct token"
 http_status_code=$(curl -H "X-Auth-Token: ${correct_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
-if [ ${http_status_code} -ne 200 ]; then
-  log "⛔️ Expected 200 http status code, got ${http_status_code}"
-  exit 1
-fi
+test_status_code ${http_status_code} 200
 
 log "REST API should time-lock after 5 bad login attempts"
 for i in {1..5} 
 do
   http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
-  if [ ${http_status_code} -ne 403 ]; then
-    log "⛔️ Expected 403 http status code, got ${http_status_code}"
-    exit 1
-  fi
+  test_status_code ${http_status_code} 403
 done
 http_status_code=$(curl -H "X-Auth-Token: ${correct_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
-  exit 1
-fi
+test_status_code ${http_status_code} 403
 
 log "Testing websocket security"
 
