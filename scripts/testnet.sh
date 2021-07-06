@@ -122,8 +122,7 @@ update_if_existing() {
 # $3 = chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  # make sure we pass the websocket endpoint url, not the http endpoint url
-  local rpc=${3/https:/wss:/}
+  local rpc=${3}
 
   if [ "$(update_if_existing $1 $2 ${rpc})" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \

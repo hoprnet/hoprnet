@@ -80,8 +80,7 @@ gcloud_get_image_running_on_vm() {
 # $4 = mount path
 # $5 = chain provider
 gcloud_update_container_with_image() {
-  # make sure we pass the websocket endpoint url, not the http endpoint url
-  local rpc=${5/https:/wss:/}
+  local rpc=${5}
 
   echo "Updating container on vm:$1 - $2 (disk: $3:$4)"
   gcloud compute instances update-container $1 $ZONE \
