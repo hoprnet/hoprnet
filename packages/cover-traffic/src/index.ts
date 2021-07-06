@@ -11,6 +11,7 @@ import blessed from 'blessed'
 import contrib from 'blessed-contrib'
 
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
+const CHANNEL_STAKE = new BN('1000')
 
 const addBN = (a: BN, b: BN): BN => a.add(b)
 const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
@@ -168,16 +169,16 @@ function setupDashboard(selfPub: PublicKey) {
   return update
 }
 
-async function tick(update) {
+async function tick(update, node: Hopr) {
   if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(STATE.nodes).length > 0) {
     const toOpen = weightedRandomChoice()
     if (!STATE.ctChannels.find((x) => x.eq(toOpen))) {
       STATE.ctChannels.push(toOpen)
-      // await channel.open
+      await node.openChannel(toOpen.toPeerId(), CHANNEL_STAKE) 
     }
   }
   update()
-  setTimeout(() => tick(update), 1000)
+  setTimeout(() => tick(update, node), 1000)
 }
 
 async function main() {
@@ -241,8 +242,7 @@ async function main() {
   const channels = await node.getChannelsFrom(selfAddr) 
   channels.forEach(c => STATE.ctChannels.push(c.destination))
   update()
-
-  tick(update)
+  tick(update, node)
 }
 
 main()
