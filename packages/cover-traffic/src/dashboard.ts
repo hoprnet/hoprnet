@@ -85,9 +85,11 @@ function setupDashboard(selfPub: PublicKey) {
       headers: ['Dest', 'Status'],
       data: state.ctChannels.map((p: PublicKey) => {
         const chan = findChannel(selfPub, p)
-        let status = 'PENDING'
+        let status
         if (chan) {
           status = chan.status.toString()
+        } else {
+          status = 'UNKNOWN'
         }
         return [p.toPeerId().toB58String(), status]
       })
@@ -97,7 +99,6 @@ function setupDashboard(selfPub: PublicKey) {
   }
   return update
 }
-
 
 
 const priv = process.argv[2]

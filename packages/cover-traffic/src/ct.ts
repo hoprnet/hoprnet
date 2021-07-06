@@ -12,7 +12,8 @@ const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
 
 const options: HoprOptions = {
   //provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
-  provider: 'https://eth-goerli.gateway.pokt.network/v1/6021a2b6928ff9002e6c7f2f',
+// provider: 'https://eth-goerli.gateway.pokt.network/v1/6021a2b6928ff9002e6c7f2f',
+  provider: 'wss://goerli.infura.io/ws/v3/51d4d972f30c4d92b61f2b3898fccaf6',
   createDbIfNotExist: true,
   password: '',
   forceCreateDB: true,
@@ -71,28 +72,30 @@ class CoverTrafficStrategy extends SaneDefaults {
   async tick(
     _balance: BN,
     _n: ChannelEntry[],
-    _currentChannels: ChannelEntry[],
+    currentChannels: ChannelEntry[],
     _peers: any,
     _getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
-
     const toOpen = []
     const toClose = []
 
-    STATE.ctChannels.forEach(dest => {
-      const c = findChannel(this.selfPub, dest) 
-      if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)){
-        toClose.push(dest)
+    currentChannels.forEach(curr => {
+      if (curr.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)){
+        toClose.push(curr.destination)
       }
     })
 
-    if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(STATE.nodes).length > 0) {
+    if (currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(STATE.nodes).length > 0) {
       const c = weightedRandomChoice()
-      if (!STATE.ctChannels.find((x) => x.eq(c)) && !c.eq(this.selfPub)) {
-        STATE.ctChannels.push(c)
+      if (!currentChannels.find((x) => x.destination.eq(c)) && !c.eq(this.selfPub)) {
         toOpen.push([c, CHANNEL_STAKE])
       }
     }
+
+    STATE.ctChannels = currentChannels.map(c => c.destination)
+                                      .concat(toOpen.map(o =>o[0]))
+                                      .concat(toClose)
+    STATE.log.push(`strategy tick, open:${toOpen.map(p => p[0].toHex()).join(',')}, close: ${toClose.map(p=>p.toHex()).join(',')}`)
     this.update(STATE)
     return [toOpen, toClose]
   }
@@ -116,6 +119,11 @@ const STATE: State = {
   log: [],
   ctChannels: []
 }
+
+// Otherwise we get a mess
+process.on('unhandledRejection', (_reason, promise) => {
+  STATE.log.push('uncaught exception in promise' + promise)
+});
 
 export async function main(update: (State) => void, peerId: PeerId) {
   const selfPub = PublicKey.fromPeerId(peerId)

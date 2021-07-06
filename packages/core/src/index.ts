@@ -310,14 +310,14 @@ class Hopr extends EventEmitter {
       rndChannels,
       currentChannels,
       this.networkPeers,
-      chain.getRandomOpenChannel.bind(this.paymentChannels)
+      chain.getRandomOpenChannel.bind(chain)
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
       verbose(`closing ${toClose}`)
       await this.closeChannel(toClose.toPeerId())
       verbose(`closed channel to ${toClose.toString()}`)
-      this.emit('hopr:channel:closed', toClose)
+      this.emit('hopr:channel:closed', toClose.toPeerId())
     }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
