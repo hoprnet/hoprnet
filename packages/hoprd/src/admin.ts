@@ -19,7 +19,7 @@ let debugLog = debug('hoprd:admin')
 const MIN_BALANCE = new Balance(SUGGESTED_BALANCE).toFormattedString()
 const MIN_NATIVE_BALANCE = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 const MAX_FAILED_LOGINS = 5
-const LOCK_TIMEOUT_MS = 10 * 1000
+const LOCK_TIMEOUT_MS = 5 * 60 * 1000
 
 export class AdminServer {
   private app: any
