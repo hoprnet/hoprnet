@@ -12,6 +12,7 @@ import contrib from 'blessed-contrib'
 
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
 const CHANNEL_STAKE = new BN('1000')
+const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
 
 const addBN = (a: BN, b: BN): BN => a.add(b)
 const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
@@ -57,7 +58,7 @@ const weightedRandomChoice = (): PublicKey => {
 
 class CoverTrafficStrategy extends SaneDefaults {
   name = "covertraffic"
-  constructor(private update) {
+  constructor(private update, private selfPub: PublicKey) {
     super()
   }
 
@@ -68,8 +69,26 @@ class CoverTrafficStrategy extends SaneDefaults {
     _peers: any,
     _getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+
+    const toOpen = []
+    const toClose = []
+
+    STATE.ctChannels.forEach(dest => {
+      const c = findChannel(this.selfPub, dest) 
+      if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)){
+        toClose.push(dest)
+      }
+    })
+
+    if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(STATE.nodes).length > 0) {
+      const c = weightedRandomChoice()
+      if (!STATE.ctChannels.find((x) => x.eq(c))) {
+        STATE.ctChannels.push(c)
+        toOpen.push([c, CHANNEL_STAKE])
+      }
+    }
     this.update()
-    return [[], []]
+    return [toOpen, toClose]
   }
 
 }
@@ -188,18 +207,6 @@ function setupDashboard(selfPub: PublicKey) {
   return update
 }
 
-async function tick(update, node: Hopr) {
-  if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(STATE.nodes).length > 0) {
-    const toOpen = weightedRandomChoice()
-    if (!STATE.ctChannels.find((x) => x.eq(toOpen))) {
-      STATE.ctChannels.push(toOpen)
-      await node.openChannel(toOpen.toPeerId(), CHANNEL_STAKE) 
-    }
-  }
-  update()
-  setTimeout(() => tick(update, node), 1000)
-}
-
 async function main() {
   const priv = process.argv[2]
   const peerId = privKeyToPeerId(priv)
@@ -261,8 +268,7 @@ async function main() {
   const channels = await node.getChannelsFrom(selfAddr)
   channels.forEach((c) => STATE.ctChannels.push(c.destination))
   update()
-  node.setChannelStrategy(new CoverTrafficStrategy(update))
-  tick(update, node)
+  node.setChannelStrategy(new CoverTrafficStrategy(update, selfPub))
 }
 
 main()
