@@ -34,6 +34,10 @@ export class AdminServer {
       return true
     }
 
+    if (req.headers.cookie == undefined) {
+      return false
+    }
+
     let cookies: ReturnType<typeof cookie.parse> | undefined
     try {
       cookies = cookie.parse(req.headers.cookie)
@@ -82,7 +86,13 @@ export class AdminServer {
 
     this.wsServer.on('connection', (socket: any, req: any) => {
       if (!this.authenticate(req)) {
-        socket.send('authentication failed')
+        socket.send(
+          JSON.stringify({
+            type: 'auth-failed',
+            msg: 'authentication failed',
+            ts: new Date().toISOString()
+          })
+        )
         socket.close()
         return
       }

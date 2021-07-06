@@ -96,6 +96,7 @@ run_command(){
 
 # $1 = vm name
 # $2 = docker image
+# $3 = chain provider
 update_if_existing() {
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
     echo "Container exists, updating" 1>&2
@@ -105,7 +106,7 @@ update_if_existing() {
       return 0
     fi
     echo "Previous GCloud VM Image: $PREV"
-    gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db"
+    gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db" "${3}"
     sleep 60
 
     # prevent docker images overloading the disk space
@@ -121,10 +122,9 @@ update_if_existing() {
 # $3 = chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  # make sure we pass the websocket endpoint url, not the http endpoint url
-  local rpc=${3/https:/wss:/}
+  local rpc=${3}
 
-  if [ "$(update_if_existing $1 $2)" = "no container" ]; then
+  if [ "$(update_if_existing $1 $2 ${rpc})" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
