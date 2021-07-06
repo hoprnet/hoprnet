@@ -27,7 +27,7 @@ The destination address of the address must now commit in order for the channel 
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
 \paragraph{Closing a channel}
 Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
-A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}. When channel is closed, funds (stake) are transfered automatically back to both A. Every ticket that wasn't redeemed while channel was open can't be redeemed after closure.
+A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}. When channel is closed, funds (stake) are transfered automatically back to A. Every ticket that wasn't redeemed while channel was open can't be redeemed after closure.
 
 \begin{comment}
     
