@@ -630,7 +630,6 @@ class Hopr extends EventEmitter {
       // TODO - don't double bind here
       this.strategy.onWinningTicket(ack, channel)
     })
-    throw new Error('Unknown strategy')
   }
 
   public getChannelStrategy(): string {

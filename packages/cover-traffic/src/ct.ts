@@ -1,12 +1,10 @@
-//import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions, ChannelsToOpen, ChannelsToClose } from '@hoprnet/hopr-core'
 import Hopr, { SaneDefaults } from '@hoprnet/hopr-core'
-import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
 import { PublicKey, HoprDB, ChannelEntry } from '@hoprnet/hopr-utils'
 import { createChainWrapper, Indexer, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from '@hoprnet/hopr-core-ethereum'
-
+import type PeerId from 'peer-id'
 
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
 const CHANNEL_STAKE = new BN('1000')
@@ -20,26 +18,27 @@ const options: HoprOptions = {
   announce: false
 }
 
-const addBN = (a: BN, b: BN): BN => a.add(b)
-const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
-const findChannelsFrom = (p: PublicKey): ChannelEntry[] =>
+export const addBN = (a: BN, b: BN): BN => a.add(b)
+export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
+export const findChannelsFrom = (p: PublicKey): ChannelEntry[] =>
   Object.values(STATE.channels).filter((c: ChannelEntry) => c.source.eq(p))
-const totalChannelBalanceFor = (p: PublicKey): BN =>
+export const totalChannelBalanceFor = (p: PublicKey): BN =>
   findChannelsFrom(p)
     .map((c) => c.balance.toBN())
     .reduce(addBN, new BN('0'))
 
-const importance = (p: PublicKey): BN =>
+export const importance = (p: PublicKey): BN =>
   findChannelsFrom(p)
     .map((c: ChannelEntry) =>
       sqrtBN(totalChannelBalanceFor(p).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination)))
     )
     .reduce(addBN, new BN('0'))
 
-const findChannel = (src: PublicKey, dest: PublicKey): ChannelEntry =>
+export const findChannel = (src: PublicKey, dest: PublicKey): ChannelEntry =>
   Object.values(STATE.channels).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
+export const getNode = (b58String: string): PeerData => STATE.nodes[b58String]
 
-const weightedRandomChoice = (): PublicKey => {
+export const weightedRandomChoice = (): PublicKey => {
   if (Object.keys(STATE.nodes).length == 0) {
     throw new Error('no nodes to pick from')
   }
@@ -64,7 +63,7 @@ const weightedRandomChoice = (): PublicKey => {
 
 class CoverTrafficStrategy extends SaneDefaults {
   name = "covertraffic"
-  constructor(private update, private selfPub: PublicKey) {
+  constructor(private update:(State) => void, private selfPub: PublicKey) {
     super()
   }
 
@@ -88,15 +87,14 @@ class CoverTrafficStrategy extends SaneDefaults {
 
     if (STATE.ctChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(STATE.nodes).length > 0) {
       const c = weightedRandomChoice()
-      if (!STATE.ctChannels.find((x) => x.eq(c))) {
+      if (!STATE.ctChannels.find((x) => x.eq(c)) && !c.eq(this.selfPub)) {
         STATE.ctChannels.push(c)
         toOpen.push([c, CHANNEL_STAKE])
       }
     }
-    this.update()
+    this.update(STATE)
     return [toOpen, toClose]
   }
-
 }
 
 type PeerData = {
@@ -104,7 +102,7 @@ type PeerData = {
   pub: PublicKey
   multiaddrs: any
 }
-type State = {
+export type State = {
   nodes: Record<string, PeerData>
   channels: Record<string, ChannelEntry>
   log: string[]
@@ -118,15 +116,13 @@ const STATE: State = {
   ctChannels: []
 }
 
-export async function main(update: () => void) {
-  const priv = process.argv[2]
-  const peerId = privKeyToPeerId(priv)
+export async function main(update: (State) => void, peerId: PeerId) {
   const selfPub = PublicKey.fromPeerId(peerId)
   const selfAddr = selfPub.toAddress()
 
   const onChannelUpdate = (newChannel) => {
     STATE.channels[newChannel.getId().toHex()] = newChannel
-    update()
+    update(STATE)
   }
 
   const peerUpdate = (peer) => {
@@ -135,7 +131,7 @@ export async function main(update: () => void) {
       multiaddrs: peer.multiaddrs,
       pub: PublicKey.fromPeerId(peer.id)
     }
-    update()
+    update(STATE)
   }
 
   const db = new HoprDB(
@@ -152,22 +148,22 @@ export async function main(update: () => void) {
   indexer.on('channel-update', onChannelUpdate)
   indexer.on('peer', peerUpdate)
   STATE.log.push('indexing...')
-  update()
+  update(STATE)
   await indexer.start()
   STATE.log.push('done')
-  update()
+  update(STATE)
   STATE.log.push('creating a node...')
-  update()
+  update(STATE)
   const node = new Hopr(peerId, options)
   STATE.log.push('waiting for node to be funded ...')
-  update()
+  update(STATE)
   await node.waitForFunds()
   STATE.log.push('starting node ...')
-  update()
+  update(STATE)
   await node.start()
   STATE.log.push('node is running')
   const channels = await node.getChannelsFrom(selfAddr)
   channels.forEach((c) => STATE.ctChannels.push(c.destination))
-  update()
+  update(STATE)
   node.setChannelStrategy(new CoverTrafficStrategy(update, selfPub))
 }

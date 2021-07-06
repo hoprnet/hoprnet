@@ -1,5 +1,9 @@
 import blessed from 'blessed'
 import contrib from 'blessed-contrib'
+import { main, State, findChannelsFrom, importance, totalChannelBalanceFor, findChannel, getNode } from './ct'
+import { privKeyToPeerId } from '@hoprnet/hopr-utils'
+import { PublicKey } from '@hoprnet/hopr-utils'
+import { BigNumber } from 'bignumber.js'
 
 function setupDashboard(selfPub: PublicKey) {
   const screen = blessed.screen()
@@ -38,7 +42,7 @@ function setupDashboard(selfPub: PublicKey) {
 
   table.rows.on('select item', (item) => {
     const id = item.content.split(' ')[0].trim()
-    const node = STATE.nodes[id]
+    const node = getNode(id) 
     if (node) {
       const data = [
         ['id', node.id.toB58String()],
@@ -59,10 +63,10 @@ function setupDashboard(selfPub: PublicKey) {
 
   screen.render()
 
-  const update = () => {
+  const update = (state: State) => {
     table.setData({
       headers: ['ID', 'Importance', '#Chans', 'Tot.Stk'],
-      data: Object.values(STATE.nodes)
+      data: Object.values(state.nodes)
         .sort((a: any, b: any) => importance(b.pub).cmp(importance(a.pub)))
         .map((p) => [
           p.id.toB58String(),
@@ -73,13 +77,13 @@ function setupDashboard(selfPub: PublicKey) {
     })
 
     var l
-    while ((l = STATE.log.pop())) {
+    while ((l = state.log.pop())) {
       logs.log(l)
     }
 
     ctChan.setData({
       headers: ['Dest', 'Status'],
-      data: STATE.ctChannels.map((p: PublicKey) => {
+      data: state.ctChannels.map((p: PublicKey) => {
         const chan = findChannel(selfPub, p)
         let status = 'PENDING'
         if (chan) {
@@ -91,15 +95,16 @@ function setupDashboard(selfPub: PublicKey) {
 
     screen.render()
   }
-  update()
-
   return update
 }
 
 
 
+const priv = process.argv[2]
+const peerId = privKeyToPeerId(priv)
+const selfPub = PublicKey.fromPeerId(peerId)
 const update = setupDashboard(selfPub)
-main(update)
+main(update, peerId)
 
 
 
