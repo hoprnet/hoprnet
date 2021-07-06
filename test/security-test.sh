@@ -26,6 +26,9 @@ declare host="${1}"
 declare rest_port="${2}"
 declare admin_port="${3}"
 
+declare bad_token="bad_token"
+declare correct_token="e2e-API-token^^"
+
 log "Security tests started"
 log "Rest API @ ${host}:${rest_port}"
 log "Admin websocket API @ ${host}:${admin_port}"
@@ -50,22 +53,29 @@ if [ ${http_status_code} -ne 403 ]; then
 fi
 
 log "REST API should reject authentication with invalid token"
-http_status_code=$(curl -H "X-Auth-Token: bad-token" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
+http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${http_status_code} -ne 403 ]; then
   log "⛔️ Expected 403 http status code, got ${http_status_code}"
+  exit 1
+fi
+
+log "REST API should auth with correct token"
+http_status_code=$(curl -H "X-Auth-Token: ${correct_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
+if [ ${http_status_code} -ne 200 ]; then
+  log "⛔️ Expected 200 http status code, got ${http_status_code}"
   exit 1
 fi
 
 log "REST API should time-lock after 5 bad login attempts"
 for i in {1..5} 
 do
-  http_status_code=$(curl -H "X-Auth-Token: bad-token" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
+  http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
   if [ ${http_status_code} -ne 403 ]; then
     log "⛔️ Expected 403 http status code, got ${http_status_code}"
     exit 1
   fi
 done
-http_status_code=$(curl -H "X-Auth-Token: e2e-api-token" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
+http_status_code=$(curl -H "X-Auth-Token: ${correct_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${http_status_code} -ne 403 ]; then
   log "⛔️ Expected 403 http status code, got ${http_status_code}"
   exit 1
@@ -91,7 +101,7 @@ if [ "${msg_type}" != "auth-failed" ]; then
 fi
 
 log "Admin websocket should reject commands with invalid token"
-ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=bad-token")
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=${bad_token}")
 msg_type=$(echo "${ws_response}" | jq .type --raw-output )
 
 if [ "${msg_type}" != "auth-failed" ]; then
@@ -105,7 +115,7 @@ if [ "${msg_type}" != "auth-failed" ]; then
 fi
 
 log "Admin websocket should execute info command with correct token"
-ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=e2e-API-token^^")
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=${correct_token}")
 if [[ "${ws_response}" != *"ws client connected [ authentication ENABLED ]"* ]]; then
   log "⛔️ Didn't succeed ws authentication"
   log "Expected response should contain: 'ws client connected [ authentication ENABLED ]' "
@@ -117,11 +127,11 @@ fi
 log "Admin websocket should lock after 5 failed attempts"
 for i in {1..5} 
 do
-  ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=bad-token")
+  ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=${bad_token}")
 done
 
 declare msg
-ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=e2e-api-token")
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=${correct_token}")
 msg=$(echo "${ws_response}" | jq .msg --raw-output )
 if [[ "${msg}" != "try again later" ]]; then
   log "⛔️ Didn't time-lock ws authentication after 5 failed login attempts"
