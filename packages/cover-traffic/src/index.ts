@@ -32,7 +32,6 @@ const importance = (p: PublicKey): BN =>
 const findChannel = (src: PublicKey, dest: PublicKey): ChannelEntry =>
   Object.values(STATE.channels).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
 
-
 const weightedRandomChoice = (): PublicKey => {
   if (Object.keys(STATE.nodes).length == 0) {
     throw new Error('no nodes to pick from')
@@ -239,8 +238,8 @@ async function main() {
   update()
   await node.start()
   STATE.log.push('node is running')
-  const channels = await node.getChannelsFrom(selfAddr) 
-  channels.forEach(c => STATE.ctChannels.push(c.destination))
+  const channels = await node.getChannelsFrom(selfAddr)
+  channels.forEach((c) => STATE.ctChannels.push(c.destination))
   update()
   tick(update, node)
 }
