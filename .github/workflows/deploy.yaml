@@ -356,6 +356,16 @@ jobs:
           HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
           TAG: ${{ steps.set-latest-release-tag.outputs.tag }}
 
+      - name: Add debug tags to new Docker image (on debug-deploy branches)
+        if: ${{ startsWith(github.ref, 'refs/heads/debug-deploy/') && !env.ACT }}
+        run: |
+          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}"
+          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${tag}
+        env:
+          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: |
@@ -463,7 +473,7 @@ jobs:
           yarn
           # set release to intermediate docker build for debugging PRs
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
-            export RELEASE=${{ steps.set-image-version.outputs.vsn }}
+            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}"
           fi
           echo "Pre-deploy env var RELEASE=${RELEASE}"
           ./scripts/deploy.sh
