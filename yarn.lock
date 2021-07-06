@@ -665,17 +665,18 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.2.0.tgz#f3933a44e365864f4dad5db94158106d511e8131"
   integrity sha512-sqKVVVOe5ivCaXDWivIJYVSaEgdQK9ul7a4Kity5Iw7u9+wBAPbX1RMSnLLmp7O4Vzj0WOWwMAJsTL00xwaNug==
 
-"@hoprnet/hopr-connect@0.2.29":
-  version "0.2.29"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.29.tgz#2e12d5e1398f393d7dc2a9b802947d402d8c7ddb"
-  integrity sha512-BKGD7HGMGk7DiFOR8Ofj20m7j1WBr/N9IQ5boaaEgBUfccnIRUbjwZ7GZDIlOqy3+IqHr9DIi5f4SyLU4JT92Q==
+"@hoprnet/hopr-connect@0.2.30":
+  version "0.2.30"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.30.tgz#2db795fa843580b880ab09b7edc8fb99a9cfbcfe"
+  integrity sha512-ZpLjGP66xEL8/seahUrAijRMqYg3xHryta3FtouagGDOMZFeuYipWROkV+iCHx8pq1q0jR7iEF3rDnhQxsEQzg==
   dependencies:
-    "@hoprnet/hopr-utils" "1.71.0-next.145"
+    "@hoprnet/hopr-utils" "1.74.0-next.16"
     abortable-iterator "^3.0.0"
     bl "^5.0"
     debug "^4.3.1"
+    heap-js "^2.1.5"
     it-handshake "^2.0.0"
-    multiaddr "~9.0.1"
+    multiaddr "~9.0.2"
     multihashes "^4.0.2"
     p-defer "3"
     peer-id "~0.14.8"
@@ -684,28 +685,29 @@
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
 
-"@hoprnet/hopr-utils@1.71.0-next.145":
-  version "1.71.0-next.145"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.71.0-next.145.tgz#8836b5a1dfcef8d58b6fabc4c7154c6f35b67c22"
-  integrity sha512-141mqrBLJpMXvvdy2VFXAbBXiDsMqwNlFHqZgLYmvZBN1y0fnxrSRLUfTJJpn54k8eDKY9EeeaIWVhV2whjZqQ==
+"@hoprnet/hopr-utils@1.74.0-next.16":
+  version "1.74.0-next.16"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.74.0-next.16.tgz#a5d2fbd67e297b28ad0f751d8daa334cd1277ade"
+  integrity sha512-KC+WhLRlgn/Y7ulXo4DSXrALb2M9NBoMgkjwHk/wfHrnlujHFwaJEtCQKZzvLfEq0UZc5quvCvtbGpVmBan9lw==
   dependencies:
     abort-controller "~3.0.0"
     bignumber.js "^9.0.0"
     bn.js "^5.2.0"
+    bs58 "^4.0.1"
     chalk "^4.1.1"
     ethers "^5.1.3"
     futoin-hkdf "~1.3.2"
     it-pipe "^1.1.0"
     leveldown "^6.0.0"
     levelup "^5.0.0"
-    libp2p "0.31.3"
+    libp2p "0.31.7"
     libp2p-crypto "0.19.4"
     memdown "^6.0.0"
-    multiaddr "9.0.1"
+    multiaddr "^9.0.1"
     multihashes "~4.0.1"
     peer-id "0.14.8"
+    private-ip "^2.2.1"
     secp256k1 "^4.0.2"
-    strip-ansi "^7.0.0"
 
 "@lerna/add@4.0.0":
   version "4.0.0"
@@ -2562,11 +2564,6 @@ ansi-regex@^5.0.0:
   version "5.0.0"
   resolved "https://registry.yarnpkg.com/ansi-regex/-/ansi-regex-5.0.0.tgz#388539f55179bf39339c81af30a654d69f87cb75"
   integrity sha512-bY6fj56OUQ0hU1KjFNDQuJFezqKdrAyFdIevADiqrWHwSlbmBNMHp5ak2f40Pm8JTFyM2mqxkG6ngkHO11f/lg==
-
-ansi-regex@^6.0.0:
-  version "6.0.0"
-  resolved "https://registry.yarnpkg.com/ansi-regex/-/ansi-regex-6.0.0.tgz#ecc7f5933cbe5ac7b33e209a5ff409ab1669c6b2"
-  integrity sha512-tAaOSrWCHF+1Ear1Z4wnJCXA9GGox4K6Ic85a5qalES2aeEwQGr7UC93mwef49536PkCYjzkp0zIxfFvexJ6zQ==
 
 ansi-styles@^2.2.1:
   version "2.2.1"
@@ -7320,7 +7317,7 @@ he@1.2.0:
   resolved "https://registry.yarnpkg.com/he/-/he-1.2.0.tgz#84ae65fa7eafb165fddb61566ae14baf05664f0f"
   integrity sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==
 
-heap-js@^2.1.2:
+heap-js@^2.1.2, heap-js@^2.1.5:
   version "2.1.5"
   resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.5.tgz#43251ecdd23c632653fe783bc8bdc2b7da4baf4c"
   integrity sha512-zJeFH1ZxUHuYG6x9+a8Dy+5kjqbKk1K8yPI1KZEdsi18VCd0UjTyJ2u9PfuIoj7t3+saMmI132rJGV33tP52VQ==
@@ -9111,63 +9108,6 @@ libp2p-utils@^0.3.0, libp2p-utils@^0.3.1:
     multiaddr "^9.0.1"
     private-ip "^2.1.1"
 
-libp2p@0.31.3:
-  version "0.31.3"
-  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.31.3.tgz#fbd69f13d5fe6a3256f9ccb986035836f18d69f1"
-  integrity sha512-EwdTkmbp4kcaVDoSoXzTqI1TzhnX0LrEDMODsOiuglFvvbK0dSgoOBQS1qpFUDJ6DNBqCsPFxR0cFkSTgRCgUA==
-  dependencies:
-    "@motrix/nat-api" "^0.3.1"
-    "@vascosantos/moving-average" "^1.1.0"
-    abort-controller "^3.0.0"
-    aggregate-error "^3.1.0"
-    any-signal "^2.1.1"
-    bignumber.js "^9.0.1"
-    cids "^1.1.5"
-    class-is "^1.1.0"
-    debug "^4.3.1"
-    err-code "^3.0.0"
-    es6-promisify "^6.1.1"
-    events "^3.3.0"
-    hashlru "^2.3.0"
-    interface-datastore "^4.0.0"
-    ipfs-utils "^7.0.0"
-    it-all "^1.0.4"
-    it-buffer "^0.1.2"
-    it-drain "^1.0.3"
-    it-filter "^1.0.1"
-    it-first "^1.0.4"
-    it-handshake "^2.0.0"
-    it-length-prefixed "^5.0.2"
-    it-map "^1.0.4"
-    it-merge "1.0.0"
-    it-pipe "^1.1.0"
-    it-take "1.0.0"
-    libp2p-crypto "^0.19.4"
-    libp2p-interfaces "^0.10.4"
-    libp2p-utils "^0.3.1"
-    mafmt "^9.0.0"
-    merge-options "^3.0.4"
-    multiaddr "^9.0.1"
-    multicodec "^3.0.1"
-    multihashing-async "^2.1.2"
-    multistream-select "^2.0.0"
-    mutable-proxy "^1.0.0"
-    node-forge "^0.10.0"
-    p-any "^3.0.0"
-    p-fifo "^1.0.0"
-    p-retry "^4.4.0"
-    p-settle "^4.1.1"
-    peer-id "^0.14.2"
-    private-ip "^2.1.0"
-    protobufjs "^6.10.2"
-    retimer "^3.0.0"
-    sanitize-filename "^1.6.3"
-    set-delayed-interval "^1.0.0"
-    streaming-iterables "^5.0.2"
-    timeout-abort-controller "^1.1.1"
-    varint "^6.0.0"
-    xsalsa20 "^1.1.0"
-
 libp2p@0.31.7:
   version "0.31.7"
   resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.31.7.tgz#49ff8b74cd5a3ed252b8584aaa6071f73cf62e6c"
@@ -10072,20 +10012,7 @@ ms@2.1.3, ms@^2.0.0, ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz#574c8138ce1d2b5861f0b44579dbadd60c6615b2"
   integrity sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==
 
-multiaddr@9.0.1:
-  version "9.0.1"
-  resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-9.0.1.tgz#4a3b5a21b37e4df5b443f2ca957304ea5bfd4604"
-  integrity sha512-fubxMjVoRPcz3GYBb63Z6ADCY6BoqezbnL2o8owDcfYqhwW61oFtIlsZGiNKIVC2Fk1Od5rf/3z34QSGJFT/uA==
-  dependencies:
-    cids "^1.0.0"
-    dns-over-http-resolver "^1.0.0"
-    err-code "^3.0.1"
-    is-ip "^3.1.0"
-    multibase "^4.0.2"
-    uint8arrays "^2.1.3"
-    varint "^6.0.0"
-
-multiaddr@^9.0.0, multiaddr@^9.0.1, multiaddr@~9.0.1:
+multiaddr@^9.0.0, multiaddr@^9.0.1, multiaddr@~9.0.2:
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-9.0.2.tgz#ab322bb768e77270650ebce71a452fdc760bda0d"
   integrity sha512-YFaEb9t4yXSbaGksSEdg+Kn2U02s7w4wXUgyEMQmPxFJj7CfVHY10WOsScAX/rK6Soa15S1zXYadqH9TtlVreQ==
@@ -13450,13 +13377,6 @@ strip-ansi@^5.0.0, strip-ansi@^5.1.0, strip-ansi@^5.2.0:
   integrity sha512-DuRs1gKbBqsMKIZlrffwlug8MHkcnpjs5VPmL1PAh+mA30U0DTotfDZ0d2UUsXpPmPmMMJ6W773MaA3J+lbiWA==
   dependencies:
     ansi-regex "^4.1.0"
-
-strip-ansi@^7.0.0:
-  version "7.0.0"
-  resolved "https://registry.yarnpkg.com/strip-ansi/-/strip-ansi-7.0.0.tgz#1dc49b980c3a4100366617adac59327eefdefcb0"
-  integrity sha512-UhDTSnGF1dc0DRbUqr1aXwNoY3RgVkSWG8BrpnuFIxhP57IqbS7IRta2Gfiavds4yCxc5+fEAVVOgBZWnYkvzg==
-  dependencies:
-    ansi-regex "^6.0.0"
 
 strip-bom@^2.0.0:
   version "2.0.0"
