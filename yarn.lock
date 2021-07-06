@@ -5077,9 +5077,9 @@ did-resolver@^3.1.0:
   integrity sha512-uf3/4LfHoDn3Ek8bFegO72OemHMytBhAkud6CA1HlB5I0iVwrCpG4oh+DA6DXUuBdhrA0cY4cGz1D0VNDTlgnw==
 
 dids@^2.1.0:
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/dids/-/dids-2.2.0.tgz#10019c2b0d9058d5b1cb22935917c7384e97d90b"
-  integrity sha512-h9dRsTNrcInaLAlJlJBDZxmQ6eByBkoJ7z/UHDB/tCXEgbsvGhBdIwbgEbexxe0TifLCo5D8dfajftOp9F95yQ==
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/dids/-/dids-2.2.1.tgz#19e5fe3f138631046c83bda357dbf3ca17bb2915"
+  integrity sha512-jAD7xZ/8ETSmPRKQfGBhZucsLav+rX8Qa0faWQ00JaVjn0Q5yKl3T9wgJ/pBkMRPMMtHfnHqlfkM3/pE5sUWug==
   dependencies:
     "@stablelib/random" "^1.0.1"
     cids "^1.1.6"
