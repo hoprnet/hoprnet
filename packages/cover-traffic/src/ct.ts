@@ -11,7 +11,8 @@ const CHANNEL_STAKE = new BN('1000')
 const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
 
 const options: HoprOptions = {
-  provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
+  //provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
+  provider: 'https://eth-goerli.gateway.pokt.network/v1/6021a2b6928ff9002e6c7f2f',
   createDbIfNotExist: true,
   password: '',
   forceCreateDB: true,
