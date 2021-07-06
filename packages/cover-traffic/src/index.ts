@@ -173,7 +173,7 @@ async function tick(update, node: Hopr) {
     const toOpen = weightedRandomChoice()
     if (!STATE.ctChannels.find((x) => x.eq(toOpen))) {
       STATE.ctChannels.push(toOpen)
-      await node.openChannel(toOpen.toPeerId(), CHANNEL_STAKE) 
+      await node.openChannel(toOpen.toPeerId(), CHANNEL_STAKE)
     }
   }
   update()
