@@ -57,8 +57,6 @@ interface NetOptions {
   port: number
 }
 
-export type ChannelStrategyNames = 'passive' | 'promiscuous'
-
 export type HoprOptions = {
   provider: string
   announce?: boolean
@@ -67,7 +65,7 @@ export type HoprOptions = {
   forceCreateDB?: boolean
   password?: string
   connector?: HoprCoreEthereum
-  strategy?: ChannelStrategyNames
+  strategy?: ChannelStrategy 
   hosts?: {
     ip4?: NetOptions
     ip6?: NetOptions
@@ -256,7 +254,7 @@ class Hopr extends EventEmitter {
     log('announced, starting heartbeat')
 
     this.heartbeat.start()
-    this.setChannelStrategy(this.options.strategy || 'passive')
+    this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
     this.status = 'RUNNING'
     this.emit('running')
 
@@ -625,18 +623,11 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public async setChannelStrategy(strategy: ChannelStrategyNames) {
-    if (strategy == 'passive') {
-      this.strategy = new PassiveStrategy()
-      return
-    }
-    if (strategy == 'promiscuous') {
-      this.strategy = new PromiscuousStrategy()
-      return
-    }
-
+  public async setChannelStrategy(strategy: ChannelStrategy) {
+    this.strategy = strategy
     const ethereum = await this.paymentChannels
     ethereum.on('ticket:win', (ack, channel) => {
+      // TODO - don't double bind here
       this.strategy.onWinningTicket(ack, channel)
     })
     throw new Error('Unknown strategy')
@@ -877,3 +868,4 @@ class Hopr extends EventEmitter {
 
 export { Hopr as default, LibP2P }
 export * from './constants'
+export { PassiveStrategy, PromiscuousStrategy }
