@@ -5,7 +5,16 @@ import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
 import Indexer from '.'
-import { stringToU8a, Address, ChannelEntry, Defer, Hash, HoprDB, generateChannelId, ChannelStatus } from '@hoprnet/hopr-utils'
+import {
+  stringToU8a,
+  Address,
+  ChannelEntry,
+  Defer,
+  Hash,
+  HoprDB,
+  generateChannelId,
+  ChannelStatus
+} from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
 import { CHANNEL_ID, PARTY_A, PARTY_B } from '../fixtures'
