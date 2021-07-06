@@ -15,7 +15,7 @@ export default function setupAPI(node: Hopr, logs: any, options: any) {
   service.post('/api/v1/command', async (req, res) => {
     await node.waitForRunning()
     logs.log('Node is running')
-    if (options.apiToken !== undefined) {
+    if (!options.testNoAuthentication && options.apiToken !== undefined) {
       if (req.headers['x-auth-token'] !== options.apiToken) {
         logs.log('command rejected: authentication failed')
         res.send('authentication failed', 403)

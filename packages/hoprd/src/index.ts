@@ -133,6 +133,11 @@ const argv = yargs(process.argv.slice(2))
     describe: 'weaker crypto for faster node startup',
     default: false
   })
+  .option('testNoAuthentication', {
+    boolean: true,
+    describe: 'no remote authentication for easier testing',
+    default: false
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -213,7 +218,7 @@ async function main() {
     logs.startLoggingQueue()
   }
 
-  if (argv.rest || argv.admin) {
+  if (!argv.testNoAuthentication && (argv.rest || argv.admin)) {
     if (argv.apiToken == null) {
       throw Error(`Must provide --apiToken when --admin or --rest is specified`)
     }
@@ -231,7 +236,11 @@ async function main() {
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
     // as if the HOPR node fails, we need to put an error message up.
-    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort, argv.apiToken)
+    let apiToken = argv.apiToken
+    if (argv.testNoAuthentication) {
+      apiToken = null
+    }
+    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort, apiToken)
     await adminServer.setup()
   }
 
