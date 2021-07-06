@@ -62,10 +62,9 @@ export const weightedRandomChoice = (): PublicKey => {
   throw new Error('wtf')
 }
 
-
 class CoverTrafficStrategy extends SaneDefaults {
-  name = "covertraffic"
-  constructor(private update:(State) => void, private selfPub: PublicKey) {
+  name = 'covertraffic'
+  constructor(private update: (State) => void, private selfPub: PublicKey) {
     super()
   }
 
@@ -95,7 +94,7 @@ class CoverTrafficStrategy extends SaneDefaults {
     STATE.ctChannels = currentChannels.map(c => c.destination)
                                       .concat(toOpen.map(o =>o[0]))
                                       .concat(toClose)
-    STATE.log.push(`strategy tick, open:${toOpen.map(p => p[0].toHex()).join(',')}, close: ${toClose.map(p=>p.toHex()).join(',')}`)
+    STATE.log.push(`strategy tick, open:${toOpen.map(p => p[0].toPeerId().toB58String()).join(',')}, close: ${toClose.map(p=>p.toPeerId().toB58String()).join(',')}`)
     this.update(STATE)
     return [toOpen, toClose]
   }

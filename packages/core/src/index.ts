@@ -39,7 +39,14 @@ import BN from 'bn.js'
 import { getAddrs } from './identity'
 
 import EventEmitter from 'events'
-import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy, SaneDefaults, ChannelsToOpen, ChannelsToClose } from './channel-strategy'
+import {
+  ChannelStrategy,
+  PassiveStrategy,
+  PromiscuousStrategy,
+  SaneDefaults,
+  ChannelsToOpen,
+  ChannelsToClose
+} from './channel-strategy'
 import Debug from 'debug'
 import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
 
@@ -299,7 +306,7 @@ class Hopr extends EventEmitter {
     for (const channel of rndChannels) {
       this.networkPeers.register(channel.source.toPeerId()) // Listen to nodes with outgoing stake
     }
-    const currentChannels = await this.getOpenChannels()
+    const currentChannels = await this.getAllChannels()
     for (const channel of currentChannels) {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
@@ -354,8 +361,14 @@ class Hopr extends EventEmitter {
     return Array.from(channels.values())
   }
 
+  /*
   private async getOpenChannels(): Promise<ChannelEntry[]> {
     return (await this.paymentChannels).getOpenChannelsFrom(PublicKey.fromPeerId(this.getId()))
+  }
+  */
+
+  private async getAllChannels(): Promise<ChannelEntry[]> {
+    return (await this.paymentChannels).getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress())
   }
 
   /**
