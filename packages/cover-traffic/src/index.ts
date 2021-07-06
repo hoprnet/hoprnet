@@ -1,6 +1,6 @@
 //import Hopr from '@hoprnet/hopr-core'
-import type { HoprOptions } from '@hoprnet/hopr-core'
-import Hopr from '@hoprnet/hopr-core'
+import type { HoprOptions, ChannelsToOpen, ChannelsToClose } from '@hoprnet/hopr-core'
+import Hopr, { SaneDefaults } from '@hoprnet/hopr-core'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
@@ -52,6 +52,26 @@ const weightedRandomChoice = (): PublicKey => {
     }
   }
   throw new Error('wtf')
+}
+
+
+class CoverTrafficStrategy extends SaneDefaults {
+  name = "covertraffic"
+  constructor(private update) {
+    super()
+  }
+
+  async tick(
+    _balance: BN,
+    _n: ChannelEntry[],
+    _currentChannels: ChannelEntry[],
+    _peers: any,
+    _getRandomChannel: () => Promise<ChannelEntry>
+  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+    this.update()
+    return [[], []]
+  }
+
 }
 
 type PeerData = {
@@ -241,6 +261,7 @@ async function main() {
   const channels = await node.getChannelsFrom(selfAddr)
   channels.forEach((c) => STATE.ctChannels.push(c.destination))
   update()
+  node.setChannelStrategy(new CoverTrafficStrategy(update))
   tick(update, node)
 }
 

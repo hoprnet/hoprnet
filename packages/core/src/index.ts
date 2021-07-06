@@ -39,7 +39,7 @@ import BN from 'bn.js'
 import { getAddrs } from './identity'
 
 import EventEmitter from 'events'
-import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
+import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy, SaneDefaults, ChannelsToOpen, ChannelsToClose } from './channel-strategy'
 import Debug from 'debug'
 import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
 
@@ -868,4 +868,5 @@ class Hopr extends EventEmitter {
 
 export { Hopr as default, LibP2P }
 export * from './constants'
-export { PassiveStrategy, PromiscuousStrategy }
+export { PassiveStrategy, PromiscuousStrategy, SaneDefaults }
+export type { ChannelsToOpen, ChannelsToClose }
