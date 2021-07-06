@@ -17,7 +17,7 @@ the challenge is given together with the routing information by the packet.
     \\\textbf{Ticket Index $I$:} is set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops packets if this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with unchanged index.
     \\\textbf{Ticket challenge $T_c$:}  is set by the ticket issuer and used to ckeck whether a ticket is redeemable before the packet is been relayed. The packet is dropped if that's not the case.
     \\\textbf{Ticket Epoch $\alpha$:} is used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha_c$ whenever a node resets a commitment which helps keeping track of updates to the on-chain commitments.
-    \\\textbf{Channel Epoch $\zeta$:} is used to give each reincarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel lose their validity once a channel is reopened.
+    \\\textbf{Channel Epoch $\zeta$:} is used to give each reincarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel lose their validity once a channel is reopened. This is due to the fact that $\zeta$ increments whenever a closed channel is re(-opened).
     \begin{comment}
         
    
