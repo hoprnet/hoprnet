@@ -134,7 +134,7 @@ jobs:
   github_release:
     name: Create Github Release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build_deploy_sc_npm]
     if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
     steps:
       - uses: actions/checkout@v2
