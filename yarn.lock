@@ -2147,9 +2147,9 @@
     "@types/node" "*"
 
 "@types/levelup@^4.3.0":
-  version "4.3.2"
-  resolved "https://registry.yarnpkg.com/@types/levelup/-/levelup-4.3.2.tgz#a185ecc30118bd7ee48b2d8d57de566a08d24cb2"
-  integrity sha512-5Su1Dkl6nMjkXqUb2z72gbroG0WFLs+6nMH+wQt4GWIrDwR/IconLTojHtC0klLJODCJ64Cr6P5cWqVeuxAbSg==
+  version "4.3.3"
+  resolved "https://registry.yarnpkg.com/@types/levelup/-/levelup-4.3.3.tgz#4dc2b77db079b1cf855562ad52321aa4241b8ef4"
+  integrity sha512-K+OTIjJcZHVlZQN1HmU64VtrC0jC3dXWQozuEIR9zVvltIk90zaGPM2AgT+fIkChpzHhFE3YnvFLCbLtzAmexA==
   dependencies:
     "@types/abstract-leveldown" "*"
     "@types/level-errors" "*"
