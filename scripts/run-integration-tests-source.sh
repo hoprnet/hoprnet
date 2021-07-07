@@ -219,15 +219,15 @@ wait_for_port 19095 "${node5_log}"
 # no need to wait for node 6 since that will stop right away
 # }}}
 
-# --- Run security tests --- {{{
-${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 19501
-#}}}
-
 # --- Run protocol test --- {{{
 ${mydir}/../test/integration-test.sh \
   "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305"
 # }}}
+
+# --- Run security tests (should run after protocol test, because it locks access)--- {{{
+${mydir}/../test/security-test.sh \
+  127.0.0.1 13301 19501
+#}}}
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
