@@ -84,11 +84,12 @@ If this is not the case, the node should drop the ticket.
 The final recipient of the packet does not receive a ticket because message reception is not incentivized by the HOPR protocol.
 \item  The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. $$r*G=T_{c_i}$$
 It then replies with an acknowledgement that includes a response to the challenge.
-\item Ticket signer must be the ticket issuer. This is done using the $ECDSA.recover()$ ethereum function which recovers the private key used to sign $T= (t, Sig_I(t))$ and verifies if the associated public key is the issuer's public key. The packet is dropped if this test fails.
-\item Ticket Epoch $\alpha$ must be equal to the spending channel ticket epoch $$\alpha=\alpha_c$$
+\item Ticket signer must be the ticket issuer. This is done using the $$ECDSA.recover()$$ ethereum function which recovers the private key used to sign $T= (t, Sig_I(t))$ and verifies if the associated public key is the issuer's public key. The packet is dropped if this test fails.
+\item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the account nonce (current values in the smart contract) $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
+where $\alpha_c$ and $\zeta_c$ represent the current values in the smart contract.
 \item The ticket hasn't been already redeemed and ticket index is strictly greater than the current value in the smart contract (replay protection).
      $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ the ticket index.
-\item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket: $$ C_b>\sigma$$ where $\sigma$ is the ticket amount and $C_b$ is the channel balance.
+\item Channel must have enough funds to cover the costs for the ticket: $$ C_b>\sigma$$ where $\sigma$ is the ticket amount and $C_b$ is the channel balance.
    
 
 
