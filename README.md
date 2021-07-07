@@ -160,13 +160,13 @@ Here is a short break-down of each argument.
 
 ```sh
 hoprd
-  --admin   	                           # enable the node's admin UI, available at localhost:3000
+  --admin   	                         # enable the node's admin UI, available at localhost:3000
   --init 				 # initialize the database and identity if not present
-  --announce 				                     # announce the node to other nodes in the network and act as relay if publicly reachable
+  --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
   --identity .hopr-identity              # store your node identity information in your test folder
-  --password switzerland   		           # set the encryption password for your identity
+  --password switzerland   		 # set the encryption password for your identity
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
-  --apiToken <MY_TOKEN>                  # specify password for accessing admin panel (REQUIRED)
+  --apiToken <MY_TOKEN> # specify password for accessing admin panel (REQUIRED)
 ```
 
 ### Using Docker
@@ -182,14 +182,14 @@ Here is a short break-down of each argument.
 ```sh
 hoprd
   --identity /app/db/.hopr-identity      # store your node identity information in the persisted database folder
-  --password switzerland   		           # set the encryption password for your identity
-  --init 				                         # initialize the database and identity if not present
-  --announce 				                     # announce the node to other nodes in the network and act as relay if publicly reachable
-  --host "0.0.0.0:9091"   		           # set IP and port of the P2P API to the container's external IP so it can be reached on your host
-  --admin   	                           # enable the node's admin UI
+  --password switzerland   		 # set the encryption password for your identity
+  --init 				 # initialize the database and identity if not present
+  --announce 				 # announce the node to other nodes in the network and act as relay if publicly reachable
+  --host "0.0.0.0:9091"   		 # set IP and port of the P2P API to the container's external IP so it can be reached on your host
+  --admin   	                         # enable the node's admin UI
   --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
-  --apiToken <MY_TOKEN>                  # specify password for accessing admin panel (REQUIRED)
+  --apiToken <MY_TOKEN> # specify password for accessing admin panel (REQUIRED)
 ```
 
 ## Develop
