@@ -39,7 +39,14 @@ import BN from 'bn.js'
 import { getAddrs } from './identity'
 
 import EventEmitter from 'events'
-import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
+import {
+  ChannelStrategy,
+  PassiveStrategy,
+  PromiscuousStrategy,
+  SaneDefaults,
+  ChannelsToOpen,
+  ChannelsToClose
+} from './channel-strategy'
 import Debug from 'debug'
 import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
 
@@ -57,17 +64,15 @@ interface NetOptions {
   port: number
 }
 
-export type ChannelStrategyNames = 'passive' | 'promiscuous'
-
 export type HoprOptions = {
-  network: string
   provider: string
   announce?: boolean
   dbPath?: string
   createDbIfNotExist?: boolean
+  forceCreateDB?: boolean
   password?: string
   connector?: HoprCoreEthereum
-  strategy?: ChannelStrategyNames
+  strategy?: ChannelStrategy
   hosts?: {
     ip4?: NetOptions
     ip6?: NetOptions
@@ -115,7 +120,8 @@ class Hopr extends EventEmitter {
       PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(),
       options.createDbIfNotExist,
       VERSION,
-      options.dbPath
+      options.dbPath,
+      options.forceCreateDB
     )
     this.paymentChannels = HoprCoreEthereum.create(this.db, this.id.privKey.marshal(), {
       provider: this.options.provider
@@ -255,7 +261,7 @@ class Hopr extends EventEmitter {
     log('announced, starting heartbeat')
 
     this.heartbeat.start()
-    this.setChannelStrategy(this.options.strategy || 'passive')
+    this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
     this.status = 'RUNNING'
     this.emit('running')
 
@@ -300,7 +306,7 @@ class Hopr extends EventEmitter {
     for (const channel of rndChannels) {
       this.networkPeers.register(channel.source.toPeerId()) // Listen to nodes with outgoing stake
     }
-    const currentChannels = await this.getOpenChannels()
+    const currentChannels = await this.getAllChannels()
     for (const channel of currentChannels) {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
@@ -311,14 +317,14 @@ class Hopr extends EventEmitter {
       rndChannels,
       currentChannels,
       this.networkPeers,
-      chain.getRandomOpenChannel.bind(this.paymentChannels)
+      chain.getRandomOpenChannel.bind(chain)
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
       verbose(`closing ${toClose}`)
       await this.closeChannel(toClose.toPeerId())
       verbose(`closed channel to ${toClose.toString()}`)
-      this.emit('hopr:channel:closed', toClose)
+      this.emit('hopr:channel:closed', toClose.toPeerId())
     }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
@@ -355,8 +361,14 @@ class Hopr extends EventEmitter {
     return Array.from(channels.values())
   }
 
+  /*
   private async getOpenChannels(): Promise<ChannelEntry[]> {
     return (await this.paymentChannels).getOpenChannelsFrom(PublicKey.fromPeerId(this.getId()))
+  }
+  */
+
+  private async getAllChannels(): Promise<ChannelEntry[]> {
+    return (await this.paymentChannels).getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress())
   }
 
   /**
@@ -624,21 +636,13 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public async setChannelStrategy(strategy: ChannelStrategyNames) {
-    if (strategy == 'passive') {
-      this.strategy = new PassiveStrategy()
-      return
-    }
-    if (strategy == 'promiscuous') {
-      this.strategy = new PromiscuousStrategy()
-      return
-    }
-
+  public async setChannelStrategy(strategy: ChannelStrategy) {
+    this.strategy = strategy
     const ethereum = await this.paymentChannels
     ethereum.on('ticket:win', (ack, channel) => {
+      // TODO - don't double bind here
       this.strategy.onWinningTicket(ack, channel)
     })
-    throw new Error('Unknown strategy')
   }
 
   public getChannelStrategy(): string {
@@ -876,3 +880,5 @@ class Hopr extends EventEmitter {
 
 export { Hopr as default, LibP2P }
 export * from './constants'
+export { PassiveStrategy, PromiscuousStrategy, SaneDefaults }
+export type { ChannelsToOpen, ChannelsToClose }
