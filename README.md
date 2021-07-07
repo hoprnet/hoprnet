@@ -166,7 +166,7 @@ hoprd
   --identity .hopr-identity              # store your node identity information in your test folder
   --password switzerland   		 # set the encryption password for your identity
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
-  --apiToken <MY_TOKEN> # specify password for accessing admin panel (REQUIRED)
+  --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API (REQUIRED)
 ```
 
 ### Using Docker
@@ -189,7 +189,7 @@ hoprd
   --admin   	                         # enable the node's admin UI
   --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
-  --apiToken <MY_TOKEN> # specify password for accessing admin panel (REQUIRED)
+  --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API(REQUIRED)
 ```
 
 ## Develop
