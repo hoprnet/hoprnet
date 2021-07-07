@@ -142,6 +142,7 @@ Options:
   --testAnnounceLocalAddresses  For testing local testnets. Announce local addresses.  [boolean] [default: false]
   --testPreferLocalAddresses    For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
   --testUseWeakCrypto           weaker crypto for faster node startup  [boolean] [default: false]
+  --testNoAuthentication        (experimental) disable remote security
 ```
 
 As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.
@@ -152,7 +153,7 @@ The following command assumes you've setup a local installation like described i
 
 ```sh
 cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs
+DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs --apiToken <MY_TOKEN>
 ```
 
 Here is a short break-down of each argument.
@@ -165,6 +166,7 @@ hoprd
   --identity .hopr-identity              # store your node identity information in your test folder
   --password switzerland   		 # set the encryption password for your identity
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
+  --apiToken <MY_TOKEN> # specify password for accessing admin panel (REQUIRED)
 ```
 
 ### Using Docker
@@ -187,6 +189,7 @@ hoprd
   --admin   	                         # enable the node's admin UI
   --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
+  --apiToken <MY_TOKEN> # specify password for accessing admin panel (REQUIRED)
 ```
 
 ## Develop
