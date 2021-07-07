@@ -45,5 +45,5 @@ Options:
   --testAnnounceLocalAddresses  For testing local testnets. Announce local addresses.  [boolean] [default: false]
   --testPreferLocalAddresses    For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
   --testUseWeakCrypto           weaker crypto for faster node startup  [boolean] [default: false]
-  --testNoAuthentication        (experimental) disable remote security
+  --testNoAuthentication        (experimental) disable remote authentication
 ```
