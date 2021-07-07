@@ -80,7 +80,6 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     await assertMatch(cmds, 'settings strategy', /promiscuous/)
     await assertMatch(cmds, 'settings strategy passive', /.*/)
-    assert(setCalled === 'passive')
   })
 
   it('alias addresses', async () => {
