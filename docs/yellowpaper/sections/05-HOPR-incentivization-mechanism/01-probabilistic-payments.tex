@@ -48,7 +48,8 @@ Once the call has succeeded, an on-chain event \textit{WAITING\_FOR\_COMMITMENT}
 \\~\\The destination address of the channel must now commit in order for the channel between both parties to be open. 
 The channel destination (let's say it's B) can now call \textit{bumpChannel()} function to make a new set of commitments towards this channel. This call will trigger an onchain event \textit{ChannelIsOpened} and bumbs the ticket epoch to ensure tickets with the previous epoch are invalidated
 \paragraph{Redeem tickets}
-As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
+As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. 
+\\~\\If/when B tries to redeem a ticket from the channel $A\rightarrow B$ (spending channel) but also there is an open channel $B\rightarrow A$ (earning channel), B's rewards will go to $B\rightarrow A$. Otherwise, rewards will be sent directly to B.
 \paragraph{Closing a channel}
 Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
 Only the channel creator (let's say it's A) can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$ and triggers an on-chain event. Other nodes should monitor blockchain events to be aware of this change and thus will have now time to claim not yet claimed tickets. 
