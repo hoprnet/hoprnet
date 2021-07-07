@@ -107,7 +107,7 @@ function setup_node() {
     --testAnnounceLocalAddresses --identity="${id}" \
     --host="127.0.0.1:${node_port}" --testPreferLocalAddresses \
     --data="${dir}" --rest --restPort "${rest_port}" --announce \
-    --api-token "e2e-API-token^^" \
+    --apiToken "e2e-API-token^^" \
     --admin --adminHost "127.0.0.1" --adminPort ${admin_port} \
     --password="e2e-test" --testUseWeakCrypto \
     ${additional_args} \
