@@ -42,9 +42,9 @@ Initially, each payment channel in HOPR is \textit{closed} which means that in o
     \caption{Channel statuses}
 \end{figure}
 \paragraph{Opening a channel} Nodes can open channels to other nodes by the following:
-A calls the method \textit{fundChannel()} or \textit{fundChannelMulti()}. The first function only funds the account of the sender (channel creator) and the second functions funds both accounts (sender and recipient). 
-$$fundChannelMulti(A: <\lambda>, B:<\mu> )$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender (sender can be the same as A or B) for A and B. Both values can also be equal or any of them could be zero. The sender is also able to fund other channels which the sender is not part of.
-Once the call has succeeded, an on-chain event \textit{WaitingForCommitment} is emited. 
+A calls the method \textit{fundChannelMulti()} such that:
+$$fundChannelMulti(A: <\lambda>, B:<\mu> )$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender A for A and B. Both values can also be equal or any of them could be zero. This function opens two unidirectional channels $A\rightarrow B$ and $B\rightarrow A$ if both staked amounts are specified. If not, only the channel $A\rightarrow B$ is opened where $A$ is the sender and $B$ is the recipient.
+Once the call has succeeded, an on-chain event \textit{WAITING\_FOR\_COMMITMENT} is emited. 
 \\~\\The destination address of the channel must now commit in order for the channel between both parties to be open. 
 The channel destination (let's say it's B) can now call \textit{bumpChannel()} function to make a new set of commitments towards this channel. This call will trigger an onchain event \textit{ChannelIsOpened} and bumbs the ticket epoch to ensure tickets with the previous epoch are invalidated
 \paragraph{Redeem tickets}
