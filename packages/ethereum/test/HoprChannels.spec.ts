@@ -273,10 +273,29 @@ describe('funding a HoprChannel success', function () {
   it('should multi fund and open channel A->B, no commitment', async function () {
     const { channels, accountA, fundAndApprove, token } = await useFixtures()
     await fundAndApprove(accountA, 100)
-    await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30'))
+      .to.emit(channels, 'ChannelUpdate')
+      .withArgs(
+        ACCOUNT_A.address,
+        ACCOUNT_B.address,
+        createMockChannelFromMerge(
+          await channels.channels(ACCOUNT_AB_CHANNEL_ID),
+          createMockChannelFromProps({
+            balance: BigNumber.from(70)
+          })
+        )
+      )
+      .and.to.emit(channels, 'ChannelUpdate')
+      .withArgs(
+        ACCOUNT_B.address,
+        ACCOUNT_A.address,
+        createMockChannelFromMerge(
+          await channels.channels(ACCOUNT_AB_CHANNEL_ID),
+          createMockChannelFromProps({
+            balance: BigNumber.from(30)
+          })
+        )
+      )
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
     validateChannel(ab, { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
