@@ -71,8 +71,6 @@ fund_if_empty() {
     if [ "$BALANCE" = '0.0' ]; then
       echo "Funding account ... ${rpc} -> ${address} $MIN_FUNDS"
       yarn ethers send --rpc "${rpc}" --account "$FUNDING_PRIV_KEY" "${address}" $MIN_FUNDS --yes
-
-      sleep 60
     fi
   fi
 }
@@ -107,7 +105,6 @@ update_if_existing() {
     fi
     echo "Previous GCloud VM Image: $PREV"
     gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db" "${3}"
-    sleep 60
 
     # prevent docker images overloading the disk space
     gcloud_cleanup_docker_images "$1"
