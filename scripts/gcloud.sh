@@ -21,7 +21,8 @@ GCLOUD_IMAGE="--image-family=cos-stable --image-project=cos-cloud"
 
 GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDISK $GCLOUD_IMAGE"
 
-alias gssh="gcloud compute ssh --force-key-file-overwrite --ssh-flag='-t' $ZONE"
+# let keys expire after 1 hour
+alias gssh="gcloud compute ssh --force-key-file-overwrite --ssh-key-expire-after=1h --ssh-flag='-t' $ZONE"
 
 # NB: This is useless for getting an IP of a VM
 # Get or create an IP address
