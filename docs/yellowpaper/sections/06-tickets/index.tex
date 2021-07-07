@@ -82,7 +82,7 @@ $$ comm_{i-1} != 0 \; and \; comm_{i}=h(comm_{i-1})$$
 This is the case if $$h(t_h, r_i, comm_{i-1} ) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$ is a hash function.
 If this is not the case, the node should drop the ticket.
 The final recipient of the packet does not receive a ticket because message reception is not incentivized by the HOPR protocol.
-\item  The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. $$r*G=T_{c_i}$$
+\item  The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. $$r_i*G=T_{c_i}$$
 It then replies with an acknowledgement that includes a response to the challenge.
 \item Ticket signer must be the ticket issuer. This is done using the $$ECDSA.recover()$$ ethereum function which recovers the private key used to sign $T= (t, Sig_I(t))$ and verifies if the associated public key is the issuer's public key. The packet is dropped if this test fails.
 \item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the account nonce (current values in the smart contract) $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
