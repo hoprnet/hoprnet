@@ -26,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: '[SETUP] Configure Git info'
         run: ./scripts/configure-git-info.sh
@@ -257,7 +259,9 @@ jobs:
       - name: Add debug tags to new Docker image (on debug-deploy branches)
         if: ${{ startsWith(github.ref, 'refs/heads/debug-deploy/') && !env.ACT }}
         run: |
-          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}"
+          declare last_git_tag="$(git describe --tags --abbrev=0)"
+          declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
+          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${commits_since_tag}"
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${tag}
         env:
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
