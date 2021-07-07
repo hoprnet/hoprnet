@@ -123,6 +123,8 @@ update_if_existing() {
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
   local rpc=${3}
+  local api_token="${HOPRD_API_TOKEN}"
+  local password="${BS_PASSWORD}"
 
   if [ "$(update_if_existing $1 $2 ${rpc})" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
@@ -130,17 +132,18 @@ start_testnode_vm() {
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-image=$2 \
-      --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
-      --container-arg="--password" --container-arg="$BS_PASSWORD" \
-      --container-arg="--init" --container-arg="true" \
-      --container-arg="--announce" --container-arg="true" \
-      --container-arg="--rest" --container-arg="true" \
-      --container-arg="--restHost" --container-arg="0.0.0.0" \
-      --container-arg="--healthCheck" --container-arg="true" \
-      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-      --container-arg="--admin" --container-arg="true" \
+      --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
+      --container-arg="--announce" \
+      --container-arg="--apiToken" --container-arg="${api_token}" \
+      --container-arg="--healthCheck" \
+      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
+      --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
+      --container-arg="--init" \
+      --container-arg="--password" --container-arg="${password}" \
       --container-arg="--provider" --container-arg="${rpc}" \
+      --container-arg="--rest" \
+      --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-restart-policy=always
   fi
