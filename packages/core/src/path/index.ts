@@ -3,6 +3,7 @@ import type NetworkPeers from '../network/network-peers'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
 import Debug from 'debug'
 import type { ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
+import { PATH_RANDOMNESS } from '../constants'
 
 import BN from 'bn.js'
 const log = Debug('hopr-core:pathfinder')
@@ -19,6 +20,16 @@ const debugPath = (p: ChannelPath) =>
     .map((x) => x.toString())
     .join(',')
 
+
+// Weight a node based on stake, and a random component.
+const defaultWeight = (edge: ChannelEntry): BN => {
+  // Minimum is 'stake', therefore weight is monotonically increasing
+  const r = 1 + rand() * PATH_RANDOMNESS 
+  // Log scale, but minimum 1 weight per edge
+  return edge.balance.toBN().addn(1).muln(r) //log()
+}
+
+
 /**
  * Find a path through the payment channels.
  *
@@ -31,17 +42,10 @@ export async function findPath(
   hops: number,
   networkPeers: NetworkPeers,
   getOpenChannelsFromPeer: (p: PublicKey) => Promise<ChannelEntry[]>,
-  randomness: number // Proportion of randomness in stake.
+  weight=defaultWeight
 ): Promise<Path> {
   log('find path from', start.toString(), 'to ', destination.toString(), 'length', hops)
 
-  // Weight a node based on stake, and a random component.
-  const weight = (edge: ChannelEntry): BN => {
-    // Minimum is 'stake', therefore weight is monotonically increasing
-    const r = 1 + rand() * randomness
-    // Log scale, but minimum 1 weight per edge
-    return edge.balance.toBN().addn(1).muln(r) //log()
-  }
 
   const compareWeight = (a: ChannelEntry, b: ChannelEntry) => (weight(b).gte(weight(a)) ? 1 : -1)
 

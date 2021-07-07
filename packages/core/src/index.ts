@@ -847,8 +847,7 @@ class Hopr extends EventEmitter {
       destination,
       INTERMEDIATE_HOPS,
       this.networkPeers,
-      ethereum.getOpenChannelsFrom.bind(ethereum),
-      PATH_RANDOMNESS
+      ethereum.getOpenChannelsFrom.bind(ethereum)
     )
   }
 

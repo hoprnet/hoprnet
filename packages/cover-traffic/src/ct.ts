@@ -9,6 +9,8 @@ import type PeerId from 'peer-id'
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
 const CHANNEL_STAKE = new BN('1000')
 const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
+const CT_PATH_LENGTH = 1
+const MAX_PATH_ATTEMPTS = 99
 
 const options: HoprOptions = {
   //provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
@@ -62,6 +64,17 @@ export const weightedRandomChoice = (): PublicKey => {
   throw new Error('wtf')
 }
 
+export const createPath(): ChannelEntry[] {
+  let path = []
+  let attempts = 0
+  while (path.length < CT_PATH_LENGTH) {
+    if (attempts > MAX_PATH_ATTEMPTS) {
+      throw new Error('could not create path')
+    }
+    attempts ++
+  }
+}
+
 class CoverTrafficStrategy extends SaneDefaults {
   name = 'covertraffic'
   constructor(private update: (State) => void, private selfPub: PublicKey) {
@@ -69,7 +82,7 @@ class CoverTrafficStrategy extends SaneDefaults {
   }
 
   async tick(
-    _balance: BN,
+    balance: BN,
     _n: ChannelEntry[],
     currentChannels: ChannelEntry[],
     _peers: any,
@@ -96,10 +109,12 @@ class CoverTrafficStrategy extends SaneDefaults {
       .concat(toOpen.map((o) => o[0]))
       .concat(toClose)
     STATE.log.push(
-      `strategy tick, open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')}, close: ${toClose
+      (`strategy tick: balance:${balance.toString()
+       } open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')
+       } close: ${toClose
         .map((p) => p.toPeerId().toB58String())
         .join(',')}`
-    )
+    ).replace('\n', ', '))
     this.update(STATE)
     return [toOpen, toClose]
   }

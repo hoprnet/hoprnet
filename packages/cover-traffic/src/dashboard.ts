@@ -13,7 +13,6 @@ function setupDashboard(selfPub: PublicKey) {
   })
 
   const table = grid.set(0, 0, 3, 2, contrib.table, {
-    fg: 'white',
     label: 'Nodes',
     keys: true,
     interactive: true,
@@ -24,7 +23,6 @@ function setupDashboard(selfPub: PublicKey) {
   table.focus()
 
   const inspect = grid.set(0, 2, 2, 2, contrib.table, {
-    fg: 'white',
     label: 'Selected',
     keys: false,
     interactive: false,
@@ -37,7 +35,10 @@ function setupDashboard(selfPub: PublicKey) {
 
   const ctChan = grid.set(2, 2, 1, 2, contrib.table, {
     label: 'Cover Traffic channels',
-    columnWidth: [60, 20]
+    keys: false,
+    interactive: false,
+    columnSpacing: 2, //in chars
+    columnWidth: [55, 10, 10, 20]
   })
 
   table.rows.on('select item', (item) => {
@@ -70,9 +71,9 @@ function setupDashboard(selfPub: PublicKey) {
         .sort((a: any, b: any) => importance(b.pub).cmp(importance(a.pub)))
         .map((p) => [
           p.id.toB58String(),
-          new BigNumber(importance(p.pub).toString()).toPrecision(4, 0),
+          new BigNumber(importance(p.pub).toString()).toPrecision(2, 0),
           findChannelsFrom(p.pub).length,
-          new BigNumber(totalChannelBalanceFor(p.pub).toString()).toPrecision(4, 0)
+          new BigNumber(totalChannelBalanceFor(p.pub).toString()).toPrecision(2, 0)
         ])
     })
 
@@ -82,16 +83,18 @@ function setupDashboard(selfPub: PublicKey) {
     }
 
     ctChan.setData({
-      headers: ['Dest', 'Status'],
+      headers: ['Dest', 'Status', '#Sent', 'Balance'],
       data: state.ctChannels.map((p: PublicKey) => {
         const chan = findChannel(selfPub, p)
         let status
+        let balance = '-'
         if (chan) {
           status = chan.status.toString()
+          balance = chan.balance.toFormattedString()
         } else {
           status = 'UNKNOWN'
         }
-        return [p.toPeerId().toB58String(), status]
+        return [p.toPeerId().toB58String(), status, 0, balance]
       })
     })
 
