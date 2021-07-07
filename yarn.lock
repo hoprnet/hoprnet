@@ -10076,6 +10076,11 @@ multicodec@^3.0.1:
     uint8arrays "^2.1.3"
     varint "^5.0.2"
 
+multiformats@^9.0.0:
+  version "9.1.2"
+  resolved "https://registry.yarnpkg.com/multiformats/-/multiformats-9.1.2.tgz#dca968bd7822bfce385f98782ed997f02a07d216"
+  integrity sha512-ca/Mvp8iQmCyLomEpMHRr0MgyBN3nTZ9YznOsoCBajyI51Y9TL8UNsX1CQXW/RGsYcto+OHmGelFZzsmdl66wA==
+
 multihashes@^0.4.15, multihashes@~0.4.15:
   version "0.4.21"
   resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-0.4.21.tgz#dc02d525579f334a7909ade8a122dabb58ccfcb5"
@@ -11337,7 +11342,19 @@ pbkdf2@^3.0.17, pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@0, peer-id@0.14.8, peer-id@^0.14.2, peer-id@^0.14.3, peer-id@~0.14.8:
+peer-id@0, peer-id@0.15.0:
+  version "0.15.0"
+  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.15.0.tgz#8416d976fdc44389eb38639a2fbaef9b909fce03"
+  integrity sha512-IYgdFzYEWhEQQV/tlcr7f+13q7fxFlBT/fDd9KMLT989RwD2fqAhwIziF2bJN6J8XppejNjvAYclTibyo5FFmg==
+  dependencies:
+    class-is "^1.1.0"
+    libp2p-crypto "^0.19.0"
+    minimist "^1.2.5"
+    multiformats "^9.0.0"
+    protobufjs "^6.10.2"
+    uint8arrays "^2.0.5"
+
+peer-id@0.14.8, peer-id@^0.14.2, peer-id@^0.14.3, peer-id@~0.14.8:
   version "0.14.8"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.14.8.tgz#667c6bedc8ab313c81376f6aca0baa2140266fab"
   integrity sha512-GpuLpob/9FrEFvyZrKKsISEkaBYsON2u0WtiawLHj1ii6ewkoeRiSDFLyIefYhw0jGvQoeoZS05jaT52X7Bvig==
