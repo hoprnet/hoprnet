@@ -12,6 +12,14 @@ on:
     paths-ignore:
       - '**/docs/**/*'
 
+concurrency:
+  # limit invocations of this workflow to one at a time to prevent race
+  # conditions
+  group: deploy
+  # just canceling could lead to side-effects of incomplete runs, so let's just
+  # run through each invocation completely
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build
