@@ -7,7 +7,7 @@ HOPR uses $acknowledgements$ which allow every node to create a message that ack
 value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
      \end{align}
 where $n$ is the total number of mixnet packets transformed.
-\\~\\If B received $ACK_n$ before sending $packet_{n-1}$, it has no incentive to process $packet_{n-1}$ rather than $packet_{n-2}$.
+\\~\\If B received $ACK_n$ for $packet_n$ before sending $packet_{n-1}$, it has no incentive to process $packet_{n-1}$ rather than $packet_{n}$.
 \\~\\To avoid this limitation of traditional payment channels, HOPR utilizes probabilistic payments
 \\~\\In probabilistic payments, the payouts use a concept called “tickets” (see section \nameref{ticket}), a ticket can be either a win or a loss with a certain winning probability. This means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win.
 \\~\\HOPR uses a custom-made layer 2 solution. It is inspired by payment channels and probabilistic payments where incentives can be claimed independently:
@@ -16,13 +16,37 @@ where $n$ is the total number of mixnet packets transformed.
          \end{align}
 Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
 \subsubsection{Channel management}
-Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened.
+Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened. There are four distinct channel statuses which are represented in the following scheme:
+\begin{figure}[H]
+    \begin{center}
+        
+
+    \begin{tikzpicture}
+\begin{scope}[very thick,->]
+    \path (-4,1)--(-4,0)--(0.1,0) node (commitment) [draw,align=left] {$WAITING\_FOR\_COMMITMENT$};
+    \path  (0,0)--(4,0)--(4,1.1) node (closed) [draw] {$CLOSED$};
+    \path (4,1)--(4,2)--(-0.1,2) node (pending) [draw,align=left] {$PENDING\_TO\_CLOSE$};
+    \path (0,2)--(-4,2)--(-4,0.9) node (open) [draw] {$OPEN$};
+    \draw [->,draw](closed) to [left] node {} (open);
+    \draw [->,draw](commitment) to [bend left] node {} (open);
+    \draw [->,draw](open) to [bend left] node [align=center] {} (pending);
+    \draw [->,draw](pending) to [bend left] node {} (closed); 
+    \draw [->,draw](closed) to [bend left] node {} (commitment); 
+
+
+    
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+\label{fig:channel statuses}
+    \caption{Channel statuses}
+\end{figure}
 \paragraph{Opening a channel} Nodes can open channels to other nodes by the following:
 A calls the method \textit{fundChannel()} or \textit{fundChannelMulti()}. The first function only funds the account of the sender (channel creator) and the second functions funds both accounts (sender and recipient). 
 $$fundChannelMulti(A: <\lambda>, B:<\mu> )$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender (sender can be the same as A or B) for A and B. Both values can also be equal or any of them could be zero. The sender is also able to fund other channels which the sender is not part of.
-The destination address of the address must now commit in order for the channel between both parties to be open. 
 Once the call has succeeded, an on-chain event \textit{WaitingForCommitment} is emited. 
-\\~\\ The channel destination (let's say it's B) can now call \textit{bumpChannel()} function to make a new set of commitments towards this channel. This call will trigger an onchain event \textit{ChannelIsOpened} and bumbs the ticket epoch to ensure tickets with the previous epoch are invalidated
+\\~\\The destination address of the channel must now commit in order for the channel between both parties to be open. 
+The channel destination (let's say it's B) can now call \textit{bumpChannel()} function to make a new set of commitments towards this channel. This call will trigger an onchain event \textit{ChannelIsOpened} and bumbs the ticket epoch to ensure tickets with the previous epoch are invalidated
 \paragraph{Redeem tickets}
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
 \paragraph{Closing a channel}
@@ -53,30 +77,7 @@ Only the channel creator (let's say it's A) can initiate the process by calling 
 \end{figure}
 \end{comment}
 
-\begin{figure}[H]
-    \begin{center}
-        
 
-    \begin{tikzpicture}
-\begin{scope}[very thick,->]
-    \path (-4,1)--(-4,0)--(0.1,0) node (commitment) [draw,align=left] {$Waiting$\\$Commitment$};
-    \path  (0,0)--(4,0)--(4,1.1) node (closed) [draw] {$Closed$};
-    \path (4,1)--(4,2)--(-0.1,2) node (pending) [draw,align=left] {$Pending$\\$Timeout$};
-    \path (0,2)--(-4,2)--(-4,0.9) node (open) [draw] {$Open$};
-    \draw [->,draw](closed) to [left] node {\naput{fund()}} (open);
-    \draw [->,draw](commitment) to [bend left] node {\naput{fund()}} (open);
-    \draw [->,draw](open) to [bend left] node [align=center] {} (pending);
-    \draw [->,draw](pending) to [bend left] node {} (closed); 
-    \draw [->,draw](closed) to [bend left] node {} (commitment); 
-
-
-    
-  \end{scope}
-\end{tikzpicture}
-\end{center}
-\label{fig:channel workflow}
-    \caption{Channel workflow}
-\end{figure}
 \begin{comment}
   \draw [->,draw](commitment) to [bend left] node {\textsf{fund()}} (open);
     \draw [->,draw](open) to [bend left] node [align=center] {\textsf{initiateChannelClosure()}} (pending);
