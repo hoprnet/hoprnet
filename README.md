@@ -235,6 +235,13 @@ run the following:
 yarn test:hoprd --grep "Identity"
 ```
 
+In a similar fashion, our contracts can be tested in isolation. For now, you
+need to pass the file to be tested, as [hardhat does not support --grep][12]
+
+```sh
+yarn test:contracts test/HoprChannels.spec.ts
+```
+
 In case a package you need to test is not included in our `package.json`,
 please feel free to update it as needed.
 
@@ -311,3 +318,4 @@ whenever you need an issue about a particular tool.
 [9]: https://mochajs.org/
 [10]: https://github.com/hoprnet/hoprnet/pull/1974/commits/331d6e99d1199250a302211be7b8dd9a22fa6e23#diff-83e70acfe04a8f13821ff96a1115f02a4b683a6370568ba9beea16da6d0c2cffR33-R49
 [11]: https://github.com/hoprnet/hoprnet/pull/1974/commits/53663517309d0f8918c5066fd98503afe8d8dd76#diff-9bf7c02325c8f5b6330a15a745a3ad736ee139a78c28a15d594756c406378884R91-R96
+[12]: https://github.com/nomiclabs/hardhat/issues/1116
