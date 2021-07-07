@@ -81,7 +81,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     address indexed source,
     address indexed destination,
     uint32 closureFinalizationTime,
-    uint32 channelBalance
+    uint256 channelBalance
   );
 
   event ChannelBumped(
