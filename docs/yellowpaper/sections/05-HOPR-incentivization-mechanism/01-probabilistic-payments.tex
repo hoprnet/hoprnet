@@ -17,12 +17,13 @@ Hence, there is no added value in pretending packet loss or intentionally changi
 \subsubsection{Channel management}
 Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened.
 \paragraph{Opening a channel} Nodes can open channels to other nodes by the following:
-A calls the method \textit{fundChannel()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is emited. The channel is now \textit{open}.
-
-
-$$fundChannel(A: <\lambda>, B: <\mu>)$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender (sender can be the same as A or B) for A and B. Both values can also be equal or any of them could be zero. The sender is also able to fund other channels which the sender is not part of.
-The destination address of the address must now commit in order for the channel between both parties is opened. Channel state is either open or waiting for commitment.
-
+A calls the method \textit{fundChannel()} or \textit{fundChannelMulti()}. The first function only funds the account of the sender (channel creator) and the second functions funds both accounts (sender and recipient). 
+$$fundChannelMulti(A: <\lambda>, B:<\mu> )$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender (sender can be the same as A or B) for A and B. Both values can also be equal or any of them could be zero. The sender is also able to fund other channels which the sender is not part of.
+The destination address of the address must now commit in order for the channel between both parties to be open. 
+Once the call has succeeded, an on-chain event \textit{Waiting\_For\_Commitment} is emited. 
+\newline fundChannel
+\newline waiting for commitment
+\newline bump channel
 \paragraph{Redeem tickets}
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
 \paragraph{Closing a channel}
