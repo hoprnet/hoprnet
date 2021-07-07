@@ -85,7 +85,7 @@ The final recipient of the packet does not receive a ticket because message rece
 \item  The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. $$r_i*G=T_{c_i}$$
 It then replies with an acknowledgement that includes a response to the challenge.
 \item Ticket signer must be the ticket issuer. This is done using the $$ECDSA.recover()$$ ethereum function which recovers the private key used to sign $T= (t, Sig_I(t))$ and verifies if the associated public key is the issuer's public key. The packet is dropped if this test fails.
-\item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the account nonce (current values in the smart contract) $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
+\item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the account nonces (current values in the smart contract) $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
 where $\alpha_c$ and $\zeta_c$ represent the current values in the smart contract.
 \item The ticket hasn't been already redeemed and ticket index is strictly greater than the current value in the smart contract (replay protection).
      $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ the ticket index.
