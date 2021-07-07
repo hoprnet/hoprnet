@@ -27,16 +27,16 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: [SETUP] Configure Git info
+      - name: '(SETUP) Configure Git info'
         run: ./scripts/configure-git-info.sh
 
-      - name: [SETUP] Use Node.js
+      - name: '[SETUP] Use Node.js'
         uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
-      - name: [SETUP] Install Yarn (only when using ACT)
+      - name: '[SETUP] Install Yarn (only when using ACT)'
         if: ${{ env.ACT == 'true' }}
         run: |
           curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
@@ -44,11 +44,11 @@ jobs:
           apt update
           apt install --no-install-recommends yarn
 
-      - name: [SETUP] Get yarn cache directory path
+      - name: '[SETUP] Get yarn cache directory path'
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
 
-      - name: [SETUP] Restore cache of node modules and yarn cache
+      - name: '[SETUP] Restore cache of node modules and yarn cache'
         uses: actions/cache@v2
         if: ${{ !env.ACT }}
         id: nodejs-cache
@@ -61,14 +61,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nodejs-
 
-      - name: [BUILD] Install dependencies / link / build
+      - name: '[BUILD] Install dependencies / link / build'
         run: |
           yarn
           yarn setup
           yarn util:link
           yarn build
 
-      - name: [SMART-CONTRACTS] Deploy on Goerli
+      - name: '[SMART-CONTRACTS] Deploy on Goerli'
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
         env:
@@ -77,7 +77,7 @@ jobs:
           ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
           NETWORK: goerli
 
-      - name: [SMART-CONTRACTS] Deploy on xDai
+      - name: '[SMART-CONTRACTS] Deploy on xDai'
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
         env:
@@ -85,20 +85,20 @@ jobs:
           QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
           NETWORK: xdai
 
-      - name: [SMART-CONTRACTS] Deploy on hardhat localhost
+      - name: '[SMART-CONTRACTS] Deploy on hardhat localhost'
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
         env:
           DEVELOPMENT: true
           NETWORK: hardhat
 
-      - name: [SMART-CONTRACTS] Commit & push changes
+      - name: '[SMART-CONTRACTS] Commit & push changes'
         if: ${{ !env.ACT }}
         run: ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: "Update smart contract deployments"
 
-      - name: [NPM] Publish prerelease version (On pushes to master)
+      - name: '[NPM] Publish prerelease version (On pushes to master)'
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
@@ -110,14 +110,14 @@ jobs:
 
       # Pushing a PR to a release branch should increment the patch version in
       # accordance with semver.
-      - name: [NPM] Publish patch version (On pushes to release branches)
+      - name: '[NPM] Publish patch version (On pushes to release branches)'
         if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
         run: ./scripts/publish-patch-release.sh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           HOPR_PACKAGE: hoprd
 
-      - name: [NPM] Wait for package to be accessible
+      - name: '[NPM] Wait for package to be accessible'
         if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: |
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
@@ -125,7 +125,7 @@ jobs:
         env:
           HOPR_PACKAGE: hoprd
 
-      - name: [FINISH] Send notification if anything failed on master or release branches
+      - name: '[FINISH] Send notification if anything failed on master or release branches'
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
