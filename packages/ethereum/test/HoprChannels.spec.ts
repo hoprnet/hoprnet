@@ -24,6 +24,7 @@ import {
   PromiseValue
 } from '@hoprnet/hopr-utils'
 import type { Wallet } from '@ethersproject/wallet'
+import { BigNumber } from 'ethers'
 
 type TicketValues = {
   recipient: string
@@ -51,6 +52,47 @@ export const redeemArgs = (ticket: AcknowledgedTicket): Parameters<HoprChannels[
 export const validateChannel = (actual, expected) => {
   expect(actual.balance.toString()).to.equal(expected.balance)
   expect(actual.status.toString()).to.equal(expected.status)
+}
+
+type ChannelArrProps = [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number]
+type ChannelObjProps = {
+  balance?: BigNumber
+  commitment?: string
+  ticketEpoch?: BigNumber
+  ticketIndex?: BigNumber
+  status?: number
+  channelEpoch?: BigNumber
+  closureTime?: number
+}
+type ChannelProps = ChannelArrProps & ChannelObjProps
+
+const createMockChannelFromProps = (props: ChannelObjProps): ChannelProps => {
+  const _emptyChannelProps = {
+    balance: undefined,
+    commitment: undefined,
+    ticketEpoch: undefined,
+    ticketIndex: undefined,
+    status: undefined,
+    channelEpoch: undefined,
+    closureTime: undefined
+  }
+  const channel = []
+  Object.keys(_emptyChannelProps).map((key, index) => {
+    if (props[key] != undefined) {
+      channel[index] = props[key]
+      channel[key] = props[key]
+    } else {
+      channel[index] = _emptyChannelProps[key]
+      channel[key] = _emptyChannelProps[key]
+    }
+  })
+  return channel as ChannelProps
+}
+
+export const createMockChannelFromMerge = (channel: ChannelProps, props: ChannelProps) => {
+  let newChannel = []
+  Object.keys(channel).map((key) => (newChannel[key] = props[key] != undefined ? props[key] : channel[key]))
+  return newChannel
 }
 
 export const createTicket = async (
@@ -541,11 +583,20 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
 
   it('should finalize channel closure', async function () {
     await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
-    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
-
+    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address))
+      .to.emit(channels, 'ChannelUpdate')
+      .withArgs(
+        fixtures.accountA.address,
+        fixtures.accountB.address,
+        createMockChannelFromMerge(
+          await channels.channels(ACCOUNT_AB_CHANNEL_ID),
+          createMockChannelFromProps({
+            balance: BigNumber.from(0),
+            closureTime: 0,
+            status: 0
+          })
+        )
+      )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: ChannelStatus.Closed + '' })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
       balance: '30',
