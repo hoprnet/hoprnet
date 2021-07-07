@@ -172,6 +172,8 @@ jobs:
     needs: [build_deploy_sc_npm]
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -336,6 +338,8 @@ jobs:
     needs: [build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -375,7 +379,9 @@ jobs:
           yarn
           # set release to intermediate docker build for debugging PRs
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
-            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}"
+            declare last_git_tag="$(git describe --tags --abbrev=0)"
+            declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
+            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${commits_since_tag}"
           fi
           echo "Pre-deploy env var RELEASE=${RELEASE}"
           ./scripts/deploy.sh
