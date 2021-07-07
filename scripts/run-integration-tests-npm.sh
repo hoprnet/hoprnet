@@ -118,13 +118,22 @@ function setup_node() {
   yarn --cwd "${npm_install_dir}" add @hoprnet/hoprd@${version}
 
   DEBUG="hopr*" yarn --cwd "${npm_install_dir}" hoprd \
-    --init --provider=http://127.0.0.1:8545/ \
-    --testAnnounceLocalAddresses --identity="${id}" \
-    --host="127.0.0.1:${node_port}" --testPreferLocalAddresses \
-    --data="${dir}" --rest --restPort "${rest_port}" --announce \
-    --api-token "e2e-api-token" \
-    --admin --adminHost "127.0.0.1" --adminPort ${admin_port} \
-    --password="e2e-test" --testUseWeakCrypto \
+    --admin \
+    --adminHost "127.0.0.1" \
+    --adminPort ${admin_port} \
+    --announce \
+    --api-token "e2e-API-token^^" \
+    --data="${dir}" \
+    --host="127.0.0.1:${node_port}" \
+    --identity="${id}" \
+    --init \
+    --password="e2e-test" \
+    --provider=http://127.0.0.1:8545/ \
+    --rest \
+    --restPort "${rest_port}" \
+    --testAnnounceLocalAddresses \
+    --testPreferLocalAddresses \
+    --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
 
