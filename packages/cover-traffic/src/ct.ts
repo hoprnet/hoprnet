@@ -1,5 +1,5 @@
 import type { HoprOptions, ChannelsToOpen, ChannelsToClose } from '@hoprnet/hopr-core'
-import Hopr, { SaneDefaults } from '@hoprnet/hopr-core'
+import Hopr, { SaneDefaults, findPath} from '@hoprnet/hopr-core'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
 import { PublicKey, HoprDB, ChannelEntry } from '@hoprnet/hopr-utils'
@@ -9,8 +9,7 @@ import type PeerId from 'peer-id'
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
 const CHANNEL_STAKE = new BN('1000')
 const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
-const CT_PATH_LENGTH = 1
-const MAX_PATH_ATTEMPTS = 99
+const CT_INTERMEDIATE_HOPS = 3 // NB. min is 2
 
 const options: HoprOptions = {
   //provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
@@ -64,15 +63,26 @@ export const weightedRandomChoice = (): PublicKey => {
   throw new Error('wtf')
 }
 
-export const createPath(): ChannelEntry[] {
-  let path = []
-  let attempts = 0
-  while (path.length < CT_PATH_LENGTH) {
-    if (attempts > MAX_PATH_ATTEMPTS) {
-      throw new Error('could not create path')
-    }
-    attempts ++
+export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey): Promise<boolean> => {
+  const weight = (edge: ChannelEntry): BN => importance(edge.destination)
+  try {
+    const path = await findPath(
+      startNode,
+      selfPub,
+      CT_INTERMEDIATE_HOPS - 1,// As us to start is first intermediate
+      (_p: PublicKey): number => 1, // TODO network quality?
+      (p: PublicKey) => Promise.resolve(findChannelsFrom(p)),
+      weight
+    )
+    path.push(selfPub) // destination is always self.
+    STATE.log.push('SEND ' + path.map(pub => pub.toPeerId().toB58String()).join(','))
+  } catch (e) {
+    // could not find path
+    console.log(e)
+    return false
   }
+  // TODO _send_
+  return true
 }
 
 class CoverTrafficStrategy extends SaneDefaults {
@@ -115,10 +125,19 @@ class CoverTrafficStrategy extends SaneDefaults {
         .map((p) => p.toPeerId().toB58String())
         .join(',')}`
     ).replace('\n', ', '))
+
+    await Promise.all(STATE.ctChannels.map(async (dest) => {
+      const success = await sendCTMessage(dest, this.selfPub)
+      if (!success) {
+        toClose.push(dest);
+      }
+    }))
+
     this.update(STATE)
     return [toOpen, toClose]
   }
 }
+
 
 type PeerData = {
   id: any //PeerId,
@@ -130,13 +149,15 @@ export type State = {
   channels: Record<string, ChannelEntry>
   log: string[]
   ctChannels: PublicKey[]
+  block: BN
 }
 
 const STATE: State = {
   nodes: {},
   channels: {},
   log: [],
-  ctChannels: []
+  ctChannels: [],
+  block: new BN('0')
 }
 
 // Otherwise we get a mess
@@ -175,6 +196,11 @@ export async function main(update: (State) => void, peerId: PeerId) {
   const indexer = new Indexer(chain.getGenesisBlock(), db, chain, CONFIRMATIONS, INDEXER_BLOCK_RANGE)
   indexer.on('channel-update', onChannelUpdate)
   indexer.on('peer', peerUpdate)
+  /*
+  indexer.on('block', (blockNumber) => {
+    STATE.block = new BN(blockNumber.toString())
+  })
+  */
   STATE.log.push('indexing...')
   update(STATE)
   await indexer.start()

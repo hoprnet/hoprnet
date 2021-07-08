@@ -7,7 +7,7 @@ import { NOISE } from 'libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 
-import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, CHECK_TIMEOUT, PATH_RANDOMNESS, FULL_VERSION } from './constants'
+import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, CHECK_TIMEOUT, FULL_VERSION } from './constants'
 
 import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
@@ -846,7 +846,7 @@ class Hopr extends EventEmitter {
       PublicKey.fromPeerId(this.getId()),
       destination,
       INTERMEDIATE_HOPS,
-      this.networkPeers,
+      (p: PublicKey) => this.networkPeers.qualityOf(p.toPeerId()),
       ethereum.getOpenChannelsFrom.bind(ethereum)
     )
   }
@@ -879,5 +879,5 @@ class Hopr extends EventEmitter {
 
 export { Hopr as default, LibP2P }
 export * from './constants'
-export { PassiveStrategy, PromiscuousStrategy, SaneDefaults }
+export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }

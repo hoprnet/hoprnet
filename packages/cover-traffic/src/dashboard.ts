@@ -31,7 +31,14 @@ function setupDashboard(selfPub: PublicKey) {
     columnWidth: [6, 90] /*in chars*/
   } as any)
 
-  const logs = grid.set(3, 0, 1, 4, contrib.log, { label: 'logs' })
+  const logs = grid.set(3, 0, 1, 3, contrib.log, { label: 'logs' })
+  const stats = grid.set(3,3,1,1, contrib.table, {
+    label: 'stats',
+    keys: false,
+    interactive: false,
+    columnSpacing: 2, //in chars
+    columnWidth: [55, 40]
+  })
 
   const ctChan = grid.set(2, 2, 1, 2, contrib.table, {
     label: 'Cover Traffic channels',
@@ -97,6 +104,10 @@ function setupDashboard(selfPub: PublicKey) {
         return [p.toPeerId().toB58String(), status, 0, balance]
       })
     })
+
+    stats.setData({ headers: ['', ''], data: [
+      ['block', stats.block.toString()]
+    ]})
 
     screen.render()
   }
