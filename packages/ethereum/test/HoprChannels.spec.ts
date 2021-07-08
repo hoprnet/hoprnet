@@ -559,25 +559,24 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
   })
 
   it('B can initialize channel closure', async function () {
-    await expect(channels.connect(fixtures.accountB).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
-      channels,
-      'ChannelUpdate'
-    ).withArgs(
-      fixtures.accountB.address,
-      ACCOUNT_A.address,
-      createMockChannelFromMerge(
-        await channels.channels(ACCOUNT_BA_CHANNEL_ID),
-        createMockChannelFromProps({
-          status: ChannelStatus.PendingToClose,
-          closureTime:
-            (
-              await ethers.provider.getBlock(ethers.provider.getBlockNumber())
-            ).timestamp + // Block timestamp
-            (await channels.secsClosure()) + // Contract secs
-            1 // tick
-        })
+    await expect(channels.connect(fixtures.accountB).initiateChannelClosure(ACCOUNT_A.address))
+      .to.emit(channels, 'ChannelUpdate')
+      .withArgs(
+        fixtures.accountB.address,
+        ACCOUNT_A.address,
+        createMockChannelFromMerge(
+          await channels.channels(ACCOUNT_BA_CHANNEL_ID),
+          createMockChannelFromProps({
+            status: ChannelStatus.PendingToClose,
+            closureTime:
+              (
+                await ethers.provider.getBlock(ethers.provider.getBlockNumber())
+              ).timestamp + // Block timestamp
+              (await channels.secsClosure()) + // Contract secs
+              1 // tick
+          })
+        )
       )
-    )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
       balance: '30',
