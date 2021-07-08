@@ -34,32 +34,36 @@ function ensure_port_is_free() {
   fi
 }
 
-# $1 = port to wait for
-# $2 = optional: file to tail for debug info
-# $3 = optional: delay between checks in seconds, defaults to 2s
-# $4 = optional: max number of checks, defaults to 1000
+# $1 = host to check port on
+# $2 = port to wait for
+# $3 = optional: file to tail for debug info
+# $4 = optional: delay between checks in seconds, defaults to 2s
+# $5 = optional: max number of checks, defaults to 1000
 function wait_for_http_port() {
-  local port=${1}
-  local log_file=${2:-}
-  local delay=${3:-2}
-  local max_wait=${4:-1000}
-  local cmd="curl --silent "localhost:${port}""
+  local host=${1}
+  local port=${2}
+  local log_file=${3:-}
+  local delay=${4:-2}
+  local max_wait=${5:-1000}
+  local cmd="curl --silent "${host}:${port}""
 
-  wait_for_port "${port}" "${log_file}" "${delay}" "${max_wait}" "${cmd}"
+  wait_for_port "${host}" "${port}" "${log_file}" "${delay}" "${max_wait}" "${cmd}"
 }
 
-# $1 = port to wait for
-# $2 = optional: file to tail for debug info
-# $3 = optional: delay between checks in seconds, defaults to 2s
-# $4 = optional: max number of checks, defaults to 1000
-# $5 = optional: command to check
+# $1 = host to check port on
+# $2 = port to wait for
+# $3 = optional: file to tail for debug info
+# $4 = optional: delay between checks in seconds, defaults to 2s
+# $5 = optional: max number of checks, defaults to 1000
+# $6 = optional: command to check
 function wait_for_port() {
-  local port=${1}
-  local log_file=${2:-}
-  local delay=${3:-2}
-  local max_wait=${4:-1000}
+  local host=${1}
+  local port=${2}
+  local log_file=${3:-}
+  local delay=${4:-2}
+  local max_wait=${5:-1000}
   # by default we do a basic listen check
-  local cmd=${5:-lsof -i ":${port}" -s TCP:LISTEN}
+  local cmd=${6:-nc -z -w 0 ${host} ${port}}
 
   i=0
   until ${cmd}; do
