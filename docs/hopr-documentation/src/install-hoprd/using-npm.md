@@ -50,4 +50,12 @@ If everything was done properly, you can run `node --version` to see your curren
 $ mkdir MY_NEW_HOPR_TEST_FOLDER
 $ cd MY_NEW_HOPR_TEST_FOLDER
 $ npm install @hoprnet/hoprd@1.73
+
+# run hoprd
+$ DEBUG=hopr* npx hoprd --admin --init --announce
+
+# add security
+$ DEBUG=hopr* npx hoprd --admin --init --announce --apiToken <YOU_SECRET_TOKEN>
+
+Please note that if `--rest` or `--admin` is specificed, you **must** provide an `--apiToken` which is at least 8 symbols, contains a lowercase and an uppercase letter, a number and a special symbol. This ensure the node cannot be accessed by a malicious user residing in the same network.
 ```

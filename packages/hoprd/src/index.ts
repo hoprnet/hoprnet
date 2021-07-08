@@ -11,6 +11,7 @@ import { terminalWidth } from 'yargs'
 import setupAPI from './api'
 import { getIdentity } from './identity'
 import path from 'path'
+import { passwordStrength } from 'check-password-strength'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -22,7 +23,7 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/'
+    default: 'https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -35,12 +36,12 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('admin', {
     boolean: true,
-    describe: 'Run an admin interface on localhost:3000',
+    describe: 'Run an admin interface on localhost:3000, requires --apiToken',
     default: false
   })
   .option('rest', {
     boolean: true,
-    describe: 'Run a rest interface on localhost:3001',
+    describe: 'Run a rest interface on localhost:3001, requires --apiToken',
     default: false
   })
   .option('restHost', {
@@ -132,6 +133,11 @@ const argv = yargs(process.argv.slice(2))
     describe: 'weaker crypto for faster node startup',
     default: false
   })
+  .option('testNoAuthentication', {
+    boolean: true,
+    describe: 'no remote authentication for easier testing',
+    default: false
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -170,14 +176,14 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   if (argv.data && argv.data !== '') {
     options.dbPath = argv.data
   }
+
   return options
 }
 
 function addUnhandledPromiseRejectionHandler() {
   process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason)
-    // @TODO uncomment next line
-    // process.exit(1)
+    process.exit(1)
   })
 }
 
@@ -212,10 +218,29 @@ async function main() {
     logs.startLoggingQueue()
   }
 
+  if (!argv.testNoAuthentication && (argv.rest || argv.admin)) {
+    if (argv.apiToken == null) {
+      throw Error(`Must provide --apiToken when --admin or --rest is specified`)
+    }
+    const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
+    for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
+      if (!hasSymbolTypes.includes(requiredSymbolType)) {
+        throw new Error(`API token must include a ${requiredSymbolType}`)
+      }
+    }
+    if (length < 8) {
+      throw new Error(`API token must be at least 8 characters long`)
+    }
+  }
+
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
     // as if the HOPR node fails, we need to put an error message up.
-    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort, argv.apiToken)
+    let apiToken = argv.apiToken
+    if (argv.testNoAuthentication) {
+      apiToken = null
+    }
+    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort, apiToken)
     await adminServer.setup()
   }
 

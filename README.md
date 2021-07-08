@@ -117,11 +117,11 @@ Options:
   --help                        Show help  [boolean]
   --version                     Show version number  [boolean]
   --network                     Which network to run the HOPR node on  [choices: "ETHEREUM"] [default: "ETHEREUM"]
-  --provider                    A provider url for the Network you specified  [default: "wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"]
+  --provider                    A provider url for the Network you specified  [default: "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"]
   --host                        The network host to run the HOPR node on.  [default: "0.0.0.0:9091"]
   --announce                    Announce public IP to the network  [boolean] [default: false]
-  --admin                       Run an admin interface on localhost:3000  [boolean] [default: false]
-  --rest                        Run a rest interface on localhost:3001  [boolean] [default: false]
+  --admin                       Run an admin interface on localhost:3000, requires --apiToken  [boolean] [default: false]
+  --rest                        Run a rest interface on localhost:3001, requires --apiToken  [boolean] [default: false]
   --restHost                    Updates the host for the rest server  [default: "localhost"]
   --restPort                    Updates the port for the rest server  [default: 3001]
   --healthCheck                 Run a health check end point on localhost:8080  [boolean] [default: false]
@@ -142,6 +142,7 @@ Options:
   --testAnnounceLocalAddresses  For testing local testnets. Announce local addresses.  [boolean] [default: false]
   --testPreferLocalAddresses    For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
   --testUseWeakCrypto           weaker crypto for faster node startup  [boolean] [default: false]
+  --testNoAuthentication        (experimental) disable remote authentication
 ```
 
 As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.
@@ -152,7 +153,7 @@ The following command assumes you've setup a local installation like described i
 
 ```sh
 cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs
+DEBUG=hopr* npx hoprd --admin --init --announce --identity .hopr-identity --password switzerland --forwardLogs --apiToken <MY_TOKEN>
 ```
 
 Here is a short break-down of each argument.
@@ -165,6 +166,7 @@ hoprd
   --identity .hopr-identity              # store your node identity information in your test folder
   --password switzerland   		 # set the encryption password for your identity
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
+  --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API (REQUIRED)
 ```
 
 ### Using Docker
@@ -187,6 +189,7 @@ hoprd
   --admin   	                         # enable the node's admin UI
   --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
+  --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API(REQUIRED)
 ```
 
 ## Develop
@@ -234,6 +237,22 @@ yarn test:hoprd --grep "Identity"
 
 In case a package you need to test is not included in our `package.json`,
 please feel free to update it as needed.
+
+#### Test-driven development
+
+To make sure we add the least amount of untested code to our codebase,
+whenever possible all code should come accompanied by a test. To do so,
+locate the `.spec` or equivalent test file for your code. If it does not
+exist, create it within the same file your code will live in.
+
+Afterwards, ensure you create a breaking test for your feature. For example,
+the [following commit][10] added a test to a non-existing feature. The
+immediate [commit][11] provided the actual feature for that given test. Repeat
+this process for all the code you add to our codebase.
+
+_(The code was pushed as an example, but ideally, you only push code that has
+working tests on your machine, as to avoid overusing our CI pipeline with
+known broken tests.)_
 
 ### Github Actions CI
 
@@ -290,3 +309,5 @@ whenever you need an issue about a particular tool.
 [7]: https://www.youtube.com/watch?v=d0Eb6haIUu4
 [8]: https://github.com/nektos/act
 [9]: https://mochajs.org/
+[10]: https://github.com/hoprnet/hoprnet/pull/1974/commits/331d6e99d1199250a302211be7b8dd9a22fa6e23#diff-83e70acfe04a8f13821ff96a1115f02a4b683a6370568ba9beea16da6d0c2cffR33-R49
+[11]: https://github.com/hoprnet/hoprnet/pull/1974/commits/53663517309d0f8918c5066fd98503afe8d8dd76#diff-9bf7c02325c8f5b6330a15a745a3ad736ee139a78c28a15d594756c406378884R91-R96

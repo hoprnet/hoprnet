@@ -17,7 +17,6 @@ export function AbbreviatedId({ id }) {
 }
 
 export function LogLine(props) {
-  console.log(props)
   let raw = props.value.msg
   let msg = []
   let ids = []
@@ -66,6 +65,7 @@ export function Logs(props) {
     <div className={cls}>
       <div ref={container}>
         {props.connecting && <span>Attempting to connect</span>}
+        {props.authRequired && <span>Auth Required</span>}
         {props.messages.map((x) => (
           <LogLine value={x} />
         ))}
