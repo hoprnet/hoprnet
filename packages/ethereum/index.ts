@@ -5,7 +5,7 @@ export * from './constants'
 export * from './types'
 export * from './types/commons'
 
-export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'
+export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor' | 'HoprRegistry'
 
 export type ContractData = {
   address: string
@@ -14,7 +14,7 @@ export type ContractData = {
 }
 
 export const getContractData = (network: Networks, contract: ContractNames): ContractData => {
-  // hack: required for E2E tests to pass
+  // hack: required for E2E tests to work
   // when a contract changes we redeploy it, this causes the deployments folder to change
   // unlike normal the release workflow, when running the E2E tests, we build the project
   // and then run deployments, which may update the deployment folder

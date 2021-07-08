@@ -94,6 +94,14 @@ export default class HoprEthereum extends EventEmitter {
     return this.indexer.getRandomOpenChannel()
   }
 
+  public getAddress(): Address {
+    return this.address
+  }
+
+  public getPublicKey() {
+    return this.publicKey
+  }
+
   private uncachedGetBalance = () => this.chain.getBalance(this.address)
   private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
   /**
@@ -102,14 +110,6 @@ export default class HoprEthereum extends EventEmitter {
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
     return useCache ? this.cachedGetBalance() : this.uncachedGetBalance()
-  }
-
-  public getAddress(): Address {
-    return this.address
-  }
-
-  public getPublicKey() {
-    return this.publicKey
   }
 
   /**
@@ -123,6 +123,19 @@ export default class HoprEthereum extends EventEmitter {
   )
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
     return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
+  }
+
+  /**
+   * Get distribution links.
+   * @returns
+   */
+  private uncachedGetDistributionLinks = () => this.chain.getDistributionLinks()
+  private cachedGetDistributionLinks = cacheNoArgAsyncFunction<[string, string][]>(
+    this.uncachedGetDistributionLinks,
+    PROVIDER_CACHE_TTL
+  )
+  public async getDistributionLinks(useCache: boolean = false): Promise<[string, string][]> {
+    return useCache ? this.cachedGetDistributionLinks() : this.uncachedGetDistributionLinks()
   }
 
   public smartContractInfo(): {

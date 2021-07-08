@@ -8,7 +8,8 @@ import {
   HoprToken,
   HoprChannels,
   HoprToken__factory,
-  HoprChannels__factory
+  HoprChannels__factory,
+  HoprRegistry__factory
 } from '@hoprnet/hopr-ethereum'
 import {
   Address,
@@ -50,9 +51,11 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
   const hoprTokenDeployment = getContractData(network, 'HoprToken')
   const hoprChannelsDeployment = getContractData(network, 'HoprChannels')
+  const hoprRegistryDeployment = getContractData(network, 'HoprRegistry')
 
   const token = HoprToken__factory.connect(hoprTokenDeployment.address, wallet)
   const channels = HoprChannels__factory.connect(hoprChannelsDeployment.address, wallet)
+  const registry = HoprRegistry__factory.connect(hoprRegistryDeployment.address, provider)
   const genesisBlock = (await provider.getTransaction(hoprChannelsDeployment.transactionHash)).blockNumber
   const channelClosureSecs = await channels.secsClosure()
 
@@ -298,7 +301,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       hoprTokenAddress: hoprTokenDeployment.address,
       hoprChannelsAddress: hoprChannelsDeployment.address,
       channelClosureSecs
-    })
+    }),
+    getDistributionLinks: () => registry.getLinks()
   }
 
   return api
