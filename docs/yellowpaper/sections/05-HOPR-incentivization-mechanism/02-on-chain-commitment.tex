@@ -4,11 +4,12 @@ HOPR uses a commitment scheme to deposit values on-chain and reveal them once a 
 
 \begin{defnsub}
     % Currently leaving out further details such as unconditionally/computationally binding / hiding
-    A commitment scheme $Cm = (\mathsf{Commit}, \mathsf{Open})$ is a protocol between two parties, $A$ and $B$, that gives $A$ the opportunity to store a value $comm = \mathsf{Commit}(x)$ at $B$. The value $x$ stays unknown to $B$ until $A$ decides to reveal it to $B$.
+    A commitment scheme $Cm = (\textit{Commit}, \textit{Open})$ is a protocol between two parties, $A$ and $B$, that gives $A$ the opportunity to store a value $comm = \textit{Commit}(x)$ at $B$. The value $x$ stays unknown to $B$ until $A$ decides to reveal it to $B$.
+    \\ \noindent\textbf{Hiding:} A commitment scheme is called \textbf{computational hiding} if the following holds:
+    $$\forall \;x\neq x' \; \{\textit{Commit}_k(x,U_k)\}_{k\in\mathbb{N}}\approx\{{\textit{Commit}_k(x',U_k)}\}_{k\in\mathbb{N}}$$ which means both probability ensembles are computationally indistinguashable such that $U_{k}$ is the uniform distribution over the $2^{k}$ opening values for security parameter $k$.
+    \\\noindent\textbf{Binding:} A commitment scheme is called \textbf{computational binding} if for all bounded polynomial adversary \textit{Adv} algorithms that run in time $t$ and output $x,x',open,open'$ the following holds:
+    $$P	[ \,x\neq x' \; and \; \textit{Commit}(x,open)={\textit{Commit}(x',open')})] \,\leq \epsilon$$ A Computationally bounded adversary means that the adversary has limitations on their computational resources. 
 
-    \noindent\textbf{Hiding:} A commitment scheme is called \textbf{hiding} if it is infeasible for an adversary $\mathsf{Adv}$ to recover $x$ from $comm$.
-
-    \noindent\textbf{Binding:} A commitment scheme is called \textbf{binding} if it is infeasible for an adversary $\mathsf{Adv}$ to find a value $x'$ with $x \neq x'$ such that $\mathsf{Open}(cm, x') \neq \bot$.
 \end{defnsub}
 
 \subsubsection{Setup phase}
