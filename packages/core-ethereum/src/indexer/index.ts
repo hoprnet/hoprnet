@@ -191,7 +191,7 @@ class Indexer extends EventEmitter {
    */
   private async onNewBlock(blockNumber: number): Promise<void> {
     log('Indexer got new block %d', blockNumber)
-    //this.emit('block', blockNumber)
+    this.emit('block', blockNumber)
 
     // update latest block
     if (this.latestBlock < blockNumber) {

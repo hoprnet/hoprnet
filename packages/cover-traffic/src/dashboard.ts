@@ -37,7 +37,7 @@ function setupDashboard(selfPub: PublicKey) {
     keys: false,
     interactive: false,
     columnSpacing: 2, //in chars
-    columnWidth: [55, 40]
+    columnWidth: [10, 20]
   })
 
   const ctChan = grid.set(2, 2, 1, 2, contrib.table, {
@@ -106,7 +106,7 @@ function setupDashboard(selfPub: PublicKey) {
     })
 
     stats.setData({ headers: ['', ''], data: [
-      ['block', stats.block.toString()]
+      ['block', state.block.toString()]
     ]})
 
     screen.render()

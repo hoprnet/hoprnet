@@ -196,11 +196,10 @@ export async function main(update: (State) => void, peerId: PeerId) {
   const indexer = new Indexer(chain.getGenesisBlock(), db, chain, CONFIRMATIONS, INDEXER_BLOCK_RANGE)
   indexer.on('channel-update', onChannelUpdate)
   indexer.on('peer', peerUpdate)
-  /*
   indexer.on('block', (blockNumber) => {
     STATE.block = new BN(blockNumber.toString())
+    update(STATE)
   })
-  */
   STATE.log.push('indexing...')
   update(STATE)
   await indexer.start()
