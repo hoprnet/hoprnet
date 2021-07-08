@@ -15,7 +15,7 @@ HOPR uses a commitment scheme to deposit values on-chain and reveal them once a 
 
 \subsubsection{Commitment phase}
 
-Once a node engages with another node in a payment channel, it derives a master key $comm_0$ from its private key and uses it to create an iterated commitment $comm_i$ such that for every $i \in \mathbb{N}_0$ and $i > 0$ it holds that $$ \mathsf{Open}(comm_{i}, comm_{i-1}) = \top $$
+Once a node engages with another node in a payment channel as the destination of the channel, it derives a master key $comm_0$ from its private key and uses it to create an iterated commitment $comm_i$ such that for every $i \in \mathbb{N}_0$ and $i > 0$ it holds that $$ \mathsf{Open}(comm_{i}, comm_{i-1}) = \top $$
 where opening $comm_{i}$ with $comm_{i-1}$ holds true.
 The iterated commitment is computed as $$comm_n = h^n(comm_0)$$ where $\mathsf{h}$ is a preimage-resistant hash function (we use keccak256 hash function which is used in Ethereum) and $comm_0$ is derived as 
 $$ comm_0 = \mathsf{h}(privKey, chainId, contractAddr, channelId, channelEpoch)$$
