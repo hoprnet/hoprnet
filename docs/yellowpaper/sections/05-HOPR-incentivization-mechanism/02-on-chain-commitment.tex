@@ -1,15 +1,15 @@
 \subsection{On-chain Commitment}
 
-HOPR uses a commitment scheme to deposit values on-chain and reveal them once a node redeems an incentive for relaying packets. This comes with the benefit that the redeeming party discloses a secret that is unknown to the issuer of the incentive until it is claimed on-chain. The $\textbf{opening}$ and the $\textbf{response}$ to the PoR challenge (or as we call them in the smart contract \textit{nextCommitment} and \textit{proofOfRelaySecret}) are then used by the smart contract to determine whether the ticket has been redeemed or not.
+HOPR uses a commitment scheme to deposit values on-chain and reveal them once a node redeems an incentive for relaying packets. This comes with the benefit that the redeeming party discloses a secret that is unknown to the issuer of the incentive until it is claimed on-chain. The $\textbf{opening}$ $\mathsf{Open}$ and the $\textbf{response}$ $r$ to the PoR challenge (or as we call them in the smart contract \textit{nextCommitment} and \textit{proofOfRelaySecret}) are then used by the smart contract to determine whether the ticket has been redeemed or not.
 
 \begin{defnsub}
     % Currently leaving out further details such as unconditionally/computationally binding / hiding
     A commitment scheme $\mathsf{C_m} = (\mathsf{Commit}, \mathsf{Open})$ is a protocol between two parties, $A$ and $B$, that gives $A$ the opportunity to store a value $comm = \mathsf{Commit}(x)$ at $B$. The value $x$ stays unknown to $B$ until $A$ decides to reveal it to $B$.
     Such that for any $m\in \mathbb{M}$, $(c,d)\leftarrow \mathsf{Commit(m)}$ is the commitment/opening pair for $m$ where $c = c(m)$ serves as the commitment value, and $d = d(m)$ as the opening value.
     \\~\\ \noindent\textbf{Hiding:} A commitment scheme is called \textbf{computational hiding} if the following holds:
-    $$\forall \;x\neq x' \; \{\mathsf{Commit}_k(x,U_k)\}_{k\in\mathbb{N}}\approx\{{\mathsf{Commit}_k(x',U_k)}\}_{k\in\mathbb{N}}$$ which means both probability ensembles are computationally indistinguashable such that $U_{k}$ is the uniform distribution over the $2^{k}$ opening values for security parameter $k$.
+    $$\forall \;x\neq x' \; \{\mathsf{Commit}_k(x,U_k)\}_{k\in\mathbb{N}}\approx\{{\mathsf{Commit}_k(x',U_k)}\}_{k\in\mathbb{N}}$$ which means both probability ensembles are computationally indistinguashable such that $U_{k}$ is the uniform distribution over the $2^{k}$ opening values for the security parameter $k$.
     \\~\\\noindent\textbf{Binding:} A commitment scheme is called \textbf{computational binding} if for all bounded polynomial adversary \textit{Adv} algorithms that run in time $t$ and output $x,x',open,open'$ the following holds:
-    $$P	[ \,x\neq x' \; and \; \mathsf{Commit}(x,open)={\mathsf{Commit}(x',open')})] \,\leq \epsilon$$ A Computationally bounded adversary means that the adversary has limitations on their computational resources. 
+    $$P	[ \,x\neq x' \; and \; \mathsf{Commit}(x,open)={\mathsf{Commit}(x',open')}] \,\leq \epsilon$$ A Computationally bounded adversary means that the adversary has limitations on their computational resources. 
 
 \end{defnsub}
 
