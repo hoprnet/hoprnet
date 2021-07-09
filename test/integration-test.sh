@@ -89,8 +89,7 @@ get_hopr_address(){
 }
 
 validate_node_eth_address() {
-  local ETH_ADDRESS
-  local IS_VALID_ETH_ADDRESS
+  local ETH_ADDRESS IS_VALID_ETH_ADDRESS
 
   ETH_ADDRESS="$(get_eth_address $1)"
   if [ -z "$ETH_ADDRESS" ]; then
@@ -173,11 +172,11 @@ log "Node 1 send 0-hop message to node 2"
 run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 600
 
 log "Node 1 open channel to Node 2"
-result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel")
+result=$(run_command "${api1}" "open ${addr2} 0.001" "Successfully opened channel")
 log "-- ${result}"
 
 log "Node 2 open channel to Node 3"
-result=$(run_command "${api2}" "open ${addr3} 0.1" "Successfully opened channel")
+result=$(run_command "${api2}" "open ${addr3} 0.001" "Successfully opened channel")
 log "-- ${result}"
 
 for i in `seq 1 10`; do
@@ -195,7 +194,7 @@ for i in `seq 1 10`; do
 done
 
 log "Node 3 open channel to Node 4"
-result=$(run_command "${api3}" "open ${addr4} 0.1" "Successfully opened channel")
+result=$(run_command "${api3}" "open ${addr4} 0.001" "Successfully opened channel")
 log "-- ${result}"
 
 for i in `seq 1 10`; do

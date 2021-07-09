@@ -41,23 +41,23 @@ gcloud_get_address() {
   local ip=$(gcloud compute addresses describe $1 $gcloud_region 2>&1)
   # Google does not return an appropriate exit code :(
   if [ "$(echo "$ip" | grep 'ERROR')" ]; then
-    echo "No address, creating" 1>&2
+    log "No address, creating"
     gcloud compute addresses create $1 $gcloud_region
     local ip=$(gcloud compute addresses describe $1 $gcloud_region 2>&1)
   fi
   echo $ip | awk '{ print $2 }'
 }
 
-# Waits until the node is ready (port 8080 healthcheck by default)
 # $1 = ip
+# $2 = optional: healthcheck port, defaults to 8080
 wait_until_node_is_ready() {
   is_ready=0
   while [ $is_ready -eq 0 ]; do
-    if curl $1:8080/healthcheck/v1/version; then
-      echo "VM with IP $1 has a HOPR node up and running"
+    if curl --silent "${1}:${2:-8080}/healthcheck/v1/version"; then
+      log "VM with IP $1 has a HOPR node up and running"
       is_ready=1
     else
-      echo "VM with IP $1 is not ready, sleeping for 10s"
+      log "VM with IP $1 is not ready, sleeping for 10s"
       sleep 10
     fi
   done
@@ -95,7 +95,7 @@ gcloud_update_container_with_image() {
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
-  echo "Updating container on vm:$1 - $2 (disk: $3:$4)"
+  log "Updating container on vm:$1 - $2 (disk: $3:$4)"
   gcloud compute instances update-container $1 $ZONE \
     --container-image=$2 --container-mount-disk name=$3,mount-path="$4" \
     --container-arg="--admin" \
@@ -117,7 +117,7 @@ gcloud_update_container_with_image() {
 # $1 - vm name
 # $2 - docker image
 gcloud_stop() {
-  echo "Stopping docker image:$2 on vm $1"
+  log "Stopping docker image:$2 on vm $1"
   gssh $1 -- "export DOCKER_IMAGE=$2 && docker stop \$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)"
 }
 
@@ -149,7 +149,7 @@ gcloud_create_or_update_instance_template() {
   api_token="${4}"
   password="${5}"
   mount_path="/app/db"
-  host_path="/root"
+  host_path="/var/hoprd"
 
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet >/dev/null; then
@@ -250,6 +250,6 @@ gcloud_get_managed_instance_group_instances_ips() {
   gcloud compute instance-groups list-instances "${name}" \
     ${gcloud_region} --uri | \
     xargs -P `nproc` -I '{}' gcloud compute instances describe '{}' \
-    --flatten 'networkInterfaces[].accessConfigs[]' \
-    --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
+      --flatten 'networkInterfaces[].accessConfigs[]' \
+      --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
 }
