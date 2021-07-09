@@ -1,4 +1,4 @@
-name: HOPR End-to-end tests (NPM)
+name: HOPR End-to-end tests (gcloud)
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
@@ -8,12 +8,12 @@ env:
 
 on:
   push:
-    branches: ['master', 'release/**', 'debug-npm-e2e/**']
+    branches: ['master', 'release/**', 'debug-e2e-gcloud/**']
     paths-ignore:
       - '**/docs/**/*'
 
 jobs:
-  npm-e2e:
+  e2e-gcloud:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
 
@@ -56,27 +56,17 @@ jobs:
       - name: Install websocat
         run: ./scripts/install-websocat.sh
 
+      - name: Install jq
+        run: ./scripts/install-jq.sh
+
       - name: Test
-        run: ./scripts/run-integration-tests-npm.sh
-
-      - name: Upload node logs (Linux)
-        uses: actions/upload-artifact@v2
-        if: ${{ always() && runner.os == 'Linux' }}
-        with:
-          name: hopr-e2e-source-node-logs
-          path: |
-            /tmp/hopr-*-node*.log
-
-      - name: Upload node logs (macOS)
-        uses: actions/upload-artifact@v2
-        if: ${{ always() && runner.os == 'macOS' }}
-        with:
-          name: hopr-e2e-source-node-logs
-          path: |
-            /var/tmp/hopr-*-node*.log
+        run: ./scripts/run-integration-tests-gcloud.sh
+        env:
+          FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
 
       - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ failure() && !env.ACT }}
         run: |
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"

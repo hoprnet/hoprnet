@@ -40,6 +40,7 @@ declare password="pw${RANDOM}${RANDOM}${RANDOM}pw"
 declare wait_delay=2
 declare wait_max_wait=1000
 declare rpc_endpoint="https://goerli.infura.io/v3/${HOPRD_INFURA_KEY}"
+declare hopr_token_contract="0x566a5c774bb8ABE1A88B4f187e24d4cD55C207A5"
 
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   wait_delay=10
@@ -82,7 +83,7 @@ node_ips_arr=( ${node_ips} )
 for ip in ${node_ips}; do
   wait_until_node_is_ready "${ip}"
   declare eth_address=$(get_eth_address "${ip}")
-  fund_if_empty "${eth_address}" "${rpc_endpoint}"
+  fund_if_empty "${eth_address}" "${rpc_endpoint}" "${hopr_token_contract}"
 done
 # }}}
 

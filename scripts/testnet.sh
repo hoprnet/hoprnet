@@ -16,6 +16,7 @@ source "${mydir}/gcloud.sh"
 source "${mydir}/dns.sh"
 
 declare min_funds=0.01291
+declare min_funds_hopr=10.0
 
 # $1 = role (ie. node-4)
 # $2 = network name
@@ -47,9 +48,11 @@ funding_wallet_address() {
 
 # $1 = account (hex)
 # $2 = chain provider
+# $3 = optional: hopr token contract
 fund_if_empty() {
   local address="${1}"
   local rpc="${2}"
+  local token_contract="${3:-}"
 
   local funding_address funding_balance balance
 
@@ -67,8 +70,16 @@ fund_if_empty() {
 
     log "Balance of ${address} is ${balance}"
     if [ "${balance}" = '0.0' ]; then
-      log "Funding account -> ${address} ${min_funds}"
-      yarn ethers send --rpc "${rpc}" --account "${FUNDING_PRIV_KEY}" "${address}" ${min_funds} --yes
+      local ethers_opts="--rpc \"${rpc}\" --account \"${FUNDING_PRIV_KEY}\" --yes"
+
+      log "Funding account with native token -> ${address} ${min_funds}"
+      yarn ethers send "${address}" ${min_funds} ${ethers_opts}
+
+      if [ -n "${token_contract}" ]; then
+        # at this point we assume that the account needs HOPR as well
+        log "Funding account with HOPR token -> ${address} ${min_funds_hopr}"
+        yarn ethers send-token "${token_contract}" "${address}" ${min_funds_hopr} ${ethers_opts}
+      fi
     fi
   fi
 }
