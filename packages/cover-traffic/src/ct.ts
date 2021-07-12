@@ -1,5 +1,5 @@
 import type { HoprOptions, ChannelsToOpen, ChannelsToClose } from '@hoprnet/hopr-core'
-import Hopr, { SaneDefaults, findPath} from '@hoprnet/hopr-core'
+import Hopr, { SaneDefaults, findPath } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
 import { PublicKey, HoprDB, ChannelEntry } from '@hoprnet/hopr-utils'
@@ -69,13 +69,13 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey): P
     const path = await findPath(
       startNode,
       selfPub,
-      CT_INTERMEDIATE_HOPS - 1,// As us to start is first intermediate
+      CT_INTERMEDIATE_HOPS - 1, // As us to start is first intermediate
       (_p: PublicKey): number => 1, // TODO network quality?
       (p: PublicKey) => Promise.resolve(findChannelsFrom(p)),
       weight
     )
     path.push(selfPub) // destination is always self.
-    STATE.log.push('SEND ' + path.map(pub => pub.toPeerId().toB58String()).join(','))
+    STATE.log.push('SEND ' + path.map((pub) => pub.toPeerId().toB58String()).join(','))
   } catch (e) {
     // could not find path
     STATE.log.push('Could not find path - ' + startNode.toPeerId().toB58String())
@@ -120,25 +120,24 @@ class CoverTrafficStrategy extends SaneDefaults {
       .concat(toOpen.map((o) => o[0]))
       .concat(toClose)
     STATE.log.push(
-      (`strategy tick: balance:${balance.toString()
-       } open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')
-       } close: ${toClose
-        .map((p) => p.toPeerId().toB58String())
-        .join(',')}`
-    ).replace('\n', ', '))
+      `strategy tick: balance:${balance.toString()} open:${toOpen
+        .map((p) => p[0].toPeerId().toB58String())
+        .join(',')} close: ${toClose.map((p) => p.toPeerId().toB58String()).join(',')}`.replace('\n', ', ')
+    )
 
-    await Promise.all(STATE.ctChannels.map(async (dest) => {
-      const success = await sendCTMessage(dest, this.selfPub)
-      if (!success) {
-        toClose.push(dest);
-      }
-    }))
+    await Promise.all(
+      STATE.ctChannels.map(async (dest) => {
+        const success = await sendCTMessage(dest, this.selfPub)
+        if (!success) {
+          toClose.push(dest)
+        }
+      })
+    )
 
     this.update(STATE)
     return [toOpen, toClose]
   }
 }
-
 
 type PeerData = {
   id: any //PeerId,

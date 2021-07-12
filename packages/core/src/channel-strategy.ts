@@ -64,11 +64,7 @@ export abstract class SaneDefaults {
 export class PassiveStrategy extends SaneDefaults implements ChannelStrategy {
   name = 'passive'
 
-  async tick(
-    _balance: BN,
-    _c: ChannelEntry[],
-    _p: NetworkPeers
-  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+  async tick(_balance: BN, _c: ChannelEntry[], _p: NetworkPeers): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     return [[], []]
   }
 }
