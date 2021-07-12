@@ -2139,9 +2139,9 @@
   integrity sha512-/lMtoq/Cf/2DVOm6zE6ORyOM+3ZVm/BvzEZVxUhf6bgh8ZHglXlBqxbxSlJeVp8FCbD3IVvk/VbsaNmDjrQvqQ==
 
 "@types/leveldown@^4.0.2":
-  version "4.0.2"
-  resolved "https://registry.yarnpkg.com/@types/leveldown/-/leveldown-4.0.2.tgz#edb44a33668ae58656721bb1852345e6a2f2e42a"
-  integrity sha512-VW6QbUnPb5yLbUBcXEh93lFNphyxkBul7Ae41OCgROd76WfLM3qzAbuzErx1LtsTqwcNlbavTr9rWXHCiGVF8A==
+  version "4.0.3"
+  resolved "https://registry.yarnpkg.com/@types/leveldown/-/leveldown-4.0.3.tgz#4b868fd747808d378df6ffb27de7f889cae46aad"
+  integrity sha512-fzIXOuUCSZQKkRadWhURwu6mMYbfqi/nRDA+yBwz8kj7AK/L7L//u6A0MqSv0gsilzo7N/5+FlZOx8G6m03EVQ==
   dependencies:
     "@types/abstract-leveldown" "*"
     "@types/node" "*"
