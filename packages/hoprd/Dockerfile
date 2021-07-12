@@ -71,5 +71,7 @@ EXPOSE 3000
 EXPOSE 3001
 # Healthcheck server
 EXPOSE 8080
+# p2p
+EXPOSE 9091
 
 ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd"]
