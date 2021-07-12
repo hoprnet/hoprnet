@@ -19,6 +19,8 @@ usage() {
   msg
   msg "\twhere <npm_package_version> uses the most recent Git tag as default"
   msg
+  msg "\tThe cleanup process can be skipped by setting the environment variable HOPRD_SKIP_CLEANUP to 'true'."
+  msg
 }
 
 # return early with help info when requested
@@ -26,6 +28,7 @@ usage() {
 
 # verify and set parameters
 declare npm_package_version
+declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
 
 # we rely on Git tags so need to fetch the tags in case they are not present
 git fetch --unshallow --tags || :
@@ -87,7 +90,9 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-trap cleanup SIGINT SIGTERM ERR EXIT
+if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
+  trap cleanup SIGINT SIGTERM ERR EXIT
+fi
 
 # $1 = rest port
 # $2 = node port

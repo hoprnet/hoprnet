@@ -43,7 +43,7 @@ gcloud_get_address() {
   if [ "$(echo "$ip" | grep 'ERROR')" ]; then
     log "No address, creating"
     gcloud compute addresses create $1 $gcloud_region
-    local ip=$(gcloud compute addresses describe $1 $gcloud_region 2>&1)
+    ip=$(gcloud compute addresses describe $1 $gcloud_region 2>&1)
   fi
   echo $ip | awk '{ print $2 }'
 }
@@ -51,16 +51,13 @@ gcloud_get_address() {
 # $1 = ip
 # $2 = optional: healthcheck port, defaults to 8080
 wait_until_node_is_ready() {
-  is_ready=0
-  while [ $is_ready -eq 0 ]; do
-    if curl --silent "${1}:${2:-8080}/healthcheck/v1/version"; then
-      log "VM with IP $1 has a HOPR node up and running"
-      is_ready=1
-    else
-      log "VM with IP $1 is not ready, sleeping for 10s"
-      sleep 10
-    fi
-  done
+  local ip=${1}
+  local port=${2:-8080}
+  local cmd="curl --silent --max-time 5 ${ip}:${port}/healthcheck/v1/version"
+
+  # try every 10 seconds for 5 minutes
+  log "waiting for VM with IP $1 to have HOPR node up and running"
+  try_cmd "${cmd}" 30 10 true
 }
 
 # Get external IP for running node or die

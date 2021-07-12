@@ -17,6 +17,8 @@ usage() {
   msg
   msg "Usage: $0"
   msg
+  msg "\tThe cleanup process can be skipped by setting the environment variable HOPRD_SKIP_CLEANUP to 'true'."
+  msg
 }
 
 # return early with help info when requested
@@ -25,6 +27,7 @@ usage() {
 # verify and set parameters
 declare wait_delay=2
 declare wait_max_wait=1000
+declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
 
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   wait_delay=10
@@ -77,7 +80,9 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-trap cleanup SIGINT SIGTERM ERR EXIT
+if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
+  trap cleanup SIGINT SIGTERM ERR EXIT
+fi
 
 # $1 = rest port
 # $2 = node port

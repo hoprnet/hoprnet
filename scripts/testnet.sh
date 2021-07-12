@@ -16,7 +16,7 @@ source "${mydir}/gcloud.sh"
 source "${mydir}/dns.sh"
 
 declare min_funds=0.01291
-declare min_funds_hopr=10.0
+declare min_funds_hopr=0.5
 
 # $1 = role (ie. node-4)
 # $2 = network name
@@ -43,7 +43,7 @@ funding_wallet_address() {
   local rpc="${1}"
 
   # the value of FUNDING_PRIV_KEY must be prefixed with 0x
-  yarn run --silent ethers --rpc "${rpc}" --account "${FUNDING_PRIV_KEY}" eval 'accounts[0].getAddress().then(a => a)'
+  yarn run --silent ethers --rpc "${rpc}" --account ${FUNDING_PRIV_KEY} eval 'accounts[0].getAddress().then(a => a)'
 }
 
 # $1 = account (hex)
@@ -70,30 +70,41 @@ fund_if_empty() {
 
     log "Balance of ${address} is ${balance}"
     if [ "${balance}" = '0.0' ]; then
-      local ethers_opts="--rpc \"${rpc}\" --account \"${FUNDING_PRIV_KEY}\" --yes"
+      # need to wait to make retries work
+      local ethers_opts="--rpc ${rpc} --account ${FUNDING_PRIV_KEY} --yes --wait"
 
       log "Funding account with native token -> ${address} ${min_funds}"
-      yarn ethers send "${address}" ${min_funds} ${ethers_opts}
+      try_cmd "yarn run --silent ethers send ${address} ${min_funds} ${ethers_opts}" 12 10
 
       if [ -n "${token_contract}" ]; then
         # at this point we assume that the account needs HOPR as well
         log "Funding account with HOPR token -> ${address} ${min_funds_hopr}"
-        yarn ethers send-token "${token_contract}" "${address}" ${min_funds_hopr} ${ethers_opts}
+        try_cmd "yarn run --silent ethers send-token ${token_contract} ${address} ${min_funds_hopr} ${ethers_opts}" 12 10
       fi
     fi
   fi
 }
 
 # $1 = IP
-# $2 = optional: port
+# $2 = optional: port, defaults to 3001
 get_eth_address(){
-  curl "${1}:${2:-3001}/api/v1/address/eth"
+  local ip=${1}
+  local port=${2:-3001}
+  local cmd="curl ${ip}:${port}/api/v1/address/eth"
+
+  # try every 5 seconds for 5 minutes
+  try_cmd "${cmd}" 30 5
 }
 
 # $1 = IP
-# $2 = optional: port
+# $2 = optional: port, defaults to 3001
 get_hopr_address() {
-  curl "${1}:${2:-3001}/api/v1/address/hopr"
+  local ip=${1}
+  local port=${2:-3001}
+  local cmd="curl ${ip}:${port}/api/v1/address/hopr"
+
+  # try every 5 seconds for 5 minutes
+  try_cmd "${cmd}" 30 5
 }
 
 # $1 = IP
