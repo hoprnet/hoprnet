@@ -63,10 +63,11 @@ export const weightedRandomChoice = (): PublicKey => {
   throw new Error('wtf')
 }
 
-export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey): Promise<boolean> => {
+export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, sendMessage: (path: PublicKey[]) => Promise<void>): Promise<boolean> => {
   const weight = (edge: ChannelEntry): BN => importance(edge.destination)
+  let path
   try {
-    const path = await findPath(
+    path = await findPath(
       startNode,
       selfPub,
       CT_INTERMEDIATE_HOPS - 1,// As us to start is first intermediate
@@ -74,20 +75,37 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey): P
       (p: PublicKey) => Promise.resolve(findChannelsFrom(p)),
       weight
     )
+
+    path.forEach(p => STATE.ctSent[p.toB58String()] = STATE.ctSent[p.toB58String()] || {
+      forwardAttempts: 0,
+      sendAttempts: 0
+    } as CTStats)
+    path.forEach(p => STATE.ctSent[p.toB58String()].forwardAttempts ++)
     path.push(selfPub) // destination is always self.
-    STATE.log.push('SEND ' + path.map(pub => pub.toPeerId().toB58String()).join(','))
+    STATE.log.push('SEND ' + path.map(pub => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
     STATE.log.push('Could not find path - ' + startNode.toPeerId().toB58String())
     return false
   }
-  // TODO _send_
-  return true
+  try {
+    STATE.ctSent[startNode.toB58String()] = STATE.ctSent[startNode.toB58String()] || {
+      forwardAttempts: 0,
+      sendAttempts: 0
+    } as CTStats
+    STATE.ctSent[startNode.toB58String()].sendAttempts ++
+    await sendMessage(path)
+    return true
+  } catch (e) {
+    //console.log(e)
+    STATE.log.push('error sending to' + startNode.toPeerId().toB58String())
+    return false
+  }
 }
 
 class CoverTrafficStrategy extends SaneDefaults {
   name = 'covertraffic'
-  constructor(private update: (State) => void, private selfPub: PublicKey) {
+  constructor(private update: (State) => void, private selfPub: PublicKey, private node: Hopr) {
     super()
   }
 
@@ -128,7 +146,9 @@ class CoverTrafficStrategy extends SaneDefaults {
     ).replace('\n', ', '))
 
     await Promise.all(STATE.ctChannels.map(async (dest) => {
-      const success = await sendCTMessage(dest, this.selfPub)
+      const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
+        await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
+      })
       if (!success) {
         toClose.push(dest);
       }
@@ -139,6 +159,10 @@ class CoverTrafficStrategy extends SaneDefaults {
   }
 }
 
+type CTStats = {
+  sendAttempts: number,
+  forwardAttempts: number
+}
 
 type PeerData = {
   id: any //PeerId,
@@ -151,6 +175,7 @@ export type State = {
   log: string[]
   ctChannels: PublicKey[]
   block: BN
+  ctSent: Record<string, CTStats>
 }
 
 const STATE: State = {
@@ -158,7 +183,8 @@ const STATE: State = {
   channels: {},
   log: [],
   ctChannels: [],
-  block: new BN('0')
+  block: new BN('0'),
+  ctSent: {}
 }
 
 /*
@@ -221,5 +247,5 @@ export async function main(update: (State) => void, peerId: PeerId) {
   const channels = await node.getChannelsFrom(selfAddr)
   channels.forEach((c) => STATE.ctChannels.push(c.destination))
   update(STATE)
-  node.setChannelStrategy(new CoverTrafficStrategy(update, selfPub))
+  node.setChannelStrategy(new CoverTrafficStrategy(update, selfPub, node))
 }
