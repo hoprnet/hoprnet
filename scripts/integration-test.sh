@@ -105,10 +105,27 @@ rm -Rf "${charly_log}"
 rm -Rf "${bob_log}"
 rm -Rf "${alice_log}"
 
+log "alice -> ${alice_log}"
+log "bob -> ${bob_log}"
+log "charly -> ${charly_log}"
+
 # run nodes
-start_node examples/server.ts "${charly_log}" ${charly_port} 'charly'
-start_node examples/client.ts ${bob_log} 1 ${bob_port} 'bob' ${charly_port} 'charly'
-start_node examples/client.ts ${alice_log} 0 ${alice_port} 'alice'  ${charly_port} 'charly' 'bob'
+start_node examples/server.ts "${charly_log}" \
+  --serverPort ${charly_port} \
+  --serverIdentityName 'charly'
+
+start_node examples/client.ts ${bob_log}  \
+  --clientPort ${bob_port} \
+  --clientIdentityName 'bob' \
+  --relayPort ${charly_port} \
+  --relayIdentityName 'charly'
+
+start_node examples/client.ts ${alice_log} \
+  --clientPort ${alice_port} \
+  --clientIdentityName 'alice' \
+  --relayPort ${charly_port} \
+  --relayIdentityName 'charly' \
+  --counterPartyIdentityName 'bob'
 
 wait_for_regex_in_file ${bob_log} "Received message <test>"
 wait_for_regex_in_file ${alice_log} "Received <Echoing <test>>"

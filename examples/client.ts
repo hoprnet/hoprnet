@@ -11,27 +11,52 @@ import { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import { getIdentity } from './identities'
 import pipe from 'it-pipe'
+import yargs from 'yargs/yargs'
 
 const TEST_PROTOCOL = '/hopr-connect/test/0.0.1'
 
 async function main() {
-  const clientPort = process.argv[3]
-  const clientIdentityName = process.argv[4]
-  const relayPort = process.argv[5]
-  const relayPeerId = await PeerId.createFromPrivKey(getIdentity(process.argv[6]))
+  const argv = yargs(process.argv.slice(2))
+    .option('clientPort', {
+      describe: 'client port',
+      type: 'number',
+      demandOption: true
+    })
+    .option('clientIdentityName', {
+      describe: 'client identity name',
+      choices: ['alice', 'bob', 'charly', 'dave', 'ed'],
+      demandOption: true
+    })
+    .option('relayPort', {
+      describe: 'relayPort port',
+      type: 'number',
+      demandOption: true
+    })
+    .option('relayIdentityName', {
+      describe: 'identity name of a relay',
+      choices: ['alice', 'bob', 'charly', 'dave', 'ed'],
+      demandOption: true
+    })
+    .option('counterPartyIdentityName', {
+      describe: 'identity name of a counter party to send msg to',
+      choices: ['alice', 'bob', 'charly', 'dave', 'ed']
+    })
+    .parseSync()
+
+  const relayPeerId = await PeerId.createFromPrivKey(getIdentity(argv.relayIdentityName))
   let counterPartyPeerId: PeerId | null = null
-  if (process.argv[7]) {
-    counterPartyPeerId = await PeerId.createFromPrivKey(getIdentity(process.argv[7]))
+  if (argv.counterPartyIdentityName) {
+    counterPartyPeerId = await PeerId.createFromPrivKey(getIdentity(argv.counterPartyIdentityName))
   }
 
-  const RELAY_ADDRESS = new Multiaddr(`/ip4/127.0.0.1/tcp/${relayPort}/p2p/${relayPeerId.toB58String()}`)
+  const RELAY_ADDRESS = new Multiaddr(`/ip4/127.0.0.1/tcp/${argv.relayPort}/p2p/${relayPeerId.toB58String()}`)
 
-  const clientPeerId = await PeerId.createFromPrivKey(getIdentity(clientIdentityName))
+  const clientPeerId = await PeerId.createFromPrivKey(getIdentity(argv.clientIdentityName))
 
   const node = await libp2p.create({
     peerId: clientPeerId,
     addresses: {
-      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/${clientPort}/p2p/${clientPeerId.toB58String()}`)]
+      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/${argv.clientPort}/p2p/${clientPeerId.toB58String()}`)]
     },
     modules: {
       transport: [HoprConnect],
@@ -80,7 +105,7 @@ async function main() {
 
   await node.dial(RELAY_ADDRESS)
 
-  console.log(`running client ${clientIdentityName} on port ${clientPort}`)
+  console.log(`running client ${argv.clientIdentityName} on port ${argv.clientPort}`)
 
   console.log(`giving counterparty time to start`)
   await new Promise((resolve) => setTimeout(resolve, durations.seconds(8)))

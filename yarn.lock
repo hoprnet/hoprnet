@@ -412,6 +412,7 @@ __metadata:
     "@types/mocha": ^8.2.2
     "@types/node": 14
     "@types/simple-peer": ^9.11
+    "@types/yargs": ^17.0.2
     abort-controller: 3.0.0
     abortable-iterator: ^3.0.0
     bl: ^5.0
@@ -437,6 +438,7 @@ __metadata:
     typescript: ^4.3
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
+    yargs: ^17.0.1
   languageName: unknown
   linkType: soft
 
@@ -697,6 +699,22 @@ __metadata:
   dependencies:
     "@types/node": "*"
   checksum: ab05e2373fe48faa59cc0d7795bfdea3c7e7a93f7af2683cfdd2a311035ce4dd2a948c950886f48d662db503e8af2d930b9d51b53c0eef8c90ba86287864d4f7
+  languageName: node
+  linkType: hard
+
+"@types/yargs-parser@npm:*":
+  version: 20.2.1
+  resolution: "@types/yargs-parser@npm:20.2.1"
+  checksum: 868343daaa222b4c3db773556b7be8ee60b68b76860867a54fbc94e6081597a7b0092ec1bdb56e6f43495c16e18d76f7ae5ca75c4e7edbf584eff8370d550025
+  languageName: node
+  linkType: hard
+
+"@types/yargs@npm:^17.0.2":
+  version: 17.0.2
+  resolution: "@types/yargs@npm:17.0.2"
+  dependencies:
+    "@types/yargs-parser": "*"
+  checksum: b3dec3703ad5b9d3e8d5f485abf89bbdc601ec0dd2a1156176ffbe9212a1b693c22e7a29430de0e33aac15e71afefa36846f5ad9976a957006e275335a79d2a6
   languageName: node
   linkType: hard
 
@@ -5037,6 +5055,21 @@ typescript@^4.3:
     y18n: ^5.0.5
     yargs-parser: ^20.2.2
   checksum: a79ce1f043021cd645de1ffebb6149541d382ba68f4a6b5eca5d2ad65af51893371bbd78e240dc3b6cf0cbb419511ba5bda715dec992e4266e6863ea49f14feb
+  languageName: node
+  linkType: hard
+
+"yargs@npm:^17.0.1":
+  version: 17.0.1
+  resolution: "yargs@npm:17.0.1"
+  dependencies:
+    cliui: ^7.0.2
+    escalade: ^3.1.1
+    get-caller-file: ^2.0.5
+    require-directory: ^2.1.1
+    string-width: ^4.2.0
+    y18n: ^5.0.5
+    yargs-parser: ^20.2.2
+  checksum: a7969b48d2dea129a7d4fcc3f13e88d4f94bacbd24f720b2ce19946fa9facc42cfed89c059d953091241f4e9e9000ed9dbf86e4bb4b6ceb3a26af10ddebdd0b2
   languageName: node
   linkType: hard
 
