@@ -286,7 +286,7 @@
     "@ethersproject/properties" "^5.0.3"
     "@ethersproject/strings" "^5.0.4"
 
-"@ethersproject/abi@5.4.0", "@ethersproject/abi@^5.0.0-beta.146", "@ethersproject/abi@^5.0.1", "@ethersproject/abi@^5.0.2", "@ethersproject/abi@^5.1.2", "@ethersproject/abi@^5.3.1", "@ethersproject/abi@^5.4.0":
+"@ethersproject/abi@5.4.0", "@ethersproject/abi@^5.0.0-beta.146", "@ethersproject/abi@^5.0.1", "@ethersproject/abi@^5.1.2", "@ethersproject/abi@^5.3.1", "@ethersproject/abi@^5.4.0":
   version "5.4.0"
   resolved "https://registry.yarnpkg.com/@ethersproject/abi/-/abi-5.4.0.tgz#a6d63bdb3672f738398846d4279fa6b6c9818242"
   integrity sha512-9gU2H+/yK1j2eVMdzm6xvHSnMxk8waIHQGYCZg5uvAyH0rsAzxkModzBSpbAkAuhKFEovC2S9hM4nPuLym8IZw==
@@ -1456,11 +1456,11 @@
   integrity sha512-6quxWe8wwS4X5v3Au8q1jOvXYEPkS1Fh+cME5u6AwNdnI4uERvPlVjlgRWzpnb+Rrt1l/cEqiNRH9GlsBMSDQg==
 
 "@nomiclabs/hardhat-etherscan@^2.1.1":
-  version "2.1.3"
-  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-etherscan/-/hardhat-etherscan-2.1.3.tgz#ba52e5cb526f6c477e5e97e07c72a42232773c92"
-  integrity sha512-0Ic5dLBWASeX3e8tR5cdfoSQw8fTp2Bw49RGUN1pSJuxKIQAOWq5MI9qC1Bd51xK/AsdRSnHDxoVYK1+FC1s1w==
+  version "2.1.4"
+  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-etherscan/-/hardhat-etherscan-2.1.4.tgz#510b6a669cc2dad095466b2ba9ae0b411c779081"
+  integrity sha512-KgFNTQv9gpioiTpQ9UlTysCAFfkcBonmEn9rVPTT22A7DRENFM1VTsVeGWF3AzRhd0mrASBF+o0gvbH30pSe0Q==
   dependencies:
-    "@ethersproject/abi" "^5.0.2"
+    "@ethersproject/abi" "^5.1.2"
     "@ethersproject/address" "^5.0.2"
     cbor "^5.0.2"
     debug "^4.1.1"
