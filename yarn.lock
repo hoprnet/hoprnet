@@ -7721,6 +7721,14 @@ ip-address@^7.1.0:
     jsbn "1.1.0"
     sprintf-js "1.1.2"
 
+ip-address@^8.0.0:
+  version "8.0.0"
+  resolved "https://registry.yarnpkg.com/ip-address/-/ip-address-8.0.0.tgz#00ba9435c8027dd591c491ad64c3e6a52a767ee4"
+  integrity sha512-HAGaTPtx3AJj2p/ymbUjAJzF5bQ+pI6sDDEixHnj+vj1XL9DaK4hGvOOs3mdCMZZLIDOH8T8U6SInpqTk76wXw==
+  dependencies:
+    jsbn "1.1.0"
+    sprintf-js "1.1.2"
+
 ip-regex@^4.0.0, ip-regex@^4.3.0:
   version "4.3.0"
   resolved "https://registry.yarnpkg.com/ip-regex/-/ip-regex-4.3.0.tgz#687275ab0f57fa76978ff8f4dddc8a23d5990db5"
@@ -9109,18 +9117,18 @@ libp2p-record@^0.10.0:
     protobufjs "^6.10.2"
     uint8arrays "^2.0.5"
 
-libp2p-tcp@0.16:
-  version "0.16.0"
-  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.16.0.tgz#ba32514cd4c15cd1dbc60986bf80455ee31a5106"
-  integrity sha512-ULmJPt+MWofhL+htRpjJuVcFxIPAPkD6xCYHobSfQkrEOVFZ8vNv1XTBz8PDQ6u+GIvDahpDZta7TTh9KrbgAw==
+libp2p-tcp@0.17:
+  version "0.17.1"
+  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.17.1.tgz#7d6844fdfbe978f862dd8b7b812f80c0c0eb1d80"
+  integrity sha512-Kxqb0gEi1BZT0guhWbmeyG+XhJHqod6jM3NvSvjwUaD6XmKFVt9yj4IPGnTfKPOSrkcWwAUhk6Qbv0eKSHlCnw==
   dependencies:
     abortable-iterator "^3.0.0"
     class-is "^1.1.0"
     debug "^4.3.1"
     err-code "^3.0.1"
-    libp2p-utils "^0.3.0"
-    mafmt "^9.0.0"
-    multiaddr "^9.0.1"
+    libp2p-utils "^0.4.0"
+    mafmt "^10.0.0"
+    multiaddr "^10.0.0"
     stream-to-it "^0.2.2"
 
 libp2p-tcp@^0.15.3:
@@ -9148,6 +9156,19 @@ libp2p-utils@^0.3.0, libp2p-utils@^0.3.1:
     ip-address "^7.1.0"
     is-loopback-addr "^1.0.0"
     multiaddr "^9.0.1"
+    private-ip "^2.1.1"
+
+libp2p-utils@^0.4.0:
+  version "0.4.1"
+  resolved "https://registry.yarnpkg.com/libp2p-utils/-/libp2p-utils-0.4.1.tgz#260405434c376db8a1d9023867373b99b81c657f"
+  integrity sha512-kq/US2unamiyY+YwP47dO1uqpAdcbdYI2Fzi9JIEhjfPBaD1MR/uyQ/YP7ABthl3EaxAjIQYd1TVp85d6QKAtQ==
+  dependencies:
+    abortable-iterator "^3.0.0"
+    debug "^4.3.0"
+    err-code "^3.0.1"
+    ip-address "^8.0.0"
+    is-loopback-addr "^1.0.0"
+    multiaddr "^10.0.0"
     private-ip "^2.1.1"
 
 libp2p@0.31.7:
@@ -9455,6 +9476,13 @@ lunr@^2.3.9:
   version "2.3.9"
   resolved "https://registry.yarnpkg.com/lunr/-/lunr-2.3.9.tgz#18b123142832337dd6e964df1a5a7707b25d35e1"
   integrity sha512-zTU3DaZaF3Rt9rhN3uBMGQD3dD2/vFQqnvZCDv4dl5iOzq2IZQqTxu90r4E5J+nP70J3ilqVCrbho2eWaeW8Ow==
+
+mafmt@^10.0.0:
+  version "10.0.0"
+  resolved "https://registry.yarnpkg.com/mafmt/-/mafmt-10.0.0.tgz#431726f16e51090b32ada621c402acbdb64fce9c"
+  integrity sha512-K1bziJOXcnepfztu+2Xy9FLKVLaFMDuspmiyJIYRxnO0WOxFSV7XKSdMxMrVZxcvg1+YjlTIvSGTImUHU2k4Aw==
+  dependencies:
+    multiaddr "^10.0.0"
 
 mafmt@^9.0.0:
   version "9.0.0"
@@ -10054,6 +10082,18 @@ ms@2.1.3, ms@^2.0.0, ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz#574c8138ce1d2b5861f0b44579dbadd60c6615b2"
   integrity sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==
 
+multiaddr@^10.0.0:
+  version "10.0.0"
+  resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-10.0.0.tgz#3d5cf213c9c89a14520bfb581557e4d75c6323a9"
+  integrity sha512-yP3LzFkM0GORZHNenS8Ok2spsaICRBhxLEohAfKKwwrgHIEWrDUhMRIkh/MONDBThNqaiGl7Ch1H7qblRDNHyg==
+  dependencies:
+    dns-over-http-resolver "^1.0.0"
+    err-code "^3.0.1"
+    is-ip "^3.1.0"
+    multiformats "^9.0.2"
+    uint8arrays "^2.1.3"
+    varint "^6.0.0"
+
 multiaddr@^9.0.0, multiaddr@^9.0.1, multiaddr@~9.0.2:
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-9.0.2.tgz#ab322bb768e77270650ebce71a452fdc760bda0d"
@@ -10113,7 +10153,7 @@ multicodec@^3.0.1:
     uint8arrays "^2.1.3"
     varint "^5.0.2"
 
-multiformats@^9.1.2:
+multiformats@^9.0.2, multiformats@^9.1.2:
   version "9.3.0"
   resolved "https://registry.yarnpkg.com/multiformats/-/multiformats-9.3.0.tgz#be31fa1ef55b5d92feff4ca4be86dc7db1550f71"
   integrity sha512-CIZnirGmiw92jpkfmzObOPEAkpW08CgjwxBAliEPWfc2hFHflOngBt3YRaT2H8RKMbGaNlyv7Cza4RbmFYOf1w==
