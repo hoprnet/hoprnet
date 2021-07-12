@@ -300,12 +300,6 @@ class Hopr extends EventEmitter {
       return
     }
 
-    // TODO: replace with newChannels
-    const rndChannels = await this.getRandomOpenChannels()
-
-    for (const channel of rndChannels) {
-      this.networkPeers.register(channel.source.toPeerId()) // Listen to nodes with outgoing stake
-    }
     const currentChannels = await this.getAllChannels()
     for (const channel of currentChannels) {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
@@ -314,7 +308,6 @@ class Hopr extends EventEmitter {
     const chain = await this.paymentChannels
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance.toBN(),
-      rndChannels,
       currentChannels,
       this.networkPeers,
       chain.getRandomOpenChannel.bind(chain)
@@ -338,27 +331,6 @@ class Hopr extends EventEmitter {
         log('error when trying to open strategy channels', e)
       }
     }
-  }
-
-  /**
-   * Randomly pick 10 open channels
-   * @returns maximum 10 open channels
-   */
-  private async getRandomOpenChannels(): Promise<ChannelEntry[]> {
-    const chain = await this.paymentChannels
-    const channels = new Map<string, ChannelEntry>()
-
-    for (let i = 0; i < 100; i++) {
-      if (channels.size >= 10) break
-
-      const channel = await chain.getRandomOpenChannel()
-      if (!channel) break
-
-      if (channels.has(channel.getId().toHex())) continue
-      channels.set(channel.getId().toHex(), channel)
-    }
-
-    return Array.from(channels.values())
   }
 
   /*
@@ -601,7 +573,7 @@ class Hopr extends EventEmitter {
     } catch (e) {
       log('error in periodic check', e)
     }
-    this.checkTimeout = setTimeout(() => this.periodicCheck(), CHECK_TIMEOUT)
+    this.checkTimeout = setTimeout(() => this.periodicCheck(), this.strategy.tickInterval)
   }
 
   private async announce(includeRouting: boolean = false): Promise<void> {

@@ -78,7 +78,7 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey): P
     STATE.log.push('SEND ' + path.map(pub => pub.toPeerId().toB58String()).join(','))
   } catch (e) {
     // could not find path
-    console.log(e)
+    STATE.log.push('Could not find path - ' + startNode.toPeerId().toB58String())
     return false
   }
   // TODO _send_
@@ -91,9 +91,10 @@ class CoverTrafficStrategy extends SaneDefaults {
     super()
   }
 
+  tickInterval = 10000
+
   async tick(
     balance: BN,
-    _n: ChannelEntry[],
     currentChannels: ChannelEntry[],
     _peers: any,
     _getRandomChannel: () => Promise<ChannelEntry>
@@ -160,10 +161,12 @@ const STATE: State = {
   block: new BN('0')
 }
 
+/*
 // Otherwise we get a mess
 process.on('unhandledRejection', (_reason, promise) => {
   STATE.log.push('uncaught exception in promise' + promise)
 })
+*/
 
 export async function main(update: (State) => void, peerId: PeerId) {
   const selfPub = PublicKey.fromPeerId(peerId)
