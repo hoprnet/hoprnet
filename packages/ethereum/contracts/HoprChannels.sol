@@ -87,6 +87,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param _secsClosure seconds until a channel can be closed
      */
     constructor(address _token, uint32 _secsClosure) {
+        require(_token != address(0), "token must not be empty");
+
         token = IERC20(_token);
         secsClosure = _secsClosure;
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
@@ -240,7 +242,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function finalizeChannelClosure(
         address destination
     ) external validateSourceAndDest(msg.sender, destination) {
-        require(address(token) != address(0), "token must not be empty");
         (, Channel storage channel) = _getChannel(msg.sender, destination);
         require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
         require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
