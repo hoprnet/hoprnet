@@ -24,6 +24,7 @@ import {
   PromiseValue
 } from '@hoprnet/hopr-utils'
 import type { Wallet } from '@ethersproject/wallet'
+import { BigNumber } from 'ethers'
 
 type TicketValues = {
   recipient: string
@@ -51,6 +52,47 @@ export const redeemArgs = (ticket: AcknowledgedTicket): Parameters<HoprChannels[
 export const validateChannel = (actual, expected) => {
   expect(actual.balance.toString()).to.equal(expected.balance)
   expect(actual.status.toString()).to.equal(expected.status)
+}
+
+type ChannelArrProps = [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number]
+type ChannelObjProps = {
+  balance?: BigNumber
+  commitment?: string
+  ticketEpoch?: BigNumber
+  ticketIndex?: BigNumber
+  status?: number
+  channelEpoch?: BigNumber
+  closureTime?: number
+}
+type ChannelProps = ChannelArrProps & ChannelObjProps
+
+const createMockChannelFromProps = (props: ChannelObjProps): ChannelProps => {
+  const _emptyChannelProps = {
+    balance: undefined,
+    commitment: undefined,
+    ticketEpoch: undefined,
+    ticketIndex: undefined,
+    status: undefined,
+    channelEpoch: undefined,
+    closureTime: undefined
+  }
+  const channel = []
+  Object.keys(_emptyChannelProps).map((key, index) => {
+    if (props[key] != undefined) {
+      channel[index] = props[key]
+      channel[key] = props[key]
+    } else {
+      channel[index] = _emptyChannelProps[key]
+      channel[key] = _emptyChannelProps[key]
+    }
+  })
+  return channel as ChannelProps
+}
+
+export const createMockChannelFromMerge = (channel: ChannelProps, props: ChannelProps) => {
+  let newChannel = []
+  Object.keys(channel).map((key) => (newChannel[key] = props[key] != undefined ? props[key] : channel[key]))
+  return newChannel
 }
 
 export const createTicket = async (
@@ -228,6 +270,7 @@ describe('funding HoprChannel catches failures', function () {
 
 describe('funding a HoprChannel success', function () {
   // TODO events
+  // NB: Adding withArgs will break test, see https://github.com/EthWorks/Waffle/issues/537
   it('should multi fund and open channel A->B, no commitment', async function () {
     const { channels, accountA, fundAndApprove, token } = await useFixtures()
     await fundAndApprove(accountA, 100)
@@ -317,7 +360,20 @@ describe('funding a HoprChannel success', function () {
             [ACCOUNT_B.address, ACCOUNT_A.address, '30', ChannelStatus.Closed + '']
           )
         )
-    ).to.emit(channels, 'ChannelUpdate')
+    )
+      .to.emit(channels, 'ChannelUpdate')
+      .withArgs(
+        ACCOUNT_B.address,
+        ACCOUNT_A.address,
+        createMockChannelFromMerge(
+          await channels.channels(ACCOUNT_BA_CHANNEL_ID),
+          createMockChannelFromProps({
+            balance: BigNumber.from(30),
+            status: ChannelStatus.WaitingForCommitment,
+            channelEpoch: BigNumber.from(1)
+          })
+        )
+      )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: ChannelStatus.Closed + '',
       status: ChannelStatus.Closed + ''
@@ -477,10 +533,24 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
   })
 
   it('A can initialize channel closure', async function () {
-    await expect(channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address))
+      .to.emit(channels, 'ChannelUpdate')
+      .withArgs(
+        fixtures.accountA.address,
+        ACCOUNT_B.address,
+        createMockChannelFromMerge(
+          await channels.channels(ACCOUNT_AB_CHANNEL_ID),
+          createMockChannelFromProps({
+            status: ChannelStatus.PendingToClose,
+            closureTime:
+              (
+                await ethers.provider.getBlock(ethers.provider.getBlockNumber())
+              ).timestamp + // Block timestamp
+              (await channels.secsClosure()) + // Contract secs
+              1 // tick
+          })
+        )
+      )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: '70',
       status: ChannelStatus.PendingToClose + ''
@@ -489,10 +559,24 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
   })
 
   it('B can initialize channel closure', async function () {
-    await expect(channels.connect(fixtures.accountB).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(fixtures.accountB).initiateChannelClosure(ACCOUNT_A.address))
+      .to.emit(channels, 'ChannelUpdate')
+      .withArgs(
+        fixtures.accountB.address,
+        ACCOUNT_A.address,
+        createMockChannelFromMerge(
+          await channels.channels(ACCOUNT_BA_CHANNEL_ID),
+          createMockChannelFromProps({
+            status: ChannelStatus.PendingToClose,
+            closureTime:
+              (
+                await ethers.provider.getBlock(ethers.provider.getBlockNumber())
+              ).timestamp + // Block timestamp
+              (await channels.secsClosure()) + // Contract secs
+              1 // tick
+          })
+        )
+      )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
       balance: '30',
@@ -541,11 +625,20 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
 
   it('should finalize channel closure', async function () {
     await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
-    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
-
+    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address))
+      .to.emit(channels, 'ChannelUpdate')
+      .withArgs(
+        fixtures.accountA.address,
+        fixtures.accountB.address,
+        createMockChannelFromMerge(
+          await channels.channels(ACCOUNT_AB_CHANNEL_ID),
+          createMockChannelFromProps({
+            balance: BigNumber.from(0),
+            closureTime: 0,
+            status: 0
+          })
+        )
+      )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: ChannelStatus.Closed + '' })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
       balance: '30',
