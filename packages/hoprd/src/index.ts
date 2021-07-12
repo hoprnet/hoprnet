@@ -30,12 +30,12 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('admin', {
     boolean: true,
-    describe: 'Run an admin interface on localhost:3000',
+    describe: 'Run an admin interface on localhost:3000, requires --apiToken',
     default: false
   })
   .option('rest', {
     boolean: true,
-    describe: 'Run a rest interface on localhost:3001',
+    describe: 'Run a rest interface on localhost:3001, requires --apiToken',
     default: false
   })
   .option('restHost', {

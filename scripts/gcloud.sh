@@ -21,7 +21,8 @@ GCLOUD_IMAGE="--image-family=cos-stable --image-project=cos-cloud"
 
 GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDISK $GCLOUD_IMAGE"
 
-alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
+# let keys expire after 1 hour
+alias gssh="gcloud compute ssh --force-key-file-overwrite --ssh-key-expire-after=1h --ssh-flag='-t' $ZONE"
 
 # NB: This is useless for getting an IP of a VM
 # Get or create an IP address
@@ -81,24 +82,26 @@ gcloud_get_image_running_on_vm() {
 # $5 = chain provider
 gcloud_update_container_with_image() {
   local rpc=${5}
+  local api_token="${HOPRD_API_TOKEN}"
+  local password="${BS_PASSWORD}"
 
   echo "Updating container on vm:$1 - $2 (disk: $3:$4)"
   gcloud compute instances update-container $1 $ZONE \
     --container-image=$2 --container-mount-disk name=$3,mount-path="$4" \
-    --container-arg="--identity" --container-arg="${4}/.hopr-identity" \
-    --container-arg="--password" --container-arg="$BS_PASSWORD" \
-    --container-arg="--init" --container-arg="true" \
-    --container-arg="--announce" --container-arg="true" \
-    --container-arg="--rest" --container-arg="true" \
-    --container-arg="--restHost" --container-arg="0.0.0.0" \
-    --container-arg="--healthCheck" --container-arg="true" \
-    --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-    --container-arg="--admin" --container-arg="true" \
+    --container-arg="--admin" \
     --container-arg="--adminHost" --container-arg="0.0.0.0" \
+    --container-arg="--announce" \
+    --container-arg="--apiToken" --container-arg="${api_token}" \
+    --container-arg="--healthCheck" \
+    --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
+    --container-arg="--identity" --container-arg="${4}/.hopr-identity" \
+    --container-arg="--init" \
+    --container-arg="--password" --container-arg="${password}" \
     --container-arg="--provider" --container-arg="${rpc}" \
+    --container-arg="--rest" \
+    --container-arg="--restHost" --container-arg="0.0.0.0" \
     --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
     --container-restart-policy=always
-  sleep 30s
 }
 
 # $1 - vm name
@@ -112,11 +115,11 @@ gcloud_stop() {
 # $2 - docker image
 gcloud_get_logs() {
   # Docker sucks and gives us warnings in stdout.
-  local id=$(gcloud compute ssh $ZONE $1 --command "docker ps -q --filter ancestor='$2' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
-  gcloud compute ssh $ZONE $1 --command "docker logs $id"
+  local id=$(gssh $1 --command "docker ps -q --filter ancestor='$2' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
+  gssh $1 --command "docker logs $id"
 }
 
 # $1 - vm name
 gcloud_cleanup_docker_images() {
-  gcloud compute ssh $ZONE "$1" --command "sudo docker system prune -a -f"
+  gssh "$1" --command "sudo docker system prune -a -f"
 }
