@@ -23,4 +23,21 @@ const Ed = Uint8Array.from([
   157, 51, 169, 214, 5, 252, 155, 38, 132
 ])
 
+export function getIdentity(name: string): Uint8Array {
+  switch (name) {
+    case 'alice':
+      return Alice
+    case 'bob':
+      return Bob
+    case 'charly':
+      return Charly
+    case 'dave':
+      return Dave
+    case 'ed':
+      return Ed
+    default:
+      throw new Error(`unknown identity ${name}`)
+  }
+}
+
 export { Alice, Bob, Charly, Dave, Ed }

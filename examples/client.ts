@@ -9,34 +9,29 @@ const MPLEX = require('libp2p-mplex')
 import { HoprConnect } from '../src'
 import { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
-import { Alice, Bob, Charly } from './identities'
+import { getIdentity } from './identities'
 import pipe from 'it-pipe'
 
 const TEST_PROTOCOL = '/hopr-connect/test/0.0.1'
 
 async function main() {
-  const RELAY_ADDRESS = new Multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Charly)}`)
-
-  let peerId: PeerId
-  let port: number
-  switch (process.argv[2]) {
-    case '0':
-      peerId = await PeerId.createFromPrivKey(Alice)
-      port = 9090
-      break
-    case '1':
-      peerId = await PeerId.createFromPrivKey(Bob)
-      port = 9091
-      break
-    default:
-      console.log(`Invalid CLI options. Either run with '0' or '1'. Got ${process.argv[2]}`)
-      process.exit()
+  const clientPort = process.argv[3]
+  const clientIdentityName = process.argv[4]
+  const relayPort = process.argv[5]
+  const relayPeerId = await PeerId.createFromPrivKey(getIdentity(process.argv[6]))
+  let counterPartyPeerId: PeerId | null = null
+  if (process.argv[7]) {
+    counterPartyPeerId = await PeerId.createFromPrivKey(getIdentity(process.argv[7]))
   }
 
+  const RELAY_ADDRESS = new Multiaddr(`/ip4/127.0.0.1/tcp/${relayPort}/p2p/${relayPeerId.toB58String()}`)
+
+  const clientPeerId = await PeerId.createFromPrivKey(getIdentity(clientIdentityName))
+
   const node = await libp2p.create({
-    peerId,
+    peerId: clientPeerId,
     addresses: {
-      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toB58String()}`)]
+      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/${clientPort}/p2p/${clientPeerId.toB58String()}`)]
     },
     modules: {
       transport: [HoprConnect],
@@ -85,6 +80,8 @@ async function main() {
 
   await node.dial(RELAY_ADDRESS)
 
+  console.log(`running client ${clientIdentityName} on port ${clientPort}`)
+
   console.log(`giving counterparty time to start`)
   await new Promise((resolve) => setTimeout(resolve, durations.seconds(8)))
   console.log(`end Timeout`)
@@ -92,56 +89,23 @@ async function main() {
   //@ts-ignore
   let conn: Handler
 
-  switch (process.argv[2]) {
-    case '0':
-      try {
-        conn = await node.dialProtocol(
-          new Multiaddr(
-            `/p2p/${await PeerId.createFromPrivKey(Charly)}/p2p-circuit/p2p/${await PeerId.createFromPrivKey(Bob)}`
-          ),
-          TEST_PROTOCOL
-        )
-      } catch (err) {
-        console.log(err)
-        return
-      }
-
-      await pipe(
-        // prettier-ignore
-        // async function * () {
-        //   let i = 0
-        //   while(true) {
-        //     yield new TextEncoder().encode(`test ${i}`)
-
-        //     await new Promise(resolve => setTimeout(resolve, 100))
-        //     i++
-        //   }
-        // }(),
-        [new TextEncoder().encode(`test`)],
-        conn.stream,
-        async (source: Stream['source']) => {
-          for await (const msg of source) {
-            const decoded = new TextDecoder().decode(msg.slice())
-
-            console.log(`Received <${decoded}>`)
-          }
-        }
+  if (counterPartyPeerId)
+    try {
+      conn = await node.dialProtocol(
+        new Multiaddr(`/p2p/${relayPeerId}/p2p-circuit/p2p/${counterPartyPeerId.toB58String()}`),
+        TEST_PROTOCOL
       )
+      await pipe([new TextEncoder().encode(`test`)], conn.stream, async (source: Stream['source']) => {
+        for await (const msg of source) {
+          const decoded = new TextDecoder().decode(msg.slice())
 
-      break
-    // case '1':
-    //   conn = await node.dialProtocol(
-    //     Multiaddr(`/ip4/127.0.0.1/tcp/9090/p2p/${await PeerId.createFromPrivKey(Alice)}`),
-    //     TEST_PROTOCOL
-    //   )
-
-    //   break
-    // default:
-    //   console.log(`Invalid CLI options. Either run with '0' or '1'. Got ${process.argv[2]}`)
-    //   process.exit()
-  }
-
-  console.log('running')
+          console.log(`Received <${decoded}>`)
+        }
+      })
+    } catch (err) {
+      console.log(err)
+      return
+    }
 }
 
 main()

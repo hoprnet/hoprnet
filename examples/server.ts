@@ -4,15 +4,19 @@ import { NOISE } from 'libp2p-noise'
 const MPLEX = require('libp2p-mplex')
 
 import { HoprConnect } from '../src'
-import { Charly } from './identities'
+import { getIdentity } from './identities'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
 async function main() {
+  const serverPort = process.argv[2]
+  const serverIdentityName = process.argv[3]
+  const serverPeerId = await PeerId.createFromPrivKey(getIdentity(serverIdentityName))
+
   const node = await libp2p.create({
-    peerId: await PeerId.createFromPrivKey(Charly),
+    peerId: serverPeerId,
     addresses: {
-      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/9092/p2p/${(await PeerId.createFromPrivKey(Charly)).toB58String()}`)]
+      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/${serverPort}/p2p/${serverPeerId.toB58String()}`)]
     },
     modules: {
       transport: [HoprConnect],
@@ -32,7 +36,7 @@ async function main() {
 
   await node.start()
 
-  console.log(`running`)
+  console.log(`running server ${serverIdentityName} on port ${serverPort}`)
 }
 
 main()
