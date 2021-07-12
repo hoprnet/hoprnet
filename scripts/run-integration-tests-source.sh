@@ -103,13 +103,22 @@ function setup_node() {
   fi
 
   DEBUG="hopr*" node packages/hoprd/lib/index.js \
-    --init --provider=http://127.0.0.1:8545/ \
-    --testAnnounceLocalAddresses --identity="${id}" \
-    --host="127.0.0.1:${node_port}" --testPreferLocalAddresses \
-    --data="${dir}" --rest --restPort "${rest_port}" --announce \
+    --admin \
+    --adminHost "127.0.0.1" \
+    --adminPort ${admin_port} \
+    --announce \
     --api-token "e2e-API-token^^" \
-    --admin --adminHost "127.0.0.1" --adminPort ${admin_port} \
-    --password="e2e-test" --testUseWeakCrypto \
+    --data="${dir}" \
+    --host="127.0.0.1:${node_port}" \
+    --identity="${id}" \
+    --init \
+    --password="e2e-test" \
+    --provider=http://127.0.0.1:8545/ \
+    --rest \
+    --restPort "${rest_port}" \
+    --testAnnounceLocalAddresses \
+    --testPreferLocalAddresses \
+    --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
 
