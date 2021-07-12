@@ -21,7 +21,7 @@ The first key $s_i^{(0)}$ will be used as the node's \textit{own key share} and 
         $$HKDF.expand(h_b, |h_b|,s_i, |s_i|, hashKey)$$
     \end{itemize}
     where $||$ is concatenation and $*$ is scalar multiplication on the curve. $h_b$ is blake2s256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudo random key used as a seed and $|s_i|$ is its length, $hashKey$ is an identifier used to derive a valid field element output. In case the result of HKDF does not lead to a field element, $hashKey$ is padded until that's the case.
-    \newline The sender $(A)$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
+    \\~\\ The sender $(A)$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
     The value “hint” or $H$ is computed as 
     \begin{align}  
         H_i&=s_{i+1}^{(1)}*G
