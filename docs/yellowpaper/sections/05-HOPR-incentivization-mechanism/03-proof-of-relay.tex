@@ -20,7 +20,7 @@ The first key $s_i^{(0)}$ will be used as the node's \textit{own key share} and 
         \item Expand: This step takes the output of the previous one $s_i$ as a seed and creates an output key material $s_i^{(0)},s_i^{(1)}$ which is expanded from hashes of $s_i$ and an optional info message (salt). The process goes as follows:
         $$HKDF.expand(h_b, |h_b|,s_i, |s_i|, hashKey)$$
     \end{itemize}
-    where $||$ is concatenation and $*$ is scalar multiplication on the curve. $h_b$ is blake2s256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudo random key used as a seed and $|s_i|$ is its length, $hashKey$ is an identifier used to derive a valid field element output. In case the result of HKDF does not lead to a field element, $hashKey$ is padded until that's the case.
+    where $||$ is concatenation and $*$ is scalar multiplication on the curve. $h_b$ is blake2s256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudo random key used as a seed and $|s_i|$ is its length, $hashKey$ is an identifier used to create a "virtual" hash function for each purpose, e.g. for the PRG, one for PRP, etc. and as well as for the PoR scheme. In case the result of HKDF does not lead to a field element, $hashKey$ is padded until that's the case.
     \\~\\ The sender $(A)$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
     The value “hint” or $H$ is computed as 
     \begin{align}  
