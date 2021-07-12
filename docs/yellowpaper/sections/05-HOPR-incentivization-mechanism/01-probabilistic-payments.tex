@@ -18,26 +18,8 @@ Hence, there is no added value in pretending packet loss or intentionally changi
 \subsubsection{Channel management}
 Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened. There are four distinct channel statuses which are represented in the following scheme:
 \begin{figure}[H]
-    \begin{center}
-        
-
-    \begin{tikzpicture}
-\begin{scope}[very thick,->]
-    \path (-4,1)--(-4,0)--(0.1,0) node (commitment) [draw,align=left] {$WAITING\_FOR\_COMMITMENT$};
-    \path  (0,0)--(4,0)--(4,1.1) node (closed) [draw] {$CLOSED$};
-    \path (4,1)--(4,2)--(-0.1,2) node (pending) [draw,align=left] {$PENDING\_TO\_CLOSE$};
-    \path (0,2)--(-4,2)--(-4,0.9) node (open) [draw] {$OPEN$};
-    \draw [->,draw](closed) to [left] node {} (open);
-    \draw [->,draw](commitment) to [bend left] node {} (open);
-    \draw [->,draw](open) to [bend left] node [align=center] {} (pending);
-    \draw [->,draw](pending) to [bend left] node {} (closed); 
-    \draw [->,draw](closed) to [bend left] node {} (commitment); 
-
-
-    
-  \end{scope}
-\end{tikzpicture}
-\end{center}
+    \centering
+    \includegraphics[width=9cm,height=9cm,keepaspectratio]{../yellowpaper/images/Element 16@3x.png}
 \label{fig:channel statuses}
     \caption{Channel statuses}
 \end{figure}
