@@ -18,6 +18,9 @@ export function multiaddrToIceServer(ma: Multiaddr): string {
   return `stun:${options.host}:${options.port}`
 }
 
+// @TODO adjust this
+export const MAX_STUN_SERVERS = 23
+
 /**
  * Encapsulate configuration used to create WebRTC instances
  */
@@ -31,6 +34,14 @@ class WebRTCUpgrader {
   }
 
   onNewPublicNode(ma: Multiaddr) {
+    if (
+      this.rtcConfig != undefined &&
+      this.rtcConfig.iceServers != undefined &&
+      this.rtcConfig.iceServers.length >= MAX_STUN_SERVERS
+    ) {
+      return
+    }
+
     const tuples = ma.tuples()
 
     if (tuples[0].length < 2 || tuples[0][0] != CODE_IP4 || tuples[1][0] != CODE_UDP) {

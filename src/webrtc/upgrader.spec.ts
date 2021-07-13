@@ -3,7 +3,7 @@ import { Multiaddr } from 'multiaddr'
 
 import assert from 'assert'
 
-import { multiaddrToIceServer, WebRTCUpgrader } from './upgrader'
+import { MAX_STUN_SERVERS, multiaddrToIceServer, WebRTCUpgrader } from './upgrader'
 
 describe('webrtc upgrader', function () {
   it('add public nodes', async function () {
@@ -104,5 +104,26 @@ describe('webrtc upgrader', function () {
     await new Promise((resolve) => setTimeout(resolve))
 
     assert(webRTCUpgrader.rtcConfig?.iceServers == undefined)
+  })
+
+  it(`limit available STUN servers`, async function () {
+    const publicNodeEmitter = new EventEmitter()
+
+    const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
+
+    for (let i = 0; i <= MAX_STUN_SERVERS; i++) {
+      const multiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/${i + 1}`)
+
+      publicNodeEmitter.emit(`publicNode`, multiaddr)
+
+      if (i < MAX_STUN_SERVERS) {
+        assert(
+          webRTCUpgrader.rtcConfig?.iceServers?.length == i + 1 &&
+            webRTCUpgrader.rtcConfig.iceServers[0].urls == multiaddrToIceServer(multiaddr)
+        )
+      }
+    }
+
+    assert(webRTCUpgrader.rtcConfig?.iceServers?.length == MAX_STUN_SERVERS)
   })
 })
