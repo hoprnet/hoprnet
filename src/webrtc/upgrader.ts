@@ -3,6 +3,7 @@ import debug from 'debug'
 
 import type { Multiaddr } from 'multiaddr'
 import type { EventEmitter } from 'events'
+import { CODE_IP4, CODE_UDP } from '../constants'
 
 const wrtc = require('wrtc')
 
@@ -30,6 +31,13 @@ class WebRTCUpgrader {
   }
 
   onNewPublicNode(ma: Multiaddr) {
+    const tuples = ma.tuples()
+
+    if (tuples[0].length < 2 || tuples[0][0] != CODE_IP4 || tuples[1][0] != CODE_UDP) {
+      verbose(`Dropping potential STUN ${ma.toString()} because format is invalid`)
+      return
+    }
+
     const iceServerUrl = multiaddrToIceServer(ma)
 
     const iceServers = (this.rtcConfig?.iceServers ?? []).filter((iceServer: RTCIceServer) => {

@@ -81,4 +81,28 @@ describe('webrtc upgrader', function () {
         webRTCUpgrader.rtcConfig.iceServers[1].urls === multiaddrToIceServer(initialMultiaddr)
     )
   })
+
+  it.only('add public nodes - edge cases', async function () {
+    const publicNodeEmitter = new EventEmitter()
+
+    const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
+
+    const invalidMultiaddr = new Multiaddr(`/ip4/1.2.3.4/tcp/12345`)
+
+    publicNodeEmitter.emit(`publicNode`, invalidMultiaddr)
+
+    // Let Events happen
+    await new Promise((resolve) => setTimeout(resolve))
+
+    assert(webRTCUpgrader.rtcConfig?.iceServers == undefined)
+
+    const secondInvalidMultiaddr = new Multiaddr(`/ip6/::/udp/12345`)
+
+    publicNodeEmitter.emit(`publicNode`, secondInvalidMultiaddr)
+
+    // Let Events happen
+    await new Promise((resolve) => setTimeout(resolve))
+
+    assert(webRTCUpgrader.rtcConfig?.iceServers == undefined)
+  })
 })
