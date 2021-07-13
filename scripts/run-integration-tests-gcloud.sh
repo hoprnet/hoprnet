@@ -118,8 +118,7 @@ declare eth_address
 for ip in ${node_ips}; do
   wait_until_node_is_ready "${ip}"
   eth_address=$(get_eth_address "${ip}")
-  # let the funding be done async, the following wait will sync this step again
-  fund_if_empty "${eth_address}" "${rpc_endpoint}" "${hopr_token_contract}" &
+  fund_if_empty "${eth_address}" "${rpc_endpoint}" "${hopr_token_contract}"
 done
 
 for ip in ${node_ips}; do
