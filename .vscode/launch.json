@@ -42,6 +42,6 @@
       "args": ["--reporter=tap", "--full-trace", "--exit"],
       "cwd": "${workspaceFolder}/packages/core",
       "outFiles": ["${workspaceFolder}/packages/core/**/*.{ts,js}"]
-    },
+    }
   ]
 }

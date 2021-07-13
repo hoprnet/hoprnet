@@ -43,8 +43,8 @@ export type NetworkContractAddress = {
   address: string
 }
 
-export const getChannelsContractData = (network: Networks): ContractData => getContractData(network, 'HoprChannels');
-export const getTokensContractData = (network: Networks): ContractData => getContractData(network, 'HoprToken');
+export const getChannelsContractData = (network: Networks): ContractData => getContractData(network, 'HoprChannels')
+export const getTokensContractData = (network: Networks): ContractData => getContractData(network, 'HoprToken')
 
 export async function createChainWrapper(providerURI: string, privateKey: Uint8Array) {
   const provider = providerURI.startsWith('http')

@@ -49,6 +49,9 @@ export class PacketForwardInteraction {
       await this.interact(pubKeyToPeerId(packet.nextHop), packet)
     }
     const { network, hoprChannelsAddress } = this.chain.smartContractInfo()
-    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, { network, address: hoprChannelsAddress })
+    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, {
+      network,
+      address: hoprChannelsAddress
+    })
   }
 }
