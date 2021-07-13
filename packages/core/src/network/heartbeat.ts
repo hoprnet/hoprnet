@@ -2,6 +2,7 @@ import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
 import debug from 'debug'
 import { Hash } from '@hoprnet/hopr-utils'
+import { NetworkContractAddress } from '@hoprnet/hopr-core-ethereum'
 import { randomInteger, limitConcurrency, LibP2PHandlerFunction, u8aEquals, DialOpts } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'
 import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../constants'
@@ -11,7 +12,7 @@ const log = debug('hopr-core:heartbeat')
 
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
-  private protocolConfiguration: { network: string; address: string }
+  private protocolConfiguration: NetworkContractAddress
 
   constructor(
     private networkPeers: NetworkPeerStore,
@@ -23,7 +24,7 @@ export default class Heartbeat {
       opts: DialOpts
     ) => Promise<Uint8Array[]>,
     private hangUp: (addr: PeerId) => Promise<void>,
-    protocolConfiguration: { network: string; address: string }
+    protocolConfiguration: NetworkContractAddress
   ) {
     this.protocolConfiguration = protocolConfiguration
     subscribe(

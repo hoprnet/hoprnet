@@ -1,7 +1,7 @@
 import debug from 'debug'
 import { PublicKey, durations, oneAtATime } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { NetworkContractAddress } from '@hoprnet/hopr-core-ethereum'
 import { getChannelsContractData } from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { Acknowledgement, Packet } from '../../messages'
@@ -48,7 +48,7 @@ export function sendAcknowledgement(
   destination: PeerId,
   sendMessage: any,
   privKey: PeerId,
-  networkConfiguration: { network: string; address: string }
+  networkConfiguration: NetworkContractAddress
 ): void {
   setImmediate(async () => {
     const ack = packet.createAcknowledgement(privKey)
