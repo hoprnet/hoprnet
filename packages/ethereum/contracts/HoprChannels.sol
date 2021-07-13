@@ -50,7 +50,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 ticketEpoch;
         uint256 ticketIndex;
         ChannelStatus status;
-        uint channelEpoch;
+        uint256 channelEpoch;
         // the time when the channel can be closed - NB: overloads at year >2105
         uint32 closureTime;
     }
@@ -136,9 +136,21 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param _secsClosure seconds until a channel can be closed
      */
     constructor(address _token, uint32 _secsClosure) {
+        require(_token != address(0), "token must not be empty");
+
         token = IERC20(_token);
         secsClosure = _secsClosure;
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
+    }
+
+    /**
+    * Assert that source and destination are good addresses, and distinct.
+    */
+    modifier validateSourceAndDest(address source, address destination) {
+      require(source != destination, "source and destination must not be the same");
+      require(source != address(0), "source must not be empty");
+      require(destination != address(0), "destination must not be empty");
+      _;
     }
 
     /**
@@ -195,14 +207,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 amount,
         uint256 winProb,
         bytes memory signature
-    ) external {
-        address destination = msg.sender;
-        _validateSourceAndDest(source, destination);
+    ) external validateSourceAndDest(source, msg.sender) {
         require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
         require(amount != uint256(0), "amount must not be empty");
         (, Channel storage spendingChannel) = _getChannel(
             source,
-            destination
+            msg.sender
         );
         require(spendingChannel.status == ChannelStatus.OPEN || spendingChannel.status == ChannelStatus.PENDING_TO_CLOSE, "spending channel must be open or pending to close");
         require(spendingChannel.commitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
@@ -212,7 +222,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
             keccak256(
               _getEncodedTicket(
-                  destination,
+                  msg.sender,
                   spendingChannel.ticketEpoch,
                   proofOfRelaySecret,
                   spendingChannel.channelEpoch,
@@ -237,16 +247,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           spendingChannel.commitment = nextCommitment;
           spendingChannel.balance = spendingChannel.balance.sub(amount);
           (, Channel storage earningChannel) = _getChannel(
-              destination,
+              msg.sender,
               source
           );
           if (earningChannel.status == ChannelStatus.OPEN) {
             earningChannel.balance = earningChannel.balance.add(amount);
-            emit ChannelUpdate(destination, source, earningChannel);
+            emit ChannelUpdate(msg.sender, source, earningChannel);
           } else {
             token.safeTransfer(msg.sender, amount);
           }
-          emit ChannelUpdate(source, destination, spendingChannel);
+          emit ChannelUpdate(source, msg.sender, spendingChannel);
           emit TicketRedeemed(source, destination, nextCommitment, ticketEpoch, ticketIndex, proofOfRelaySecret, amount, winProb, signature);
     }
 
@@ -266,8 +276,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     function initiateChannelClosure(
         address destination
-    ) external {
-        _validateSourceAndDest(msg.sender, destination);
+    ) external validateSourceAndDest(msg.sender, destination) {
         (, Channel storage channel) = _getChannel(msg.sender, destination);
         require(channel.status == ChannelStatus.OPEN || channel.status == ChannelStatus.WAITING_FOR_COMMITMENT, "channel must be open or waiting for commitment");
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
@@ -285,9 +294,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     function finalizeChannelClosure(
         address destination
-    ) external {
-        _validateSourceAndDest(msg.sender, destination);
-        require(address(token) != address(0), "token must not be empty");
+    ) external validateSourceAndDest(msg.sender, destination) {
         (, Channel storage channel) = _getChannel(msg.sender, destination);
         require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
         require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
@@ -313,9 +320,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function bumpChannel(
       address source,
       bytes32 newCommitment
-    ) external {
-        _validateSourceAndDest(source, msg.sender);
-
+    ) external validateSourceAndDest(source, msg.sender) {
         (, Channel storage channel) = _getChannel(
             source,
             msg.sender
@@ -387,8 +392,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         address source,
         address dest,
         uint256 amount
-    ) internal {
-        _validateSourceAndDest(source, dest);
+    ) internal validateSourceAndDest(source, dest) {
         require(amount > 0, "amount must be greater than 0");
 
         (, Channel storage channel) = _getChannel(source, dest);
@@ -444,16 +448,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function _currentBlockTimestamp() internal view returns (uint32) {
         // solhint-disable-next-line
         return uint32(block.timestamp);
-    }
-
-
-    /**
-    * Assert that source and destination are good addresses, and distinct.
-    */
-    function _validateSourceAndDest (address source, address destination) internal pure {
-      require(source != destination, "source and destination must not be the same");
-      require(source != address(0), "source must not be empty");
-      require(destination != address(0), "destination must not be empty");
     }
 
     /**
