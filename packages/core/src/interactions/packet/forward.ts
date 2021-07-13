@@ -19,12 +19,14 @@ export class PacketForwardInteraction {
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB
   ) {
+    const { network, hoprChannelsAddress } = this.chain.smartContractInfo()
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
-    this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this))
+    this.subscribe(PROTOCOL_STRING(network, hoprChannelsAddress), this.handlePacket.bind(this))
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
-    await this.sendMessage(counterparty, PROTOCOL_STRING, packet.serialize(), {
+    const { network, hoprChannelsAddress } = this.chain.smartContractInfo()
+    await this.sendMessage(counterparty, PROTOCOL_STRING(network, hoprChannelsAddress), packet.serialize(), {
       timeout: FORWARD_TIMEOUT
     })
   }
@@ -46,7 +48,7 @@ export class PacketForwardInteraction {
 
       await this.interact(pubKeyToPeerId(packet.nextHop), packet)
     }
-
-    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
+    const { network, hoprChannelsAddress } = this.chain.smartContractInfo()
+    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, { network, address: hoprChannelsAddress })
   }
 }

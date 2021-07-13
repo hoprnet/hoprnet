@@ -8,11 +8,9 @@ export const VERSION = packageVersion[0] + '.' + packageVersion[1] + '.0' // Ver
 
 const PROTOCOL_NAME = 'hopr'
 
-export const PROTOCOL_STRING = `/${PROTOCOL_NAME}/msg/${VERSION}`
-export const PROTOCOL_ACKNOWLEDGEMENT = `/${PROTOCOL_NAME}/ack/${VERSION}`
-export const PROTOCOL_PAYMENT_CHANNEL = `/${PROTOCOL_NAME}/payment/open/${VERSION}`
-export const PROTOCOL_ONCHAIN_KEY = `/${PROTOCOL_NAME}/onChainKey/${VERSION}`
-export const PROTOCOL_HEARTBEAT = `/${PROTOCOL_NAME}/heartbeat/${VERSION}`
+export const PROTOCOL_STRING = (network, hoprChannelContractAddress) => `/${PROTOCOL_NAME}/msg/${VERSION}/${network}/${hoprChannelContractAddress}`
+export const PROTOCOL_ACKNOWLEDGEMENT = (network, hoprChannelContractAddress) => `/${PROTOCOL_NAME}/ack/${VERSION}/${network}/${hoprChannelContractAddress}`
+export const PROTOCOL_HEARTBEAT = (network, hoprChannelContractAddress) => `/${PROTOCOL_NAME}/heartbeat/${VERSION}/${network}/${hoprChannelContractAddress}`
 export const DEFAULT_STUN_PORT = 3478
 
 export const HEARTBEAT_INTERVAL = 3000

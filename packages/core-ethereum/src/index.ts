@@ -1,5 +1,6 @@
 import type { Multiaddr } from 'multiaddr'
-import type { ChainWrapper } from './ethereum'
+import type { ChainWrapper, NetworkContractAddress } from './ethereum'
+import type { Networks } from '@hoprnet/hopr-ethereum'
 import chalk from 'chalk'
 import debug from 'debug'
 import {
@@ -15,7 +16,7 @@ import {
 import Indexer from './indexer'
 import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
-import { createChainWrapper } from './ethereum'
+import { createChainWrapper, getChannelsContractData, getTokensContractData } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 
@@ -126,7 +127,7 @@ export default class HoprEthereum extends EventEmitter {
   }
 
   public smartContractInfo(): {
-    network: string
+    network: Networks
     hoprTokenAddress: string
     hoprChannelsAddress: string
     channelClosureSecs: number
@@ -172,4 +173,4 @@ export default class HoprEthereum extends EventEmitter {
   }
 }
 
-export { ChannelEntry, Channel, Indexer }
+export { ChannelEntry, Channel, Indexer, NetworkContractAddress, getChannelsContractData, getTokensContractData }

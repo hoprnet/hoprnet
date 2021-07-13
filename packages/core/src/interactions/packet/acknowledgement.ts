@@ -2,6 +2,7 @@ import debug from 'debug'
 import { PublicKey, durations, oneAtATime } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { getChannelsContractData } from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { Acknowledgement, Packet } from '../../messages'
 import { HoprDB } from '@hoprnet/hopr-utils'
@@ -34,19 +35,31 @@ export function subscribeToAcknowledgements(
     }
     onMessage(ackMsg)
   }
-
+  const { network } = chain.smartContractInfo()
+  const { address } = getChannelsContractData(network)
   const limitConcurrency = oneAtATime()
-  subscribe(PROTOCOL_ACKNOWLEDGEMENT, (msg: Uint8Array, remotePeer: PeerId) =>
+  subscribe(PROTOCOL_ACKNOWLEDGEMENT(network, address), (msg: Uint8Array, remotePeer: PeerId) =>
     limitConcurrency(() => handleAcknowledgement(msg, remotePeer))
   )
 }
 
-export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMessage: any, privKey: PeerId): void {
+export function sendAcknowledgement(
+  packet: Packet,
+  destination: PeerId,
+  sendMessage: any,
+  privKey: PeerId,
+  networkConfiguration: { network: string; address: string }
+): void {
   setImmediate(async () => {
     const ack = packet.createAcknowledgement(privKey)
 
-    sendMessage(destination, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), {
-      timeout: ACKNOWLEDGEMENT_TIMEOUT
-    })
+    sendMessage(
+      destination,
+      PROTOCOL_ACKNOWLEDGEMENT(networkConfiguration.network, networkConfiguration.address),
+      ack.serialize(),
+      {
+        timeout: ACKNOWLEDGEMENT_TIMEOUT
+      }
+    )
   })
 }

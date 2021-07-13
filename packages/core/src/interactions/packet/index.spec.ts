@@ -22,7 +22,7 @@ import {
   u8aEquals,
   PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
-
+import { getChannelsContractData } from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge, Packet } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import Defer from 'p-defer'
@@ -72,7 +72,11 @@ function createFakeChain(privKey: PeerId) {
       )
   })
 
-  return { getChannel }
+  const smartContractInfo = () => ({
+    network: 'xdai'
+  })
+
+  return { getChannel, smartContractInfo }
 }
 
 function createFakeSendReceive(events: EventEmitter, self: PeerId) {
@@ -138,7 +142,9 @@ describe('packet interaction', function () {
       defer.resolve()
     })
 
-    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send, counterparty)
+    const network = 'xdai'
+    const { address } = getChannelsContractData(network)
+    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send, counterparty, { network, address })
 
     await defer.promise
   })

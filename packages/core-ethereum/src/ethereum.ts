@@ -2,14 +2,15 @@ import type { ContractTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
 import {
-  Networks,
   networks,
   getContractData,
   HoprToken,
   HoprChannels,
   HoprToken__factory,
-  HoprChannels__factory
+  HoprChannels__factory,
+  ContractData
 } from '@hoprnet/hopr-ethereum'
+import type { Networks } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Ticket,
@@ -37,6 +38,14 @@ const knownNetworks = Object.entries(networks).map(([name, data]) => ({
 export type Receipt = string
 export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>
 
+export type NetworkContractAddress = {
+  network: Networks
+  address: string
+}
+
+export const getChannelsContractData = (network: Networks): ContractData => getContractData(network, 'HoprChannels');
+export const getTokensContractData = (network: Networks): ContractData => getContractData(network, 'HoprToken');
+
 export async function createChainWrapper(providerURI: string, privateKey: Uint8Array) {
   const provider = providerURI.startsWith('http')
     ? new providers.JsonRpcProvider(providerURI)
@@ -48,8 +57,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   // get network's name by looking into our known networks
   const network: Networks = networkInfo?.name || 'localhost'
 
-  const hoprTokenDeployment = getContractData(network, 'HoprToken')
-  const hoprChannelsDeployment = getContractData(network, 'HoprChannels')
+  const hoprTokenDeployment = getTokensContractData(network)
+  const hoprChannelsDeployment = getChannelsContractData(network)
 
   const token = HoprToken__factory.connect(hoprTokenDeployment.address, wallet)
   const channels = HoprChannels__factory.connect(hoprChannelsDeployment.address, wallet)

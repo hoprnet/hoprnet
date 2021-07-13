@@ -11,6 +11,7 @@ const log = debug('hopr-core:heartbeat')
 
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
+  private protocolConfiguration: { network: string; address: string }
 
   constructor(
     private networkPeers: NetworkPeerStore,
@@ -21,9 +22,15 @@ export default class Heartbeat {
       msg: Uint8Array,
       opts: DialOpts
     ) => Promise<Uint8Array[]>,
-    private hangUp: (addr: PeerId) => Promise<void>
+    private hangUp: (addr: PeerId) => Promise<void>,
+    protocolConfiguration: { network: string; address: string }
   ) {
-    subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true)
+    this.protocolConfiguration = protocolConfiguration
+    subscribe(
+      PROTOCOL_HEARTBEAT(protocolConfiguration.network, protocolConfiguration.address),
+      this.handleHeartbeatRequest.bind(this),
+      true
+    )
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array {
@@ -39,9 +46,14 @@ export default class Heartbeat {
     const expectedResponse = Hash.create(challenge).serialize()
 
     try {
-      const pingResponse = await this.sendMessageAndExpectResponse(id, PROTOCOL_HEARTBEAT, challenge, {
-        timeout: HEARTBEAT_TIMEOUT
-      })
+      const pingResponse = await this.sendMessageAndExpectResponse(
+        id,
+        PROTOCOL_HEARTBEAT(this.protocolConfiguration.network, this.protocolConfiguration.address),
+        challenge,
+        {
+          timeout: HEARTBEAT_TIMEOUT
+        }
+      )
 
       if (pingResponse == null || pingResponse.length == 0 || !u8aEquals(expectedResponse, pingResponse[0])) {
         log(`Mismatched challenge. ${pingResponse}`)
