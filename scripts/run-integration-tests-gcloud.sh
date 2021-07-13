@@ -59,6 +59,8 @@ declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 declare run_cleanup_only="${HOPRD_RUN_CLEANUP_ONLY:-false}"
 
+test -z "${FUNDING_PRIV_KEY:-}" && { msg "Missing FUNDING_PRIV_KEY"; usage; exit 1; }
+
 function cleanup {
   local EXIT_CODE=$?
 
