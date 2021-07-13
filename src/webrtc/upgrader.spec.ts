@@ -82,7 +82,7 @@ describe('webrtc upgrader', function () {
     )
   })
 
-  it.only('add public nodes - edge cases', async function () {
+  it('add public nodes - edge cases', async function () {
     const publicNodeEmitter = new EventEmitter()
 
     const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
