@@ -257,7 +257,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             token.safeTransfer(msg.sender, amount);
           }
           emit ChannelUpdate(source, msg.sender, spendingChannel);
-          emit TicketRedeemed(source, destination, nextCommitment, ticketEpoch, ticketIndex, proofOfRelaySecret, amount, winProb, signature);
+          emit TicketRedeemed(source, msg.sender, nextCommitment, ticketEpoch, ticketIndex, proofOfRelaySecret, amount, winProb, signature);
     }
 
 
