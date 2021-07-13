@@ -87,7 +87,7 @@ describe('webrtc upgrader', function () {
 
     const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
 
-    const invalidMultiaddr = new Multiaddr(`/ip4/1.2.3.4/tcp/12345`)
+    const invalidMultiaddr = new Multiaddr(`/ip4/1.2.3.4/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`)
 
     publicNodeEmitter.emit(`publicNode`, invalidMultiaddr)
 

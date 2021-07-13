@@ -3,7 +3,7 @@ import debug from 'debug'
 
 import type { Multiaddr } from 'multiaddr'
 import type { EventEmitter } from 'events'
-import { CODE_IP4, CODE_UDP } from '../constants'
+import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants'
 
 const wrtc = require('wrtc')
 
@@ -44,7 +44,8 @@ class WebRTCUpgrader {
 
     const tuples = ma.tuples()
 
-    if (tuples[0].length < 2 || tuples[0][0] != CODE_IP4 || tuples[1][0] != CODE_UDP) {
+    // Also try "TCP addresses" as we expect that node is listening on TCP *and* UDP
+    if (tuples[0].length < 2 || tuples[0][0] != CODE_IP4 || ![CODE_UDP, CODE_TCP].includes(tuples[1][0])) {
       verbose(`Dropping potential STUN ${ma.toString()} because format is invalid`)
       return
     }
