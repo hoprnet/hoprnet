@@ -103,14 +103,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 channelBalance
     );
 
-    event ChannelMultiFunded(
-        address indexed from,
-        address indexed account1,
-        address indexed account2,
-        uint256 amount1,
-        uint256 amount2
-    );
-
     event TicketRedeemed(
         address indexed source,
         address indexed destination,
@@ -184,7 +176,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         if (amount2 > 0){
           _fundChannel(account2, account1, amount2);
         }
-        emit ChannelMultiFunded(msg.sender, account1, account2, amount1, amount2);
     }
 
     /**

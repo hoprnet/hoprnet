@@ -289,9 +289,10 @@ describe('funding a HoprChannel success', function () {
   it('should multi fund and open channel B->A, no commitment', async function () {
     const { channels, accountB, fundAndApprove } = await useFixtures()
     await fundAndApprove(accountB, 100)
-    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
-      .to.emit(channels, 'ChannelUpdate')
-      .and.to.emit(channels, 'ChannelMultiFunded')
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
+      channels,
+      'ChannelUpdate'
+    )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: '70',
       status: ChannelStatus.WaitingForCommitment + ''
