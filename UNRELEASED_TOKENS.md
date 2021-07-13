@@ -19,7 +19,7 @@ Read [#2093](https://github.com/hoprnet/hoprnet/issues/2093) for context.
 <signature of "Link my Ethereum address to HOPR node address 16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h>
 ```
 
-2. PM creates an issue containing user's email and assigns a [team member](#who-is-team-member) to tackle.
+2. PM creates a github issue containing the email's content and assigns a [team member](#who-is-team-member) to tackle. Any personally identifyable data should be removed from the email.
 3. Team member must then verify the validity of the request:
    1. Signer address (aka `CLAIMANT_ADDR`) of the signature has claimable tokens on schedules `EarlyTokenBuyers` or `TeamAndAdvisors` _(link to etherscan method)_.
    2. Signer does not already exist in [unreleasedTokens.json](./packages/cover-traffic/unreleasedTokens.json)
@@ -49,4 +49,4 @@ The release's [PM](./WORKFLOW.md) is responsible for ensuring that a new entry i
 
 ## Notes for community
 
-- User should expect his entry to be added within 1-2 working days, if it's not added, user should reach us through twitter.
+- User should expect the entry to be added within 1-2 working days, if it's not added, user should reach us through telegram.
