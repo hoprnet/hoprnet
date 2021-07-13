@@ -8,7 +8,9 @@ env:
 
 on:
   push:
-    branches: ['master', 'release/**', 'debug-e2e-gcloud/**']
+    # FIXME: make funding work reliably
+    # branches: ['master', 'release/**', 'debug-e2e-gcloud/**']
+    branches: ['debug-e2e-gcloud/**']
     paths-ignore:
       - '**/docs/**/*'
 
