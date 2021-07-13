@@ -2,28 +2,49 @@ import SimplePeer from 'simple-peer'
 import debug from 'debug'
 
 import type { Multiaddr } from 'multiaddr'
+import type { EventEmitter } from 'events'
 
 const wrtc = require('wrtc')
 
-const error = debug('hopr-connect:error')
-const verbose = debug('hopr-connect:verbose:webrtc')
+const DEBUG_PREFIX = `hopr-connect:webrtc`
+
+const error = debug(DEBUG_PREFIX.concat(':error'))
+const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
+
+export function multiaddrToIceServer(ma: Multiaddr): string {
+  const options = ma.toOptions()
+
+  return `stun:${options.host}:${options.port}`
+}
 
 /**
  * Encapsulate configuration used to create WebRTC instances
  */
 class WebRTCUpgrader {
-  private _stunServers?: {
-    iceServers?: {
-      urls: string
-    }[]
-  }
-  constructor(opts: { stunServers?: Multiaddr[] }) {
-    this._stunServers = {
-      iceServers: opts.stunServers?.map((ma: Multiaddr) => {
-        const options = ma.toOptions()
+  public rtcConfig?: RTCConfiguration
 
-        return { urls: `stun:${options.host}:${options.port}` }
-      })
+  constructor(publicNodes?: EventEmitter, initialNodes?: Multiaddr[]) {
+    initialNodes?.forEach(this.onNewPublicNode.bind(this))
+
+    publicNodes?.on('publicNode', this.onNewPublicNode.bind(this))
+  }
+
+  onNewPublicNode(ma: Multiaddr) {
+    const iceServerUrl = multiaddrToIceServer(ma)
+
+    const iceServers = (this.rtcConfig?.iceServers ?? []).filter((iceServer: RTCIceServer) => {
+      if (Array.isArray(iceServer.urls)) {
+        return !iceServer.urls.some((url: string) => iceServerUrl === url)
+      }
+
+      return iceServer.urls !== iceServerUrl
+    })
+
+    iceServers.unshift({ urls: iceServerUrl })
+
+    this.rtcConfig = {
+      ...this.rtcConfig,
+      iceServers
     }
   }
 
@@ -58,7 +79,7 @@ class WebRTCUpgrader {
       trickle: true,
       // @ts-ignore
       allowHalfTrickle: true,
-      config: this._stunServers
+      config: this.rtcConfig
     })
 
     const onAbort = () => {
@@ -68,8 +89,7 @@ class WebRTCUpgrader {
 
     const done = async (err?: Error) => {
       channel.removeListener('connect', done)
-      // do not remove error listener
-      //channel.removeListener('error', done)
+      channel.removeListener('error', done)
 
       signal?.removeEventListener('abort', onAbort)
 
@@ -81,7 +101,7 @@ class WebRTCUpgrader {
       }
     }
 
-    channel.on('error', done)
+    channel.once('error', done)
     channel.once('connect', done)
 
     signal?.addEventListener('abort', onAbort)
