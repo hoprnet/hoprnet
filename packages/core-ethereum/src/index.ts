@@ -39,6 +39,7 @@ export type RedeemTicketResponse =
 export default class HoprEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
+  private started: Promise<HoprEthereum> | undefined
 
   constructor(//private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
     private db: HoprDB,
@@ -55,15 +56,20 @@ export default class HoprEthereum extends EventEmitter {
     )
   }
 
-  async start() {
-    const chain = await createChainWrapper(this.options.provider || PROVIDER_DEFAULT_URI, this.privateKey)
-    await chain.waitUntilReady()
+  async start(): Promise<HoprEthereum> {
+    if (this.started) { return this.started }
 
-    await this.indexer.start(chain, chain.getGenesisBlock())
+    const _start = async (): Promise<HoprEthereum> => {
+      this.chain = await createChainWrapper(this.options.provider || PROVIDER_DEFAULT_URI, this.privateKey)
+      await this.chain.waitUntilReady()
+      await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
-
-    log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
-    log(chalk.green('Connector started'))
+      log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
+      log(chalk.green('Connector started'))
+      return this
+    }
+    this.started = _start() 
+    return this.started
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'

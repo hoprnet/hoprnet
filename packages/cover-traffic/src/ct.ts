@@ -2,8 +2,7 @@ import type { HoprOptions, ChannelsToOpen, ChannelsToClose } from '@hoprnet/hopr
 import Hopr, { SaneDefaults, findPath } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
-import { PublicKey, HoprDB, ChannelEntry } from '@hoprnet/hopr-utils'
-import { createChainWrapper, Indexer, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from '@hoprnet/hopr-core-ethereum'
+import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import type PeerId from 'peer-id'
 
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
@@ -63,6 +62,10 @@ export const weightedRandomChoice = (): PublicKey => {
   throw new Error('wtf')
 }
 
+const log = (...args:String[]) => {
+  STATE.log.push(args.join(' '))
+}
+
 export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, sendMessage: (path: PublicKey[]) => Promise<void>): Promise<boolean> => {
   const weight = (edge: ChannelEntry): BN => importance(edge.destination)
   let path
@@ -82,10 +85,10 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, se
     } as CTStats)
     path.forEach(p => STATE.ctSent[p.toB58String()].forwardAttempts ++)
     path.push(selfPub) // destination is always self.
-    STATE.log.push('SEND ' + path.map(pub => pub.toB58String()).join(','))
+    log('SEND ' + path.map(pub => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
-    STATE.log.push('Could not find path - ' + startNode.toPeerId().toB58String())
+    log('Could not find path - ' + startNode.toPeerId().toB58String())
     return false
   }
   try {
@@ -98,7 +101,7 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, se
     return true
   } catch (e) {
     //console.log(e)
-    STATE.log.push('error sending to' + startNode.toPeerId().toB58String())
+    log('error sending to' + startNode.toPeerId().toB58String())
     return false
   }
 }
@@ -137,7 +140,20 @@ class CoverTrafficStrategy extends SaneDefaults {
       .map((c) => c.destination)
       .concat(toOpen.map((o) => o[0]))
       .concat(toClose)
-    STATE.log.push(
+
+    await Promise.all(STATE.ctChannels.map(async (dest) => {
+      const channel = findChannel(this.selfPub, dest) 
+      if (channel.status == ChannelStatus.Open) {
+        const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
+          await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
+        })
+        if (!success) {
+          toClose.push(dest);
+        }
+      }
+    }))
+
+    log(
       (`strategy tick: balance:${balance.toString()
        } open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')
        } close: ${toClose
@@ -145,14 +161,6 @@ class CoverTrafficStrategy extends SaneDefaults {
         .join(',')}`
     ).replace('\n', ', '))
 
-    await Promise.all(STATE.ctChannels.map(async (dest) => {
-      const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
-        await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
-      })
-      if (!success) {
-        toClose.push(dest);
-      }
-    }))
     this.update(STATE)
     return [toOpen, toClose]
   }
@@ -211,32 +219,19 @@ export async function main(update: (State) => void, peerId: PeerId) {
     update(STATE)
   }
 
-  const db = new HoprDB(
-    PublicKey.fromPrivKey(peerId.privKey.marshal()).toAddress(),
-    options.createDbIfNotExist,
-    'cover-traffic',
-    options.dbPath,
-    options.forceCreateDB
-  )
-
-  const chain = await createChainWrapper(options.provider, peerId.privKey.marshal())
-  await chain.waitUntilReady()
-  const indexer = new Indexer(selfAddr, db, CONFIRMATIONS, INDEXER_BLOCK_RANGE)
-  indexer.on('channel-update', onChannelUpdate)
-  indexer.on('peer', peerUpdate)
-  indexer.on('block', (blockNumber) => {
+  log('creating a node...')
+  update(STATE)
+  const node = new Hopr(peerId, options)
+  log('setting up indexer')
+  update(STATE)
+  node.indexer.on('channel-update', onChannelUpdate)
+  node.indexer.on('peer', peerUpdate)
+  node.indexer.on('block', (blockNumber) => {
     STATE.block = new BN(blockNumber.toString())
     update(STATE)
   })
-  STATE.log.push('indexing...')
-  update(STATE)
-  await indexer.start(chain, chain.getGenesisBlock())
-  STATE.log.push('done')
-  update(STATE)
-  STATE.log.push('creating a node...')
-  update(STATE)
-  const node = new Hopr(peerId, options)
-  STATE.log.push('waiting for node to be funded ...')
+
+  log('waiting for node to be funded')
   update(STATE)
   await node.waitForFunds()
   STATE.log.push('starting node ...')
