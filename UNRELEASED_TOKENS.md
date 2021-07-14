@@ -25,7 +25,7 @@ Read [#2093](https://github.com/hoprnet/hoprnet/issues/2093) for context.
    2. Signer does not already exist in [unreleasedTokens.json](./packages/cover-traffic/unreleasedTokens.json)
    3. Inserted `HOPR_ID` is a valid HOPR ID _(link to tooling)_
 4. Team member adds another entry to [unreleasedTokens.json](./packages/cover-traffic/unreleasedTokens.json) using syntax `{ tokens: string, ethAddress: string, hoprId: string }[]`
-5. Team member creates a PR so another team member can review and approve, from here on we follow our usual [WORKFLOW](./WORKFLOW.md) steps.
+5. Team member creates a PR so another team member can review and approve, from here on we follow our usual [WORKFLOW](./WORKFLOW.md) steps, reviewer must verify the validity of the request as well.
 6. Once merged, team member replies to user with:
 
 ```
