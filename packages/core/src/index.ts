@@ -47,7 +47,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
-import { localAddressesFirst, AddressSorter } from '@hoprnet/hopr-utils'
+import { localAddressesFirst, AddressSorter, backoff, durations } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -564,27 +564,12 @@ class Hopr extends EventEmitter {
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
   }
 
-  private async checkBalances() {
-    const balance = await this.getBalance()
-    const address = (await this.getEthereumAddress()).toHex()
-    if (balance.toBN().lten(0)) {
-      log('unfunded node', address)
-      this.emit('hopr:warning:unfunded', address)
-    }
-    const nativeBalance = await this.getNativeBalance()
-    if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
-      log('unfunded node', address)
-      this.emit('hopr:warning:unfundedNative', address)
-    }
-  }
-
   private async periodicCheck() {
     log('periodic check', this.status)
     if (this.status != 'RUNNING') {
       return
     }
     try {
-      await this.checkBalances()
       await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
@@ -598,10 +583,6 @@ class Hopr extends EventEmitter {
     //const account = await chain.getAccount(await this.getEthereumAddress())
     // exit if we already announced
     //if (account.hasAnnounced()) return
-
-    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
-      throw new Error('Cannot announce without funds')
-    }
 
     const multiaddrs = await this.getAnnouncedAddresses()
     const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))
@@ -850,19 +831,33 @@ class Hopr extends EventEmitter {
 
   // This is a utility method to wait until the node is funded.
   public async waitForFunds(): Promise<void> {
-    return new Promise((resolve) => {
-      const tick = () => {
-        this.getNativeBalance().then((nativeBalance) => {
-          if (nativeBalance.toBN().gt(MIN_NATIVE_BALANCE)) {
-            resolve()
-          } else {
-            log('still unfunded, trying again soon')
-            setTimeout(tick, CHECK_TIMEOUT)
-          }
-        })
-      }
-      tick()
-    })
+    const MIN_DELAY = durations.seconds(10)
+    const MAX_DELAY = durations.hours(1)
+
+    try {
+      return backoff(
+        () => {
+          return new Promise<void>(async (resolve, reject) => {
+            const nativeBalance = await this.getNativeBalance()
+
+            if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
+              resolve()
+            } else {
+              log('still unfunded, trying again soon')
+              reject()
+            }
+          })
+        },
+        {
+          minDelay: MIN_DELAY,
+          maxDelay: MAX_DELAY,
+          delayMultiple: 1.5
+        }
+      )
+    } catch {
+      log(`unfunded for more than ${Math.round(MAX_DELAY / 60e3)} minutes, shutting down`)
+      await this.stop()
+    }
   }
 
   // Utility method to wait until the node is running successfully

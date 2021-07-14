@@ -156,6 +156,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
       throw error
     }
+
     return transaction
   }
 
