@@ -474,8 +474,6 @@ class Hopr extends EventEmitter {
           }
 
           const path: PublicKey[] = [].concat(intermediatePath, [PublicKey.fromPeerId(destination)])
-          console.log('>>>', path)
-
           let packet: Packet
           try {
             packet = await Packet.create(
@@ -544,7 +542,7 @@ class Hopr extends EventEmitter {
       return 'Node has not started yet'
     }
     const connected = this.networkPeers.debugLog()
-    const announced = await (this.paymentChannels).indexer.getAnnouncedAddresses()
+    const announced = await this.paymentChannels.indexer.getAnnouncedAddresses()
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`

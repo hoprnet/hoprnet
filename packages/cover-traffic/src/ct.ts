@@ -79,11 +79,16 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, se
       weight
     )
 
-    path.forEach(p => STATE.ctSent[p.toB58String()] = STATE.ctSent[p.toB58String()] || {
-      forwardAttempts: 0,
-      sendAttempts: 0
-    } as CTStats)
-    path.forEach(p => STATE.ctSent[p.toB58String()].forwardAttempts ++)
+    path.forEach(
+      (p) =>
+        (STATE.ctSent[p.toB58String()] =
+          STATE.ctSent[p.toB58String()] ||
+          ({
+            forwardAttempts: 0,
+            sendAttempts: 0
+          } as CTStats))
+    )
+    path.forEach((p) => STATE.ctSent[p.toB58String()].forwardAttempts++)
     path.push(selfPub) // destination is always self.
     log('SEND ' + path.map(pub => pub.toB58String()).join(','))
   } catch (e) {
@@ -92,11 +97,13 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, se
     return false
   }
   try {
-    STATE.ctSent[startNode.toB58String()] = STATE.ctSent[startNode.toB58String()] || {
-      forwardAttempts: 0,
-      sendAttempts: 0
-    } as CTStats
-    STATE.ctSent[startNode.toB58String()].sendAttempts ++
+    STATE.ctSent[startNode.toB58String()] =
+      STATE.ctSent[startNode.toB58String()] ||
+      ({
+        forwardAttempts: 0,
+        sendAttempts: 0
+      } as CTStats)
+    STATE.ctSent[startNode.toB58String()].sendAttempts++
     await sendMessage(path)
     return true
   } catch (e) {
@@ -167,7 +174,7 @@ class CoverTrafficStrategy extends SaneDefaults {
 }
 
 type CTStats = {
-  sendAttempts: number,
+  sendAttempts: number
   forwardAttempts: number
 }
 

@@ -41,7 +41,8 @@ export default class HoprEthereum extends EventEmitter {
   private chain: ChainWrapper
   private started: Promise<HoprEthereum> | undefined
 
-  constructor(//private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
+  constructor(
+    //private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
