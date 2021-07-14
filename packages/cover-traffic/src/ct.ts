@@ -62,11 +62,15 @@ export const weightedRandomChoice = (): PublicKey => {
   throw new Error('wtf')
 }
 
-const log = (...args:String[]) => {
+const log = (...args: String[]) => {
   STATE.log.push(args.join(' '))
 }
 
-export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, sendMessage: (path: PublicKey[]) => Promise<void>): Promise<boolean> => {
+export const sendCTMessage = async (
+  startNode: PublicKey,
+  selfPub: PublicKey,
+  sendMessage: (path: PublicKey[]) => Promise<void>
+): Promise<boolean> => {
   const weight = (edge: ChannelEntry): BN => importance(edge.destination)
   let path
   try {
@@ -90,7 +94,7 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, se
     )
     path.forEach((p) => STATE.ctSent[p.toB58String()].forwardAttempts++)
     path.push(selfPub) // destination is always self.
-    log('SEND ' + path.map(pub => pub.toB58String()).join(','))
+    log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
     log('Could not find path - ' + startNode.toPeerId().toB58String())
@@ -148,25 +152,25 @@ class CoverTrafficStrategy extends SaneDefaults {
       .concat(toOpen.map((o) => o[0]))
       .concat(toClose)
 
-    await Promise.all(STATE.ctChannels.map(async (dest) => {
-      const channel = findChannel(this.selfPub, dest) 
-      if (channel.status == ChannelStatus.Open) {
-        const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
-          await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
-        })
-        if (!success) {
-          toClose.push(dest);
+    await Promise.all(
+      STATE.ctChannels.map(async (dest) => {
+        const channel = findChannel(this.selfPub, dest)
+        if (channel.status == ChannelStatus.Open) {
+          const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
+            await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
+          })
+          if (!success) {
+            toClose.push(dest)
+          }
         }
-      }
-    }))
+      })
+    )
 
     log(
-      (`strategy tick: balance:${balance.toString()
-       } open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')
-       } close: ${toClose
-        .map((p) => p.toPeerId().toB58String())
-        .join(',')}`
-    ).replace('\n', ', '))
+      `strategy tick: balance:${balance.toString()} open:${toOpen
+        .map((p) => p[0].toPeerId().toB58String())
+        .join(',')} close: ${toClose.map((p) => p.toPeerId().toB58String()).join(',')}`.replace('\n', ', ')
+    )
 
     this.update(STATE)
     return [toOpen, toClose]

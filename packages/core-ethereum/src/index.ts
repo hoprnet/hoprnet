@@ -58,7 +58,9 @@ export default class HoprEthereum extends EventEmitter {
   }
 
   async start(): Promise<HoprEthereum> {
-    if (this.started) { return this.started }
+    if (this.started) {
+      return this.started
+    }
 
     const _start = async (): Promise<HoprEthereum> => {
       this.chain = await createChainWrapper(this.options.provider || PROVIDER_DEFAULT_URI, this.privateKey)
@@ -69,7 +71,7 @@ export default class HoprEthereum extends EventEmitter {
       log(chalk.green('Connector started'))
       return this
     }
-    this.started = _start() 
+    this.started = _start()
     return this.started
   }
 
