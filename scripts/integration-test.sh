@@ -36,8 +36,8 @@ declare charly_port=11092
 
 function free_ports {
     for port in ${alice_port} ${bob_port} ${charly_port}; do
-        if lsof -i ":${port}" -s TCP:LISTEN; then
-        lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+        if lsof -i ":${port}" -s TCP:LISTEN > /dev/null; then
+          lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} 
         fi
     done
 }
@@ -56,7 +56,8 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 function start_node() {
     declare filename=${1}
     declare log_file=${2}
-    declare rest_args=${@:3}
+    declare script=${3}
+    declare rest_args=${@:4}
 
     DEBUG=hopr-connect*,simple-peer \
     yarn dlx \
@@ -64,9 +65,13 @@ function start_node() {
         "${filename}" \
         > "${log_file}" \
         ${rest_args} \
+        --script "${script}" \
         2>&1 &
     declare pid=$!
-    log "${filename} ${rest_args} started with PID ${pid}"
+    log "node started with PID ${pid}"
+    log "args: ${rest_args}"
+    log "script: "
+    log "${script}"
     echo ${pid}
 }
 
@@ -109,23 +114,64 @@ log "alice -> ${alice_log}"
 log "bob -> ${bob_log}"
 log "charly -> ${charly_log}"
 
-# run nodes
-start_node examples/server.ts "${charly_log}" \
-  --serverPort ${charly_port} \
-  --serverIdentityName 'charly'
-
-start_node examples/client.ts ${bob_log}  \
-  --clientPort ${bob_port} \
-  --clientIdentityName 'bob' \
-  --relayPort ${charly_port} \
-  --relayIdentityName 'charly'
-
-start_node examples/client.ts ${alice_log} \
-  --clientPort ${alice_port} \
-  --clientIdentityName 'alice' \
-  --relayPort ${charly_port} \
-  --relayIdentityName 'charly' \
-  --counterPartyIdentityName 'bob'
+# run alice (client)
+start_node tests/node.ts \
+    "${alice_log}" \
+    "[ {
+        'cmd': 'wait',
+        'delay': 8
+      },
+      {
+        'cmd': 'dial',
+        'targetIdentityName': 'charly',
+        'targetPort': ${charly_port}
+      },
+      {
+        'cmd': 'msg',
+        'relayIdentityName': 'charly',
+        'targetIdentityName': 'bob',
+        'msg': 'test'
+      }
+    ]" \
+    --port ${alice_port} \
+    --identityName 'alice' \
+    --bootstrapPort ${charly_port} \
+    --bootstrapIdentityName 'charly' \
+    --noDirectConnections true \
+    --noWebRTCUpgrade false \
+    
+# run bob (client)
+start_node tests/node.ts "${bob_log}"  \
+  "[ {
+        'cmd': 'wait',
+        'delay': 8
+      },
+      {
+        'cmd': 'dial',
+        'targetIdentityName': 'charly',
+        'targetPort': ${charly_port}
+      },
+      {
+        'cmd': 'msg',
+        'relayIdentityName': 'charly',
+        'targetIdentityName': 'bob',
+        'msg': 'test'
+      }
+    ]" \
+  --port ${bob_port} \
+  --identityName 'bob' \
+  --bootstrapPort ${charly_port} \
+  --bootstrapIdentityName 'charly' \
+  --noDirectConnections true \
+  --noWebRTCUpgrade false \  
+  
+# run charly (bootstrap, relay)
+start_node tests/node.ts "${charly_log}" \
+  "[]" \
+  --port ${charly_port} \
+  --identityName 'charly' \
+  --noDirectConnections true \
+  --noWebRTCUpgrade false
 
 wait_for_regex_in_file ${bob_log} "Received message <test>"
 wait_for_regex_in_file ${alice_log} "Received <Echoing <test>>"
