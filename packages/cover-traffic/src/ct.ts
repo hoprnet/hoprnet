@@ -222,7 +222,7 @@ export async function main(update: (State) => void, peerId: PeerId) {
 
   const chain = await createChainWrapper(options.provider, peerId.privKey.marshal())
   await chain.waitUntilReady()
-  const indexer = new Indexer(chain.getGenesisBlock(), db, chain, CONFIRMATIONS, INDEXER_BLOCK_RANGE)
+  const indexer = new Indexer(db, CONFIRMATIONS, INDEXER_BLOCK_RANGE)
   indexer.on('channel-update', onChannelUpdate)
   indexer.on('peer', peerUpdate)
   indexer.on('block', (blockNumber) => {
@@ -231,7 +231,7 @@ export async function main(update: (State) => void, peerId: PeerId) {
   })
   STATE.log.push('indexing...')
   update(STATE)
-  await indexer.start()
+  await indexer.start(chain, chain.getGenesisBlock())
   STATE.log.push('done')
   update(STATE)
   STATE.log.push('creating a node...')

@@ -28,11 +28,11 @@ class Indexer extends EventEmitter {
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
   private address: Address
   private pendingCommitments: Map<string, DeferredPromise<void>>
+  private chain: ChainWrapper
+  private genesisBlock: number
 
   constructor(
-    private genesisBlock: number,
     private db: HoprDB,
-    private chain: ChainWrapper,
     private maxConfirmations: number,
     private blockRange: number
   ) {
@@ -45,9 +45,11 @@ class Indexer extends EventEmitter {
   /**
    * Starts indexing.
    */
-  public async start(): Promise<void> {
+  public async start(chain: ChainWrapper, genesisBlock: number): Promise<void> {
     if (this.status === 'started') return
     log(`Starting indexer...`)
+    this.chain = chain
+    this.genesisBlock = genesisBlock
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       await this.db.getLatestBlockNumber(),
@@ -118,7 +120,7 @@ class Indexer extends EventEmitter {
       this.status = 'restarting'
 
       await this.stop()
-      await this.start()
+      await this.start(this.chain, this.genesisBlock)
     } catch (err) {
       this.status = 'stopped'
       this.emit('status', 'stopped')

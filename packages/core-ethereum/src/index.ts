@@ -37,15 +37,32 @@ export type RedeemTicketResponse =
     }
 
 export default class HoprEthereum extends EventEmitter {
-  private privateKey: Uint8Array
-  private publicKey: PublicKey
-  private address: Address
+  public indexer: Indexer
+  private chain: ChainWrapper
 
-  constructor(private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
+  constructor(//private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
+    private db: HoprDB,
+    private publicKey: PublicKey,
+    private privateKey: Uint8Array,
+    private options?: { provider?: string; maxConfirmations?: number }
+  ) {
     super()
-    this.privateKey = this.chain.getPrivateKey()
-    this.publicKey = this.chain.getPublicKey()
-    this.address = Address.fromString(this.chain.getWallet().address)
+    this.indexer = new Indexer(
+      this.db,
+      this.options.maxConfirmations ?? CONFIRMATIONS,
+      INDEXER_BLOCK_RANGE
+    )
+  }
+
+  async start() {
+    const chain = await createChainWrapper(this.options.provider || PROVIDER_DEFAULT_URI, this.privateKey)
+    await chain.waitUntilReady()
+
+    await this.indexer.start(chain, chain.getGenesisBlock())
+
+
+    log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
+    log(chalk.green('Connector started'))
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -94,7 +111,7 @@ export default class HoprEthereum extends EventEmitter {
     return this.indexer.getRandomOpenChannel()
   }
 
-  private uncachedGetBalance = () => this.chain.getBalance(this.address)
+  private uncachedGetBalance = () => this.chain.getBalance(this.publicKey.toAddress())
   private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
   /**
    * Retrieves HOPR balance, optionally uses the cache.
@@ -102,10 +119,6 @@ export default class HoprEthereum extends EventEmitter {
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
     return useCache ? this.cachedGetBalance() : this.uncachedGetBalance()
-  }
-
-  public getAddress(): Address {
-    return this.address
   }
 
   public getPublicKey() {
@@ -116,7 +129,7 @@ export default class HoprEthereum extends EventEmitter {
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
-  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.address)
+  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.publicKey.toAddress())
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
     this.uncachedGetNativeBalance,
     PROVIDER_CACHE_TTL
@@ -136,39 +149,6 @@ export default class HoprEthereum extends EventEmitter {
 
   public async waitForPublicNodes(): Promise<Multiaddr[]> {
     return await this.indexer.getPublicNodes()
-  }
-
-  /**
-   * Creates an uninitialised instance.
-   *
-   * @param db database instance
-   * @param privateKey that is used to derive that on-chain identity
-   * @param options.provider provider URI that is used to connect to the blockchain
-   * @returns a promise resolved to the connector
-   */
-  public static async create(
-    db: HoprDB,
-    privateKey: Uint8Array,
-    options?: { provider?: string; maxConfirmations?: number }
-  ): Promise<HoprEthereum> {
-    const chain = await createChainWrapper(options?.provider || PROVIDER_DEFAULT_URI, privateKey)
-    await chain.waitUntilReady()
-
-    const indexer = new Indexer(
-      chain.getGenesisBlock(),
-      db,
-      chain,
-      options.maxConfirmations ?? CONFIRMATIONS,
-      INDEXER_BLOCK_RANGE
-    )
-    await indexer.start()
-
-    const coreConnector = new HoprEthereum(chain, db, indexer)
-
-    log(`using blockchain address ${coreConnector.getAddress().toHex()}`)
-    log(chalk.green('Connector started'))
-
-    return coreConnector
   }
 }
 
