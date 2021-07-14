@@ -1,5 +1,5 @@
 import type { HoprOptions, ChannelsToOpen, ChannelsToClose } from '@hoprnet/hopr-core'
-import Hopr, { SaneDefaults, findPath} from '@hoprnet/hopr-core'
+import Hopr, { SaneDefaults, findPath } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
 import { PublicKey, HoprDB, ChannelEntry } from '@hoprnet/hopr-utils'
@@ -70,7 +70,7 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, se
     path = await findPath(
       startNode,
       selfPub,
-      CT_INTERMEDIATE_HOPS - 1,// As us to start is first intermediate
+      CT_INTERMEDIATE_HOPS - 1, // As us to start is first intermediate
       (_p: PublicKey): number => 1, // TODO network quality?
       (p: PublicKey) => Promise.resolve(findChannelsFrom(p)),
       weight
@@ -153,7 +153,6 @@ class CoverTrafficStrategy extends SaneDefaults {
         toClose.push(dest);
       }
     }))
-
     this.update(STATE)
     return [toOpen, toClose]
   }

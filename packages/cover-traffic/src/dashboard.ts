@@ -32,7 +32,7 @@ function setupDashboard(selfPub: PublicKey) {
   } as any)
 
   const logs = grid.set(3, 0, 1, 3, contrib.log, { label: 'logs' })
-  const stats = grid.set(3,3,1,1, contrib.table, {
+  const stats = grid.set(3, 3, 1, 1, contrib.table, {
     label: 'stats',
     keys: false,
     interactive: false,
@@ -106,9 +106,7 @@ function setupDashboard(selfPub: PublicKey) {
       })
     })
 
-    stats.setData({ headers: ['', ''], data: [
-      ['block', state.block.toString()]
-    ]})
+    stats.setData({ headers: ['', ''], data: [['block', state.block.toString()]] })
 
     screen.render()
   }
