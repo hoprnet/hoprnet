@@ -3,17 +3,15 @@
 
 import net, { AddressInfo, Socket as TCPSocket } from 'net'
 import dgram, { RemoteInfo } from 'dgram'
-import { once } from 'events'
 
-import { EventEmitter } from 'events'
+import { EventEmitter, once } from 'events'
 import debug from 'debug'
 import { NetworkInterfaceInfo, networkInterfaces } from 'os'
 
 import AbortController from 'abort-controller'
 import type { AbortSignal } from 'abort-controller'
-import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, RELAY_CONTACT_TIMEOUT } from '../constants'
-import type { Connection, ConnHandler } from 'libp2p'
-import { MultiaddrConnection, Upgrader } from 'libp2p'
+import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, CODE_UDP, RELAY_CONTACT_TIMEOUT } from '../constants'
+import type { Connection, ConnHandler, MultiaddrConnection, Upgrader } from 'libp2p'
 
 import type { Listener as InterfaceListener } from 'libp2p-interfaces'
 import type PeerId from 'peer-id'
@@ -23,7 +21,7 @@ import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
 import { isAnyAddress } from '../utils'
 import { TCPConnection } from './tcp'
-import { randomSubset } from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-connect:listener')
 const error = debug('hopr-connect:listener:error')
@@ -31,8 +29,6 @@ const verbose = debug('hopr-connect:verbose:listener')
 
 // @TODO to be adjusted
 const MAX_RELAYS_PER_NODE = 7
-// @TODO to be adjusted
-const MAX_RELAYS_TO_CHECK = 91
 
 /**
  * Attempts to close the given maConn. If a failure occurs, it will be logged.
@@ -51,14 +47,22 @@ async function attemptClose(maConn: MultiaddrConnection) {
   }
 }
 
+type NodeEntry = {
+  latency: number
+  peerId: string
+  multiAddr: Multiaddr
+}
+
+function latencyCompare(a: NodeEntry, b: NodeEntry) {
+  return a.latency - b.latency
+}
+
 enum State {
   UNINITIALIZED,
   LISTENING,
   CLOSING,
   CLOSED
 }
-
-type ConnectResult = { id: string; latency: number }
 
 type Address = { port: number; address: string }
 
@@ -71,29 +75,30 @@ class Listener extends EventEmitter implements InterfaceListener {
 
   private listeningAddr?: Multiaddr
 
+  private publicNodes: NodeEntry[]
+
   private addrs: {
     interface: Multiaddr[]
     external: Multiaddr[]
     relays: Multiaddr[]
   }
 
-  private stunServers: Multiaddr[]
-
   constructor(
     private handler: ConnHandler | undefined,
     private upgrader: Upgrader,
-    stunServers: Multiaddr[] = [],
-    private relays: Multiaddr[] = [],
+    publicNodes: EventEmitter | undefined,
+    initialNodes: Multiaddr[] | undefined,
     private peerId: PeerId,
     private _interface: string | undefined
   ) {
     super()
 
+    this.publicNodes = []
+
     this.__connections = []
     this.upgrader = upgrader
 
-    this.tcpSocket = net.createServer(this.onTCPConnection.bind(this))
-
+    this.tcpSocket = net.createServer()
     this.udpSocket = dgram.createSocket({
       // @TODO
       // `udp6` does not seem to work in Node 12.x
@@ -102,17 +107,6 @@ class Listener extends EventEmitter implements InterfaceListener {
       // set to true to reuse port that is bound
       // to TCP socket
       reuseAddr: true
-    })
-
-    this.stunServers = stunServers.filter((ma: Multiaddr) => {
-      let maPeerId = ma.getPeerId()
-
-      if (maPeerId == null) {
-        return true
-      }
-
-      // Do not use self as STUN server
-      return maPeerId !== this.peerId.toB58String()
     })
 
     this.state = State.UNINITIALIZED
@@ -129,17 +123,80 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
     })
 
-    this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
-
     // Forward socket errors
     this.tcpSocket.on('error', (err) => this.emit('error', err))
     this.udpSocket.on('error', (err) => this.emit('error', err))
+
+    this.tcpSocket.on('connection', this.onTCPConnection.bind(this))
+    this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
 
     this.addrs = {
       interface: [],
       external: [],
       relays: []
     }
+
+    initialNodes?.forEach(this.onNewRelay.bind(this))
+
+    publicNodes?.on('publicNode', this.onNewRelay.bind(this))
+  }
+
+  async onNewRelay(ma: Multiaddr): Promise<void> {
+    if (this.publicNodes.length > MAX_RELAYS_PER_NODE) {
+      return
+    }
+
+    const tuples = ma.tuples()
+    const maPeerId = ma.getPeerId() as string
+
+    // Also try "TCP addresses" as we expect that node is listening on TCP *and* UDP
+    if (
+      tuples[0].length < 2 ||
+      tuples[0][0] != CODE_IP4 ||
+      ![CODE_UDP, CODE_TCP].includes(tuples[1][0]) ||
+      this.peerId.toB58String() === ma.getPeerId()
+    ) {
+      verbose(`Dropping potential STUN ${ma.toString()} because format is invalid or equal to own address`)
+      return
+    }
+
+    const publicNodes = this.publicNodes.filter((entry: NodeEntry) => {
+      const maTuples = entry.multiAddr.tuples()
+
+      // Check if same peerId -> duplicate
+      if (maPeerId === entry.peerId) {
+        return false
+      }
+
+      // Check if same address:port
+      if (
+        u8aEquals(maTuples[0][1] as Uint8Array, tuples[0][1] as Uint8Array) &&
+        u8aEquals(maTuples[1][1] as Uint8Array, tuples[1][1] as Uint8Array)
+      ) {
+        return false
+      }
+
+      return true
+    })
+
+    if (this.state != State.LISTENING) {
+      await once(this, 'listening')
+    }
+
+    const abort = new AbortController()
+    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CONTACT_TIMEOUT)
+
+    const result = await this.connectToRelay(ma, maPeerId, { signal: abort.signal })
+
+    clearTimeout(timeout)
+
+    if (result.latency < 0) {
+      return
+    }
+
+    publicNodes.push(result)
+
+    this.publicNodes = publicNodes.sort(latencyCompare)
   }
 
   /**
@@ -176,7 +233,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         throw Error(`Unable to bind socket to <${tmpListeningAddr.toString()}>`)
       }
 
-      // Replace wrong PeerId in given listeningAddr
+      // Replace wrong PeerId in given listeningAddr with own PeerId
       log(`replacing peerId in ${ma.toString()} by our peerId which is ${this.peerId.toB58String()}`)
       this.listeningAddr = tmpListeningAddr.encapsulate(`/p2p/${this.peerId.toB58String()}`)
     } else {
@@ -212,8 +269,6 @@ class Listener extends EventEmitter implements InterfaceListener {
     // Prevent from sending a STUN request to self
     let usableStunServers = this.getUsableStunServers(address.port, address.address)
     await this.determinePublicIpAddress(usableStunServers)
-
-    await this.connectToRelays()
 
     this.state = State.LISTENING
     this.emit('listening')
@@ -470,15 +525,15 @@ class Listener extends EventEmitter implements InterfaceListener {
    */
   private getUsableStunServers(port: number, host?: string): Multiaddr[] {
     if (host == undefined) {
-      return this.stunServers
+      return this.publicNodes.map((entry: NodeEntry) => entry.multiAddr)
     }
 
     const usableStunServers: Multiaddr[] = []
 
-    for (const potentialStunServer of this.stunServers) {
+    for (const potentialStunServer of this.publicNodes) {
       let cOpts: { host: string; port: number }
       try {
-        cOpts = potentialStunServer.toOptions()
+        cOpts = potentialStunServer.multiAddr.toOptions()
       } catch (err) {
         continue
       }
@@ -487,7 +542,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         continue
       }
 
-      usableStunServers.push(potentialStunServer)
+      usableStunServers.push(potentialStunServer.multiAddr)
     }
 
     return usableStunServers
@@ -532,53 +587,11 @@ class Listener extends EventEmitter implements InterfaceListener {
     return usableInterfaces[0].address
   }
 
-  private async connectToRelays() {
-    // @TODO check address family
-    if (this.relays.length == 0) {
-      return
-    }
-
-    const promises: Promise<ConnectResult>[] = []
-    const abort = new AbortController()
-
-    const usedPeerIds = new Set<string>()
-
-    for (const relay of randomSubset(this.relays, Math.min(MAX_RELAYS_TO_CHECK, this.relays.length))) {
-      const relayPeerId = relay.getPeerId()
-
-      if (relayPeerId == null || this.peerId.toB58String() === relayPeerId) {
-        // Relay must have a peerId and must be not self
-        continue
-      }
-
-      if (usedPeerIds.has(relayPeerId)) {
-        continue
-      }
-
-      usedPeerIds.add(relayPeerId)
-
-      promises.push(this.connectToRelay(relay, relayPeerId, { signal: abort.signal }))
-    }
-
-    if (promises.length == 0) {
-      // No usable relays found
-      return
-    }
-
-    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CONTACT_TIMEOUT)
-
-    const rawResults = await Promise.all(promises)
-
-    clearTimeout(timeout)
-
-    const filteredAndSortedResults = rawResults.filter((res) => res.latency >= 0).sort((a, b) => a.latency - b.latency)
-
-    for (const result of filteredAndSortedResults.slice(0, MAX_RELAYS_PER_NODE)) {
-      this.addrs.relays.push(new Multiaddr(`/p2p/${result.id}/p2p-circuit/p2p/${this.peerId}`))
-    }
-  }
-
-  private async connectToRelay(relay: Multiaddr, relayPeerId: string, opts?: { signal: AbortSignal }) {
+  private async connectToRelay(
+    relay: Multiaddr,
+    relayPeerId: string,
+    opts?: { signal: AbortSignal }
+  ): Promise<NodeEntry> {
     let latency: number
     let conn: Connection | undefined
     let maConn: MultiaddrConnection | undefined
@@ -595,7 +608,8 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     if (maConn == undefined) {
       return {
-        id: relayPeerId,
+        peerId: relayPeerId,
+        multiAddr: relay,
         latency: -1
       }
     }
@@ -621,7 +635,8 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     if (conn == undefined) {
       return {
-        id: relayPeerId,
+        peerId: relayPeerId,
+        multiAddr: relay,
         latency: -1
       }
     }
@@ -635,7 +650,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     this.emit('connection', conn)
 
     return {
-      id: relayPeerId,
+      peerId: relayPeerId,
+      multiAddr: relay,
       latency
     }
   }
