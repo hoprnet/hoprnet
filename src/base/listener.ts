@@ -87,7 +87,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     private handler: ConnHandler | undefined,
     private upgrader: Upgrader,
     publicNodes: EventEmitter | undefined,
-    initialNodes: Multiaddr[] | undefined,
+    private initialNodes: Multiaddr[] | undefined,
     private peerId: PeerId,
     private _interface: string | undefined
   ) {
@@ -195,6 +195,10 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     publicNodes.push(result)
+
+    this.addrs.relays = publicNodes.map(
+      (entry: NodeEntry) => new Multiaddr(`/p2p/${entry.peerId}/p2p-circuit/p2p/${this.peerId}`)
+    )
 
     this.publicNodes = publicNodes.sort(latencyCompare)
   }
@@ -530,10 +534,12 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     const usableStunServers: Multiaddr[] = []
 
-    for (const potentialStunServer of this.publicNodes) {
+    for (const potentialStunServer of this.publicNodes != undefined && this.publicNodes.length > 0
+      ? this.publicNodes.map((entry: NodeEntry) => entry.multiAddr)
+      : this.initialNodes ?? []) {
       let cOpts: { host: string; port: number }
       try {
-        cOpts = potentialStunServer.multiAddr.toOptions()
+        cOpts = potentialStunServer.toOptions()
       } catch (err) {
         continue
       }
@@ -542,7 +548,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         continue
       }
 
-      usableStunServers.push(potentialStunServer.multiAddr)
+      usableStunServers.push(potentialStunServer)
     }
 
     return usableStunServers
