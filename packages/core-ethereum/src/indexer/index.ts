@@ -26,19 +26,17 @@ class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
-  private address: Address
   private pendingCommitments: Map<string, DeferredPromise<void>>
   private chain: ChainWrapper
   private genesisBlock: number
 
   constructor(
+    private address: Address,
     private db: HoprDB,
     private maxConfirmations: number,
     private blockRange: number
   ) {
     super()
-
-    this.address = Address.fromString(this.chain.getWallet().address)
     this.pendingCommitments = new Map<string, DeferredPromise<void>>()
   }
 

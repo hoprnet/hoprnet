@@ -136,7 +136,7 @@ const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event
     newBlock,
     hoprChannels,
     newEvent,
-    indexer: new Indexer(db, 1, 5),
+    indexer: new Indexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5),
     chain,
     OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
       Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
@@ -155,8 +155,8 @@ const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: E
   const chainAlice = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_A)
   const chainBob = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_B)
 
-  const indexerAlice = new Indexer(db, 1, 5)
-  const indexerBob = new Indexer(db, 1, 5)
+  const indexerAlice = new Indexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5)
+  const indexerBob = new Indexer(Address.fromString(fixtures.ACCOUNT_B.address), db, 1, 5)
 
   return {
     db,
