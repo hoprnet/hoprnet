@@ -45,7 +45,7 @@ function setupDashboard(selfPub: PublicKey) {
     keys: false,
     interactive: false,
     columnSpacing: 2, //in chars
-    columnWidth: [55, 10, 10, 10,  20]
+    columnWidth: [55, 10, 10, 10, 20]
   })
 
   table.rows.on('select item', (item) => {
@@ -90,19 +90,19 @@ function setupDashboard(selfPub: PublicKey) {
     }
 
     ctChan.setData({
-      headers: ['Dest', 'Status', '#Sent', '#Fwd',  'Balance'],
+      headers: ['Dest', 'Status', '#Sent', '#Fwd', 'Balance'],
       data: state.ctChannels.map((p: PublicKey) => {
         const chan = findChannel(selfPub, p)
         let status
         let balance = '-'
-        let stats = state.ctSent[p.toB58String()] || {} as any
+        let stats = state.ctSent[p.toB58String()] || ({} as any)
         if (chan) {
           status = chan.status.toString()
           balance = chan.balance.toFormattedString()
         } else {
           status = 'UNKNOWN'
         }
-        return [p.toPeerId().toB58String(), status, stats.sendAttempts || 0, stats.forwardAttempts || 0,  balance]
+        return [p.toPeerId().toB58String(), status, stats.sendAttempts || 0, stats.forwardAttempts || 0, balance]
       })
     })
 

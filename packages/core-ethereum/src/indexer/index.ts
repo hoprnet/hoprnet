@@ -31,11 +31,7 @@ class Indexer extends EventEmitter {
   private chain: ChainWrapper
   private genesisBlock: number
 
-  constructor(
-    private db: HoprDB,
-    private maxConfirmations: number,
-    private blockRange: number
-  ) {
+  constructor(private db: HoprDB, private maxConfirmations: number, private blockRange: number) {
     super()
 
     this.address = Address.fromString(this.chain.getWallet().address)

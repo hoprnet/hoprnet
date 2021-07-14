@@ -340,7 +340,7 @@ class Hopr extends EventEmitter {
   */
 
   private async getAllChannels(): Promise<ChannelEntry[]> {
-    return (this.paymentChannels).getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress())
+    return this.paymentChannels.getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress())
   }
 
   /**
@@ -356,7 +356,7 @@ class Hopr extends EventEmitter {
   public async stop(): Promise<void> {
     this.status = 'DESTROYED'
     clearTimeout(this.checkTimeout)
-    await Promise.all([this.heartbeat.stop(), (this.paymentChannels).stop()])
+    await Promise.all([this.heartbeat.stop(), this.paymentChannels.stop()])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
@@ -542,7 +542,7 @@ class Hopr extends EventEmitter {
       return 'Node has not started yet'
     }
     const connected = this.networkPeers.debugLog()
-    const announced = await (this.paymentChannels).indexer.getAnnouncedAddresses()
+    const announced = await this.paymentChannels.indexer.getAnnouncedAddresses()
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`

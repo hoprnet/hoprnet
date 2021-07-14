@@ -63,7 +63,11 @@ export const weightedRandomChoice = (): PublicKey => {
   throw new Error('wtf')
 }
 
-export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, sendMessage: (path: PublicKey[]) => Promise<void>): Promise<boolean> => {
+export const sendCTMessage = async (
+  startNode: PublicKey,
+  selfPub: PublicKey,
+  sendMessage: (path: PublicKey[]) => Promise<void>
+): Promise<boolean> => {
   const weight = (edge: ChannelEntry): BN => importance(edge.destination)
   let path
   try {
@@ -76,24 +80,31 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, se
       weight
     )
 
-    path.forEach(p => STATE.ctSent[p.toB58String()] = STATE.ctSent[p.toB58String()] || {
-      forwardAttempts: 0,
-      sendAttempts: 0
-    } as CTStats)
-    path.forEach(p => STATE.ctSent[p.toB58String()].forwardAttempts ++)
+    path.forEach(
+      (p) =>
+        (STATE.ctSent[p.toB58String()] =
+          STATE.ctSent[p.toB58String()] ||
+          ({
+            forwardAttempts: 0,
+            sendAttempts: 0
+          } as CTStats))
+    )
+    path.forEach((p) => STATE.ctSent[p.toB58String()].forwardAttempts++)
     path.push(selfPub) // destination is always self.
-    STATE.log.push('SEND ' + path.map(pub => pub.toB58String()).join(','))
+    STATE.log.push('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
     STATE.log.push('Could not find path - ' + startNode.toPeerId().toB58String())
     return false
   }
   try {
-    STATE.ctSent[startNode.toB58String()] = STATE.ctSent[startNode.toB58String()] || {
-      forwardAttempts: 0,
-      sendAttempts: 0
-    } as CTStats
-    STATE.ctSent[startNode.toB58String()].sendAttempts ++
+    STATE.ctSent[startNode.toB58String()] =
+      STATE.ctSent[startNode.toB58String()] ||
+      ({
+        forwardAttempts: 0,
+        sendAttempts: 0
+      } as CTStats)
+    STATE.ctSent[startNode.toB58String()].sendAttempts++
     await sendMessage(path)
     return true
   } catch (e) {
@@ -138,28 +149,28 @@ class CoverTrafficStrategy extends SaneDefaults {
       .concat(toOpen.map((o) => o[0]))
       .concat(toClose)
     STATE.log.push(
-      (`strategy tick: balance:${balance.toString()
-       } open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')
-       } close: ${toClose
-        .map((p) => p.toPeerId().toB58String())
-        .join(',')}`
-    ).replace('\n', ', '))
+      `strategy tick: balance:${balance.toString()} open:${toOpen
+        .map((p) => p[0].toPeerId().toB58String())
+        .join(',')} close: ${toClose.map((p) => p.toPeerId().toB58String()).join(',')}`.replace('\n', ', ')
+    )
 
-    await Promise.all(STATE.ctChannels.map(async (dest) => {
-      const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
-        await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
+    await Promise.all(
+      STATE.ctChannels.map(async (dest) => {
+        const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
+          await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
+        })
+        if (!success) {
+          toClose.push(dest)
+        }
       })
-      if (!success) {
-        toClose.push(dest);
-      }
-    }))
+    )
     this.update(STATE)
     return [toOpen, toClose]
   }
 }
 
 type CTStats = {
-  sendAttempts: number,
+  sendAttempts: number
   forwardAttempts: number
 }
 

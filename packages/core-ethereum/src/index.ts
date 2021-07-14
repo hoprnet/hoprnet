@@ -40,18 +40,15 @@ export default class HoprEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
 
-  constructor(//private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
+  constructor(
+    //private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
     private options?: { provider?: string; maxConfirmations?: number }
   ) {
     super()
-    this.indexer = new Indexer(
-      this.db,
-      this.options.maxConfirmations ?? CONFIRMATIONS,
-      INDEXER_BLOCK_RANGE
-    )
+    this.indexer = new Indexer(this.db, this.options.maxConfirmations ?? CONFIRMATIONS, INDEXER_BLOCK_RANGE)
   }
 
   async start() {
@@ -59,7 +56,6 @@ export default class HoprEthereum extends EventEmitter {
     await chain.waitUntilReady()
 
     await this.indexer.start(chain, chain.getGenesisBlock())
-
 
     log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
     log(chalk.green('Connector started'))
