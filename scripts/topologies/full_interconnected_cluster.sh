@@ -17,6 +17,11 @@ usage() {
   msg
   msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5>"
   msg
+  msg "Required environment variables"
+  msg "------------------------------"
+  msg
+  msg "HOPRD_API_TOKEN\t\t\tused as api token for all nodes"
+  msg
 }
 
 # return early with help info when requested
@@ -28,12 +33,14 @@ test -z "${2:-}" && { msg "Missing <node_api_2>"; usage; exit 1; }
 test -z "${3:-}" && { msg "Missing <node_api_3>"; usage; exit 1; }
 test -z "${4:-}" && { msg "Missing <node_api_4>"; usage; exit 1; }
 test -z "${5:-}" && { msg "Missing <node_api_5>"; usage; exit 1; }
+test -z "${HOPRD_API_TOKEN:-}" && { msg "Missing HOPRD_API_TOKEN"; usage; exit 1; }
 
 declare api1="${1}"
 declare api2="${2}"
 declare api3="${3}"
 declare api4="${4}"
 declare api5="${5}"
+declare api_token=${HOPRD_API_TOKEN}
 
 # $1 = endpoint
 # $2 = Hopr command
@@ -52,7 +59,7 @@ run_command(){
   local step_time=${5:-5}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v1/command --data "
+  local cmd="curl --silent -X POST --header X-Auth-Token:${api_token} --url ${endpoint}/api/v1/command --data "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -189,3 +196,5 @@ done
 
 log "Wait for all operations to finish"
 wait
+
+log "finished"

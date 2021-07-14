@@ -51,7 +51,7 @@ usage() {
 declare test_id="e2e-gcloud-test-${1:-$RANDOM-$RANDOM}"
 declare docker_image=${2:-gcr.io/hoprassociation/hoprd:latest}
 
-declare api_token="${HOPRD_API_TOKEN:-token${RANDOM}${RANDOM}${RANDOM}token}"
+declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}%${RANDOM}%${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare provider="${HOPRD_PROVIDER:-https://goerli.infura.io/v3/${HOPRD_INFURA_KEY}}"
 declare hopr_token_contract="${HOPRD_TOKEN_CONTRACT:-0x566a5c774bb8ABE1A88B4f187e24d4cD55C207A5}"
