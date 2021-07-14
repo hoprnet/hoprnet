@@ -19,6 +19,8 @@ usage() {
   msg
   msg "\twhere <npm_package_version> uses the most recent Git tag as default"
   msg
+  msg "\tThe cleanup process can be skipped by setting the environment variable HOPRD_SKIP_CLEANUP to 'true'."
+  msg
 }
 
 # return early with help info when requested
@@ -26,6 +28,7 @@ usage() {
 
 # verify and set parameters
 declare npm_package_version
+declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
 
 # we rely on Git tags so need to fetch the tags in case they are not present
 git fetch --unshallow --tags || :
@@ -73,6 +76,7 @@ function cleanup {
   local EXIT_CODE=$?
 
   trap - SIGINT SIGTERM ERR EXIT
+  set +Eeuo pipefail
 
   # Cleaning up everything
   log "Wiping databases"
@@ -80,15 +84,15 @@ function cleanup {
 
   log "Cleaning up processes"
   for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096; do
-    if lsof -i ":${port}" -s TCP:LISTEN; then
-      lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
-    fi
+    lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
   exit $EXIT_CODE
 }
 
-trap cleanup SIGINT SIGTERM ERR EXIT
+if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
+  trap cleanup SIGINT SIGTERM ERR EXIT
+fi
 
 # $1 = rest port
 # $2 = node port
@@ -137,7 +141,7 @@ function setup_node() {
     ${additional_args} \
     > "${log}" 2>&1 &
 
-  wait_for_http_port "${rest_port}" "${log}" "${wait_delay}" "${wait_max_wait}"
+  wait_for_http_port "${rest_port}" "127.0.0.1" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
 
 # $1 = port
@@ -215,7 +219,7 @@ DEVELOPMENT=true yarn hardhat node --config packages/ethereum/hardhat.config.ts 
   "${hardhat_rpc_log}" 2>&1 &
 
 log "Hardhat node started (127.0.0.1:8545)"
-wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
+wait_for_http_port 8545 "127.0.0.1" "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
@@ -237,11 +241,11 @@ fund_node 13306 "${node6_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_port 19091 "${node1_log}"
-wait_for_port 19092 "${node2_log}"
-wait_for_port 19093 "${node3_log}"
-wait_for_port 19094 "${node4_log}"
-wait_for_port 19095 "${node5_log}"
+wait_for_port 19091 "127.0.0.1" "${node1_log}"
+wait_for_port 19092 "127.0.0.1" "${node2_log}"
+wait_for_port 19093 "127.0.0.1" "${node3_log}"
+wait_for_port 19094 "127.0.0.1" "${node4_log}"
+wait_for_port 19095 "127.0.0.1" "${node5_log}"
 # no need to wait for node 6 since that will stop right away
 # }}}
 

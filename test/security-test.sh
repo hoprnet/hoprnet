@@ -35,8 +35,8 @@ alias websocat=websocat
 [ -x "${mydir}/../.bin/websocat" ] && alias websocat="${mydir}/../.bin/websocat"
 
 # wait for input ports to be ready
-wait_for_port ${rest_port}
-wait_for_port ${admin_port}
+wait_for_port "${rest_port}" "${host}"
+wait_for_port "${admin_port}" "${host}"
 
 declare http_status_code
 
