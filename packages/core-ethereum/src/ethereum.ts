@@ -135,9 +135,12 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
       transactions.moveToConfirmed(transaction.hash)
     } catch (error) {
-      const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
+      const isRevertedErr = [error?.code, String(error)].includes(errors.CALL_EXCEPTION)
+      const isAlreadyKnownErr =
+        [error?.code, String(error)].includes(errors.NONCE_EXPIRED) ||
+        [error?.code, String(error)].includes(errors.REPLACEMENT_UNDERPRICED)
 
-      if (reverted) {
+      if (isRevertedErr) {
         log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
 
         // this transaction failed but was confirmed as reverted
@@ -145,10 +148,9 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       } else {
         log('Transaction with nonce %d failed to sent: %s', nonce, error)
 
-        const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
         // if this hash is already known and we already have it included in
         // pending we can safely ignore this
-        if (alreadyKnown && transactions.pending.has(transaction.hash)) return
+        if (isAlreadyKnownErr && transactions.pending.has(transaction.hash)) return
 
         // this transaction was not confirmed so we just remove it
         transactions.remove(transaction.hash)

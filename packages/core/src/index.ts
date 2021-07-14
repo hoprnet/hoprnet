@@ -47,7 +47,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
-import { localAddressesFirst, AddressSorter, backoff, durations } from '@hoprnet/hopr-utils'
+import { localAddressesFirst, AddressSorter, backoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -285,6 +285,25 @@ class Hopr extends EventEmitter {
       } catch (e) {
         console.log(e)
       }
+    }
+  }
+
+  /**
+   * Emits node is out of funds and forces balance check
+   * @param type type of funds
+   */
+  private async outOfFunds(type: 'NATIVE' | 'HOPR'): Promise<void> {
+    const ethereum = await this.paymentChannels
+    const address = (await this.getEthereumAddress()).toHex()
+
+    if (type === 'NATIVE') {
+      log('unfunded node', address)
+      this.emit('hopr:warning:unfundedNative', address)
+      await ethereum.getNativeBalance(false)
+    } else if (type === 'HOPR') {
+      log('unfunded node', address)
+      this.emit('hopr:warning:unfunded', address)
+      await ethereum.getBalance(false)
     }
   }
 
@@ -601,6 +620,7 @@ class Hopr extends EventEmitter {
       await chain.announce(p2p)
     } catch (err) {
       log('announce failed')
+      await this.outOfFunds(isErrorOutOfFunds(err))
       throw new Error(`Failed to announce: ${err}`)
     }
   }
@@ -671,8 +691,17 @@ class Hopr extends EventEmitter {
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
+    let channelId: Hash
+
+    try {
+      channelId = await channel.open(new Balance(amountToFund))
+    } catch (err) {
+      await this.outOfFunds(isErrorOutOfFunds(err))
+      throw err
+    }
+
     return {
-      channelId: await channel.open(new Balance(amountToFund))
+      channelId
     }
   }
 
@@ -704,7 +733,13 @@ class Hopr extends EventEmitter {
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
-    await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
+
+    try {
+      await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
+    } catch (err) {
+      await this.outOfFunds(isErrorOutOfFunds(err))
+      throw err
+    }
 
     return {
       channelId: (await channel.usToThem()).getId()
@@ -727,9 +762,15 @@ class Hopr extends EventEmitter {
       await this.strategy.onChannelWillClose(channel)
     }
 
-    const txHash = await (channelState.status === ChannelStatus.Open
-      ? channel.initializeClosure()
-      : channel.finalizeClosure())
+    let txHash: string
+    try {
+      txHash = await (channelState.status === ChannelStatus.Open
+        ? channel.initializeClosure()
+        : channel.finalizeClosure())
+    } catch (err) {
+      await this.outOfFunds(isErrorOutOfFunds(err))
+      throw err
+    }
 
     return { receipt: txHash, status: channelState.status }
   }
@@ -783,7 +824,13 @@ class Hopr extends EventEmitter {
   public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
     const ethereum = await this.paymentChannels
     const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.signer)
-    return await channel.redeemTicket(ackTicket)
+
+    try {
+      return await channel.redeemTicket(ackTicket)
+    } catch (err) {
+      await this.outOfFunds(isErrorOutOfFunds(err))
+      throw err
+    }
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
@@ -808,7 +855,13 @@ class Hopr extends EventEmitter {
 
   public async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     const ethereum = await this.paymentChannels
-    return ethereum.withdraw(currency, recipient, amount)
+
+    try {
+      return ethereum.withdraw(currency, recipient, amount)
+    } catch (err) {
+      await this.outOfFunds(isErrorOutOfFunds(err))
+      throw err
+    }
   }
 
   /**
