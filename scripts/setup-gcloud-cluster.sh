@@ -20,6 +20,10 @@ source "${mydir}/testnet.sh"
 
 usage() {
   msg
+  msg "This script can be used to setup a cluster of nodes on gcloud and run"
+  msg "an initial setup script against these nodes. Once testing has"
+  msg "completed the script can be used to cleanup the cluster as well."
+  msg
   msg "Usage: $0 [<cluster_id> [<docker_image> [<init_script>]]]"
   msg
   msg "where <cluster_id>:\t\tuses a random value as default"
