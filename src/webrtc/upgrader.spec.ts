@@ -8,13 +8,13 @@ import { PublicNodesEmitter } from '../types'
 
 describe('webrtc upgrader', function () {
   it('add public nodes', async function () {
-    const publicNodeEmitter = new EventEmitter()
+    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
 
     const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
 
     const testMultiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/12345`)
 
-    publicNodeEmitter.emit(`publicNode`, testMultiaddr)
+    publicNodeEmitter.emit(`addPublicNode`, testMultiaddr)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -26,7 +26,7 @@ describe('webrtc upgrader', function () {
 
     const secondTestMultiaddr = new Multiaddr(`/ip4/1.2.3.5/udp/12345`)
 
-    publicNodeEmitter.emit(`publicNode`, secondTestMultiaddr)
+    publicNodeEmitter.emit(`addPublicNode`, secondTestMultiaddr)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
