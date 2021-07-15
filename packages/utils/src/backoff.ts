@@ -4,6 +4,13 @@ export async function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
+/**
+ * A general use backoff that will reject once MAX_DELAY is reached.
+ * @param fn asynchronous function to run on every tick
+ * @param options.minDelay minimum delay, we start with this
+ * @param options.maxDelay maximum delay, we reject once we reach this
+ * @param options.delayMultiple multiplier to apply to increase running delay
+ */
 export async function backoff(
   fn: () => Promise<any>,
   options: {
@@ -30,7 +37,7 @@ export async function backoff(
 
         // if delay is not set, our first delay is minDelay
         // else we start exp increasing
-        delay = !delay ? minDelay : Math.min(delay * delayMultiple, maxDelay)
+        delay = typeof delay === 'undefined' ? minDelay : Math.min(delay * delayMultiple, maxDelay)
 
         await wait(delay)
         return tick()
