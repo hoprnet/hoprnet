@@ -4,6 +4,7 @@ import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
 
 import { MAX_STUN_SERVERS, multiaddrToIceServer, WebRTCUpgrader } from './upgrader'
+import { PublicNodesEmitter } from '../types'
 
 describe('webrtc upgrader', function () {
   it('add public nodes', async function () {
@@ -38,14 +39,14 @@ describe('webrtc upgrader', function () {
   })
 
   it('add public nodes more than once', async function () {
-    const publicNodeEmitter = new EventEmitter()
+    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
 
     const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
 
     const testMultiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/12345`)
 
-    publicNodeEmitter.emit(`publicNode`, testMultiaddr)
-    publicNodeEmitter.emit(`publicNode`, testMultiaddr)
+    publicNodeEmitter.emit(`addPublicNode`, testMultiaddr)
+    publicNodeEmitter.emit(`addPublicNode`, testMultiaddr)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -57,7 +58,7 @@ describe('webrtc upgrader', function () {
   })
 
   it('add public nodes to initial nodes', async function () {
-    const publicNodeEmitter = new EventEmitter()
+    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
 
     const initialMultiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/12345`)
 
@@ -70,7 +71,7 @@ describe('webrtc upgrader', function () {
 
     const nextMultiaddr = new Multiaddr(`/ip4/1.2.3.5/udp/12345`)
 
-    publicNodeEmitter.emit(`publicNode`, nextMultiaddr)
+    publicNodeEmitter.emit(`addPublicNode`, nextMultiaddr)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -83,13 +84,13 @@ describe('webrtc upgrader', function () {
   })
 
   it('add public nodes - edge cases', async function () {
-    const publicNodeEmitter = new EventEmitter()
+    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
 
     const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
 
     const invalidMultiaddr = new Multiaddr(`/ip4/1.2.3.4/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`)
 
-    publicNodeEmitter.emit(`publicNode`, invalidMultiaddr)
+    publicNodeEmitter.emit(`addPublicNode`, invalidMultiaddr)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -98,7 +99,7 @@ describe('webrtc upgrader', function () {
 
     const secondInvalidMultiaddr = new Multiaddr(`/ip6/::/udp/12345`)
 
-    publicNodeEmitter.emit(`publicNode`, secondInvalidMultiaddr)
+    publicNodeEmitter.emit(`addPublicNode`, secondInvalidMultiaddr)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -107,14 +108,14 @@ describe('webrtc upgrader', function () {
   })
 
   it(`limit available STUN servers`, async function () {
-    const publicNodeEmitter = new EventEmitter()
+    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
 
     const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
 
     for (let i = 0; i <= MAX_STUN_SERVERS; i++) {
       const multiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/${i + 1}`)
 
-      publicNodeEmitter.emit(`publicNode`, multiaddr)
+      publicNodeEmitter.emit(`addPublicNode`, multiaddr)
 
       if (i < MAX_STUN_SERVERS) {
         assert(
