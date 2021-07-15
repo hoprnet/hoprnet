@@ -4,7 +4,6 @@ import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
 import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import type PeerId from 'peer-id'
-import fs from 'fs'
 
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
 const CHANNEL_STAKE = new BN('1000')
@@ -21,24 +20,24 @@ const options: HoprOptions = {
   announce: false
 }
 
-
-type CTStats = {
-  sendAttempts: number
-  forwardAttempts: number
-}
-
 type PeerData = {
   id: any //PeerId,
   pub: PublicKey
   multiaddrs: any
 }
+
+type ChannelData = {
+  channel: ChannelEntry
+  sendAttempts: number
+  forwardAttempts: number
+}
+
 export type State = {
   nodes: Record<string, PeerData>
-  channels: Record<string, ChannelEntry>
+  channels: Record<string, ChannelData>
   log: string[]
   ctChannels: PublicKey[]
   block: BN
-  ctSent: Record<string, CTStats>
 }
 
 class PersistedState {
@@ -46,33 +45,39 @@ class PersistedState {
   // Caveats:
   // - Must live in same timeline as the hoprdb, as it relies on
   //   the indexer being in the same state.
-  constructor(private update: (s: State) => void){
+  private _data: State
 
-    if (!fs.existsSync('./state.json')) {
-      this.set({
+  constructor(private update: (s: State) => void) {
+    this._data = {
         nodes: {},
         channels: {},
         log: [],
         ctChannels: [],
         block: new BN('0'),
-        ctSent: {}
-      })
     }
   }
 
   async get(): Promise<State> {
-    return JSON.parse(fs.readFileSync('./state.json', 'utf8') || '{}') as State
+    return this._data
   }
 
   async set(s: State){
-    fs.writeFileSync('./state.json', JSON.stringify(s), 'utf8')
+    this._data = s
     this.update(s)
     return
   }
 
-  async setChannel(channel) {
+  async setChannel(channel: ChannelEntry) {
     const state = await this.get()
-    state.channels[channel.getId().toHex()] = channel
+    if (state.channels[channel.getId().toHex()]){
+      state.channels[channel.getId().toHex()].channel = channel
+    } else {
+      state.channels[channel.getId().toHex()] = { 
+        channel,
+        sendAttempts: 0,
+        forwardAttempts: 0
+      }
+    }
     await this.set(state)
   }
 
@@ -93,7 +98,7 @@ class PersistedState {
   }
 
   async findChannelsFrom(p: PublicKey): Promise<ChannelEntry[]> {
-    return Object.values((await this.get()).channels).filter((c: ChannelEntry) => c.source.eq(p))
+    return Object.values((await this.get()).channels).filter((c: ChannelData) => c.channel.source.eq(p)).map(c => c.channel)
   }
 
   async log(...args:String[]){
@@ -141,16 +146,16 @@ class PersistedState {
     throw new Error('wtf')
   }
 
-  async incrementSent(p: PublicKey) {
-    const s = await this.get()
+  async incrementSent(_p: PublicKey) {
+   // const s = await this.get()
     // TODO init
-    s.ctSent[p.toB58String()].sendAttempts ++
+    //s.channels[p.toB58String()].sendAttempts ++
   }
 
-  async incrementForwards(p: PublicKey) {
-    const s = await this.get()
+  async incrementForwards(_p: PublicKey) {
+    //const s = await this.get()
     // TODO init
-    s.ctSent[p.toB58String()].forwardAttempts++
+    //s.ctSent[p.toB58String()].forwardAttempts++
   }
 }
 
@@ -158,7 +163,7 @@ export const addBN = (a: BN, b: BN): BN => a.add(b)
 export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
 
 export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
-  Object.values(state.channels).filter((c: ChannelEntry) => c.source.eq(p))
+  Object.values(state.channels).map(c => c.channel).filter((c: ChannelEntry) => c.source.eq(p))
 
 export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
   findChannelsFrom(p, state).map((c) => c.balance.toBN()).reduce(addBN, new BN('0'))
@@ -169,7 +174,7 @@ export const importance = (p: PublicKey, state: State): BN =>
   ).reduce(addBN, new BN('0'))
 
 export const findChannel = (src: PublicKey, dest: PublicKey, state: State): ChannelEntry =>
-   Object.values(state.channels).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
+   Object.values(state.channels).map(c => c.channel).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
 
 
 

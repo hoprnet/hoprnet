@@ -80,7 +80,7 @@ function setupDashboard(selfPub: PublicKey) {
         const chan = findChannel(selfPub, p, state)
         let status
         let balance = '-'
-        let stats = state.ctSent[p.toB58String()] || ({} as any)
+        let stats = state.channels[p.toB58String()] || ({} as any)
         if (chan) {
           status = chan.status.toString()
           balance = chan.balance.toFormattedString()
