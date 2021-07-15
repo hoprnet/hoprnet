@@ -13,7 +13,7 @@ export async function backoff(
   } = {}
 ): ReturnType<typeof fn> {
   const { minDelay = durations.seconds(1), maxDelay = durations.minutes(10), delayMultiple = 2 } = options
-  let delay: number
+  let delay: number | undefined
 
   if (minDelay >= maxDelay) throw Error('minDelay should be smaller than maxDelay')
   else if (delayMultiple < 1) throw Error('delayMultiple should be larger than 1')
