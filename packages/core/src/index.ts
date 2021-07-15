@@ -47,7 +47,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
-import { localAddressesFirst, AddressSorter } from '@hoprnet/hopr-utils'
+import { localAddressesFirst, AddressSorter, backoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -288,6 +288,31 @@ class Hopr extends EventEmitter {
     }
   }
 
+  /**
+   * If error provided is considered an out of funds error
+   * - it will emit that the node is out of funds
+   * - it will set channel strategy to passive
+   * @param error error thrown by an ethereum transaction
+   */
+  private async isOutOfFunds(error: any): Promise<void> {
+    const isOutOfFunds = isErrorOutOfFunds(error)
+    if (!isOutOfFunds) return
+
+    const address = (await this.getEthereumAddress()).toHex()
+
+    if (isOutOfFunds === 'NATIVE') {
+      log('unfunded node', address)
+      this.emit('hopr:warning:unfundedNative', address)
+      await this.getNativeBalance()
+    } else if (isOutOfFunds === 'HOPR') {
+      log('unfunded node', address)
+      this.emit('hopr:warning:unfunded', address)
+      await this.getBalance()
+    }
+
+    await this.setChannelStrategy('passive')
+  }
+
   private async tickChannelStrategy() {
     verbose('strategy tick', this.status)
     if (this.status != 'RUNNING') {
@@ -316,9 +341,13 @@ class Hopr extends EventEmitter {
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
       verbose(`closing ${toClose}`)
-      await this.closeChannel(toClose.toPeerId())
-      verbose(`closed channel to ${toClose.toString()}`)
-      this.emit('hopr:channel:closed', toClose)
+      try {
+        await this.closeChannel(toClose.toPeerId())
+        verbose(`closed channel to ${toClose.toString()}`)
+        this.emit('hopr:channel:closed', toClose)
+      } catch (e) {
+        log('error when trying to close strategy channels', e)
+      }
     }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
@@ -564,27 +593,12 @@ class Hopr extends EventEmitter {
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
   }
 
-  private async checkBalances() {
-    const balance = await this.getBalance()
-    const address = (await this.getEthereumAddress()).toHex()
-    if (balance.toBN().lten(0)) {
-      log('unfunded node', address)
-      this.emit('hopr:warning:unfunded', address)
-    }
-    const nativeBalance = await this.getNativeBalance()
-    if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
-      log('unfunded node', address)
-      this.emit('hopr:warning:unfundedNative', address)
-    }
-  }
-
   private async periodicCheck() {
     log('periodic check', this.status)
     if (this.status != 'RUNNING') {
       return
     }
     try {
-      await this.checkBalances()
       await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
@@ -598,10 +612,6 @@ class Hopr extends EventEmitter {
     //const account = await chain.getAccount(await this.getEthereumAddress())
     // exit if we already announced
     //if (account.hasAnnounced()) return
-
-    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
-      throw new Error('Cannot announce without funds')
-    }
 
     const multiaddrs = await this.getAnnouncedAddresses()
     const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))
@@ -620,6 +630,7 @@ class Hopr extends EventEmitter {
       await chain.announce(p2p)
     } catch (err) {
       log('announce failed')
+      await this.isOutOfFunds(err)
       throw new Error(`Failed to announce: ${err}`)
     }
   }
@@ -690,8 +701,17 @@ class Hopr extends EventEmitter {
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
+    let channelId: Hash
+
+    try {
+      channelId = await channel.open(new Balance(amountToFund))
+    } catch (err) {
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to openChannel: ${err}`)
+    }
+
     return {
-      channelId: await channel.open(new Balance(amountToFund))
+      channelId
     }
   }
 
@@ -723,7 +743,13 @@ class Hopr extends EventEmitter {
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
-    await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
+
+    try {
+      await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
+    } catch (err) {
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to fundChannel: ${err}`)
+    }
 
     return {
       channelId: (await channel.usToThem()).getId()
@@ -746,9 +772,15 @@ class Hopr extends EventEmitter {
       await this.strategy.onChannelWillClose(channel)
     }
 
-    const txHash = await (channelState.status === ChannelStatus.Open
-      ? channel.initializeClosure()
-      : channel.finalizeClosure())
+    let txHash: string
+    try {
+      txHash = await (channelState.status === ChannelStatus.Open
+        ? channel.initializeClosure()
+        : channel.finalizeClosure())
+    } catch (err) {
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to closeChannel: ${err}`)
+    }
 
     return { receipt: txHash, status: channelState.status }
   }
@@ -802,7 +834,13 @@ class Hopr extends EventEmitter {
   public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
     const ethereum = await this.paymentChannels
     const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.signer)
-    return await channel.redeemTicket(ackTicket)
+
+    try {
+      return await channel.redeemTicket(ackTicket)
+    } catch (err) {
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to redeemAcknowledgedTicket: ${err}`)
+    }
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
@@ -827,7 +865,13 @@ class Hopr extends EventEmitter {
 
   public async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     const ethereum = await this.paymentChannels
-    return ethereum.withdraw(currency, recipient, amount)
+
+    try {
+      return ethereum.withdraw(currency, recipient, amount)
+    } catch (err) {
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to withdraw: ${err}`)
+    }
   }
 
   /**
@@ -848,21 +892,39 @@ class Hopr extends EventEmitter {
     )
   }
 
-  // This is a utility method to wait until the node is funded.
+  /**
+   * This is a utility method to wait until the node is funded.
+   * A backoff is implemented, if node has not been funded and
+   * MAX_DELAY is reached, this function will reject.
+   */
   public async waitForFunds(): Promise<void> {
-    return new Promise((resolve) => {
-      const tick = () => {
-        this.getNativeBalance().then((nativeBalance) => {
-          if (nativeBalance.toBN().gt(MIN_NATIVE_BALANCE)) {
-            resolve()
-          } else {
-            log('still unfunded, trying again soon')
-            setTimeout(tick, CHECK_TIMEOUT)
-          }
-        })
-      }
-      tick()
-    })
+    const MIN_DELAY = durations.seconds(30)
+    const MAX_DELAY = durations.seconds(200)
+
+    try {
+      return backoff(
+        () => {
+          return new Promise<void>(async (resolve, reject) => {
+            const nativeBalance = await this.getNativeBalance()
+
+            if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
+              resolve()
+            } else {
+              log('still unfunded, trying again soon')
+              reject()
+            }
+          })
+        },
+        {
+          minDelay: MIN_DELAY,
+          maxDelay: MAX_DELAY,
+          delayMultiple: 1.05
+        }
+      )
+    } catch {
+      log(`unfunded for more than ${Math.round(MAX_DELAY / 60e3)} minutes, shutting down`)
+      await this.stop()
+    }
   }
 
   // Utility method to wait until the node is running successfully
