@@ -23,7 +23,7 @@ export async function backoff(
   let delay: number | undefined
 
   if (minDelay >= maxDelay) throw Error('minDelay should be smaller than maxDelay')
-  else if (delayMultiple < 1) throw Error('delayMultiple should be larger than 1')
+  else if (delayMultiple <= 1) throw Error('delayMultiple should be larger than 1')
 
   return new Promise<ReturnType<typeof fn>>(async (resolve, reject) => {
     while (true) {
