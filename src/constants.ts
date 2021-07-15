@@ -17,7 +17,6 @@ export const CODE_CIRCUIT = Multiaddr.protocols.names['p2p-circuit'].code
 export const CODE_TCP = Multiaddr.protocols.names['tcp'].code
 export const CODE_UDP = Multiaddr.protocols.names['udp'].code
 
-
 // Time to wait for a connection to close gracefully before destroying it manually
 export const CLOSE_TIMEOUT = 6000 // ms
 export const RELAY_CIRCUIT_TIMEOUT = 6000 // ms
