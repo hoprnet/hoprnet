@@ -39,7 +39,7 @@ describe('test out of funds', function () {
 
     assert(!isErrorOutOfNativeFunds(error))
     assert(!isErrorOutOfHoprFunds(error))
-    assert.strictEqual(isErrorOutOfFunds(error), undefined)
+    assert.strictEqual(isErrorOutOfFunds(error), false)
   })
 
   it('should not be an out of funds error on revert', function () {
@@ -52,6 +52,6 @@ describe('test out of funds', function () {
 
     assert(!isErrorOutOfNativeFunds(error))
     assert(!isErrorOutOfHoprFunds(error))
-    assert.strictEqual(isErrorOutOfFunds(error), undefined)
+    assert.strictEqual(isErrorOutOfFunds(error), false)
   })
 })
