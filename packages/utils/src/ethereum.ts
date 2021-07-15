@@ -11,7 +11,8 @@ export function isErrorOutOfHoprFunds(error: any): boolean {
   return [error?.reason, String(error)].includes('SafeMath: subtraction overflow')
 }
 
-export function isErrorOutOfFunds(error: any): 'NATIVE' | 'HOPR' | undefined {
+export function isErrorOutOfFunds(error: any): 'NATIVE' | 'HOPR' | false {
   if (isErrorOutOfNativeFunds(error)) return 'NATIVE'
   else if (isErrorOutOfHoprFunds(error)) return 'HOPR'
+  return false
 }

@@ -289,21 +289,25 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Emits node is out of funds and forces balance check
+   * If error provided is considered an out of funds error
+   * it will emit that the node is out of funds
    * @param type type of funds
    */
-  private async outOfFunds(type: 'NATIVE' | 'HOPR'): Promise<void> {
-    const ethereum = await this.paymentChannels
+  private async isOutOfFunds(error: any): Promise<void> {
+    const isOutOfFunds = isErrorOutOfFunds(error)
+    if (!isOutOfFunds) return
+
+    // const ethereum = await this.paymentChannels
     const address = (await this.getEthereumAddress()).toHex()
 
-    if (type === 'NATIVE') {
+    if (isOutOfFunds === 'NATIVE') {
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
-      await ethereum.getNativeBalance(false)
-    } else if (type === 'HOPR') {
+      // await ethereum.getNativeBalance(false)
+    } else if (isOutOfFunds === 'HOPR') {
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
-      await ethereum.getBalance(false)
+      // await ethereum.getBalance(false)
     }
   }
 
@@ -335,9 +339,13 @@ class Hopr extends EventEmitter {
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
       verbose(`closing ${toClose}`)
-      await this.closeChannel(toClose.toPeerId())
-      verbose(`closed channel to ${toClose.toString()}`)
-      this.emit('hopr:channel:closed', toClose)
+      try {
+        await this.closeChannel(toClose.toPeerId())
+        verbose(`closed channel to ${toClose.toString()}`)
+        this.emit('hopr:channel:closed', toClose)
+      } catch (e) {
+        log('error when trying to close strategy channels', e)
+      }
     }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
@@ -620,7 +628,7 @@ class Hopr extends EventEmitter {
       await chain.announce(p2p)
     } catch (err) {
       log('announce failed')
-      await this.outOfFunds(isErrorOutOfFunds(err))
+      await this.isOutOfFunds(err)
       throw new Error(`Failed to announce: ${err}`)
     }
   }
@@ -696,8 +704,8 @@ class Hopr extends EventEmitter {
     try {
       channelId = await channel.open(new Balance(amountToFund))
     } catch (err) {
-      await this.outOfFunds(isErrorOutOfFunds(err))
-      throw err
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to openChannel: ${err}`)
     }
 
     return {
@@ -737,8 +745,8 @@ class Hopr extends EventEmitter {
     try {
       await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
     } catch (err) {
-      await this.outOfFunds(isErrorOutOfFunds(err))
-      throw err
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to fundChannel: ${err}`)
     }
 
     return {
@@ -768,8 +776,8 @@ class Hopr extends EventEmitter {
         ? channel.initializeClosure()
         : channel.finalizeClosure())
     } catch (err) {
-      await this.outOfFunds(isErrorOutOfFunds(err))
-      throw err
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to closeChannel: ${err}`)
     }
 
     return { receipt: txHash, status: channelState.status }
@@ -828,8 +836,8 @@ class Hopr extends EventEmitter {
     try {
       return await channel.redeemTicket(ackTicket)
     } catch (err) {
-      await this.outOfFunds(isErrorOutOfFunds(err))
-      throw err
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to redeemAcknowledgedTicket: ${err}`)
     }
   }
 
@@ -859,8 +867,8 @@ class Hopr extends EventEmitter {
     try {
       return ethereum.withdraw(currency, recipient, amount)
     } catch (err) {
-      await this.outOfFunds(isErrorOutOfFunds(err))
-      throw err
+      await this.isOutOfFunds(err)
+      throw new Error(`Failed to withdraw: ${err}`)
     }
   }
 
