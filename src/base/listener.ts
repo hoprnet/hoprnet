@@ -193,6 +193,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     clearTimeout(timeout)
 
+    // Negative latency === timeout
     if (result.latency < 0) {
       return
     }
