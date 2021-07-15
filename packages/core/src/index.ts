@@ -297,18 +297,19 @@ class Hopr extends EventEmitter {
     const isOutOfFunds = isErrorOutOfFunds(error)
     if (!isOutOfFunds) return
 
-    // const ethereum = await this.paymentChannels
     const address = (await this.getEthereumAddress()).toHex()
 
     if (isOutOfFunds === 'NATIVE') {
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
-      // await ethereum.getNativeBalance(false)
+      await this.getNativeBalance()
     } else if (isOutOfFunds === 'HOPR') {
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
-      // await ethereum.getBalance(false)
+      await this.getBalance()
     }
+
+    await this.setChannelStrategy('passive')
   }
 
   private async tickChannelStrategy() {
