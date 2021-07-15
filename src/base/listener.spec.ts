@@ -431,6 +431,51 @@ describe('check listening to sockets', function () {
       addrsAfterSecondEvent.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
     )
 
+    await Promise.all([stopNode(node.listener), stopNode(relay.listener), stopNode(stunServer)])
+  })
+
+  it('overwrite existing relays', async function () {
+    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+
+    const relay = await startNode(undefined, [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    const publicNodesEmitter = new EventEmitter()
+
+    const node = await startNode(
+      publicNodesEmitter,
+      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+      {
+        msgReceived: Defer()
+      }
+    )
+
+    publicNodesEmitter.emit(
+      `publicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    // Let events happen
+    await new Promise((resolve) => setTimeout(resolve))
+
+    let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+
+    assert(addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`))
+
+    publicNodesEmitter.emit(
+      `publicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId}`)
+    )
+
+    publicNodesEmitter.emit(
+      `publicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    // Let events happen
+    await new Promise((resolve) => setTimeout(resolve))
+
     // Stop first relay and let it attach to different port
     await stopNode(relay.listener)
 
@@ -454,7 +499,7 @@ describe('check listening to sockets', function () {
 
     const addrsAfterThirdEvent = node.listener.getAddrs()
 
-    assert(addrsAfterSecondEvent.length == addrsAfterThirdEvent.length)
+    assert(addrs.length == addrsAfterThirdEvent.length)
 
     await Promise.all([stopNode(node.listener), stopNode(newRelay.listener), stopNode(stunServer)])
   })
