@@ -410,6 +410,9 @@ describe('check listening to sockets', function () {
 
     // Let events happen
     await new Promise((resolve) => setTimeout(resolve))
+    await new Promise((resolve) => setTimeout(resolve))
+    await new Promise((resolve) => setTimeout(resolve))
+    await new Promise((resolve) => setTimeout(resolve))
 
     let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
