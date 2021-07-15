@@ -1,22 +1,46 @@
 \section{Threat Model}
-Although we assume that nodes in the HOPR network can communicate reliably, the network can still be damaged by malicious actors and node failures. We assume a threat model with byzantine nodes with either the ability to observe all network traffic and launch network attacks or inject, drop or delay messages. 
-\\~\\There are different attack vectors which could threaten the security of HOPR network, in the following section we mention these attacks and the mitigation methods used by HOPR to resist them:
+
+Although we assume that nodes in the HOPR network can communicate reliably, the
+network can still be damaged by malicious actors and node failures. We assume a
+threat model with byzantine nodes with either the ability to observe all network
+traffic and launch network attacks or inject, drop or delay messages. \\~\\There
+are different attack vectors which could threaten the security of HOPR network,
+in the following section we mention these attacks and the mitigation methods
+used by HOPR to resist them:
+
 \begin{itemize}
-    \item \textbf{Sybil attacks:} An attacker uses a single node to forge multiple identities in the network, thereby bringing network redundancy and reducing system security. This attack is expensive to conduct in practice since the attacker must stake lots of HOPR tokens within each malicious node they create in order to increase their probability of being chosen as a relayer and thus attacking the network. 
-   \item \textbf{Eclipse attacks:} The attacker seeks to isolate and attack or manipulate a specific user that is part of the network. This is a common attack in peer-to-peer networks since nodes have a hard time identifying malicious ones as they don't have a global view of the whole network. The cost of launching an eclipse attack is high since HOPR nodes are constantly challenging other peers and keeping a reputation score for each node. 
-   \item \textbf{Camouflage attacks:} A malicious node pretends to be an honest one most of the time. When its reputation value reaches a high level, it occasionally attacks the system. Since the attacker needs a long time to gain enough reputation score and be selected. Based on this, the system can still perform well.
-   \item \textbf{Observe-Act Attack:} The attacker observes the reputation score distribution of honest nodes, then control malicious nodes to act and have the same reputation score in order to increase the probability that most malicious nodes are chosen as relayers.
-   This attack however reveals the identities of malicious nodes which conduct this attack and their reputation will be reduced if not loose their stake.
+    \item \textbf{Sybil attacks:} An attacker uses a single node to forge
+    multiple identities in the network, thereby bringing network redundancy and
+    reducing system security. This attack is expensive to conduct in practice since
+    the attacker must stake lots of HOPR tokens within each malicious node they
+    create in order to increase their probability of being chosen as a relayer and
+    thus attacking the network.
+    \item \textbf{Eclipse attacks:} The attacker seeks to isolate and attack or
+    manipulate a specific user that is part of the network. This is a common
+    attack in peer-to-peer networks since nodes have a hard time identifying
+    malicious ones as they don't have a global view of the whole network. The cost
+    of launching an eclipse attack is high since HOPR nodes are constantly
+    challenging other peers and keeping a reputation score for each node.
+    \item \textbf{Camouflage attacks:} A malicious node pretends to be an honest
+    one most of the time. When its reputation value reaches a high level, it
+    occasionally attacks the system. Since the attacker needs a long time to gain
+    enough reputation score and be selected. Based on this, the system can still
+    perform well.
+    \item \textbf{Observe-Act Attack:} The attacker observes the
+    reputation score distribution of honest nodes, then control malicious nodes
+    to act and have the same reputation score in order to increase the
+    probability that most malicious nodes are chosen as relayers.
+    This attack however reveals the identities of malicious nodes which conduct
+    this attack and their reputation will be reduced if not loose their stake.
 \end{itemize}
 
 \subsection*{Security Goals}
-In addition to resisting the previous attacks, the HOPR protocol has been defined to meet these security goals which are inherited from the Sphinx packet format:
+
+In addition to resisting the previous attacks, the HOPR protocol has been
+defined to meet these security goals which are inherited from the Sphinx packet
+format:
+
 \begin{itemize}
     \item Sender-receiver unlinkability: The inability of the adversary to distinguish whether $\{S_1\rightarrow R_1, S_2\rightarrow R_2\}$ or $\{S_1\rightarrow R_2, S_2\rightarrow R_1\}$ for any concurrently online honest senders $S_1,S_2$ and honest receivers $R_1,R_2$ of the adversary’s choice.
     \item Resistance to active attacks: Resistance to active attacks like tagging and replay attacks where the adversary modifies and re-injects messages to extract information about their destinations or content.
-    
 \end{itemize}
-
-
-
-
