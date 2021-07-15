@@ -4,6 +4,7 @@ import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
 import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import type PeerId from 'peer-id'
+import fs from 'fs'
 
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
 const CHANNEL_STAKE = new BN('1000')
@@ -20,158 +21,6 @@ const options: HoprOptions = {
   announce: false
 }
 
-export const addBN = (a: BN, b: BN): BN => a.add(b)
-export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
-export const findChannelsFrom = (p: PublicKey): ChannelEntry[] =>
-  Object.values(STATE.channels).filter((c: ChannelEntry) => c.source.eq(p))
-export const totalChannelBalanceFor = (p: PublicKey): BN =>
-  findChannelsFrom(p)
-    .map((c) => c.balance.toBN())
-    .reduce(addBN, new BN('0'))
-
-export const importance = (p: PublicKey): BN =>
-  findChannelsFrom(p)
-    .map((c: ChannelEntry) =>
-      sqrtBN(totalChannelBalanceFor(p).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination)))
-    )
-    .reduce(addBN, new BN('0'))
-
-export const findChannel = (src: PublicKey, dest: PublicKey): ChannelEntry =>
-  Object.values(STATE.channels).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
-export const getNode = (b58String: string): PeerData => STATE.nodes[b58String]
-
-export const weightedRandomChoice = (): PublicKey => {
-  if (Object.keys(STATE.nodes).length == 0) {
-    throw new Error('no nodes to pick from')
-  }
-  const weights: Record<string, BN> = {}
-  let total = new BN('0')
-  Object.values(STATE.nodes).forEach((p) => {
-    weights[p.pub.toHex()] = importance(p.pub)
-    total = total.add(weights[p.pub.toHex()])
-  })
-
-  const ind = Math.random()
-  let interval = total.muln(ind)
-  for (let node of Object.keys(weights)) {
-    interval = interval.sub(weights[node])
-    if (interval.lte(new BN('0'))) {
-      return PublicKey.fromString(node)
-    }
-  }
-  throw new Error('wtf')
-}
-
-const log = (...args:String[]) => {
-  STATE.log.push(args.join(' '))
-}
-
-export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, sendMessage: (path: PublicKey[]) => Promise<void>): Promise<boolean> => {
-  const weight = (edge: ChannelEntry): BN => importance(edge.destination)
-  let path
-  try {
-    path = await findPath(
-      startNode,
-      selfPub,
-      CT_INTERMEDIATE_HOPS - 1, // As us to start is first intermediate
-      (_p: PublicKey): number => 1, // TODO network quality?
-      (p: PublicKey) => Promise.resolve(findChannelsFrom(p)),
-      weight
-    )
-
-    path.forEach(
-      (p) =>
-        (STATE.ctSent[p.toB58String()] =
-          STATE.ctSent[p.toB58String()] ||
-          ({
-            forwardAttempts: 0,
-            sendAttempts: 0
-          } as CTStats))
-    )
-    path.forEach((p) => STATE.ctSent[p.toB58String()].forwardAttempts++)
-    path.push(selfPub) // destination is always self.
-    log('SEND ' + path.map(pub => pub.toB58String()).join(','))
-  } catch (e) {
-    // could not find path
-    log('Could not find path - ' + startNode.toPeerId().toB58String())
-    return false
-  }
-  try {
-    STATE.ctSent[startNode.toB58String()] =
-      STATE.ctSent[startNode.toB58String()] ||
-      ({
-        forwardAttempts: 0,
-        sendAttempts: 0
-      } as CTStats)
-    STATE.ctSent[startNode.toB58String()].sendAttempts++
-    await sendMessage(path)
-    return true
-  } catch (e) {
-    //console.log(e)
-    log('error sending to' + startNode.toPeerId().toB58String())
-    return false
-  }
-}
-
-class CoverTrafficStrategy extends SaneDefaults {
-  name = 'covertraffic'
-  constructor(private update: (State) => void, private selfPub: PublicKey, private node: Hopr) {
-    super()
-  }
-
-  tickInterval = 10000
-
-  async tick(
-    balance: BN,
-    currentChannels: ChannelEntry[],
-    _peers: any,
-    _getRandomChannel: () => Promise<ChannelEntry>
-  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
-    const toOpen = []
-    const toClose = []
-
-    currentChannels.forEach((curr) => {
-      if (curr.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
-        toClose.push(curr.destination)
-      }
-    })
-
-    if (currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(STATE.nodes).length > 0) {
-      const c = weightedRandomChoice()
-      if (!currentChannels.find((x) => x.destination.eq(c)) && !c.eq(this.selfPub)) {
-        toOpen.push([c, CHANNEL_STAKE])
-      }
-    }
-
-    STATE.ctChannels = currentChannels
-      .map((c) => c.destination)
-      .concat(toOpen.map((o) => o[0]))
-      .concat(toClose)
-
-    await Promise.all(STATE.ctChannels.map(async (dest) => {
-      const channel = findChannel(this.selfPub, dest) 
-      if (channel.status == ChannelStatus.Open) {
-        const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
-          await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
-        })
-        if (!success) {
-          toClose.push(dest);
-        }
-      }
-    }))
-
-    log(
-      (`strategy tick: balance:${balance.toString()
-       } open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')
-       } close: ${toClose
-        .map((p) => p.toPeerId().toB58String())
-        .join(',')}`
-    ).replace('\n', ', '))
-
-    this.update(STATE)
-    return [toOpen, toClose]
-  }
-}
 
 type CTStats = {
   sendAttempts: number
@@ -192,61 +41,256 @@ export type State = {
   ctSent: Record<string, CTStats>
 }
 
-const STATE: State = {
-  nodes: {},
-  channels: {},
-  log: [],
-  ctChannels: [],
-  block: new BN('0'),
-  ctSent: {}
-}
+class PersistedState {
+  // Quick and dirty DB.
+  // Caveats:
+  // - Must live in same timeline as the hoprdb, as it relies on
+  //   the indexer being in the same state.
+  constructor(private update: (s: State) => void){
 
-/*
-// Otherwise we get a mess
-process.on('unhandledRejection', (_reason, promise) => {
-  STATE.log.push('uncaught exception in promise' + promise)
-})
-*/
-
-export async function main(update: (State) => void, peerId: PeerId) {
-  const selfPub = PublicKey.fromPeerId(peerId)
-  const selfAddr = selfPub.toAddress()
-
-  const onChannelUpdate = (newChannel) => {
-    STATE.channels[newChannel.getId().toHex()] = newChannel
-    update(STATE)
+    if (!fs.existsSync('./state.json')) {
+      this.set({
+        nodes: {},
+        channels: {},
+        log: [],
+        ctChannels: [],
+        block: new BN('0'),
+        ctSent: {}
+      })
+    }
   }
 
-  const peerUpdate = (peer) => {
-    STATE.nodes[peer.id.toB58String()] = {
+  async get(): Promise<State> {
+    return JSON.parse(fs.readFileSync('./state.json', 'utf8') || '{}') as State
+  }
+
+  async set(s: State){
+    fs.writeFileSync('./state.json', JSON.stringify(s), 'utf8')
+    this.update(s)
+    return
+  }
+
+  async setChannel(channel) {
+    const state = await this.get()
+    state.channels[channel.getId().toHex()] = channel
+    await this.set(state)
+  }
+
+  async setNode(peer){
+    const state = await this.get()
+    state.nodes[peer.id.toB58String()] = {
       id: peer.id,
       multiaddrs: peer.multiaddrs,
       pub: PublicKey.fromPeerId(peer.id)
     }
-    update(STATE)
+    await this.set(state)
   }
 
-  log('creating a node...')
-  update(STATE)
+  async setCTChannels(channels: ChannelEntry[]){
+    const state = await this.get()
+    state.ctChannels = channels.map(c => c.destination)
+    await this.set(state)
+  }
+
+  async findChannelsFrom(p: PublicKey): Promise<ChannelEntry[]> {
+    return Object.values((await this.get()).channels).filter((c: ChannelEntry) => c.source.eq(p))
+  }
+
+  async log(...args:String[]){
+    const s = await this.get()
+    s.log.push(args.join(' '))
+    await this.set(s)
+  }
+
+  async setBlock(block: BN) {
+    const s = await this.get()
+    s.block = block
+    await this.set(s)
+  }
+
+  async getNode(b58String: string): Promise<PeerData> {
+    const s = await this.get()
+    return s.nodes[b58String] 
+  }
+
+  async findChannel(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
+    const s = await this.get()
+    return findChannel(src, dest, s)
+  }
+
+  async weightedRandomChoice(): Promise<PublicKey> {
+    const s = await this.get()
+    if (Object.keys(s.nodes).length == 0) {
+      throw new Error('no nodes to pick from')
+    }
+    const weights: Record<string, BN> = {}
+    let total = new BN('0')
+    for (const p of Object.values(s.nodes)) {
+      weights[p.pub.toHex()] = importance(p.pub, s)
+      total = total.add(weights[p.pub.toHex()])
+    }
+
+    const ind = Math.random()
+    let interval = total.muln(ind)
+    for (let node of Object.keys(weights)) {
+      interval = interval.sub(weights[node])
+      if (interval.lte(new BN('0'))) {
+        return PublicKey.fromString(node)
+      }
+    }
+    throw new Error('wtf')
+  }
+
+  async incrementSent(p: PublicKey) {
+    const s = await this.get()
+    // TODO init
+    s.ctSent[p.toB58String()].sendAttempts ++
+  }
+
+  async incrementForwards(p: PublicKey) {
+    const s = await this.get()
+    // TODO init
+    s.ctSent[p.toB58String()].forwardAttempts++
+  }
+}
+
+export const addBN = (a: BN, b: BN): BN => a.add(b)
+export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
+
+export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
+  Object.values(state.channels).filter((c: ChannelEntry) => c.source.eq(p))
+
+export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
+  findChannelsFrom(p, state).map((c) => c.balance.toBN()).reduce(addBN, new BN('0'))
+
+export const importance = (p: PublicKey, state: State): BN =>
+  findChannelsFrom(p, state).map((c: ChannelEntry) =>
+    sqrtBN(totalChannelBalanceFor(p, state).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination, state)))
+  ).reduce(addBN, new BN('0'))
+
+export const findChannel = (src: PublicKey, dest: PublicKey, state: State): ChannelEntry =>
+   Object.values(state.channels).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
+
+
+
+
+export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, sendMessage: (path: PublicKey[]) => Promise<void>, data: PersistedState): Promise<boolean> => {
+  const weight = async (edge: ChannelEntry): Promise<BN> => await importance(edge.destination, await data.get())
+  let path
+  try {
+    path = await findPath(
+      startNode,
+      selfPub,
+      CT_INTERMEDIATE_HOPS - 1, // As us to start is first intermediate
+      (_p: PublicKey): number => 1, // TODO network quality?
+      (p: PublicKey) => data.findChannelsFrom(p),
+      weight
+    )
+
+    path.forEach((p) => data.incrementForwards(p))
+    path.push(selfPub) // destination is always self.
+    data.log('SEND ' + path.map(pub => pub.toB58String()).join(','))
+  } catch (e) {
+    // could not find path
+    data.log('Could not find path - ' + startNode.toPeerId().toB58String())
+    return false
+  }
+  try {
+    data.incrementSent(startNode)
+    await sendMessage(path)
+    return true
+  } catch (e) {
+    //console.log(e)
+    data.log('error sending to' + startNode.toPeerId().toB58String())
+    return false
+  }
+}
+
+class CoverTrafficStrategy extends SaneDefaults {
+  name = 'covertraffic'
+  constructor(private selfPub: PublicKey, private node: Hopr, private data: PersistedState) {
+    super()
+  }
+
+  tickInterval = 10000
+
+  async tick(
+    balance: BN,
+    currentChannels: ChannelEntry[],
+    _peers: any,
+    _getRandomChannel: () => Promise<ChannelEntry>
+  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+    const toOpen = []
+    const toClose = []
+    const state = await this.data.get()
+
+    currentChannels.forEach((curr) => {
+      if (curr.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
+        toClose.push(curr.destination)
+      }
+    })
+
+    if (currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(state.nodes).length > 0) {
+      const c = await this.data.weightedRandomChoice()
+      if (!currentChannels.find((x) => x.destination.eq(c)) && !c.eq(this.selfPub)) {
+        toOpen.push([c, CHANNEL_STAKE])
+      }
+    }
+
+    state.ctChannels = currentChannels
+      .map((c) => c.destination)
+      .concat(toOpen.map((o) => o[0]))
+      .concat(toClose)
+
+    await Promise.all(state.ctChannels.map(async (dest) => {
+      const channel = await this.data.findChannel(this.selfPub, dest) 
+      if (channel.status == ChannelStatus.Open) {
+        const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
+          await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
+        }, this.data)
+        if (!success) {
+          toClose.push(dest);
+        }
+      }
+    }))
+
+    this.data.log(
+      (`strategy tick: balance:${balance.toString()
+       } open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')
+       } close: ${toClose
+        .map((p) => p.toPeerId().toB58String())
+        .join(',')}`
+    ).replace('\n', ', '))
+    return [toOpen, toClose]
+  }
+}
+
+export async function main(update: (State) => void, peerId: PeerId) {
+  const selfPub = PublicKey.fromPeerId(peerId)
+  const selfAddr = selfPub.toAddress()
+  const data = new PersistedState(update)
+
+  const onChannelUpdate = (newChannel) => {
+    data.setChannel(newChannel)
+  }
+
+  const peerUpdate = (peer) => {
+    data.setNode(peer)
+  }
+
+  data.log('creating a node...')
   const node = new Hopr(peerId, options)
-  log('setting up indexer')
-  update(STATE)
+  data.log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
-  node.indexer.on('block', (blockNumber) => {
-    STATE.block = new BN(blockNumber.toString())
-    update(STATE)
-  })
+  node.indexer.on('block', (blockNumber) => data.setBlock(new BN(blockNumber.toString())))
 
-  log('waiting for node to be funded')
-  update(STATE)
+  data.log('waiting for node to be funded')
   await node.waitForFunds()
-  STATE.log.push('starting node ...')
-  update(STATE)
+  data.log('starting node ...')
   await node.start()
-  STATE.log.push('node is running')
+  data.log('node is running')
   const channels = await node.getChannelsFrom(selfAddr)
-  channels.forEach((c) => STATE.ctChannels.push(c.destination))
-  update(STATE)
-  node.setChannelStrategy(new CoverTrafficStrategy(update, selfPub, node))
+  data.setCTChannels(channels)
+  node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))
 }

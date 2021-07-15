@@ -1,6 +1,6 @@
 import blessed from 'blessed'
 import contrib from 'blessed-contrib'
-import { main, State, findChannelsFrom, importance, totalChannelBalanceFor, findChannel, getNode } from './ct'
+import { main, State, findChannelsFrom, importance, totalChannelBalanceFor, findChannel } from './ct'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'bignumber.js'
@@ -8,6 +8,8 @@ import { BigNumber } from 'bignumber.js'
 function setupDashboard(selfPub: PublicKey) {
   const screen = blessed.screen()
   const grid = new contrib.grid({ rows: 4, cols: 4, screen: screen })
+  let selectedNode: string = undefined
+
   screen.key(['escape', 'q', 'C-c'], function () {
     return process.exit(0)
   })
@@ -49,24 +51,7 @@ function setupDashboard(selfPub: PublicKey) {
   })
 
   table.rows.on('select item', (item) => {
-    const id = item.content.split(' ')[0].trim()
-    const node = getNode(id)
-    if (node) {
-      const data = [
-        ['id', node.id.toB58String()],
-        ['pubkey', node.pub.toHex()],
-        ['addr', node.pub.toAddress().toHex()],
-        ['ma', node.multiaddrs.map((x) => x.toString()).join(',')]
-      ]
-      findChannelsFrom(node.pub).forEach((c, i) => {
-        data.push([
-          'ch.' + i,
-          c.destination.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status
-        ])
-      })
-
-      inspect.setData({ headers: ['', ''], data })
-    }
+    selectedNode = item.content.split(' ')[0].trim()
   })
 
   screen.render()
@@ -75,12 +60,12 @@ function setupDashboard(selfPub: PublicKey) {
     table.setData({
       headers: ['ID', 'Importance', '#Chans', 'Tot.Stk'],
       data: Object.values(state.nodes)
-        .sort((a: any, b: any) => importance(b.pub).cmp(importance(a.pub)))
+        .sort((a: any, b: any) => importance(b.pub, state).cmp(importance(a.pub, state)))
         .map((p) => [
           p.id.toB58String(),
-          new BigNumber(importance(p.pub).toString()).toPrecision(2, 0),
-          findChannelsFrom(p.pub).length,
-          new BigNumber(totalChannelBalanceFor(p.pub).toString()).toPrecision(2, 0)
+          new BigNumber(importance(p.pub, state).toString()).toPrecision(2, 0),
+          findChannelsFrom(p.pub, state).length,
+          new BigNumber(totalChannelBalanceFor(p.pub, state).toString()).toPrecision(2, 0)
         ])
     })
 
@@ -92,7 +77,7 @@ function setupDashboard(selfPub: PublicKey) {
     ctChan.setData({
       headers: ['Dest', 'Status', '#Sent', '#Fwd', 'Balance'],
       data: state.ctChannels.map((p: PublicKey) => {
-        const chan = findChannel(selfPub, p)
+        const chan = findChannel(selfPub, p, state)
         let status
         let balance = '-'
         let stats = state.ctSent[p.toB58String()] || ({} as any)
@@ -108,6 +93,24 @@ function setupDashboard(selfPub: PublicKey) {
 
     stats.setData({ headers: ['', ''], data: [['block', state.block.toString()]] })
 
+    if (selectedNode) {
+      const node = state.nodes[selectedNode]
+      if (node) {
+        const data = [
+          ['id', node.id.toB58String()],
+          ['pubkey', node.pub.toHex()],
+          ['addr', node.pub.toAddress().toHex()],
+          ['ma', node.multiaddrs.map((x) => x.toString()).join(',')]
+        ]
+        findChannelsFrom(node.pub, state).forEach((c, i) => {
+          data.push([
+            'ch.' + i,
+            c.destination.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status
+            ])
+          })
+        inspect.setData({ headers: ['', ''], data })
+      }
+    }
     screen.render()
   }
   return update
