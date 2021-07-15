@@ -66,15 +66,25 @@ class PersistedState {
   async load(): Promise<void> {
     const json = JSON.parse(fs.readFileSync(DB, 'utf8'))
     this._data = {
-        nodes: json.nodes.map((n): PeerData => {
-          const id = PeerId.createFromB58String(n.id)
-          return { id, pub: PublicKey.fromPeerId(id), multiaddrs: [] }
-        }),
+        nodes: {},
         channels: {},
-        log: [],
-        ctChannels: [],
+        log: ['loaded data'],
+        ctChannels: json.ctChannels.map(p => PublicKey.fromPeerId(PeerId.createFromB58String(p))),
         block: new BN(json.block),
     }
+    json.nodes.forEach((n) => {
+      const id = PeerId.createFromB58String(n.id)
+      this._data.nodes[id.toB58String()] = { id, pub: PublicKey.fromPeerId(id), multiaddrs: [] }
+    })
+
+    json.channels.forEach(c => {
+      const channel = ChannelEntry.deserialize(Uint8Array.from(Buffer.from(c.channel, 'base64')))
+      this._data.channels[channel.getId().toHex()] = {
+        channel,
+        forwardAttempts: c.forwardAttempts,
+        sendAttempts: c.sendAttempts
+      }
+    })
   }
 
   async get(): Promise<State> {
@@ -84,7 +94,14 @@ class PersistedState {
   async set(s: State){
     this._data = s
     fs.writeFileSync(DB, JSON.stringify({
-      nodes: Object.values(s.nodes).map((n: PeerData) => ({id: n.id.toB58String(), multiaddrs: n.multiaddrs.map(m => m.toString())})),
+      nodes: Object.values(s.nodes).map((n: PeerData) =>
+        ({id: n.id.toB58String(), multiaddrs: n.multiaddrs.map(m => m.toString())})),
+      channels: Object.values(s.channels).map(c => ({
+        channel: Buffer.from(c.channel.serialize()).toString('base64'),
+        forwardAttempts: c.forwardAttempts,
+        sendAttempts: c.sendAttempts
+      })),
+      ctChannels: s.ctChannels.map(p => p.toB58String()),
       block: s.block.toString()
     }) , 'utf8')
     this.update(s)

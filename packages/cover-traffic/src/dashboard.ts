@@ -9,6 +9,7 @@ function setupDashboard(selfPub: PublicKey) {
   const screen = blessed.screen()
   const grid = new contrib.grid({ rows: 4, cols: 4, screen: screen })
   let selectedNode: string = undefined
+  let _lastState: State
 
   screen.key(['escape', 'q', 'C-c'], function () {
     return process.exit(0)
@@ -52,11 +53,30 @@ function setupDashboard(selfPub: PublicKey) {
 
   table.rows.on('select item', (item) => {
     selectedNode = item.content.split(' ')[0].trim()
+    if (selectedNode && _lastState) {
+      const node = _lastState.nodes[selectedNode]
+      if (node) {
+        const data = [
+          ['id', node.id.toB58String()],
+          ['pubkey', node.pub.toHex()],
+          ['addr', node.pub.toAddress().toHex()],
+          ['ma', node.multiaddrs.map((x) => x.toString()).join(',')]
+        ]
+        findChannelsFrom(node.pub, _lastState).forEach((c, i) => {
+          data.push([
+            'ch.' + i,
+            c.destination.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status
+            ])
+          })
+        inspect.setData({ headers: ['', ''], data })
+      }
+    }
   })
 
   screen.render()
 
   const update = (state: State) => {
+    _lastState = state
     table.setData({
       headers: ['ID', 'Importance', '#Chans', 'Tot.Stk'],
       data: Object.values(state.nodes)
@@ -93,24 +113,6 @@ function setupDashboard(selfPub: PublicKey) {
 
     stats.setData({ headers: ['', ''], data: [['block', state.block.toString()]] })
 
-    if (selectedNode) {
-      const node = state.nodes[selectedNode]
-      if (node) {
-        const data = [
-          ['id', node.id.toB58String()],
-          ['pubkey', node.pub.toHex()],
-          ['addr', node.pub.toAddress().toHex()],
-          ['ma', node.multiaddrs.map((x) => x.toString()).join(',')]
-        ]
-        findChannelsFrom(node.pub, state).forEach((c, i) => {
-          data.push([
-            'ch.' + i,
-            c.destination.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status
-            ])
-          })
-        inspect.setData({ headers: ['', ''], data })
-      }
-    }
     screen.render()
   }
   return update
