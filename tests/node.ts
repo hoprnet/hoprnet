@@ -258,6 +258,8 @@ async function main() {
   })
 
   await executeCommands({ node, cmds: argv.script, pipeFileStream })
+
+  console.log(`all tasks executed`)
 }
 
 process.on('unhandledRejection', (error) => {

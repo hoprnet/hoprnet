@@ -175,7 +175,10 @@ start_node tests/node.ts "${charly_log}" \
 
 
 # wait till nodes finish communicating
-sleep 10
+wait_for_regex_in_file "${alice_log}" "all tasks executed"
+wait_for_regex_in_file "${bob_log}" "all tasks executed"
+wait_for_regex_in_file "${charly_log}" "all tasks executed"
+
 
 expect_file_content "${alice_pipe}" \
 ">bob: test
