@@ -26,24 +26,18 @@ export async function backoff(
   else if (delayMultiple < 1) throw Error('delayMultiple should be larger than 1')
 
   return new Promise<ReturnType<typeof fn>>(async (resolve, reject) => {
-    const tick = async () => {
+    while (true) {
       try {
         const result = await fn()
         return resolve(result)
       } catch (err) {
-        if (delay === maxDelay) {
-          return reject(err)
-        }
+        if (delay >= maxDelay) return reject(err)
 
         // if delay is not set, our first delay is minDelay
         // else we start exp increasing
         delay = typeof delay === 'undefined' ? minDelay : Math.min(delay * delayMultiple, maxDelay)
-
         await wait(delay)
-        return tick()
       }
     }
-
-    return tick()
   })
 }
