@@ -12,18 +12,36 @@ Read [#2093](https://github.com/hoprnet/hoprnet/issues/2093) for context.
 
 ## Process
 
-1. User sends an email to tech@hoprnet.org with subject `Link my HOPR node`, and a message containing their `HOPR_ID` and the signature of `Link my Ethereum address to HOPR node address <HOPR_ID>` that was signed using `CLAIMANT_ADDR`. Example:
+1. User sends an email to tech@hoprnet.org with subject `Link my HOPR node`, and a message containing their `HOPR_ID` and the signature of `Link my Ethereum address to HOPR node address <HOPR_ID>` that was signed using `CLAIMANT_ADDR`. Example (using [MEW](https://www.myetherwallet.com/wallet/sign)):
 
 ```
+{
+  "address": "0xa18732dc751be0db04157eb92c92ba9d0fc09fc5",
+  "msg": "0x4c696e6b206d7920457468657265756d206164647265737320746f20484f5052206e6f646520616464726573732031365569753248416d51425a4134547a6a4b6a553566704353707247754d3279386d7065704e774d53365a4b464154694b67363868",
+  "sig": "6cc0b880a6dfd9b72b9f8f684d6141c28e3f2395de58e1d3fd304561e798833d1a08e8317a5e6a5bd7585751abda7b30484cbec09492391fb2ccbd575ed7df431c",
+  "version": "3",
+  "signer": "MEW"
+}
 16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h
-<signature of "Link my Ethereum address to HOPR node address 16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h>
 ```
 
 2. PM creates a github issue containing the email's content and assigns a [team member](#who-is-team-member) to tackle. Any personally identifyable data should be removed from the email.
 3. Team member must then verify the validity of the request:
-   1. Signer address (aka `CLAIMANT_ADDR`) of the signature has claimable tokens on schedules `EarlyTokenBuyers` or `TeamAndAdvisors` _(link to etherscan method)_.
-   2. Signer does not already exist in [unreleasedTokens.json](./packages/cover-traffic/unreleasedTokens.json)
-   3. Inserted `HOPR_ID` is a valid HOPR ID _(link to tooling)_
+
+   1. User has indeed signed the right message:
+
+   ```
+   ethers = require("ethers")
+
+   ethers.utils.hexlify(ethers.utils.toUtf8Bytes("Link my Ethereum address to HOPR node address 16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h"))
+   // 0x4c696e6b206d7920457468657265756d206164647265737320746f20484f5052206e6f646520616464726573732031365569753248416d51425a4134547a6a4b6a553566704353707247754d3279386d7065704e774d53365a4b464154694b67363868
+   ```
+
+   2. Verify signature [MEW](https://www.myetherwallet.com/wallet/verify)
+   3. Signer address (aka `CLAIMANT_ADDR`) of the signature has claimable tokens on schedules `EarlyTokenBuyers` or `TeamAndAdvisors` _(link to etherscan method)_.
+   4. Signer does not already exist in [unreleasedTokens.json](./packages/cover-traffic/unreleasedTokens.json)
+   5. Inserted `HOPR_ID` is a valid HOPR ID _(link to tooling)_
+
 4. Team member adds another entry to [unreleasedTokens.json](./packages/cover-traffic/unreleasedTokens.json) using syntax `{ tokens: string, ethAddress: string, hoprId: string }[]`
 5. Team member creates a PR so another team member can review and approve, from here on we follow our usual [WORKFLOW](./WORKFLOW.md) steps, reviewer must verify the validity of the request as well.
 6. Once merged, team member replies to user with:
