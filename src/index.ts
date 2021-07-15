@@ -119,7 +119,7 @@ class HoprConnect implements Transport {
     try {
       const { version } = require('../package.json')
 
-      log(`HoprConnect:`, version)
+      log(`HoprConnect: `, version)
     } catch {
       console.error(`Cannot find package.json to load version tag. Exitting.`)
       return
@@ -142,8 +142,6 @@ class HoprConnect implements Transport {
     if (this.__noWebRTCUpgrade) {
       verbose(`DEBUG mode: no WebRTC upgrade`)
     }
-
-    verbose(`Created ${this[Symbol.toStringTag]} stack`)
   }
 
   /**
