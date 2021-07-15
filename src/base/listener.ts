@@ -160,6 +160,8 @@ class Listener extends EventEmitter implements InterfaceListener {
       return
     }
 
+    // Get previously known nodes and filter all nodes that have
+    // either the same address (ip:port) or the same peerId
     const publicNodes = this.publicNodes.filter((entry: NodeEntry) => {
       const maTuples = entry.multiAddr.tuples()
 
