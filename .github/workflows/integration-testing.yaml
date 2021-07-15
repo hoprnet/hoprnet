@@ -43,11 +43,7 @@ jobs:
       - name: Install dependencies
         if: steps.yarn-cache.outputs.cache-hit != 'true'
         run: |
-          yarn install
-
-      - name: Build
-        run: |
-          yarn          
+          yarn install        
       
       - name: Test
         run: ./scripts/integration-test.sh
