@@ -407,11 +407,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
-    "@hoprnet/hopr-utils": 1.73
+    "@hoprnet/hopr-utils": 1.74.0-next.16
     "@types/debug": ^4.1.6
     "@types/mocha": ^8.2.2
     "@types/node": 14
     "@types/simple-peer": ^9.11
+    "@types/yargs": ^17.0.2
     abort-controller: 3.0.0
     abortable-iterator: ^3.0.0
     bl: ^5.0
@@ -437,16 +438,18 @@ __metadata:
     typescript: ^4.3
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
+    yargs: ^17.0.1
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-utils@npm:1.73":
-  version: 1.73.6
-  resolution: "@hoprnet/hopr-utils@npm:1.73.6"
+"@hoprnet/hopr-utils@npm:1.74.0-next.16":
+  version: 1.74.0-next.16
+  resolution: "@hoprnet/hopr-utils@npm:1.74.0-next.16"
   dependencies:
     abort-controller: ~3.0.0
     bignumber.js: ^9.0.0
     bn.js: ^5.2.0
+    bs58: ^4.0.1
     chalk: ^4.1.1
     ethers: ^5.1.3
     futoin-hkdf: ~1.3.2
@@ -456,12 +459,12 @@ __metadata:
     libp2p: 0.31.7
     libp2p-crypto: 0.19.4
     memdown: ^6.0.0
-    multiaddr: 9.0.1
+    multiaddr: ^9.0.1
     multihashes: ~4.0.1
     peer-id: 0.14.8
     private-ip: ^2.2.1
     secp256k1: ^4.0.2
-  checksum: 5368c8995972b8e2d1191a9bd3e7ecce15bd3d4e7fae88acf625159d63921416965c2feeb6a721a18ac526a4d4d798d2639a6aca7f696731e25abcc390b641f1
+  checksum: c7d29e5c41058d6cc78080f48c7c5ac81aad03ef6160e7eb803be86c44ac143b8b344d0fb768c145733252a2f366bf20a4d26f7280f2b83414ffc5160a15e98b
   languageName: node
   linkType: hard
 
@@ -696,6 +699,22 @@ __metadata:
   dependencies:
     "@types/node": "*"
   checksum: ab05e2373fe48faa59cc0d7795bfdea3c7e7a93f7af2683cfdd2a311035ce4dd2a948c950886f48d662db503e8af2d930b9d51b53c0eef8c90ba86287864d4f7
+  languageName: node
+  linkType: hard
+
+"@types/yargs-parser@npm:*":
+  version: 20.2.1
+  resolution: "@types/yargs-parser@npm:20.2.1"
+  checksum: 868343daaa222b4c3db773556b7be8ee60b68b76860867a54fbc94e6081597a7b0092ec1bdb56e6f43495c16e18d76f7ae5ca75c4e7edbf584eff8370d550025
+  languageName: node
+  linkType: hard
+
+"@types/yargs@npm:^17.0.2":
+  version: 17.0.2
+  resolution: "@types/yargs@npm:17.0.2"
+  dependencies:
+    "@types/yargs-parser": "*"
+  checksum: b3dec3703ad5b9d3e8d5f485abf89bbdc601ec0dd2a1156176ffbe9212a1b693c22e7a29430de0e33aac15e71afefa36846f5ad9976a957006e275335a79d2a6
   languageName: node
   linkType: hard
 
@@ -952,6 +971,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"base-x@npm:^3.0.2":
+  version: 3.0.8
+  resolution: "base-x@npm:3.0.8"
+  dependencies:
+    safe-buffer: ^5.0.1
+  checksum: 9e5832ab00f4413d63f8227901c18b2a9db5f379525f70b627e6e284007dc5e7940a765ef4ab03974b4c14a664153208758656ebb86979451d1995d13e3fa29b
+  languageName: node
+  linkType: hard
+
 "base64-js@npm:^1.3.1":
   version: 1.5.1
   resolution: "base64-js@npm:1.5.1"
@@ -1082,6 +1110,15 @@ __metadata:
   version: 1.3.1
   resolution: "browser-stdout@npm:1.3.1"
   checksum: 2f91b1ad26f3401ae68801d901754331811e257aeed4ee0eb287cc2ff375c8fffadb2d14a16654eeb0729e3b1ae6d84642ba7a3119880843d774ee1db2b898b3
+  languageName: node
+  linkType: hard
+
+"bs58@npm:^4.0.1":
+  version: 4.0.1
+  resolution: "bs58@npm:4.0.1"
+  dependencies:
+    base-x: ^3.0.2
+  checksum: 0da897a0e527b31ec0fd7ce4d84a86278196acb4fa4f5010dce38a7b83b8b0bbe26909843878c2aa32bdbe00b93a68408d42c74a1cfaa05ca64f29bd5dff4187
   languageName: node
   linkType: hard
 
@@ -3256,7 +3293,7 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"multiaddr@npm:9.0.1, multiaddr@npm:^9.0.1":
+"multiaddr@npm:^9.0.1":
   version: 9.0.1
   resolution: "multiaddr@npm:9.0.1"
   dependencies:
@@ -5018,6 +5055,21 @@ typescript@^4.3:
     y18n: ^5.0.5
     yargs-parser: ^20.2.2
   checksum: a79ce1f043021cd645de1ffebb6149541d382ba68f4a6b5eca5d2ad65af51893371bbd78e240dc3b6cf0cbb419511ba5bda715dec992e4266e6863ea49f14feb
+  languageName: node
+  linkType: hard
+
+"yargs@npm:^17.0.1":
+  version: 17.0.1
+  resolution: "yargs@npm:17.0.1"
+  dependencies:
+    cliui: ^7.0.2
+    escalade: ^3.1.1
+    get-caller-file: ^2.0.5
+    require-directory: ^2.1.1
+    string-width: ^4.2.0
+    y18n: ^5.0.5
+    yargs-parser: ^20.2.2
+  checksum: a7969b48d2dea129a7d4fcc3f13e88d4f94bacbd24f720b2ce19946fa9facc42cfed89c059d953091241f4e9e9000ed9dbf86e4bb4b6ceb3a26af10ddebdd0b2
   languageName: node
   linkType: hard
 
