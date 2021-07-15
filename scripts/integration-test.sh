@@ -26,9 +26,11 @@ declare tmp="/tmp"
 [[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
 
 declare alice_log="${tmp}/hopr-connect-alice.log"
+declare alice_pipe="${tmp}/hopr-connect-alice-pipe.log"
 declare alice_port=11090
 
 declare bob_log="${tmp}/hopr-connect-bob.log"
+declare bob_pipe="${tmp}/hopr-connect-bob-pipe.log"
 declare bob_port=11091
 
 declare charly_log="${tmp}/hopr-connect-charly.log"
@@ -106,13 +108,15 @@ done
 log "Test started"
 
 # remove logs
-rm -Rf "${charly_log}"
-rm -Rf "${bob_log}"
-rm -Rf "${alice_log}"
+for file in "${alice_log}" "${bob_log}" "${charly_log}" "${alice_pipe}" "${bob_pipe}"; do 
+  rm -Rf ${file}
+done
 
-log "alice -> ${alice_log}"
-log "bob -> ${bob_log}"
-log "charly -> ${charly_log}"
+log "alice logs -> ${alice_log}"
+log "alice msgs -> ${alice_pipe}"
+log "bob logs -> ${bob_log}"
+log "bob msgs -> ${bob_pipe}"
+log "charly logs -> ${charly_log}"
 
 # run alice (client)
 start_node tests/node.ts \
@@ -134,6 +138,7 @@ start_node tests/node.ts \
       }
     ]" \
     --port ${alice_port} \
+    --pipeFile "${alice_pipe}" \
     --identityName 'alice' \
     --bootstrapPort ${charly_port} \
     --bootstrapIdentityName 'charly' \
@@ -153,6 +158,7 @@ start_node tests/node.ts "${bob_log}"  \
       }      
     ]" \
   --port ${bob_port} \
+  --pipeFile "${bob_pipe}" \
   --identityName 'bob' \
   --bootstrapPort ${charly_port} \
   --bootstrapIdentityName 'charly' \
@@ -167,7 +173,16 @@ start_node tests/node.ts "${charly_log}" \
   --noDirectConnections true \
   --noWebRTCUpgrade false
 
-wait_for_regex_in_file ${bob_log} "Received message <test>"
-wait_for_regex_in_file ${alice_log} "Received <Echoing <test>>"
+
+# wait till nodes finish communicating
+sleep 10
+
+expect_file_content "${alice_pipe}" \
+">bob: test
+<bob: echo: test"
+
+expect_file_content "${bob_pipe}" \
+"<alice: test
+>alice: echo: test"
 
 log "Test succesful"

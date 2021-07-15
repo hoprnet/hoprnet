@@ -1,6 +1,7 @@
 import libp2p from 'libp2p'
-import type { Handler, Stream } from 'libp2p'
+import type { Stream, Connection } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
+import fs from 'fs'
 
 import { NOISE } from 'libp2p-noise'
 
@@ -10,24 +11,69 @@ import { HoprConnect } from '../src'
 import { Multiaddr } from 'multiaddr'
 import pipe from 'it-pipe'
 import yargs from 'yargs/yargs'
-import { peerIdForIdentity } from './util'
+import { peerIdForIdentity, identityFromPeerId } from './identities'
 import PeerId from 'peer-id'
 import LibP2P from 'libp2p'
+import { WriteStream } from 'node:fs'
 
 const TEST_PROTOCOL = '/hopr-connect/test/0.0.1'
+
+function encodeMsg(msg: string): Uint8Array {
+  return new TextEncoder().encode(msg)
+}
+
+function decodeMsg(encodedMsg: Uint8Array): string {
+  return new TextDecoder().decode(encodedMsg)
+}
+
+function createEchoReplier(remoteIdentityname: string, pipeFileStream?: WriteStream) {
+  return (source: Stream['source']) => {
+    return (async function* () {
+      for await (const encodedMsg of source) {
+        const decodedMsg = decodeMsg(encodedMsg.slice())
+        const replyMsg = `echo: ${decodedMsg}`
+
+        console.log(`received message '${decodedMsg}' from ${remoteIdentityname}`)
+        console.log(`replied with ${replyMsg}`)
+
+        if (pipeFileStream) {
+          pipeFileStream.write(`<${remoteIdentityname}: ${decodedMsg}\n`)
+          pipeFileStream.write(`>${remoteIdentityname}: ${replyMsg}\n`)
+        }
+        yield encodeMsg(replyMsg)
+      }
+    })()
+  }
+}
+
+function createDeadEnd(remoteIdentityname: string, pipeFileStream?: WriteStream) {
+  return async (source: Stream['source']) => {
+    for await (const encodedMsg of source) {
+      const decodedMsg = decodeMsg(encodedMsg.slice())
+      console.log(`received message '${decodedMsg}' from ${remoteIdentityname}`)
+      console.log(`didn't reply`)
+
+      if (pipeFileStream) {
+        pipeFileStream.write(`<${remoteIdentityname}: ${decodedMsg}\n`)
+      }
+    }
+  }
+}
 
 async function startNode({
   peerId,
   port,
   bootstrapAddress,
   noDirectConnections,
-  noWebRTCUpgrade
+  noWebRTCUpgrade,
+  pipeFileStream
 }: {
   peerId: PeerId
   port: number
   bootstrapAddress?: Multiaddr
   noDirectConnections: boolean
   noWebRTCUpgrade: boolean
+  pipeFileStream?: WriteStream
 }) {
   console.log(`starting node, bootstrap address ${bootstrapAddress}`)
   const node = await libp2p.create({
@@ -60,22 +106,15 @@ async function startNode({
     }
   })
 
-  node.handle(TEST_PROTOCOL, (struct: Handler) => {
-    pipe(
-      struct.stream.source,
-      (source: Stream['source']) => {
-        return (async function* () {
-          for await (const msg of source) {
-            const decoded = new TextDecoder().decode(msg.slice())
+  async function identityNameForConnection(connection?: Connection): Promise<string> {
+    if (!connection) {
+      return 'unknown'
+    }
+    return identityFromPeerId(connection.remotePeer)
+  }
 
-            console.log(`Received message <${decoded}>`)
-
-            yield new TextEncoder().encode(`Echoing <${decoded}>`)
-          }
-        })()
-      },
-      struct.stream.sink
-    )
+  node.handle(TEST_PROTOCOL, async ({ connection, stream }: { connection?: Connection; stream: Stream }) => {
+    pipe(stream.source, createEchoReplier(await identityNameForConnection(connection), pipeFileStream), stream.sink)
   })
 
   await node.start()
@@ -100,7 +139,15 @@ type CmdDef =
       relayIdentityName: string
     }
 
-async function executeCommands({ node, cmds }: { node: LibP2P; cmds: CmdDef[] }) {
+async function executeCommands({
+  node,
+  cmds,
+  pipeFileStream
+}: {
+  node: LibP2P
+  cmds: CmdDef[]
+  pipeFileStream?: WriteStream
+}) {
   for (const cmdDef of cmds) {
     switch (cmdDef.cmd) {
       case 'wait': {
@@ -120,24 +167,20 @@ async function executeCommands({ node, cmds }: { node: LibP2P; cmds: CmdDef[] })
       case 'msg': {
         const targetPeerId = await peerIdForIdentity(cmdDef.targetIdentityName)
         const relayPeerId = await peerIdForIdentity(cmdDef.relayIdentityName)
-        //@ts-ignore
-        let conn: Handler
 
         console.log(`msg: dialing ${cmdDef.targetIdentityName} though relay ${cmdDef.relayIdentityName}`)
-        conn = await node.dialProtocol(
+        const { stream } = await node.dialProtocol(
           new Multiaddr(`/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId.toB58String()}`),
           TEST_PROTOCOL
         )
-        console.log(`piping msg: ${cmdDef.msg}`)
+        console.log(`sending msg '${cmdDef.msg}'`)
 
-        await pipe([new TextEncoder().encode(cmdDef.msg)], conn.stream, async (source: Stream['source']) => {
-          for await (const msg of source) {
-            const decoded = new TextDecoder().decode(msg.slice())
-
-            console.log(`Received <${decoded}>`)
-          }
-        })
-        console.log(`sent msg`)
+        const encodedMsg = encodeMsg(cmdDef.msg)
+        if (pipeFileStream) {
+          pipeFileStream.write(`>${cmdDef.targetIdentityName}: ${cmdDef.msg}\n`)
+        }
+        await pipe([encodedMsg], stream, createDeadEnd(cmdDef.targetIdentityName, pipeFileStream))
+        console.log(`sent ok`)
         break
       }
       default: {
@@ -183,6 +226,9 @@ async function main() {
       type: 'string',
       demandOption: true
     })
+    .option('pipeFile', {
+      type: 'string'
+    })
     .coerce({
       script: (input) => JSON.parse(input.replace(/'/g, '"'))
     })
@@ -196,16 +242,22 @@ async function main() {
   }
   const peerId = await peerIdForIdentity(argv.identityName)
 
+  let pipeFileStream: WriteStream | undefined
+  if (argv.pipeFile) {
+    pipeFileStream = fs.createWriteStream(argv.pipeFile)
+  }
+
   console.log(`running node ${argv.identityName} on port ${argv.port}`)
   const node = await startNode({
     peerId,
     port: argv.port,
     bootstrapAddress,
     noDirectConnections: argv.noDirectConnections,
-    noWebRTCUpgrade: argv.noWebRTCUpgrade
+    noWebRTCUpgrade: argv.noWebRTCUpgrade,
+    pipeFileStream
   })
 
-  await executeCommands({ node, cmds: argv.script })
+  await executeCommands({ node, cmds: argv.script, pipeFileStream })
 }
 
 process.on('unhandledRejection', (error) => {
