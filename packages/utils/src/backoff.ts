@@ -13,7 +13,10 @@ export async function backoff(
   } = {}
 ): ReturnType<typeof fn> {
   const { minDelay = durations.seconds(1), maxDelay = durations.minutes(10), delayMultiple = 2 } = options
-  let delay = minDelay
+  let delay: number
+
+  if (minDelay >= maxDelay) throw Error('minDelay should be smaller than maxDelay')
+  else if (delayMultiple < 1) throw Error('delayMultiple should be larger than 1')
 
   return new Promise<ReturnType<typeof fn>>(async (resolve, reject) => {
     const tick = async () => {
@@ -21,11 +24,13 @@ export async function backoff(
         const result = await fn()
         return resolve(result)
       } catch (err) {
-        delay = delay * delayMultiple
-
-        if (delay > maxDelay) {
+        if (delay === maxDelay) {
           return reject(err)
         }
+
+        // if delay is not set, our first delay is minDelay
+        // else we start exp increasing
+        delay = !delay ? minDelay : Math.min(delay * delayMultiple, maxDelay)
 
         await wait(delay)
         return tick()

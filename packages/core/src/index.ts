@@ -290,8 +290,9 @@ class Hopr extends EventEmitter {
 
   /**
    * If error provided is considered an out of funds error
-   * it will emit that the node is out of funds
-   * @param type type of funds
+   * - it will emit that the node is out of funds
+   * - it will set channel strategy to passive
+   * @param error error thrown by an ethereum transaction
    */
   private async isOutOfFunds(error: any): Promise<void> {
     const isOutOfFunds = isErrorOutOfFunds(error)
