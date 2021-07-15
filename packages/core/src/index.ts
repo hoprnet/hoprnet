@@ -892,7 +892,11 @@ class Hopr extends EventEmitter {
     )
   }
 
-  // This is a utility method to wait until the node is funded.
+  /**
+   * This is a utility method to wait until the node is funded.
+   * A backoff is implemented, if node has not been funded and
+   * MAX_DELAY is reached, this function will reject.
+   */
   public async waitForFunds(): Promise<void> {
     const MIN_DELAY = durations.seconds(30)
     const MAX_DELAY = durations.seconds(200)
