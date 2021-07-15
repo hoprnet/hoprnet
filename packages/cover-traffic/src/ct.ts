@@ -21,7 +21,6 @@ const options: HoprOptions = {
   announce: false
 }
 
-
 type CTStats = {
   sendAttempts: number
   forwardAttempts: number
@@ -46,8 +45,7 @@ class PersistedState {
   // Caveats:
   // - Must live in same timeline as the hoprdb, as it relies on
   //   the indexer being in the same state.
-  constructor(private update: (s: State) => void){
-
+  constructor(private update: (s: State) => void) {
     if (!fs.existsSync('./state.json')) {
       this.set({
         nodes: {},
@@ -64,7 +62,7 @@ class PersistedState {
     return JSON.parse(fs.readFileSync('./state.json', 'utf8') || '{}') as State
   }
 
-  async set(s: State){
+  async set(s: State) {
     fs.writeFileSync('./state.json', JSON.stringify(s), 'utf8')
     this.update(s)
     return
@@ -76,7 +74,7 @@ class PersistedState {
     await this.set(state)
   }
 
-  async setNode(peer){
+  async setNode(peer) {
     const state = await this.get()
     state.nodes[peer.id.toB58String()] = {
       id: peer.id,
@@ -86,9 +84,9 @@ class PersistedState {
     await this.set(state)
   }
 
-  async setCTChannels(channels: ChannelEntry[]){
+  async setCTChannels(channels: ChannelEntry[]) {
     const state = await this.get()
-    state.ctChannels = channels.map(c => c.destination)
+    state.ctChannels = channels.map((c) => c.destination)
     await this.set(state)
   }
 
@@ -96,7 +94,7 @@ class PersistedState {
     return Object.values((await this.get()).channels).filter((c: ChannelEntry) => c.source.eq(p))
   }
 
-  async log(...args:String[]){
+  async log(...args: String[]) {
     const s = await this.get()
     s.log.push(args.join(' '))
     await this.set(s)
@@ -110,7 +108,7 @@ class PersistedState {
 
   async getNode(b58String: string): Promise<PeerData> {
     const s = await this.get()
-    return s.nodes[b58String] 
+    return s.nodes[b58String]
   }
 
   async findChannel(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
@@ -144,7 +142,7 @@ class PersistedState {
   async incrementSent(p: PublicKey) {
     const s = await this.get()
     // TODO init
-    s.ctSent[p.toB58String()].sendAttempts ++
+    s.ctSent[p.toB58String()].sendAttempts++
   }
 
   async incrementForwards(p: PublicKey) {
@@ -161,20 +159,26 @@ export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
   Object.values(state.channels).filter((c: ChannelEntry) => c.source.eq(p))
 
 export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
-  findChannelsFrom(p, state).map((c) => c.balance.toBN()).reduce(addBN, new BN('0'))
+  findChannelsFrom(p, state)
+    .map((c) => c.balance.toBN())
+    .reduce(addBN, new BN('0'))
 
 export const importance = (p: PublicKey, state: State): BN =>
-  findChannelsFrom(p, state).map((c: ChannelEntry) =>
-    sqrtBN(totalChannelBalanceFor(p, state).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination, state)))
-  ).reduce(addBN, new BN('0'))
+  findChannelsFrom(p, state)
+    .map((c: ChannelEntry) =>
+      sqrtBN(totalChannelBalanceFor(p, state).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination, state)))
+    )
+    .reduce(addBN, new BN('0'))
 
 export const findChannel = (src: PublicKey, dest: PublicKey, state: State): ChannelEntry =>
-   Object.values(state.channels).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
+  Object.values(state.channels).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
 
-
-
-
-export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, sendMessage: (path: PublicKey[]) => Promise<void>, data: PersistedState): Promise<boolean> => {
+export const sendCTMessage = async (
+  startNode: PublicKey,
+  selfPub: PublicKey,
+  sendMessage: (path: PublicKey[]) => Promise<void>,
+  data: PersistedState
+): Promise<boolean> => {
   const weight = async (edge: ChannelEntry): Promise<BN> => await importance(edge.destination, await data.get())
   let path
   try {
@@ -189,7 +193,7 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, se
 
     path.forEach((p) => data.incrementForwards(p))
     path.push(selfPub) // destination is always self.
-    data.log('SEND ' + path.map(pub => pub.toB58String()).join(','))
+    data.log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
     data.log('Could not find path - ' + startNode.toPeerId().toB58String())
@@ -242,25 +246,30 @@ class CoverTrafficStrategy extends SaneDefaults {
       .concat(toOpen.map((o) => o[0]))
       .concat(toClose)
 
-    await Promise.all(state.ctChannels.map(async (dest) => {
-      const channel = await this.data.findChannel(this.selfPub, dest) 
-      if (channel.status == ChannelStatus.Open) {
-        const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
-          await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
-        }, this.data)
-        if (!success) {
-          toClose.push(dest);
+    await Promise.all(
+      state.ctChannels.map(async (dest) => {
+        const channel = await this.data.findChannel(this.selfPub, dest)
+        if (channel.status == ChannelStatus.Open) {
+          const success = await sendCTMessage(
+            dest,
+            this.selfPub,
+            async (path: PublicKey[]) => {
+              await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
+            },
+            this.data
+          )
+          if (!success) {
+            toClose.push(dest)
+          }
         }
-      }
-    }))
+      })
+    )
 
     this.data.log(
-      (`strategy tick: balance:${balance.toString()
-       } open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')
-       } close: ${toClose
-        .map((p) => p.toPeerId().toB58String())
-        .join(',')}`
-    ).replace('\n', ', '))
+      `strategy tick: balance:${balance.toString()} open:${toOpen
+        .map((p) => p[0].toPeerId().toB58String())
+        .join(',')} close: ${toClose.map((p) => p.toPeerId().toB58String()).join(',')}`.replace('\n', ', ')
+    )
     return [toOpen, toClose]
   }
 }
