@@ -3,12 +3,14 @@ import Hopr, { SaneDefaults, findPath } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
 import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
+import fs from 'fs'
 
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
 const CHANNEL_STAKE = new BN('1000')
 const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
 const CT_INTERMEDIATE_HOPS = 3 // NB. min is 2
+const DB = './ct.json'
 
 const options: HoprOptions = {
   //provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
@@ -48,12 +50,30 @@ class PersistedState {
   private _data: State
 
   constructor(private update: (s: State) => void) {
+    if (fs.existsSync(DB)) {
+      this.load()
+    } else {
+      this._data = {
+          nodes: {},
+          channels: {},
+          log: [],
+          ctChannels: [],
+          block: new BN('0'),
+      }
+    }
+  }
+
+  async load(): Promise<void> {
+    const json = JSON.parse(fs.readFileSync(DB, 'utf8'))
     this._data = {
-        nodes: {},
+        nodes: json.nodes.map((n): PeerData => {
+          const id = PeerId.createFromB58String(n.id)
+          return { id, pub: PublicKey.fromPeerId(id), multiaddrs: [] }
+        }),
         channels: {},
         log: [],
         ctChannels: [],
-        block: new BN('0'),
+        block: new BN(json.block),
     }
   }
 
@@ -63,6 +83,10 @@ class PersistedState {
 
   async set(s: State){
     this._data = s
+    fs.writeFileSync(DB, JSON.stringify({
+      nodes: Object.values(s.nodes).map((n: PeerData) => ({id: n.id.toB58String(), multiaddrs: n.multiaddrs.map(m => m.toString())})),
+      block: s.block.toString()
+    }) , 'utf8')
     this.update(s)
     return
   }
