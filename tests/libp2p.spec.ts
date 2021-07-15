@@ -12,7 +12,7 @@ const SECIO = require('libp2p-secio')
 const MPLEX = require('libp2p-mplex')
 const Upgrader = require('libp2p/src/upgrader')
 
-import { Alice, Bob, Charly, Dave } from '../examples/identities'
+import { Alice, Bob, Charly, Dave } from '../tests/identities'
 
 async function startBootstrapServer(privKey: Uint8Array, port: number): Promise<libp2p> {
   const node = await libp2p.create({
