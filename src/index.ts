@@ -15,13 +15,13 @@ import { Discovery } from './discovery'
 import { Filter } from './filter'
 import { dialHelper } from './utils'
 
-import type { EventEmitter } from 'events'
+import type { PublicNodesEmitter } from './types'
 
 const log = debug('hopr-connect')
 const verbose = debug('hopr-connect:verbose')
 
 export type HoprConnectOptions = {
-  publicNodes?: EventEmitter
+  publicNodes?: PublicNodesEmitter
   initialNodes?: Multiaddr[]
   interface?: string
   __noDirectConnections?: boolean
@@ -49,7 +49,7 @@ class HoprConnect implements Transport {
 
   public discovery: Discovery
 
-  private publicNodes?: EventEmitter
+  private publicNodes?: PublicNodesEmitter
   private initialNodes?: Multiaddr[]
 
   private relayPeerIds?: Set<string>
@@ -135,7 +135,7 @@ class HoprConnect implements Transport {
         addPeerIdStringToSet(this.relayPeerIds, initialNode)
       }
 
-      this.publicNodes?.on('publicNode', (ma: Multiaddr) => addPeerIdStringToSet(this.relayPeerIds as any, ma))
+      this.publicNodes?.on('addPublicNode', (ma: Multiaddr) => addPeerIdStringToSet(this.relayPeerIds as any, ma))
       verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
     }
 

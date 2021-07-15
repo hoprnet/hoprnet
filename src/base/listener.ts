@@ -4,7 +4,8 @@
 import net, { AddressInfo, Socket as TCPSocket } from 'net'
 import dgram, { RemoteInfo } from 'dgram'
 
-import { EventEmitter, once } from 'events'
+import { once, EventEmitter } from 'events'
+import { PublicNodesEmitter } from '../types'
 import debug from 'debug'
 import { NetworkInterfaceInfo, networkInterfaces } from 'os'
 
@@ -86,7 +87,7 @@ class Listener extends EventEmitter implements InterfaceListener {
   constructor(
     private handler: ConnHandler | undefined,
     private upgrader: Upgrader,
-    publicNodes: EventEmitter | undefined,
+    publicNodes: PublicNodesEmitter | undefined,
     private initialNodes: Multiaddr[] | undefined,
     private peerId: PeerId,
     private _interface: string | undefined
@@ -138,7 +139,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     initialNodes?.forEach(this.onNewRelay.bind(this))
 
-    publicNodes?.on('publicNode', this.onNewRelay.bind(this))
+    publicNodes?.on('addPublicNode', this.onNewRelay.bind(this))
   }
 
   async onNewRelay(ma: Multiaddr): Promise<void> {

@@ -2,7 +2,7 @@ import SimplePeer from 'simple-peer'
 import debug from 'debug'
 
 import type { Multiaddr } from 'multiaddr'
-import type { EventEmitter } from 'events'
+import type { PublicNodesEmitter } from '../types'
 import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants'
 
 const wrtc = require('wrtc')
@@ -27,10 +27,10 @@ export const MAX_STUN_SERVERS = 23
 class WebRTCUpgrader {
   public rtcConfig?: RTCConfiguration
 
-  constructor(publicNodes?: EventEmitter, initialNodes?: Multiaddr[]) {
+  constructor(publicNodes?: PublicNodesEmitter, initialNodes?: Multiaddr[]) {
     initialNodes?.forEach(this.onNewPublicNode.bind(this))
 
-    publicNodes?.on('publicNode', this.onNewPublicNode.bind(this))
+    publicNodes?.on('addPublicNode', this.onNewPublicNode.bind(this))
   }
 
   onNewPublicNode(ma: Multiaddr) {
