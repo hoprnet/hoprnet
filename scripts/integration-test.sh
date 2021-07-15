@@ -150,13 +150,7 @@ start_node tests/node.ts "${bob_log}"  \
         'cmd': 'dial',
         'targetIdentityName': 'charly',
         'targetPort': ${charly_port}
-      },
-      {
-        'cmd': 'msg',
-        'relayIdentityName': 'charly',
-        'targetIdentityName': 'bob',
-        'msg': 'test'
-      }
+      }      
     ]" \
   --port ${bob_port} \
   --identityName 'bob' \
