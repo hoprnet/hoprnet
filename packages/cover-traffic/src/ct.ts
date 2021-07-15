@@ -54,11 +54,11 @@ class PersistedState {
       this.load()
     } else {
       this._data = {
-          nodes: {},
-          channels: {},
-          log: [],
-          ctChannels: [],
-          block: new BN('0'),
+        nodes: {},
+        channels: {},
+        log: [],
+        ctChannels: [],
+        block: new BN('0')
       }
     }
   }
@@ -66,18 +66,18 @@ class PersistedState {
   async load(): Promise<void> {
     const json = JSON.parse(fs.readFileSync(DB, 'utf8'))
     this._data = {
-        nodes: {},
-        channels: {},
-        log: ['loaded data'],
-        ctChannels: json.ctChannels.map(p => PublicKey.fromPeerId(PeerId.createFromB58String(p))),
-        block: new BN(json.block),
+      nodes: {},
+      channels: {},
+      log: ['loaded data'],
+      ctChannels: json.ctChannels.map((p) => PublicKey.fromPeerId(PeerId.createFromB58String(p))),
+      block: new BN(json.block)
     }
     json.nodes.forEach((n) => {
       const id = PeerId.createFromB58String(n.id)
       this._data.nodes[id.toB58String()] = { id, pub: PublicKey.fromPeerId(id), multiaddrs: [] }
     })
 
-    json.channels.forEach(c => {
+    json.channels.forEach((c) => {
       const channel = ChannelEntry.deserialize(Uint8Array.from(Buffer.from(c.channel, 'base64')))
       this._data.channels[channel.getId().toHex()] = {
         channel,
@@ -91,29 +91,35 @@ class PersistedState {
     return this._data
   }
 
-  async set(s: State){
+  async set(s: State) {
     this._data = s
-    fs.writeFileSync(DB, JSON.stringify({
-      nodes: Object.values(s.nodes).map((n: PeerData) =>
-        ({id: n.id.toB58String(), multiaddrs: n.multiaddrs.map(m => m.toString())})),
-      channels: Object.values(s.channels).map(c => ({
-        channel: Buffer.from(c.channel.serialize()).toString('base64'),
-        forwardAttempts: c.forwardAttempts,
-        sendAttempts: c.sendAttempts
-      })),
-      ctChannels: s.ctChannels.map(p => p.toB58String()),
-      block: s.block.toString()
-    }) , 'utf8')
+    fs.writeFileSync(
+      DB,
+      JSON.stringify({
+        nodes: Object.values(s.nodes).map((n: PeerData) => ({
+          id: n.id.toB58String(),
+          multiaddrs: n.multiaddrs.map((m) => m.toString())
+        })),
+        channels: Object.values(s.channels).map((c) => ({
+          channel: Buffer.from(c.channel.serialize()).toString('base64'),
+          forwardAttempts: c.forwardAttempts,
+          sendAttempts: c.sendAttempts
+        })),
+        ctChannels: s.ctChannels.map((p) => p.toB58String()),
+        block: s.block.toString()
+      }),
+      'utf8'
+    )
     this.update(s)
     return
   }
 
   async setChannel(channel: ChannelEntry) {
     const state = await this.get()
-    if (state.channels[channel.getId().toHex()]){
+    if (state.channels[channel.getId().toHex()]) {
       state.channels[channel.getId().toHex()].channel = channel
     } else {
-      state.channels[channel.getId().toHex()] = { 
+      state.channels[channel.getId().toHex()] = {
         channel,
         sendAttempts: 0,
         forwardAttempts: 0
@@ -139,7 +145,9 @@ class PersistedState {
   }
 
   async findChannelsFrom(p: PublicKey): Promise<ChannelEntry[]> {
-    return Object.values((await this.get()).channels).filter((c: ChannelData) => c.channel.source.eq(p)).map(c => c.channel)
+    return Object.values((await this.get()).channels)
+      .filter((c: ChannelData) => c.channel.source.eq(p))
+      .map((c) => c.channel)
   }
 
   async log(...args: String[]) {
@@ -188,7 +196,7 @@ class PersistedState {
   }
 
   async incrementSent(_p: PublicKey) {
-   // const s = await this.get()
+    // const s = await this.get()
     // TODO init
     //s.channels[p.toB58String()].sendAttempts ++
   }
@@ -204,7 +212,9 @@ export const addBN = (a: BN, b: BN): BN => a.add(b)
 export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
 
 export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
-  Object.values(state.channels).map(c => c.channel).filter((c: ChannelEntry) => c.source.eq(p))
+  Object.values(state.channels)
+    .map((c) => c.channel)
+    .filter((c: ChannelEntry) => c.source.eq(p))
 
 export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
   findChannelsFrom(p, state)
@@ -219,12 +229,16 @@ export const importance = (p: PublicKey, state: State): BN =>
     .reduce(addBN, new BN('0'))
 
 export const findChannel = (src: PublicKey, dest: PublicKey, state: State): ChannelEntry =>
-   Object.values(state.channels).map(c => c.channel).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
+  Object.values(state.channels)
+    .map((c) => c.channel)
+    .find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
 
-
-
-
-export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, sendMessage: (path: PublicKey[]) => Promise<void>, data: PersistedState): Promise<boolean> => {
+export const sendCTMessage = async (
+  startNode: PublicKey,
+  selfPub: PublicKey,
+  sendMessage: (path: PublicKey[]) => Promise<void>,
+  data: PersistedState
+): Promise<boolean> => {
   const weight = async (edge: ChannelEntry): Promise<BN> => await importance(edge.destination, await data.get())
   let path
   try {

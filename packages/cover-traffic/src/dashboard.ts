@@ -66,8 +66,8 @@ function setupDashboard(selfPub: PublicKey) {
           data.push([
             'ch.' + i,
             c.destination.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status
-            ])
-          })
+          ])
+        })
         inspect.setData({ headers: ['', ''], data })
       }
     }
