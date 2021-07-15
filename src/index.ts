@@ -126,6 +126,9 @@ class HoprConnect implements Transport {
     }
 
     if (this.__noDirectConnections) {
+      // Whenever we don't allow direct connection, we need to store
+      // the known relays and make sure that we allow direct connections
+      // to them.
       this.relayPeerIds = new Set<string>()
 
       for (const initialNode of this.initialNodes ?? []) {
