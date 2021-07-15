@@ -16,6 +16,7 @@ import { once, EventEmitter } from 'events'
 
 import { networkInterfaces } from 'os'
 import { u8aEquals } from '@hoprnet/hopr-utils'
+import { PublicNodesEmitter } from '../types'
 
 describe('check listening to sockets', function () {
   /**
@@ -79,7 +80,7 @@ describe('check listening to sockets', function () {
     peerId?: PeerId
   ) {
     peerId = peerId ?? (await PeerId.create({ keyType: 'secp256k1' }))
-    const publicNodesEmitter = new EventEmitter()
+    const publicNodesEmitter = new EventEmitter() as PublicNodesEmitter
 
     const listener = new Listener(
       undefined,
@@ -164,16 +165,15 @@ describe('check listening to sockets', function () {
 
     const node = await startNode([stunServerMultiaddr], { msgReceived: Defer() })
 
+    const eventPromise = once(node.listener, '_newNodeRegistered')
+
     node.publicNodesEmitter.emit(
-      `publicNode`,
+      `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
     )
 
     // Checks that relay and STUN got contacted, otherwise timeout
-    await relayContacted.promise
-
-    // Let events happen
-    await new Promise((resolve) => setTimeout(resolve))
+    await Promise.all([relayContacted.promise, eventPromise])
 
     const addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
@@ -304,19 +304,21 @@ describe('check listening to sockets', function () {
       msgReceived: Defer()
     })
 
+    let eventPromise = once(node.listener, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
-      'publicNode',
+      'addPublicNode',
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
     )
 
+    await eventPromise
+
+    eventPromise = once(node.listener, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
-      'publicNode',
+      'addPublicNode',
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
     )
 
-    // Let Events happen
-    await new Promise((resolve) => setTimeout(resolve))
-    await new Promise((resolve) => setTimeout(resolve))
+    await eventPromise
 
     const addrsFromListener = node.listener.getAddrs()
 
@@ -400,28 +402,25 @@ describe('check listening to sockets', function () {
       msgReceived: Defer()
     })
 
+    let eventPromise = once(node.listener, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
-      `publicNode`,
+      `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
     )
 
-    // Let events happen
-    await new Promise((resolve) => setTimeout(resolve))
-    await new Promise((resolve) => setTimeout(resolve))
-    await new Promise((resolve) => setTimeout(resolve))
-    await new Promise((resolve) => setTimeout(resolve))
+    await eventPromise
 
     let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
     assert(addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`))
 
+    eventPromise = once(node.listener, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
-      `publicNode`,
+      `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId}`)
     )
 
-    // Let Events happen
-    await new Promise((resolve) => setTimeout(resolve))
+    await eventPromise
 
     let addrsAfterSecondEvent = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
@@ -445,30 +444,30 @@ describe('check listening to sockets', function () {
       msgReceived: Defer()
     })
 
+    let eventPromise = once(node.listener, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
-      `publicNode`,
+      `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
     )
 
-    // Let events happen
-    await new Promise((resolve) => setTimeout(resolve))
+    await eventPromise
 
     let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
     assert(addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`))
 
     node.publicNodesEmitter.emit(
-      `publicNode`,
+      `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId}`)
     )
 
+    eventPromise = once(node.listener, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
-      `publicNode`,
+      `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
     )
 
-    // Let events happen
-    await new Promise((resolve) => setTimeout(resolve))
+    await eventPromise
 
     // Stop first relay and let it attach to different port
     await stopNode(relay.listener)
@@ -482,13 +481,13 @@ describe('check listening to sockets', function () {
       relay.peerId
     )
 
+    eventPromise = once(node.listener, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
-      `publicNode`,
+      `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${newRelay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
     )
 
-    // Let Events happen
-    await new Promise((resolve) => setTimeout(resolve))
+    await eventPromise
 
     const addrsAfterThirdEvent = node.listener.getAddrs()
 

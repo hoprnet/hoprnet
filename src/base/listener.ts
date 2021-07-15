@@ -205,6 +205,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     )
 
     this.publicNodes = publicNodes.sort(latencyCompare)
+
+    this.emit(`_newNodeRegistered`, maPeerId)
   }
 
   /**
