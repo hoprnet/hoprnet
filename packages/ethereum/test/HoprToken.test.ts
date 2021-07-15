@@ -1,62 +1,71 @@
 import { expect } from 'chai'
-import { singletons, expectRevert } from '@openzeppelin/test-helpers'
-import { web3 } from 'hardhat'
-import { HoprTokenInstance } from '../types'
-import { vmErrorMessage } from './utils'
+import { deployments, ethers } from 'hardhat'
+import deployERC1820Registry from '../deploy/01_ERC1820Registry'
+import { HoprToken__factory } from '../types'
 
-const HoprToken = artifacts.require('HoprToken')
+const useFixtures = deployments.createFixture(async (hre) => {
+  const [deployer, userA] = await ethers.getSigners()
+
+  // deploy ERC1820Registry required by ERC777 token
+  await deployERC1820Registry(hre, deployer)
+
+  // deploy ChannelsMock
+  const token = await new HoprToken__factory(deployer).deploy()
+
+  // allow deployet to mint tokens
+  await token.grantRole(await token.MINTER_ROLE(), deployer.address)
+
+  return {
+    deployer: deployer.address,
+    token,
+    userA: userA.address
+  }
+})
 
 describe('HoprToken', function () {
-  let owner: string
-  let userA: string
-  let hoprToken: HoprTokenInstance
-
-  before(async function () {
-    ;[owner, userA] = await web3.eth.getAccounts()
-
-    // migrate contracts
-    await singletons.ERC1820Registry(owner)
-    hoprToken = await HoprToken.new()
-    await hoprToken.grantRole(await hoprToken.MINTER_ROLE(), owner)
-  })
-
   it("should be named 'HOPR Token'", async function () {
-    expect(await hoprToken.name()).to.be.equal('HOPR Token', 'wrong name')
+    const { token } = await useFixtures()
+
+    expect(await token.name()).to.be.equal('HOPR Token', 'wrong name')
   })
 
   it("should have symbol 'HOPR'", async function () {
-    expect(await hoprToken.symbol()).to.be.equal('HOPR', 'wrong symbol')
+    const { token } = await useFixtures()
+
+    expect(await token.symbol()).to.be.equal('HOPR', 'wrong symbol')
   })
 
   it("should have a supply of '0'", async function () {
-    const totalSupply = await hoprToken.totalSupply()
+    const { token } = await useFixtures()
 
-    expect(totalSupply.isZero()).to.be.equal(true, 'wrong total supply')
+    const totalSupply = await token.totalSupply()
+    expect(totalSupply.isZero()).to.be.true
   })
 
   it('should fail mint', async function () {
-    await expectRevert(
-      hoprToken.mint(userA, 1, '0x00', '0x00', {
-        from: userA
-      }),
-      vmErrorMessage('HoprToken: caller does not have minter role')
+    const { token, userA } = await useFixtures()
+
+    await expect(token.connect(userA).mint(userA, 1, '0x00', '0x00')).to.be.revertedWith(
+      'caller does not have minter role'
     )
   })
 
-  it("'owner' should be a minter", async function () {
-    const minterRole = await hoprToken.MINTER_ROLE()
+  it("'deployer' should be a minter", async function () {
+    const { token, deployer } = await useFixtures()
+    const minterRole = await token.MINTER_ROLE()
 
-    expect(await hoprToken.hasRole(minterRole, owner)).to.be.equal(true, 'wrong minter')
+    expect(await token.hasRole(minterRole, deployer)).to.be.true
   })
 
-  it(`should mint 100 HOPR for 'owner'`, async function () {
-    const amount = web3.utils.toWei('1', 'ether')
+  it(`should mint 100 HOPR for 'deployer'`, async function () {
+    const { token, deployer } = await useFixtures()
+    const amount = ethers.utils.parseEther('1')
 
-    await hoprToken.mint(owner, amount, '0x00', '0x00', {
-      from: owner
+    await token.mint(deployer, amount, '0x00', '0x00', {
+      from: deployer
     })
 
-    const balance = await hoprToken.balanceOf(owner).then((res) => res.toString())
+    const balance = await token.balanceOf(deployer).then((res) => res.toString())
 
     expect(balance).to.be.eq(amount, 'wrong balance')
   })

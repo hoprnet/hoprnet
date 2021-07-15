@@ -1,10 +1,8 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
-import { styleValue } from './utils'
 
 export class Info extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -16,13 +14,20 @@ export class Info extends AbstractCommand {
     return 'Information about the HOPR Node, including any options it started with'
   }
 
-  public async execute(): Promise<string> {
+  public async execute(log): Promise<void> {
+    const smartContractInfo = await this.node.smartContractInfo()
+    const channelClosureMins = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
+
     // @TODO Add connector info etc.
-    return [
-      `Bootstrap Servers: ${this.node.bootstrapServers.map((p) => styleValue(p.getPeerId(), 'peerId'))}`,
-      `Announcing to other nodes as: ${(await this.node.getAnnouncedAddresses()).map((ma) => ma.toString())}`,
-      `Listening on: ${this.node.getListeningAddresses().map((ma) => ma.toString())}`,
-      `${this.node.smartContractInfo()}`
-    ].join('\n')
+    return log(
+      [
+        `Announcing to other nodes as: ${(await this.node.getAnnouncedAddresses()).map((ma) => ma.toString())}`,
+        `Listening on: ${this.node.getListeningAddresses().map((ma) => ma.toString())}`,
+        `Running on: ${smartContractInfo.network}`,
+        `HOPR Token: ${smartContractInfo.hoprTokenAddress}`,
+        `HOPR Channels: ${smartContractInfo.hoprChannelsAddress}`,
+        `Channel closure period: ${channelClosureMins} minutes`
+      ].join('\n')
+    )
   }
 }

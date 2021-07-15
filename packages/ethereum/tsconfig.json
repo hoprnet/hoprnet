@@ -2,9 +2,16 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "lib",
-    "resolveJsonModule": true,
-    "types": ["./types"]
+    "resolveJsonModule": true
   },
-  "include": ["./hardhat.config.ts", "index.ts", "types", "test", "tasks", "utils", "chain"],
-  "exclude": ["lib", "temp"]
+  "include": ["hardhat.config.ts", "index.ts", "test", "tasks", "deploy"],
+  "exclude": ["lib", "types"],
+  "typedocOptions": {
+    "entryPoints": ["index.ts"],
+    "disableOutputCheck": true,
+    "out": "docs",
+    // by default we don't want links to source code to change on every change
+    // when building docs for releases we can fix the revision on the cmdline
+    "gitRevision": "master"
+  }
 }

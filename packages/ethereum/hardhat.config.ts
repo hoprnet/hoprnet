@@ -1,115 +1,105 @@
+import type { SolcUserConfig } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
 // load hardhat plugins
-import 'hardhat-typechain'
-import '@nomiclabs/hardhat-truffle5'
-import '@nomiclabs/hardhat-etherscan'
+import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-solhint'
+import '@nomiclabs/hardhat-waffle'
+import 'hardhat-deploy'
+import 'hardhat-gas-reporter'
 import 'solidity-coverage'
-
+import '@typechain/hardhat'
+// rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
-import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import Web3 from 'web3'
-import { mapValues } from 'lodash'
-import { MigrationOptions, getRpcOptions } from './utils/networks'
+import { ethers } from 'ethers'
+import { networks, NetworkTag } from './constants'
 
-const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, INFURA_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
+const GAS_MULTIPLIER = 1.1
 
-const publicNetworks: HardhatUserConfig['networks'] = mapValues(
-  getRpcOptions({ infura: INFURA, maticvigil: MATIC_VIGIL }),
-  (config) =>
-    ({
-      chainId: config.chainId,
-      url: config.httpUrl,
-      gasMultiplier: 1.1,
-      gasPrice: config.gasPrice ?? 'auto',
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
-    } as HardhatUserConfig['networks']['hardhat'])
-)
-
-const devSeeds = NODE_SEEDS.concat(BOOTSTRAP_SEEDS).map((privateKey) => ({
-  privateKey,
-  balance: Web3.utils.toWei('10000', 'ether')
-}))
+// set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
+process.env.ETHERSCAN_API_KEY = ETHERSCAN_KEY
 
 const hardhatConfig: HardhatUserConfig = {
-  defaultNetwork: 'localhost',
+  defaultNetwork: 'hardhat',
   networks: {
+    // hardhat-deploy cannot run deployments if the network is not hardhat
+    // we use an ENV variable (which is specified in our NPM script)
+    // to let hardhat know we want to run hardhat in 'development' mode
+    // this essentially enables mining, see below
     hardhat: {
-      accounts: devSeeds
+      live: false,
+      tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
+      saveDeployments: true,
+      mining: DEVELOPMENT
+        ? {
+            auto: true, // every transaction will trigger a new block (without this deployments fail)
+            interval: [1000, 3000] // mine new block every 1 - 3s
+          }
+        : undefined
     },
-    localhost: {
-      url: 'http://localhost:8545',
-      accounts: devSeeds.map(({ privateKey }) => privateKey)
+    goerli: {
+      ...networks.goerli,
+      live: true,
+      tags: ['staging'] as NetworkTag[],
+      gasMultiplier: GAS_MULTIPLIER,
+      url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
+      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     },
-    ...publicNetworks
+    xdai: {
+      ...networks.xdai,
+      live: true,
+      tags: ['production'] as NetworkTag[],
+      gasMultiplier: GAS_MULTIPLIER,
+      url: `https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/`,
+      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+    }
+  },
+  namedAccounts: {
+    deployer: 0
   },
   solidity: {
-    compilers: [
-      {
-        version: '0.6.6'
-      },
-      {
-        version: '0.4.24'
+    compilers: ['0.8.3', '0.6.6', '0.4.24'].map<SolcUserConfig>((version) => ({
+      version,
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200
+        }
       }
-    ],
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
-      }
-    }
+    }))
   },
   paths: {
     sources: './contracts',
     tests: './test',
     cache: './hardhat/cache',
-    artifacts: './hardhat/artifacts'
+    artifacts: './hardhat/artifacts',
+    deployments: './deployments'
   },
   typechain: {
     outDir: './types',
-    target: 'truffle-v5'
+    target: 'ethers-v5'
   },
-  etherscan: {
-    apiKey: ETHERSCAN
+  gasReporter: {
+    currency: 'USD',
+    excludeContracts: ['mocks', 'utils/console.sol']
   }
 }
 
-// create our own migration task since there isn't one implemented
-// see https://github.com/nomiclabs/hardhat/issues/381
-task('migrate', 'Migrate contracts', async (...args: any[]) => {
-  // lazy load this as it breaks hardhat due to '@openzeppelin/test-helpers'
-  // also required because we need to build typechain first
-  return (await import('./tasks/migrate')).default(args[0], args[1], args[2])
+task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) => {
+  return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
 })
-  .addOptionalParam<MigrationOptions['shouldVerify']>(
-    'shouldVerify',
-    'Try to verify contracts using etherscan',
-    false,
-    types.boolean
-  )
-  .addOptionalParam<MigrationOptions['mintUsing']>(
-    'mintUsing',
-    'Mint using "minter" or "faucet"',
-    'minter',
-    types.string
-  )
-  .addOptionalParam<MigrationOptions['revokeRoles']>(
-    'revokeRoles',
-    'Revoke admin roles from deployer',
+  .addParam<string>('address', 'HoprToken address', undefined, types.string)
+  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', ethers.utils.parseEther('1').toString(), types.string)
+  .addOptionalParam<boolean>(
+    'ishopraddress',
+    'Whether the address passed is a HOPR address or not',
     false,
     types.boolean
   )
 
-task('fund', 'Fund demo accounts', async (...args: any[]) => {
-  return (await import('./tasks/fund')).default(args[0], args[1], args[2])
+task('accounts', 'View unlocked accounts', async (...args: any[]) => {
+  return (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
 })
-  .addParam<string>('address', 'HoprToken contract address', undefined, types.string)
-  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', Web3.utils.toWei('1000000', 'ether'), types.string)
-  .addOptionalParam<number>('accountsToFund', 'Amount of accounts to fund from demo seeds', 0, types.int)
-
-task('extract', 'Extract ABIs to specified folder', async (...args: any[]) => {
-  return (await import('./tasks/extract')).default(args[0], args[1], args[2])
-}).addFlag('target', 'Folder to output contents to')
 
 export default hardhatConfig

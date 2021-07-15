@@ -7,47 +7,47 @@ import { NOISE } from 'libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 
-import { Packet } from './messages/packet'
-import {
-  PACKET_SIZE,
-  MAX_HOPS,
-  VERSION,
-  CHECK_TIMEOUT,
-  TICKET_AMOUNT,
-  TICKET_WIN_PROB,
-  PATH_RANDOMNESS,
-  MIN_NATIVE_BALANCE,
-  FULL_VERSION
-} from './constants'
+import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, CHECK_TIMEOUT, PATH_RANDOMNESS, FULL_VERSION } from './constants'
 
 import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
-import { u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { existsSync, mkdirSync } from 'fs'
-import getIdentity from './identity'
-
-import levelup, { LevelUp } from 'levelup'
-import leveldown from 'leveldown'
-import Multiaddr from 'multiaddr'
+import { protocols, Multiaddr } from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprCoreConnectorStatic, Types, Channel, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
+import {
+  PublicKey,
+  Balance,
+  Address,
+  ChannelEntry,
+  NativeBalance,
+  Hash,
+  DialOpts,
+  HoprDB,
+  libp2pSendMessageAndExpectResponse,
+  libp2pSubscribe,
+  libp2pSendMessage,
+  LibP2PHandlerFunction,
+  AcknowledgedTicket,
+  ChannelStatus,
+  MIN_NATIVE_BALANCE
+} from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
+import { getAddrs } from './identity'
 
-import { Interactions } from './interactions'
-import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
-import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
-
 import Debug from 'debug'
-import { Address } from 'libp2p/src/peer-store'
+import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
+
+import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
+import { PacketForwardInteraction } from './interactions/packet/forward'
+
+import { Packet } from './messages'
+import { localAddressesFirst, AddressSorter } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -60,183 +60,118 @@ interface NetOptions {
 export type ChannelStrategyNames = 'passive' | 'promiscuous'
 
 export type HoprOptions = {
-  debug: boolean
   network: string
   provider: string
-  ticketAmount?: number
-  ticketWinProb?: number
-  db?: LevelUp
+  announce?: boolean
   dbPath?: string
   createDbIfNotExist?: boolean
-  peerId?: PeerId
   password?: string
-  id?: number // TODO - kill this opaque accessor of db files...
-  bootstrapNode?: boolean
-  connector?: HoprCoreConnectorStatic
-  bootstrapServers?: Multiaddr[]
-  output?: (encoded: Uint8Array) => void
+  connector?: HoprCoreEthereum
   strategy?: ChannelStrategyNames
   hosts?: {
     ip4?: NetOptions
     ip6?: NetOptions
   }
+  // You almost certainly want this to be false, this is so we can test with
+  // local testnets, and announce 127.0.0.1 addresses.
+  announceLocalAddresses?: boolean
+
+  // when true, addresses will be sorted local first
+  // when false, addresses will be sorted public first
+  preferLocalAddresses?: boolean
 }
 
-const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
-  let folder: string
-  if (isBootstrap) {
-    folder = `bootstrap`
-  } else if (id) {
-    folder = `node_${id}`
-  } else {
-    folder = `node`
-  }
-  return path.join(process.cwd(), 'db', VERSION, folder)
-}
+export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
 
-class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
-  // TODO make these actually private - Do not rely on any of these properties!
-  public _interactions: Interactions<Chain>
-  // Allows us to construct HOPR with falsy options
-  public _debug: boolean
-  public _dbKeys = DbKeys
+class Hopr extends EventEmitter {
+  public status: NodeStatus = 'UNINITIALIZED'
 
-  public output: (arr: Uint8Array) => void
-  public isBootstrapNode: boolean
-  public bootstrapServers: Multiaddr[]
-  public initializedWithOptions: HoprOptions
-  public ticketAmount: string = TICKET_AMOUNT
-  public ticketWinProb: number = TICKET_WIN_PROB
-
-  private running: boolean
   private checkTimeout: NodeJS.Timeout
   private strategy: ChannelStrategy
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
+  private forward: PacketForwardInteraction
+  private libp2p: LibP2P
+  private db: HoprDB
+  private paymentChannels: Promise<HoprCoreEthereum>
+  private addressSorter: AddressSorter
 
   /**
+   * Create an uninitialized Hopr Node
+   *
    * @constructor
    *
-   * @param _options
+   * @param options
    * @param provider
    */
-  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
+  public constructor(private id: PeerId, private options: HoprOptions) {
     super()
 
-    this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
-      this.emit('hopr:peer:connection', conn.remotePeer)
-      this.networkPeers.register(conn.remotePeer)
+    if (!id.privKey) {
+      // TODO - assert secp256k1?
+      throw new Error('Hopr Node must be initialized with an id with a private key')
+    }
+    this.db = new HoprDB(
+      PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(),
+      options.createDbIfNotExist,
+      VERSION,
+      options.dbPath
+    )
+    this.paymentChannels = HoprCoreEthereum.create(this.db, this.id.privKey.marshal(), {
+      provider: this.options.provider
     })
 
-    this.setChannelStrategy(options.strategy || 'passive')
-    this.initializedWithOptions = options
-    this.output = (arr: Uint8Array) => {
-      this.emit('hopr:message', arr)
-      if (options.output) {
-        log('DEPRECATED: options.output is replaced with a hopr:message event')
-        options.output(arr)
-      }
+    if (this.options.preferLocalAddresses) {
+      this.addressSorter = localAddressesFirst
+      log('Preferring local addresses')
+    } else {
+      // Overwrite libp2p's default addressSorter to make
+      // sure it doesn't fail on HOPR-flavored addresses
+      this.addressSorter = (x) => x
+      log('Addresses are sorted by default')
     }
-    this.bootstrapServers = options.bootstrapServers || []
-    this.isBootstrapNode = options.bootstrapNode || false
-    this._interactions = new Interactions(this, (peer: PeerId) => this.networkPeers.register(peer))
-
-    if (process.env.GCLOUD) {
-      try {
-        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        if (this.isBootstrapNode) {
-          name = 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase()
-        }
-        require('@google-cloud/profiler')
-          .start({
-            projectId: 'hoprassociation',
-            serviceContext: {
-              service: name,
-              version: FULL_VERSION
-            }
-          })
-          .catch((e: any) => console.log(e))
-      } catch (e) {
-        console.log(e)
-      }
-    }
-
-    if (process.env.GCLOUD) {
-      try {
-        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        if (this.isBootstrapNode) {
-          name = 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase()
-        }
-        require('@google-cloud/profiler')
-          .start({
-            projectId: 'hoprassociation',
-            serviceContext: {
-              service: name,
-              version: FULL_VERSION
-            }
-          })
-          .catch((e: any) => console.log(e))
-      } catch (e) {
-        console.log(e)
-      }
-    }
-
-    this.networkPeers = new NetworkPeers(
-      Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id),
-      [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
-    )
-
-    this.heartbeat = new Heartbeat(
-      this.networkPeers,
-      this._interactions.heartbeat,
-      this._libp2p.hangUp.bind(this._libp2p)
-    )
-
-    if (options.ticketAmount) this.ticketAmount = String(options.ticketAmount)
-    if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
-
-    verbose('# STARTED NODE')
-    verbose('ID', this.getId().toB58String())
-    verbose('Protocol version', VERSION)
-    this._debug = options.debug
   }
 
   /**
-   * Creates a new node
-   * This is necessary as some of the constructor for the node needs to be
-   * asynchronous..
+   * Start node
    *
-   * @param options the parameters
+   * The node has a fairly complex lifecycle. This method should do all setup
+   * required for a node to be functioning.
+   *
+   * If the node is not funded, it will throw.
+   *
+   * - Create a link to the ethereum blockchain
+   *   - Finish indexing previous blocks [SLOW]
+   *   - Find publicly accessible relays
+   *
+   * - Start LibP2P and work out our network configuration.
+   *   - Pass the list of relays from the indexer
+   *
+   * - Wait for wallet to be funded with ETH [requires user interaction]
+   *
+   * - Announce address, pubkey, and multiaddr on chain.
+   *
+   * - Start heartbeat, automatic strategies, etc..
+   *
+   * @param options
    */
-  public static async create<CoreConnector extends HoprCoreConnector>(
-    options: HoprOptions
-  ): Promise<Hopr<CoreConnector>> {
-    const Connector = options.connector ?? HoprCoreEthereum
-    const db = Hopr.openDatabase(options)
-
-    const { id, addresses } = await getIdentity({
-      ...options,
-      db
-    })
-
-    if (
-      !options.debug &&
-      !options.bootstrapNode &&
-      (options.bootstrapServers == null || options.bootstrapServers.length == 0)
-    ) {
-      throw Error(`Cannot start node without a bootstrap server`)
+  public async start() {
+    this.status = 'INITIALIZING'
+    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
+      throw new Error('Cannot start node without a funded wallet')
     }
 
-    let connector = (await Connector.create(db, id.privKey.marshal(), {
-      provider: options.provider,
-      debug: options.debug
-    })) as CoreConnector
-
-    verbose('Created connector, now creating node')
+    const chain = await this.paymentChannels
+    verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
+    const publicNodes = await chain.waitForPublicNodes()
+    if (publicNodes.length == 0) {
+      log('No public nodes have announced yet, we cannot rely on relay')
+    }
+    verbose('Using public nodes:', publicNodes)
 
     const libp2p = await LibP2P.create({
-      peerId: id,
-      addresses: { listen: addresses.map((x) => x.toString()) },
+      peerId: this.id,
+      addresses: { listen: getAddrs(this.id, this.options).map((x) => x.toString()) },
       // libp2p modules
       modules: {
         transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
@@ -248,14 +183,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            bootstrapServers: options.bootstrapServers
+            bootstrapServers: publicNodes
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
           }
-        },
-        peerDiscovery: {
-          autoDial: false
         },
         dht: {
           enabled: true
@@ -266,48 +198,134 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         }
       },
       dialer: {
-        // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
-        addressSorter: (a) => a,
-        concurrency: options.bootstrapNode ? 1000 : 100
+        addressSorter: this.addressSorter,
+        maxDialsPerPeer: 100
       }
     })
 
-    return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
+    await libp2p.start()
+    log('libp2p started')
+    this.libp2p = libp2p
+    this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
+      this.emit('hopr:peer:connection', conn.remotePeer)
+      this.networkPeers.register(conn.remotePeer)
+    })
+
+    // Feed previously announced addresses to DHT
+    for (const ma of publicNodes) {
+      this.libp2p.peerStore.addressBook.add(PeerId.createFromB58String(ma.getPeerId()), [ma])
+    }
+
+    this.networkPeers = new NetworkPeers(Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id))
+
+    const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
+      libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
+    const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
+      libp2pSendMessageAndExpectResponse(this.libp2p, dest, protocol, msg, opts)
+    const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
+      libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
+    const hangup = this.libp2p.hangUp.bind(this.libp2p)
+
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
+
+    subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, this.getId(), (ack) =>
+      this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
+    )
+
+    const ethereum = await this.paymentChannels
+    const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
+    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
+
+    ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
+      const dialables = multiaddrs.filter((ma: Multiaddr) => {
+        const tuples = ma.tuples()
+        return tuples.length > 1 || tuples[0][0] != protocols.names['p2p'].code
+      })
+
+      // @ts-ignore
+      this.libp2p.peerStore.keyBook.set(id)
+
+      if (dialables.length > 0) {
+        this.libp2p.peerStore.addressBook.add(id, multiaddrs)
+      }
+    })
+
+    log('announcing')
+    await this.announce(this.options.announce)
+    log('announced, starting heartbeat')
+
+    this.heartbeat.start()
+    this.setChannelStrategy(this.options.strategy || 'passive')
+    this.status = 'RUNNING'
+    this.emit('running')
+
+    // Log information
+    log('# STARTED NODE')
+    log('ID', this.getId().toB58String())
+    log('Protocol version', VERSION)
+    log(`Available under the following addresses:`)
+    libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    this.maybeLogProfilingToGCloud()
+    this.periodicCheck()
   }
 
-  private async tickChannelStrategy(newChannels: RoutingChannel[]) {
-    verbose('new payment channels, auto opening tick', this.running)
-    if (!this.running) {
+  private maybeLogProfilingToGCloud() {
+    if (process.env.GCLOUD) {
+      try {
+        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
+        require('@google-cloud/profiler')
+          .start({
+            projectId: 'hoprassociation',
+            serviceContext: {
+              service: name,
+              version: FULL_VERSION
+            }
+          })
+          .catch((e: any) => console.log(e))
+      } catch (e) {
+        console.log(e)
+      }
+    }
+  }
+
+  private async tickChannelStrategy() {
+    verbose('strategy tick', this.status)
+    if (this.status != 'RUNNING') {
       return
     }
-    for (const channel of newChannels) {
-      this.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
+
+    // TODO: replace with newChannels
+    const rndChannels = await this.getRandomOpenChannels()
+
+    for (const channel of rndChannels) {
+      this.networkPeers.register(channel.source.toPeerId()) // Listen to nodes with outgoing stake
     }
     const currentChannels = await this.getOpenChannels()
     for (const channel of currentChannels) {
-      this.networkPeers.register(channel[1]) // Make sure current channels are 'interesting'
+      this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
     const balance = await this.getBalance()
+    const chain = await this.paymentChannels
     const [nextChannels, closeChannels] = await this.strategy.tick(
-      balance,
-      newChannels,
+      balance.toBN(),
+      rndChannels,
       currentChannels,
       this.networkPeers,
-      this.paymentChannels.indexer
+      chain.getRandomOpenChannel.bind(this.paymentChannels)
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
       verbose(`closing ${toClose}`)
-      await this.closeChannel(toClose)
-      verbose(`closed channel to ${toClose.toB58String()}`)
+      await this.closeChannel(toClose.toPeerId())
+      verbose(`closed channel to ${toClose.toString()}`)
       this.emit('hopr:channel:closed', toClose)
     }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
-      this.networkPeers.register(channelToOpen[0])
+      this.networkPeers.register(channelToOpen[0].toPeerId())
       try {
         // Opening channels can fail if we can't establish a connection.
-        const hash = await this.openChannel(...channelToOpen)
+        const hash = await this.openChannel(channelToOpen[0].toPeerId(), channelToOpen[1])
         verbose('- opened', channelToOpen, hash)
         this.emit('hopr:channel:opened', channelToOpen)
       } catch (e) {
@@ -316,19 +334,29 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-  private async getOpenChannels(): Promise<RoutingChannel[]> {
-    let channels: RoutingChannel[] = []
-    await this.paymentChannels.channel.getAll(
-      async (channel: Channel) => {
-        const pubKey = await channel.offChainCounterparty
-        const peerId = await pubKeyToPeerId(pubKey)
-        channels.push([this.getId(), peerId, await channel.balance]) // TODO partyA?
-      },
-      async (promises: Promise<void>[]) => {
-        await Promise.all(promises)
-      }
-    )
-    return channels
+  /**
+   * Randomly pick 10 open channels
+   * @returns maximum 10 open channels
+   */
+  private async getRandomOpenChannels(): Promise<ChannelEntry[]> {
+    const chain = await this.paymentChannels
+    const channels = new Map<string, ChannelEntry>()
+
+    for (let i = 0; i < 100; i++) {
+      if (channels.size >= 10) break
+
+      const channel = await chain.getRandomOpenChannel()
+      if (!channel) break
+
+      if (channels.has(channel.getId().toHex())) continue
+      channels.set(channel.getId().toHex(), channel)
+    }
+
+    return Array.from(channels.values())
+  }
+
+  private async getOpenChannels(): Promise<ChannelEntry[]> {
+    return (await this.paymentChannels).getOpenChannelsFrom(PublicKey.fromPeerId(this.getId()))
   }
 
   /**
@@ -337,46 +365,23 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public getVersion() {
     return FULL_VERSION
   }
-  /**
-   * This method starts the node and registers all necessary handlers. It will
-   * also open the database and creates one if it doesn't exists.
-   *
-   * @param options
-   */
-  public async start(): Promise<Hopr<Chain>> {
-    await Promise.all([this._libp2p.start().then(() => this.heartbeat.start()), this.paymentChannels.start()])
-
-    log(`Available under the following addresses:`)
-
-    this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    this.running = true
-    this.periodicCheck()
-    return this
-  }
 
   /**
    * Shuts down the node and saves keys and peerBook in the database
    */
   public async stop(): Promise<void> {
-    if (!this.running) {
-      return Promise.resolve()
-    }
+    this.status = 'DESTROYED'
     clearTimeout(this.checkTimeout)
-    this.running = false
-    await Promise.all([this.heartbeat.stop(), this.paymentChannels.stop()])
+    await Promise.all([this.heartbeat.stop(), (await this.paymentChannels).stop()])
 
-    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
+    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
-  public isRunning(): boolean {
-    return this.running
-  }
-
   public getId(): PeerId {
-    return this._libp2p.peerId // Not a documented API, but in the sourceu
+    return this.id
   }
 
   /**
@@ -385,57 +390,94 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    */
   public async getAnnouncedAddresses(peer: PeerId = this.getId()): Promise<Multiaddr[]> {
     if (peer.equals(this.getId())) {
-      return this._libp2p.multiaddrs
+      const addrs = this.libp2p.multiaddrs
+
+      // Most of the time we want to only return 'public' addresses, that is,
+      // addresses that have a good chance of being reachable by other nodes,
+      // therefore only ones that include a public IP etc.
+      //
+      // We also have a setting announceLocalAddresses that inverts this so we
+      // can test on closed local networks.
+      if (this.options.announceLocalAddresses) {
+        return addrs.filter((ma) => ma.toString().includes('127.0.0.1')) // TODO - proper filtering
+      }
+      return addrs.filter((ma) => !ma.toString().includes('127.0.0.1')) // TODO - proper filtering
     }
 
-    return (await this._libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
+    return (await this.libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
   }
 
   /**
    * List the addresses on which the node is listening
    */
   public getListeningAddresses(): Multiaddr[] {
-    return this._libp2p.addressManager.getListenAddrs()
+    return this.libp2p.addressManager.getListenAddrs()
   }
 
   /**
    * Gets the observed addresses of a given peer.
    * @param peer peer to query for
    */
-  public getObservedAddresses(peer: PeerId): Address[] {
-    return this._libp2p.peerStore.get(peer)?.addresses ?? []
+  public getObservedAddresses(peer: PeerId): LibP2PAddress[] {
+    return this.libp2p.peerStore.get(peer)?.addresses ?? []
   }
 
   /**
-   * Sends a message.
-   *
-   * @notice THIS METHOD WILL SPEND YOUR ETHER.
-   * @notice This method will fail if there are not enough funds to open
-   * the required payment channels. Please make sure that there are enough
-   * funds controlled by the given key pair.
-   *
    * @param msg message to send
    * @param destination PeerId of the destination
    * @param intermediateNodes optional set path manually
-   * the acknowledgement of the first hop
    */
-  public async sendMessage(
-    msg: Uint8Array,
-    destination: PeerId,
-    getIntermediateNodesManually?: () => Promise<PeerId[]>
-  ): Promise<void> {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]): Promise<void> {
     const promises: Promise<void>[] = []
+    const ethereum = await this.paymentChannels
+
+    if (this.status != 'RUNNING') {
+      throw new Error('Cannot send message until the node is running')
+    }
+
+    if (intermediatePath != undefined) {
+      // checking if path makes sense
+      for (let i = 0; i < intermediatePath.length; i++) {
+        let ticketIssuer: PublicKey
+        let ticketReceiver: PublicKey
+
+        if (i == 0) {
+          ticketIssuer = PublicKey.fromPeerId(this.getId())
+          ticketReceiver = intermediatePath[0]
+        } else {
+          ticketIssuer = intermediatePath[i - 1]
+          ticketReceiver = intermediatePath[i]
+        }
+
+        const channel = ethereum.getChannel(ticketIssuer, ticketReceiver)
+        const channelState = await channel.usToThem()
+
+        if (typeof channelState === 'undefined') {
+          throw Error(
+            `Channel from ${ticketIssuer.toPeerId().toB58String()} to ${ticketReceiver
+              .toPeerId()
+              .toB58String()} not found`
+          )
+        } else if (channelState.status !== ChannelStatus.Open) {
+          throw Error(`Channel ${channelState.getId().toHex()} is not open`)
+        }
+
+        if (channelState.ticketEpoch.toBN().isZero()) {
+          throw Error(
+            `Cannot use manually set path because apparently there is no commitment set for the channel between ${ticketIssuer
+              .toPeerId()
+              .toB58String()} and ${ticketReceiver.toPeerId().toB58String()}`
+          )
+        }
+      }
+    }
 
     for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
       promises.push(
         new Promise<void>(async (resolve, reject) => {
-          let intermediatePath: PeerId[]
-          if (getIntermediateNodesManually != undefined) {
-            verbose('manually creating intermediatePath')
-            intermediatePath = await getIntermediateNodesManually()
-          } else {
+          if (intermediatePath == undefined) {
             try {
-              intermediatePath = await this.getIntermediateNodes(destination)
+              intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
             } catch (e) {
               reject(e)
               return
@@ -445,30 +487,27 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
             }
           }
 
-          const path: PeerId[] = [].concat(intermediatePath, [destination])
+          const path: PublicKey[] = [].concat(intermediatePath, [PublicKey.fromPeerId(destination)])
+          console.log('>>>', path)
 
-          let packet: Packet<Chain>
+          let packet: Packet
           try {
             packet = await Packet.create(
-              this,
-              this._libp2p,
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-              await Promise.all(path.map(addPubKey))
+              path.map((x) => x.toPeerId()),
+              this.getId(),
+              await this.paymentChannels
             )
           } catch (err) {
             return reject(err)
           }
 
-          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.challenge.hash)
-
-          await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
-
-          this._interactions.packet.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
+          this.once('message-acknowledged:' + packet.ackChallenge.toHex(), () => {
             resolve()
           })
 
           try {
-            await this._interactions.packet.forward.interact(path[0], packet)
+            await this.forward.interact(path[0].toPeerId(), packet)
           } catch (err) {
             return reject(err)
           }
@@ -486,8 +525,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   /**
    * Ping a node.
-   * @dev returns latency >= 0 or -1 if unreachable
-   *
    * @param destination PeerId of the node
    * @returns latency
    */
@@ -495,57 +532,99 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
-    let info = ''
-    let latency = await this._interactions.heartbeat.interact(destination)
-    return { latency, info }
+    let start = Date.now()
+    try {
+      const success = await this.heartbeat.pingNode(destination)
+      if (success) {
+        return { latency: Date.now() - start, info: '' }
+      } else {
+        return { info: 'failure', latency: -1 }
+      }
+    } catch (e) {
+      log(e)
+      return { latency: -1, info: 'error' }
+    }
   }
 
   public getConnectedPeers(): PeerId[] {
+    if (!this.networkPeers) {
+      return []
+    }
     return this.networkPeers.all()
   }
 
-  public connectionReport(): string {
-    return this.networkPeers.debugLog()
+  public async connectionReport(): Promise<string> {
+    if (!this.networkPeers) {
+      return 'Node has not started yet'
+    }
+    const connected = this.networkPeers.debugLog()
+    const announced = await (await this.paymentChannels).indexer.getAnnouncedAddresses()
+    return `${connected}
+    \n${announced.length} peers have announced themselves on chain:
+    \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
   }
 
   private async checkBalances() {
     const balance = await this.getBalance()
-    let unfunded = false
-    if (balance.lten(0)) {
-      const address = await this.paymentChannels.hexAccountAddress()
+    const address = (await this.getEthereumAddress()).toHex()
+    if (balance.toBN().lten(0)) {
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
-      unfunded = true
     }
     const nativeBalance = await this.getNativeBalance()
-    if (nativeBalance.lte(MIN_NATIVE_BALANCE)) {
-      const address = await this.paymentChannels.hexAccountAddress()
+    if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
-      unfunded = true
-    }
-    if (!unfunded) {
-      // Technically we only have to do this the first time, but there are no
-      // side effects to doing this on each tick.
-      this.paymentChannels.initOnchainValues() // No-op if called many times.
     }
   }
 
   private async periodicCheck() {
-    log('periodic check', this.running)
-    if (!this.running) {
+    log('periodic check', this.status)
+    if (this.status != 'RUNNING') {
       return
     }
     try {
       await this.checkBalances()
-      await this.tickChannelStrategy([])
+      await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
     }
     this.checkTimeout = setTimeout(() => this.periodicCheck(), CHECK_TIMEOUT)
   }
 
-  public setChannelStrategy(strategy: ChannelStrategyNames) {
+  private async announce(includeRouting: boolean = false): Promise<void> {
+    log('announcing self, include routing:', includeRouting)
+    const chain = await this.paymentChannels
+    //const account = await chain.getAccount(await this.getEthereumAddress())
+    // exit if we already announced
+    //if (account.hasAnnounced()) return
+
+    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
+      throw new Error('Cannot announce without funds')
+    }
+
+    const multiaddrs = await this.getAnnouncedAddresses()
+    const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))
+    const ip6 = multiaddrs.find((s) => s.toString().includes('/ip6/'))
+    const p2p = new Multiaddr('/p2p/' + this.getId().toB58String())
+    // exit if none of these multiaddrs are available
+    if (!ip4 && !ip6 && !p2p) return
+
+    try {
+      if (includeRouting && (ip4 || ip6)) {
+        log('announcing with routing', ip4 || ip6)
+        await chain.announce(ip4 || ip6)
+        return
+      }
+      log('announcing without routing', p2p.toString())
+      await chain.announce(p2p)
+    } catch (err) {
+      log('announce failed')
+      throw new Error(`Failed to announce: ${err}`)
+    }
+  }
+
+  public async setChannelStrategy(strategy: ChannelStrategyNames) {
     if (strategy == 'passive') {
       this.strategy = new PassiveStrategy()
       return
@@ -554,6 +633,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.strategy = new PromiscuousStrategy()
       return
     }
+
+    const ethereum = await this.paymentChannels
+    ethereum.on('ticket:win', (ack, channel) => {
+      this.strategy.onWinningTicket(ack, channel)
+    })
     throw new Error('Unknown strategy')
   }
 
@@ -561,101 +645,189 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this.strategy.name
   }
 
-  public async getBalance(): Promise<Types.Balance> {
-    return await this.paymentChannels.account.getBalance(true)
+  public async getBalance(): Promise<Balance> {
+    const chain = await this.paymentChannels
+    return await chain.getBalance(true)
   }
 
-  public async getNativeBalance(): Promise<Types.NativeBalance> {
-    return await this.paymentChannels.account.getNativeBalance(true)
+  public async getNativeBalance(): Promise<NativeBalance> {
+    const chain = await this.paymentChannels
+    return await chain.getNativeBalance(true)
   }
 
-  public smartContractInfo(): string {
-    return this.paymentChannels.smartContractInfo()
+  public async smartContractInfo(): Promise<{
+    network: string
+    hoprTokenAddress: string
+    hoprChannelsAddress: string
+    channelClosureSecs: number
+  }> {
+    const chain = await this.paymentChannels
+    return chain.smartContractInfo()
   }
 
   /**
    * Open a payment channel
    *
-   * @param counterParty the counter party's peerId
+   * @param counterparty the counter party's peerId
    * @param amountToFund the amount to fund in HOPR(wei)
    */
   public async openChannel(
-    counterParty: PeerId,
+    counterparty: PeerId,
     amountToFund: BN
   ): Promise<{
-    channelId: Types.Hash
+    channelId: Hash
   }> {
-    const { utils, types, account } = this.paymentChannels
-    const self = this.getId()
-
-    const channelId = await utils.getId(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
-    )
-
-    const myAvailableTokens = await account.getBalance(true)
+    const ethereum = await this.paymentChannels
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
+    const myAvailableTokens = await ethereum.getBalance(true)
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
-    } else if (amountToFund.gt(myAvailableTokens)) {
-      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toString(10)}`)
+    } else if (amountToFund.gt(myAvailableTokens.toBN())) {
+      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
-    const amPartyA = utils.isPartyA(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
-    )
-
-    const channelBalance = types.ChannelBalance.create(
-      undefined,
-      amPartyA
-        ? {
-            balance: amountToFund,
-            balance_a: amountToFund
-          }
-        : {
-            balance: amountToFund,
-            balance_a: new BN(0)
-          }
-    )
-
-    await this.paymentChannels.channel.create(
-      counterParty.pubKey.marshal(),
-      async () => this._interactions.payments.onChainKey.interact(counterParty),
-      channelBalance,
-      (balance: Types.ChannelBalance): Promise<Types.SignedChannel> =>
-        this._interactions.payments.open.interact(counterParty, balance)
-    )
-
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     return {
-      channelId
+      channelId: await channel.open(new Balance(amountToFund))
     }
   }
 
-  public async closeChannel(peerId: PeerId): Promise<{ receipt: string; status: string }> {
-    const channel = await this.paymentChannels.channel.create(
-      peerId.pubKey.marshal(),
-      async (counterparty: Uint8Array) =>
-        this._interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty))
-    )
+  /**
+   * Fund a payment channel
+   *
+   * @param counterparty the counter party's peerId
+   * @param myFund the amount to fund the channel in my favor HOPR(wei)
+   * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
+   */
+  public async fundChannel(
+    counterparty: PeerId,
+    myFund: BN,
+    counterpartyFund: BN
+  ): Promise<{
+    channelId: Hash
+  }> {
+    const ethereum = await this.paymentChannels
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
+    const myBalance = await ethereum.getBalance(false)
+    const totalFund = myFund.add(counterpartyFund)
 
-    const status = await channel.status
-
-    if (!(status === 'OPEN' || status === 'PENDING')) {
-      throw new Error('To close a channel, it must be open or pending for closure')
+    // validate 'amountToFund'
+    if (totalFund.lten(0)) {
+      throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
+    } else if (totalFund.gt(myBalance.toBN())) {
+      throw Error(`You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.toBN().toString(10)}`)
     }
 
-    const receipt = await channel.initiateSettlement()
-    return { receipt, status }
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
+    await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
+
+    return {
+      channelId: (await channel.usToThem()).getId()
+    }
+  }
+
+  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: ChannelStatus }> {
+    const ethereum = await this.paymentChannels
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
+    const channelState = await channel.usToThem()
+
+    // TODO: should we wait for confirmation?
+    if (channelState.status === ChannelStatus.Closed) {
+      throw new Error('Channel is already closed')
+    }
+
+    if (channelState.status === ChannelStatus.Open) {
+      await this.strategy.onChannelWillClose(channel)
+    }
+
+    const txHash = await (channelState.status === ChannelStatus.Open
+      ? channel.initializeClosure()
+      : channel.finalizeClosure())
+
+    return { receipt: txHash, status: channelState.status }
   }
 
   public async getAcknowledgedTickets() {
-    return getAcknowledgedTickets(this)
+    return this.db.getAcknowledgedTickets()
   }
 
-  public async submitAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array) {
-    return submitAcknowledgedTicket(this, ackTicket, index)
+  public async getTicketStatistics() {
+    const ack = await this.getAcknowledgedTickets()
+    const pending = await this.db.getPendingTicketCount()
+    const losing = await this.db.getLosingTicketCount()
+    const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
+      ackTickets.map((a) => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO())
+
+    return {
+      pending,
+      losing,
+      winProportion: ack.length / (ack.length + losing) || 0,
+      unredeemed: ack.length,
+      unredeemedValue: totalValue(ack),
+      redeemed: await this.db.getRedeemedTicketsCount(),
+      redeemedValue: await this.db.getRedeemedTicketsValue()
+    }
+  }
+
+  public async redeemAllTickets() {
+    let count = 0,
+      redeemed = 0,
+      total = new BN(0)
+
+    for (const ackTicket of await this.getAcknowledgedTickets()) {
+      count++
+      const result = await this.redeemAcknowledgedTicket(ackTicket)
+
+      if (result.status === 'SUCCESS') {
+        redeemed++
+        total.iadd(ackTicket.ticket.amount.toBN())
+        console.log(`Redeemed ticket ${count}`)
+      } else {
+        console.log(`Failed to redeem ticket ${count}`)
+      }
+    }
+    return {
+      count,
+      redeemed,
+      total: new Balance(total)
+    }
+  }
+
+  public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
+    const ethereum = await this.paymentChannels
+    const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.signer)
+    return await channel.redeemTicket(ackTicket)
+  }
+
+  public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
+    const ethereum = await this.paymentChannels
+    return await ethereum.getChannelsFrom(addr)
+  }
+
+  public async getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
+    const ethereum = await this.paymentChannels
+    return await ethereum.getChannelsTo(addr)
+  }
+
+  public async getPublicKeyOf(addr: Address): Promise<PublicKey> {
+    const ethereum = await this.paymentChannels
+    return await ethereum.getPublicKeyOf(addr)
+  }
+
+  public async getEthereumAddress(): Promise<Address> {
+    const ethereum = await this.paymentChannels
+    return ethereum.getAddress()
+  }
+
+  public async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
+    const ethereum = await this.paymentChannels
+    return ethereum.withdraw(currency, recipient, amount)
   }
 
   /**
@@ -664,42 +836,41 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    *
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
-  private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
+  private async getIntermediateNodes(destination: PublicKey): Promise<PublicKey[]> {
+    const ethereum = await this.paymentChannels
     return await findPath(
-      this.getId(),
+      PublicKey.fromPeerId(this.getId()),
       destination,
-      MAX_HOPS - 1,
+      INTERMEDIATE_HOPS,
       this.networkPeers,
-      this.paymentChannels.indexer,
+      ethereum.getOpenChannelsFrom.bind(ethereum),
       PATH_RANDOMNESS
     )
   }
 
-  private static openDatabase(options: HoprOptions): LevelUp {
-    if (options.db) {
-      return options.db
-    }
-
-    let dbPath: string
-    if (options.dbPath) {
-      dbPath = options.dbPath
-    } else {
-      dbPath = defaultDBPath(options.id, options.bootstrapNode)
-    }
-
-    dbPath = path.resolve(dbPath)
-
-    verbose('using db at ', dbPath)
-    if (!existsSync(dbPath)) {
-      verbose('db does not exist, creating?:', options.createDbIfNotExist)
-      if (options.createDbIfNotExist) {
-        mkdirSync(dbPath, { recursive: true })
-      } else {
-        throw new Error('Database does not exist: ' + dbPath)
+  // This is a utility method to wait until the node is funded.
+  public async waitForFunds(): Promise<void> {
+    return new Promise((resolve) => {
+      const tick = () => {
+        this.getNativeBalance().then((nativeBalance) => {
+          if (nativeBalance.toBN().gt(MIN_NATIVE_BALANCE)) {
+            resolve()
+          } else {
+            log('still unfunded, trying again soon')
+            setTimeout(tick, CHECK_TIMEOUT)
+          }
+        })
       }
-    }
+      tick()
+    })
+  }
 
-    return levelup(leveldown(dbPath))
+  // Utility method to wait until the node is running successfully
+  public async waitForRunning(): Promise<void> {
+    if (this.status == 'RUNNING') {
+      return Promise.resolve()
+    }
+    return new Promise((resolve) => this.once('running', resolve))
   }
 }
 

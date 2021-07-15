@@ -1,14 +1,12 @@
 import * as mod from './index'
 import assert from 'assert'
-import type { CommandResponse } from './abstractCommand'
 // @ts-ignore
 import sinon from 'sinon'
 
-const assertMatch = (test: CommandResponse, pattern: RegExp) => {
-  if (!test) {
-    throw new Error('cannot match empty string')
-  }
-  assert(test.match(pattern), `${test} should match ${pattern}`)
+const assertMatch = async (cmds, command, pattern: RegExp) => {
+  let response = ''
+  await cmds.execute((l) => (response += l), command)
+  assert(response.match(pattern), `executing: (${command}) => ${response} should match ${pattern}`)
 }
 
 let mockNode = sinon.fake() as any
@@ -27,139 +25,49 @@ describe('Commands', () => {
   it('responds to nonsense commands', async () => {
     assert(mod.Commands)
     let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('not-a-real-command'), /unknown command/i)
+    await assertMatch(cmds, 'not-a-real-command', /unknown command/i)
   })
 
   it('ping', async () => {
-    mockNode.bootstrapServers = []
     mockNode.ping = sinon.fake.returns({ info: '', latency: 10 })
     let mockPeerId = '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
     let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute(`ping  ${mockPeerId}`), /pong/i)
+    await assertMatch(cmds, `ping  ${mockPeerId}`, /pong/i)
     assert(mockNode.ping.calledOnce)
   })
 
   it('help', async () => {
     let mockNode: any = sinon.fake()
     let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('help'), /help/)
-  })
-
-  /* DISABLED as broken in monorepo. TODO fix
-  it('listConnectors', async() => {
-    let mockNode: any = sinon.fake()
-    let cmds = new mod.Commands(mockNode)
-    assert(await cmds.execute('listConnectors')).toMatch(/ethereum/)
-  })
-  */
-
-  it('address', async () => {
-    let mockNode = sinon.fake() as any
-    mockNode.paymentChannels = sinon.fake()
-    mockNode.paymentChannels.constants = sinon.fake()
-    mockNode.paymentChannels.utils = sinon.fake()
-    mockNode.paymentChannels.utils.pubKeyToAccountId = sinon.fake.returns('')
-    mockNode.paymentChannels.constants.CHAIN_NAME = '2CHAINZ'
-    mockNode.getId = sinon.fake.returns({
-      toB58String: sinon.fake(),
-      pubKey: { marshal: sinon.fake() }
-    })
-    let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('address'), /HOPR/)
+    await assertMatch(cmds, 'help', /help/)
   })
 
   it('send message', async () => {
     mockNode.sendMessage = sinon.fake()
     let cmds = new mod.Commands(mockNode)
-    await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
+    await assertMatch(cmds, 'send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world', /.*/)
     assert(mockNode.sendMessage.calledOnce, 'send message not called')
-    assertMatch(await cmds.execute('send unknown-alias Hello, world'), /invalid/i)
+    await assertMatch(cmds, 'send unknown-alias Hello, world', /invalid/i)
 
-    await cmds.execute('alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test')
-    await cmds.execute('alias 16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW test2')
-    await cmds.execute('send test,test2 Hello, world')
+    await assertMatch(cmds, 'alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test', /.*/)
+    await assertMatch(cmds, 'alias 16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW test2', /.*/)
+    await assertMatch(cmds, 'send test,test2 Hello, world', /.*/)
     assert(mockNode.sendMessage.calledTwice, 'send message not called')
-    await cmds.execute('send ,test2 Hello, world')
+    await assertMatch(cmds, 'send ,test2 Hello, world', /.*/)
     assert(mockNode.sendMessage.callCount == 3, 'send message not called x3')
-  })
-
-  it('autocomplete sendmessage', async () => {
-    let mockNode: any = sinon.fake()
-    mockNode.sendMessage = sinon.fake()
-    mockNode.bootstrapServers = []
-    mockNode.getConnectedPeers = () => [{ toB58String: () => '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
-
-    let cmds = new mod.Commands(mockNode)
-    assertMatch((await cmds.autocomplete('send 16Ui'))[0][0], /send 16U/)
-    assert((await cmds.autocomplete('send foo'))[0][0] == '')
-
-    await cmds.execute('alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test')
-    assert((await cmds.autocomplete('send t'))[0][0] == 'send test')
-  })
-
-  it('multisend', async () => {
-    let seq = 0
-    let mockNode = sinon.fake() as any
-    mockNode.sendMessage = sinon.fake()
-
-    let mockReadline = sinon.fake() as any
-    mockReadline.write = sinon.fake()
-    mockReadline.pause = sinon.fake()
-    mockReadline.resume = sinon.fake()
-
-    mockReadline.question = sinon.fake((question: any, resolve: any) => {
-      assert(question == 'send >', 'question matches')
-      if (seq == 0) {
-        resolve('hello')
-        seq++
-      } else {
-        assert(mockNode.sendMessage.calledOnce)
-        resolve('quit')
-      }
-    })
-
-    let cmds = new mod.Commands(mockNode, mockReadline)
-    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test2')
-    await cmds.execute('multisend test2')
-    assert(mockReadline.question.calledTwice, 'called once')
-  })
-
-  it('withdraw', async () => {
-    let mockNode: any = sinon.fake()
-    mockNode.paymentChannels = sinon.fake()
-    mockNode.paymentChannels.types = sinon.fake()
-    mockNode.paymentChannels.types.Balance = sinon.fake()
-    mockNode.paymentChannels.types.NativeBalance = sinon.fake()
-    mockNode.paymentChannels.withdraw = sinon.fake()
-
-    let cmds = new mod.Commands(mockNode)
-    assertMatch((await cmds.autocomplete('withdraw'))[0][0], /amount \(ETH, HOPR\)/)
-
-    await cmds.execute('withdraw 0x123 native 1')
-    assert(mockNode.paymentChannels.withdraw.calledOnce)
   })
 
   it('settings', async () => {
     let mockNode: any = sinon.fake()
     mockNode.getChannelStrategy = (): string => ''
     let cmds = new mod.Commands(mockNode)
-
-    let ir = await cmds.execute('settings')
-    assertMatch(ir, /includeRecipient/)
+    await assertMatch(cmds, 'settings', /includeRecipient/)
   })
 
   it('settings includeRecipient', async () => {
     let mockNode: any = sinon.fake()
     let cmds = new mod.Commands(mockNode)
-
-    let ir = await cmds.execute('settings includeRecipient')
-    assertMatch(ir, /false/)
-    await cmds.execute('settings includeRecipient true')
-    ir = await cmds.execute('settings includeRecipient')
-    assertMatch(ir, /true/)
-    await cmds.execute('settings includeRecipient false')
-    ir = await cmds.execute('settings includeRecipient')
-    assertMatch(ir, /false/)
+    await assertMatch(cmds, 'settings includeRecipient', /false/)
   })
 
   it('settings strategy', async () => {
@@ -170,10 +78,8 @@ describe('Commands', () => {
     }
     mockNode.getChannelStrategy = (): string => setCalled
     let cmds = new mod.Commands(mockNode)
-
-    let ir = await cmds.execute('settings strategy')
-    assertMatch(ir, /promiscuous/)
-    await cmds.execute('settings strategy passive')
+    await assertMatch(cmds, 'settings strategy', /promiscuous/)
+    await assertMatch(cmds, 'settings strategy passive', /.*/)
     assert(setCalled === 'passive')
   })
 
@@ -181,27 +87,39 @@ describe('Commands', () => {
     let mockNode: any = sinon.fake()
     mockNode.sendMessage = sinon.fake()
     let cmds = new mod.Commands(mockNode)
-
-    let aliases = await cmds.execute('alias')
-    assertMatch(aliases, /No aliases found/)
-
-    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
-
-    aliases = await cmds.execute('alias')
-    assertMatch(aliases, /test/)
-    await cmds.execute('send test Hello, world')
+    await assertMatch(cmds, 'alias', /No aliases found/)
+    await assertMatch(cmds, 'alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test', /.*/)
+    await assertMatch(cmds, 'alias', /test/)
+    await assertMatch(cmds, 'send test Hello, world', /.*/)
     assert(mockNode.sendMessage.calledOnce)
+  })
+
+  it('fund channel', async () => {
+    const channelId = '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7'
+    let mockNode: any = sinon.fake()
+    mockNode.fundChannel = sinon.fake(async () => ({
+      channelId: {
+        toHex: () => channelId
+      }
+    }))
+
+    let cmds = new mod.Commands(mockNode)
+    await assertMatch(cmds, `fund ${channelId} 10 15`, /Successfully funded channel/)
+    await assertMatch(cmds, `fund ${channelId} 10`, /usage:/)
+    await assertMatch(cmds, `fund ${channelId} 10 y`, /is not a number/)
   })
 
   it('close channel', async () => {
     let mockNode: any = sinon.fake()
+    mockNode.smartContractInfo = async () => ({
+      channelClosureSecs: 300
+    })
     mockNode.closeChannel = sinon.fake(async () => ({
       status: undefined
     }))
-
     let cmds = new mod.Commands(mockNode)
-    const r = await cmds.execute('close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7')
-    assertMatch(r, /Initiated channel closure/)
+    await assertMatch(cmds, 'close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7', /Initiated channel closure/)
+    await assertMatch(cmds, 'close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7', /5 minutes/)
   })
 
   it('cover traffic', async () => {
@@ -220,12 +138,23 @@ describe('Commands', () => {
       return Promise.resolve()
     }
     let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('covertraffic start'), /started/)
+    await assertMatch(cmds, 'covertraffic start', /started/)
     await clock.tickAsync(30_000)
-    assertMatch(await cmds.execute('covertraffic stop'), /stopped/)
-    assertMatch(await cmds.execute('covertraffic stats'), /messages sent/)
-    assertMatch(await cmds.execute('covertraffic stats'), /reliability/)
+    await assertMatch(cmds, 'covertraffic stop', /stopped/)
+    await assertMatch(cmds, 'covertraffic stats', /messages sent/)
+    await assertMatch(cmds, 'covertraffic stats', /reliability/)
 
     clock.restore()
+  })
+
+  it('info', async () => {
+    let mockNode: any = sinon.fake()
+    mockNode.getAnnouncedAddresses = async () => []
+    mockNode.getListeningAddresses = () => []
+    mockNode.smartContractInfo = async () => ({
+      channelClosureSecs: 300
+    })
+    let cmds = new mod.Commands(mockNode)
+    await assertMatch(cmds, 'info', /Channel closure period: 5 minutes/)
   })
 })

@@ -1,4 +1,4 @@
-name: HOPR Lint and fix
+name: HOPR Lint fix
 
 on:
   push:
@@ -6,28 +6,51 @@ on:
     paths-ignore:
       - '**/docs/**/*'
 
-
 jobs:
-  build:
-    name: Lint 
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
-      - name: Use Node.js 
-        uses: actions/setup-node@v1
+      - name: Use Node.js
+        uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
-      - name: Install dependencies 
-        run: yarn
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
 
-      - name: Lint & Fix
+      - name: Restore cache of node modules and yarn cache
+        uses: actions/cache@v2
+        if: ${{ !env.ACT }}
+        id: nodejs-cache
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nodejs-
+
+      - name: Run linter
+        run: |
+          yarn
+          yarn lint:fix
+
+      - name: Check if changed
+        id: check-changed
+        run: |
+          echo "::set-output name=changed::$(git status --porcelain)"
+
+      - name: Commit changes
+        if: steps.check-changed.outputs.changed != ''
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Linting robot"
-          yarn lint:fix
           git commit -a -m "Fix linting" || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}

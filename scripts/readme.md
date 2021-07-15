@@ -1,6 +1,6 @@
 # Scripts
 
-### Start a testnet with a bootstrap node and several regular nodes
+### Start a testnet
 
 ```bash
 source testnet.sh

@@ -1,6 +1,6 @@
 import { encode, decode } from 'rlp'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import { styleValue } from './displayHelp'
+import { styleValue } from '.'
 
 /**
  * Adds the current timestamp to the message in order to measure the latency.
@@ -15,9 +15,7 @@ export function encodeMessage(msg: string): Uint8Array {
  * the measured latency.
  * @param encoded an encoded message
  */
-export function decodeMessage(
-  encoded: Uint8Array
-): {
+export function decodeMessage(encoded: Uint8Array): {
   latency: number
   msg: string
 } {

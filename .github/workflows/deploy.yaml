@@ -1,159 +1,280 @@
 name: HOPR Deploy
+
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
+  MATRIX_ROOM: ${{ secrets.MATRIX_ROOM }}
+  MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
+  MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
+
 on:
   push:
-    branches: ['master', 'release/**', 'avado']
+    branches: ['master', 'release/**', 'avado', 'debug-deploy/**']
     paths-ignore:
       - '**/docs/**/*'
 
+concurrency:
+  # limit invocations of this workflow to one at a time to prevent race
+  # conditions
+  group: deploy
+  # just canceling could lead to side-effects of incomplete runs, so let's just
+  # run through each invocation completely
+  cancel-in-progress: false
+
 jobs:
-  build:
-    name: Build, Publish etc
+  build_deploy_sc_npm:
+    name: Build / Deploy SCs / Publish NPM
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Use Node.js
-        uses: actions/setup-node@v1
+        with:
+          fetch-depth: 0
+
+      - name: '[SETUP] Configure Git info'
+        run: ./scripts/configure-git-info.sh
+
+      - name: '[SETUP] Use Node.js'
+        uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
-            #      - uses: actions/cache@v2
-            #        id: cache
-            #        with:
-            #          path: 'node_modules'
-            #          key: ${{ runner.os }}-modules-${{ hashFiles('yarn.lock') }}
 
-      - name: Install dependencies 
+      - name: '[SETUP] Install Yarn (only when using ACT)'
+        if: ${{ env.ACT == 'true' }}
+        run: |
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          apt update
+          apt install --no-install-recommends yarn
+
+      - name: '[SETUP] Get yarn cache directory path'
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: '[SETUP] Restore cache of node modules and yarn cache'
+        uses: actions/cache@v2
+        if: ${{ !env.ACT }}
+        id: nodejs-cache
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nodejs-
+
+      - name: '[BUILD] Install dependencies / link / build'
         run: |
           yarn
-          node_modules/.bin/lerna bootstrap
-          #yarn autoclean --force
+          yarn setup
+          yarn util:link
+          yarn build
 
-      - name: Link & Build
-        run: |
-          yarn util:link && yarn build
+      - name: '[SMART-CONTRACTS] Deploy on Goerli'
+        if: ${{ !env.ACT }}
+        run: ./scripts/deploy-smart-contracts.sh
+        env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
+          ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
+          NETWORK: goerli
 
-      - name: Get version from package.json
-        run: echo "PREVIOUS_RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
+      - name: '[SMART-CONTRACTS] Deploy on xDai'
+        if: ${{ !env.ACT }}
+        run: ./scripts/deploy-smart-contracts.sh
+        env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
+          NETWORK: xdai
 
-      # Goal is, every push to master increments c from a.b.0-prerelease-c to
-      # a.b.0-prerelease-(c+1)
-      # Of course this begs the question, how do we ever increment b?
-      # If there is a released branch with a.b.c, then we know we also have to
-      # increment b.
-      - name: Is there a published version of this?
-        if: github.ref == 'refs/heads/master'
+      - name: '[SMART-CONTRACTS] Deploy on hardhat localhost'
+        if: ${{ !env.ACT }}
+        run: ./scripts/deploy-smart-contracts.sh
+        env:
+          DEVELOPMENT: true
+          NETWORK: hardhat
+
+      - name: '[SMART-CONTRACTS] Commit & push changes'
+        if: ${{ !env.ACT }}
+        run: ./scripts/commit-and-push-all-changes.sh
+        env:
+          HOPR_GIT_MSG: "Update smart contract deployments"
+
+      - name: '[NPM] Publish prerelease version (On pushes to master)'
+        if: ${{ github.ref == 'refs/heads/master' }}
         run: |
-          PREVIOUS_RELEASE_MAJ_MIN=$(echo ${{ env.PREVIOUS_RELEASE }} | sed 's/\(\.[0-9]*\-alpha\)*\.[0-9]*$//')
-          FIND_NPM=$(npm view @hoprnet/hopr-core@$PREVIOUS_RELEASE_MAJ_MIN --json)
-          # preminor Goes a.b.0-next.0 to a.(b+1).0-next.0
-          # prerelease Goes a.b.0-next.c to a.b.0-next.(c+1)
-          VERSION_TYPE=$([ ${#FIND_NPM} -ge 1 ] && echo "preminor" || echo "prerelease")
-          echo "VERSION_TYPE=${VERSION_TYPE}" >> $GITHUB_ENV
-          echo "RELEASE TYPE: ${VERSION_TYPE} (${PREVIOUS_RELEASE_MAJ_MIN})"
-      - name: Publish prerelease version (On pushes to master)
-        if: github.ref == 'refs/heads/master'
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Versioning robot"
-          git config pull.rebase false
-          git pull origin master
-          node_modules/.bin/lerna version ${{ env.VERSION_TYPE }} --yes --exact --no-push --no-changelog --preid next 
-          git push origin master
-          node_modules/.bin/lerna publish from-package --yes
+          export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
+          ./scripts/publish-pre-release.sh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          HOPR_PACKAGE: hoprd
+          HOPR_VERSION_MAJMIN: true
 
       # Pushing a PR to a release branch should increment the patch version in
       # accordance with semver.
-      - name: Publish patch version (On pushes to release branches)
-        if: |
-          startsWith(github.ref, 'refs/heads/release/')
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Versioning robot"
-          git config pull.rebase false
-          git pull origin ${{ github.ref }}
-          node_modules/.bin/lerna version patch --yes --exact --no-push --no-changelog 
-          git push origin ${{ github.ref }} 
-          node_modules/.bin/lerna publish from-package --yes
+      - name: '[NPM] Publish patch version (On pushes to release branches)'
+        if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
+        run: ./scripts/publish-patch-release.sh
         env:
-          NODE_AUTH_TOKEN:
-            ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          HOPR_PACKAGE: hoprd
 
-      - name: Get version from package.json
-        run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
-
-      - name: Debug release number
-        run: echo ${{ env.RELEASE }}
-
-      - name: Wait for NPM
+      - name: '[NPM] Wait for package to be accessible'
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: |
-          sleep 5m # Allow NPM registry to catch uo
+          export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
+          ./scripts/wait-for-npm-package.sh
+        env:
+          HOPR_PACKAGE: hoprd
 
-          #      - name: Publish to GPR
-          #        if: |
-          #          startsWith(github.ref, 'refs/heads/release/')
-          #        run: |
-          #          echo //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} > .npmrc
-          #          node_modules/.bin/lerna publish from-package --yes --registry https://npm.pkg.github.com/
-          #        env:
-          #          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: '[FINISH] Send notification if anything failed on master or release branches'
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"
 
-  release:
+  github_release:
     name: Create Github Release
     runs-on: ubuntu-latest
-    needs: [build]
-    if: startsWith(github.ref, 'refs/heads/release/')
+    needs: [build_deploy_sc_npm]
+    if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
     steps:
       - uses: actions/checkout@v2
-      - name: Update repo from latest pushes.
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Versioning robot"
-          git config pull.rebase false
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
       - name: Get version from package.json
-        run: echo "RELEASE_NAME=v$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
+        id: get-package-version
+        run: echo "::set-output name=tag::v$(./scripts/get-package-version.sh)"
+        env:
+          HOPR_PACKAGE: hoprd
+
       - uses: softprops/action-gh-release@v1
+        if: ${{ !env.ACT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.RELEASE_NAME }}
-          name: HOPR - ${{ env.RELEASE_NAME }}
+          tag_name: ${{ steps.get-package-version.outputs.tag }}
+          name: HOPR - ${{ steps.get-package-version.outputs.tag }}
           draft: false
           prerelease: false
 
+      - name: Send notification if anything failed on master or release branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"
 
   build_hoprd_docker:
     name: Build HOPRD Docker
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build_deploy_sc_npm]
     steps:
       - uses: actions/checkout@v2
-      - name: Update repo from latest pushes.
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Versioning robot"
-          git config pull.rebase false
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
-      - name: Setup Google Cloud Credentials
-        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
-          version: '290.0.1'
+          fetch-depth: 0
+
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
+      - name: Setup Google Cloud Credentials
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
-      - name: Get version from package.json
-        run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
-      - name: Set Project for Google Cloud HOPR Association
-        working-directory: packages/hoprd
-        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+
+      - name: Pull recent Git changes
+        if: ${{ !env.ACT }}
+        run: |
+          # need to pull changes because we've updated the package versions in
+          # the job publish_npm beforehand
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          git pull origin "${branch}" --rebase
+
+      - name: Set image version
+        id: set-image-version
+        run: echo "::set-output name=vsn::$(date +%s)"
+
+      - name: Set package version
+        id: set-package-version
+        run: echo "::set-output name=vsn::$(./scripts/get-package-version.sh)"
+        env:
+          HOPR_PACKAGE: hoprd
+
+      - name: Set latest release tag
+        id: set-latest-release-tag
+        run: |
+          # we must set the tag specific to the release to prevent overrides
+          # from other release branches
+          declare release_name=${HOPR_GITHUB_REF##refs/heads/release/}
+          declare tag="latest-${release_name}"
+          echo "::set-output name=tag::${tag}"
+
       - name: Building Docker image using Google Cloud Build
         working-directory: packages/hoprd
-        run: | # TODO - actually parse semver to tag v1
-          gcloud builds submit --tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }}
-          gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:1
-          gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:latest 
+        run: |
+          gcloud builds submit --config cloudbuild.yaml \
+            --substitutions=_HOPR_PACKAGE_VERSION=${HOPR_PACKAGE_VERSION},_HOPR_IMAGE_VERSION=${HOPR_IMAGE_VERSION}
+        env:
+          HOPR_PACKAGE: hoprd
+          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Verify the correct hoprd package version has been bundled
+        run: |
+          declare v=$(docker run --pull always ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
+          [ "${v}" = "${HOPR_PACKAGE_VERSION}" ]
+        env:
+          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Add additional tags to new Docker image (on master and release branches)
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION}
+        env:
+          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Add tag latest to new Docker image on master
+        if: ${{ !env.ACT }} && ${{ github.ref == 'refs/heads/master' }}
+        run: |
+          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:latest
+        env:
+          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+
+      - name: Add tag for latest release to new Docker image on release branches
+        if: ${{ !env.ACT &&  startsWith(github.ref, 'refs/heads/release/') }}
+        run: |
+          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${TAG}
+        env:
+          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          TAG: ${{ steps.set-latest-release-tag.outputs.tag }}
+
+      - name: Add debug tags to new Docker image (on debug-deploy branches)
+        if: ${{ startsWith(github.ref, 'refs/heads/debug-deploy/') && !env.ACT }}
+        run: |
+          declare last_git_tag="$(git describe --tags --abbrev=0)"
+          declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
+          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${commits_since_tag}"
+          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${tag}
+        env:
+          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Send notification if anything failed on master or release branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"
 
   avado:
     name: Build Avado (master or release pushes)
@@ -161,37 +282,55 @@ jobs:
     needs: [build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
-      - name: Update repo from latest pushes.
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Versioning robot"
-          git config pull.rebase false
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
 
-      - name: Get version from package.json
-        run: |
-          echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
 
-      - name: Avado hack version if we are in master (they don't support prerelease versions)
-        if: github.ref == 'refs/heads/master'
+      - name: Set avado version
+        id: set-version
         run: |
-          echo "RELEASE=0.100.0" >> $GITHUB_ENV # Set this to an arbitrary number less than 1 
+          # Hack version if we are in master (they don't support prerelease versions)
+          # Set this to an arbitrary number less than 1
+          declare version="0.100.0"
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
+             # only assing the proper version only on release branches because
+             # only there we have simple semver versions
+            version="$(scripts/get-package-version.sh)"
+          fi
+          echo "::set-output name=vsn::${version}"
+        env:
+          HOPR_PACKAGE: hoprd
 
       - name: Build Avado
         working-directory: packages/avado
+        env:
+          HOPR_GIT_MSG: "placeholder"
+          HOPR_GITHUB_REF: ${{ github.ref }}
+          AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
         run: |
           docker-compose build
           sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#c11c4bd
           avadosdk increase minor
-          sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
+          sed -i "s/version\"[ ]*:[ ]*\"[0-9]*\.[0-9]*\.[0-9]*\"/version\": \"${AVADO_VERSION}\"/" \
+            ./dappnode_package.json
           cat ./dappnode_package.json | grep 'version'
           sudo avadosdk build --provider http://80.208.229.228:5001
           git add dappnode_package.json docker-compose.yml releases.json
           git commit -m "Avado CI: new release"
-          git pull origin ${{ github.ref }}
-          git push origin ${{ github.ref }}
-
           # http://go.ava.do/install/<IPFS HASH>
+
+      - name: Commit & Push changes
+        if: ${{ !env.ACT }}
+        env:
+          HOPR_GIT_MSG: "Avado CI: new release"
+          HOPR_GITHUB_REF: ${{ github.ref }}
+        run: ./scripts/commit-and-push-all-changes.sh
+
+      - name: Send notification if anything failed on master or release branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"
 
   deploy_instances:
     name: 'Continuous Deployment: Deploy instances'
@@ -199,31 +338,63 @@ jobs:
     needs: [build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
       - name: Use Node.js 14
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
-      - name: Update repo from latest pushes.
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Versioning robot"
-          git config pull.rebase false
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+
       - name: Setup Google Cloud Credentials
-        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@v0.2.1
         with:
-          version: '290.0.1'
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
-      - name: Set Project for Google Cloud HOPR Association
-        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-      - name: Run start script
+
+      - name: Set rpc network to xdai on release branches or goerli on master branch
+        id: set-rpc-network
         run: |
-          bash scripts/deploy.sh
+          declare network
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
+            network="xdai"
+          fi
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/master ]]; then
+            network="goerli"
+          fi
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
+            network="goerli"
+          fi
+          echo "::set-output name=network::${network}"
+
+      - name: Run start script
+        if: ${{ !env.ACT }}
+        run: |
+          # need to install tools first which may be used during deployment
+          yarn
+          # set release to intermediate docker build for debugging PRs
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
+            declare last_git_tag="$(git describe --tags --abbrev=0)"
+            declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
+            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${commits_since_tag}"
+          fi
+          echo "Pre-deploy env var RELEASE=${RELEASE}"
+          ./scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
           GITHUB_REF: ${{ github.ref }}
           BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          RPC_NETWORK: ${{ steps.set-rpc-network.outputs.network }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
-
+      - name: Send notification if anything failed on master or release branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"

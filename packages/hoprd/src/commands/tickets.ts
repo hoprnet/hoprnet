@@ -1,11 +1,9 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
-import { countSignedTickets, toSignedTickets, styleValue } from './utils'
+import { styleValue } from './utils'
 
 export default class Tickets extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -17,28 +15,22 @@ export default class Tickets extends AbstractCommand {
     return 'Displays information about your redeemed and unredeemed tickets'
   }
 
-  public async execute(): Promise<string | void> {
+  public async execute(log): Promise<void> {
+    log('finding information about tickets...')
     try {
-      const { Balance } = this.node.paymentChannels.types
-
-      const results = await this.node.getAcknowledgedTickets().then((tickets) => {
-        return tickets.filter((ticket) => !ticket.ackTicket.redeemed)
-      })
-
-      if (results.length === 0) {
-        return 'No tickets found.'
-      }
-
-      const ackTickets = results.map((o) => o.ackTicket)
-      const unredeemedResults = countSignedTickets(await toSignedTickets(ackTickets))
-      const unredeemedAmount = moveDecimalPoint(unredeemedResults.total.toString(), Balance.DECIMALS * -1)
-
-      return `Found ${styleValue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${styleValue(
-        unredeemedAmount,
-        'number'
-      )} HOPR.`
+      const stats = await this.node.getTicketStatistics()
+      log(`
+Tickets:
+- Pending:          ${stats.pending}
+- Unredeemed:       ${stats.unredeemed}
+- Unredeemed Value: ${stats.unredeemedValue.toFormattedString()}
+- Redeemed:         ${stats.redeemed}
+- Redeemed Value:   ${stats.redeemedValue.toFormattedString()}
+- Losing Tickets:   ${stats.losing}
+- Win Proportion:   ${stats.winProportion * 100}% 
+          `)
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      log(styleValue(err.message, 'failure'))
     }
   }
 }

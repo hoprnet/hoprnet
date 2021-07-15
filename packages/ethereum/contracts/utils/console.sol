@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >= 0.4.22 <0.8.0;
+// copied from https://github.com/nomiclabs/hardhat
+// @TODO: use library (currently blocked by hoisting)
+pragma solidity ^0.8;
 
 library console {
 	address constant CONSOLE_ADDRESS = address(0x000000000000000000636F6e736F6c652e6c6f67);
@@ -39,10 +41,6 @@ library console {
 
 	function logBytes(bytes memory p0) internal view {
 		_sendLogPayload(abi.encodeWithSignature("log(bytes)", p0));
-	}
-
-	function logByte(byte p0) internal view {
-		_sendLogPayload(abi.encodeWithSignature("log(byte)", p0));
 	}
 
 	function logBytes1(bytes1 p0) internal view {

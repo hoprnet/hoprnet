@@ -1,10 +1,9 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
 
 export default class PrintBalance extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -20,7 +19,7 @@ export default class PrintBalance extends AbstractCommand {
    * Prints the balance of our account.
    * @notice triggered by the CLI
    */
-  public async execute(): Promise<string> {
+  public async execute(log): Promise<void> {
     const hoprPrefix = 'HOPR Balance:'
     const hoprBalance = (await this.node.getBalance()).toFormattedString()
 
@@ -30,9 +29,11 @@ export default class PrintBalance extends AbstractCommand {
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 
     // TODO: use 'NativeBalance' and 'Balance' to display currencies
-    return [
-      `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')}`,
-      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')}`
-    ].join('\n')
+    return log(
+      [
+        `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')}`,
+        `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')}`
+      ].join('\n')
+    )
   }
 }

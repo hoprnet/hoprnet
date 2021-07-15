@@ -1,27 +1,26 @@
 import { expect } from 'chai'
-import BN from 'bn.js'
-import { snapshotComparator, isConfirmedBlock, isSyncing } from './utils'
+import { snapshotComparator, isConfirmedBlock } from './utils'
 
 describe('test snapshotComparator', function () {
   const EVENT_1_0_0 = {
-    blockNumber: new BN(1),
-    transactionIndex: new BN(0),
-    logIndex: new BN(0)
+    blockNumber: 1,
+    transactionIndex: 0,
+    logIndex: 0
   }
   const EVENT_1_1_0 = {
-    blockNumber: new BN(1),
-    transactionIndex: new BN(1),
-    logIndex: new BN(0)
+    blockNumber: 1,
+    transactionIndex: 1,
+    logIndex: 0
   }
   const EVENT_1_1_1 = {
-    blockNumber: new BN(1),
-    transactionIndex: new BN(1),
-    logIndex: new BN(1)
+    blockNumber: 1,
+    transactionIndex: 1,
+    logIndex: 1
   }
   const EVENT_2_0_0 = {
-    blockNumber: new BN(2),
-    transactionIndex: new BN(0),
-    logIndex: new BN(0)
+    blockNumber: 2,
+    transactionIndex: 0,
+    logIndex: 0
   }
 
   it('should return zero when event is the same', function () {
@@ -80,16 +79,5 @@ describe('test isConfirmedBlock', function () {
 
   it('should be true when blockNumber=5 onChainBlockNumber=10 maxConf=5', function () {
     expect(isConfirmedBlock(5, 10, 5)).to.be.true
-  })
-})
-
-describe('test isSyncing', function () {
-  it('should be syncing', function () {
-    expect(isSyncing(100, 100)).to.be.true
-    expect(isSyncing(100, 96)).to.be.true
-  })
-
-  it('should not be syncing', function () {
-    expect(isSyncing(100, 95)).to.be.false
   })
 })

@@ -1,18 +1,24 @@
-#!/bin/bash
-set -e #u
+#!/usr/bin/env bash
 
-if [ -z "$GCLOUD_INCLUDED" ]; then
-  source scripts/gcloud.sh 
-  source scripts/dns.sh
-fi
+# prevent execution of this script, only allow sourcing
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
 
-source scripts/utils.sh
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -Eeuo pipefail
 
-MIN_FUNDS=0.01291
-HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
-ZONE="--zone=europe-west6-a"
+# set log id and use shared log function for readable logs
+declare mydir
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+declare HOPR_LOG_ID="testnet"
+source "${mydir}/utils.sh"
+source "${mydir}/gcloud.sh"
+source "${mydir}/dns.sh"
 
-# $1 = role (ie. bootstrap, node-4)
+declare min_funds=0.01291
+declare min_funds_hopr=0.5
+
+# $1 = role (ie. node-4)
 # $2 = network name
 vm_name() {
   echo "$2-$1"
@@ -23,47 +29,107 @@ disk_name() {
   echo "$1-dsk"
 }
 
-# $1=account (hex)
-balance() {
-  ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
+# $1 = account (hex)
+# $2 = chain provider
+wallet_balance() {
+  local address=${1}
+  local rpc=${2}
+
+  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('$1').then(b => formatEther(b))"
 }
 
-# $1=account (hex)
+# $1 = chain provider
+funding_wallet_address() {
+  local rpc="${1}"
+
+  # the value of FUNDING_PRIV_KEY must be prefixed with 0x
+  yarn run --silent ethers --rpc "${rpc}" --account ${FUNDING_PRIV_KEY} eval 'accounts[0].getAddress().then(a => a)'
+}
+
+# $1 = account (hex)
+# $2 = chain provider
+# $3 = optional: hopr token contract
 fund_if_empty() {
-  echo "Checking balance of $1"
-  local BALANCE="$(balance $1)"
-  echo "Balance is $BALANCE"
-  if [ "$BALANCE" = '0.0' ]; then
-    echo "Funding account ... $RPC -> $1 $MIN_FUNDS"
-    ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
-    sleep 60
+  local address="${1}"
+  local rpc="${2}"
+  local token_contract="${3:-}"
+
+  local funding_address funding_balance balance
+
+  funding_address=$(funding_wallet_address "${rpc}")
+
+  log "Checking balance of funding wallet ${funding_address} using RPC ${rpc}"
+  funding_balance="$(wallet_balance "${funding_address}" "${rpc}")"
+
+  if [ "${funding_balance}" = '0.0' ]; then
+    log "Wallet ${funding_address} has zero balance and cannot fund node ${address}"
+  else
+    log "Funding wallet ${funding_address} has enough funds: ${funding_balance}"
+    log "Checking balance of the wallet ${address} to be funded"
+    balance="$(wallet_balance "${address}" "${rpc}")"
+
+    log "Balance of ${address} is ${balance}"
+    if [ "${balance}" = '0.0' ]; then
+      # need to wait to make retries work
+      local ethers_opts="--rpc ${rpc} --account ${FUNDING_PRIV_KEY} --yes --wait"
+
+      log "Funding account with native token -> ${address} ${min_funds}"
+      try_cmd "yarn run --silent ethers send ${address} ${min_funds} ${ethers_opts}" 12 10
+
+      if [ -n "${token_contract}" ]; then
+        # at this point we assume that the account needs HOPR as well
+        log "Funding account with HOPR token -> ${address} ${min_funds_hopr}"
+        try_cmd "yarn run --silent ethers send-token ${token_contract} ${address} ${min_funds_hopr} ${ethers_opts}" 12 10
+      fi
+    fi
   fi
 }
 
 # $1 = IP
+# $2 = optional: port, defaults to 3001
 get_eth_address(){
-  echo $(curl $1:3001/api/v1/address/eth)
+  local ip=${1}
+  local port=${2:-3001}
+  local cmd="curl ${ip}:${port}/api/v1/address/eth"
+
+  # try every 5 seconds for 5 minutes
+  try_cmd "${cmd}" 30 5
 }
 
 # $1 = IP
+# $2 = optional: port, defaults to 3001
 get_hopr_address() {
-  echo $(curl $1:3001/api/v1/address/hopr)
+  local ip=${1}
+  local port=${2:-3001}
+  local cmd="curl ${ip}:${port}/api/v1/address/hopr"
+
+  # try every 5 seconds for 5 minutes
+  try_cmd "${cmd}" 30 5
 }
 
+# $1 = IP
+# $2 = Hopr command
+# $3 = optional: port
+run_command(){
+  curl --silent -X POST --data "${2}" "${1}:${3:-3001}/api/v1/command"
+}
 
 # $1 = vm name
 # $2 = docker image
+# $3 = chain provider
 update_if_existing() {
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
-    echo "Container exists, updating" 1>&2
+    log "Container exists, updating" 1>&2
     PREV=$(gcloud_get_image_running_on_vm $1)
-    if [ "$PREV" == "$2" ]; then 
-      echo "Same version of image is currently running. Skipping update to $PREV" 1>&2
+    if [ "$PREV" == "$2" ]; then
+      log "Same version of image is currently running. Skipping update to $PREV" 1>&2
       return 0
     fi
-    echo "Previous GCloud VM Image: $PREV"
-    gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db"
-    sleep 60
+    log "Previous GCloud VM Image: $PREV"
+    gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db" "${3}"
+
+    # prevent docker images overloading the disk space
+    gcloud_cleanup_docker_images "$1"
   else
     echo "no container"
   fi
@@ -72,100 +138,72 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
-# NB: --run needs to be at the end or it will ignore the other arguments.
-update_or_create_bootstrap_vm() {
-  if [ "$(update_if_existing $1 $2)" = "no container" ]; then
-    echo "No container found, creating $1"
-    local ip=$(gcloud_get_address $1)
-    gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
-      --network-interface=address=$ip,network-tier=PREMIUM,subnet=default \
-      --container-restart-policy=always \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-balanced,mode=rw \
-      --container-mount-disk mount-path="/app/db" \
-      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
-      --container-image=$2 \
-      --container-arg="--password" --container-arg="$BS_PASSWORD" \
-      --container-arg="--init" --container-arg="true" \
-      --container-arg="--runAsBootstrap" --container-arg="true" \
-      --container-arg="--rest" --container-arg="true" \
-      --container-arg="--restHost" --container-arg="0.0.0.0" \
-      --container-arg="--healthCheck" --container-arg="true" \
-      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-      --container-arg="--admin" --container-arg="true" \
-      --container-arg="--adminHost" --container-arg="0.0.0.0" \
-      --container-arg="--run" --container-arg="\"settings strategy passive;daemonize\""
-    sleep 120
-  fi
-}
-
-# $1 = vm name
-# $2 = docker image
-# $3 = BS multiaddr
+# $3 = chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  if [ "$(update_if_existing $1 $2)" = "no container" ]; then
+  local rpc=${3}
+  local api_token="${HOPRD_API_TOKEN}"
+  local password="${BS_PASSWORD}"
+
+  if [ "$(update_if_existing $1 $2 ${rpc})" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-image=$2 \
-      --container-arg="--password" --container-arg="$BS_PASSWORD" \
-      --container-arg="--init" --container-arg="true" \
-      --container-arg="--rest" --container-arg="true" \
-      --container-arg="--restHost" --container-arg="0.0.0.0" \
-      --container-arg="--healthCheck" --container-arg="true" \
-      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-      --container-arg="--bootstrapServers" --container-arg="$3" \
-      --container-arg="--admin" --container-arg="true" \
+      --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
+      --container-arg="--announce" \
+      --container-arg="--apiToken" --container-arg="${api_token}" \
+      --container-arg="--healthCheck" \
+      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
+      --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
+      --container-arg="--init" \
+      --container-arg="--password" --container-arg="${password}" \
+      --container-arg="--provider" --container-arg="${rpc}" \
+      --container-arg="--rest" \
+      --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-restart-policy=always
   fi
 }
 
-# $1 network name
-# $2 docker image
-# NB: Needs to output the bs multiaddrss at the end for the testnet.
-start_bootstrap() {
-  local vm=$(vm_name bootstrap $1)
-  echo "- Starting bootstrap server for $1 at ($vm) with $2" 1>&2
-  local ip=$(gcloud_get_address $vm)
-  echo "- public ip for bootstrap server: $ip" 1>&2
-  update_or_create_bootstrap_vm $vm $2 1>&2
-  BOOTSTRAP_ETH_ADDRESS=$(get_eth_address $ip)
-  BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address $ip)
-  echo "- Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS" 1>&2
-  echo "- Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS" 1>&2
-  fund_if_empty $BOOTSTRAP_ETH_ADDRESS 1>&2
-  local multiaddr="/ip4/$ip/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
-  local release=$(echo $2 | cut -f2 -d:)
-  echo "- Bootstrap Release: $release" 1>&2
-  echo "- Bootstrap Multiaddr value: $multiaddr" 1>&2
-  local clean_release=$(get_version_maj_min_pat $release)
-  local txt_record=$(gcloud_txt_record $clean_release bootstrap $multiaddr)
-  echo "- DNS entry: $(gcloud_dns_entry $clean_release bootstrap)" 1>&2
-  echo $multiaddr
+# $1 = vm name
+# Run a VM with a hardhat instance
+start_chain_provider(){
+  gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
+      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
+      --container-image='hopr-provider'
+
+  #hardhat node --config packages/ethereum/hardhat.config.ts
 }
 
-# $1 network name
-# $2 docker image
-# $3 node number
-# $4 bootstrap multiaddr
+# $1 = network name
+# $2 = docker image
+# $3 = node number
+# $4 = chain provider
 start_testnode() {
-  local vm=$(vm_name "node-$3" $1)
-  echo "- Starting test node $vm with $2, bs: $4"
-  start_testnode_vm $vm $2 $4
+  local vm ip eth_address
+
+  # start or update vm
+  vm=$(vm_name "node-$3" $1)
+  log "- Starting test node $vm with $2 ${4}"
+  start_testnode_vm $vm $2 ${4}
+
+  # ensure node has funds, even after just updating a release
+  ip=$(gcloud_get_ip "${vm}")
+  wait_until_node_is_ready $ip
+  eth_address=$(get_eth_address "${ip}")
+  fund_if_empty "${eth_address}" "${4}"
 }
 
-# Usage 
 # $1 authorized keys file
 add_keys() {
   if test -f "$1"; then
-    echo "Reading keys from $1"
-    xargs -a $1 -I {} gcloud compute os-login ssh-keys add --key="{}"
+    log "Reading keys from $1"
+    cat $1 | xargs -I {} gcloud compute os-login ssh-keys add --key="{}"
   else
     echo "Authorized keys file not found"
-    exit 1
   fi
 }
 
@@ -173,22 +211,18 @@ add_keys() {
 #
 # Using a standard naming scheme, based on a name, we
 # either update or start VM's to create a network of
-# N nodes, including a bootstrap node running on a public
-# IP
-#
-# $1 network name
-# $2 number of nodes
-# $3 docker image
+# N nodes
+
+# $1 = network name
+# $2 = number of nodes
+# $3 = docker image
+# $4 = chain provider
 start_testnet() {
-  # First node is always bootstrap
-  bs_addr=$(start_bootstrap $1 $3)
-  echo "- bootstrap addr: $bs_addr"
-
-  for i in $(seq 2 $2);
+  for i in $(seq 1 $2);
   do
-    echo "Start node $i"
-    start_testnode $1 $3 $i $bs_addr
+    log "Start node $i"
+    start_testnode $1 $3 $i ${4}
   done
-  add_keys scripts/keys/authorized_keys
+  # @jose can you fix this pls.
+  # add_keys scripts/keys/authorized_keys
 }
-

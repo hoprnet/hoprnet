@@ -1,3 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-DEBUG=hopr*,libp2p:mplex:stream hoprd --password="" --init --rest --admin
+set -o errexit
+set -o nounset
+set -o pipefail
+
+DEBUG="hopr*" hoprd --password="" --init --admin

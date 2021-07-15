@@ -1,9 +1,8 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 
 export default class ListConnectedPeers extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -15,7 +14,7 @@ export default class ListConnectedPeers extends AbstractCommand {
     return 'Lists connected and interesting HOPR nodes'
   }
 
-  public async execute(): Promise<string | void> {
-    return this.node.connectionReport()
+  public async execute(log): Promise<void> {
+    return log(await this.node.connectionReport())
   }
 }

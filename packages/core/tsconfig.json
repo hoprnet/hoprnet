@@ -4,9 +4,16 @@
     "noImplicitReturns": true,
     "noImplicitThis": true,
     "strictBindCallApply": true,
-    "noImplicitAny": true,
     "outDir": "lib"
   },
   "exclude": ["lib", "node_modules"],
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "typedocOptions": {
+    "entryPoints": ["src/index.ts"],
+    "disableOutputCheck": true,
+    "out": "docs",
+    // by default we don't want links to source code to change on every change
+    // when building docs for releases we can fix the revision on the cmdline
+    "gitRevision": "master"
+  }
 }

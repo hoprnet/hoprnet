@@ -1,16 +1,22 @@
 import { createCipheriv, createHmac } from 'crypto'
 import { u8aXOR } from '../u8a'
 
+const HASH_ALGORITHM = 'blake2s256'
+const CIPHER_ALGORITHM = 'chacha20'
+
 const INTERMEDIATE_KEY_LENGTH = 32
 const INTERMEDIATE_IV_LENGTH = 16
 
 const HASH_LENGTH = 32
-const KEY_LENGTH = 4 * INTERMEDIATE_KEY_LENGTH // 128 Bytes
-const IV_LENGTH = 4 * INTERMEDIATE_IV_LENGTH // Bytes
-const MIN_LENGTH = HASH_LENGTH // Bytes
-const HASH_ALGORITHM = 'blake2s256'
 
-const CIPHER_ALGORITHM = 'chacha20'
+export const PRP_KEY_LENGTH = 4 * INTERMEDIATE_KEY_LENGTH
+export const PRP_IV_LENGTH = 4 * INTERMEDIATE_IV_LENGTH
+export const PRP_MIN_LENGTH = HASH_LENGTH
+
+export type PRPParameters = {
+  key: Uint8Array
+  iv: Uint8Array
+}
 
 export class PRP {
   private readonly k1: Uint8Array
@@ -23,25 +29,7 @@ export class PRP {
   private readonly iv3: Uint8Array
   private readonly iv4: Uint8Array
 
-  private initialised: boolean = false
-
-  private constructor(key: Uint8Array, iv: Uint8Array) {
-    if (key.length != KEY_LENGTH) {
-      throw Error(
-        `Invalid key. Expected ${Uint8Array.name} of size ${KEY_LENGTH} bytes but got a ${typeof key} of ${
-          key.length
-        } bytes.`
-      )
-    }
-
-    if (iv.length != IV_LENGTH) {
-      throw Error(
-        `Invalid initialisation vector. Expected ${
-          Uint8Array.name
-        } of size ${IV_LENGTH} bytes but got a ${typeof key} of ${key.length} bytes..`
-      )
-    }
-
+  private constructor(iv: Uint8Array, key: Uint8Array) {
     this.k1 = key.subarray(0, INTERMEDIATE_KEY_LENGTH)
     this.k2 = key.subarray(INTERMEDIATE_KEY_LENGTH, 2 * INTERMEDIATE_KEY_LENGTH)
     this.k3 = key.subarray(2 * INTERMEDIATE_KEY_LENGTH, 3 * INTERMEDIATE_KEY_LENGTH)
@@ -51,33 +39,31 @@ export class PRP {
     this.iv2 = iv.subarray(INTERMEDIATE_IV_LENGTH, 2 * INTERMEDIATE_IV_LENGTH)
     this.iv3 = iv.subarray(2 * INTERMEDIATE_IV_LENGTH, 3 * INTERMEDIATE_IV_LENGTH)
     this.iv4 = iv.subarray(3 * INTERMEDIATE_IV_LENGTH, 4 * INTERMEDIATE_IV_LENGTH)
-
-    this.initialised = true
   }
 
-  static get KEY_LENGTH(): number {
-    return KEY_LENGTH
-  }
+  static createPRP(params: PRPParameters): PRP {
+    if (params.key.length != PRP_KEY_LENGTH) {
+      throw Error(
+        `Invalid key. Expected ${Uint8Array.name} of size ${PRP_KEY_LENGTH} bytes but got a ${typeof params.key} of ${
+          params.key.length
+        } bytes.`
+      )
+    }
 
-  static get IV_LENGTH(): number {
-    return IV_LENGTH
-  }
+    if (params.iv.length != PRP_IV_LENGTH) {
+      throw Error(
+        `Invalid initialisation vector. Expected ${
+          Uint8Array.name
+        } of size ${PRP_IV_LENGTH} bytes but got a ${typeof params.key} of ${params.key.length} bytes.`
+      )
+    }
 
-  static get MIN_LENGTH(): number {
-    return MIN_LENGTH
-  }
-
-  static createPRP(key: Uint8Array, iv: Uint8Array): PRP {
-    return new PRP(key, iv)
+    return new PRP(params.iv, params.key)
   }
 
   permutate(plaintext: Uint8Array): Uint8Array {
-    if (!this.initialised) {
-      throw Error(`Uninitialised. Provide key and iv first.`)
-    }
-
-    if (plaintext.length < MIN_LENGTH) {
-      throw Error(`Expected plaintext with a length of a least '${MIN_LENGTH}' bytes. Got '${plaintext.length}'.`)
+    if (plaintext.length < PRP_MIN_LENGTH) {
+      throw Error(`Expected plaintext with a length of a least '${PRP_MIN_LENGTH}' bytes. Got '${plaintext.length}'.`)
     }
 
     const data = plaintext
@@ -91,12 +77,8 @@ export class PRP {
   }
 
   inverse(ciphertext: Uint8Array): Uint8Array {
-    if (!this.initialised) {
-      throw Error(`Uninitialised. Provide key and iv first.`)
-    }
-
-    if (ciphertext.length < MIN_LENGTH) {
-      throw Error(`Expected ciphertext with a length of a least '${MIN_LENGTH}' bytes. Got '${ciphertext.length}'.`)
+    if (ciphertext.length < PRP_MIN_LENGTH) {
+      throw Error(`Expected ciphertext with a length of a least '${PRP_MIN_LENGTH}' bytes. Got '${ciphertext.length}'.`)
     }
 
     const data = ciphertext

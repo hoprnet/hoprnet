@@ -2,7 +2,7 @@
  * Converts a Uint8Array to number.
  * @param arr Uint8Array to convert to number
  */
-function u8aToNumber(arr: Uint8Array): number | bigint {
+export function u8aToNumberOrBigInt(arr: Uint8Array): number | bigint {
   const arrLength = arr.length
 
   if (arrLength == 0) {
@@ -38,4 +38,6 @@ function u8aToNumber(arr: Uint8Array): number | bigint {
   throw Error(`Array has too many elements. Can only extract up to 8 elements, got ${arrLength}`)
 }
 
-export { u8aToNumber }
+export function u8aToNumber(arr: Uint8Array): number {
+  return u8aToNumberOrBigInt(arr) as number
+}

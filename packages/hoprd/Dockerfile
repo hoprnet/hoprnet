@@ -1,68 +1,69 @@
-# Run HOPRd  within a single container.
+# Run HOPRd  within a single container using npm
 
-# -- BASE STAGE --------------------------------
+# use slim version of node on Debian buster for smaller image sizes
+FROM node:14-buster-slim@sha256:ccc25181fd9bc0170cfa2f873b11d005d41c06a1f4fa9e64aa89c579bcc6b03b as build
 
-# Based on https://snyk.io/blog/10-best-practices-to-containerize-nodejs-web-applications-with-docker/
-# From the #1 recommendation “Use explicit and deterministic Docker base image tags”
-
-# Docker image builds are inconsistent. Just like we’re using lockfiles to get a deterministic
-# npm install behavior every time we install npm packages, we’d also like to get deterministic
-# docker image builds. If we build the image from node—which effectively means the node:latest
-# tag—then every build will pull a newly built Docker image of node.
-
-# Originally node:12.9.1-buster, obtained by
-# $ docker pull node:12.9.1-buster
-# $ docker images --digests
-# and added the sha to the image.
-FROM node:14.15-buster@sha256:74a322375cbf1bfca73e3d41f39d4a04e4869c7defdf83f9663166989d1b553c AS base
-WORKDIR /hoprd
-
+# python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update && \
     apt-get install -y \
-    libssl-dev \
-    ca-certificates \
-    fuse \
-    gcc \
-    cmake \
-    wget
-
-ENV YARN_VERSION 1.19.2
-RUN yarn policies set-version $YARN_VERSION
-COPY package.json .
-RUN yarn install --build-from-source
-
-# -- BUILD STAGE --------------------------------
-
-FROM base as build
-
-# build `hoprd` and `hopr-admin`
-COPY src src
-COPY hopr-admin hopr-admin
-COPY tsconfig.json tsconfig.json
-RUN yarn build
-RUN yarn buildAdmin
-
-# -- RUNTIME STAGE ------------------------------\
-
-FROM node:14.15-buster@sha256:74a322375cbf1bfca73e3d41f39d4a04e4869c7defdf83f9663166989d1b553c AS runtime
-
-RUN wget https://github.com/Yelp/dumb-init/releases/download/v1.2.4/dumb-init_1.2.4_amd64.deb
-RUN dpkg -i dumb-init_*.deb
-
-ENV NODE_ENV 'production'
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV DEBUG 'hopr*'
-ENV NODE_OPTIONS=--max_old_space_size=4096
+    python3 \
+    build-essential
 
 WORKDIR /app
 
-# Server
-COPY --from=build /hoprd/lib/ /app/
-COPY --from=build /hoprd/hopr-admin /app/hopr-admin
-COPY --from=build /hoprd/node_modules /app/node_modules
-COPY --from=build /hoprd/package.json /app/package.json
+# enable to pass the version to Docker using either --build-arg or an
+# environment variable
+# if its not given, yarn will install the latest version of the package
+ARG HOPRD_VERSION
+RUN echo "ARG HOPRD_VERSION=${HOPRD_VERSION}"
+ENV HOPRD_VERSION=${HOPRD_VERSION:-}
+RUN echo "ENV HOPRD_VERSION=${HOPRD_VERSION}"
 
+# making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_OPTIONS=--max_old_space_size=4096
+ENV npm_config_build_from_source false
+
+# install hoprd as a local module
+RUN yarn add @hoprnet/hoprd@${HOPRD_VERSION}
+
+# use slim version of node on Debian buster for smaller image sizes
+FROM node:14-buster-slim@sha256:ccc25181fd9bc0170cfa2f873b11d005d41c06a1f4fa9e64aa89c579bcc6b03b as runtime
+
+# we use tini as process 1 to catch signals properly, which is also built into
+# D<Plug>_ocker by default
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+     tini \
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
+WORKDIR /app
+
+# copy over the contents of node_modules etc
+COPY --from=build /app .
+
+# create directory which is later used for the database, so that it inherits
+# permissions when mapped to a volume
+RUN mkdir db
+
+# DISABLED temporarily until a migration path has been tested
+# switch to normal user, to prevent dangerous root access
+# RUN chown -R node:node .
+
+# set volume which can be mapped by users on the host system
 VOLUME ["/app/db"]
+
+# DISABLED temporarily until a migration path has been tested
+# finally set the non-root user so the process also run un-privilidged
+# USER node
+
+# making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV DEBUG 'hopr*'
+ENV NODE_OPTIONS=--max_old_space_size=4096
 
 # Admin web server
 EXPOSE 3000
@@ -70,5 +71,7 @@ EXPOSE 3000
 EXPOSE 3001
 # Healthcheck server
 EXPOSE 8080
+# p2p
+EXPOSE 9091
 
-ENTRYPOINT ["dumb-init", "node", "/app/index.js"]
+ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd"]

@@ -1,16 +1,31 @@
-import runner from './utils/runner'
+import type { Networks } from './constants'
+import { join } from 'path'
 
-export async function compile(args: string = '') {
-  await runner(`yarn build:sol${args ? ' ' + args : ''}`)
+export * from './constants'
+export * from './types'
+export * from './types/commons'
+
+export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'
+
+export type ContractData = {
+  address: string
+  transactionHash: string
+  abi: any
 }
 
-export async function migrate(args: string = '') {
-  await runner(`yarn migrate${args ? ' ' + args : ''}`)
-}
+export const getContractData = (network: Networks, contract: ContractNames): ContractData => {
+  // hack: required for E2E tests to pass
+  // when a contract changes we redeploy it, this causes the deployments folder to change
+  // unlike normal the release workflow, when running the E2E tests, we build the project
+  // and then run deployments, which may update the deployment folder
+  // this makes sure to always pick the deployment folder with the updated data
+  const deploymentsPath = __dirname.endsWith('lib')
+    ? join(__dirname, '..', 'deployments')
+    : join(__dirname, 'deployments')
 
-export async function fund(args: string = '') {
-  await runner(`yarn fund${args ? ' ' + args : ''}`)
+  try {
+    return require(join(deploymentsPath, network, `${contract}.json`))
+  } catch {
+    throw Error(`contract data for ${contract} from network ${network} not found`)
+  }
 }
-
-export * from './utils/networks'
-export * from './chain'

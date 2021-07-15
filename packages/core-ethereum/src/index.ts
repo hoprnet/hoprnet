@@ -1,281 +1,175 @@
-import type { LevelUp } from 'levelup'
-import type { WebsocketProvider } from 'web3-core'
-import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprChannels } from './tsc/web3/HoprChannels'
-import type { HoprToken } from './tsc/web3/HoprToken'
-import Web3 from 'web3'
+import type { Multiaddr } from 'multiaddr'
+import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
-import { ChannelFactory } from './channel'
-import types from './types'
-import Indexer from './indexer'
-import * as dbkeys from './dbKeys'
-import * as utils from './utils'
-import * as constants from './constants'
-import * as config from './config'
-import Account from './account'
-import HashedSecret from './hashedSecret'
 import debug from 'debug'
-
-const HoprChannelsAbi = abis.HoprChannels
-const HoprTokenAbi = abis.HoprToken
+import {
+  AcknowledgedTicket,
+  PublicKey,
+  Balance,
+  Address,
+  NativeBalance,
+  cacheNoArgAsyncFunction,
+  HoprDB,
+  ChannelEntry
+} from '@hoprnet/hopr-utils'
+import Indexer from './indexer'
+import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
+import { Channel } from './channel'
+import { createChainWrapper } from './ethereum'
+import { PROVIDER_CACHE_TTL } from './constants'
+import { EventEmitter } from 'events'
 
 const log = debug('hopr-core-ethereum')
-let provider: WebsocketProvider
 
-export default class HoprEthereum implements HoprCoreConnector {
-  private _status: 'dead' | 'alive' = 'dead'
-  private _starting?: Promise<HoprEthereum>
-  private _stopping?: Promise<void>
-  private _debug: boolean
+export type RedeemTicketResponse =
+  | {
+      status: 'SUCCESS'
+      receipt: string
+      ackTicket: AcknowledgedTicket
+    }
+  | {
+      status: 'FAILURE'
+      message: string
+    }
+  | {
+      status: 'ERROR'
+      error: Error | string
+    }
 
-  public channel: ChannelFactory
-  public types: types
-  public indexer: Indexer
-  public account: Account
-  public hashedSecret: HashedSecret
+export default class HoprEthereum extends EventEmitter {
+  private privateKey: Uint8Array
+  private publicKey: PublicKey
+  private address: Address
 
-  constructor(
-    public db: LevelUp,
-    public web3: Web3,
-    public chainId: number,
-    public network: Network,
-    public hoprChannels: HoprChannels,
-    public hoprToken: HoprToken,
-    debug: boolean,
-    privateKey: Uint8Array,
-    publicKey: Uint8Array,
-    maxConfirmations: number
-  ) {
-    this.account = new Account(this, privateKey, publicKey, chainId)
-    this.indexer = new Indexer(this, maxConfirmations)
-    this.types = new types()
-    this.channel = new ChannelFactory(this)
-    this._debug = debug
-    this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
+  constructor(private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
+    super()
+    this.privateKey = this.chain.getPrivateKey()
+    this.publicKey = this.chain.getPublicKey()
+    this.address = Address.fromString(this.chain.getWallet().address)
   }
 
-  readonly dbKeys = dbkeys
-  readonly utils = utils
-  readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
-
-  private async _start(): Promise<HoprEthereum> {
-    await this.waitForWeb3()
-    // await this.initOnchainValues()
-    await this.indexer.start()
-    await provider.connect()
-    this._status = 'alive'
-    log(chalk.green('Connector started'))
-    return this
-  }
-
-  /**
-   * Initialises the connector, e.g. connect to a blockchain node.
-   */
-  public async start(): Promise<HoprEthereum> {
-    log('Starting connector..')
-    if (this._status === 'alive') {
-      log('Connector has already started')
-      return Promise.resolve(this)
-    }
-    if (!this._starting) {
-      this._starting = this._start()
-      this._starting.finally(() => {
-        this._starting = undefined
-      })
-    }
-    return this._starting
-  }
 
   /**
    * Stops the connector.
    */
   async stop(): Promise<void> {
-    log('Stopping connector..')
-    if (typeof this._stopping !== 'undefined') {
-      return this._stopping
-    } else if (this._status === 'dead') {
-      return
-    }
-
-    this._stopping = Promise.resolve()
-      .then(async () => {
-        if (this._starting) {
-          log("Connector will stop once it's started")
-          await this._starting
-        }
-
-        await this.indexer.stop()
-        await this.account.stop()
-        provider.disconnect(1000, 'Stopping HOPR node.')
-        this._status = 'dead'
-        log(chalk.green('Connector stopped'))
-      })
-      .finally(() => {
-        this._stopping = undefined
-      })
-    return this._stopping
+    log('Stopping connector...')
+    await this.indexer.stop()
   }
 
-  get started() {
-    return this._status === 'alive'
+  public getChannel(src: PublicKey, counterparty: PublicKey) {
+    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey, this)
+  }
+
+  async announce(multiaddr: Multiaddr): Promise<string> {
+    return this.chain.announce(multiaddr)
+  }
+
+  async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
+    return this.chain.withdraw(currency, recipient, amount)
+  }
+
+  public getOpenChannelsFrom(p: PublicKey) {
+    return this.indexer.getOpenChannelsFrom(p)
+  }
+
+  public getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
+    return this.indexer.getChannelsFrom(addr)
+  }
+
+  public getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
+    return this.indexer.getChannelsTo(addr)
+  }
+
+  public async getAccount(addr: Address) {
+    return this.indexer.getAccount(addr)
+  }
+
+  public getPublicKeyOf(addr: Address) {
+    return this.indexer.getPublicKeyOf(addr)
+  }
+
+  public getRandomOpenChannel() {
+    return this.indexer.getRandomOpenChannel()
+  }
+
+  private uncachedGetBalance = () => this.chain.getBalance(this.address)
+  private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
+  /**
+   * Retrieves HOPR balance, optionally uses the cache.
+   * @returns HOPR balance
+   */
+  public async getBalance(useCache: boolean = false): Promise<Balance> {
+    return useCache ? this.cachedGetBalance() : this.uncachedGetBalance()
+  }
+
+  public getAddress(): Address {
+    return this.address
+  }
+
+  public getPublicKey() {
+    return this.publicKey
   }
 
   /**
-   * Initializes the on-chain values of our account.
+   * Retrieves ETH balance, optionally uses the cache.
+   * @returns ETH balance
    */
-  public async initOnchainValues(): Promise<void> {
-    await this.hashedSecret.initialize(this._debug) // no-op if already initialized
+  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.address)
+  private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
+    this.uncachedGetNativeBalance,
+    PROVIDER_CACHE_TTL
+  )
+  public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
+    return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
   }
 
-  /**
-   * Checks whether web3 connection is alive
-   * @returns a promise resolved true if web3 connection is alive
-   */
-  private async checkWeb3(): Promise<void> {
-    if (!(await this.web3.eth.net.isListening())) {
-      throw Error('web3 is not connected')
-    }
+  public smartContractInfo(): {
+    network: string
+    hoprTokenAddress: string
+    hoprChannelsAddress: string
+    channelClosureSecs: number
+  } {
+    return this.chain.getInfo()
   }
 
-  // Web3's API leaves a lot to be desired...
-  private async waitForWeb3(iterations: number = 0): Promise<void> {
-    try {
-      return await this.checkWeb3()
-    } catch (e) {
-      log('error when waiting for web3, try again', e)
-      await utils.wait(1 * 1e3)
-      if (iterations < 2) {
-        this.waitForWeb3(iterations + 1)
-      } else {
-        throw new Error('giving up connecting to web3 after ' + iterations + 'attempts')
-      }
-    }
-  }
-
-  withdraw(currency: Currencies, recipient: string, amount: string): Promise<string> {
-    return new Promise<string>(async (resolve, reject) => {
-      try {
-        if (currency === 'NATIVE') {
-          const tx = await this.account.signTransaction({
-            from: (await this.account.address).toHex(),
-            to: recipient,
-            value: amount
-          })
-
-          tx.send().once('transactionHash', (hash) => resolve(hash))
-        } else {
-          const tx = await this.account.signTransaction(
-            {
-              from: (await this.account.address).toHex(),
-              to: this.hoprToken.options.address
-            },
-            this.hoprToken.methods.transfer(recipient, amount)
-          )
-
-          tx.send().once('transactionHash', (hash) => resolve(hash))
-        }
-      } catch (err) {
-        reject(err)
-      }
-    })
-  }
-
-  public async hexAccountAddress(): Promise<string> {
-    return (await this.account.address).toHex()
-  }
-
-  public smartContractInfo(): string {
-    const network = utils.getNetworkName(this.chainId)
-    const addr = addresses[network]
-    return [`Running on: ${network}`, `HOPR Token: ${addr.HoprToken}`, `HOPR Channels: ${addr.HoprChannels}`].join('\n')
+  public async waitForPublicNodes(): Promise<Multiaddr[]> {
+    return await this.indexer.getPublicNodes()
   }
 
   /**
    * Creates an uninitialised instance.
    *
    * @param db database instance
-   * @param seed that is used to derive that on-chain identity
+   * @param privateKey that is used to derive that on-chain identity
    * @param options.provider provider URI that is used to connect to the blockchain
-   * @param options.debug debug mode, will generate account secrets using account's public key
    * @returns a promise resolved to the connector
    */
   public static async create(
-    db: LevelUp,
-    seed: Uint8Array,
-    options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
+    db: HoprDB,
+    privateKey: Uint8Array,
+    options?: { provider?: string; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
-    const providerUri = options?.provider || config.DEFAULT_URI
+    const chain = await createChainWrapper(options?.provider || PROVIDER_DEFAULT_URI, privateKey)
+    await chain.waitUntilReady()
 
-    provider = new Web3.providers.WebsocketProvider(providerUri, {
-      reconnect: {
-        auto: true,
-        delay: 1000, // ms
-        maxAttempts: 30
-      }
-    })
-
-    const web3 = new Web3(provider)
-
-    const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), utils.privKeyToPubKey(seed)])
-    const network = utils.getNetworkName(chainId) as Network
-
-    if (typeof addresses?.[network]?.HoprChannels === 'undefined') {
-      throw Error(`token contract address from network ${network} not found`)
-    }
-
-    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.[network]?.HoprChannels)
-    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.[network]?.HoprToken)
-
-    // @TODO: maybe use this later? for emmenbruecke
-    // const methods = [...Object.keys(hoprChannels.methods), ...Object.keys(hoprToken.methods)]
-    // const methodsMapped = methods.reduce((result, func) => {
-    //   result.set(web3.eth.abi.encodeFunctionSignature(func), func)
-    //   return result
-    // }, new Map())
-
-    // const oldSend = provider.send
-    // function wrapSend(...args: any): any {
-    //   const rpcMethod = args?.[0]?.method
-    //   let method: string
-
-    //   if (rpcMethod === 'eth_call') {
-    //     const param = args?.[0]?.params?.[0]
-    //     const funcSignature = param.data.slice(0, 10)
-    //     method = methodsMapped.get(funcSignature)
-    //   } else {
-    //     method = rpcMethod
-    //   }
-
-    //   console.count(method)
-
-    //   // @ts-ignore
-    //   return oldSend.bind(provider)(...args)
-    // }
-    // provider.send = wrapSend.bind(provider)
-
-    const coreConnector = new HoprEthereum(
+    const indexer = new Indexer(
+      chain.getGenesisBlock(),
       db,
-      web3,
-      chainId,
-      network,
-      hoprChannels,
-      hoprToken,
-      options?.debug || false,
-      seed,
-      publicKey,
-      options.maxConfirmations ?? config.MAX_CONFIRMATIONS
+      chain,
+      options.maxConfirmations ?? CONFIRMATIONS,
+      INDEXER_BLOCK_RANGE
     )
-    log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
-    return coreConnector
-  }
+    await indexer.start()
 
-  static get constants() {
-    return constants
+    const coreConnector = new HoprEthereum(chain, db, indexer)
+
+    log(`using blockchain address ${coreConnector.getAddress().toHex()}`)
+    log(chalk.green('Connector started'))
+
+    return coreConnector
   }
 }
 
-export const Types = types
-export const Utils = utils
+export { ChannelEntry, Channel, Indexer }

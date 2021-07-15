@@ -1,12 +1,6 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { GlobalState } from '../abstractCommand'
 import PeerId from 'peer-id'
-// @ts-ignore
-import Multihash from 'multihashes'
-import bs58 from 'bs58'
-import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
-import { getPeersIdsAsString } from './openChannels'
 
 /**
  * Takes a string, and checks whether it's an alias or a valid peerId,
@@ -21,10 +15,7 @@ export async function checkPeerIdInput(peerIdString: string, state?: GlobalState
       return state.aliases.get(peerIdString)!
     }
 
-    // Throws an error if the Id is invalid
-    Multihash.decode(bs58.decode(peerIdString))
-
-    return await addPubKey(PeerId.createFromB58String(peerIdString))
+    return PeerId.createFromB58String(peerIdString)
   } catch (err) {
     throw Error(`Invalid peerId. ${err.message}`)
   }
@@ -36,20 +27,17 @@ export async function checkPeerIdInput(peerIdString: string, state?: GlobalState
  *
  * @param node hopr node
  * @param state global state
- * @param ops.noBootstrapNodes do not return any bootstrap nodes
  * @param ops.returnAlias when available, return the peerIds's alias
  * @param ops.mustBeOnline only return online peerIds
  * @returns an array of peerIds / aliases
  */
 export function getPeerIdsAndAliases(
-  node: Hopr<HoprCoreConnector>,
+  node: Hopr,
   state: GlobalState,
   ops: {
-    noBootstrapNodes: boolean
     returnAlias: boolean
     mustBeOnline: boolean
   } = {
-    noBootstrapNodes: false,
     returnAlias: false,
     mustBeOnline: false
   }
@@ -64,14 +52,17 @@ export function getPeerIdsAndAliases(
   >()
 
   // add online peer ids into map
-  getPeersIdsAsString(node, {
-    noBootstrapNodes: ops.noBootstrapNodes
-  }).forEach((value) => {
-    peerIds.set(value, {
-      value,
-      isOnline: true
+  let peers = node.getConnectedPeers()
+
+  // update map
+  peers
+    .map((p) => p.toB58String())
+    .forEach((value) => {
+      peerIds.set(value, {
+        value,
+        isOnline: true
+      })
     })
-  })
 
   // add aliases peer ids into map
   Array.from(state.aliases.entries()).forEach(([alias, peerId]) => {

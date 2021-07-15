@@ -6,7 +6,7 @@ export interface Intermediate {
 }
 export async function iterateHash(
   seed: Uint8Array | undefined,
-  hashFunc: (preImage: Uint8Array) => Promise<Uint8Array> | Uint8Array,
+  hashFunc: (preImage: Uint8Array) => Uint8Array,
   iterations: number,
   stepSize: number,
   hint?: (index: number) => Uint8Array | undefined | Promise<Uint8Array | undefined>
@@ -43,7 +43,7 @@ export async function iterateHash(
         preImage: intermediate
       })
     }
-    intermediate = await hashFunc(intermediate)
+    intermediate = hashFunc(intermediate)
   }
 
   return {
@@ -54,8 +54,8 @@ export async function iterateHash(
 
 export async function recoverIteratedHash(
   hashValue: Uint8Array,
-  hashFunc: (preImage: Uint8Array) => Promise<Uint8Array> | Uint8Array,
-  hint: (index: number) => Uint8Array | undefined | Promise<Uint8Array | undefined>,
+  hashFunc: (preImage: Uint8Array) => Uint8Array,
+  hint: (index: number) => Promise<Uint8Array>,
   maxIterations: number,
   stepSize?: number,
   indexHint?: number
@@ -82,7 +82,7 @@ export async function recoverIteratedHash(
     }
 
     for (let i = 0; i < stepSize; i++) {
-      let _tmp = await hashFunc(intermediate)
+      let _tmp = hashFunc(intermediate)
 
       if (u8aEquals(_tmp, hashValue)) {
         return {

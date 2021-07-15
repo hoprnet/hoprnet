@@ -1,24 +1,22 @@
 import Heap from 'heap-js'
-import PeerId from 'peer-id'
 import type NetworkPeers from '../network/network-peers'
-import type { Indexer, RoutingChannel as Edge } from '@hoprnet/hopr-core-connector-interface'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
 import Debug from 'debug'
+import type { ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
+
 import BN from 'bn.js'
 const log = Debug('hopr-core:pathfinder')
 
-export type Path = PeerId[]
-type ChannelPath = Edge[]
+export type Path = PublicKey[]
+type ChannelPath = ChannelEntry[]
 
 const sum = (a: BN, b: BN) => a.add(b)
-const next = (c: Edge): PeerId => c[1]
-const stake = (c: Edge): BN => c[2]
-const pathFrom = (c: ChannelPath): Path => c.map(next) // Doesn't include ourself [0]
-const filterCycles = (c: Edge, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.equals(next(c)))
+const pathFrom = (c: ChannelPath): Path => c.map((ce) => ce.destination) // Doesn't include ourself [0]
+const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.eq(c.destination))
 const rand = () => Math.random() // TODO - swap for something crypto safe
 const debugPath = (p: ChannelPath) =>
   pathFrom(p)
-    .map((x) => x.toB58String())
+    .map((x) => x.toString())
     .join(',')
 
 /**
@@ -28,24 +26,24 @@ const debugPath = (p: ChannelPath) =>
  * destination
  */
 export async function findPath(
-  start: PeerId,
-  destination: PeerId,
+  start: PublicKey,
+  destination: PublicKey,
   hops: number,
   networkPeers: NetworkPeers,
-  indexer: Indexer,
+  getOpenChannelsFromPeer: (p: PublicKey) => Promise<ChannelEntry[]>,
   randomness: number // Proportion of randomness in stake.
 ): Promise<Path> {
-  log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
+  log('find path from', start.toString(), 'to ', destination.toString(), 'length', hops)
 
   // Weight a node based on stake, and a random component.
-  const weight = (edge: Edge): BN => {
+  const weight = (edge: ChannelEntry): BN => {
     // Minimum is 'stake', therefore weight is monotonically increasing
     const r = 1 + rand() * randomness
     // Log scale, but minimum 1 weight per edge
-    return stake(edge).addn(1).muln(r) //log()
+    return edge.balance.toBN().addn(1).muln(r) //log()
   }
 
-  const compareWeight = (a: Edge, b: Edge) => (weight(b).gte(weight(a)) ? 1 : -1)
+  const compareWeight = (a: ChannelEntry, b: ChannelEntry) => (weight(b).gte(weight(a)) ? 1 : -1)
 
   // Weight the path with the sum of its' edges weight
   const pathWeight = (a: ChannelPath): BN => a.map(weight).reduce(sum, new BN(0))
@@ -57,7 +55,7 @@ export async function findPath(
   let queue = new Heap<ChannelPath>(comparePath)
   let deadEnds = new Set<string>()
   let iterations = 0
-  queue.addAll((await indexer.getChannelsFromPeer(start)).map((x) => [x]))
+  queue.addAll((await getOpenChannelsFromPeer(start)).map((x) => [x]))
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath = queue.peek()
@@ -66,22 +64,22 @@ export async function findPath(
       return pathFrom(currentPath)
     }
 
-    const lastPeer = next(currentPath[currentPath.length - 1])
-    const newChannels = (await indexer.getChannelsFromPeer(lastPeer))
+    const lastPeer = currentPath[currentPath.length - 1].destination
+    const newChannels = (await getOpenChannelsFromPeer(lastPeer))
       .filter((c) => {
-        networkPeers.register(next(c))
+        networkPeers.register(c.destination.toPeerId())
         return (
-          !destination.equals(next(c)) &&
-          networkPeers.qualityOf(next(c)) > NETWORK_QUALITY_THRESHOLD &&
+          !destination.eq(c.destination) &&
+          networkPeers.qualityOf(c.destination.toPeerId()) > NETWORK_QUALITY_THRESHOLD &&
           filterCycles(c, currentPath) &&
-          !deadEnds.has(next(c).toB58String())
+          !deadEnds.has(c.destination.toHex())
         )
       })
       .sort(compareWeight)
 
     if (newChannels.length == 0) {
       queue.pop()
-      deadEnds.add(lastPeer.toB58String())
+      deadEnds.add(lastPeer.toHex())
     } else {
       const toPush = Array.from(currentPath)
       toPush.push(newChannels[0])

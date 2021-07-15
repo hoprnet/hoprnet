@@ -1,313 +1,457 @@
-import type CoreConnector from '..'
+import type { providers as Providers, Wallet } from 'ethers'
+import type { HoprChannels } from '@hoprnet/hopr-ethereum'
+import type { Event } from './types'
+import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
-import BN from 'bn.js'
-import Web3 from 'web3'
-import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, fund, addresses, abis } from '@hoprnet/hopr-ethereum'
-import { durations, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
-import { stringToU8a } from '@hoprnet/hopr-utils'
-import * as testconfigs from '../config.spec'
-import * as configs from '../config'
-import { time, isPartyA } from '../utils'
-import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
-import { HoprToken } from '../tsc/web3/HoprToken'
-import { HoprChannels } from '../tsc/web3/HoprChannels'
-import { Public } from '../types'
-import { publicKeyConvert } from 'secp256k1'
-import { randomBytes } from 'crypto'
+import EventEmitter from 'events'
+import Indexer from '.'
+import { stringToU8a, Address, ChannelEntry, Hash, HoprDB, generateChannelId, ChannelStatus } from '@hoprnet/hopr-utils'
+import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
+import Defer from 'p-defer'
+import * as fixtures from './fixtures'
+import { CHANNEL_ID, PARTY_A, PARTY_B } from '../fixtures'
+import { BigNumber } from 'ethers'
 
-const HoprTokenAbi = abis.HoprToken
-const HoprChannelsAbi = abis.HoprChannels
-const CLOSURE_DURATION = durations.days(3)
+const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
+  let latestBlockNumber = ops.latestBlockNumber ?? 0
 
-// @TODO: remove legacy tests
-// @TODO: add more tests
+  const provider = new EventEmitter() as unknown as Providers.WebSocketProvider
+  provider.getBlockNumber = async (): Promise<number> => latestBlockNumber
+
+  return {
+    provider,
+    newBlock() {
+      latestBlockNumber++
+      provider.emit('block', latestBlockNumber)
+    }
+  }
+}
+
+const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
+  const pastEvents = ops.pastEvents ?? []
+  const channels: any = {}
+  const pubkeys: any = {}
+
+  const handleEvent = (ev) => {
+    if (ev.event == 'ChannelUpdate') {
+      const updateEvent = ev as Event<'ChannelUpdate'>
+
+      const eventChannelId = generateChannelId(
+        Address.fromString(updateEvent.args.source),
+        Address.fromString(updateEvent.args.destination)
+      )
+      channels[eventChannelId.toHex()] = updateEvent.args.newState
+    } else if (ev.event == 'Announce') {
+      pubkeys[ev.args.account] = ev.args.multiaddr
+    } else {
+      //throw new Error("MISSING EV HANDLER IN TEST")
+    }
+  }
+
+  class FakeChannels extends EventEmitter {
+    async channels(channelId: string) {
+      for (let ev of pastEvents) {
+        handleEvent(ev)
+      }
+      return channels[channelId]
+    }
+
+    async bumpChannel(_counterparty: string, _comm: string) {
+      let newEvent = {
+        event: 'ChannelUpdate',
+        transactionHash: '',
+        blockNumber: 3,
+        transactionIndex: 0,
+        logIndex: 0,
+        args: {
+          source: PARTY_B.toAddress().toHex(),
+          destination: PARTY_A.toAddress().toHex(),
+          newState: {
+            balance: BigNumber.from('3'),
+            commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+            ticketEpoch: BigNumber.from('1'),
+            ticketIndex: BigNumber.from('0'),
+            status: 2,
+            channelEpoch: BigNumber.from('0'),
+            closureTime: BigNumber.from('0')
+          }
+        } as any
+      } as Event<'ChannelUpdate'>
+      handleEvent(newEvent)
+      this.emit('*', newEvent)
+    }
+
+    async queryFilter() {
+      return pastEvents
+    }
+  }
+
+  const hoprChannels = new FakeChannels() as unknown as HoprChannels
+
+  return {
+    hoprChannels,
+    pubkeys,
+    newEvent(event: Event<any>) {
+      pastEvents.push(event)
+      hoprChannels.emit('*', event)
+    }
+  }
+}
+
+const createChainMock = (
+  provider: Providers.WebSocketProvider,
+  hoprChannels: HoprChannels,
+  account?: Wallet
+): ChainWrapper => {
+  return {
+    getLatestBlockNumber: () => provider.getBlockNumber(),
+    subscribeBlock: (cb) => provider.on('block', cb),
+    subscribeError: (cb) => {
+      provider.on('error', cb)
+      hoprChannels.on('error', cb)
+    },
+    subscribeChannelEvents: (cb) => hoprChannels.on('*', cb),
+    unsubscribe: () => {
+      provider.removeAllListeners()
+      hoprChannels.removeAllListeners()
+    },
+    getChannels: () => hoprChannels,
+    getWallet: () => account ?? fixtures.ACCOUNT_A,
+    setCommitment: (counterparty: Address, commitment: Hash) =>
+      hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex())
+  } as unknown as ChainWrapper
+}
+
+const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
+  const latestBlockNumber = ops.latestBlockNumber ?? 0
+  const pastEvents = ops.pastEvents ?? []
+
+  const db = HoprDB.createMock()
+  const { provider, newBlock } = createProviderMock({ latestBlockNumber })
+  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
+  const chain = createChainMock(provider, hoprChannels)
+  return {
+    db,
+    provider,
+    newBlock,
+    hoprChannels,
+    newEvent,
+    indexer: new Indexer(0, db, chain, 1, 5),
+    OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
+      Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
+    )
+  }
+}
+
+const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
+  const latestBlockNumber = ops.latestBlockNumber ?? 0
+  const pastEvents = ops.pastEvents ?? []
+
+  const db = HoprDB.createMock()
+  const { provider, newBlock } = createProviderMock({ latestBlockNumber })
+  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
+
+  const chainAlice = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_A)
+  const chainBob = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_B)
+
+  const indexerAlice = new Indexer(0, db, chainAlice, 1, 5)
+  const indexerBob = new Indexer(0, db, chainBob, 1, 5)
+
+  return {
+    db,
+    provider,
+    newBlock,
+    hoprChannels,
+    newEvent,
+    alice: {
+      indexer: indexerAlice
+    },
+    bob: {
+      indexer: indexerBob
+    }
+  }
+}
+
 describe('test indexer', function () {
-  this.timeout(durations.minutes(5))
+  it('should start indexer', async function () {
+    const { indexer } = await useFixtures()
 
-  const ganache = new Ganache()
-  let web3: Web3
-  let hoprToken: HoprToken
-  let hoprChannels: HoprChannels
-  let connector: CoreConnector
-  let userA: Account
-  let userB: Account
-  let userC: Account
-  let userD: Account
-
-  before(async function () {
-    this.timeout(durations.minutes(1))
-
-    await ganache.start()
-    await migrate()
-    await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 4`)
-
-    web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
-    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.localhost?.HoprChannels)
-
-    userA = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    // userA < userB
-    userB = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[1])
-    // userC < userA
-    userC = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[2])
-    //
-    userD = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[3])
-    connector = await createNode(userA.privKey, undefined, 8)
-
-    await connector.start()
-    await connector.initOnchainValues()
-    await connector.db.clear()
+    await indexer.start()
+    assert.strictEqual(indexer.status, 'started')
   })
 
-  after(async function () {
-    await connector.stop()
-    await ganache.stop()
+  it('should stop indexer', async function () {
+    const { indexer } = await useFixtures()
+
+    await indexer.start()
+    await indexer.stop()
+    assert.strictEqual(indexer.status, 'stopped')
   })
 
-  context('intergration tests', function () {
-    it('should not store channel before confirmations', async function () {
-      this.timeout(durations.seconds(5))
+  it('should process 1 past event', async function () {
+    const { indexer, OPENED_CHANNEL } = await useFixtures({
+      latestBlockNumber: 2,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+    })
+    await indexer.start()
 
-      //const uncompressedPubKeyA = publicKeyConvert(userA.pubKey, false).slice(1)
-      const uncompressedPubKeyB = publicKeyConvert(userB.pubKey, false).slice(1)
+    const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
+    expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-      // await connector.hoprChannels.methods
-      //   .init(
-      //     u8aToHex(uncompressedPubKeyA.slice(0, 32)),
-      //     u8aToHex(uncompressedPubKeyA.slice(32, 64)),
-      //     u8aToHex(randomBytes(27))
-      //   )
-      //   .send({
-      //     from: userA.address.toHex(),
-      //   })
+    const channel = await indexer.getChannel(OPENED_CHANNEL.getId())
+    assert.strictEqual(typeof channel, 'undefined')
+  })
 
-      await connector.hoprChannels.methods
-        .init(
-          u8aToHex(uncompressedPubKeyB.slice(0, 32)),
-          u8aToHex(uncompressedPubKeyB.slice(32, 64)),
-          u8aToHex(randomBytes(27))
-        )
-        .send({
-          from: userB.address.toHex()
-        })
+  it('should process all past events', async function () {
+    const { indexer } = await useFixtures({
+      latestBlockNumber: 3,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
+    })
+    await indexer.start()
 
-      await hoprToken.methods
-        .send(
-          hoprChannels.options.address,
-          1,
-          web3.eth.abi.encodeParameters(['address', 'address'], [userA.address.toHex(), userB.address.toHex()])
-        )
-        .send({
-          from: userA.address.toHex(),
-          gas: 200e3
-        })
-      await hoprChannels.methods.openChannel(userB.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 200e3
-      })
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 0, 'check Channels.store')
+    const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
+    expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
+
+    const account2 = await indexer.getAccount(fixtures.PARTY_B.toAddress())
+    expectAccountsToBeEqual(account2, fixtures.PARTY_B_INITIALIZED_ACCOUNT)
+  })
+
+  it('should continue processing events', async function () {
+    const { indexer, newEvent, newBlock, OPENED_CHANNEL } = await useFixtures({
+      latestBlockNumber: 3,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
+    })
+    await indexer.start()
+
+    newEvent(fixtures.OPENED_EVENT)
+    newBlock()
+
+    const blockMined = Defer()
+
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 4) blockMined.resolve()
     })
 
-    it('should store channel & blockNumber correctly', async function () {
-      const currentBlockNumber = await web3.eth.getBlockNumber()
-      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 1, 'check Channels.store')
+    await blockMined.promise
+
+    const channel = await indexer.getChannel(OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, OPENED_CHANNEL)
+  })
+
+  it('should get public key of addresses', async function () {
+    const { indexer } = await useFixtures({
+      latestBlockNumber: 2,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
     })
 
-    it('should find all channels', async function () {
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
+    await indexer.start()
+
+    const pubKey = await indexer.getPublicKeyOf(fixtures.PARTY_A.toAddress())
+    assert.strictEqual(pubKey.toHex(), fixtures.PARTY_A.toHex())
+  })
+
+  it('should get all data from DB', async function () {
+    const { indexer, OPENED_CHANNEL } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+    })
+
+    await indexer.start()
+
+    const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
+    expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
+
+    const channel = await indexer.getChannel(OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, OPENED_CHANNEL)
+
+    const channels = await indexer.getChannels()
+    assert.strictEqual(channels.length, 1, 'expected channels')
+    expectChannelsToBeEqual(channels[0], OPENED_CHANNEL)
+
+    const channelsFromPartyA = await indexer.getChannelsFrom(fixtures.PARTY_A.toAddress())
+    assert.strictEqual(channelsFromPartyA.length, 1)
+    expectChannelsToBeEqual(channelsFromPartyA[0], OPENED_CHANNEL)
+
+    const channelsOfPartyB = await indexer.getChannelsFrom(fixtures.PARTY_B.toAddress())
+    assert.strictEqual(channelsOfPartyB.length, 0)
+  })
+
+  it('should handle provider error by restarting', async function () {
+    const { indexer, provider } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+    })
+
+    await indexer.start()
+
+    provider.emit('error', new Error('MOCK'))
+
+    assert.strictEqual(indexer.status, 'stopped')
+
+    const started = Defer()
+    indexer.on('status', (status: string) => {
+      if (status === 'started') started.resolve()
+    })
+    await started.promise
+    assert.strictEqual(indexer.status, 'started')
+  })
+
+  it('should contract error by restarting', async function () {
+    const { indexer, hoprChannels } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+    })
+
+    await indexer.start()
+
+    hoprChannels.emit('error', new Error('MOCK'))
+
+    const started = Defer()
+    indexer.on('status', (status: string) => {
+      if (status === 'started') started.resolve()
+    })
+    await started.promise
+    assert.strictEqual(indexer.status, 'started')
+  })
+
+  it('should emit events on updated channels', async function () {
+    this.timeout(5000)
+    const { indexer, newEvent, newBlock } = await useFixtures({
+      latestBlockNumber: 3,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
+    })
+
+    const opened = Defer()
+    const commitmentSet = Defer()
+    const pendingIniated = Defer()
+    const closed = Defer()
+
+    indexer.on('own-channel-updated', (channel: ChannelEntry) => {
+      switch (channel.status) {
+        case ChannelStatus.WaitingForCommitment:
+          opened.resolve()
+          break
+        case ChannelStatus.Open:
+          commitmentSet.resolve()
+          break
+        case ChannelStatus.PendingToClose: {
+          pendingIniated.resolve()
+          break
+        }
+        case ChannelStatus.Closed: {
+          closed.resolve()
+          break
+        }
       }
-
-      const blockNumber = await web3.eth.getBlockNumber()
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 1, 'check Channels.store')
-      // @ts-ignore
-      // const latestConfirmedBlockNumber = await connector.indexer.getLatestConfirmedBlockNumber()
-      const [channel] = channels
-      assert(u8aEquals(channel.partyA, partyA), 'check Channels.store')
-      assert(u8aEquals(channel.partyB, partyB), 'check Channels.store')
-      assert(channel.channelEntry.blockNumber.lt(new BN(blockNumber)), 'check Channels.store')
-      // assert(latestConfirmedBlockNumber < blockNumber, 'check Channels.store')
     })
 
-    it('should find channel using partyA', async function () {
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
-      }
+    await indexer.start()
+    const ev = {
+      event: 'ChannelUpdate',
+      transactionHash: '',
+      blockNumber: 2,
+      transactionIndex: 0,
+      logIndex: 0,
+      args: {
+        source: PARTY_B.toAddress().toHex(),
+        destination: PARTY_A.toAddress().toHex(),
+        newState: {
+          balance: BigNumber.from('3'),
+          commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+          ticketEpoch: BigNumber.from('0'),
+          ticketIndex: BigNumber.from('0'),
+          status: 1,
+          channelEpoch: BigNumber.from('0'),
+          closureTime: BigNumber.from('0')
+        }
+      } as any
+    } as Event<'ChannelUpdate'>
+    // We are ACCOUNT_A - if B opens a channel to us, we should automatically
+    // commit.
+    newEvent(ev)
 
-      const channels = await connector.indexer.getChannelEntries(partyA)
-      assert.equal(channels.length, 1, 'check Channels.get')
-      const [channel] = channels
-      assert(u8aEquals(channel.partyA, partyA), 'check Channels.get')
-      assert(u8aEquals(channel.partyB, partyB), 'check Channels.get')
-    })
-    it('should find channel using partyB', async function () {
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
-      }
+    newBlock()
+    newBlock()
+    await opened.promise
+    // Total hack as this test sucks. There is no way to await the actual
+    // commitment setting as this is behind an event.
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    newBlock()
+    newBlock()
+    await commitmentSet.promise
 
-      const channels = await connector.indexer.getChannelEntries(partyB)
-      const [channel] = channels
-      assert.equal(channels.length, 1, 'check Channels.get')
-      assert(u8aEquals(channel.partyA, partyA), 'check Channels.get')
-      assert(u8aEquals(channel.partyB, partyB), 'check Channels.get')
-    })
+    const evClose = {
+      event: 'ChannelUpdate',
+      transactionHash: '',
+      blockNumber: 5,
+      transactionIndex: 0,
+      logIndex: 0,
+      args: {
+        source: PARTY_B.toAddress().toHex(),
+        destination: PARTY_A.toAddress().toHex(),
+        newState: {
+          balance: BigNumber.from('3'),
+          commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+          ticketEpoch: BigNumber.from('1'),
+          ticketIndex: BigNumber.from('0'),
+          status: 3,
+          channelEpoch: BigNumber.from('0'),
+          closureTime: BigNumber.from('0'),
+          closureByPartyA: true
+        }
+      } as any
+    } as Event<'ChannelUpdate'>
+    newEvent(evClose)
+    newBlock()
+    newBlock()
 
-    it('should find channel using partyA & partyB', async function () {
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
-      }
+    await pendingIniated.promise
 
-      const channel = await connector.indexer.getChannelEntry(partyA, partyB)
-      assert(!!channel, 'check Channels.getChannelEntry')
-    })
-    it('should store another channel', async function () {
-      this.timeout(durations.seconds(5))
-      const uncompressedPubKeyC = publicKeyConvert(userC.pubKey, false).slice(1)
+    const evClosed = {
+      event: 'ChannelUpdate',
+      transactionHash: '',
+      blockNumber: 7,
+      transactionIndex: 0,
+      logIndex: 0,
+      args: {
+        source: PARTY_B.toAddress().toHex(),
+        destination: PARTY_A.toAddress().toHex(),
+        newState: {
+          balance: BigNumber.from('0'),
+          commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+          ticketEpoch: BigNumber.from('0'),
+          ticketIndex: BigNumber.from('0'),
+          status: 0,
+          channelEpoch: BigNumber.from('0'),
+          closureTime: BigNumber.from('0'),
+          closureByPartyA: false
+        }
+      } as any
+    } as Event<'ChannelUpdate'>
 
-      await connector.hoprChannels.methods
-        .init(
-          u8aToHex(uncompressedPubKeyC.slice(0, 32)),
-          u8aToHex(uncompressedPubKeyC.slice(32, 64)),
-          u8aToHex(randomBytes(27))
-        )
-        .send({
-          from: userC.address.toHex()
-        })
+    newEvent(evClosed)
+    newBlock()
+    newBlock()
 
-      await hoprToken.methods
-        .send(
-          hoprChannels.options.address,
-          1,
-          web3.eth.abi.encodeParameters(['address', 'address'], [userA.address.toHex(), userC.address.toHex()])
-        )
-        .send({
-          from: userA.address.toHex(),
-          gas: 200e3
-        })
+    await closed.promise
+  })
 
-      await hoprChannels.methods.openChannel(userC.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 200e3
-      })
-      const currentBlockNumber = await web3.eth.getBlockNumber()
-      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 2, 'check Channels.store')
-      const channelsUsingPartyA = await connector.indexer.getChannelEntries(userA.pubKey)
-      assert.equal(channelsUsingPartyA.length, 2, 'check Channels.get')
-      const channelsUsingPartyB = await connector.indexer.getChannelEntries(userB.pubKey)
-      assert.equal(channelsUsingPartyB.length, 1, 'check Channels.get')
-    })
-
-    it('should not delete channel before confirmations', async function () {
-      await hoprChannels.methods.initiateChannelClosure(userB.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 200e3
-      })
-      await time.increase(web3, Math.floor(CLOSURE_DURATION / 1e3))
-      await hoprChannels.methods.claimChannelClosure(userB.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 200e3
-      })
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 2, 'check Channels.store')
+  it('should start two indexers and should set commitments only once', async function () {
+    const { alice, bob, newBlock, newEvent } = useMultiPartyFixtures({
+      latestBlockNumber: 3,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
 
-    it('should "ZERO" channel', async function () {
-      const currentBlockNumber = await web3.eth.getBlockNumber()
-      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 2, 'check Channels.store')
+    await Promise.all([alice.indexer.start(), bob.indexer.start()])
+    newEvent(fixtures.OPENED_EVENT)
 
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
-      }
+    newBlock()
+    newBlock()
+    newBlock()
 
-      const channel = await connector.indexer.getChannelEntry(partyA, partyB)
-      assert(!!channel, 'check Channels.getChannelEntry')
-      assert(channel.deposit.isZero())
-      assert(channel.partyABalance.isZero())
-      assert(channel.closureTime.isZero())
-      assert(!channel.closureByPartyA)
-    })
-
-    it('should stop indexer and open new channel', async function () {
-      this.timeout(durations.seconds(5))
-      await connector.indexer.stop()
-      assert(connector.indexer.status === 'stopped', 'could not stop indexer')
-      const uncompressedPubKeyD = publicKeyConvert(userD.pubKey, false).slice(1)
-
-      await connector.hoprChannels.methods
-        .init(
-          u8aToHex(uncompressedPubKeyD.slice(0, 32)),
-          u8aToHex(uncompressedPubKeyD.slice(32, 64)),
-          u8aToHex(randomBytes(27))
-        )
-        .send({
-          from: userD.address.toHex()
-        })
-
-      await hoprToken.methods
-        .send(
-          hoprChannels.options.address,
-          1,
-          web3.eth.abi.encodeParameters(['address', 'address'], [userA.address.toHex(), userD.address.toHex()])
-        )
-        .send({
-          from: userA.address.toHex(),
-          gas: 200e3
-        })
-      await hoprChannels.methods.openChannel(userD.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 200e3
-      })
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 2, 'check Channels.store')
-    })
-
-    it('should not index new channel', async function () {
-      const currentBlockNumber = await web3.eth.getBlockNumber()
-      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 2, 'check Channels.store')
-    })
-
-    it('should start indexer and index new channel', async function () {
-      this.timeout(durations.seconds(5))
-      await connector.indexer.start()
-      assert(connector.indexer.status === 'started', 'could not start indexer')
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 3, 'check Channels.store')
-    })
+    await Promise.all([
+      alice.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID))),
+      bob.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID)))
+    ])
   })
 })

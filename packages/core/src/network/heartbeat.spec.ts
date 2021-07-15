@@ -5,6 +5,7 @@ import { HEARTBEAT_INTERVAL, NETWORK_QUALITY_THRESHOLD } from '../constants'
 import sinon from 'sinon'
 import { fakePeerId } from '../test-utils'
 import PeerId from 'peer-id'
+import { Hash } from '@hoprnet/hopr-utils'
 
 describe('unit test heartbeat', async () => {
   let heartbeat: Heartbeat
@@ -12,14 +13,13 @@ describe('unit test heartbeat', async () => {
   let peers: NetworkPeerStore
   let clock: any
 
-  let interaction = {
-    interact: sinon.fake.resolves(true)
-  } as any
+  let send = sinon.fake((_id: any, _proto: any, challenge: Uint8Array) => [Hash.create(challenge).serialize()])
+  let subscribe = sinon.fake()
 
   beforeEach(async () => {
     clock = sinon.useFakeTimers(Date.now())
     peers = new NetworkPeerStore([], [await PeerId.create({ keyType: 'secp256k1' })])
-    heartbeat = new Heartbeat(peers, interaction, hangUp)
+    heartbeat = new Heartbeat(peers, subscribe, send, hangUp)
   })
 
   afterEach(() => {
@@ -29,14 +29,14 @@ describe('unit test heartbeat', async () => {
   it('check nodes is noop with empty store', async () => {
     await heartbeat.__forTestOnly_checkNodes()
     assert(hangUp.notCalled, 'hangup not called')
-    assert(interaction.interact.notCalled, 'interact not called')
+    assert(send.notCalled, 'interact not called')
   })
 
   it('check nodes is noop with only new peers', async () => {
     peers.register(fakePeerId(1))
     await heartbeat.__forTestOnly_checkNodes()
     assert(hangUp.notCalled)
-    assert(interaction.interact.notCalled)
+    assert(send.notCalled)
   })
 
   it('check nodes interacts with an old peer', async () => {
@@ -44,15 +44,15 @@ describe('unit test heartbeat', async () => {
     clock.tick(HEARTBEAT_INTERVAL * 2)
     await heartbeat.__forTestOnly_checkNodes()
     assert(hangUp.notCalled, 'shouldnt call hangup')
-    assert(interaction.interact.calledOnce, 'should call interact')
+    assert(send.calledOnce, 'should call interact')
   })
 
   it('test heartbeat flow', async () => {
     let generateMock = (i: string | number) => {
       let id = fakePeerId(i)
       let peers = new NetworkPeerStore([], [id])
-      let heartbeat = new Heartbeat(peers, interaction, hangUp)
-      return { peers, interaction, id, heartbeat }
+      let heartbeat = new Heartbeat(peers, subscribe, send, hangUp)
+      return { peers, id, heartbeat }
     }
 
     let alice = generateMock(1)
@@ -86,11 +86,12 @@ describe('unit test heartbeat', async () => {
     assert(alice.peers.qualityOf(chris.id) > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
 
     // Chris dies, alice heartbeats again
-    alice.interaction.interact = sinon.fake((id: PeerId) => {
+    //@ts-ignore
+    alice.heartbeat.sendMessageAndExpectResponse = sinon.fake((id: PeerId, _proto: any, challenge: Uint8Array) => {
       if (id.equals(chris.id)) {
-        return Promise.resolve(-1)
+        return Promise.reject()
       }
-      return Promise.resolve(0)
+      return [Hash.create(challenge).serialize()]
     })
 
     clock.tick(HEARTBEAT_INTERVAL * 2)

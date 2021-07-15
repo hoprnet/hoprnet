@@ -9,8 +9,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "sourceMap": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
   },
-  "exclude": ["lib, node_modules"],
-  "include": ["src/**/*.ts"]
+  "exclude": ["node_modules"]
 }

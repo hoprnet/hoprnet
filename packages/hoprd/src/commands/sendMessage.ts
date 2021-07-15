@@ -1,13 +1,12 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import type { AutoCompleteResult, CommandResponse } from './abstractCommand'
 import type PeerId from 'peer-id'
-import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
-import { checkPeerIdInput, encodeMessage, getPeerIdsAndAliases, styleValue } from './utils'
+import { INTERMEDIATE_HOPS } from '@hoprnet/hopr-core/lib/constants'
+import { PublicKey } from '@hoprnet/hopr-utils'
+import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
-export abstract class SendMessageBase extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+export class SendMessage extends AbstractCommand {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -28,30 +27,19 @@ export abstract class SendMessageBase extends AbstractCommand {
     state: GlobalState,
     recipient: PeerId,
     rawMessage: string,
-    getIntermediateNodes?: () => Promise<PeerId[]>
-  ): Promise<string | void> {
+    path?: PublicKey[]
+  ): Promise<string> {
     const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
     try {
-      await this.node.sendMessage(encodeMessage(message), recipient, getIntermediateNodes)
+      await this.node.sendMessage(encodeMessage(message), recipient, path)
+      return 'Message sent'
     } catch (err) {
-      return styleValue(`Could not send message. (${err})`, 'failure')
+      return styleValue(`Could not send message. (${err.message})`, 'failure')
     }
   }
 
-  public async autocomplete(query: string = '', line: string = '', state: GlobalState): Promise<AutoCompleteResult> {
-    const allIds = getPeerIdsAndAliases(this.node, state, {
-      noBootstrapNodes: true,
-      returnAlias: true,
-      mustBeOnline: true
-    })
-
-    return this._autocompleteByFiltering(query, allIds, line)
-  }
-}
-
-export class SendMessage extends SendMessageBase {
-  public async execute(query: string, state: GlobalState): Promise<CommandResponse> {
+  public async execute(log: (str: string) => void, query: string, state: GlobalState): Promise<void> {
     try {
       let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
       if (err) throw Error(err)
@@ -59,34 +47,37 @@ export class SendMessage extends SendMessageBase {
       if (peerIdString.includes(',')) {
         // Manual routing
         // Direct routing can be done with ,recipient
-        const path = await Promise.all(
-          peerIdString
-            .split(',')
-            .filter(Boolean)
-            .map((x) => checkPeerIdInput(x, state))
-        )
-        if (path.length > MAX_HOPS + 1) {
-          throw new Error('Cannot create path longer than MAX_HOPS')
+        const path = (
+          await Promise.all(
+            peerIdString
+              .split(',')
+              .filter(Boolean)
+              .map((x) => checkPeerIdInput(x, state))
+          )
+        ).map((x) => PublicKey.fromPeerId(x))
+
+        if (path.length > INTERMEDIATE_HOPS + 1) {
+          throw new Error('Cannot create path longer than INTERMEDIATE_HOPS')
         }
 
-        const recipient = path[path.length - 1]
+        const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
         console.log(
-          `Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path.slice(
-            0,
-            path.length - 1
-          )} ...`
+          `Sending message to ${styleValue(recipient.toString(), 'peerId')} via ${path
+            .slice(0, path.length - 1)
+            .map((current) => styleValue(current.toString(), 'peerId'))
+            .join(',')} ...`
         )
-        return this.sendMessage(state, recipient, message, async () => {
-          return path.slice(0, path.length - 1)
-        })
+        log(await this.sendMessage(state, recipient.toPeerId(), message, intermediateNodes))
+
+        return
       }
 
       let peerId = await checkPeerIdInput(peerIdString, state)
 
       console.log(`Sending message to ${styleValue(peerId.toB58String(), 'peerId')} ...`)
-      return this.sendMessage(state, peerId, message)
+      log(await this.sendMessage(state, peerId, message))
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      log(styleValue(err.message, 'failure'))
     }
   }
 }

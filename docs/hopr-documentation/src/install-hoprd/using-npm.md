@@ -37,10 +37,25 @@ $ nvm use v14
 
 If everything was done properly, you can run `node --version` to see your current `node` version, alongside running basic commands as shown when running simply `node` in your terminal.
 
+```eval_rst
+.. ATTENTION::
+   MacOS M1 users will need to follow an extra set of instructions from `NVM <https://github.com/nvm-sh/nvm#macos-troubleshooting>`_ to allow them to use nodejs 14.
+```
+
 ![](../../images/node.gif)
 
 ## Installing HOPRd using NPM
 
 ```bash
-$ npm install --unsafe-perm=true -g @hoprnet/hoprd
+$ mkdir MY_NEW_HOPR_TEST_FOLDER
+$ cd MY_NEW_HOPR_TEST_FOLDER
+$ npm install @hoprnet/hoprd@1.73
+
+# run hoprd
+$ DEBUG=hopr* npx hoprd --admin --init --announce
+
+# add security
+$ DEBUG=hopr* npx hoprd --admin --init --announce --apiToken <YOU_SECRET_TOKEN>
+
+Please note that if `--rest` or `--admin` is specificed, you **must** provide an `--apiToken` which is at least 8 symbols, contains a lowercase and an uppercase letter, a number and a special symbol. This ensure the node cannot be accessed by a malicious user residing in the same network.
 ```

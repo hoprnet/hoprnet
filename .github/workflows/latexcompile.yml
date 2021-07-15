@@ -1,5 +1,5 @@
 name: Build LaTeX document
-on: 
+on:
   push:
     paths:
       'docs/yellowpaper/**/*.tex'
@@ -8,8 +8,10 @@ jobs:
   build_latex:
     runs-on: ubuntu-latest
     steps:
+
       - name: Set up Git repository
         uses: actions/checkout@v2
+
       - name: Compile LaTeX document
         uses: xu-cheng/texlive-action/small@v1
         with:
@@ -22,6 +24,7 @@ jobs:
             latexmk -pdf
             latexmk -c
             mv main.pdf yellowpaper.pdf
+
       - name: Commit latest version
         run: |
           git config --global user.email "noreply@hoprnet.org"

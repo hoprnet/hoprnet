@@ -1,0 +1,60 @@
+name: HOPR Generate API docs
+
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  docs:
+    name: Generate API docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install Yarn (only when using ACT)
+        if: ${{ env.ACT == 'true' }}
+        run: |
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          apt update
+          apt install --no-install-recommends yarn
+
+      - name: Restore cache of node modules.
+        uses: actions/cache@v2
+        if: ${{ !env.ACT }}
+        id: nodejs-cache
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Generate docs
+        run: ./scripts/regenerate-typedocs.sh
+
+      - name: Commit docs changes
+        # only commit changes when not running via act and when on final branch<Plug>_es
+        if: |
+          (github.ref == 'refs/heads/master' ||
+           github.ref == 'refs/heads/avado' ||
+           startsWith(github.ref, 'refs/heads/debug-docs/') ||
+           startsWith(github.ref, 'refs/heads/release/')
+          ) && !env.ACT
+        run: ./scripts/commit-and-push-all-changes.sh
+        env:
+          HOPR_GIT_MSG: "Re-generate API docs for packages"

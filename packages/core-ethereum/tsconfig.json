@@ -1,8 +1,17 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "resolveJsonModule": true,
     "outDir": "./lib"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["lib"]
+  "exclude": ["lib"],
+  "typedocOptions": {
+    "entryPoints": ["src/index.ts"],
+    "disableOutputCheck": true,
+    "out": "docs",
+    // by default we don't want links to source code to change on every change
+    // when building docs for releases we can fix the revision on the cmdline
+    "gitRevision": "master"
+  }
 }

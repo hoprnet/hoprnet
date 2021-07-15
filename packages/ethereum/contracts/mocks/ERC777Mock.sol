@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.0;
 
-// SPDX-License-Identifier: LGPL-3.0-only
-
-import "@openzeppelin/contracts/GSN/Context.sol";
-import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
+import "@openzeppelin/contracts-v3-0-1/GSN/Context.sol";
+import "@openzeppelin/contracts-v3-0-1/token/ERC777/ERC777.sol";
 
 contract ERC777Mock is Context, ERC777 {
     constructor(
@@ -12,7 +11,7 @@ contract ERC777Mock is Context, ERC777 {
         string memory name,
         string memory symbol,
         address[] memory defaultOperators
-    ) public ERC777(name, symbol, defaultOperators) {
+    ) ERC777(name, symbol, defaultOperators) public {
         _mint(initialHolder, initialBalance, "", "");
     }
 

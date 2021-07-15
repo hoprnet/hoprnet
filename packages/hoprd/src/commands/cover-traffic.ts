@@ -1,5 +1,4 @@
 import { encode, decode } from 'rlp'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import debug from 'debug'
@@ -31,7 +30,7 @@ export class CoverTraffic extends AbstractCommand {
   private totalLatency: number
 
   private identifier: string
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
     this.messagesSent = 0
     this.messagesReceived = 0
@@ -80,7 +79,7 @@ export class CoverTraffic extends AbstractCommand {
     return `${this.messagesSent} messages sent, ${this.messagesReceived} received, reliability = ${reliability}%, average latency is ${latency}`
   }
 
-  public async execute(query: string): Promise<string> {
+  public async execute(log, query: string): Promise<void> {
     if (query === 'start' && !this.timeout) {
       if (!this.registered) {
         // Intercept message event to monitor success rate.
@@ -88,15 +87,15 @@ export class CoverTraffic extends AbstractCommand {
         this.registered = true
       }
       this.timeout = setTimeout(this.tick.bind(this), INTERVAL)
-      return 'started'
+      return log('started')
     }
     if (query === 'stop' && this.timeout) {
       clearTimeout(this.timeout)
       delete this.timeout
-      return 'stopped'
+      return log('stopped')
     }
     if (query === 'stats') {
-      return this.stats()
+      return log(this.stats())
     }
   }
 }

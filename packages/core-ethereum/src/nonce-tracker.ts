@@ -2,26 +2,9 @@ import type { Transaction as ITransaction } from './transaction-manager'
 import debug from 'debug'
 import assert from 'assert'
 import { Mutex } from 'async-mutex'
+import { Address } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core-ethereum:nonce-tracker')
-
-/**
- *  @property opts.web3 - An ethereum provider
- *  @property opts.blockTracker - An instance of eth-block-tracker
- *  @property opts.getPendingTransactions - A function that returns an array of txMeta
- *  whose status is `submitted`
- *  @property opts.getConfirmedTransactions - A function that returns an array of txMeta
- *  whose status is `confirmed`
- *  @property minPending minimum time a transaction can be pending until it becomes replacable in ms
- *  if not passed, it will not be used
- */
-export interface NonceTrackerOptions {
-  getLatestBlockNumber: () => Promise<number>
-  getTransactionCount: (address: string, blockNumber?: number) => Promise<number>
-  getPendingTransactions: (address: string) => Transaction[]
-  getConfirmedTransactions: (address: string) => Transaction[]
-  minPending?: number
-}
 
 /**
  * @property highestLocallyConfirmed - A hex string of the highest nonce on a confirmed transaction.
@@ -91,19 +74,17 @@ export type Transaction = ITransaction & {
  * this could happen because of network issues, low funds, node unavailability, etc.
  */
 export default class NonceTracker {
-  private getLatestBlockNumber: NonceTrackerOptions['getLatestBlockNumber']
-  private getTransactionCount: NonceTrackerOptions['getTransactionCount']
-  private getPendingTransactions: NonceTrackerOptions['getPendingTransactions']
-  private getConfirmedTransactions: NonceTrackerOptions['getConfirmedTransactions']
-  private minPending: NonceTrackerOptions['minPending']
   private lockMap: Record<string, Mutex>
 
-  constructor(opts: NonceTrackerOptions) {
-    this.getLatestBlockNumber = opts.getLatestBlockNumber
-    this.getTransactionCount = opts.getTransactionCount
-    this.getPendingTransactions = opts.getPendingTransactions
-    this.getConfirmedTransactions = opts.getConfirmedTransactions
-    this.minPending = opts.minPending
+  constructor(
+    private api: {
+      getLatestBlockNumber: () => Promise<number>
+      getTransactionCount: (address: Address, blockNumber?: number) => Promise<number>
+      getPendingTransactions: (address: Address) => Transaction[]
+      getConfirmedTransactions: (address: Address) => Transaction[]
+    },
+    private minPending?: number
+  ) {
     this.lockMap = {}
   }
 
@@ -124,11 +105,11 @@ export default class NonceTracker {
    * @param address the hex string for the address whose nonce we are calculating
    * @returns {Promise<NonceLock>}
    */
-  public async getNonceLock(address: string): Promise<NonceLock> {
+  public async getNonceLock(address: Address): Promise<NonceLock> {
     // await global mutex free
     await this._globalMutexFree()
     // await lock free, then take lock
-    const releaseLock = await this._takeMutex(address)
+    const releaseLock = await this._takeMutex(address.toHex())
     try {
       // evaluate multiple nextNonce strategies
       const networkNonceResult = await this._getNetworkNextNonce(address)
@@ -136,7 +117,7 @@ export default class NonceTracker {
       const nextNetworkNonce = networkNonceResult.nonce
       const highestSuggested = Math.max(nextNetworkNonce, highestLocallyConfirmed)
 
-      const allPendingTxs = this.getPendingTransactions(address)
+      const allPendingTxs = this.api.getPendingTransactions(address)
       const hasStuckTx = this._containsStuckTx(allPendingTxs)
       if (hasStuckTx) {
         log('Found stuck txs')
@@ -209,13 +190,12 @@ export default class NonceTracker {
    * @param address the hex string for the address whose nonce we are calculating
    * @returns {Promise<NetworkNextNonce>}
    */
-  private async _getNetworkNextNonce(address: string): Promise<NetworkNextNonce> {
+  private async _getNetworkNextNonce(address: Address): Promise<NetworkNextNonce> {
     // calculate next nonce
     // we need to make sure our base count
     // and pending count are from the same block
-    // @TODO: use block event tracker so we don't query every time
-    const blockNumber = await this.getLatestBlockNumber()
-    const baseCount = await this.getTransactionCount(address, blockNumber)
+    const blockNumber = await this.api.getLatestBlockNumber()
+    const baseCount = await this.api.getTransactionCount(address, blockNumber)
     assert(
       Number.isInteger(baseCount),
       `nonce-tracker - baseCount is not an integer - got: (${typeof baseCount}) "${baseCount}"`
@@ -237,8 +217,8 @@ export default class NonceTracker {
    * Function returns the highest of the confirmed transaction from the address.
    * @param address the hex string for the address whose nonce we are calculating
    */
-  private _getHighestLocallyConfirmed(address: string): number {
-    const confirmedTransactions: Transaction[] = this.getConfirmedTransactions(address)
+  private _getHighestLocallyConfirmed(address: Address): number {
+    const confirmedTransactions: Transaction[] = this.api.getConfirmedTransactions(address)
     const highest = this._getHighestNonce(confirmedTransactions)
     return Number.isInteger(highest) ? highest + 1 : 0
   }

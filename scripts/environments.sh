@@ -1,22 +1,22 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 source scripts/utils.sh
 
 # These will be cleaned up and machines stopped
-OLD_RELEASES='zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly internal'
+OLD_RELEASES='stirling zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly internal integration-test'
 
 # ===== Load env variables for the current github ref =====
 # Takes:
 # - GITHUB_REF
 # - RELEASE
-# Sets: 
+# Sets:
 # - RELEASE_NAME
 # - RELEASE_IP deprecated
 # - VERSION_MAJ_MIN
 get_environment() {
   BRANCH=$(echo "$GITHUB_REF" | sed -e "s#refs/heads/##g") # Removing `refs/heads`
 
-  if [ "$BRANCH" == 'master' ]; then
+  if [[ "$BRANCH" == 'master' ]] || [[ "$BRANCH" == debug-deploy/* ]]; then
     RELEASE_NAME='master'
     RELEASE_IP='34.65.102.152'
     VERSION_MAJ_MIN='prerelease'
@@ -24,41 +24,63 @@ get_environment() {
   fi
 
   case "$BRANCH" in release/*)
-    VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
-    
+    VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE)
+    if [ "$VERSION_MAJ_MIN" == '1.73' ]; then
+      RELEASE_NAME='paphos'
+      return
+    fi
+
+    if [ "$VERSION_MAJ_MIN" == '1.72' ]; then
+      RELEASE_NAME='kiautschou'
+      return
+    fi
+
+    if [ "$VERSION_MAJ_MIN" == '1.71' ]; then
+      RELEASE_NAME='stirling'
+      return
+    fi
+
     if [ "$VERSION_MAJ_MIN" == '1.70' ]; then
       RELEASE_NAME='jungfrau'
       return
     fi
+
     if [ "$VERSION_MAJ_MIN" == '1.69' ]; then
       RELEASE_NAME='bienne'
       return
     fi
+
     if [ "$VERSION_MAJ_MIN" == '1.68' ]; then
       RELEASE_NAME='neuchatel'
       return
     fi
+
     if [ "$VERSION_MAJ_MIN" == '1.67' ]; then
       RELEASE_NAME='emmenbrucke'
       return
     fi
+
     if [ "$VERSION_MAJ_MIN" == '1.64' ]; then
       RELEASE_NAME='morat'
       return
     fi
+
     if [ "$VERSION_MAJ_MIN" == '1.62' ]; then
       RELEASE_NAME='titlis'
       return
     fi
+
     if [ "$VERSION_MAJ_MIN" == '1.61' ]; then
       RELEASE_NAME='nyc'
       return
     fi
+
     if [ "$VERSION_MAJ_MIN" == '1.60' ]; then
       RELEASE_NAME='mainz'
       # Released by mistake: https://github.com/hoprnet/hoprnet/pull/893#issuecomment-750318579
       return
     fi
+
     if [ "$VERSION_MAJ_MIN" == '1.59' ]; then
       RELEASE_NAME='mainz'
       # From this release on, RELEASE_IP is deprecated
@@ -86,18 +108,20 @@ get_environment() {
       RELEASE_IP='34.65.158.118'
       return
     fi
+
     if [ "$VERSION_MAJ_MIN" == '1.54' ]; then
       RELEASE_NAME='zurich'
       RELEASE_IP='unknown'
       return
     fi
+
     echo "Unknown version: $VERSION_MAJ_MIN"
   esac
 
   echo "Unknown release / environment: '$BRANCH'"
   exit 1
+
   RELEASE_NAME='debug'
   RELEASE_IP='34.65.56.229'
   VERSION_MAJ_MIN='dbg'
 }
-

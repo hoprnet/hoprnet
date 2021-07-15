@@ -1,0 +1,2 @@
+# use image with standard tools installed
+-P ubuntu-latest=catthehacker/ubuntu:act-latest

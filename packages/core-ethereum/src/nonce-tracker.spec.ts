@@ -1,8 +1,8 @@
 import { expect } from 'chai'
 import NonceTracker, { Transaction } from './nonce-tracker'
-import { durations } from '@hoprnet/hopr-utils'
+import { durations, Address } from '@hoprnet/hopr-utils'
 
-const USER_ADDRESS = '0x7d3517b0d011698406d6e0aed8453f0be2697926'
+const USER_ADDRESS = Address.fromString('0x7d3517b0d011698406d6e0aed8453f0be2697926')
 
 describe('nonce-tracker', function () {
   let nonceTracker: NonceTracker
@@ -89,7 +89,6 @@ describe('nonce-tracker', function () {
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
     })
-
     pendingTxs = genMultiTx({
       fromNonce: 3,
       count: 29
@@ -125,7 +124,6 @@ describe('nonce-tracker', function () {
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
     })
-
     confirmedTxs = genMultiTx({ count: 3 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
@@ -140,7 +138,6 @@ describe('nonce-tracker', function () {
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
     })
-
     pendingTxs = genMultiTx({ count: 2 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
@@ -155,7 +152,6 @@ describe('nonce-tracker', function () {
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
     })
-
     pendingTxs = genMultiTx({ count: 2 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
@@ -252,13 +248,15 @@ describe('nonce-tracker', function () {
   it('should ignore long-time pending transactions', async function () {
     const minPending = durations.seconds(30)
 
-    nonceTracker = new NonceTracker({
-      getLatestBlockNumber: async () => 1,
-      getTransactionCount: getTransactionCountFromConfirmed,
-      getPendingTransactions: () => pendingTxs,
-      getConfirmedTransactions: () => confirmedTxs,
+    nonceTracker = new NonceTracker(
+      {
+        getLatestBlockNumber: async () => 1,
+        getTransactionCount: getTransactionCountFromConfirmed,
+        getPendingTransactions: () => pendingTxs,
+        getConfirmedTransactions: () => confirmedTxs
+      },
       minPending
-    })
+    )
 
     let createdAt = new Date().getTime() - minPending - 1
 
@@ -278,7 +276,7 @@ describe('nonce-tracker', function () {
 
 const genTx = (opts: { nonce: number; createdAt?: number }): Transaction => {
   const { createdAt = new Date().getTime() } = opts
-  return { ...opts, from: USER_ADDRESS, createdAt }
+  return { ...opts, from: USER_ADDRESS.toHex(), createdAt }
 }
 
 const genMultiTx = (opts: {

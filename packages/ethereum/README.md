@@ -17,9 +17,8 @@ Hopr-ethereum contains the on-chain logic that is used to process payments for [
 - [Testing](#testing)
 - [Coverage](#coverage)
 - [Migrating](#migrating)
-- [Audit](#audit)
-  - [Linting](#linting)
-- [Future Improvements](#future-improvements)
+- [Audits](#audits)
+- [Linting](#linting)
 
 # Requirements
 
@@ -46,7 +45,6 @@ yarn build
 # Testing
 
 ```bash
-# Runs `truffle test`
 yarn test
 ```
 
@@ -55,9 +53,7 @@ yarn test
 # Coverage
 
 ```bash
-# 1. Runs solidity-coverage
-# 2. Stores result in `coverage` folder
-yarn coverage
+npx hardhat coverage
 ```
 
 > tip: see coverage results by launching `./coverage/index.html`
@@ -67,27 +63,17 @@ yarn coverage
 For public network migrations (rinkeby, kovan, [etc](./utils/networks.ts)), you will have to create a [.env](./.env.example) file within the root directory of this project.
 
 ```bash
-yarn network # starts a locally hosted network
-yarn migrate
+# local migration
+yarn network
 
-# deploying smart contract on a public network
+# public migration
 yarn migrate --network matic
 ```
 
-# Audit
+# Audits
 
-The `HoprToken` and `HoprDistributor` contracts are currently being audited.
+You can follow the auditing process over at [hopr-audits](https://github.com/hoprnet/hopr-audits).
 
-You can find some _early_ feedback over at [bokkypoobah/HoprTokenAudit](https://github.com/bokkypoobah/HoprTokenAudit).
+# Linting
 
-See audit scope [here](./AUDIT.md).
-
-## Linting
-
-We use solhint's default preset to perform linting onto our smart contracts.
-
-# Future Improvements
-
-- **ganache-cli-coverage**: eventually we would like to switch to [ganache-core-coverage](https://github.com/OpenZeppelin/ganache-core-coverage) once it matures enough. [#issue](https://forum.openzeppelin.com/t/how-is-solidity-coverage-integrated-into-openzeppelin/1323/3)
-
-- **redundant compiles**: when running `yarn test` or `yarn coverage`, we always make sure to generate the latest typescript types, this requires us to compile the contracts. Internally, both scripts use `truffle test` which recompiles the contracts even though they haven't changed. [#issue](https://github.com/trufflesuite/truffle/issues/469) [#solution](https://github.com/trufflesuite/truffle/issues/2661)
+We use solhint's recommended preset to perform linting onto our smart contracts.

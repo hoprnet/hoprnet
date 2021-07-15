@@ -1,156 +1,52 @@
-import { AbstractInteraction } from '../abstractInteraction'
-import type { Connection, MuxedStream } from 'libp2p'
-
-import pipe from 'it-pipe'
-import PeerId from 'peer-id'
-
 import debug from 'debug'
-const log = debug('hopr-core:acknowledgement')
-const error = debug('hopr-core:acknowledgement:error')
-
-import { green, red, blue, yellow } from 'chalk'
-
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type Hopr from '../../'
-import { Acknowledgement } from '../../messages/acknowledgement'
-
-import EventEmitter from 'events'
-
+import { PublicKey, durations, oneAtATime } from '@hoprnet/hopr-utils'
+import PeerId from 'peer-id'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import {
-  dialHelper,
-  u8aToHex,
-  durations,
-  u8aConcat,
-  toU8a,
-  u8aToNumber,
-  pubKeyToPeerId,
-  u8aAdd
-} from '@hoprnet/hopr-utils'
-import { UnacknowledgedTicket } from '../../messages/ticket'
-
-import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
-
-const ONE = toU8a(1, 8)
+import { Acknowledgement, Packet } from '../../messages'
+import { HoprDB } from '@hoprnet/hopr-utils'
+const log = debug('hopr-core:acknowledgement')
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
-class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
-  extends EventEmitter
-  implements AbstractInteraction {
-  protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]
+export function subscribeToAcknowledgements(
+  subscribe: any,
+  db: HoprDB,
+  chain: HoprCoreEthereum,
+  pubKey: PeerId,
+  onMessage: (ackMessage: Acknowledgement) => void
+) {
+  async function handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId) {
+    const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
-  constructor(public node: Hopr<Chain>) {
-    super()
-    this.node._libp2p.handle(this.protocols, this.handler.bind(this))
-  }
-
-  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
-    pipe(struct.stream, this.handleHelper.bind(this))
-  }
-
-  async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
-    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
-      timeout: ACKNOWLEDGEMENT_TIMEOUT
-    })
-
-    if (struct == undefined) {
-      error(`Could not send acknowledgement to party ${counterparty.toB58String()}.`)
-    }
-
-    pipe([acknowledgement], struct.stream)
-  }
-
-  async handleHelper(source: AsyncIterable<Uint8Array>): Promise<void> {
-    for await (const msg of source) {
-      const arr = msg.slice()
-      const acknowledgement = new Acknowledgement(this.node.paymentChannels, {
-        bytes: arr.buffer,
-        offset: arr.byteOffset
-      })
-
-      const unAcknowledgedDbKey = this.node._dbKeys.UnAcknowledgedTickets(await acknowledgement.hashedKey)
-
-      let tmp: Uint8Array
-      try {
-        tmp = await this.node.db.get(Buffer.from(unAcknowledgedDbKey))
-      } catch (err) {
-        if (err.notFound) {
-          error(
-            `received unknown acknowledgement from party ${blue(
-              (await pubKeyToPeerId(await acknowledgement.responseSigningParty)).toB58String()
-            )} for challenge ${yellow(u8aToHex(await acknowledgement.hashedKey))} - response was ${green(
-              u8aToHex(await acknowledgement.hashedKey)
-            )}. ${red('Dropping acknowledgement')}.`
-          )
-
-          continue
-        } else {
-          throw err
-        }
+    try {
+      let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
+      const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), unacknowledgedTicket.signer)
+      const ackedTicket = await channel.acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare)
+      if (ackedTicket) {
+        log(`Storing winning ticket`)
+        await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
       }
-
-      if (tmp.length > 0) {
-        const unacknowledgedTicket = new UnacknowledgedTicket(this.node.paymentChannels, {
-          bytes: tmp.buffer,
-          offset: tmp.byteOffset
-        })
-
-        let ticketCounter: Uint8Array
-        try {
-          let tmpTicketCounter = await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()))
-
-          ticketCounter = u8aAdd(true, tmpTicketCounter, ONE)
-        } catch (err) {
-          // Set ticketCounter to initial value
-          ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
-        }
-
-        let acknowledgedTicket = this.node.paymentChannels.types.AcknowledgedTicket.create(
-          this.node.paymentChannels,
-          undefined,
-          {
-            signedTicket: await unacknowledgedTicket.signedTicket,
-            response: await this.node.paymentChannels.utils.hash(
-              u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)
-            ),
-            redeemed: false
-          }
-        )
-
-        const isWinningTicket = await this.node.paymentChannels.account.reservePreImageIfIsWinning(acknowledgedTicket)
-
-        if (!isWinningTicket) {
-          log(`Got a ticket that is not a win. Dropping ticket.`)
-          await this.node.db.del(Buffer.from(unAcknowledgedDbKey))
-        }
-
-        const acknowledgedDbKey = this.node._dbKeys.AcknowledgedTickets(ticketCounter)
-
-        log(
-          `Storing ticket #${u8aToNumber(ticketCounter)} from ${blue(
-            (await pubKeyToPeerId(await acknowledgement.responseSigningParty)).toB58String()
-          )}. Ticket contains preImage for ${green(u8aToHex(await acknowledgement.hashedKey))}`
-        )
-
-        try {
-          await this.node.db
-            .batch()
-            .del(Buffer.from(unAcknowledgedDbKey))
-            .put(Buffer.from(acknowledgedDbKey), Buffer.from(acknowledgedTicket))
-            .put(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
-            .write()
-        } catch (err) {
-          error(`Error while writing to database. Error was ${red(err.message)}.`)
-        }
-      } else {
-        // Deleting dummy DB entry
-        await this.node.db.del(Buffer.from(unAcknowledgedDbKey))
+    } catch (err) {
+      if (!err.notFound) {
+        throw err
       }
-
-      this.emit(u8aToHex(unAcknowledgedDbKey))
     }
+    onMessage(ackMsg)
   }
+
+  const limitConcurrency = oneAtATime()
+  subscribe(PROTOCOL_ACKNOWLEDGEMENT, (msg: Uint8Array, remotePeer: PeerId) =>
+    limitConcurrency(() => handleAcknowledgement(msg, remotePeer))
+  )
 }
 
-export { PacketAcknowledgementInteraction }
+export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMessage: any, privKey: PeerId): void {
+  setImmediate(async () => {
+    const ack = packet.createAcknowledgement(privKey)
+
+    sendMessage(destination, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), {
+      timeout: ACKNOWLEDGEMENT_TIMEOUT
+    })
+  })
+}

@@ -1,5 +1,5 @@
 import LibP2P from 'libp2p'
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 const TCP = require('libp2p-tcp')
 const MPLEX = require('libp2p-mplex')
@@ -52,8 +52,8 @@ export async function generateLibP2PMock(addr = '/ip4/0.0.0.0/tcp/0'): Promise<L
 
 export function fakePeerId(i: number | string): PeerId {
   return {
-    id: (i as unknown) as Uint8Array,
-    equals: (x: PeerId) => ((x.id as unknown) as number) == i,
+    id: i as unknown as Uint8Array,
+    equals: (x: PeerId) => (x.id as unknown as number) == i,
     toB58String: () => i
   } as PeerId
 }

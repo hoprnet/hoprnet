@@ -1,13 +1,6 @@
-import BN from 'bn.js'
-
 const pkg = require('../package.json')
 
-export const TICKET_AMOUNT = '10000000000000000' // 0.01 HOPR
-export const TICKET_WIN_PROB = 1 // 100%
 export const PACKET_SIZE = 500
-export const MARSHALLED_PUBLIC_KEY_SIZE = 37
-export const NAME = 'ipfs' // 'hopr'
-
 export const FULL_VERSION = pkg.version
 
 const packageVersion = pkg.version.split('.')
@@ -31,17 +24,10 @@ export const HEARTBEAT_TIMEOUT = 4000
 
 export const MAX_PACKET_DELAY = 200
 
-export const MAX_HOPS = 2
+export const INTERMEDIATE_HOPS = 3 // require 3 intermediary nodes
 export const PATH_RANDOMNESS = 0.1
 export const MAX_PATH_ITERATIONS = 100
 export const NETWORK_QUALITY_THRESHOLD = 0.5
-export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(TICKET_AMOUNT).muln(100)
 export const MAX_NEW_CHANNELS_PER_TICK = 5
-export const MAX_AUTO_CHANNELS = 5
-export const MIN_NATIVE_BALANCE = new BN('100000000000000') // 0.0001 ETH
 
-// enough to fund 10 channels
-export const SUGGESTED_BALANCE = MINIMUM_REASONABLE_CHANNEL_STAKE.muln(MAX_AUTO_CHANNELS * 2)
-export const SUGGESTED_NATIVE_BALANCE = MIN_NATIVE_BALANCE.muln(250) // 0.025 ETH
-
-export const CHECK_TIMEOUT = 10000
+export const CHECK_TIMEOUT = 60000

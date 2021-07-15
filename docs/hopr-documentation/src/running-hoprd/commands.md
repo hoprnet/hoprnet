@@ -32,6 +32,10 @@ The bottom address is your native address, used for funding with native and HOPR
 
 Type `settings` to see your current settings. This will show whether you're currently including your address with sent messages (includeRecipient true / false), and your current channel opening strategy (promiscuous / passive). To change your `includeRecipient` setting, type `settings includeRecipient true` or `settings includeRecipient false`. To change your funding strategy, type `settings strategy promiscuous` or `settings strategy passive`.
 
+#### Passive and Promiscuous strategies
+
+By default, hoprd runs in `passive` mode, this means that your node will not attempt to open or close any channels automatically. When you set your strategy to `promiscuous` mode, your node will attempt to open channels to a _randomly_ selected group of nodes which you have a healthy connection to. At the same time, your node will also attempt to close channels that are running low on balance or are unhealthy.
+
 ## ping
 
 Type `ping [HOPR address]` to attempt to pings another node. You should receive a pong and a latency report. This can be used to assess the health of the target node and your own node.
@@ -71,7 +75,7 @@ Type `channels` to see your currently open channels. You'll see the node that ea
 
 ## close
 
-Type `close [HOPR address]` to close an open channel. Once you've initiated channel closure, you have to wait at least two minutes and then send the command again. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.
+Type `close [HOPR address]` to close an open channel. Once you've initiated channel closure, you have to wait for a specified closure time, then you may send the command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.
 
 ## tickets
 
@@ -82,6 +86,8 @@ Type `tickets` to displays information about your redeemed and unredeemed ticket
 Type `redeemTickets` to attempt to redeem your earned tickets for HOPR. Make sure you have sufficient native currency in your balance to cover the gas fees.
 
 ## covertraffic
+
+This feature is work in progress and may contain bugs.
 
 Type `covertraffic start` to being generating cover traffic messages. Type `covertraffic stop` to stop the cover traffic. You can type `covertraffic stats` to see the current status and reliability of your cover traffic.
 

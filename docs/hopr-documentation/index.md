@@ -21,6 +21,12 @@ At the time of writing, HOPR is also able to implement a [Polkadot-enabled payme
 ```eval_rst
 .. toctree::
    :maxdepth: 1
+   :caption: Quickstart
+
+   src/quickstart/index.md
+
+.. toctree::
+   :maxdepth: 1
    :caption: Core HOPR Concepts
 
    src/core-concepts/index.md
@@ -49,4 +55,5 @@ At the time of writing, HOPR is also able to implement a [Polkadot-enabled payme
    src/running-hoprd/funding/native-tokens.md
    src/running-hoprd/funding/hopr-tokens.md
    src/running-hoprd/commands.md
+   src/running-hoprd/flags.md
 ```

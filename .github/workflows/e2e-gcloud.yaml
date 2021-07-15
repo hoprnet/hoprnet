@@ -1,0 +1,96 @@
+name: HOPR End-to-end tests (gcloud)
+
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
+  MATRIX_ROOM: ${{ secrets.MATRIX_ROOM }}
+  MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
+  MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
+
+on:
+  push:
+    # FIXME: make funding work reliably
+    # branches: ['master', 'release/**', 'debug-e2e-gcloud/**']
+    branches: ['debug-e2e-gcloud/**']
+    paths-ignore:
+      - '**/docs/**/*'
+
+jobs:
+  e2e-gcloud:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    strategy:
+      matrix:
+        node-version: [14]
+        # only need to run on one OS since all testing is done on cloud VMs
+        os: ['ubuntu-latest']
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://registry.npmjs.org/
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: Restore cache of node modules and yarn cache
+        uses: actions/cache@v2
+        if: ${{ !env.ACT }}
+        id: nodejs-cache
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nodejs-
+
+      - name: Build
+        run: |
+          yarn
+          yarn build
+
+      - name: Install websocat
+        run: ./scripts/install-websocat.sh
+
+      - name: Install jq
+        run: ./scripts/install-jq.sh
+
+      - name: Setup Google Cloud Credentials
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+
+      - name: Test
+        id: test
+        run: |
+          # generating and storing test id for cleanup later
+          declare test_id="ci-test-${RANDOM}-${RANDOM}"
+          echo "::set-output name=test_id::${test_id}"
+          ./scripts/run-integration-tests-gcloud.sh ${test_id}
+        env:
+          FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          HOPRD_INFURA_KEY: ${{ secrets.INFURA_KEY }}
+
+      - name: Cleanup resources in case the job was cancelled or failed
+        if: ${{ always() }}
+        run: |
+          ./scripts/run-integration-tests-gcloud.sh ${HOPRD_TEST_ID}
+        env:
+          HOPRD_TEST_ID: ${{ steps.test.outputs.test_id }}
+          HOPRD_RUN_CLEANUP_ONLY: true
+          HOPRD_INFURA_KEY: placeholder
+
+      - name: Send notification if anything failed on master or release branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"
