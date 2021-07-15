@@ -277,7 +277,7 @@ class HoprConnect implements Transport {
       // don't try a direct dial attempt.
       // @dev Used for testing
       this.__noDirectConnections &&
-      (this.relayPeerIds == undefined || (maPeerId != null && !this.relayPeerIds.has(maPeerId)))
+      (this.relayPeerIds == undefined || this.relayPeerIds.size == 0 || (maPeerId != null && !this.relayPeerIds.has(maPeerId)))
     ) {
       return false
     }
