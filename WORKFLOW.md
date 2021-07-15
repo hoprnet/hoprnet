@@ -34,7 +34,7 @@ particular branch to deploy on every change.
 ```
 
 
-   release/paphos          master          jjpa/solves-channels-1556
+   release/moscow          master          jjpa/solves-channels-1556
 
          x                   │                       x
          x                   │                       x
@@ -75,7 +75,7 @@ particular branch to deploy on every change.
 
 ```
 
-   hotfix/patch-paphos    release/paphos          master
+   hotfix/patch-moscow    release/moscow          master
 
          x                   x                       x 1.71.0-next.44
          x                   │ ◄─────────────────────x
