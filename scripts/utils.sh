@@ -18,15 +18,32 @@ function ensure_port_is_free() {
   fi
 }
 
+# $1 = filename
+# $2 = expected content
+function expect_file_content {
+  local filename="${1}"
+  local expected="${2}"
+  local actual="$(cat "${filename}")"
+
+  if [[ "${expected}" != "${actual}" ]]; then
+    log "⛔️ bad content for ${filename}"
+    log "expected: "
+    log "${expected}"
+    log "actual: "
+    log "${actual}"
+    exit 1
+  fi
+}
+
 # $1 = file to monitor
 # $2 = regexp to look for
 function wait_for_regex_in_file() {    
-    declare file=${1}
-    declare regex=${2}    
+    local file=${1}
+    local regex=${2}    
  
     log "Waiting for ${regex} in ${file}..."    
     
-    declare delay=0.1
+    local delay=0.1
     
     while true; do
       sleep ${delay}

@@ -1,3 +1,5 @@
+import PeerId from 'peer-id'
+
 const Alice = Uint8Array.from([
   8, 2, 18, 32, 143, 114, 18, 156, 186, 207, 242, 255, 116, 75, 164, 53, 121, 130, 42, 201, 169, 1, 1, 105, 210, 158,
   183, 69, 162, 182, 149, 57, 195, 5, 32, 197
@@ -41,3 +43,20 @@ export function getIdentity(name: string): Uint8Array {
 }
 
 export { Alice, Bob, Charly, Dave, Ed }
+
+export async function peerIdForIdentity(identityName: string): Promise<PeerId> {
+  return PeerId.createFromPrivKey(getIdentity(identityName))
+}
+
+export async function identityFromPeerId(peerIdToCheck: PeerId): Promise<string> {
+  console.log(peerIdToCheck)
+  for (const identityName of ['alice', 'bob', 'charly', 'dave', 'ed']) {
+    const peerId = await peerIdForIdentity(identityName)
+    if (peerId.toB58String() === peerIdToCheck.toB58String()) {
+      return identityName
+    }
+  }
+
+  console.log(`can't find identity for peerId ${peerIdToCheck}`)
+  return 'unknown'
+}
