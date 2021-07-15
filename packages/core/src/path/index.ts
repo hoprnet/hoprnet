@@ -8,7 +8,7 @@ import BN from 'bn.js'
 const log = Debug('hopr-core:pathfinder')
 
 export type Path = PublicKey[]
-type ChannelPath = { weight: BN, path: ChannelEntry[] }
+type ChannelPath = { weight: BN; path: ChannelEntry[] }
 
 const sum = (a: BN, b: BN) => a.add(b)
 const pathFrom = (c: ChannelPath): Path => c.path.map((ce) => ce.destination) // Doesn't include ourself [0]
@@ -55,8 +55,9 @@ export async function findPath(
   let queue = new Heap<ChannelPath>(comparePath)
   let deadEnds = new Set<string>()
   let iterations = 0
-  await Promise.all((await getOpenChannelsFromPeer(start))
-                .map(async x => queue.add({ weight: await weight(x), path: [x] })))
+  await Promise.all(
+    (await getOpenChannelsFromPeer(start)).map(async (x) => queue.add({ weight: await weight(x), path: [x] }))
+  )
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath = queue.peek()
@@ -66,16 +67,15 @@ export async function findPath(
     }
 
     const lastPeer = currentPath[currentPath.path.length - 1].destination
-    const newChannels = (await getOpenChannelsFromPeer(lastPeer))
-      .filter((c) => {
-        return (
-          !destination.eq(c.destination) &&
-          networkQualityOf(c.destination) > NETWORK_QUALITY_THRESHOLD &&
-          filterCycles(c, currentPath) &&
-          !deadEnds.has(c.destination.toHex())
-        )
-      })
-      // TODO sort
+    const newChannels = (await getOpenChannelsFromPeer(lastPeer)).filter((c) => {
+      return (
+        !destination.eq(c.destination) &&
+        networkQualityOf(c.destination) > NETWORK_QUALITY_THRESHOLD &&
+        filterCycles(c, currentPath) &&
+        !deadEnds.has(c.destination.toHex())
+      )
+    })
+    // TODO sort
 
     if (newChannels.length == 0) {
       queue.pop()

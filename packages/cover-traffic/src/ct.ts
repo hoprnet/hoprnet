@@ -122,7 +122,7 @@ class PersistedState {
     await this.set(state)
   }
 
-  async setNode(peer){
+  async setNode(peer) {
     const state = await this.get()
     state.nodes[peer.id.toB58String()] = {
       id: peer.id,
@@ -132,9 +132,9 @@ class PersistedState {
     await this.set(state)
   }
 
-  async setCTChannels(channels: ChannelEntry[]){
+  async setCTChannels(channels: ChannelEntry[]) {
     const state = await this.get()
-    state.ctChannels = channels.map(c => c.destination)
+    state.ctChannels = channels.map((c) => c.destination)
     await this.set(state)
   }
 
@@ -142,7 +142,7 @@ class PersistedState {
     return Object.values((await this.get()).channels).filter((c: ChannelData) => c.channel.source.eq(p)).map(c => c.channel)
   }
 
-  async log(...args:String[]){
+  async log(...args: String[]) {
     const s = await this.get()
     s.log.push(args.join(' '))
     await this.set(s)
@@ -156,7 +156,7 @@ class PersistedState {
 
   async getNode(b58String: string): Promise<PeerData> {
     const s = await this.get()
-    return s.nodes[b58String] 
+    return s.nodes[b58String]
   }
 
   async findChannel(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
@@ -207,12 +207,16 @@ export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
   Object.values(state.channels).map(c => c.channel).filter((c: ChannelEntry) => c.source.eq(p))
 
 export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
-  findChannelsFrom(p, state).map((c) => c.balance.toBN()).reduce(addBN, new BN('0'))
+  findChannelsFrom(p, state)
+    .map((c) => c.balance.toBN())
+    .reduce(addBN, new BN('0'))
 
 export const importance = (p: PublicKey, state: State): BN =>
-  findChannelsFrom(p, state).map((c: ChannelEntry) =>
-    sqrtBN(totalChannelBalanceFor(p, state).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination, state)))
-  ).reduce(addBN, new BN('0'))
+  findChannelsFrom(p, state)
+    .map((c: ChannelEntry) =>
+      sqrtBN(totalChannelBalanceFor(p, state).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination, state)))
+    )
+    .reduce(addBN, new BN('0'))
 
 export const findChannel = (src: PublicKey, dest: PublicKey, state: State): ChannelEntry =>
    Object.values(state.channels).map(c => c.channel).find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
@@ -235,7 +239,7 @@ export const sendCTMessage = async (startNode: PublicKey, selfPub: PublicKey, se
 
     path.forEach((p) => data.incrementForwards(p))
     path.push(selfPub) // destination is always self.
-    data.log('SEND ' + path.map(pub => pub.toB58String()).join(','))
+    data.log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
     data.log('Could not find path - ' + startNode.toPeerId().toB58String())
@@ -288,25 +292,30 @@ class CoverTrafficStrategy extends SaneDefaults {
       .concat(toOpen.map((o) => o[0]))
       .concat(toClose)
 
-    await Promise.all(state.ctChannels.map(async (dest) => {
-      const channel = await this.data.findChannel(this.selfPub, dest) 
-      if (channel.status == ChannelStatus.Open) {
-        const success = await sendCTMessage(dest, this.selfPub, async (path: PublicKey[]) => {
-          await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
-        }, this.data)
-        if (!success) {
-          toClose.push(dest);
+    await Promise.all(
+      state.ctChannels.map(async (dest) => {
+        const channel = await this.data.findChannel(this.selfPub, dest)
+        if (channel.status == ChannelStatus.Open) {
+          const success = await sendCTMessage(
+            dest,
+            this.selfPub,
+            async (path: PublicKey[]) => {
+              await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
+            },
+            this.data
+          )
+          if (!success) {
+            toClose.push(dest)
+          }
         }
-      }
-    }))
+      })
+    )
 
     this.data.log(
-      (`strategy tick: balance:${balance.toString()
-       } open:${toOpen.map((p) => p[0].toPeerId().toB58String()).join(',')
-       } close: ${toClose
-        .map((p) => p.toPeerId().toB58String())
-        .join(',')}`
-    ).replace('\n', ', '))
+      `strategy tick: balance:${balance.toString()} open:${toOpen
+        .map((p) => p[0].toPeerId().toB58String())
+        .join(',')} close: ${toClose.map((p) => p.toPeerId().toB58String()).join(',')}`.replace('\n', ', ')
+    )
     return [toOpen, toClose]
   }
 }
