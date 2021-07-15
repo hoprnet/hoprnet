@@ -1,3 +1,5 @@
+/// <reference path="../src/@types/it-handshake.ts" />
+
 import libp2p from 'libp2p'
 import type { Handler, Stream } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
@@ -6,7 +8,7 @@ import { NOISE } from 'libp2p-noise'
 
 const MPLEX = require('libp2p-mplex')
 
-import { HoprConnect } from '../src'
+import { HoprConnect, HoprConnectOptions } from '../src'
 import { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import { Alice, Bob, Charly } from './identities'
@@ -33,6 +35,12 @@ async function main() {
       process.exit()
   }
 
+  const connectOpts: HoprConnectOptions = {
+    initialNodes: [RELAY_ADDRESS],
+    __noDirectConnections: true,
+    __noWebRTCUpgrade: false
+  }
+
   const node = await libp2p.create({
     peerId,
     addresses: {
@@ -45,13 +53,7 @@ async function main() {
     },
     config: {
       transport: {
-        HoprConnect: {
-          bootstrapServers: [RELAY_ADDRESS],
-          // simulates a NAT
-          // DO NOT use this in production
-          __noDirectConnections: true,
-          __noWebRTCUpgrade: false
-        }
+        HoprConnect: connectOpts
       },
       peerDiscovery: {
         autoDial: false
