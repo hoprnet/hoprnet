@@ -87,6 +87,15 @@ function removeNodeFromList(
   return result
 }
 
+function isUsableRelay(tuples: ReturnType<Multiaddr['tuples']>, maPeerId: string, self: PeerId) {
+  return (
+    tuples[0].length >= 2 &&
+    tuples[0][0] == CODE_IP4 &&
+    [CODE_UDP, CODE_TCP].includes(tuples[1][0]) &&
+    self.toB58String() !== maPeerId
+  )
+}
+
 enum State {
   UNINITIALIZED,
   LISTENING,
@@ -183,15 +192,10 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     const tuples = ma.tuples()
-    const maPeerId = ma.getPeerId() as string
+    const maPeerId = ma.getPeerId()
 
     // Also try "TCP addresses" as we expect that node is listening on TCP *and* UDP
-    if (
-      tuples[0].length < 2 ||
-      tuples[0][0] != CODE_IP4 ||
-      ![CODE_UDP, CODE_TCP].includes(tuples[1][0]) ||
-      this.peerId.toB58String() === ma.getPeerId()
-    ) {
+    if (maPeerId == null || !isUsableRelay(tuples, maPeerId, this.peerId)) {
       verbose(`Dropping potential STUN ${ma.toString()} because format is invalid or equal to own address`)
       return
     }
@@ -210,6 +214,10 @@ class Listener extends EventEmitter implements InterfaceListener {
   protected onRemoveRelay(ma: Multiaddr) {
     const maPeerId = ma.getPeerId()
     const tuples = ma.tuples()
+
+    if (maPeerId == null || !isUsableRelay(tuples, maPeerId, this.peerId)) {
+      return
+    }
 
     this.publicNodes = removeNodeFromList(this.publicNodes, maPeerId, tuples)
 
