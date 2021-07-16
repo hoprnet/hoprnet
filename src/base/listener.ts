@@ -50,7 +50,7 @@ async function attemptClose(maConn: MultiaddrConnection) {
 
 type NodeEntry = {
   latency: number
-  peerId: string
+  peerId?: string
   multiAddr: Multiaddr
 }
 
@@ -87,7 +87,7 @@ function removeNodeFromList(
   return result
 }
 
-function isUsableRelay(tuples: ReturnType<Multiaddr['tuples']>, maPeerId: string, self: PeerId) {
+function isUsableRelay(tuples: ReturnType<Multiaddr['tuples']>, maPeerId: string | null, self: PeerId) {
   return (
     tuples[0].length >= 2 &&
     tuples[0][0] == CODE_IP4 &&
@@ -195,7 +195,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     const maPeerId = ma.getPeerId()
 
     // Also try "TCP addresses" as we expect that node is listening on TCP *and* UDP
-    if (maPeerId == null || !isUsableRelay(tuples, maPeerId, this.peerId)) {
+    if (!isUsableRelay(tuples, maPeerId, this.peerId)) {
       verbose(`Dropping potential STUN ${ma.toString()} because format is invalid or equal to own address`)
       return
     }
@@ -228,7 +228,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
   protected async updatePublicNodes(
     ma: Multiaddr,
-    maPeerId: string,
+    maPeerId: string | null,
     tuples: ReturnType<Multiaddr['tuples']>
   ): Promise<void> {
     // Get previously known nodes and filter all nodes that have
@@ -648,12 +648,20 @@ class Listener extends EventEmitter implements InterfaceListener {
 
   private async connectToRelay(
     relay: Multiaddr,
-    relayPeerId: string,
+    relayPeerId: string | null,
     opts?: { signal: AbortSignal }
   ): Promise<NodeEntry> {
     let latency: number
     let conn: Connection | undefined
     let maConn: MultiaddrConnection | undefined
+
+    const result = {
+      multiAddr: relay
+    } as NodeEntry
+
+    if (relayPeerId != null) {
+      result.peerId = relayPeerId
+    }
 
     const start = Date.now()
 
@@ -666,11 +674,9 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     if (maConn == undefined) {
-      return {
-        peerId: relayPeerId,
-        multiAddr: relay,
-        latency: -1
-      }
+      result.latency = -1
+
+      return result
     }
 
     try {
@@ -693,11 +699,9 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     if (conn == undefined) {
-      return {
-        peerId: relayPeerId,
-        multiAddr: relay,
-        latency: -1
-      }
+      result.latency = -1
+
+      return result
     }
 
     latency = Date.now() - start
@@ -708,11 +712,9 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.emit('connection', conn)
 
-    return {
-      peerId: relayPeerId,
-      multiAddr: relay,
-      latency
-    }
+    result.latency = latency
+
+    return result
   }
 }
 
