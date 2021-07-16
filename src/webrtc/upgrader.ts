@@ -22,6 +22,32 @@ export function multiaddrToIceServer(ma: Multiaddr): string {
 export const MAX_STUN_SERVERS = 23
 
 /**
+ *
+ * @param tuples tuples of the Multiaddr
+ * @returns
+ */
+function isUsableMultiaddr(tuples: ReturnType<Multiaddr['tuples']>) {
+  return tuples[0].length >= 2 && tuples[0][0] == CODE_IP4 && [CODE_UDP, CODE_TCP].includes(tuples[1][0])
+}
+
+function removeMultiaddrFromList(iceServers: RTCIceServer[], iceServerUrl: string): RTCIceServer[] {
+  let result = []
+  for (const iceServer of iceServers) {
+    if (Array.isArray(iceServer.urls)) {
+      if (!iceServer.urls.some((url: string) => iceServerUrl === url)) {
+        result.push(iceServer)
+      }
+      continue
+    }
+
+    if (iceServer.urls !== iceServerUrl) {
+      result.push(iceServer)
+    }
+  }
+
+  return result
+}
+/**
  * Encapsulate configuration used to create WebRTC instances
  */
 class WebRTCUpgrader {
@@ -31,9 +57,11 @@ class WebRTCUpgrader {
     initialNodes?.forEach(this.onNewPublicNode.bind(this))
 
     publicNodes?.on('addPublicNode', this.onNewPublicNode.bind(this))
+
+    publicNodes?.on('removePublicNode', this.onOfflineNode.bind(this))
   }
 
-  onNewPublicNode(ma: Multiaddr) {
+  private onNewPublicNode(ma: Multiaddr) {
     if (
       this.rtcConfig != undefined &&
       this.rtcConfig.iceServers != undefined &&
@@ -45,26 +73,40 @@ class WebRTCUpgrader {
     const tuples = ma.tuples()
 
     // Also try "TCP addresses" as we expect that node is listening on TCP *and* UDP
-    if (tuples[0].length < 2 || tuples[0][0] != CODE_IP4 || ![CODE_UDP, CODE_TCP].includes(tuples[1][0])) {
+    if (!isUsableMultiaddr(tuples)) {
       verbose(`Dropping potential STUN ${ma.toString()} because format is invalid`)
       return
     }
 
     const iceServerUrl = multiaddrToIceServer(ma)
 
-    const iceServers = (this.rtcConfig?.iceServers ?? []).filter((iceServer: RTCIceServer) => {
-      if (Array.isArray(iceServer.urls)) {
-        return !iceServer.urls.some((url: string) => iceServerUrl === url)
-      }
-
-      return iceServer.urls !== iceServerUrl
-    })
+    const iceServers = removeMultiaddrFromList(this.rtcConfig?.iceServers ?? [], iceServerUrl)
 
     iceServers.unshift({ urls: iceServerUrl })
 
     this.rtcConfig = {
       ...this.rtcConfig,
       iceServers
+    }
+  }
+
+  private onOfflineNode(ma: Multiaddr) {
+    if (this.rtcConfig == undefined || this.rtcConfig.iceServers == undefined) {
+      return
+    }
+
+    if (!isUsableMultiaddr(ma.tuples())) {
+      return
+    }
+
+    switch (this.rtcConfig.iceServers.length) {
+      case 0:
+        return
+      case 1:
+        this.rtcConfig.iceServers = []
+        return
+      default:
+        this.rtcConfig.iceServers = removeMultiaddrFromList(this.rtcConfig.iceServers, multiaddrToIceServer(ma))
     }
   }
 
