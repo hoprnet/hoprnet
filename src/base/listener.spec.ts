@@ -442,6 +442,7 @@ describe('check listening to sockets', function () {
     })
 
     let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
+
     node.publicNodesEmitter.emit(
       `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
@@ -484,6 +485,7 @@ describe('check listening to sockets', function () {
     })
 
     let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
+
     node.publicNodesEmitter.emit(
       `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
@@ -491,16 +493,12 @@ describe('check listening to sockets', function () {
 
     await eventPromise
 
+    eventPromise = once(node.listener.emitter, '_newNodeRegistered')
+
     let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
     assert(addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`))
 
-    node.publicNodesEmitter.emit(
-      `addPublicNode`,
-      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId}`)
-    )
-
-    eventPromise = once(node.listener.emitter, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
       `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
@@ -533,5 +531,83 @@ describe('check listening to sockets', function () {
     assert(addrs.length == addrsAfterThirdEvent.length)
 
     await Promise.all([stopNode(node.listener), stopNode(newRelay.listener), stopNode(stunServer)])
+  })
+
+  it('remove offline relay nodes', async function () {
+    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+
+    const relay = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
+
+    node.publicNodesEmitter.emit(
+      `addPublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    await eventPromise
+
+    let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+
+    assert(addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`))
+
+    eventPromise = once(node.listener.emitter, '_nodeOffline')
+
+    node.publicNodesEmitter.emit(
+      `removePublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    await eventPromise
+
+    let addrsAfterRemoval = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+
+    assert(
+      addrs.length - 1 == addrsAfterRemoval.length &&
+        !addrsAfterRemoval.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
+    )
+
+    await Promise.all([stopNode(node.listener), stopNode(relay.listener), stopNode(stunServer)])
+  })
+
+  it('remove offline relay nodes - edge cases', async function () {
+    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+
+    const relay = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+
+    let eventPromise = once(node.listener.emitter, '_nodeOffline')
+
+    node.publicNodesEmitter.emit(
+      `removePublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    await eventPromise
+
+    let addrsAfterRemoval = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+
+    assert(
+      addrs.length == addrsAfterRemoval.length &&
+        !addrsAfterRemoval.includes(
+          `/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`
+        ) &&
+        addrs.every((addr: string) => addrsAfterRemoval.some((addrAfterRemoval: string) => addr === addrAfterRemoval))
+    )
+
+    await Promise.all([stopNode(node.listener), stopNode(relay.listener), stopNode(stunServer)])
   })
 })
