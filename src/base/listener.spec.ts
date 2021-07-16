@@ -12,116 +12,155 @@ import net from 'net'
 import Defer from 'p-defer'
 import type { DeferredPromise } from 'p-defer'
 import * as stun from 'webrtc-stun'
-import { once, EventEmitter } from 'events'
+import { once, on, EventEmitter } from 'events'
 
 import { networkInterfaces } from 'os'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import { PublicNodesEmitter } from '../types'
 
-describe('check listening to sockets', function () {
-  /**
-   * Encapsulates the logic that is necessary to lauch a test
-   * STUN server instance and track whether it receives requests
-   * @param port port to listen to
-   * @param state used to track incoming messages
-   */
-  async function startStunServer(
-    port: number | undefined,
-    state: { msgReceived: DeferredPromise<void> }
-  ): Promise<Socket> {
-    const socket = dgram.createSocket('udp4')
+/**
+ * Decorated Listener class that throws events after
+ * updating list of potential relays
+ */
+class TestingListener extends Listener {
+  public emitter: EventEmitter
+  constructor(...args: ConstructorParameters<typeof Listener>) {
+    super(...args)
 
-    await new Promise<void>((resolve, reject) => {
-      socket.once('error', (err: any) => {
-        socket.removeListener('listening', resolve)
-        reject(err)
-      })
-      socket.once('listening', () => {
-        socket.removeListener('error', reject)
-        resolve()
-      })
-
-      try {
-        socket.bind(port)
-      } catch (err) {
-        reject(err)
-      }
-    })
-
-    socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
-      state.msgReceived.resolve()
-      handleStunRequest(socket, msg, rinfo)
-    })
-
-    return socket
+    this.emitter = new EventEmitter()
   }
 
-  async function waitUntilListening(socket: Listener, ma: Multiaddr) {
-    const promise = once(socket, 'listening')
+  protected onRemoveRelay(...args: Parameters<Listener['onRemoveRelay']>) {
+    super.onRemoveRelay(...args)
 
-    await socket.listen(ma)
-
-    return promise
+    this.emitter.emit(`_nodeOffline`, ...args)
   }
 
-  /**
-   * Creates a node and attaches message listener to it.
-   * @param publicNodes emitter that emit an event on new public nodes
-   * @param initialNodes nodes that are initially known
-   * @param state check message reception and content of message
-   * @param expectedMessage message to check for, or undefined to skip this check
-   * @param peerId peerId of the node
-   * @returns
-   */
-  async function startNode(
-    initialNodes: Multiaddr[],
-    state: { msgReceived: DeferredPromise<void>; expectedMessageReceived?: DeferredPromise<void> },
-    expectedMessage?: Uint8Array,
-    peerId?: PeerId
-  ) {
-    peerId = peerId ?? (await PeerId.create({ keyType: 'secp256k1' }))
-    const publicNodesEmitter = new EventEmitter() as PublicNodesEmitter
+  protected async updatePublicNodes(...args: Parameters<Listener['updatePublicNodes']>) {
+    await super.updatePublicNodes(...args)
 
-    const listener = new Listener(
-      undefined,
-      {
-        upgradeInbound: async (conn: MultiaddrConnection) => {
-          if (expectedMessage != undefined) {
-            for await (const msg of conn.source) {
-              if (u8aEquals(msg.slice(), expectedMessage)) {
-                state.expectedMessageReceived?.resolve()
-              }
+    this.emitter.emit(`_newNodeRegistered`, ...args)
+  }
+}
+
+/**
+ * Encapsulates the logic that is necessary to lauch a test
+ * STUN server instance and track whether it receives requests
+ * @param port port to listen to
+ * @param state used to track incoming messages
+ */
+async function startStunServer(
+  port: number | undefined,
+  state: { msgReceived: DeferredPromise<void> }
+): Promise<Socket> {
+  const socket = dgram.createSocket('udp4')
+
+  await new Promise<void>((resolve, reject) => {
+    socket.once('error', (err: any) => {
+      socket.removeListener('listening', resolve)
+      reject(err)
+    })
+    socket.once('listening', () => {
+      socket.removeListener('error', reject)
+      resolve()
+    })
+
+    try {
+      socket.bind(port)
+    } catch (err) {
+      reject(err)
+    }
+  })
+
+  socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
+    state.msgReceived.resolve()
+    handleStunRequest(socket, msg, rinfo)
+  })
+
+  return socket
+}
+
+async function waitUntilListening(socket: Listener, ma: Multiaddr) {
+  const promise = once(socket, 'listening')
+
+  await socket.listen(ma)
+
+  return promise
+}
+
+/**
+ * Creates a node and attaches message listener to it.
+ * @param publicNodes emitter that emit an event on new public nodes
+ * @param initialNodes nodes that are initially known
+ * @param state check message reception and content of message
+ * @param expectedMessage message to check for, or undefined to skip this check
+ * @param peerId peerId of the node
+ * @returns
+ */
+async function startNode(
+  initialNodes: Multiaddr[],
+  state: { msgReceived: DeferredPromise<void>; expectedMessageReceived?: DeferredPromise<void> },
+  expectedMessage?: Uint8Array,
+  peerId?: PeerId
+) {
+  peerId = peerId ?? (await PeerId.create({ keyType: 'secp256k1' }))
+  const publicNodesEmitter = new EventEmitter() as PublicNodesEmitter
+
+  const listener = new TestingListener(
+    undefined,
+    {
+      upgradeInbound: async (conn: MultiaddrConnection) => {
+        if (expectedMessage != undefined) {
+          for await (const msg of conn.source) {
+            if (u8aEquals(msg.slice(), expectedMessage)) {
+              state.expectedMessageReceived?.resolve()
             }
           }
+        }
 
-          state.msgReceived.resolve()
-          return conn
-        },
-        upgradeOutbound: async (conn: MultiaddrConnection) => conn
-      } as unknown as Upgrader,
-      publicNodesEmitter,
-      initialNodes,
-      peerId,
-      undefined
-    )
+        state.msgReceived.resolve()
+        return conn
+      },
+      upgradeOutbound: async (conn: MultiaddrConnection) => conn
+    } as unknown as Upgrader,
+    publicNodesEmitter,
+    initialNodes,
+    peerId,
+    undefined
+  )
 
-    await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
+  await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
 
-    return {
-      peerId,
-      listener,
-      publicNodesEmitter
+  const initialNodesRegistered: Multiaddr[] = []
+
+  for await (const initialNode of on(listener.emitter, '_newNodeRegistered')) {
+    if (initialNodesRegistered.push(initialNode[0]) == initialNodes.length) {
+      break
     }
   }
 
-  async function stopNode(socket: Socket | Listener) {
-    const closePromise = once(socket, 'close')
+  assert(
+    initialNodes.every((ma: Multiaddr) =>
+      initialNodesRegistered.some((registeredMa: Multiaddr) => registeredMa.toString() === ma.toString())
+    )
+  )
 
-    socket.close()
-
-    return closePromise
+  return {
+    peerId,
+    listener,
+    publicNodesEmitter
   }
+}
 
+async function stopNode(socket: Socket | Listener) {
+  const closePromise = once(socket, 'close')
+
+  socket.close()
+
+  return closePromise
+}
+
+describe('check listening to sockets', function () {
   it('recreate the socket and perform STUN request', async function () {
     let listener: Listener
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
@@ -165,7 +204,7 @@ describe('check listening to sockets', function () {
 
     const node = await startNode([stunServerMultiaddr], { msgReceived: Defer() })
 
-    const eventPromise = once(node.listener, '_newNodeRegistered')
+    const eventPromise = once(node.listener.emitter, '_newNodeRegistered')
 
     node.publicNodesEmitter.emit(
       `addPublicNode`,
@@ -304,7 +343,7 @@ describe('check listening to sockets', function () {
       msgReceived: Defer()
     })
 
-    let eventPromise = once(node.listener, '_newNodeRegistered')
+    let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
       'addPublicNode',
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
@@ -312,7 +351,7 @@ describe('check listening to sockets', function () {
 
     await eventPromise
 
-    eventPromise = once(node.listener, '_newNodeRegistered')
+    eventPromise = once(node.listener.emitter, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
       'addPublicNode',
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
@@ -402,7 +441,7 @@ describe('check listening to sockets', function () {
       msgReceived: Defer()
     })
 
-    let eventPromise = once(node.listener, '_newNodeRegistered')
+    let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
       `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
@@ -414,7 +453,7 @@ describe('check listening to sockets', function () {
 
     assert(addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`))
 
-    eventPromise = once(node.listener, '_newNodeRegistered')
+    eventPromise = once(node.listener.emitter, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
       `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId}`)
@@ -444,7 +483,7 @@ describe('check listening to sockets', function () {
       msgReceived: Defer()
     })
 
-    let eventPromise = once(node.listener, '_newNodeRegistered')
+    let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
       `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
@@ -461,7 +500,7 @@ describe('check listening to sockets', function () {
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId}`)
     )
 
-    eventPromise = once(node.listener, '_newNodeRegistered')
+    eventPromise = once(node.listener.emitter, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
       `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
@@ -481,7 +520,7 @@ describe('check listening to sockets', function () {
       relay.peerId
     )
 
-    eventPromise = once(node.listener, '_newNodeRegistered')
+    eventPromise = once(node.listener.emitter, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
       `addPublicNode`,
       new Multiaddr(`/ip4/127.0.0.1/tcp/${newRelay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
