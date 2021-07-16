@@ -19,7 +19,7 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 import { PublicNodesEmitter } from '../types'
 
 /**
- * Decorated Listener class that throws events after
+ * Decorated Listener class that emits events after
  * updating list of potential relays
  */
 class TestingListener extends Listener {
