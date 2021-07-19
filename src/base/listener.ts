@@ -212,10 +212,7 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param ma Multiaddr of node that is considered to be offline now
    */
   protected onRemoveRelay(ma: Multiaddr) {
-    const maPeerId = ma.getPeerId()
-    const tuples = ma.tuples()
-
-    if (maPeerId == null || !isUsableRelay(ma, this.peerId)) {
+    if (ma.getPeerId() == null || !isUsableRelay(ma, this.peerId)) {
       return
     }
 
