@@ -26,28 +26,28 @@ class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
-  private address: Address
   private pendingCommitments: Map<string, DeferredPromise<void>>
+  private chain: ChainWrapper
+  private genesisBlock: number
 
   constructor(
-    private genesisBlock: number,
+    private address: Address,
     private db: HoprDB,
-    private chain: ChainWrapper,
     private maxConfirmations: number,
     private blockRange: number
   ) {
     super()
-
-    this.address = Address.fromString(this.chain.getWallet().address)
     this.pendingCommitments = new Map<string, DeferredPromise<void>>()
   }
 
   /**
    * Starts indexing.
    */
-  public async start(): Promise<void> {
+  public async start(chain: ChainWrapper, genesisBlock: number): Promise<void> {
     if (this.status === 'started') return
     log(`Starting indexer...`)
+    this.chain = chain
+    this.genesisBlock = genesisBlock
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       await this.db.getLatestBlockNumber(),
@@ -118,7 +118,7 @@ class Indexer extends EventEmitter {
       this.status = 'restarting'
 
       await this.stop()
-      await this.start()
+      await this.start(this.chain, this.genesisBlock)
     } catch (err) {
       this.status = 'stopped'
       this.emit('status', 'stopped')
@@ -191,6 +191,7 @@ class Indexer extends EventEmitter {
    */
   private async onNewBlock(blockNumber: number): Promise<void> {
     log('Indexer got new block %d', blockNumber)
+    this.emit('block', blockNumber)
 
     // update latest block
     if (this.latestBlock < blockNumber) {
@@ -300,6 +301,7 @@ class Indexer extends EventEmitter {
 
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
+    this.emit('channel-update', channel)
 
     if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       this.emit('own-channel-updated', channel)

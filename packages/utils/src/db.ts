@@ -1,7 +1,7 @@
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
 import MemDown from 'memdown'
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import Debug from 'debug'
 import { Hash, u8aConcat, Address, Intermediate, Ticket } from '.'
@@ -51,7 +51,7 @@ const PENDING_TICKETS_VALUE = (address: Address) =>
 export class HoprDB {
   private db: LevelUp
 
-  constructor(private id: Address, initialize: boolean, version: string, dbPath?: string) {
+  constructor(private id: Address, initialize: boolean, version: string, dbPath?: string, forceCreate?: boolean) {
     if (!dbPath) {
       dbPath = path.join(process.cwd(), 'db', version)
     }
@@ -59,6 +59,11 @@ export class HoprDB {
     dbPath = path.resolve(dbPath)
 
     log('using db at ', dbPath)
+    if (forceCreate) {
+      log('force create - wipe old database and create anew')
+      rmSync(dbPath, { recursive: true, force: true })
+      mkdirSync(dbPath, { recursive: true })
+    }
     if (!existsSync(dbPath)) {
       log('db does not exist, creating?:', initialize)
       if (initialize) {

@@ -71,6 +71,10 @@ export class PublicKey {
     return `<PubKey:${this.toHex()}>`
   }
 
+  toB58String(): string {
+    return this.toPeerId().toB58String()
+  }
+
   eq(b: PublicKey) {
     return u8aEquals(this.arr, b.serialize())
   }
