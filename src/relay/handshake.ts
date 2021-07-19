@@ -20,7 +20,8 @@ export enum RelayHandshakeMessage {
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
   FAIL_COULD_NOT_IDENTIFY_PEER,
   FAIL_INVALID_PUBLIC_KEY,
-  FAIL_LOOPBACKS_ARE_NOT_ALLOWED
+  FAIL_LOOPBACKS_ARE_NOT_ALLOWED,
+  FAIL_RELAY_FULL
 }
 
 function handshakeMessageToString(handshakeMessage: RelayHandshakeMessage): string {
@@ -35,6 +36,8 @@ function handshakeMessageToString(handshakeMessage: RelayHandshakeMessage): stri
       return 'FAIL_INVALID_PUBLIC_KEY'
     case RelayHandshakeMessage.FAIL_LOOPBACKS_ARE_NOT_ALLOWED:
       return 'FAIL_LOOPBACKS_ARE_NOT_ALLOWED'
+    case RelayHandshakeMessage.FAIL_RELAY_FULL:
+      return 'FAIL_RELAY_FULL'
     default:
       throw Error(`Invalid state. Got ${handshakeMessage}`)
   }
@@ -77,6 +80,20 @@ class RelayHandshake {
 
   constructor(stream: Stream) {
     this.shaker = handshake<StreamResult>(stream)
+  }
+
+  /**
+   * Immediately rejects the relay handshake with the given reason
+   * @param reason one of RelayHandshakeMessage to send before termination
+   * @returns
+   */
+  async reject(reason: RelayHandshakeMessage) {
+    this.shaker.write(Uint8Array.of(reason))
+    this.shaker.rest()
+    return {
+      success: false,
+      code: 'FAIL'
+    }
   }
 
   /**

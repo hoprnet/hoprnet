@@ -36,8 +36,11 @@ declare bob_port=11091
 declare charly_log="${tmp}/hopr-connect-charly.log"
 declare charly_port=11092
 
+declare dave_log="${tmp}/hopr-connect-dave.log"
+declare dave_port=11093
+
 function free_ports {
-    for port in ${alice_port} ${bob_port} ${charly_port}; do
+    for port in ${alice_port} ${bob_port} ${charly_port} ${dave_port}; do
         if lsof -i ":${port}" -s TCP:LISTEN > /dev/null; then
           lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} 
         fi
@@ -101,14 +104,14 @@ free_ports
 
 # check ports are free
 
-for port in ${alice_port} ${bob_port} ${charly_port}; do
+for port in ${alice_port} ${bob_port} ${charly_port} ${dave_port}; do
   ensure_port_is_free ${port}
 done
 
 log "Test started"
 
 # remove logs
-for file in "${alice_log}" "${bob_log}" "${charly_log}" "${alice_pipe}" "${bob_pipe}"; do 
+for file in "${alice_log}" "${bob_log}" "${charly_log}" "${dave_log}" "${alice_pipe}" "${bob_pipe}"; do 
   rm -Rf ${file}
 done
 
@@ -117,13 +120,15 @@ log "alice msgs -> ${alice_pipe}"
 log "bob logs -> ${bob_log}"
 log "bob msgs -> ${bob_pipe}"
 log "charly logs -> ${charly_log}"
+log "dave logs -> ${dave_log}"
 
 # run alice (client)
 start_node tests/node.ts \
     "${alice_log}" \
-    "[ {
+    "[ 
+      {
         'cmd': 'wait',
-        'delay': 8
+        'waitForSecs': 8
       },
       {
         'cmd': 'dial',
@@ -149,7 +154,7 @@ start_node tests/node.ts \
 start_node tests/node.ts "${bob_log}"  \
   "[ {
         'cmd': 'wait',
-        'delay': 8
+        'waitForSecs': 8
       },
       {
         'cmd': 'dial',
@@ -171,6 +176,34 @@ start_node tests/node.ts "${charly_log}" \
   --port ${charly_port} \
   --identityName 'charly' \
   --noDirectConnections true \
+  --noWebRTCUpgrade false \
+  --maxRelayedConnections 1
+
+
+# run dave (client)
+# dave is out of luck since charly cannot relay more than 1 connection and alice already opens a connection to bob
+start_node tests/node.ts "${dave_log}" \
+  "[ {
+        'cmd': 'wait',
+        'waitForSecs': 9
+      },
+      {
+        'cmd': 'dial',
+        'targetIdentityName': 'charly',
+        'targetPort': ${charly_port}
+      },
+      {
+        'cmd': 'msg',
+        'relayIdentityName': 'charly',
+        'targetIdentityName': 'bob',
+        'msg': 'test'
+      }
+    ]" \
+  --port ${dave_port} \
+  --identityName 'dave' \
+  --bootstrapPort ${charly_port} \
+  --bootstrapIdentityName 'charly' \
+  --noDirectConnections true \
   --noWebRTCUpgrade false
 
 
@@ -178,7 +211,8 @@ start_node tests/node.ts "${charly_log}" \
 wait_for_regex_in_file "${alice_log}" "all tasks executed"
 wait_for_regex_in_file "${bob_log}" "all tasks executed"
 wait_for_regex_in_file "${charly_log}" "all tasks executed"
-
+wait_for_regex_in_file "${dave_log}" "Answer was: <FAIL_RELAY_FULL>"
+wait_for_regex_in_file "${dave_log}" "dialProtocol to bob failed"
 
 expect_file_content "${alice_pipe}" \
 ">bob: test

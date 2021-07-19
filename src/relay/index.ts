@@ -5,6 +5,7 @@
 import debug from 'debug'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
+const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
 
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
@@ -22,7 +23,7 @@ import { RelayConnection } from './connection'
 import type { Connection } from 'libp2p-interfaces'
 import type { DialOptions, Handler, Stream, ConnHandler, Dialer, ConnectionManager, Upgrader } from 'libp2p'
 import { AbortError } from 'abortable-iterator'
-import { RelayHandshake } from './handshake'
+import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
 
 /**
@@ -44,7 +45,8 @@ class Relay {
     private upgrader: Upgrader,
     private connHandler: ConnHandler | undefined,
     private webRTCUpgrader?: WebRTCUpgrader,
-    private __noWebRTCUpgrade?: boolean
+    private __noWebRTCUpgrade?: boolean,
+    private maxRelayedConnections: number = DEFAULT_MAX_RELAYED_CONNECTIONS
   ) {
     this.relayState = new RelayState()
 
@@ -56,14 +58,24 @@ class Relay {
         return
       }
 
-      new RelayHandshake(stream).negotiate(
-        connection.remotePeer,
-        (counterparty: PeerId) => this.contactCounterparty(counterparty),
-        this.relayState.exists.bind(this.relayState),
-        this.relayState.isActive.bind(this.relayState),
-        this.relayState.updateExisting.bind(this.relayState),
-        this.relayState.createNew.bind(this.relayState)
-      )
+      const shaker = new RelayHandshake(stream)
+
+      log(`handling relay request from ${connection.remotePeer}`)
+      log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
+
+      if (this.relayState.relayedConnectionCount() >= this.maxRelayedConnections) {
+        log(`relayed request rejected, already at max capacity (${this.maxRelayedConnections})`)
+        shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
+      } else {
+        shaker.negotiate(
+          connection.remotePeer,
+          (counterparty: PeerId) => this.contactCounterparty(counterparty),
+          this.relayState.exists.bind(this.relayState),
+          this.relayState.isActive.bind(this.relayState),
+          this.relayState.updateExisting.bind(this.relayState),
+          this.relayState.createNew.bind(this.relayState)
+        )
+      }
     })
   }
 

@@ -26,6 +26,7 @@ export type HoprConnectOptions = {
   interface?: string
   __noDirectConnections?: boolean
   __noWebRTCUpgrade?: boolean
+  maxRelayedConnections?: number
 }
 
 /**
@@ -109,7 +110,8 @@ class HoprConnect implements Transport {
       this._upgrader,
       this.connHandler,
       this._webRTCUpgrader,
-      opts.__noWebRTCUpgrade
+      opts.__noWebRTCUpgrade,
+      opts.maxRelayedConnections
     )
 
     // Used for testing
