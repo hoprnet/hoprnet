@@ -297,31 +297,20 @@ class CoverTrafficStrategy extends SaneDefaults {
     const toClose = []
     const state = await this.data.get()
 
-    currentChannels.forEach((curr) => {
-      if (curr.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
-        toClose.push(curr.destination)
-      }
-    })
-
-    if (currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(state.nodes).length > 0) {
-      const c = await this.data.weightedRandomChoice()
-      if (!currentChannels.find((x) => x.destination.eq(c)) && !c.eq(this.selfPub)) {
-        toOpen.push([c, CHANNEL_STAKE])
-      }
-    }
-
     // Refresh open channels
-    state.ctChannels = []
-    for (let destination of currentChannels
-      .map((c) => c.destination)
-      .concat(toOpen.map((o) => o[0]))
-      .concat(toClose)) {
-      const q = await peers.qualityOf(destination)
-      state.ctChannels.push({ destination, latestQualityOf: q })
-      if (q < 0.1) {
-        toClose.push(destination)
+    const ctChannels = []
+    for (let c of currentChannels) {
+      if (c.status === ChannelStatus.Closed) { continue }
+      const q = await peers.qualityOf(c.destination)
+      ctChannels.push({ destination: c.destination, latestQualityOf: q })
+      if (q < 0.15) {
+        toClose.push(c.destination)
+      }
+      if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
+        toClose.push(c.destination)
       }
     }
+    await this.data.setCTChannels(ctChannels)
 
     for (let openChannel of state.ctChannels) {
       const channel = await this.data.findChannel(this.selfPub, openChannel.destination)
@@ -338,11 +327,21 @@ class CoverTrafficStrategy extends SaneDefaults {
           toClose.push(openChannel.destination)
         }
       }
+
       // TODO handle waiting for commitment stalls
     }
 
+    let attempts = 0
+    while (currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(state.nodes).length > 0 && attempts < 1000) {
+      attempts ++
+      const c = await this.data.weightedRandomChoice()
+      if (!currentChannels.find((x) => x.destination.eq(c)) && !c.eq(this.selfPub) && !toOpen.find(x => x[1].eq(c)) && await peers.qualityOf(c) > 0.6) {
+        toOpen.push([c, CHANNEL_STAKE])
+      }
+    }
+
     this.data.log(
-      `strategy tick: balance:${balance.toString()} open:${toOpen
+      `strategy tick: ${Date.now()} balance:${balance.toString()} open:${toOpen
         .map((p) => p[0].toPeerId().toB58String())
         .join(',')} close: ${toClose.map((p) => p.toPeerId().toB58String()).join(',')}`.replace('\n', ', ')
     )

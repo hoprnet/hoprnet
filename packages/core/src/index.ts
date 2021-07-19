@@ -747,9 +747,11 @@ class Hopr extends EventEmitter {
 
     let txHash: string
     try {
-      txHash = await (channelState.status === ChannelStatus.Open
-        ? channel.initializeClosure()
-        : channel.finalizeClosure())
+      if (channelState.status === ChannelStatus.Open || channelState.status == ChannelStatus.WaitingForCommitment){
+        txHash = await channel.initializeClosure()
+      } else {
+        txHash = await channel.finalizeClosure()
+      }
     } catch (err) {
       await this.isOutOfFunds(err)
       throw new Error(`Failed to closeChannel: ${err}`)
