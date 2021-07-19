@@ -7,6 +7,7 @@ import dgram, { RemoteInfo } from 'dgram'
 import { once, EventEmitter } from 'events'
 import { PublicNodesEmitter } from '../types'
 import debug from 'debug'
+import { green, red } from 'chalk'
 import { NetworkInterfaceInfo, networkInterfaces } from 'os'
 
 import AbortController from 'abort-controller'
@@ -58,12 +59,11 @@ function latencyCompare(a: NodeEntry, b: NodeEntry) {
   return a.latency - b.latency
 }
 
-function removeNodeFromList(
-  nodeList: NodeEntry[],
-  maPeerId: string | null,
-  maTuples: ReturnType<Multiaddr['tuples']>
-): NodeEntry[] {
+function removeNodeFromList(nodeList: NodeEntry[], ma: Multiaddr): NodeEntry[] {
   const result = []
+
+  const maTuples = ma.tuples()
+  const maPeerId = ma.getPeerId()
 
   for (const entry of nodeList) {
     const tuples = entry.multiAddr.tuples()
@@ -87,7 +87,10 @@ function removeNodeFromList(
   return result
 }
 
-function isUsableRelay(tuples: ReturnType<Multiaddr['tuples']>, maPeerId: string | null, self: PeerId) {
+function isUsableRelay(ma: Multiaddr, self: PeerId) {
+  const tuples = ma.tuples()
+  const maPeerId = ma.getPeerId()
+
   return (
     tuples[0].length >= 2 &&
     tuples[0][0] == CODE_IP4 &&
@@ -191,19 +194,16 @@ class Listener extends EventEmitter implements InterfaceListener {
       return
     }
 
-    const tuples = ma.tuples()
-    const maPeerId = ma.getPeerId()
-
     // Also try "TCP addresses" as we expect that node is listening on TCP *and* UDP
-    if (!isUsableRelay(tuples, maPeerId, this.peerId)) {
+    if (!isUsableRelay(ma, this.peerId)) {
       verbose(`Dropping potential STUN ${ma.toString()} because format is invalid or equal to own address`)
       return
     }
 
     if (this.state != State.LISTENING) {
-      once(this, 'listening').then(() => this.updatePublicNodes(ma, maPeerId, tuples))
+      once(this, 'listening').then(() => this.updatePublicNodes(ma))
     } else {
-      setImmediate(() => this.updatePublicNodes(ma, maPeerId, tuples))
+      setImmediate(() => this.updatePublicNodes(ma))
     }
   }
 
@@ -215,30 +215,32 @@ class Listener extends EventEmitter implements InterfaceListener {
     const maPeerId = ma.getPeerId()
     const tuples = ma.tuples()
 
-    if (maPeerId == null || !isUsableRelay(tuples, maPeerId, this.peerId)) {
+    if (maPeerId == null || !isUsableRelay(ma, this.peerId)) {
       return
     }
 
-    this.publicNodes = removeNodeFromList(this.publicNodes, maPeerId, tuples)
+    this.publicNodes = removeNodeFromList(this.publicNodes, ma)
 
     this.addrs.relays = this.publicNodes.map(
       (entry: NodeEntry) => new Multiaddr(`/p2p/${entry.peerId}/p2p-circuit/p2p/${this.peerId}`)
     )
+
+    log(
+      `relay ${ma.toString()} ${red(`removed`)}. Current addrs:\n\t${this.addrs.relays
+        .map((addr: Multiaddr) => addr.toString())
+        .join(`\n\t`)}`
+    )
   }
 
-  protected async updatePublicNodes(
-    ma: Multiaddr,
-    maPeerId: string | null,
-    tuples: ReturnType<Multiaddr['tuples']>
-  ): Promise<void> {
+  protected async updatePublicNodes(ma: Multiaddr): Promise<void> {
     // Get previously known nodes and filter all nodes that have
     // either the same address (ip:port) or the same peerId
-    const publicNodes = removeNodeFromList(this.publicNodes, maPeerId, tuples)
+    const publicNodes = removeNodeFromList(this.publicNodes, ma)
 
     const abort = new AbortController()
     const timeout = setTimeout(abort.abort.bind(abort), RELAY_CONTACT_TIMEOUT)
 
-    const result = await this.connectToRelay(ma, maPeerId, { signal: abort.signal })
+    const result = await this.connectToRelay(ma, { signal: abort.signal })
 
     clearTimeout(timeout)
 
@@ -254,6 +256,12 @@ class Listener extends EventEmitter implements InterfaceListener {
     )
 
     this.publicNodes = publicNodes.sort(latencyCompare)
+
+    log(
+      `relay ${ma.toString()} ${green(`added`)}. Current addrs:\n\t${this.addrs.relays
+        .map((addr: Multiaddr) => addr.toString())
+        .join(`\n\t`)}`
+    )
   }
 
   /**
@@ -646,14 +654,12 @@ class Listener extends EventEmitter implements InterfaceListener {
     return usableInterfaces[0].address
   }
 
-  private async connectToRelay(
-    relay: Multiaddr,
-    relayPeerId: string | null,
-    opts?: { signal: AbortSignal }
-  ): Promise<NodeEntry> {
+  private async connectToRelay(relay: Multiaddr, opts?: { signal: AbortSignal }): Promise<NodeEntry> {
     let latency: number
     let conn: Connection | undefined
     let maConn: MultiaddrConnection | undefined
+
+    const relayPeerId = relay.getPeerId()
 
     const result = {
       multiAddr: relay
