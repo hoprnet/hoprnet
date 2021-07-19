@@ -44,6 +44,32 @@ class TestingListener extends Listener {
 }
 
 /**
+ * Creates a UDP socket and binds it to the given port.
+ * @param port port to which the socket should be bound
+ * @returns a bound socket
+ */
+function bindToUdpSocket(port?: number): Promise<Socket> {
+  const socket = dgram.createSocket('udp4')
+
+  return new Promise<Socket>((resolve, reject) => {
+    socket.once('error', (err: any) => {
+      socket.removeListener('listening', resolve)
+      reject(err)
+    })
+    socket.once('listening', () => {
+      socket.removeListener('error', reject)
+      resolve(socket)
+    })
+
+    try {
+      socket.bind(port)
+    } catch (err) {
+      reject(err)
+    }
+  })
+}
+
+/**
  * Encapsulates the logic that is necessary to lauch a test
  * STUN server instance and track whether it receives requests
  * @param port port to listen to
@@ -53,24 +79,7 @@ async function startStunServer(
   port: number | undefined,
   state: { msgReceived: DeferredPromise<void> }
 ): Promise<Socket> {
-  const socket = dgram.createSocket('udp4')
-
-  await new Promise<void>((resolve, reject) => {
-    socket.once('error', (err: any) => {
-      socket.removeListener('listening', resolve)
-      reject(err)
-    })
-    socket.once('listening', () => {
-      socket.removeListener('error', reject)
-      resolve()
-    })
-
-    try {
-      socket.bind(port)
-    } catch (err) {
-      reject(err)
-    }
-  })
+  const socket = await bindToUdpSocket(port)
 
   socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
     state.msgReceived.resolve()
