@@ -1922,6 +1922,24 @@
   resolved "https://registry.yarnpkg.com/@stablelib/hash/-/hash-1.0.1.tgz#3c944403ff2239fad8ebb9015e33e98444058bc5"
   integrity sha512-eTPJc/stDkdtOcrNMZ6mcMK1e6yBbqRBaNW55XA1jU8w/7QdnCF0CmMmOD1m7VSkBR44PWrMHU2l6r8YEQHMgg==
 
+"@stablelib/hkdf@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@stablelib/hkdf/-/hkdf-1.0.1.tgz#b4efd47fd56fb43c6a13e8775a54b354f028d98d"
+  integrity sha512-SBEHYE16ZXlHuaW5RcGk533YlBj4grMeg5TooN80W3NpcHRtLZLLXvKyX0qcRFxf+BGDobJLnwkvgEwHIDBR6g==
+  dependencies:
+    "@stablelib/hash" "^1.0.1"
+    "@stablelib/hmac" "^1.0.1"
+    "@stablelib/wipe" "^1.0.1"
+
+"@stablelib/hmac@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@stablelib/hmac/-/hmac-1.0.1.tgz#3d4c1b8cf194cb05d28155f0eed8a299620a07ec"
+  integrity sha512-V2APD9NSnhVpV/QMYgCVMIYKiYG6LSqw1S65wxVoirhU/51ACio6D4yDVSwMzuTJXWZoVHbDdINioBwKy5kVmA==
+  dependencies:
+    "@stablelib/constant-time" "^1.0.1"
+    "@stablelib/hash" "^1.0.1"
+    "@stablelib/wipe" "^1.0.1"
+
 "@stablelib/int@^1.0.1":
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/@stablelib/int/-/int-1.0.1.tgz#75928cc25d59d73d75ae361f02128588c15fd008"
@@ -1950,7 +1968,7 @@
     "@stablelib/binary" "^1.0.1"
     "@stablelib/wipe" "^1.0.1"
 
-"@stablelib/sha256@^1.0.0":
+"@stablelib/sha256@^1.0.0", "@stablelib/sha256@^1.0.1":
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/@stablelib/sha256/-/sha256-1.0.1.tgz#77b6675b67f9b0ea081d2e31bda4866297a3ae4f"
   integrity sha512-GIIH3e6KH+91FqGV42Kcj71Uefd/QEe7Dy42sBTeqppXV95ggCcxLTk39bEr+lZfJmp+ghsR07J++ORkRELsBQ==
@@ -1973,7 +1991,7 @@
   resolved "https://registry.yarnpkg.com/@stablelib/wipe/-/wipe-1.0.1.tgz#d21401f1d59ade56a62e139462a97f104ed19a36"
   integrity sha512-WfqfX/eXGiAd3RJe4VU2snh/ZPwtSjLG4ynQ/vYzvghTh7dHFcI1wl+nrkWG6lGhukOxOsUHfv8dUXr58D0ayg==
 
-"@stablelib/x25519@^1.0.0":
+"@stablelib/x25519@^1.0.0", "@stablelib/x25519@^1.0.1":
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/@stablelib/x25519/-/x25519-1.0.1.tgz#bcd6132ac4dd94f28f1479e228c85b3468d6ed27"
   integrity sha512-nmyUI2ZArxYDh1PhdoSCPEtlTYE0DYugp2qqx8OtjrX3Hmh7boIlDsD0X71ihAxzxqJf3TyQqN/p58ToWhnp+Q==
@@ -3442,14 +3460,6 @@ bcrypt-pbkdf@^1.0.0:
   dependencies:
     tweetnacl "^0.14.3"
 
-bcrypto@^5.4.0:
-  version "5.4.0"
-  resolved "https://registry.yarnpkg.com/bcrypto/-/bcrypto-5.4.0.tgz#4046f0c44a4b301eff84de593b4f86fce8d91db2"
-  integrity sha512-KDX2CR29o6ZoqpQndcCxFZAtYA1jDMnXU3jmCfzP44g++Cu7AHHtZN/JbrN/MXAg9SLvtQ8XISG+eVD9zH1+Jg==
-  dependencies:
-    bufio "~1.0.7"
-    loady "~0.0.5"
-
 bech32@1.1.4:
   version "1.1.4"
   resolved "https://registry.yarnpkg.com/bech32/-/bech32-1.1.4.tgz#e38c9f37bf179b8eb16ae3a772b40c356d4832e9"
@@ -3766,11 +3776,6 @@ bufferutil@^4.0.1:
   integrity sha512-yEYTwGndELGvfXsImMBLop58eaGW+YdONi1fNjTINSY98tmMmFijBG6WXgdkfuLNt4imzQNtIE+eBp1PVpMCSw==
   dependencies:
     node-gyp-build "^4.2.0"
-
-bufio@~1.0.7:
-  version "1.0.7"
-  resolved "https://registry.yarnpkg.com/bufio/-/bufio-1.0.7.tgz#b7f63a1369a0829ed64cc14edf0573b3e382a33e"
-  integrity sha512-bd1dDQhiC+bEbEfg56IdBv7faWa6OipMs/AFFFvtFnB3wAYjlwQpQRZ0pm6ZkgtfL0pILRXhKxOiQj6UzoMR7A==
 
 builtin-status-codes@^3.0.0:
   version "3.0.0"
@@ -9089,12 +9094,15 @@ libp2p-mplex@0.10.4:
     it-pushable "^1.4.1"
     varint "^6.0.0"
 
-libp2p-noise@^3.0.0:
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/libp2p-noise/-/libp2p-noise-3.0.0.tgz#9320c4dd42019f4f75e2fddf265c4c5f5e5546ab"
-  integrity sha512-2UrR9mw+VeMRs0eOwqEqVEoFJxjCgibQsX4nnDFmFvb1C3+BnTuIUsqNS5YkxLhw3/q++8MvB/p5/2X0MRfA7g==
+libp2p-noise@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/libp2p-noise/-/libp2p-noise-4.0.0.tgz#53350a426dd6efcb18d7cd9ddb52cfbc40c091e2"
+  integrity sha512-DCXRKh9Y4pkw4HEWKPpZbeoROilZA1nrQMHIVrJ4JDEMUKVRucJc9GZTFNzo4yJUZ+ayQAlrfbUARiPPFbpfng==
   dependencies:
-    bcrypto "^5.4.0"
+    "@stablelib/chacha20poly1305" "^1.0.1"
+    "@stablelib/hkdf" "^1.0.1"
+    "@stablelib/sha256" "^1.0.1"
+    "@stablelib/x25519" "^1.0.1"
     debug "^4.3.1"
     it-buffer "^0.1.1"
     it-length-prefixed "^5.0.2"
@@ -9102,7 +9110,7 @@ libp2p-noise@^3.0.0:
     it-pb-rpc "^0.1.9"
     it-pipe "^1.1.0"
     libp2p-crypto "^0.19.0"
-    peer-id "^0.14.3"
+    peer-id "^0.15.0"
     protobufjs "^6.10.1"
     uint8arrays "^2.0.5"
 
@@ -9272,11 +9280,6 @@ loader-utils@1.2.3:
     big.js "^5.2.2"
     emojis-list "^2.0.0"
     json5 "^1.0.1"
-
-loady@~0.0.5:
-  version "0.0.5"
-  resolved "https://registry.yarnpkg.com/loady/-/loady-0.0.5.tgz#b17adb52d2fb7e743f107b0928ba0b591da5d881"
-  integrity sha512-uxKD2HIj042/HBx77NBcmEPsD+hxCgAtjEWlYNScuUjIsh/62Uyu39GOR68TBR68v+jqDL9zfftCWoUo4y03sQ==
 
 locate-path@^2.0.0:
   version "2.0.0"
@@ -10157,6 +10160,11 @@ multiformats@^9.0.2, multiformats@^9.1.2:
   version "9.3.0"
   resolved "https://registry.yarnpkg.com/multiformats/-/multiformats-9.3.0.tgz#be31fa1ef55b5d92feff4ca4be86dc7db1550f71"
   integrity sha512-CIZnirGmiw92jpkfmzObOPEAkpW08CgjwxBAliEPWfc2hFHflOngBt3YRaT2H8RKMbGaNlyv7Cza4RbmFYOf1w==
+
+multiformats@^9.3.0:
+  version "9.4.2"
+  resolved "https://registry.yarnpkg.com/multiformats/-/multiformats-9.4.2.tgz#3995a0b23072657d7a2fa56b2afc745e0ce8e5bd"
+  integrity sha512-GXsulAzqA+EI/iObKWsg9n4PKNVpUTsWdA+Ijn3hJMaVHQ/+dJaClSZ55g8sVKniBjQkouGaVCKCu9c/wwMXQQ==
 
 multihashes@^0.4.15, multihashes@~0.4.15:
   version "0.4.21"
@@ -11419,7 +11427,19 @@ pbkdf2@^3.0.17, pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@0, peer-id@0.14.8, peer-id@^0.14.2, peer-id@^0.14.3, peer-id@~0.14.8:
+peer-id@0, peer-id@^0.15.0:
+  version "0.15.1"
+  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.15.1.tgz#a64e78d9c9c1f86b68dfb9c06ee9458446ca4774"
+  integrity sha512-EoZig26nzPt922s1D/EOe2vJY3D1NCl/+G8rzI99G4HOrUcM94DI5MV8EWLv3ra5j9R/6n7TLgQIpZm2hpBaAA==
+  dependencies:
+    class-is "^1.1.0"
+    libp2p-crypto "^0.19.0"
+    minimist "^1.2.5"
+    multiformats "^9.3.0"
+    protobufjs "^6.10.2"
+    uint8arrays "^2.0.5"
+
+peer-id@0.14.8, peer-id@^0.14.2, peer-id@~0.14.8:
   version "0.14.8"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.14.8.tgz#667c6bedc8ab313c81376f6aca0baa2140266fab"
   integrity sha512-GpuLpob/9FrEFvyZrKKsISEkaBYsON2u0WtiawLHj1ii6ewkoeRiSDFLyIefYhw0jGvQoeoZS05jaT52X7Bvig==
