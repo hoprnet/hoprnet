@@ -414,6 +414,7 @@ describe('with single funded HoprChannels: AB: 70', function () {
 describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', function () {
   let channels: HoprChannels
   let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let blockTimestamp: number
 
   beforeEach(async function () {
     fixtures = await useFixtures()
@@ -422,6 +423,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
     await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2) // TODO secret per account
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    blockTimestamp = (await ethers.provider.getBlock(ethers.provider.getBlockNumber())).timestamp
   })
 
   it('should redeem ticket for account A', async function () {
@@ -442,7 +444,9 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
 
-    await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN.ticket))
+    await expect(await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN.ticket)))
+      .to.emit(channels, 'ChannelUpdate')
+      .and.to.emit(channels, 'TicketRedeemed')
 
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '80', status: ChannelStatus.Open + '' })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '20', status: ChannelStatus.Open + '' })
@@ -543,14 +547,14 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
           createMockChannelFromProps({
             status: ChannelStatus.PendingToClose,
             closureTime:
-              (
-                await ethers.provider.getBlock(ethers.provider.getBlockNumber())
-              ).timestamp + // Block timestamp
+              blockTimestamp + // Block timestamp
               (await channels.secsClosure()) + // Contract secs
-              1 // tick
+              1 // Tick
           })
         )
       )
+      .and.to.emit(channels, 'ChannelClosureInitiated')
+      .withArgs(fixtures.accountA.address, ACCOUNT_B.address, blockTimestamp + 1)
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: '70',
       status: ChannelStatus.PendingToClose + ''
@@ -569,11 +573,9 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
           createMockChannelFromProps({
             status: ChannelStatus.PendingToClose,
             closureTime:
-              (
-                await ethers.provider.getBlock(ethers.provider.getBlockNumber())
-              ).timestamp + // Block timestamp
+              blockTimestamp + // Block timestamp
               (await channels.secsClosure()) + // Contract secs
-              1 // tick
+              1
           })
         )
       )
@@ -624,6 +626,7 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
   })
 
   it('should finalize channel closure', async function () {
+    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
     await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address))
       .to.emit(channels, 'ChannelUpdate')
@@ -631,7 +634,7 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
         fixtures.accountA.address,
         fixtures.accountB.address,
         createMockChannelFromMerge(
-          await channels.channels(ACCOUNT_AB_CHANNEL_ID),
+          channel,
           createMockChannelFromProps({
             balance: BigNumber.from(0),
             closureTime: 0,
@@ -639,6 +642,8 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
           })
         )
       )
+      .and.to.emit(channels, 'ChannelClosureFinalized')
+      .withArgs(fixtures.accountA.address, fixtures.accountB.address, channel.closureTime, channel.balance)
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: ChannelStatus.Closed + '' })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), {
       balance: '30',
