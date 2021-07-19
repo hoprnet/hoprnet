@@ -29,22 +29,21 @@ jobs:
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
 
-      - name: Restore cache of node modules and yarn cache
-        uses: actions/cache@v2
-        if: ${{ !env.ACT }}
-        id: nodejs-cache
+      - uses: actions/cache@v2
+        id: yarn-cache
         with:
           path: |
             node_modules
             */*/node_modules
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-nodejs-
+            ${{ runner.os }}-yarn-
 
-      - name: Build
+      - name: Install dependencies
+        if: steps.yarn-cache.outputs.cache-hit != 'true'
         run: |
-          yarn          
+          yarn install        
       
       - name: Test
         run: ./scripts/integration-test.sh

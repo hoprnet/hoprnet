@@ -12,10 +12,11 @@ import net from 'net'
 import Defer from 'p-defer'
 import type { DeferredPromise } from 'p-defer'
 import * as stun from 'webrtc-stun'
-import { once } from 'events'
+import { once, EventEmitter } from 'events'
 
 import { networkInterfaces } from 'os'
 import { u8aEquals } from '@hoprnet/hopr-utils'
+import { PublicNodesEmitter } from '../types'
 
 describe('check listening to sockets', function () {
   /**
@@ -63,13 +64,24 @@ describe('check listening to sockets', function () {
     return promise
   }
 
+  /**
+   * Creates a node and attaches message listener to it.
+   * @param publicNodes emitter that emit an event on new public nodes
+   * @param initialNodes nodes that are initially known
+   * @param state check message reception and content of message
+   * @param expectedMessage message to check for, or undefined to skip this check
+   * @param peerId peerId of the node
+   * @returns
+   */
   async function startNode(
-    stunServers: Multiaddr[],
-    potentialRelays: Multiaddr[] = [],
+    initialNodes: Multiaddr[],
     state: { msgReceived: DeferredPromise<void>; expectedMessageReceived?: DeferredPromise<void> },
-    expectedMessage?: Uint8Array
+    expectedMessage?: Uint8Array,
+    peerId?: PeerId
   ) {
-    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    peerId = peerId ?? (await PeerId.create({ keyType: 'secp256k1' }))
+    const publicNodesEmitter = new EventEmitter() as PublicNodesEmitter
+
     const listener = new Listener(
       undefined,
       {
@@ -87,8 +99,8 @@ describe('check listening to sockets', function () {
         },
         upgradeOutbound: async (conn: MultiaddrConnection) => conn
       } as unknown as Upgrader,
-      stunServers,
-      potentialRelays,
+      publicNodesEmitter,
+      initialNodes,
       peerId,
       undefined
     )
@@ -97,7 +109,8 @@ describe('check listening to sockets', function () {
 
     return {
       peerId,
-      listener
+      listener,
+      publicNodesEmitter
     }
   }
 
@@ -124,11 +137,8 @@ describe('check listening to sockets', function () {
       listener = new Listener(
         () => {},
         undefined as unknown as Upgrader,
-        [
-          new Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
-          new Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`)
-        ],
         undefined,
+        stunServers.map((s: Socket) => new Multiaddr(`/ip4/127.0.0.1/tcp/${s.address().port}`)),
         peerId,
         undefined
       )
@@ -149,18 +159,21 @@ describe('check listening to sockets', function () {
 
     const stunServerMultiaddr = new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
-    const relay = await startNode([stunServerMultiaddr], undefined, {
+    const relay = await startNode([stunServerMultiaddr], {
       msgReceived: relayContacted
     })
 
-    const node = await startNode(
-      [stunServerMultiaddr],
-      [new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)],
-      { msgReceived: Defer() }
+    const node = await startNode([stunServerMultiaddr], { msgReceived: Defer() })
+
+    const eventPromise = once(node.listener, '_newNodeRegistered')
+
+    node.publicNodesEmitter.emit(
+      `addPublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
     )
 
     // Checks that relay and STUN got contacted, otherwise timeout
-    await relayContacted.promise
+    await Promise.all([relayContacted.promise, eventPromise])
 
     const addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
@@ -181,7 +194,6 @@ describe('check listening to sockets', function () {
 
     const node = await startNode(
       [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
-      undefined,
       {
         msgReceived,
         expectedMessageReceived
@@ -224,8 +236,8 @@ describe('check listening to sockets', function () {
       {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
       } as unknown as Upgrader,
-      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
       undefined,
+      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
       peerId,
       validInterfaces[0]
     )
@@ -241,7 +253,7 @@ describe('check listening to sockets', function () {
     const defer = Defer<void>()
     const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
 
-    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], undefined, {
+    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
       msgReceived: Defer()
     })
 
@@ -284,20 +296,29 @@ describe('check listening to sockets', function () {
   it('get the right addresses', async function () {
     const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
 
-    const relay = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], undefined, {
+    const relay = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
       msgReceived: Defer()
     })
 
-    const node = await startNode(
-      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
-      [
-        new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`),
-        new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
-      ],
-      {
-        msgReceived: Defer()
-      }
+    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    let eventPromise = once(node.listener, '_newNodeRegistered')
+    node.publicNodesEmitter.emit(
+      'addPublicNode',
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
     )
+
+    await eventPromise
+
+    eventPromise = once(node.listener, '_newNodeRegistered')
+    node.publicNodesEmitter.emit(
+      'addPublicNode',
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    await eventPromise
 
     const addrsFromListener = node.listener.getAddrs()
 
@@ -323,7 +344,7 @@ describe('check listening to sockets', function () {
     const msgReceived = Defer<void>()
     const expectedMessageReceived = Defer<void>()
 
-    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], undefined, {
+    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
       msgReceived,
       expectedMessageReceived
     })
@@ -368,5 +389,110 @@ describe('check listening to sockets', function () {
     assert(node.listener.getConnections() == 0, `Connection must have been removed`)
 
     await Promise.all([stopNode(node.listener), stopNode(stunServer)])
+  })
+
+  it('add relay node only once', async function () {
+    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+
+    const relay = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    let eventPromise = once(node.listener, '_newNodeRegistered')
+    node.publicNodesEmitter.emit(
+      `addPublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    await eventPromise
+
+    let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+
+    assert(addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`))
+
+    eventPromise = once(node.listener, '_newNodeRegistered')
+    node.publicNodesEmitter.emit(
+      `addPublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId}`)
+    )
+
+    await eventPromise
+
+    let addrsAfterSecondEvent = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+
+    assert(addrs.length == addrsAfterSecondEvent.length)
+
+    assert(
+      addrsAfterSecondEvent.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
+    )
+
+    await Promise.all([stopNode(node.listener), stopNode(relay.listener), stopNode(stunServer)])
+  })
+
+  it('overwrite existing relays', async function () {
+    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+
+    const relay = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    const node = await startNode([new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
+      msgReceived: Defer()
+    })
+
+    let eventPromise = once(node.listener, '_newNodeRegistered')
+    node.publicNodesEmitter.emit(
+      `addPublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    await eventPromise
+
+    let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+
+    assert(addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`))
+
+    node.publicNodesEmitter.emit(
+      `addPublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId}`)
+    )
+
+    eventPromise = once(node.listener, '_newNodeRegistered')
+    node.publicNodesEmitter.emit(
+      `addPublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    await eventPromise
+
+    // Stop first relay and let it attach to different port
+    await stopNode(relay.listener)
+
+    const newRelay = await startNode(
+      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+      {
+        msgReceived: Defer()
+      },
+      undefined,
+      relay.peerId
+    )
+
+    eventPromise = once(node.listener, '_newNodeRegistered')
+    node.publicNodesEmitter.emit(
+      `addPublicNode`,
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${newRelay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
+    )
+
+    await eventPromise
+
+    const addrsAfterThirdEvent = node.listener.getAddrs()
+
+    assert(addrs.length == addrsAfterThirdEvent.length)
+
+    await Promise.all([stopNode(node.listener), stopNode(newRelay.listener), stopNode(stunServer)])
   })
 })

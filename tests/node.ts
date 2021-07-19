@@ -7,7 +7,7 @@ import { NOISE } from 'libp2p-noise'
 
 const MPLEX = require('libp2p-mplex')
 
-import { HoprConnect } from '../src'
+import { HoprConnect, HoprConnectOptions } from '../src'
 import { Multiaddr } from 'multiaddr'
 import pipe from 'it-pipe'
 import yargs from 'yargs/yargs'
@@ -76,6 +76,12 @@ async function startNode({
   pipeFileStream?: WriteStream
 }) {
   console.log(`starting node, bootstrap address ${bootstrapAddress}`)
+  const connectOpts: HoprConnectOptions = {
+    initialNodes: bootstrapAddress ? [bootstrapAddress] : [],
+    __noDirectConnections: noDirectConnections,
+    __noWebRTCUpgrade: noWebRTCUpgrade
+  }
+
   const node = await libp2p.create({
     peerId,
     addresses: {
@@ -88,13 +94,7 @@ async function startNode({
     },
     config: {
       transport: {
-        HoprConnect: {
-          bootstrapServers: bootstrapAddress ? [bootstrapAddress] : [],
-          // simulates a NAT
-          // DO NOT use this in production
-          __noDirectConnections: noDirectConnections,
-          __noWebRTCUpgrade: noWebRTCUpgrade
-        }
+        HoprConnect: connectOpts
       },
       peerDiscovery: {
         autoDial: false
