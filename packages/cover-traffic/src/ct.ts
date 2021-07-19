@@ -300,7 +300,9 @@ class CoverTrafficStrategy extends SaneDefaults {
     // Refresh open channels
     const ctChannels = []
     for (let c of currentChannels) {
-      if (c.status === ChannelStatus.Closed) { continue }
+      if (c.status === ChannelStatus.Closed) {
+        continue
+      }
       const q = await peers.qualityOf(c.destination)
       ctChannels.push({ destination: c.destination, latestQualityOf: q })
       if (q < 0.15) {
@@ -332,10 +334,19 @@ class CoverTrafficStrategy extends SaneDefaults {
     }
 
     let attempts = 0
-    while (currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(state.nodes).length > 0 && attempts < 1000) {
-      attempts ++
+    while (
+      currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE &&
+      Object.keys(state.nodes).length > 0 &&
+      attempts < 1000
+    ) {
+      attempts++
       const c = await this.data.weightedRandomChoice()
-      if (!currentChannels.find((x) => x.destination.eq(c)) && !c.eq(this.selfPub) && !toOpen.find(x => x[1].eq(c)) && await peers.qualityOf(c) > 0.6) {
+      if (
+        !currentChannels.find((x) => x.destination.eq(c)) &&
+        !c.eq(this.selfPub) &&
+        !toOpen.find((x) => x[1].eq(c)) &&
+        (await peers.qualityOf(c)) > 0.6
+      ) {
         toOpen.push([c, CHANNEL_STAKE])
       }
     }

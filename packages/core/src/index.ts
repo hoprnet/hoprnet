@@ -747,7 +747,7 @@ class Hopr extends EventEmitter {
 
     let txHash: string
     try {
-      if (channelState.status === ChannelStatus.Open || channelState.status == ChannelStatus.WaitingForCommitment){
+      if (channelState.status === ChannelStatus.Open || channelState.status == ChannelStatus.WaitingForCommitment) {
         txHash = await channel.initializeClosure()
       } else {
         txHash = await channel.finalizeClosure()
