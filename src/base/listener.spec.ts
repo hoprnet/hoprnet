@@ -452,7 +452,10 @@ describe('check listening to sockets', function () {
 
     let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
-    assert(addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`))
+    assert(
+      addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`),
+      'Addrs should include new relay node'
+    )
 
     eventPromise = once(node.listener.emitter, '_newNodeRegistered')
     node.publicNodesEmitter.emit(
@@ -467,7 +470,8 @@ describe('check listening to sockets', function () {
     assert(addrs.length == addrsAfterSecondEvent.length)
 
     assert(
-      addrsAfterSecondEvent.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
+      addrsAfterSecondEvent.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`),
+      'Addrs should include new relay node'
     )
 
     await Promise.all([stopNode(node.listener), stopNode(relay.listener), stopNode(stunServer)])
@@ -568,9 +572,10 @@ describe('check listening to sockets', function () {
 
     let addrsAfterRemoval = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
+    assert(addrs.length - 1 == addrsAfterRemoval.length, 'Addr should be removed, hence size should be reduced by one.')
     assert(
-      addrs.length - 1 == addrsAfterRemoval.length &&
-        !addrsAfterRemoval.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
+      !addrsAfterRemoval.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`),
+      'Addrs should not contain removed node'
     )
 
     await Promise.all([stopNode(node.listener), stopNode(relay.listener), stopNode(stunServer)])
@@ -601,11 +606,16 @@ describe('check listening to sockets', function () {
     let addrsAfterRemoval = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
     assert(
-      addrs.length == addrsAfterRemoval.length &&
-        !addrsAfterRemoval.includes(
-          `/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`
-        ) &&
-        addrs.every((addr: string) => addrsAfterRemoval.some((addrAfterRemoval: string) => addr === addrAfterRemoval))
+      addrs.length == addrsAfterRemoval.length,
+      'Number of addresses should stay same after removing invalid multiaddr'
+    )
+    assert(
+      !addrsAfterRemoval.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`),
+      'Addrs should not include addr of invalid node'
+    )
+    assert(
+      addrs.every((addr: string) => addrsAfterRemoval.some((addrAfterRemoval: string) => addr === addrAfterRemoval)),
+      'Addrs should stay same after trying remove invalid multiaddr'
     )
 
     await Promise.all([stopNode(node.listener), stopNode(relay.listener), stopNode(stunServer)])
