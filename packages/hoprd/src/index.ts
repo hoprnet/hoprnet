@@ -282,7 +282,6 @@ async function main() {
     }
 
     const ethAddr = (await node.getEthereumAddress()).toHex()
-    // 0.1 NativeBalance
     const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
     logs.log(`Node is not started, please fund this node ${ethAddr} with atleast ${fundsReq}`)
