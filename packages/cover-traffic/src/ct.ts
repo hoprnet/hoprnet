@@ -18,7 +18,7 @@ const options: HoprOptions = {
   provider: 'wss://goerli.infura.io/ws/v3/51d4d972f30c4d92b61f2b3898fccaf6',
   createDbIfNotExist: true,
   password: '',
- // forceCreateDB: true,
+  // forceCreateDB: true,
   announce: false
 }
 
@@ -310,8 +310,6 @@ class CoverTrafficStrategy extends SaneDefaults {
       }
     }
 
-
-
     // Refresh open channels
     state.ctChannels = []
     for (let destination of currentChannels
@@ -319,7 +317,7 @@ class CoverTrafficStrategy extends SaneDefaults {
       .concat(toOpen.map((o) => o[0]))
       .concat(toClose)) {
       const q = await peers.qualityOf(destination)
-      state.ctChannels.push({destination, latestQualityOf: q})
+      state.ctChannels.push({ destination, latestQualityOf: q })
       if (q < 0.1) {
         toClose.push(destination)
       }
@@ -378,6 +376,6 @@ export async function main(update: (State) => void, peerId: PeerId) {
   await node.start()
   data.log('node is running')
   const channels = await node.getChannelsFrom(selfAddr)
-  data.setCTChannels(channels.map(c =>({ destination: c.destination, latestQualityOf: 0 })))
+  data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0 })))
   node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))
 }

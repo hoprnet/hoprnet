@@ -1,6 +1,6 @@
 import blessed from 'blessed'
 import contrib from 'blessed-contrib'
-import { main, State, findChannelsFrom, importance, totalChannelBalanceFor, findChannel, OpenChannels} from './ct'
+import { main, State, findChannelsFrom, importance, totalChannelBalanceFor, findChannel, OpenChannels } from './ct'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'bignumber.js'
@@ -107,7 +107,14 @@ function setupDashboard(selfPub: PublicKey) {
         } else {
           status = 'UNKNOWN'
         }
-        return [c.destination.toB58String(), status, stats.sendAttempts || 0, stats.forwardAttempts || 0, c.latestQualityOf, balance]
+        return [
+          c.destination.toB58String(),
+          status,
+          stats.sendAttempts || 0,
+          stats.forwardAttempts || 0,
+          c.latestQualityOf,
+          balance
+        ]
       })
     })
 
