@@ -34,7 +34,7 @@ import {
   ChannelStatus,
   MIN_NATIVE_BALANCE
 } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { getChannelsContractData } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { getAddrs } from './identity'
 
@@ -226,7 +226,12 @@ class Hopr extends EventEmitter {
       libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
+    const { network } = chain.smartContractInfo()
+    const { address } = getChannelsContractData(network)
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup, {
+      network,
+      address
+    })
 
     subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, this.getId(), (ack) =>
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
