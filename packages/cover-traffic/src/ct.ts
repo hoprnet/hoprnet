@@ -6,7 +6,7 @@ import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import fs from 'fs'
 
-const CHANNELS_PER_COVER_TRAFFIC_NODE = 5
+const CHANNELS_PER_COVER_TRAFFIC_NODE = 10
 const CHANNEL_STAKE = new BN('1000')
 const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
 const CT_INTERMEDIATE_HOPS = 3 // NB. min is 2
@@ -18,7 +18,7 @@ const options: HoprOptions = {
   provider: 'wss://goerli.infura.io/ws/v3/51d4d972f30c4d92b61f2b3898fccaf6',
   createDbIfNotExist: true,
   password: '',
-  forceCreateDB: true,
+ // forceCreateDB: true,
   announce: false
 }
 
@@ -28,17 +28,22 @@ type PeerData = {
   multiaddrs: any
 }
 
-type ChannelData = {
+export type ChannelData = {
   channel: ChannelEntry
   sendAttempts: number
   forwardAttempts: number
+}
+
+export type OpenChannels = {
+  destination: PublicKey
+  latestQualityOf: number
 }
 
 export type State = {
   nodes: Record<string, PeerData>
   channels: Record<string, ChannelData>
   log: string[]
-  ctChannels: PublicKey[]
+  ctChannels: OpenChannels[]
   block: BN
 }
 
@@ -58,6 +63,7 @@ class PersistedState {
         channels: {},
         log: [],
         ctChannels: [],
+
         block: new BN('0')
       }
     }
@@ -69,7 +75,10 @@ class PersistedState {
       nodes: {},
       channels: {},
       log: ['loaded data'],
-      ctChannels: json.ctChannels.map((p) => PublicKey.fromPeerId(PeerId.createFromB58String(p))),
+      ctChannels: json.ctChannels.map((p) => ({
+        destination: PublicKey.fromPeerId(PeerId.createFromB58String(p)),
+        latestQualityOf: 0
+      })),
       block: new BN(json.block)
     }
     json.nodes.forEach((n) => {
@@ -105,7 +114,7 @@ class PersistedState {
           forwardAttempts: c.forwardAttempts,
           sendAttempts: c.sendAttempts
         })),
-        ctChannels: s.ctChannels.map((p) => p.toB58String()),
+        ctChannels: s.ctChannels.map((o: OpenChannels) => o.destination.toB58String()),
         block: s.block.toString()
       }),
       'utf8'
@@ -138,9 +147,9 @@ class PersistedState {
     await this.set(state)
   }
 
-  async setCTChannels(channels: ChannelEntry[]) {
+  async setCTChannels(channels: OpenChannels[]) {
     const state = await this.get()
-    state.ctChannels = channels.map((c) => c.destination)
+    state.ctChannels = channels
     await this.set(state)
   }
 
@@ -230,7 +239,7 @@ export const importance = (p: PublicKey, state: State): BN =>
 
 export const findChannel = (src: PublicKey, dest: PublicKey, state: State): ChannelEntry =>
   Object.values(state.channels)
-    .map((c) => c.channel)
+    .map((c: ChannelData): ChannelEntry => c.channel)
     .find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
 
 export const sendCTMessage = async (
@@ -281,7 +290,7 @@ class CoverTrafficStrategy extends SaneDefaults {
   async tick(
     balance: BN,
     currentChannels: ChannelEntry[],
-    _peers: any,
+    peers: any,
     _getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     const toOpen = []
@@ -301,29 +310,38 @@ class CoverTrafficStrategy extends SaneDefaults {
       }
     }
 
-    state.ctChannels = currentChannels
+
+
+    // Refresh open channels
+    state.ctChannels = []
+    for (let destination of currentChannels
       .map((c) => c.destination)
       .concat(toOpen.map((o) => o[0]))
-      .concat(toClose)
+      .concat(toClose)) {
+      const q = await peers.qualityOf(destination)
+      state.ctChannels.push({destination, latestQualityOf: q})
+      if (q < 0.1) {
+        toClose.push(destination)
+      }
+    }
 
-    await Promise.all(
-      state.ctChannels.map(async (dest) => {
-        const channel = await this.data.findChannel(this.selfPub, dest)
-        if (channel.status == ChannelStatus.Open) {
-          const success = await sendCTMessage(
-            dest,
-            this.selfPub,
-            async (path: PublicKey[]) => {
-              await this.node.sendMessage(new Uint8Array(1), dest.toPeerId(), path)
-            },
-            this.data
-          )
-          if (!success) {
-            toClose.push(dest)
-          }
+    for (let openChannel of state.ctChannels) {
+      const channel = await this.data.findChannel(this.selfPub, openChannel.destination)
+      if (channel && channel.status == ChannelStatus.Open) {
+        const success = await sendCTMessage(
+          openChannel.destination,
+          this.selfPub,
+          async (path: PublicKey[]) => {
+            await this.node.sendMessage(new Uint8Array(1), openChannel.destination.toPeerId(), path)
+          },
+          this.data
+        )
+        if (!success) {
+          toClose.push(openChannel.destination)
         }
-      })
-    )
+      }
+      // TODO handle waiting for commitment stalls
+    }
 
     this.data.log(
       `strategy tick: balance:${balance.toString()} open:${toOpen
@@ -360,6 +378,6 @@ export async function main(update: (State) => void, peerId: PeerId) {
   await node.start()
   data.log('node is running')
   const channels = await node.getChannelsFrom(selfAddr)
-  data.setCTChannels(channels)
+  data.setCTChannels(channels.map(c =>({ destination: c.destination, latestQualityOf: 0 })))
   node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))
 }

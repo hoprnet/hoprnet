@@ -1,6 +1,6 @@
 import blessed from 'blessed'
 import contrib from 'blessed-contrib'
-import { main, State, findChannelsFrom, importance, totalChannelBalanceFor, findChannel } from './ct'
+import { main, State, findChannelsFrom, importance, totalChannelBalanceFor, findChannel, OpenChannels} from './ct'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'bignumber.js'
@@ -48,7 +48,7 @@ function setupDashboard(selfPub: PublicKey) {
     keys: false,
     interactive: false,
     columnSpacing: 2, //in chars
-    columnWidth: [55, 10, 10, 10, 20]
+    columnWidth: [55, 6, 6, 6, 6, 15]
   })
 
   table.rows.on('select item', (item) => {
@@ -95,19 +95,19 @@ function setupDashboard(selfPub: PublicKey) {
     }
 
     ctChan.setData({
-      headers: ['Dest', 'Status', '#Sent', '#Fwd', 'Balance'],
-      data: state.ctChannels.map((p: PublicKey) => {
-        const chan = findChannel(selfPub, p, state)
+      headers: ['Dest', 'Status', '#Sent', '#Fwd', 'Q', 'Balance'],
+      data: state.ctChannels.map((c: OpenChannels) => {
+        const chan = findChannel(selfPub, c.destination, state)
         let status
         let balance = '-'
-        let stats = state.channels[p.toB58String()] || ({} as any)
+        let stats = state.channels[c.destination.toB58String()] || ({} as any)
         if (chan) {
           status = chan.status.toString()
           balance = chan.balance.toFormattedString()
         } else {
           status = 'UNKNOWN'
         }
-        return [p.toPeerId().toB58String(), status, stats.sendAttempts || 0, stats.forwardAttempts || 0, balance]
+        return [c.destination.toB58String(), status, stats.sendAttempts || 0, stats.forwardAttempts || 0, c.latestQualityOf, balance]
       })
     })
 
