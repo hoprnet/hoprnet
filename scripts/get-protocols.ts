@@ -68,6 +68,7 @@ async function main() {
   const argv = yargs(process.argv.slice(2))
     .option('addr', {
       describe: 'example: --addr /ip4/34.65.42.178/tcp/9091/p2p/16Uiu2HAkyQGg2LLqwbDbuiHZSVtB3q5xmhpq7URirCEuJ4CXjZTh',
+      demandOption: true,
       type: 'string'
     })
     .parseSync()
@@ -84,8 +85,7 @@ async function main() {
 
   // @ts-ignore
   const upgrader = new ReducedUpgrader({
-    localPeer: self,
-    metrics: null
+    localPeer: self
   })
 
   upgrader.cryptos.set(NOISE.protocol, NOISE)
