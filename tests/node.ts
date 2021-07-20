@@ -141,6 +141,10 @@ type CmdDef =
       targetIdentityName: string
       relayIdentityName: string
     }
+  | {
+      cmd: 'hangup'
+      targetIdentityName: string
+    }
 
 async function executeCommands({
   node,
@@ -192,6 +196,13 @@ async function executeCommands({
         }
         await pipe([encodedMsg], stream, createDeadEnd(cmdDef.targetIdentityName, pipeFileStream))
         console.log(`sent ok`)
+        break
+      }
+      case 'hangup': {
+        const targetPeerId = await peerIdForIdentity(cmdDef.targetIdentityName)
+        console.log(`hanging up on ${cmdDef.targetIdentityName}`)
+        await node.hangUp(targetPeerId)
+        console.log(`hanged up`)
         break
       }
       default: {

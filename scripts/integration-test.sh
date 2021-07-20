@@ -123,12 +123,14 @@ log "charly logs -> ${charly_log}"
 log "dave logs -> ${dave_log}"
 
 # run alice (client)
+# should be able to send 'test from alice' to bob through relay charly
+# should be ablt to get 'echo: test' back from bob
 start_node tests/node.ts \
     "${alice_log}" \
     "[ 
       {
         'cmd': 'wait',
-        'waitForSecs': 8
+        'waitForSecs': 2
       },
       {
         'cmd': 'dial',
@@ -139,7 +141,11 @@ start_node tests/node.ts \
         'cmd': 'msg',
         'relayIdentityName': 'charly',
         'targetIdentityName': 'bob',
-        'msg': 'test'
+        'msg': 'test from alice'
+      },
+      { 
+        'cmd': 'hangup',
+        'targetIdentityName': 'bob'
       }
     ]" \
     --port ${alice_port} \
@@ -151,10 +157,12 @@ start_node tests/node.ts \
     --noWebRTCUpgrade false \
     
 # run bob (client)
+# should be able to receive 'test' from alice through charly
+# should be able to reply with 'echo: test'
 start_node tests/node.ts "${bob_log}"  \
   "[ {
         'cmd': 'wait',
-        'waitForSecs': 8
+        'waitForSecs': 2
       },
       {
         'cmd': 'dial',
@@ -170,7 +178,9 @@ start_node tests/node.ts "${bob_log}"  \
   --noDirectConnections true \
   --noWebRTCUpgrade false \  
   
-# run charly (bootstrap, relay)
+# run charly
+# should able to serve as a bootstrap
+# should be able to relay 1 connection at a time
 start_node tests/node.ts "${charly_log}" \
   "[]" \
   --port ${charly_port} \
@@ -181,11 +191,11 @@ start_node tests/node.ts "${charly_log}" \
 
 
 # run dave (client)
-# dave is out of luck since charly cannot relay more than 1 connection and alice already opens a connection to bob
+# should try connecting to bob through relay charly and get RELAY_FULL error
 start_node tests/node.ts "${dave_log}" \
   "[ {
         'cmd': 'wait',
-        'waitForSecs': 9
+        'waitForSecs': 3
       },
       {
         'cmd': 'dial',
@@ -196,7 +206,7 @@ start_node tests/node.ts "${dave_log}" \
         'cmd': 'msg',
         'relayIdentityName': 'charly',
         'targetIdentityName': 'bob',
-        'msg': 'test'
+        'msg': 'test from dave'
       }
     ]" \
   --port ${dave_port} \
@@ -206,7 +216,6 @@ start_node tests/node.ts "${dave_log}" \
   --noDirectConnections true \
   --noWebRTCUpgrade false
 
-
 # wait till nodes finish communicating
 wait_for_regex_in_file "${alice_log}" "all tasks executed"
 wait_for_regex_in_file "${bob_log}" "all tasks executed"
@@ -215,11 +224,11 @@ wait_for_regex_in_file "${dave_log}" "Answer was: <FAIL_RELAY_FULL>"
 wait_for_regex_in_file "${dave_log}" "dialProtocol to bob failed"
 
 expect_file_content "${alice_pipe}" \
-">bob: test
-<bob: echo: test"
+">bob: test from alice
+<bob: echo: test from alice"
 
 expect_file_content "${bob_pipe}" \
-"<alice: test
->alice: echo: test"
+"<alice: test from alice
+>alice: echo: test from alice"
 
 log "Test succesful"

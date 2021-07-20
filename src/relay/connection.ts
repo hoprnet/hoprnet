@@ -358,6 +358,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       if (received.done) {
         currentSource = undefined
         streamPromise = undefined
+        this.destroyed = true
+        this._destroyedPromise.resolve()
         break
       }
 
