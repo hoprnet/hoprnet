@@ -100,7 +100,14 @@ async function main() {
     }
   })
 
-  const _conn = (await Transport.dial(ma)) as ReturnType<ReducedUpgrader['_createConnection']>
+  let _conn: ReturnType<ReducedUpgrader['_createConnection']>
+
+  try {
+    _conn = await Transport.dial(ma)
+  } catch (err) {
+    console.log(err)
+    return
+  }
 
   const protocols = await _conn.getProtocols()
 
