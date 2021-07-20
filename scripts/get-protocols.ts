@@ -1,0 +1,116 @@
+import pipe from 'it-pipe'
+import chalk from 'chalk'
+const yargs = require('yargs/yargs')
+
+import { Multiaddr } from 'multiaddr'
+import type PeerId from 'peer-id'
+import { NOISE } from 'libp2p-noise'
+import Upgrader from 'libp2p/src/upgrader'
+const MPLEX = require('libp2p-mplex')
+const Multistream = require('multistream-select')
+
+const { HoprConnect } = require('@hoprnet/hopr-connect')
+import { privKeyToPeerId, stringToU8a } from '@hoprnet/hopr-utils'
+
+const id = '0x964e55c734330e9393a32aef61e6b75f3b526fb64df0ac55a6076045918657e1'
+
+// @ts-ignore
+class ReducedUpgrader extends Upgrader {
+  /**
+   * Overwriting a convenience method in libp2p's Upgrader class to get the spoken
+   * protocols before using the connection
+   *
+   * @override
+   * @param {object} options
+   * @param {MultiaddrConnection} options.maConn - The transport layer connection
+   * @param {MuxedStream | MultiaddrConnection} options.upgradedConn - A duplex connection returned from multiplexer and/or crypto selection
+   * @param {MuxerFactory} [options.Muxer] - The muxer to be used for muxing
+   * @param {PeerId} options.remotePeer - The peer the connection is with
+   */
+  // @ts-ignore
+  private _createConnection({ maConn, upgradedConn, Muxer, remotePeer }): {
+    getProtocols: () => Promise<string[]>
+    remotePeer: PeerId
+    close: () => Promise<void>
+  } {
+    let muxer = new Muxer()
+
+    let getProtocols = async () => {
+      // log('%s: starting new stream on %s', direction, protocols)
+      const muxedStream = muxer.newStream()
+      const mss = new Multistream.Dialer(muxedStream)
+
+      return await mss.ls()
+    }
+
+    // Pipe all data through the muxer
+    pipe(upgradedConn, muxer, upgradedConn) //.catch(log.error)
+
+    maConn.timeline.upgraded = Date.now()
+
+    const close = async () => {
+      await maConn.close()
+      // Ensure remaining streams are aborted
+      if (muxer) {
+        muxer.streams.map((stream) => stream.abort())
+      }
+    }
+
+    return {
+      getProtocols,
+      close,
+      remotePeer
+    }
+  }
+}
+
+async function main() {
+  const argv = yargs(process.argv.slice(2))
+    .option('addr', {
+      describe: 'example: --addr /ip4/34.65.42.178/tcp/9091/p2p/16Uiu2HAkyQGg2LLqwbDbuiHZSVtB3q5xmhpq7URirCEuJ4CXjZTh',
+      type: 'string'
+    })
+    .parseSync()
+
+  let ma: Multiaddr
+  try {
+    ma = new Multiaddr(argv.addr)
+  } catch (err) {
+    console.log(`Error while decoding Multiaddr: `, err)
+    return
+  }
+
+  const self = privKeyToPeerId(stringToU8a(id, 32))
+
+  // @ts-ignore
+  const upgrader = new ReducedUpgrader({
+    localPeer: self,
+    metrics: null
+  })
+
+  upgrader.cryptos.set(NOISE.protocol, NOISE)
+
+  upgrader.muxers.set(MPLEX.multicodec, MPLEX)
+
+  const Transport = new HoprConnect({
+    upgrader,
+    libp2p: {
+      peerId: self,
+      handle: () => {}
+    }
+  })
+
+  const _conn = (await Transport.dial(ma)) as ReturnType<ReducedUpgrader['_createConnection']>
+
+  const protocols = await _conn.getProtocols()
+
+  console.log(
+    `Node identified as ${chalk.blue(_conn.remotePeer.toB58String())}, spoken protocol${
+      protocols.length == 1 ? '' : 's'
+    }:\n  ${protocols.map((str) => chalk.green(str)).join('\n  ')}`
+  )
+
+  await _conn.close()
+}
+
+main()
