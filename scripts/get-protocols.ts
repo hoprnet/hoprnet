@@ -1,3 +1,6 @@
+// Used to get a node's spoken protocols and to test connectivity
+// Example usage: `ts-node scripts/get-protocols.ts --addr /ip4/34.65.6.139/tcp/9091/p2p/16Uiu2HAm5Ym8minpwct7aZ9dYYnpbjfsfr8wa6o7GbRFcmXLcmFW`
+
 import pipe from 'it-pipe'
 import chalk from 'chalk'
 const yargs = require('yargs/yargs')
@@ -88,10 +91,11 @@ async function main() {
     localPeer: self
   })
 
+  // As used by other HOPR nodes
   upgrader.cryptos.set(NOISE.protocol, NOISE)
-
   upgrader.muxers.set(MPLEX.multicodec, MPLEX)
 
+  // Use minimal configuration for hopr-connect
   const Transport = new HoprConnect({
     upgrader,
     libp2p: {
@@ -102,6 +106,7 @@ async function main() {
 
   let _conn: ReturnType<ReducedUpgrader['_createConnection']>
 
+  // Try to dial node and fail if there was an error
   try {
     _conn = await Transport.dial(ma)
   } catch (err) {
