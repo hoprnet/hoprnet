@@ -1,6 +1,10 @@
 \subsection{Proof Of Relay}
-\label{ProofOfRelay}
-HOPR incentivizes packet transformation and delivery using a mechanism called “Proof-Of-Relay”. This mechanism guarantees that nodes relay services are verifiable.
+\label{sec:proofofrelay}
+
+HOPR incentivizes packet transformation and delivery using a mechanism called
+“Proof-Of-Relay”. This mechanism guarantees that nodes relay services are
+verifiable.
+
 \paragraph{Construction}
 \begin{itemize}
     \item Every packet is sent together with a ticket (check ticket section).
@@ -9,6 +13,7 @@ HOPR incentivizes packet transformation and delivery using a mechanism called �
 \end{itemize}
 
 \subsubsection{Challenge}
+
 $(A)$ creates a shared group element $\alpha_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key that's generated from the master DH sphinx key and will be used to derive new keys $s_i^{(0)}$ and $s_{i}^{(1)}$. 
 The first key $s_i^{(0)}$ will be used as the node's \textit{own key share} and the second key $s_i^{(1)}$ will be used as the \textit{acknowledgement key} which will be embedded in the acknowledgement for a packet and thereby unlocks the incentive for the previous relayer for transforming and delivering the packet.
     \paragraph{Key derivation}

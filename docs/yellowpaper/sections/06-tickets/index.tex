@@ -1,9 +1,12 @@
 \section{Tickets}
-\label{ticket}
+\label{sec:tickets}
+
 In the HOPR protocol, nodes that have staked funds within a payment channel can issue tickets that are used for payment to other nodes.
 Tickets are used for probabilistic payments; every ticket is bound to a specific payment channel and cannot be spent elsewhere.
 They are redeemable at most once and they lose their value when the channel is closed or when the commitment is reset. A commitment is a secret on-chain value that is used to verify whether a ticket is a win or not when it's revealed in order to redeem it.
-\subsection{Ticket issuance}
+
+\subsection{Ticket Issuance}
+
 A ticket can be issued once two nodes have established a payment channel with each other which means that at least one of them has locked HOPR tokens.
 \newline The ticket issuer A (A could also be the packet creator) selects the winning probability of the ticket and the relay fee to use and sets amount to:
 $$\sigma=\dfrac{L\times F}{P_w}$$
@@ -19,8 +22,8 @@ the challenge is given together with the routing information by the packet.
     \\\textbf{Ticket Epoch $\alpha$:} is used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha$ whenever a node resets a commitment which helps keeping track of updates to the on-chain commitments and invalidates tickets with the previous epoch.
     \\\textbf{Channel Epoch $\zeta$:} is used to give each reincarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel lose their validity once a channel is reopened ($\alpha$'s count restarts again). This is due to the fact that $\zeta$ increments whenever a closed channel is re(-opened).
     \begin{comment}
-        
-   
+
+
     \\\textbf{ChainId $c_{Id}$:} The channel identifier which is defined by the ticket issuer in order to determine which channel will be used between issuer and recipient. For example, tickets that are valid on xDAI are not valid on Ethereum.
     \\\textbf{Tag $\tau$} is given as a constant and depends on the utilized blockchain. It is used to distinguish HOPR tickets from others with the same structure that are meant for different payment channels and invalidates their usage in HOPR.
     \\\textbf{Version $V$} is given as a constant and depends on the utilized blockchain. It is used to invalidate tickets that were issued for previous versions of HOPR from being used in future iterations of the protocol.
@@ -53,7 +56,8 @@ the challenge is given together with the routing information by the packet.
     \end{figure}
 
 
-\subsection{Ticket validation}
+\subsection{Ticket Validation}
+
 Tickets are received together with packets which means that the recipient and the next downstream node share a secret $s$ whose key shares $s_i$ and $s_{i+1}$ are derivable by those nodes.
 \\~\\ \textbf{Validate response:} Once $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute $$r_i=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
 $$r_i*G=T_{c_i}$$
@@ -66,8 +70,7 @@ If this is not the case, then the node should drop the packet.
 \newline Without this check, the sender is able to intentionally create falsy challenges that lead to unredeemable tickets.
 
 
-\subsection{Ticket redemption}
-
+\subsection{Ticket Redemption}
 
 In order to unlock the ticket, the node (ticket recipient) stores it within its database until it receives an acknowledgement containing $s_{i+1}$ from the next downstream node. The challenge can be computed from acknowledgement as $T_{c_i}=ack_i*G$. The node checks the following in order to redeem tickets:
 \begin{itemize}
@@ -90,15 +93,7 @@ where $\alpha_c$ and $\zeta_c$ represent the current values in the smart contrac
 \item The ticket hasn't been already redeemed and ticket index is strictly greater than the current value in the smart contract (replay protection).
      $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ the ticket index.
 \item Channel must have enough funds to cover the costs for the ticket: $$ C_b>\sigma$$ where $\sigma$ is the ticket amount and $C_b$ is the channel balance.
-   
+
 
 
 \end{itemize}
-
-
-
-
-
-
-
-
