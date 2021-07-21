@@ -211,19 +211,15 @@ class Listener extends EventEmitter implements InterfaceListener {
    * Called once a node is considered to be offline
    * @param ma Multiaddr of node that is considered to be offline now
    */
-  protected onRemoveRelay(ma: Multiaddr) {
-    if (ma.getPeerId() == null || !isUsableRelay(ma, this.peerId)) {
-      return
-    }
-
-    this.publicNodes = removeNodeFromList(this.publicNodes, ma)
+  protected onRemoveRelay(peer: PeerId) {
+    this.publicNodes = this.publicNodes.filter((entry: NodeEntry) => entry.peerId !== peer.toB58String())
 
     this.addrs.relays = this.publicNodes.map(
       (entry: NodeEntry) => new Multiaddr(`/p2p/${entry.peerId}/p2p-circuit/p2p/${this.peerId}`)
     )
 
     log(
-      `relay ${ma.toString()} ${red(`removed`)}. Current addrs:\n\t${this.addrs.relays
+      `relay ${peer.toB58String()} ${red(`removed`)}. Current addrs:\n\t${this.addrs.relays
         .map((addr: Multiaddr) => addr.toString())
         .join(`\n\t`)}`
     )

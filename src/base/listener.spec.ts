@@ -572,10 +572,7 @@ describe('check listening to sockets', function () {
 
     eventPromise = once(node.listener.emitter, '_nodeOffline')
 
-    node.publicNodesEmitter.emit(
-      `removePublicNode`,
-      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
-    )
+    node.publicNodesEmitter.emit(`removePublicNode`, relay.peerId)
 
     await eventPromise
 
@@ -605,10 +602,7 @@ describe('check listening to sockets', function () {
 
     let eventPromise = once(node.listener.emitter, '_nodeOffline')
 
-    node.publicNodesEmitter.emit(
-      `removePublicNode`,
-      new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)
-    )
+    node.publicNodesEmitter.emit(`removePublicNode`, relay.peerId)
 
     await eventPromise
 

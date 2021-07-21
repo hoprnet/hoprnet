@@ -5,6 +5,7 @@ import assert from 'assert'
 
 import { MAX_STUN_SERVERS, multiaddrToIceServer, WebRTCUpgrader } from './upgrader'
 import { PublicNodesEmitter } from '../types'
+import PeerId from 'peer-id'
 
 describe('webrtc upgrader', function () {
   it('add public nodes', async function () {
@@ -135,10 +136,11 @@ describe('webrtc upgrader', function () {
 
     const ATTEMPTS = Math.min(MAX_STUN_SERVERS, 3)
 
-    const multiaddrs: Multiaddr[] = []
+    const peerIds: PeerId[] = []
     for (let i = 0; i < ATTEMPTS; i++) {
-      const multiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/${i}`)
-      multiaddrs.push(multiaddr)
+      const peerId = await PeerId.create({ keyType: 'secp256k1'})
+      const multiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/${i}/p2p/${peerId.toB58String()}`)
+      peerIds.push(peerId)
 
       publicNodeEmitter.emit(`addPublicNode`, multiaddr)
 
@@ -149,7 +151,7 @@ describe('webrtc upgrader', function () {
     }
 
     for (let i = 0; i < ATTEMPTS; i++) {
-      publicNodeEmitter.emit(`removePublicNode`, multiaddrs[i])
+      publicNodeEmitter.emit(`removePublicNode`, peerIds[i])
 
       assert((webRTCUpgrader.rtcConfig?.iceServers?.length as any) == ATTEMPTS - i - 1)
     }
@@ -162,9 +164,9 @@ describe('webrtc upgrader', function () {
 
     const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
 
-    const multiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/123`)
+    const peerId = await PeerId.create({ keyType: 'secp256k1'})
 
-    publicNodeEmitter.emit(`removePublicNode`, multiaddr)
+    publicNodeEmitter.emit(`removePublicNode`, peerId)
 
     assert((webRTCUpgrader.rtcConfig?.iceServers?.length as any) == undefined)
   })

@@ -4,6 +4,7 @@ import debug from 'debug'
 import type { Multiaddr } from 'multiaddr'
 import type { PublicNodesEmitter } from '../types'
 import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants'
+import type PeerId from 'peer-id'
 
 const wrtc = require('wrtc')
 
@@ -47,13 +48,16 @@ function removeMultiaddrFromList(iceServers: RTCIceServer[], iceServerUrl: strin
 
   return result
 }
+
 /**
  * Encapsulate configuration used to create WebRTC instances
  */
 class WebRTCUpgrader {
   public rtcConfig?: RTCConfiguration
+  private publicNodes: Map<string, Multiaddr[]>
 
   constructor(publicNodes?: PublicNodesEmitter, initialNodes?: Multiaddr[]) {
+    this.publicNodes = new Map<string, Multiaddr[]>()
     initialNodes?.forEach(this.onNewPublicNode.bind(this))
 
     publicNodes?.on('addPublicNode', this.onNewPublicNode.bind(this))
@@ -78,6 +82,19 @@ class WebRTCUpgrader {
       return
     }
 
+    const maPeerId = ma.getPeerId() ?? 'unknownPeer'
+
+    let found = this.publicNodes.get(maPeerId)
+    if (found) {
+      if (!found.some((existing: Multiaddr) => existing.equals(ma))) {
+        found.push(ma)
+      }
+    } else {
+      found = [ma]
+    }
+
+    this.publicNodes.set(maPeerId, found)
+
     const iceServerUrl = multiaddrToIceServer(ma)
 
     const iceServers = removeMultiaddrFromList(this.rtcConfig?.iceServers ?? [], iceServerUrl)
@@ -90,23 +107,20 @@ class WebRTCUpgrader {
     }
   }
 
-  private onOfflineNode(ma: Multiaddr) {
+  private onOfflineNode(peer: PeerId) {
     if (this.rtcConfig == undefined || this.rtcConfig.iceServers == undefined) {
       return
     }
 
-    if (!isUsableMultiaddr(ma.tuples())) {
-      return
-    }
+    let found = this.publicNodes.get(peer.toB58String())
+    if (found) {
+      let iceServers = this.rtcConfig.iceServers
+      for (const ma of found) {
+        iceServers = removeMultiaddrFromList(iceServers, multiaddrToIceServer(ma))
+      }
+      this.rtcConfig.iceServers = iceServers
 
-    switch (this.rtcConfig.iceServers.length) {
-      case 0:
-        return
-      case 1:
-        this.rtcConfig.iceServers = []
-        return
-      default:
-        this.rtcConfig.iceServers = removeMultiaddrFromList(this.rtcConfig.iceServers, multiaddrToIceServer(ma))
+      this.publicNodes.delete(peer.toB58String())
     }
   }
 
