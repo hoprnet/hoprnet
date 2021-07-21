@@ -15,6 +15,7 @@ const MAX_DELAY = 5 * 60 * 1000 // 5mins
 const BACKOFF_EXPONENT = 1.5
 const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
 const UNKNOWN_Q = 0.2 // Default quality for nodes we don't know about.
+const OFFLINE_THRESHOLD = 0.5 // Nodes with quality below are considered dead
 
 class NetworkPeers {
   private peers: Entry[]
@@ -23,7 +24,11 @@ class NetworkPeers {
     return this.peers.find((x) => x.id.toB58String() === peer.toB58String())
   }
 
-  constructor(existingPeers: Array<PeerId>, private exclude: PeerId[] = []) {
+  constructor(
+    existingPeers: Array<PeerId>,
+    private exclude: PeerId[] = [],
+    private onPeerOffline?: (peer: PeerId) => void
+  ) {
     this.peers = []
 
     for (const peer of existingPeers) {
@@ -68,6 +73,10 @@ class NetworkPeers {
     } else {
       entry.lastTen = Math.max(0, entry.lastTen - 0.1)
       entry.backoff = Math.min(MAX_BACKOFF, Math.pow(entry.backoff, BACKOFF_EXPONENT))
+
+      if (entry.lastTen < OFFLINE_THRESHOLD) {
+        this.onPeerOffline?.(peer)
+      }
     }
   }
 

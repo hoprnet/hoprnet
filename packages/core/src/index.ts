@@ -166,6 +166,9 @@ class Hopr extends EventEmitter {
 
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
 
+    const ethereum = await this.paymentChannels
+    const initialNodes = await ethereum.waitForPublicNodes()
+
     const libp2p = await LibP2P.create({
       peerId: this.id,
       addresses: { listen: getAddrs(this.id, this.options).map((x) => x.toString()) },
@@ -180,7 +183,7 @@ class Hopr extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            initialNodes: await (await this.paymentChannels).waitForPublicNodes(),
+            initialNodes,
             publicNodes: this.publicNodesEmitter
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
@@ -204,32 +207,6 @@ class Hopr extends EventEmitter {
     await libp2p.start()
     log('libp2p started')
     this.libp2p = libp2p
-    this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
-      this.emit('hopr:peer:connection', conn.remotePeer)
-      this.networkPeers.register(conn.remotePeer)
-    })
-
-    this.networkPeers = new NetworkPeers(Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id))
-
-    const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
-      libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
-    const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
-      libp2pSendMessageAndExpectResponse(this.libp2p, dest, protocol, msg, opts)
-    const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
-      libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
-    const hangup = this.libp2p.hangUp.bind(this.libp2p)
-
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
-
-    subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, this.getId(), (ack) =>
-      this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
-    )
-
-    const ethereum = await this.paymentChannels
-    const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
-
-    // @TODO add previous nodes
 
     ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
       console.log(`on Peer`, multiaddrs)
@@ -254,6 +231,36 @@ class Hopr extends EventEmitter {
         this.libp2p.peerStore.addressBook.add(id, multiaddrs)
       }
     })
+
+    this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
+      this.emit('hopr:peer:connection', conn.remotePeer)
+      this.networkPeers.register(conn.remotePeer)
+    })
+
+    this.networkPeers = new NetworkPeers(
+      Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id),
+      undefined,
+      (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
+    )
+
+    const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
+      libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
+    const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
+      libp2pSendMessageAndExpectResponse(this.libp2p, dest, protocol, msg, opts)
+    const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
+      libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
+    const hangup = this.libp2p.hangUp.bind(this.libp2p)
+
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
+
+    subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, this.getId(), (ack) =>
+      this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
+    )
+
+    const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
+    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
+
+    // @TODO add previous nodes
 
     log('announcing')
     await this.announce(this.options.announce)
