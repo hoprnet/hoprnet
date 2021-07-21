@@ -184,7 +184,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this.setClosed()
 
-    await this._destroyedPromise.promise
+    // @TODO remove timeout once issue with destroyPromise is solved
+    await Promise.race([new Promise((resolve) => setTimeout(resolve, 100)), this._destroyedPromise.promise])
   }
 
   /**

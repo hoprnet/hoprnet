@@ -8,8 +8,8 @@
 
 ```ts
 new HoprConnect(upgrader, {
-    publicNodes, // EventEmitter
-    initialNodes // Multiaddr[], list of already known nodes
+  publicNodes, // EventEmitter
+  initialNodes // Multiaddr[], list of already known nodes
 })
 ```
 
@@ -19,6 +19,7 @@ The property `bootstrapNodes` is ignored.
 
 - support for relay slots, actively limitting maximum number of simultaneous relayed connections (#237)
 - relay management API: dynamically add and remove potential relays and use them to bypass NATs (#243, #231)
+- improved CI testing (#222, #227, #230, #232, #233, #234, #235)
 
 ### Fixes:
 
