@@ -66,7 +66,8 @@ async function startNode({
   bootstrapAddress,
   noDirectConnections,
   noWebRTCUpgrade,
-  pipeFileStream
+  pipeFileStream,
+  maxRelayedConnections
 }: {
   peerId: PeerId
   port: number
@@ -74,12 +75,14 @@ async function startNode({
   noDirectConnections: boolean
   noWebRTCUpgrade: boolean
   pipeFileStream?: WriteStream
+  maxRelayedConnections?: number
 }) {
   console.log(`starting node, bootstrap address ${bootstrapAddress}`)
   const connectOpts: HoprConnectOptions = {
     initialNodes: bootstrapAddress ? [bootstrapAddress] : [],
     __noDirectConnections: noDirectConnections,
-    __noWebRTCUpgrade: noWebRTCUpgrade
+    __noWebRTCUpgrade: noWebRTCUpgrade,
+    maxRelayedConnections
   }
 
   const node = await libp2p.create({
@@ -138,6 +141,10 @@ type CmdDef =
       targetIdentityName: string
       relayIdentityName: string
     }
+  | {
+      cmd: 'hangup'
+      targetIdentityName: string
+    }
 
 async function executeCommands({
   node,
@@ -161,6 +168,7 @@ async function executeCommands({
         const targetAddress = new Multiaddr(`/ip4/127.0.0.1/tcp/${cmdDef.targetPort}/p2p/${targetPeerId.toB58String()}`)
         console.log(`dialing ${cmdDef.targetIdentityName}`)
         await node.dial(targetAddress)
+
         console.log(`dialed`)
         break
       }
@@ -169,10 +177,17 @@ async function executeCommands({
         const relayPeerId = await peerIdForIdentity(cmdDef.relayIdentityName)
 
         console.log(`msg: dialing ${cmdDef.targetIdentityName} though relay ${cmdDef.relayIdentityName}`)
-        const { stream } = await node.dialProtocol(
-          new Multiaddr(`/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId.toB58String()}`),
-          TEST_PROTOCOL
-        )
+        const { stream } = await node
+          .dialProtocol(
+            new Multiaddr(`/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId.toB58String()}`),
+            TEST_PROTOCOL
+          )
+          .catch((err) => {
+            console.log(`dialProtocol to ${cmdDef.targetIdentityName} failed`)
+            console.log(err)
+            process.exit(1)
+          })
+
         console.log(`sending msg '${cmdDef.msg}'`)
 
         const encodedMsg = encodeMsg(cmdDef.msg)
@@ -181,6 +196,13 @@ async function executeCommands({
         }
         await pipe([encodedMsg], stream, createDeadEnd(cmdDef.targetIdentityName, pipeFileStream))
         console.log(`sent ok`)
+        break
+      }
+      case 'hangup': {
+        const targetPeerId = await peerIdForIdentity(cmdDef.targetIdentityName)
+        console.log(`hanging up on ${cmdDef.targetIdentityName}`)
+        await node.hangUp(targetPeerId)
+        console.log(`hanged up`)
         break
       }
       default: {
@@ -229,6 +251,9 @@ async function main() {
     .option('pipeFile', {
       type: 'string'
     })
+    .option('maxRelayedConnections', {
+      type: 'number'
+    })
     .coerce({
       script: (input) => JSON.parse(input.replace(/'/g, '"'))
     })
@@ -254,7 +279,8 @@ async function main() {
     bootstrapAddress,
     noDirectConnections: argv.noDirectConnections,
     noWebRTCUpgrade: argv.noWebRTCUpgrade,
-    pipeFileStream
+    pipeFileStream,
+    maxRelayedConnections: argv.maxRelayedConnections
   })
 
   await executeCommands({ node, cmds: argv.script, pipeFileStream })

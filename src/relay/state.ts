@@ -26,6 +26,10 @@ class RelayState {
     this.relayedConnections = new Map()
   }
 
+  relayedConnectionCount() {
+    return this.relayedConnections.size
+  }
+
   /**
    * Checks if there is a relayed connection. Liveness is not checked,
    * so connection might be dead.
