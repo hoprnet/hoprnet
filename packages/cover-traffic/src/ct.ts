@@ -18,7 +18,7 @@ const options: HoprOptions = {
   provider: 'wss://goerli.infura.io/ws/v3/51d4d972f30c4d92b61f2b3898fccaf6',
   createDbIfNotExist: true,
   password: '',
-  // forceCreateDB: true,
+  forceCreateDB: true,
   announce: false
 }
 
@@ -332,11 +332,15 @@ class CoverTrafficStrategy extends SaneDefaults {
     }
 
     let attempts = 0
-    while (currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(state.nodes).length > 0 && attempts < 1000) {
+    while (currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(state.nodes).length > 0 && attempts < 100) {
       attempts ++
       const c = await this.data.weightedRandomChoice()
-      if (!currentChannels.find((x) => x.destination.eq(c)) && !c.eq(this.selfPub) && !toOpen.find(x => x[1].eq(c)) && await peers.qualityOf(c) > 0.6) {
+      const q = await peers.qualityOf(c)
+      if (!currentChannels.find((x) => x.destination.eq(c)) && !c.eq(this.selfPub) && !toOpen.find(x => x[1].eq(c)) && q > 0.6) {
         toOpen.push([c, CHANNEL_STAKE])
+      }
+      if ( q < 0.6 ){
+        console.error('low quality node skipped', c.toB58String(), q)
       }
     }
 
