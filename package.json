@@ -36,7 +36,8 @@
   },
   "devDependencies": {
     "@ethersproject/cli": "^5.2.0",
-    "rimraf": "^3.0.2"
+    "rimraf": "^3.0.2",
+    "ts-node": "^10.1.0"
   },
   "prettier": {
     "tabWidth": 2,

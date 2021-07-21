@@ -85,6 +85,7 @@
 
 ### Functions
 
+- [backoff](modules.md#backoff)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
@@ -102,6 +103,9 @@
 - [getHeaderLength](modules.md#getheaderlength)
 - [getPacketLength](modules.md#getpacketlength)
 - [hasB58String](modules.md#hasb58string)
+- [isErrorOutOfFunds](modules.md#iserroroutoffunds)
+- [isErrorOutOfHoprFunds](modules.md#iserroroutofhoprfunds)
+- [isErrorOutOfNativeFunds](modules.md#iserroroutofnativefunds)
 - [isExpired](modules.md#isexpired)
 - [isMultiaddrLocal](modules.md#ismultiaddrlocal)
 - [iterateHash](modules.md#iteratehash)
@@ -144,6 +148,7 @@
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
 - [validatePoRHint](modules.md#validateporhint)
 - [validatePoRResponse](modules.md#validateporresponse)
+- [wait](modules.md#wait)
 
 ## Type aliases
 
@@ -632,6 +637,32 @@ ___
 
 ## Functions
 
+### backoff
+
+▸ **backoff**(`fn`, `options?`): `ReturnType`<typeof `fn`\>
+
+A general use backoff that will reject once MAX_DELAY is reached.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `fn` | () => `Promise`<`any`\> | asynchronous function to run on every tick |
+| `options` | `Object` | - |
+| `options.delayMultiple?` | `number` | multiplier to apply to increase running delay |
+| `options.maxDelay?` | `number` | maximum delay, we reject once we reach this |
+| `options.minDelay?` | `number` | minimum delay, we start with this |
+
+#### Returns
+
+`ReturnType`<typeof `fn`\>
+
+#### Defined in
+
+[backoff.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L14)
+
+___
+
 ### cacheNoArgAsyncFunction
 
 ▸ **cacheNoArgAsyncFunction**<`T`\>(`func`, `expiry`): () => `Promise`<`T`\>
@@ -1069,6 +1100,66 @@ Returns true or false if given string does not contain a b58string
 #### Defined in
 
 [libp2p/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L51)
+
+___
+
+### isErrorOutOfFunds
+
+▸ **isErrorOutOfFunds**(`error`): ``"NATIVE"`` \| ``"HOPR"`` \| ``false``
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `error` | `any` |
+
+#### Returns
+
+``"NATIVE"`` \| ``"HOPR"`` \| ``false``
+
+#### Defined in
+
+[ethereum.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L14)
+
+___
+
+### isErrorOutOfHoprFunds
+
+▸ **isErrorOutOfHoprFunds**(`error`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `error` | `any` |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[ethereum.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L8)
+
+___
+
+### isErrorOutOfNativeFunds
+
+▸ **isErrorOutOfNativeFunds**(`error`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `error` | `any` |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[ethereum.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L3)
 
 ___
 
@@ -2100,3 +2191,23 @@ ___
 #### Defined in
 
 [crypto/por/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L132)
+
+___
+
+### wait
+
+▸ **wait**(`milliseconds`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `milliseconds` | `number` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[backoff.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L3)

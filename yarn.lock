@@ -966,7 +966,7 @@
     "@ethersproject/properties" "^5.0.3"
     "@ethersproject/strings" "^5.0.4"
 
-"@ethersproject/abi@5.4.0", "@ethersproject/abi@^5.0.0-beta.146", "@ethersproject/abi@^5.0.1", "@ethersproject/abi@^5.0.2", "@ethersproject/abi@^5.1.2", "@ethersproject/abi@^5.3.1", "@ethersproject/abi@^5.4.0":
+"@ethersproject/abi@5.4.0", "@ethersproject/abi@^5.0.0-beta.146", "@ethersproject/abi@^5.0.1", "@ethersproject/abi@^5.1.2", "@ethersproject/abi@^5.3.1", "@ethersproject/abi@^5.4.0":
   version "5.4.0"
   resolved "https://registry.yarnpkg.com/@ethersproject/abi/-/abi-5.4.0.tgz#a6d63bdb3672f738398846d4279fa6b6c9818242"
   integrity sha512-9gU2H+/yK1j2eVMdzm6xvHSnMxk8waIHQGYCZg5uvAyH0rsAzxkModzBSpbAkAuhKFEovC2S9hM4nPuLym8IZw==
@@ -1354,10 +1354,10 @@
     convert-source-map "^1.6.0"
     source-map "^0.7.3"
 
-"@hoprnet/hopr-connect@0.2.30":
-  version "0.2.30"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.30.tgz#2db795fa843580b880ab09b7edc8fb99a9cfbcfe"
-  integrity sha512-ZpLjGP66xEL8/seahUrAijRMqYg3xHryta3FtouagGDOMZFeuYipWROkV+iCHx8pq1q0jR7iEF3rDnhQxsEQzg==
+"@hoprnet/hopr-connect@0.2.31":
+  version "0.2.31"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.31.tgz#3ce3fe693b60bb6654e177fd57cd0fb670478826"
+  integrity sha512-juRa49j8RLsGYkNLbjZsZo9KeOCZh0xmtCgjv71u6Hg2jGlhn0VHWKI9hBWodGzIZ8QD76LaqeyrKzSuXSvCEA==
   dependencies:
     "@hoprnet/hopr-utils" "1.74.0-next.16"
     abortable-iterator "^3.0.0"
@@ -2192,11 +2192,11 @@
   integrity sha512-6quxWe8wwS4X5v3Au8q1jOvXYEPkS1Fh+cME5u6AwNdnI4uERvPlVjlgRWzpnb+Rrt1l/cEqiNRH9GlsBMSDQg==
 
 "@nomiclabs/hardhat-etherscan@^2.1.1":
-  version "2.1.3"
-  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-etherscan/-/hardhat-etherscan-2.1.3.tgz#ba52e5cb526f6c477e5e97e07c72a42232773c92"
-  integrity sha512-0Ic5dLBWASeX3e8tR5cdfoSQw8fTp2Bw49RGUN1pSJuxKIQAOWq5MI9qC1Bd51xK/AsdRSnHDxoVYK1+FC1s1w==
+  version "2.1.4"
+  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-etherscan/-/hardhat-etherscan-2.1.4.tgz#510b6a669cc2dad095466b2ba9ae0b411c779081"
+  integrity sha512-KgFNTQv9gpioiTpQ9UlTysCAFfkcBonmEn9rVPTT22A7DRENFM1VTsVeGWF3AzRhd0mrASBF+o0gvbH30pSe0Q==
   dependencies:
-    "@ethersproject/abi" "^5.0.2"
+    "@ethersproject/abi" "^5.1.2"
     "@ethersproject/address" "^5.0.2"
     cbor "^5.0.2"
     debug "^4.1.1"
@@ -2824,6 +2824,26 @@
     "@truffle/error" "^0.0.14"
     "@truffle/interface-adapter" "^0.5.0"
     web3 "1.3.6"
+
+"@tsconfig/node10@^1.0.7":
+  version "1.0.8"
+  resolved "https://registry.yarnpkg.com/@tsconfig/node10/-/node10-1.0.8.tgz#c1e4e80d6f964fbecb3359c43bd48b40f7cadad9"
+  integrity sha512-6XFfSQmMgq0CFLY1MslA/CPUfhIL919M1rMsa5lP2P097N2Wd1sSX0tx1u4olM16fLNhtHZpRhedZJphNJqmZg==
+
+"@tsconfig/node12@^1.0.7":
+  version "1.0.9"
+  resolved "https://registry.yarnpkg.com/@tsconfig/node12/-/node12-1.0.9.tgz#62c1f6dee2ebd9aead80dc3afa56810e58e1a04c"
+  integrity sha512-/yBMcem+fbvhSREH+s14YJi18sp7J9jpuhYByADT2rypfajMZZN4WQ6zBGgBKp53NKmqI36wFYDb3yaMPurITw==
+
+"@tsconfig/node14@^1.0.0":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@tsconfig/node14/-/node14-1.0.1.tgz#95f2d167ffb9b8d2068b0b235302fafd4df711f2"
+  integrity sha512-509r2+yARFfHHE7T6Puu2jjkoycftovhXRqW328PDXTVGKihlb1P8Z9mMZH04ebyajfRY7dedfGynlrFHJUQCg==
+
+"@tsconfig/node16@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@tsconfig/node16/-/node16-1.0.1.tgz#a6ca6a9a0ff366af433f42f5f0e124794ff6b8f1"
+  integrity sha512-FTgBI767POY/lKNDNbIzgAX6miIDBs6NTCbdlDb8TrWovHsSvaVIZDlTqym29C6UqhzwcJx4CYr+AlrMywA0cA==
 
 "@typechain/ethers-v5@^2.0.0":
   version "2.0.0"
@@ -9512,9 +9532,9 @@ he@1.2.0:
   integrity sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==
 
 heap-js@^2.1.2, heap-js@^2.1.5:
-  version "2.1.5"
-  resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.5.tgz#43251ecdd23c632653fe783bc8bdc2b7da4baf4c"
-  integrity sha512-zJeFH1ZxUHuYG6x9+a8Dy+5kjqbKk1K8yPI1KZEdsi18VCd0UjTyJ2u9PfuIoj7t3+saMmI132rJGV33tP52VQ==
+  version "2.1.6"
+  resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.6.tgz#817021e6d252ad6ba9a11ea65988cc4e6207782d"
+  integrity sha512-xQxyJg7VcgveAZtY0eAu7iCn+2VCqLBkQoz7G4RnOIEsmP82J/LnRdr0I2Mi/pThkP5tviL8yFq5utE3yOPYpQ==
 
 heap@0.2.6, heap@~0.2.6:
   version "0.2.6"
@@ -11517,7 +11537,7 @@ libp2p-crypto@0.19.4:
     uint8arrays "^2.1.4"
     ursa-optional "^0.10.1"
 
-libp2p-crypto@0.19.6:
+libp2p-crypto@0.19.6, libp2p-crypto@^0.19.0, libp2p-crypto@^0.19.4:
   version "0.19.6"
   resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.19.6.tgz#d9792614eb2a94db9c6c8a249719a3cae39e15f5"
   integrity sha512-oZaAomSLnEJPEvJaj4Dmp+JDuKsTndbdmdod9rCe8lX5f9hMP3p3wRADOeVGhgleiQ3LH+3XmFuULARMNXLiRw==
@@ -11534,7 +11554,7 @@ libp2p-crypto@0.19.6:
     uint8arrays "^2.1.4"
     ursa-optional "^0.10.1"
 
-libp2p-crypto@^0.19.0, libp2p-crypto@^0.19.4, libp2p-crypto@^0.19.5:
+libp2p-crypto@^0.19.5:
   version "0.19.5"
   resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.19.5.tgz#59c3e8e5f4302790eac0721ce75c80f641176c46"
   integrity sha512-eAjA3bJen2pAMLzHcJY+/lhNnpf2RZot63JfLMaP4/QTBpgwcCPW6SUoSaogwsQ7/rl5PqJTxPvAZmvoBOlZ7g==
@@ -17603,11 +17623,15 @@ ts-generator@^0.1.1:
     resolve "^1.8.1"
     ts-essentials "^1.0.0"
 
-ts-node@^9.1.1:
-  version "9.1.1"
-  resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-9.1.1.tgz#51a9a450a3e959401bda5f004a72d54b936d376d"
-  integrity sha512-hPlt7ZACERQGf03M253ytLY3dHbGNGrAq9qIHWUY9XHYl1z7wYngSr3OQ5xmui8o2AaxsONxIzjafLUiWBo1Fg==
+ts-node@^10.1.0:
+  version "10.1.0"
+  resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-10.1.0.tgz#e656d8ad3b61106938a867f69c39a8ba6efc966e"
+  integrity sha512-6szn3+J9WyG2hE+5W8e0ruZrzyk1uFLYye6IGMBadnOzDh8aP7t8CbFpsfCiEx2+wMixAhjFt7lOZC4+l+WbEA==
   dependencies:
+    "@tsconfig/node10" "^1.0.7"
+    "@tsconfig/node12" "^1.0.7"
+    "@tsconfig/node14" "^1.0.0"
+    "@tsconfig/node16" "^1.0.1"
     arg "^4.1.0"
     create-require "^1.1.0"
     diff "^4.0.1"
@@ -17831,10 +17855,10 @@ typedoc-default-themes@^0.12.10:
   resolved "https://registry.yarnpkg.com/typedoc-default-themes/-/typedoc-default-themes-0.12.10.tgz#614c4222fe642657f37693ea62cad4dafeddf843"
   integrity sha512-fIS001cAYHkyQPidWXmHuhs8usjP5XVJjWB8oZGqkTowZaz3v7g3KDZeeqE82FBrmkAnIBOY3jgy7lnPnqATbA==
 
-typedoc-plugin-markdown@3.10.2:
-  version "3.10.2"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-markdown/-/typedoc-plugin-markdown-3.10.2.tgz#4b1400706d4c8c3924481808aba4efa684605174"
-  integrity sha512-eAV7fuCymdbUIk2P3jjehUWG0VE3YSr/qGGYAHUEBTrRZMuFxS/rYrooF0PPabBUdbprL4BKV8HaP7oed12T2Q==
+typedoc-plugin-markdown@3.10.3:
+  version "3.10.3"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-markdown/-/typedoc-plugin-markdown-3.10.3.tgz#8d7f3e8d44363143cd4d032bab5db0460b0434f8"
+  integrity sha512-CmNfHjiCc3ttJo3IYa7te+xOLJIn+jRVloSkM4j3It2rhJTeYp6OhZocnIHYIJIIqXuttoXAbFAbfJ2v7X+nbA==
   dependencies:
     handlebars "^4.7.7"
 

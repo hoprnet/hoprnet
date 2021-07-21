@@ -10,12 +10,17 @@ set -Eeuo pipefail
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-declare HOPR_LOG_ID="e2e-test"
-source "${mydir}/../scripts/utils.sh"
+declare HOPR_LOG_ID="full-interconnected_cluster"
+source "${mydir}/../utils.sh"
 
 usage() {
   msg
   msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5>"
+  msg
+  msg "Required environment variables"
+  msg "------------------------------"
+  msg
+  msg "HOPRD_API_TOKEN\t\t\tused as api token for all nodes"
   msg
 }
 
@@ -23,17 +28,19 @@ usage() {
 ([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
 # verify and set parameters
-test -z "${1:-}" && { msg "Missing 1st parameter"; usage; exit 1; }
-test -z "${2:-}" && { msg "Missing 2nd parameter"; usage; exit 1; }
-test -z "${3:-}" && { msg "Missing 3rd parameter"; usage; exit 1; }
-test -z "${4:-}" && { msg "Missing 4th parameter"; usage; exit 1; }
-test -z "${5:-}" && { msg "Missing 5th parameter"; usage; exit 1; }
+test -z "${1:-}" && { msg "Missing <node_api_1>"; usage; exit 1; }
+test -z "${2:-}" && { msg "Missing <node_api_2>"; usage; exit 1; }
+test -z "${3:-}" && { msg "Missing <node_api_3>"; usage; exit 1; }
+test -z "${4:-}" && { msg "Missing <node_api_4>"; usage; exit 1; }
+test -z "${5:-}" && { msg "Missing <node_api_5>"; usage; exit 1; }
+test -z "${HOPRD_API_TOKEN:-}" && { msg "Missing HOPRD_API_TOKEN"; usage; exit 1; }
 
 declare api1="${1}"
 declare api2="${2}"
 declare api3="${3}"
 declare api4="${4}"
 declare api5="${5}"
+declare api_token=${HOPRD_API_TOKEN}
 
 # $1 = endpoint
 # $2 = Hopr command
@@ -52,7 +59,7 @@ run_command(){
   local step_time=${5:-5}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v1/command --data "
+  local cmd="curl --silent -X POST --header X-Auth-Token:${api_token} --url ${endpoint}/api/v1/command --data "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -160,80 +167,34 @@ for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
   log "-- ${result}"
 done
 
-log "Node 2 ping node 3"
-result=$(run_command ${api2} "ping ${addr3}" "Pong received in:" 600)
-log "-- ${result}"
+log "Opening channels in background to parallelize operations"
 
-log "Node 2 has no unredeemed ticket value"
-result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR" 600)
-log "-- ${result}"
-
-log "Node 1 send 0-hop message to node 2"
-run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 600
-
-log "Node 1 open channel to Node 2"
-result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel" 600)
-log "-- ${result}"
-
-log "Node 2 open channel to Node 3"
-result=$(run_command "${api2}" "open ${addr3} 0.1" "Successfully opened channel" 600)
-log "-- ${result}"
-
-log "Node 3 open channel to Node 4"
-result=$(run_command "${api3}" "open ${addr4} 0.1" "Successfully opened channel" 600)
-log "-- ${result}"
-
-log "Node 4 open channel to Node 5"
-result=$(run_command "${api4}" "open ${addr5} 0.1" "Successfully opened channel" 600)
-log "-- ${result}"
-
-for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to self via node 2"
-  run_command "${api1}" "send ${addr2},${addr1} 'hello, world'" "Message sent" 600
-
-  log "Node 2 send 1 hop message to self via node 3"
-  run_command "${api2}" "send ${addr3},${addr2} 'hello, world'" "Message sent" 600
-
-  log "Node 3 send 1 hop message to self via node 4"
-  run_command "${api3}" "send ${addr4},${addr3} 'hello, world'" "Message sent" 600
-
-  log "Node 4 send 1 hop message to self via node 5"
-  run_command "${api4}" "send ${addr5},${addr4} 'hello, world'" "Message sent" 600
+for addr in ${addr2} ${addr3} ${addr4} ${addr5}; do
+  log "Node ${addr1} open channel to node ${addr}"
+  run_command "${api1}" "open ${addr} 0.1" "Successfully opened channel" 600 &
 done
 
-log "Node 2 should now have a ticket"
-result=$(run_command ${api2} "tickets" "Win Proportion:   100%" 600)
-log "-- ${result}"
-
-log "Node 3 should now have a ticket"
-result=$(run_command ${api3} "tickets" "Win Proportion:   100%" 600)
-log "-- ${result}"
-
-log "Node 4 should now have a ticket"
-result=$(run_command ${api4} "tickets" "Win Proportion:   100%" 600)
-log "-- ${result}"
-
-log "Node 5 should now have a ticket"
-result=$(run_command ${api5} "tickets" "Win Proportion:   100%" 600)
-log "-- ${result}"
-
-for i in `seq 1 10`; do
-  log "Node 1 send 1 hop message to node 3 via node 2"
-  run_command "${api1}" "send ${addr2},${addr3} 'hello, world'" "Message sent" 600
-
-  log "Node 2 send 1 hop message to node 4 via node 3"
-  run_command "${api2}" "send ${addr3},${addr4} 'hello, world'" "Message sent" 600
-
-  log "Node 3 send 1 hop message to node 5 via node 4"
-  run_command "${api3}" "send ${addr4},${addr5} 'hello, world'" "Message sent" 600
+for addr in ${addr1} ${addr3} ${addr4} ${addr5}; do
+  log "Node ${addr2} open channel to node ${addr}"
+  run_command "${api2}" "open ${addr} 0.1" "Successfully opened channel" 600 &
 done
 
-for i in `seq 1 10`; do
-  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
-  run_command "${api1}" "send ${addr2},${addr3},${addr4},${addr5} 'hello, world'" "Message sent" 600
+for addr in ${addr1} ${addr2} ${addr4} ${addr5}; do
+  log "Node ${addr3} open channel to node ${addr}"
+  run_command "${api3}" "open ${addr} 0.1" "Successfully opened channel" 600 &
 done
 
-# this works locally but fails in CI, the quality of the peers is lower than the
-# expected 0.5
-# log "Node 1 send message to node 5"
-# run_command "${api1}" "send ${addr5} 'hello, world'" "Message sent" 300
+for addr in ${addr1} ${addr2} ${addr3} ${addr5}; do
+  log "Node ${addr4} open channel to node ${addr}"
+  run_command "${api4}" "open ${addr} 0.1" "Successfully opened channel" 600 &
+done
+
+for addr in ${addr1} ${addr2} ${addr3} ${addr4}; do
+  log "Node ${addr5} open channel to node ${addr}"
+  run_command "${api5}" "open ${addr} 0.1" "Successfully opened channel" 600 &
+done
+
+log "Wait for all operations to finish"
+wait
+
+log "finished"
