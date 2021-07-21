@@ -138,7 +138,7 @@ describe('webrtc upgrader', function () {
 
     const peerIds: PeerId[] = []
     for (let i = 0; i < ATTEMPTS; i++) {
-      const peerId = await PeerId.create({ keyType: 'secp256k1'})
+      const peerId = await PeerId.create({ keyType: 'secp256k1' })
       const multiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/${i}/p2p/${peerId.toB58String()}`)
       peerIds.push(peerId)
 
@@ -164,7 +164,7 @@ describe('webrtc upgrader', function () {
 
     const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
 
-    const peerId = await PeerId.create({ keyType: 'secp256k1'})
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
     publicNodeEmitter.emit(`removePublicNode`, peerId)
 
