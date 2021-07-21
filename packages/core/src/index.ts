@@ -181,7 +181,7 @@ class Hopr extends EventEmitter {
         transport: {
           HoprConnect: {
             initialNodes: await (await this.paymentChannels).waitForPublicNodes(),
-            bootstrapServers: this.publicNodesEmitter
+            publicNodes: this.publicNodesEmitter
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
