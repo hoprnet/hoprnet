@@ -1,3 +1,30 @@
+<a name="0.2.31"></a>
+
+## [0.2.31](https://github.com/hoprnet/hopr-connect/compare/v0.2.30...v0.2.31) (2021-07-21)
+
+### Breaking changes:
+
+- Changed configuration object:
+
+```ts
+new HoprConnect(upgrader, {
+  publicNodes, // EventEmitter
+  initialNodes // Multiaddr[], list of already known nodes
+})
+```
+
+The property `bootstrapNodes` is ignored.
+
+### New features:
+
+- support for relay slots, actively limitting maximum number of simultaneous relayed connections (#237)
+- relay management API: dynamically add and remove potential relays and use them to bypass NATs (#243, #231)
+- improved CI testing (#222, #227, #230, #232, #233, #234, #235)
+
+### Fixes:
+
+- fix `hangUp()` producing hanging promise (#240)
+
 <a name="0.2.30"></a>
 
 ## [0.2.30](https://github.com/hoprnet/hopr-connect/compare/v0.2.29...v0.2.30) (2021-07-02)
