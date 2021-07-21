@@ -6,11 +6,11 @@
 
 ### Namespaces
 
-- [LibP2P](modules/libp2p.md)
+- [LibP2P](modules/LibP2P.md)
 
 ### Classes
 
-- [LibP2P](classes/libp2p.md)
+- [LibP2P](classes/LibP2P.md)
 - [default](classes/default.md)
 
 ### Type aliases
