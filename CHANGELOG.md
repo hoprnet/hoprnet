@@ -8,8 +8,8 @@
 
 ```ts
 new HoprConnect(upgrader, {
-    publicNodes, // EventEmitter
-    initialNodes // Multiaddr[], list of already known nodes
+  publicNodes, // EventEmitter
+  initialNodes // Multiaddr[], list of already known nodes
 })
 ```
 
