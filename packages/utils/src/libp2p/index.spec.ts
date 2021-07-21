@@ -24,7 +24,7 @@ describe(`test convertPubKeyFromPeerId`, function () {
   it(`should equal to pubkey from a PeerId CID`, async function () {
     const testIdB58String = '16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg'
     const pubKey = await convertPubKeyFromB58String(testIdB58String)
-    const id = PeerId.createFromCID(testIdB58String)
+    const id = PeerId.createFromB58String(testIdB58String)
     assert(id.pubKey.toString() === pubKey.toString())
   })
 })
