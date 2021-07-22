@@ -11,9 +11,9 @@ export class Connection {
   prevLog = ''
   authFailed = false
 
-  constructor(setConnecting, setStarted, setMessages, setConnectedPeers, onAuthFailed) {
+  constructor(setConnecting, setReady, setMessages, setConnectedPeers, onAuthFailed) {
     this.setConnecting = setConnecting
-    this.setStarted = setStarted
+    this.setReady = setReady
     this.setMessages = setMessages
     this.setConnectedPeers = setConnectedPeers
     this.onAuthFailed = onAuthFailed
@@ -54,8 +54,10 @@ export class Connection {
           this.setMessages(this.logs.slice(0)) // Need a clone
           break
         case 'status':
-          if (msg.msg === 'STARTED') {
-            this.setStarted(true)
+          if (msg.msg === 'READY') {
+            this.setReady(true)
+          } else {
+            this.setReady(false)
           }
           break
         case 'auth-failed':
