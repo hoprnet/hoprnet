@@ -111,7 +111,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L97)
+[packages/core/src/index.ts:107](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L107)
 
 ## Properties
 
@@ -167,7 +167,7 @@ ___
 
 ### libp2p
 
-• `Private` **libp2p**: [`LibP2P`](libp2p.md)
+• `Private` **libp2p**: [`LibP2P`](LibP2P.md)
 
 #### Defined in
 
