@@ -235,7 +235,7 @@ class Hopr extends EventEmitter {
 
     this.networkPeers = new NetworkPeers(
       Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id),
-      undefined,
+      [this.id],
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
 
