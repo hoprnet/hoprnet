@@ -209,7 +209,6 @@ class Hopr extends EventEmitter {
     this.libp2p = libp2p
 
     ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
-      console.log(`on Peer`, multiaddrs)
       if (id.equals(this.id)) {
         // Ignore announcements from ourself
         return
@@ -225,7 +224,6 @@ class Hopr extends EventEmitter {
 
       if (dialables.length > 0) {
         for (const dialable of dialables) {
-          console.log(`emitting dialable`, dialable)
           this.publicNodesEmitter.emit('addPublicNode', dialable)
         }
         this.libp2p.peerStore.addressBook.add(id, multiaddrs)
