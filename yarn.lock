@@ -411,7 +411,7 @@ __metadata:
     "@types/debug": ^4.1.6
     "@types/mocha": ^8.2.3
     "@types/node": 14
-    "@types/simple-peer": ^9.11
+    "@types/simple-peer": ^9.11.1
     "@types/yargs": ^17.0.2
     abort-controller: 3.0.0
     abortable-iterator: ^3.0.0
@@ -841,12 +841,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/simple-peer@npm:^9.11":
-  version: 9.11.0
-  resolution: "@types/simple-peer@npm:9.11.0"
+"@types/simple-peer@npm:^9.11.1":
+  version: 9.11.1
+  resolution: "@types/simple-peer@npm:9.11.1"
   dependencies:
     "@types/node": "*"
-  checksum: ab05e2373fe48faa59cc0d7795bfdea3c7e7a93f7af2683cfdd2a311035ce4dd2a948c950886f48d662db503e8af2d930b9d51b53c0eef8c90ba86287864d4f7
+  checksum: 15738eb9e95e2fa98b012f519ed01dbd55219ff52ed531a95b6cb7861fc1a000930db7e165de8f414a3b1998813a7c6c26becaa1eb21918f8e65e7e03395cfe5
   languageName: node
   linkType: hard
 
