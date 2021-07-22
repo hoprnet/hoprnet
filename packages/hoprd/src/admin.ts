@@ -150,6 +150,8 @@ export class AdminServer {
       )
     })
 
+    this.logs.logStatus(this.node.status === 'RUNNING' ? 'READY' : 'PENDING')
+
     // Setup some noise
     connectionReport(this.node, this.logs)
     reportMemoryUsage(this.logs)

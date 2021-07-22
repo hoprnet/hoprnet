@@ -94,7 +94,7 @@ export class LogStream {
     this.log('VERBOSE', message)
   }
 
-  logStatus(status: string) {
+  logStatus(status: 'READY' | 'PENDING') {
     const msg = { type: 'status', msg: status, ts: new Date().toISOString() }
     this._log(msg)
   }

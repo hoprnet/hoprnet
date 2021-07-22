@@ -45,7 +45,7 @@ export default function Home() {
 
   const [showConnected, setShowConnected] = useState(false)
   const [connecting, setConnecting] = useState(true)
-  const [started, setStarted] = useState(false)
+  const [ready, setReady] = useState(false)
   const [messages, setMessages] = useState([]) // The fetish for immutability in react means this will be slower than a mutable array..
   const [peers, setConnectedPeers] = useState([])
   const [, updateState] = React.useState()
@@ -62,12 +62,12 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      connection = new Connection(setConnecting, setStarted, setMessages, setConnectedPeers, handleAuthFailed)
+      connection = new Connection(setConnecting, setReady, setMessages, setConnectedPeers, handleAuthFailed)
       return Connection.disconnect
     }
   }, [])
 
-  const isNodeReady = !connecting && started && !authFailed
+  const isNodeReady = !connecting && ready && !authFailed
   const cookie = Cookies.get('X-Auth-Token')
 
   return (
@@ -82,7 +82,13 @@ export default function Home() {
       <Logs messages={messages} connecting={connecting} authRequired={authFailed} />
 
       <div className="send">
-        <input id="command" type="text" autoFocus placeholder="type 'help' for full list of commands" />
+        <input
+          id="command"
+          type="text"
+          autoFocus
+          placeholder="type 'help' for full list of commands"
+          disabled={!isNodeReady}
+        />
       </div>
 
       {(authFailed || cookie === null) && <TokenInput handleTokenSet={handleTokenSet} />}
