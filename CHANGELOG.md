@@ -1,3 +1,11 @@
+<a name="0.2.32"></a>
+
+## [0.2.32](https://github.com/hoprnet/hopr-connect/compare/v0.2.31...v0.2.32) (2021-07-21)
+
+Changes:
+
+- upgrade to `libp2p@0.32`
+
 <a name="0.2.31"></a>
 
 ## [0.2.31](https://github.com/hoprnet/hopr-connect/compare/v0.2.30...v0.2.31) (2021-07-21)
