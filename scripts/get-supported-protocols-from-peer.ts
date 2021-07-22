@@ -1,5 +1,6 @@
+#!/usr/bin/env -S yarn --silent ts-node
 // Used to get a node's spoken protocols and to test connectivity
-// Example usage: `ts-node scripts/get-protocols.ts --addr /ip4/34.65.6.139/tcp/9091/p2p/16Uiu2HAm5Ym8minpwct7aZ9dYYnpbjfsfr8wa6o7GbRFcmXLcmFW`
+// Example usage: `./scripts/get-supported-protocols-from-peer.ts --addr /ip4/34.65.6.139/tcp/9091/p2p/16Uiu2HAm5Ym8minpwct7aZ9dYYnpbjfsfr8wa6o7GbRFcmXLcmFW`
 
 import pipe from 'it-pipe'
 import chalk from 'chalk'
@@ -117,7 +118,7 @@ async function main() {
   const protocols = await _conn.getProtocols()
 
   console.log(
-    `Node identified as ${chalk.blue(_conn.remotePeer.toB58String())}, spoken protocol${
+    `Node identified as ${chalk.blue(_conn.remotePeer.toB58String())}, supported protocol${
       protocols.length == 1 ? '' : 's'
     }:\n  ${protocols.map((str) => chalk.green(str)).join('\n  ')}`
   )
