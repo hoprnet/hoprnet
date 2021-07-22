@@ -2388,10 +2388,10 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.0.1.tgz#2f327f77d16b43f14674086b2b634bda38cb0838"
   integrity sha512-uSrD7hZ0ViuHGqHZbeHawZBi/uy7aBiNramXAt2dFFuSuoU4u9insS3V3zdVfOnYSPreUo636xSOuQIFN4//HA==
 
-"@openzeppelin/contracts@4.1.0":
-  version "4.1.0"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.1.0.tgz#baec89a7f5f73e3d8ea582a78f1980134b605375"
-  integrity sha512-TihZitscnaHNcZgXGj9zDLDyCqjziytB4tMCwXq0XimfWkAjBYyk5/pOsDbbwcavhlc79HhpTEpQcrMnPVa1mw==
+"@openzeppelin/contracts@4.2.0":
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.2.0.tgz#260d921d99356e48013d9d760caaa6cea35dc642"
+  integrity sha512-LD4NnkKpHHSMo5z9MvFsG4g1xxZUDqV3A3Futu3nvyfs4wPwXxqOgMaxOoa2PeyGL2VNeSlbxT54enbQzGcgJQ==
 
 "@overnightjs/logger@^1.2.0":
   version "1.2.1"
@@ -6667,9 +6667,9 @@ did-resolver@^3.1.0:
   integrity sha512-uf3/4LfHoDn3Ek8bFegO72OemHMytBhAkud6CA1HlB5I0iVwrCpG4oh+DA6DXUuBdhrA0cY4cGz1D0VNDTlgnw==
 
 dids@^2.1.0:
-  version "2.3.0"
-  resolved "https://registry.yarnpkg.com/dids/-/dids-2.3.0.tgz#d277a926d67075d63048d6adbaa89bcc23078611"
-  integrity sha512-J8SSUyyGSRrueywLDljlLhERsFmDIXYKSBD9PHaeXOH+HbHibSd6znUn5tXL4Kre3V2dkVwDFEotM11QeLbcCA==
+  version "2.4.0"
+  resolved "https://registry.yarnpkg.com/dids/-/dids-2.4.0.tgz#7791369f75e4097595236c6b188a827f90fe6619"
+  integrity sha512-IVPw9rB85z4CDym8myWO8Z0TaeYM2pHgj/FHQDgsnGtL1PPE1OVFFK87QsCiqYd2LhRP5DX/k5jso3oecnXFtg==
   dependencies:
     "@stablelib/random" "^1.0.1"
     cids "^1.1.6"
@@ -9339,9 +9339,9 @@ hardhat-gas-reporter@^1.0.4:
     sha1 "^1.1.1"
 
 hardhat@^2.4.1:
-  version "2.4.3"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.4.3.tgz#093373b383eacec0d3e7fb223353b2f0cb9f2802"
-  integrity sha512-xgbnhEnmaKau8xT6wPJlzoyMLAZyxQoElACQQCyEeAY1DURpZbYwjIQUywmL/ZNv3QEl38Yqu/n8mPOc2HXyGA==
+  version "2.5.0"
+  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.5.0.tgz#0a10bf85d9b2c3c7c12cfa4e35454296c670c054"
+  integrity sha512-S5CWcmiFZlFF2qFGyf5LlgVnJDXwTs5UBKU3GPQCjsUD3NAIWzXr/4xDSij3YWdg751axgLiKAJM01cHcxGb7A==
   dependencies:
     "@ethereumjs/block" "^3.4.0"
     "@ethereumjs/blockchain" "^5.4.0"

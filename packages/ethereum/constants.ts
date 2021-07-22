@@ -1,6 +1,6 @@
 import { utils } from 'ethers'
 
-export type PublicNetworks = 'xdai' | 'goerli'
+export type PublicNetworks = 'xdai' | 'goerli' | 'mumbai'
 export type Networks = 'hardhat' | 'localhost' | PublicNetworks
 export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'production'
 export type NetworkTag = DeploymentTypes | 'etherscan'
@@ -17,5 +17,9 @@ export const networks: {
   },
   goerli: {
     chainId: 5
+  },
+  mumbai: {
+    chainId: 80001,
+    gas: Number(utils.parseUnits('1', 'gwei'))
   }
 }

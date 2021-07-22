@@ -162,7 +162,7 @@ ___
 
 ### PublicNetworks
 
-Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"``
+Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"`` \| ``"mumbai"``
 
 #### Defined in
 

@@ -177,7 +177,6 @@ class Hopr extends EventEmitter {
         transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
         streamMuxer: [MPLEX],
         connEncryption: [NOISE],
-        // @ts-ignore //TODO 'Libp2pModules' does not contain types for DHT as ov v0.30 see js-libp2p/659
         dht: KadDHT
       },
       config: {
@@ -193,7 +192,6 @@ class Hopr extends EventEmitter {
         dht: {
           enabled: true
         },
-        //@ts-ignore - bug in libp2p options
         relay: {
           enabled: false
         }
@@ -209,7 +207,6 @@ class Hopr extends EventEmitter {
     this.libp2p = libp2p
 
     ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
-      console.log(`on Peer`, multiaddrs)
       if (id.equals(this.id)) {
         // Ignore announcements from ourself
         return
@@ -225,7 +222,6 @@ class Hopr extends EventEmitter {
 
       if (dialables.length > 0) {
         for (const dialable of dialables) {
-          console.log(`emitting dialable`, dialable)
           this.publicNodesEmitter.emit('addPublicNode', dialable)
         }
         this.libp2p.peerStore.addressBook.add(id, multiaddrs)

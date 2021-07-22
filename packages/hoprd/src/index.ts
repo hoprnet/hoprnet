@@ -263,6 +263,7 @@ async function main() {
   // 2. Create node instance
   try {
     node = new Hopr(peerId, options)
+    logs.logStatus('PENDING')
     logs.log('Creating HOPR Node')
     node.on('hopr:message', logMessageToNode)
 
@@ -303,7 +304,7 @@ async function main() {
       adminServer.registerNode(node, cmds)
     }
 
-    logs.logStatus('STARTED')
+    logs.logStatus('READY')
     logs.log('Node has started!')
 
     if (argv.run && argv.run !== '') {
