@@ -95,8 +95,7 @@ export type DialResponse =
     }
   | {
       status: 'E_DIAL'
-      error: Error
-      dht: boolean
+      error: string
     }
   | {
       status: 'E_DHT_QUERY'
@@ -155,7 +154,7 @@ export async function dial(
   if ((err != null || struct == null) && libp2p._dht == undefined) {
     logError(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
     clearTimeout(timeout)
-    return { status: 'E_DIAL', error: err, dht: false }
+    return { status: 'E_DIAL', error: err.message }
   }
 
   // Try to get some fresh addresses from the DHT
@@ -176,7 +175,7 @@ export async function dial(
   // Only start a dial attempt if we have received new addresses
   if (newAddresses.length == 0) {
     clearTimeout(timeout)
-    return { status: 'E_DIAL', error: new Error('No new addresses'), dht: true }
+    return { status: 'E_DIAL', error: 'No new addresses after contacting the DHT' }
   }
 
   try {
@@ -185,7 +184,7 @@ export async function dial(
   } catch (err) {
     logError(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
     clearTimeout(timeout)
-    return { status: 'E_DIAL', error: err, dht: true }
+    return { status: 'E_DIAL', error: err.message }
   }
 
   if (signal.aborted) {
