@@ -102,7 +102,7 @@
 | `chain.waitUntilReady` | () => `Promise`<`Network`\> |
 | `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\> |
 | `db` | `HoprDB` |
-| `indexer` | [`Indexer`](indexer.md) |
+| `indexer` | [`Indexer`](Indexer.md) |
 
 #### Overrides
 
@@ -110,7 +110,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[core-ethereum/src/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L42)
+[core-ethereum/src/index.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L44)
 
 ## Properties
 
@@ -172,7 +172,7 @@ ___
 
 ### indexer
 
-• **indexer**: [`Indexer`](indexer.md)
+• **indexer**: [`Indexer`](Indexer.md)
 
 ___
 
@@ -410,7 +410,7 @@ ___
 
 ### getChannel
 
-▸ **getChannel**(`src`, `counterparty`): [`Channel`](channel.md)
+▸ **getChannel**(`src`, `counterparty`): [`Channel`](Channel.md)
 
 #### Parameters
 
@@ -421,7 +421,7 @@ ___
 
 #### Returns
 
-[`Channel`](channel.md)
+[`Channel`](Channel.md)
 
 #### Defined in
 
@@ -431,7 +431,7 @@ ___
 
 ### getChannelsFrom
 
-▸ **getChannelsFrom**(`addr`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
+▸ **getChannelsFrom**(`addr`): `Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
 
 #### Parameters
 
@@ -441,7 +441,7 @@ ___
 
 #### Returns
 
-`Promise`<[`ChannelEntry`](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
 
 #### Defined in
 
@@ -451,7 +451,7 @@ ___
 
 ### getChannelsTo
 
-▸ **getChannelsTo**(`addr`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
+▸ **getChannelsTo**(`addr`): `Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
 
 #### Parameters
 
@@ -461,7 +461,7 @@ ___
 
 #### Returns
 
-`Promise`<[`ChannelEntry`](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
 
 #### Defined in
 
@@ -509,7 +509,7 @@ ___
 
 ### getOpenChannelsFrom
 
-▸ **getOpenChannelsFrom**(`p`): `Promise`<[`ChannelEntry`](channelentry.md)[]\>
+▸ **getOpenChannelsFrom**(`p`): `Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
 
 #### Parameters
 
@@ -519,7 +519,7 @@ ___
 
 #### Returns
 
-`Promise`<[`ChannelEntry`](channelentry.md)[]\>
+`Promise`<[`ChannelEntry`](ChannelEntry.md)[]\>
 
 #### Defined in
 
@@ -563,11 +563,11 @@ ___
 
 ### getRandomOpenChannel
 
-▸ **getRandomOpenChannel**(): `Promise`<[`ChannelEntry`](channelentry.md)\>
+▸ **getRandomOpenChannel**(): `Promise`<[`ChannelEntry`](ChannelEntry.md)\>
 
 #### Returns
 
-`Promise`<[`ChannelEntry`](channelentry.md)\>
+`Promise`<[`ChannelEntry`](ChannelEntry.md)\>
 
 #### Defined in
 

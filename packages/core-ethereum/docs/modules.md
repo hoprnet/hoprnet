@@ -6,9 +6,9 @@
 
 ### Classes
 
-- [Channel](classes/channel.md)
-- [ChannelEntry](classes/channelentry.md)
-- [Indexer](classes/indexer.md)
+- [Channel](classes/Channel.md)
+- [ChannelEntry](classes/ChannelEntry.md)
+- [Indexer](classes/Indexer.md)
 - [default](classes/default.md)
 
 ### Type aliases
