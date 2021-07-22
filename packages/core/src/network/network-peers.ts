@@ -1,5 +1,6 @@
 import { randomSubset } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
+import { NETWORK_QUALITY_THRESHOLD } from '../constants'
 
 type Entry = {
   id: PeerId
@@ -23,7 +24,11 @@ class NetworkPeers {
     return this.peers.find((x) => x.id.toB58String() === peer.toB58String())
   }
 
-  constructor(existingPeers: Array<PeerId>, private exclude: PeerId[] = []) {
+  constructor(
+    existingPeers: Array<PeerId>,
+    private exclude: PeerId[] = [],
+    private onPeerOffline?: (peer: PeerId) => void
+  ) {
     this.peers = []
 
     for (const peer of existingPeers) {
@@ -68,6 +73,10 @@ class NetworkPeers {
     } else {
       entry.lastTen = Math.max(0, entry.lastTen - 0.1)
       entry.backoff = Math.min(MAX_BACKOFF, Math.pow(entry.backoff, BACKOFF_EXPONENT))
+
+      if (entry.lastTen < NETWORK_QUALITY_THRESHOLD) {
+        this.onPeerOffline?.(peer)
+      }
     }
   }
 

@@ -36,7 +36,7 @@ export default class Addresses extends AbstractCommand {
         .join('\n- ')}` +
         `\nObserved addresses for ${query}:\n- ${this.node
           .getObservedAddresses(peerId)
-          .map((addr) => `${addr.multiaddr.toString()}, certified: ${addr.isCertified}`)
+          .map((addr) => `${addr.toString()}`)
           .join(`\n- `)}`
     )
   }

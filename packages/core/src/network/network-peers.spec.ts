@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { NETWORK_QUALITY_THRESHOLD as Q } from '../constants'
+import { NETWORK_QUALITY_THRESHOLD, NETWORK_QUALITY_THRESHOLD as Q } from '../constants'
 import { fakePeerId } from '../test-utils'
 import PeerStore from './network-peers'
 
@@ -48,5 +48,30 @@ describe('test PeerStore', async function () {
     await networkPeers.ping(id, () => Promise.resolve(true))
     await networkPeers.ping(id, () => Promise.resolve(true))
     assert(networkPeers.qualityOf(id) > Q, 'after 2 more pings, peer is good again')
+  })
+
+  it('should detect that node is offline', async function () {
+    let peerConsideredOffline = false
+
+    const onPeerOffline = () => {
+      peerConsideredOffline = true
+    }
+
+    const networkPeers = new PeerStore([], [SELF], onPeerOffline)
+
+    const id = fakePeerId(5)
+    networkPeers.register(id)
+
+    while (networkPeers.qualityOf(id) <= NETWORK_QUALITY_THRESHOLD) {
+      await networkPeers.ping(id, () => Promise.resolve(true))
+    }
+
+    await networkPeers.ping(id, () => Promise.resolve(true))
+
+    while (networkPeers.qualityOf(id) >= NETWORK_QUALITY_THRESHOLD) {
+      await networkPeers.ping(id, () => Promise.resolve(false))
+    }
+
+    assert(peerConsideredOffline, 'peer should be considered offline since quality fell below threshold')
   })
 })

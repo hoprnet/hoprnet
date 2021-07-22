@@ -35,35 +35,39 @@ function ensure_port_is_free() {
 }
 
 # $1 = port to wait for
-# $2 = optional: file to tail for debug info
-# $3 = optional: delay between checks in seconds, defaults to 2s
-# $4 = optional: max number of checks, defaults to 1000
+# $2 = host to check port on
+# $3 = optional: file to tail for debug info
+# $4 = optional: delay between checks in seconds, defaults to 2s
+# $5 = optional: max number of checks, defaults to 1000
 function wait_for_http_port() {
   local port=${1}
-  local log_file=${2:-}
-  local delay=${3:-2}
-  local max_wait=${4:-1000}
-  local cmd="curl --silent "localhost:${port}""
+  local host=${2}
+  local log_file=${3:-}
+  local delay=${4:-2}
+  local max_wait=${5:-1000}
+  local cmd="curl --silent "${host}:${port}""
 
-  wait_for_port "${port}" "${log_file}" "${delay}" "${max_wait}" "${cmd}"
+  wait_for_port "${port}" "${host}" "${log_file}" "${delay}" "${max_wait}" "${cmd}"
 }
 
 # $1 = port to wait for
-# $2 = optional: file to tail for debug info
-# $3 = optional: delay between checks in seconds, defaults to 2s
-# $4 = optional: max number of checks, defaults to 1000
-# $5 = optional: command to check
+# $2 = optional: host to check port on, defaults to 127.0.0.1
+# $3 = optional: file to tail for debug info
+# $4 = optional: delay between checks in seconds, defaults to 2s
+# $5 = optional: max number of checks, defaults to 1000
+# $6 = optional: command to check
 function wait_for_port() {
   local port=${1}
-  local log_file=${2:-}
-  local delay=${3:-2}
-  local max_wait=${4:-1000}
+  local host=${2:-127.0.0.1}
+  local log_file=${3:-}
+  local delay=${4:-10}
+  local max_wait=${5:-1000}
   # by default we do a basic listen check
-  local cmd=${5:-lsof -i ":${port}" -s TCP:LISTEN}
+  local cmd=${6:-nc -z -w 1 ${host} ${port}}
 
   i=0
   until ${cmd}; do
-    log "Waiting (${delay}) seconds for port ${port}"
+    log "Waiting ${delay} seconds for port to be reachable ${host}:${port}"
     if [ -s "${log_file}" ]; then
       log "Last 5 logs:"
       tail -n 5 "${log_file}" | sed "s/^/\\t/"
@@ -96,6 +100,50 @@ log() {
 
 msg() {
   echo >&2 -e "${1-}"
+}
+
+# $1 command to execute
+# $2 optional: number of retries, defaults to 0
+# $3 optional: seconds between retries, defaults to 1
+# $4 optional: print command before execution, defaults to false
+try_cmd() {
+  local cmd="${1}"
+  local retries_left=${2:-0}
+  local wait_in_sec="${3:-1}"
+  local verbose="${4:-false}"
+  local cmd_exit_code result
+
+  if [ "${verbose}" = "true" ]; then
+    log "Executing command: ${cmd}"
+  fi
+
+  if [ ${retries_left} -le 0 ]; then
+    # no retries left, so we just execute the command as is
+    eval ${cmd}
+  else
+    # the output needs to be captured to not mess up the return result
+    # also exit on error needs to be disabled for execution of the command and re-enabled afterwards again
+    local output_file=$(mktemp -q)
+    set +Eeo pipefail
+    if ${cmd} > ${output_file}; then
+      # command succeeded, return the output
+      set -Eeo pipefail
+      local result
+      result=$(cat ${output_file})
+      rm -f ${output_file}
+      echo ${result}
+    else
+      # command failed, need to retry
+      set -Eeo pipefail
+      rm -f ${output_file}
+      ((retries_left--))
+      if [ ${wait_in_sec} > 0 ]; then
+        sleep ${wait_in_sec}
+      fi
+      log "Retrying command ${retries_left} more time(s)"
+      try_cmd "${cmd}" ${retries_left} ${wait_in_sec} ${verbose}
+    fi
+  fi
 }
 
 setup_colors

@@ -6,37 +6,37 @@
 
 ### Enumerations
 
-- [ChannelStatus](enums/channelstatus.md)
+- [ChannelStatus](enums/ChannelStatus.md)
 
 ### Classes
 
-- [AccountEntry](classes/accountentry.md)
-- [AcknowledgedTicket](classes/acknowledgedticket.md)
-- [Address](classes/address.md)
-- [Balance](classes/balance.md)
-- [Challenge](classes/challenge.md)
-- [ChannelEntry](classes/channelentry.md)
-- [CurvePoint](classes/curvepoint.md)
-- [EthereumChallenge](classes/ethereumchallenge.md)
-- [HalfKey](classes/halfkey.md)
-- [HalfKeyChallenge](classes/halfkeychallenge.md)
-- [Hash](classes/hash.md)
-- [HoprDB](classes/hoprdb.md)
-- [NativeBalance](classes/nativebalance.md)
-- [PRG](classes/prg.md)
-- [PRP](classes/prp.md)
-- [PublicKey](classes/publickey.md)
-- [Response](classes/response.md)
-- [Signature](classes/signature.md)
-- [Snapshot](classes/snapshot.md)
-- [Ticket](classes/ticket.md)
-- [UINT256](classes/uint256.md)
-- [UnacknowledgedTicket](classes/unacknowledgedticket.md)
+- [AccountEntry](classes/AccountEntry.md)
+- [AcknowledgedTicket](classes/AcknowledgedTicket.md)
+- [Address](classes/Address.md)
+- [Balance](classes/Balance.md)
+- [Challenge](classes/Challenge.md)
+- [ChannelEntry](classes/ChannelEntry.md)
+- [CurvePoint](classes/CurvePoint.md)
+- [EthereumChallenge](classes/EthereumChallenge.md)
+- [HalfKey](classes/HalfKey.md)
+- [HalfKeyChallenge](classes/HalfKeyChallenge.md)
+- [Hash](classes/Hash.md)
+- [HoprDB](classes/HoprDB.md)
+- [NativeBalance](classes/NativeBalance.md)
+- [PRG](classes/PRG.md)
+- [PRP](classes/PRP.md)
+- [PublicKey](classes/PublicKey.md)
+- [Response](classes/Response.md)
+- [Signature](classes/Signature.md)
+- [Snapshot](classes/Snapshot.md)
+- [Ticket](classes/Ticket.md)
+- [UINT256](classes/UINT256.md)
+- [UnacknowledgedTicket](classes/UnacknowledgedTicket.md)
 
 ### Interfaces
 
-- [Intermediate](interfaces/intermediate.md)
-- [NetOptions](interfaces/netoptions.md)
+- [Intermediate](interfaces/Intermediate.md)
+- [NetOptions](interfaces/NetOptions.md)
 
 ### Type aliases
 
@@ -85,6 +85,7 @@
 
 ### Functions
 
+- [backoff](modules.md#backoff)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
@@ -102,6 +103,9 @@
 - [getHeaderLength](modules.md#getheaderlength)
 - [getPacketLength](modules.md#getpacketlength)
 - [hasB58String](modules.md#hasb58string)
+- [isErrorOutOfFunds](modules.md#iserroroutoffunds)
+- [isErrorOutOfHoprFunds](modules.md#iserroroutofhoprfunds)
+- [isErrorOutOfNativeFunds](modules.md#iserroroutofnativefunds)
 - [isExpired](modules.md#isexpired)
 - [isMultiaddrLocal](modules.md#ismultiaddrlocal)
 - [iterateHash](modules.md#iteratehash)
@@ -144,6 +148,7 @@
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
 - [validatePoRHint](modules.md#validateporhint)
 - [validatePoRResponse](modules.md#validateporresponse)
+- [wait](modules.md#wait)
 
 ## Type aliases
 
@@ -205,8 +210,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ip4?` | [`NetOptions`](interfaces/netoptions.md) |
-| `ip6?` | [`NetOptions`](interfaces/netoptions.md) |
+| `ip4?` | [`NetOptions`](interfaces/NetOptions.md) |
+| `ip6?` | [`NetOptions`](interfaces/NetOptions.md) |
 
 #### Defined in
 
@@ -632,6 +637,32 @@ ___
 
 ## Functions
 
+### backoff
+
+▸ **backoff**(`fn`, `options?`): `ReturnType`<typeof `fn`\>
+
+A general use backoff that will reject once MAX_DELAY is reached.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `fn` | () => `Promise`<`any`\> | asynchronous function to run on every tick |
+| `options` | `Object` | - |
+| `options.delayMultiple?` | `number` | multiplier to apply to increase running delay |
+| `options.maxDelay?` | `number` | maximum delay, we reject once we reach this |
+| `options.minDelay?` | `number` | minimum delay, we start with this |
+
+#### Returns
+
+`ReturnType`<typeof `fn`\>
+
+#### Defined in
+
+[backoff.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L14)
+
+___
+
 ### cacheNoArgAsyncFunction
 
 ▸ **cacheNoArgAsyncFunction**<`T`\>(`func`, `expiry`): () => `Promise`<`T`\>
@@ -791,9 +822,9 @@ the challenge for the first ticket sent to the first relayer
 
 | Name | Type |
 | :------ | :------ |
-| `ackChallenge` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
-| `ownKey` | [`HalfKey`](classes/halfkey.md) |
-| `ticketChallenge` | [`Challenge`](classes/challenge.md) |
+| `ackChallenge` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+| `ownKey` | [`HalfKey`](classes/HalfKey.md) |
+| `ticketChallenge` | [`Challenge`](classes/Challenge.md) |
 
 #### Defined in
 
@@ -817,8 +848,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ackChallenge` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
-| `nextTicketChallenge` | [`Challenge`](classes/challenge.md) |
+| `ackChallenge` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+| `nextTicketChallenge` | [`Challenge`](classes/Challenge.md) |
 
 #### Defined in
 
@@ -828,7 +859,7 @@ ___
 
 ### deriveAckKeyShare
 
-▸ **deriveAckKeyShare**(`secret`): [`HalfKey`](classes/halfkey.md)
+▸ **deriveAckKeyShare**(`secret`): [`HalfKey`](classes/HalfKey.md)
 
 Comutes the key share that is embedded in the acknowledgement
 for a packet and thereby unlocks the incentive for the previous
@@ -842,7 +873,7 @@ relayer for transforming and delivering the packet
 
 #### Returns
 
-[`HalfKey`](classes/halfkey.md)
+[`HalfKey`](classes/HalfKey.md)
 
 #### Defined in
 
@@ -934,18 +965,18 @@ ___
 
 ### generateChannelId
 
-▸ **generateChannelId**(`source`, `destination`): [`Hash`](classes/hash.md)
+▸ **generateChannelId**(`source`, `destination`): [`Hash`](classes/Hash.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `source` | [`Address`](classes/address.md) |
-| `destination` | [`Address`](classes/address.md) |
+| `source` | [`Address`](classes/Address.md) |
+| `destination` | [`Address`](classes/Address.md) |
 
 #### Returns
 
-[`Hash`](classes/hash.md)
+[`Hash`](classes/Hash.md)
 
 #### Defined in
 
@@ -1069,6 +1100,66 @@ Returns true or false if given string does not contain a b58string
 #### Defined in
 
 [libp2p/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L51)
+
+___
+
+### isErrorOutOfFunds
+
+▸ **isErrorOutOfFunds**(`error`): ``"NATIVE"`` \| ``"HOPR"`` \| ``false``
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `error` | `any` |
+
+#### Returns
+
+``"NATIVE"`` \| ``"HOPR"`` \| ``false``
+
+#### Defined in
+
+[ethereum.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L14)
+
+___
+
+### isErrorOutOfHoprFunds
+
+▸ **isErrorOutOfHoprFunds**(`error`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `error` | `any` |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[ethereum.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L8)
+
+___
+
+### isErrorOutOfNativeFunds
+
+▸ **isErrorOutOfNativeFunds**(`error`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `error` | `any` |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[ethereum.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L3)
 
 ___
 
@@ -1383,7 +1474,7 @@ incentive for relaying the packet
 | :------ | :------ | :------ |
 | `secret` | `Uint8Array` | shared secret with the creator of the packet |
 | `porBytes` | `Uint8Array` | PoR bitstring as included within the packet |
-| `challenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) | ticket challenge of the incoming ticket |
+| `challenge` | [`EthereumChallenge`](classes/EthereumChallenge.md) | ticket challenge of the incoming ticket |
 
 #### Returns
 
@@ -1601,7 +1692,7 @@ ___
 
 ### recoverIteratedHash
 
-▸ **recoverIteratedHash**(`hashValue`, `hashFunc`, `hint`, `maxIterations`, `stepSize?`, `indexHint?`): `Promise`<[`Intermediate`](interfaces/intermediate.md) \| `undefined`\>
+▸ **recoverIteratedHash**(`hashValue`, `hashFunc`, `hint`, `maxIterations`, `stepSize?`, `indexHint?`): `Promise`<[`Intermediate`](interfaces/Intermediate.md) \| `undefined`\>
 
 #### Parameters
 
@@ -1616,7 +1707,7 @@ ___
 
 #### Returns
 
-`Promise`<[`Intermediate`](interfaces/intermediate.md) \| `undefined`\>
+`Promise`<[`Intermediate`](interfaces/Intermediate.md) \| `undefined`\>
 
 #### Defined in
 
@@ -2026,7 +2117,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `halfKey` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
+| `halfKey` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
 
 #### Returns
 
@@ -2046,9 +2137,9 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ethereumChallenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) |
-| `ownKey` | [`HalfKey`](classes/halfkey.md) |
-| `ack` | [`HalfKey`](classes/halfkey.md) |
+| `ethereumChallenge` | [`EthereumChallenge`](classes/EthereumChallenge.md) |
+| `ownKey` | [`HalfKey`](classes/HalfKey.md) |
+| `ack` | [`HalfKey`](classes/HalfKey.md) |
 
 #### Returns
 
@@ -2068,9 +2159,9 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ethereumChallenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) |
-| `ownShare` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
-| `ack` | [`HalfKey`](classes/halfkey.md) |
+| `ethereumChallenge` | [`EthereumChallenge`](classes/EthereumChallenge.md) |
+| `ownShare` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+| `ack` | [`HalfKey`](classes/HalfKey.md) |
 
 #### Returns
 
@@ -2090,8 +2181,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ethereumChallenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) |
-| `response` | [`Response`](classes/response.md) |
+| `ethereumChallenge` | [`EthereumChallenge`](classes/EthereumChallenge.md) |
+| `response` | [`Response`](classes/Response.md) |
 
 #### Returns
 
@@ -2100,3 +2191,23 @@ ___
 #### Defined in
 
 [crypto/por/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L132)
+
+___
+
+### wait
+
+▸ **wait**(`milliseconds`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `milliseconds` | `number` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[backoff.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L3)

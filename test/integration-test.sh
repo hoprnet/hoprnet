@@ -89,8 +89,7 @@ get_hopr_address(){
 }
 
 validate_node_eth_address() {
-  local ETH_ADDRESS
-  local IS_VALID_ETH_ADDRESS
+  local ETH_ADDRESS IS_VALID_ETH_ADDRESS
 
   ETH_ADDRESS="$(get_eth_address $1)"
   if [ -z "$ETH_ADDRESS" ]; then
@@ -173,39 +172,66 @@ log "Node 1 send 0-hop message to node 2"
 run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 600
 
 log "Node 1 open channel to Node 2"
-result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel")
+result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel" 600)
 log "-- ${result}"
 
 log "Node 2 open channel to Node 3"
-result=$(run_command "${api2}" "open ${addr3} 0.1" "Successfully opened channel")
+result=$(run_command "${api2}" "open ${addr3} 0.1" "Successfully opened channel" 600)
+log "-- ${result}"
+
+log "Node 3 open channel to Node 4"
+result=$(run_command "${api3}" "open ${addr4} 0.1" "Successfully opened channel" 600)
+log "-- ${result}"
+
+log "Node 4 open channel to Node 5"
+result=$(run_command "${api4}" "open ${addr5} 0.1" "Successfully opened channel" 600)
 log "-- ${result}"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
   run_command "${api1}" "send ${addr2},${addr1} 'hello, world'" "Message sent" 600
+
+  log "Node 2 send 1 hop message to self via node 3"
+  run_command "${api2}" "send ${addr3},${addr2} 'hello, world'" "Message sent" 600
+
+  log "Node 3 send 1 hop message to self via node 4"
+  run_command "${api3}" "send ${addr4},${addr3} 'hello, world'" "Message sent" 600
+
+  log "Node 4 send 1 hop message to self via node 5"
+  run_command "${api4}" "send ${addr5},${addr4} 'hello, world'" "Message sent" 600
 done
 
 log "Node 2 should now have a ticket"
 result=$(run_command ${api2} "tickets" "Win Proportion:   100%" 600)
 log "-- ${result}"
 
+log "Node 3 should now have a ticket"
+result=$(run_command ${api3} "tickets" "Win Proportion:   100%" 600)
+log "-- ${result}"
+
+log "Node 4 should now have a ticket"
+result=$(run_command ${api4} "tickets" "Win Proportion:   100%" 600)
+log "-- ${result}"
+
+log "Node 5 should now have a ticket"
+result=$(run_command ${api5} "tickets" "Win Proportion:   100%" 600)
+log "-- ${result}"
+
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to node 3 via node 2"
   run_command "${api1}" "send ${addr2},${addr3} 'hello, world'" "Message sent" 600
-done
 
-log "Node 3 open channel to Node 4"
-result=$(run_command "${api3}" "open ${addr4} 0.1" "Successfully opened channel")
-log "-- ${result}"
+  log "Node 2 send 1 hop message to node 4 via node 3"
+  run_command "${api2}" "send ${addr3},${addr4} 'hello, world'" "Message sent" 600
+
+  log "Node 3 send 1 hop message to node 5 via node 4"
+  run_command "${api3}" "send ${addr4},${addr5} 'hello, world'" "Message sent" 600
+done
 
 for i in `seq 1 10`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
   run_command "${api1}" "send ${addr2},${addr3},${addr4},${addr5} 'hello, world'" "Message sent" 600
 done
-
-log "Node 4 should now have a ticket"
-result=$(run_command ${api4} "tickets" "Win Proportion:   100%" 600)
-log "-- ${result}"
 
 # this works locally but fails in CI, the quality of the peers is lower than the
 # expected 0.5
