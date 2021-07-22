@@ -33,7 +33,7 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-connect": "0.2.32",
+    "@hoprnet/hopr-connect": "0.2.33",
     "@hoprnet/hopr-core-ethereum": "1.75.0-next.4",
     "@hoprnet/hopr-utils": "1.75.0-next.4",
     "abort-controller": "^3.0.0",
@@ -43,7 +43,7 @@
     "heap-js": "^2.1.2",
     "leveldown": "~6.0.0",
     "levelup": "~5.0.0",
-    "libp2p": "0.32.0",
+    "libp2p": "0.32.1",
     "libp2p-crypto": "0.19.6",
     "libp2p-kad-dht": "0.23.1",
     "libp2p-mplex": "0.10.4",
