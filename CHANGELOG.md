@@ -1,6 +1,6 @@
 <a name="0.2.33"></a>
 
-## [0.2.33](https://github.com/hoprnet/hopr-connect/compare/v0.2.32...v0.2.33) (2021-07-21)
+## [0.2.33](https://github.com/hoprnet/hopr-connect/compare/v0.2.32...v0.2.33) (2021-07-22)
 
 Changes:
 
