@@ -16,7 +16,6 @@ const MAX_DELAY = 5 * 60 * 1000 // 5mins
 const BACKOFF_EXPONENT = 1.5
 const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
 const UNKNOWN_Q = 0.2 // Default quality for nodes we don't know about.
-const OFFLINE_THRESHOLD = 0.5 // Nodes with quality below are considered dead
 
 class NetworkPeers {
   private peers: Entry[]
