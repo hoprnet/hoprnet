@@ -422,9 +422,9 @@ __metadata:
     it-pair: ^1.0.0
     it-pipe: ^1.1.0
     it-pushable: ^1.4.2
-    libp2p: hoprnet/js-libp2p
+    libp2p: ^0.32.1
     libp2p-interfaces: ^1.0.1
-    libp2p-mplex: 0.10
+    libp2p-mplex: 0.10.3
     libp2p-noise: ^4.0
     mocha: ^9.0.2
     multiaddr: ^10.0.0
@@ -1714,7 +1714,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"err-code@npm:^2.0.0, err-code@npm:^2.0.3":
+"err-code@npm:^2.0.0":
   version: 2.0.3
   resolution: "err-code@npm:2.0.3"
   checksum: 14e09e9990bcd0dd8e91881bf6e0ac6177b9cd72404951e443e8052f6272f276dbe1f3a34c7802fd6dee5276b34134b091665e18cebc9e1ce0a4519561f16c44
@@ -3034,7 +3034,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"libp2p-interfaces@npm:^1.0.1":
+"libp2p-interfaces@npm:^1.0.0, libp2p-interfaces@npm:^1.0.1":
   version: 1.0.1
   resolution: "libp2p-interfaces@npm:1.0.1"
   dependencies:
@@ -3055,19 +3055,19 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"libp2p-mplex@npm:0.10":
-  version: 0.10.2
-  resolution: "libp2p-mplex@npm:0.10.2"
+"libp2p-mplex@npm:0.10.3":
+  version: 0.10.3
+  resolution: "libp2p-mplex@npm:0.10.3"
   dependencies:
     abort-controller: ^3.0.0
     abortable-iterator: ^3.0.0
-    bl: ^4.0.0
+    bl: ^5.0.0
     debug: ^4.3.1
-    err-code: ^2.0.3
+    err-code: ^3.0.1
     it-pipe: ^1.1.0
     it-pushable: ^1.4.1
     varint: ^6.0.0
-  checksum: 9cdf7915b538180f96df53bd062e39ae399121d965327941a642cbbb2e1dcb8acc21d00db1b51f323888d084326b59eb0bf28a3b4634f9bace4fa0cad826b55c
+  checksum: c37385da8e8a53576b2f9250ab26420861f789eb4e5e3625dfcaad8088389c76922efa51ca01d66762f4a920952a851cb8c09a6ae013117d2d7c21062f6adca2
   languageName: node
   linkType: hard
 
@@ -3139,62 +3139,6 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-libp2p@hoprnet/js-libp2p:
-  version: 0.32.0
-  resolution: "libp2p@https://github.com/hoprnet/js-libp2p.git#commit=c20e932a4be0e5fd10d097def7388a10ebcedc54"
-  dependencies:
-    "@motrix/nat-api": ^0.3.1
-    "@vascosantos/moving-average": ^1.1.0
-    abort-controller: ^3.0.0
-    aggregate-error: ^3.1.0
-    any-signal: ^2.1.1
-    bignumber.js: ^9.0.1
-    class-is: ^1.1.0
-    debug: ^4.3.1
-    err-code: ^3.0.0
-    es6-promisify: ^6.1.1
-    events: ^3.3.0
-    hashlru: ^2.3.0
-    interface-datastore: ^5.1.1
-    it-all: ^1.0.4
-    it-buffer: ^0.1.2
-    it-drain: ^1.0.3
-    it-filter: ^1.0.1
-    it-first: ^1.0.4
-    it-handshake: ^2.0.0
-    it-length-prefixed: ^5.0.2
-    it-map: ^1.0.4
-    it-merge: ^1.0.0
-    it-pipe: ^1.1.0
-    it-take: ^1.0.0
-    libp2p-crypto: ^0.19.4
-    libp2p-utils: ^0.4.0
-    mafmt: ^10.0.0
-    merge-options: ^3.0.4
-    multiaddr: ^10.0.0
-    multiformats: ^9.0.0
-    multistream-select: ^2.0.0
-    mutable-proxy: ^1.0.0
-    node-forge: ^0.10.0
-    p-any: ^3.0.0
-    p-fifo: ^1.0.0
-    p-retry: ^4.4.0
-    p-settle: ^4.1.1
-    peer-id: ^0.15.0
-    private-ip: ^2.1.0
-    protobufjs: ^6.10.2
-    retimer: ^3.0.0
-    sanitize-filename: ^1.6.3
-    set-delayed-interval: ^1.0.0
-    streaming-iterables: ^6.0.0
-    timeout-abort-controller: ^1.1.1
-    varint: ^6.0.0
-    wherearewe: ^1.0.0
-    xsalsa20: ^1.1.0
-  checksum: b09c3e7826bd51eb8cd243df1f9173f0167801e17397b46beba01df9021c082749945197453bcd8ca0c4a4b08b84d37926c2f30c71173e040b667ef9fd71e3a5
-  languageName: node
-  linkType: hard
-
 "libp2p@npm:0.31.7":
   version: 0.31.7
   resolution: "libp2p@npm:0.31.7"
@@ -3251,6 +3195,63 @@ libp2p@hoprnet/js-libp2p:
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
   checksum: a749b8098c9e8a5346b1429cc1b42a374cca3dd5f4ff4a1a0d635d197d099e24b1ecd0cbdd0a713230f9dfa09a9889aa129349412ef1cad87ddc6c0193116707
+  languageName: node
+  linkType: hard
+
+"libp2p@npm:^0.32.1":
+  version: 0.32.1
+  resolution: "libp2p@npm:0.32.1"
+  dependencies:
+    "@motrix/nat-api": ^0.3.1
+    "@vascosantos/moving-average": ^1.1.0
+    abort-controller: ^3.0.0
+    aggregate-error: ^3.1.0
+    any-signal: ^2.1.1
+    bignumber.js: ^9.0.1
+    class-is: ^1.1.0
+    debug: ^4.3.1
+    err-code: ^3.0.0
+    es6-promisify: ^6.1.1
+    events: ^3.3.0
+    hashlru: ^2.3.0
+    interface-datastore: ^5.1.1
+    it-all: ^1.0.4
+    it-buffer: ^0.1.2
+    it-drain: ^1.0.3
+    it-filter: ^1.0.1
+    it-first: ^1.0.4
+    it-handshake: ^2.0.0
+    it-length-prefixed: ^5.0.2
+    it-map: ^1.0.4
+    it-merge: ^1.0.0
+    it-pipe: ^1.1.0
+    it-take: ^1.0.0
+    libp2p-crypto: ^0.19.4
+    libp2p-interfaces: ^1.0.0
+    libp2p-utils: ^0.4.0
+    mafmt: ^10.0.0
+    merge-options: ^3.0.4
+    multiaddr: ^10.0.0
+    multiformats: ^9.0.0
+    multistream-select: ^2.0.0
+    mutable-proxy: ^1.0.0
+    node-forge: ^0.10.0
+    p-any: ^3.0.0
+    p-fifo: ^1.0.0
+    p-retry: ^4.4.0
+    p-settle: ^4.1.1
+    peer-id: ^0.15.0
+    private-ip: ^2.1.0
+    protobufjs: ^6.10.2
+    retimer: ^3.0.0
+    sanitize-filename: ^1.6.3
+    set-delayed-interval: ^1.0.0
+    streaming-iterables: ^6.0.0
+    timeout-abort-controller: ^1.1.1
+    varint: ^6.0.0
+    wherearewe: ^1.0.0
+    xsalsa20: ^1.1.0
+  checksum: 141d936801510f9cd2dfd6b5b82905863d0331d7b814f108ac19f4cdb7c905ffc4ba52a1992cb5478d039bfa2bc32c9f0c74bb5be7884e1ca7ccca92b8b97630
   languageName: node
   linkType: hard
 
