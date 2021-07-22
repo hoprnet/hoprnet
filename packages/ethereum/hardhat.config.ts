@@ -53,6 +53,14 @@ const hardhatConfig: HardhatUserConfig = {
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+    },
+    mumbai: {
+      ...networks.mumbai,
+      live: false,
+      tags: ['testing'] as NetworkTag[],
+      gasMultiplier: GAS_MULTIPLIER,
+      url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
+      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     }
   },
   namedAccounts: {
