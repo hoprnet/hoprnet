@@ -177,7 +177,6 @@ class Hopr extends EventEmitter {
         transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
         streamMuxer: [MPLEX],
         connEncryption: [NOISE],
-        // @ts-ignore //TODO 'Libp2pModules' does not contain types for DHT as ov v0.30 see js-libp2p/659
         dht: KadDHT
       },
       config: {
@@ -193,7 +192,6 @@ class Hopr extends EventEmitter {
         dht: {
           enabled: true
         },
-        //@ts-ignore - bug in libp2p options
         relay: {
           enabled: false
         }
