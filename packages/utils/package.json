@@ -47,7 +47,7 @@
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
-    "@types/mocha": "^8.2.0",
+    "@types/mocha": "^9.0.0",
     "@types/node": "14",
     "bl": "^5.0.0",
     "chai": "^4.3.0",
