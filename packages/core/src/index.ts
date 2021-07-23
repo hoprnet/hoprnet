@@ -2,7 +2,7 @@ import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
 const MPLEX = require('libp2p-mplex')
-const KadDHT = require('libp2p-kad-dht')
+import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from 'libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
@@ -31,6 +31,7 @@ import {
   libp2pSubscribe,
   libp2pSendMessage,
   LibP2PHandlerFunction,
+  isSecp256k1PeerId,
   AcknowledgedTicket,
   ChannelStatus,
   MIN_NATIVE_BALANCE
@@ -108,9 +109,8 @@ class Hopr extends EventEmitter {
   public constructor(private id: PeerId, private options: HoprOptions) {
     super()
 
-    if (!id.privKey) {
-      // TODO - assert secp256k1?
-      throw new Error('Hopr Node must be initialized with an id with a private key')
+    if (!id.privKey || !isSecp256k1PeerId(id)) {
+      throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
     this.db = new HoprDB(
       PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(),
