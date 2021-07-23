@@ -108,6 +108,7 @@
 - [isErrorOutOfNativeFunds](modules.md#iserroroutofnativefunds)
 - [isExpired](modules.md#isexpired)
 - [isMultiaddrLocal](modules.md#ismultiaddrlocal)
+- [isSecp256k1PeerId](modules.md#issecp256k1peerid)
 - [iterateHash](modules.md#iteratehash)
 - [lengthPrefixedToU8a](modules.md#lengthprefixedtou8a)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
@@ -188,7 +189,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L84)
+[libp2p/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L95)
 
 ___
 
@@ -198,7 +199,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L88)
+[libp2p/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L99)
 
 ___
 
@@ -233,7 +234,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L246)
+[libp2p/index.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L257)
 
 ___
 
@@ -258,7 +259,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:247](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L247)
+[libp2p/index.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L258)
 
 ___
 
@@ -904,7 +905,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/index.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L116)
+[libp2p/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L127)
 
 ___
 
@@ -1209,6 +1210,30 @@ ___
 
 ___
 
+### isSecp256k1PeerId
+
+▸ **isSecp256k1PeerId**(`peer`): `boolean`
+
+Check if PeerId contains a secp256k1 privKey
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `peer` | `PeerId` | PeerId to check |
+
+#### Returns
+
+`boolean`
+
+whether embedded privKey is a secp256k1 key
+
+#### Defined in
+
+[libp2p/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L84)
+
+___
+
 ### iterateHash
 
 ▸ **iterateHash**(`seed`, `hashFunc`, `iterations`, `stepSize`, `hint?`): `Promise`<`Object`\>
@@ -1277,7 +1302,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L203)
+[libp2p/index.ts:214](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L214)
 
 ___
 
@@ -1301,7 +1326,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:219](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L219)
+[libp2p/index.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L230)
 
 ___
 
@@ -1324,7 +1349,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:282](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L282)
+[libp2p/index.ts:293](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L293)
 
 ___
 
