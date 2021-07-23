@@ -1,6 +1,7 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
 import {
+  isSecp256k1PeerId,
   convertPubKeyFromPeerId,
   convertPubKeyFromB58String,
   hasB58String,
@@ -274,5 +275,17 @@ describe(`test libp2pSubscribe`, async function () {
     libp2pSubscribe(fakeLibp2p as any, 'demo protocol', fakeOnMessage, false)
 
     await msgReceived.promise
+  })
+})
+
+describe('test libp2p utils', function () {
+  it('should be a secp256k1 peerId', async function () {
+    const pId = await PeerId.create({ keyType: 'secp256k1' })
+
+    assert(isSecp256k1PeerId(pId) == true, 'peerId must have a secp256k1 keypair')
+
+    const pIdDifferentKey = await PeerId.create({ keyType: 'Ed25519' })
+
+    assert(isSecp256k1PeerId(pIdDifferentKey) == false, 'peerId does not have a secp256k1 keypair')
   })
 })
