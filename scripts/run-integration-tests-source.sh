@@ -65,10 +65,8 @@ declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 function cleanup {
   local EXIT_CODE=$?
 
-  trap - SIGINT SIGTERM ERR EXIT
-  set +Eeuo pipefail
-
   # at this point we don't want to fail hard anymore
+  trap - SIGINT SIGTERM ERR EXIT
   set +Eeuo pipefail
 
   # Cleaning up everything
