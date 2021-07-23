@@ -256,9 +256,8 @@ class Hopr extends EventEmitter {
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
-    log('announcing')
     await this.announce(this.options.announce)
-    log('announced, starting heartbeat')
+    log('announcing done, starting heartbeat')
 
     this.heartbeat.start()
     this.setChannelStrategy(this.options.strategy || 'passive')
@@ -420,7 +419,8 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Lists the addresses which the given node announces to other nodes
+   * List of addresses that is announced to other nodes
+   * @dev returned list can change at runtime
    * @param peer peer to query for, default self
    */
   public async getAnnouncedAddresses(peer: PeerId = this.getId()): Promise<Multiaddr[]> {
@@ -613,27 +613,29 @@ class Hopr extends EventEmitter {
   }
 
   private async announce(includeRouting: boolean = false): Promise<void> {
-    log('announcing self, include routing:', includeRouting)
     const chain = await this.paymentChannels
-    //const account = await chain.getAccount(await this.getEthereumAddress())
-    // exit if we already announced
-    //if (account.hasAnnounced()) return
 
     const multiaddrs = await this.getAnnouncedAddresses()
-    const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))
-    const ip6 = multiaddrs.find((s) => s.toString().includes('/ip6/'))
+
+    const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
+    const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
+
     const p2p = new Multiaddr('/p2p/' + this.getId().toB58String())
-    // exit if none of these multiaddrs are available
-    if (!ip4 && !ip6 && !p2p) return
+
+    const addrToAnnounce = ip4 ?? ip6 ?? p2p
+    const isRoutableAddress = (ip4 ?? ip6) != undefined
+
+    const ownAccount = await chain.getAccount(await this.getEthereumAddress())
+
+    if (ownAccount?.multiAddr?.equals(addrToAnnounce)) {
+      log(`intended address has already been announced, nothing to do`)
+      return
+    }
 
     try {
-      if (includeRouting && (ip4 || ip6)) {
-        log('announcing with routing', ip4 || ip6)
-        await chain.announce(ip4 || ip6)
-        return
-      }
-      log('announcing without routing', p2p.toString())
-      await chain.announce(p2p)
+      log(`announcing ${includeRouting && isRoutableAddress ? 'with' : 'without'} routing`)
+
+      await chain.announce(addrToAnnounce)
     } catch (err) {
       log('announce failed')
       await this.isOutOfFunds(err)
