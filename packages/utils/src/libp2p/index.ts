@@ -176,7 +176,13 @@ export async function dial(
     // Let libp2p populate its internal peerStore with fresh addresses
     dhtResponse = await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
-    logError(`Querying the DHT for ${destination.toB58String()} failed. ${err.message}`)
+    logError(
+      `Querying the DHT for ${destination.toB58String()} failed. Knwon addresses:\n  ${(
+        libp2p.peerStore.get(destination)?.addresses ?? []
+      )
+        .map((addr) => addr.multiaddr.toString())
+        .join('\n  ')}.\n${err.message}`
+    )
   }
 
   const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
