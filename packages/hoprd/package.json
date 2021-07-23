@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.75.0-next.10",
+  "version": "1.75.0-next.12",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -30,8 +30,8 @@
   "dependencies": {
     "@ceramicnetwork/http-client": "^1.0.6",
     "@ceramicnetwork/stream-tile": "^1.0.6",
-    "@hoprnet/hopr-core": "1.75.0-next.10",
-    "@hoprnet/hopr-utils": "1.75.0-next.10",
+    "@hoprnet/hopr-core": "1.75.0-next.12",
+    "@hoprnet/hopr-utils": "1.75.0-next.12",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
     "check-password-strength": "^2.0.3",
@@ -56,7 +56,7 @@
   "devDependencies": {
     "@types/bs58": "^4.0.1",
     "@types/debug": "^4.1.5",
-    "@types/mocha": "^8.2.0",
+    "@types/mocha": "^9.0.0",
     "@types/node": "14.14.35",
     "@types/yargs": "^17.0.0",
     "mocha": "^9.0.0",
