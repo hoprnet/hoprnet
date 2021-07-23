@@ -2,7 +2,7 @@ import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import { HalfKeyChallenge, sampleGroupElement } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import assert from 'assert'
-import { randomBytes } from 'libp2p-crypto'
+import { randomBytes } from 'crypto'
 
 describe('test creation & verification of a challenge', function () {
   it('should create a verifiable challenge', async function () {
