@@ -7,10 +7,13 @@ test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
 
-test -z "${HOPR_GITHUB_REF:-}" && (echo "Missing environment variable HOPR_GITHUB_REF"; exit 1)
+declare branch mydir
+
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 # ensure local copy is up-to-date with origin
-git pull origin "${HOPR_GITHUB_REF}"
+branch=$(git rev-parse --abbrev-ref HEAD)
+git pull origin "${branch}" --rebase
 
 # ensure the build is up-to-date
 yarn

@@ -7,10 +7,7 @@ test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
 
-declare branch
-declare mydir
-declare npm_package
-declare version_type
+declare branch mydir npm_package version_type
 
 # ensure local copy is up-to-date with origin
 branch=$(git rev-parse --abbrev-ref HEAD)
@@ -30,7 +27,7 @@ yarn build
 # create new version in each package
 yarn workspaces foreach -piv --no-private --topological-dev version prerelease
 declare new_version
-new_version=$(HOPR_PACKAGE=hoprd ${mydir}/get-package-version.sh)
+new_version=$(${mydir}/get-package-version.sh)
 
 # commit changes and create Git tag
 git add packages/*/package.json
