@@ -4,6 +4,7 @@
 import PeerId from 'peer-id'
 import { keys, PublicKey } from 'libp2p-crypto'
 import multihashes from 'multihashes'
+import { green } from 'chalk'
 import type { PeerRoutingModule, Connection, MuxedStream } from 'libp2p'
 import type LibP2P from 'libp2p'
 
@@ -194,7 +195,15 @@ export async function dial(
     struct = await libp2p.dialProtocol(destination, protocol, { signal })
     verbose(`Dial after DHT request successful`, struct)
   } catch (err) {
-    logError(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
+    logError(
+      `Cannot connect to ${green(
+        destination.toB58String()
+      )}. New addresses after DHT request did not lead to a connection. Used addresses:\n  ${(
+        libp2p.peerStore.get(destination)?.addresses ?? []
+      )
+        .map((addr) => addr.multiaddr.toString())
+        .join('\n  ')}\n${err.message}`
+    )
     clearTimeout(timeout)
     return { status: 'E_DIAL', error: err.message, dhtContacted: true }
   }
