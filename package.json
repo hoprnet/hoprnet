@@ -59,7 +59,7 @@
     "it-pushable": "^1.4.2",
     "libp2p": "^0.32.1",
     "libp2p-interfaces": "^1.0.1",
-    "libp2p-mplex": "0.10.3",
+    "libp2p-mplex": "0.10.4",
     "libp2p-noise": "^4.0",
     "mocha": "^9.0.2",
     "prettier": "~2.3.2",
