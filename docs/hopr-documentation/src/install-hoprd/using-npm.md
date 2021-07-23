@@ -26,20 +26,20 @@ _Please bear in mind you might need to restart your terminal after running these
 
 After you have downloaded and setup nvm in your machine \(run `nvm ls` to ensure everything is in place\), now you need to install a specific version of Nodejs before running **HOPRd**.
 
-At the time of writing, **HOPRd** runs on Nodejs `v14`. Specifically, **HOPRd** has been developed and tested in `v14`, so in case you run on any issues with **HOPRd,** try switch to `v14` to see if those issues disappear.
+At the time of writing, **HOPRd** runs on Nodejs `v16`. Specifically, **HOPRd** has been developed and tested in `v16`, so in case you run on any issues with **HOPRd,** try switch to `v16` to see if those issues disappear.
 
 To install Nodejs with nvm, run the following
 
 ```bash
-$ nvm install v14
-$ nvm use v14
+$ nvm install v16
+$ nvm use v16
 ```
 
 If everything was done properly, you can run `node --version` to see your current `node` version, alongside running basic commands as shown when running simply `node` in your terminal.
 
 ```eval_rst
 .. ATTENTION::
-   MacOS M1 users will need to follow an extra set of instructions from `NVM <https://github.com/nvm-sh/nvm#macos-troubleshooting>`_ to allow them to use nodejs 14.
+   MacOS M1 users will need to follow an extra set of instructions from `NVM <https://github.com/nvm-sh/nvm#macos-troubleshooting>`_ to allow them to use nodejs 16.
 ```
 
 ![](../../images/node.gif)

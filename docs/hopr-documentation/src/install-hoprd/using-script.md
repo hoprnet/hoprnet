@@ -1,10 +1,10 @@
 # Using A Script (Recommended)
 
-The simplest way to get started with HOPR is to run our pre-prepared [script](https://github.com/hoprnet/hopr-sh) to install **hoprd**. The script will install all the required dependencies, including `node.js` version `14`. If you have [`nvm`](https://github.com/nvm-sh/nvm) installed, it will use it.
+The simplest way to get started with HOPR is to run our pre-prepared [script](https://github.com/hoprnet/hopr-sh) to install **hoprd**. The script will install all the required dependencies, including `node.js` version `16`. If you have [`nvm`](https://github.com/nvm-sh/nvm) installed, it will use it.
 
 ```eval_rst
 .. ATTENTION::
-   Please bear in mind that at the time of writing, ``hoprd`` only has been tested in version ``14``.
+   Please bear in mind that at the time of writing, ``hoprd`` only has been tested in version ``16``.
 
    If you are a MacOS M1 user, please refer to the `npm guide <./using-npm.html>`_, this script will not work for you.
 ```
