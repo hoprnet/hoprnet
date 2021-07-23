@@ -157,22 +157,37 @@ class RelayContext extends EventEmitter {
         this._sourcePromise = this._stream.source.next()
       }
 
+      this.verbose(`FLOW: relay_incoming: started loop`)
       while (true) {
+        this.verbose(`FLOW: relay_incoming: new loop iteration`)
+
         const promises: Promise<Stream['source'] | StreamResult>[] = []
+        let resolvedPromiseName
+
+        const pushPromise = (promise: Promise<any>, name: string) => {
+          promises.push(
+            promise.then((res) => {
+              resolvedPromiseName = name
+              return res
+            })
+          )
+        }
 
         // Wait for stream switches
-        promises.push(this._streamSourceSwitchPromise.promise)
+        pushPromise(this._streamSourceSwitchPromise.promise, 'streamSwitch')
 
         // Wait for payload messages
         if (result == undefined || (result as StreamResult).done != true) {
           this._sourcePromise = this._sourcePromise ?? this._stream.source.next()
 
-          promises.push(this._sourcePromise)
+          pushPromise(this._sourcePromise, 'sourcePromise')
         }
 
+        this.verbose(`FLOW: relay_incoming: awaiting promises`)
         // 1. Handle Stream switches
         // 2. Handle payload / status messages
         result = await Promise.race(promises)
+        this.verbose(`FLOW: relay_incoming: promise ${resolvedPromiseName} resolved`)
 
         if (result == undefined) {
           // @TODO throw Error to make debugging easier
@@ -188,6 +203,7 @@ class RelayContext extends EventEmitter {
 
           next()
 
+          this.verbose(`FLOW: relay_incoming: source switched continue`)
           yield Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
           continue
         }
@@ -195,6 +211,7 @@ class RelayContext extends EventEmitter {
         const received = result as IteratorYieldResult<Uint8Array>
 
         if (received.done) {
+          this.verbose(`FLOW: relay_incoming: received done, continue`)
           continue
         }
 
@@ -203,6 +220,7 @@ class RelayContext extends EventEmitter {
           this.log(`got empty message`)
           next()
 
+          this.verbose(`FLOW: relay_incoming: empty message, continue`)
           // Ignore empty messages
           continue
         }
@@ -215,6 +233,7 @@ class RelayContext extends EventEmitter {
           next()
 
           // Ignore invalid prefixes
+          this.verbose(`FLOW: relay_incoming: invalid prefix, continue`)
           continue
         }
 
@@ -233,6 +252,7 @@ class RelayContext extends EventEmitter {
 
           next()
 
+          this.verbose(`FLOW: relay_incoming: got PING or PONG, continue`)
           continue
           // Interprete connection sub-protocol
         } else if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS) {
@@ -240,6 +260,8 @@ class RelayContext extends EventEmitter {
             this.verbose(`STOP relayed`)
 
             this.emit('close')
+
+            this.verbose(`FLOW: relay_incoming: STOP relayed, break`)
             // forward STOP message
             yield received.value
 
@@ -247,13 +269,18 @@ class RelayContext extends EventEmitter {
             break
           } else if ((SUFFIX[0] = ConnectionStatusMessages.RESTART)) {
             this.verbose(`RESTART relayed`)
+            this.verbose(`FLOW: relay_incoming: RESTART relayed, break`)
           }
         }
+
+        this.verbose(`FLOW: relay_incoming: loop iteration end`)
 
         yield received.value
 
         next()
       }
+
+      this.verbose(`FLOW: relay_incoming: loop ended`)
     }.call(this)
 
     return eagerIterator(iterator)
@@ -286,29 +313,46 @@ class RelayContext extends EventEmitter {
         sourcePromise = currentSource?.next()
       }
 
+      this.verbose(`FLOW: relay_outgoing: loop started`)
       while (iteration == drainIteration) {
+        this.verbose(`FLOW: relay_outgoing: new loop iteration`)
+
         const promises: Promise<SinkResult>[] = []
 
-        if (currentSource == undefined) {
-          promises.push(this._sinkSourceAttachedPromise.promise)
+        let resolvedPromiseName
+
+        const pushPromise = (promise: Promise<any>, name: string) => {
+          promises.push(
+            promise.then((res) => {
+              resolvedPromiseName = name
+              return res
+            })
+          )
         }
 
-        promises.push(this._statusMessagePromise.promise)
+        if (currentSource == undefined) {
+          pushPromise(this._sinkSourceAttachedPromise.promise, 'sinkSourceAttacked')
+        }
+
+        pushPromise(this._statusMessagePromise.promise, 'statusMessage')
 
         if (currentSource != undefined && (result == undefined || (result as StreamResult).done != true)) {
           sourcePromise = sourcePromise ?? currentSource.next()
 
-          promises.push(sourcePromise)
+          pushPromise(sourcePromise, 'payload')
         }
 
         // (0. Handle source attach)
         // 1. Handle stream switches
         // 2. Handle status messages
         // 3. Handle payload messages
+        this.verbose(`FLOW: relay_outgoing: awaiting promises`)
         result = await Promise.race(promises)
+        this.verbose(`FLOW: relay_outgoing: promise ${resolvedPromiseName} resolved`)
 
         // Don't handle incoming messages after migration
         if (iteration != drainIteration) {
+          this.verbose(`FLOW: relay_outgoing: iteration != drainIteration, break`)
           break
         }
 
@@ -317,23 +361,27 @@ class RelayContext extends EventEmitter {
           currentSource = result as Stream['source']
 
           result = undefined
+          this.verbose(`FLOW: relay_outgoing: sinkSource attacked, continue`)
           continue
         }
 
         if (this._statusMessages.length > 0) {
           yield this.unqueueStatusMessage()
+          this.verbose(`FLOW: relay_outgoing: unqueuedStatusMsg, continue`)
           continue
         }
 
         let received = result as StreamResult
 
         if (received.done) {
+          this.verbose(`FLOW: relay_outgoing: received done, continue`)
           continue
         }
 
         if (received.value.length == 0) {
           this.verbose(`Ignoring empty message`)
           next()
+          this.verbose(`FLOW: relay_outgoing: empty msg, continue`)
           continue
         }
 
@@ -342,17 +390,21 @@ class RelayContext extends EventEmitter {
         if (SUFFIX.length == 0) {
           this.verbose(`Ignoring empty payload`)
           next()
+          this.verbose(`FLOW: relay_outgoing: empty payload, continue`)
           continue
         }
 
         if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS && SUFFIX[0] == ConnectionStatusMessages.STOP) {
+          this.verbose(`FLOW: relay_outgoing: STOP, break`)
           yield received.value
           break
         }
 
         next()
+        this.verbose(`FLOW: relay_outgoing: end of loop iteration`)
         yield received.value
       }
+      this.verbose(`FLOW: relay_outgoing: loop ended`)
     }
 
     while (true) {
