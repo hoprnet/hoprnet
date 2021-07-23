@@ -206,25 +206,7 @@ class Hopr extends EventEmitter {
     log('libp2p started')
     this.libp2p = libp2p
 
-    for (const initialNode of initialNodes) {
-      const peerId = PeerId.createFromB58String(initialNode.getPeerId())
-
-      if (peerId.equals(this.id)) {
-        // Ignore announcements from ourself
-        return
-      }
-
-      // @ts-ignore
-      this.libp2p.peerStore.keyBook.set(peerId)
-
-      const tuples = initialNode.tuples()
-
-      if (tuples.length == 0 || tuples[0][0] == protocols.names['p2p'].code) {
-        continue
-      }
-
-      this.libp2p.peerStore.addressBook.add(peerId, [initialNode])
-    }
+    this.addPreviousNodes(initialNodes)
 
     ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
       if (id.equals(this.id)) {
@@ -336,6 +318,33 @@ class Hopr extends EventEmitter {
     }
 
     await this.setChannelStrategy('passive')
+  }
+
+  /**
+   * Populates libp2p's peerStore with previously announced nodes
+   * @param initialNodes previosly announced nodes
+   * @returns
+   */
+  private addPreviousNodes(initialNodes: Multiaddr[]): void {
+    for (const initialNode of initialNodes) {
+      const peerId = PeerId.createFromB58String(initialNode.getPeerId())
+
+      if (peerId.equals(this.id)) {
+        // Ignore announcements from ourself
+        return
+      }
+
+      // @ts-ignore
+      this.libp2p.peerStore.keyBook.set(peerId)
+
+      const tuples = initialNode.tuples()
+
+      if (tuples.length == 0 || tuples[0][0] == protocols.names['p2p'].code) {
+        continue
+      }
+
+      this.libp2p.peerStore.addressBook.add(peerId, [initialNode])
+    }
   }
 
   private async tickChannelStrategy() {
