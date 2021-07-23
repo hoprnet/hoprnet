@@ -206,6 +206,26 @@ class Hopr extends EventEmitter {
     log('libp2p started')
     this.libp2p = libp2p
 
+    for (const initialNode of initialNodes) {
+      const peerId = PeerId.createFromB58String(initialNode.getPeerId())
+
+      if (peerId.equals(this.id)) {
+        // Ignore announcements from ourself
+        return
+      }
+
+      // @ts-ignore
+      this.libp2p.peerStore.keyBook.set(peerId)
+
+      const tuples = initialNode.tuples()
+
+      if (tuples.length == 0 || tuples[0][0] == protocols.names['p2p'].code) {
+        continue
+      }
+
+      this.libp2p.peerStore.addressBook.add(peerId, [initialNode])
+    }
+
     ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
       if (id.equals(this.id)) {
         // Ignore announcements from ourself
