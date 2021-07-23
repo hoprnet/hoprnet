@@ -4,6 +4,7 @@
 import type { Stream, StreamType, Handler } from 'libp2p'
 import type LibP2P from 'libp2p'
 import Debug from 'debug'
+import { green } from 'chalk'
 import AbortController, { AbortSignal } from 'abort-controller'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
@@ -131,7 +132,11 @@ export async function dialHelper(
     dhtResponse = await (libp2p._dht as any).findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     error(
-      `Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${destination.toB58String()} failed. ${err.message}`
+      `Querying the DHT for ${destination.toB58String()} failed. Knwon addresses:\n  ${(
+        libp2p.peerStore.get(destination)?.addresses ?? []
+      )
+        .map((addr: any) => addr.multiaddr.toString())
+        .join('\n  ')}.\n${err.message}`
     )
   }
 
@@ -151,9 +156,17 @@ export async function dialHelper(
 
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal })
-    verbose(`Dial after DHT request successful`, struct)
+    verbose(`Dial after DHT request successful`)
   } catch (err) {
-    error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
+    error(
+      `Cannot connect to ${green(
+        destination.toB58String()
+      )}. New addresses after DHT request did not lead to a connection. Used addresses:\n  ${(
+        libp2p.peerStore.get(destination)?.addresses ?? []
+      )
+        .map((addr: any) => addr.multiaddr.toString())
+        .join('\n  ')}\n${err.message}}\n${err.message}`
+    )
     return
   }
 
