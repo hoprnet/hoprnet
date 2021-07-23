@@ -2149,17 +2149,10 @@
   dependencies:
     "@types/node" "*"
 
-"@types/debug@^4.1.5":
+"@types/debug@^4.1.5", "@types/debug@^4.1.6":
   version "4.1.6"
   resolved "https://registry.yarnpkg.com/@types/debug/-/debug-4.1.6.tgz#0b7018723084918a865eff99249c490505df2163"
   integrity sha512-7fDOJFA/x8B+sO1901BmHlf5dE1cxBU8mRXj8QOEDnn16hhGJv/IHxJtZhvsabZsIMn0eLIyeOKAeqSNJJYTpA==
-
-"@types/err-code@^3.0.0":
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/@types/err-code/-/err-code-3.0.0.tgz#ce5568b48b83a0aef0363b83ef5617f006d90ff9"
-  integrity sha512-jBkAuQbFrxXjt32B+RxGQ9pPOwXZp8qBs2twEXn16ClfFtNR4Gb7a71NrVDOb2jrjKxZbjgX4s+Fg/eox2IUnA==
-  dependencies:
-    err-code "*"
 
 "@types/form-data@0.0.33":
   version "0.0.33"
@@ -2181,7 +2174,7 @@
   resolved "https://registry.yarnpkg.com/@types/level-errors/-/level-errors-3.0.0.tgz#15c1f4915a5ef763b51651b15e90f6dc081b96a8"
   integrity sha512-/lMtoq/Cf/2DVOm6zE6ORyOM+3ZVm/BvzEZVxUhf6bgh8ZHglXlBqxbxSlJeVp8FCbD3IVvk/VbsaNmDjrQvqQ==
 
-"@types/leveldown@^4.0.2":
+"@types/leveldown@^4.0.3":
   version "4.0.3"
   resolved "https://registry.yarnpkg.com/@types/leveldown/-/leveldown-4.0.3.tgz#4b868fd747808d378df6ffb27de7f889cae46aad"
   integrity sha512-fzIXOuUCSZQKkRadWhURwu6mMYbfqi/nRDA+yBwz8kj7AK/L7L//u6A0MqSv0gsilzo7N/5+FlZOx8G6m03EVQ==
@@ -2189,7 +2182,7 @@
     "@types/abstract-leveldown" "*"
     "@types/node" "*"
 
-"@types/levelup@^4.3.0":
+"@types/levelup@^4.3.0", "@types/levelup@^4.3.3":
   version "4.3.3"
   resolved "https://registry.yarnpkg.com/@types/levelup/-/levelup-4.3.3.tgz#4dc2b77db079b1cf855562ad52321aa4241b8ef4"
   integrity sha512-K+OTIjJcZHVlZQN1HmU64VtrC0jC3dXWQozuEIR9zVvltIk90zaGPM2AgT+fIkChpzHhFE3YnvFLCbLtzAmexA==
@@ -2241,6 +2234,11 @@
   version "8.2.3"
   resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-8.2.3.tgz#bbeb55fbc73f28ea6de601fbfa4613f58d785323"
   integrity sha512-ekGvFhFgrc2zYQoX4JeZPmVzZxw6Dtllga7iGHzfbYIYkAMUx/sAFP2GdFpLff+vdHXu5fl7WX9AT+TtqYcsyw==
+
+"@types/mocha@^9.0.0":
+  version "9.0.0"
+  resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-9.0.0.tgz#3205bcd15ada9bc681ac20bef64e9e6df88fd297"
+  integrity sha512-scN0hAWyLVAvLR9AyW7HoFF5sJZglyBsbPuHO4fv7JRvfmPBMfp1ozWqOf/e4wwPNxezBZXRfWzMb6iFLgEVRA==
 
 "@types/node-fetch@^2.5.5":
   version "2.5.11"
@@ -2339,7 +2337,7 @@
     "@types/chai" "*"
     "@types/sinon" "*"
 
-"@types/sinon@*", "@types/sinon@^10.0.0":
+"@types/sinon@*", "@types/sinon@^10.0.0", "@types/sinon@^10.0.2":
   version "10.0.2"
   resolved "https://registry.yarnpkg.com/@types/sinon/-/sinon-10.0.2.tgz#f360d2f189c0fd433d14aeb97b9d705d7e4cc0e4"
   integrity sha512-BHn8Bpkapj8Wdfxvh2jWIUoaYB/9/XhsL0oOvBfRagJtKlSl9NWPcFOz2lRukI9szwGxFtYZCTejJSqsGDbdmw==
@@ -4017,7 +4015,7 @@ chalk@^1.1.3:
     strip-ansi "^3.0.0"
     supports-color "^2.0.0"
 
-chalk@^4.1.0, chalk@^4.1.1, chalk@~4.1.0:
+chalk@^4.1.0, chalk@^4.1.1, chalk@~4.1.1:
   version "4.1.1"
   resolved "https://registry.yarnpkg.com/chalk/-/chalk-4.1.1.tgz#c80b3fab28bf6371e6863325eee67e618b77e6ad"
   integrity sha512-diHzdDKxcU+bAsUboHLPEDQiw0qEe0qd7SYUn3HgcFlWgbDcfLGswOHYeGrHKzG9z6UYf01d9VFMfZxPM1xZSg==
@@ -5334,15 +5332,15 @@ envinfo@^7.7.4:
   resolved "https://registry.yarnpkg.com/envinfo/-/envinfo-7.8.1.tgz#06377e3e5f4d379fea7ac592d5ad8927e0c4d475"
   integrity sha512-/o+BXHmB7ocbHEAs6F2EnG0ogybVVUdkRunTT2glZU9XAaGmhqskrvKwqXuDfNjEO0LZKWdejEEpnq8aM0tOaw==
 
-err-code@*, err-code@^3.0.0, err-code@^3.0.1:
-  version "3.0.1"
-  resolved "https://registry.yarnpkg.com/err-code/-/err-code-3.0.1.tgz#a444c7b992705f2b120ee320b09972eef331c920"
-  integrity sha512-GiaH0KJUewYok+eeY05IIgjtAe4Yltygk9Wqp1V5yVWLdhf0hYZchRjNIT9bb0mSwRcIusT3cx7PJUf3zEIfUA==
-
 err-code@^2.0.2:
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/err-code/-/err-code-2.0.3.tgz#23c2f3b756ffdfc608d30e27c9a941024807e7f9"
   integrity sha512-2bmlRpNKBxT/CRmPOlyISQpNj+qSeYvcym/uT0Jx2bMOlKLtSy1ZmLuVxSEKKyor/N5yhvp/ZiG1oE3DEYMSFA==
+
+err-code@^3.0.0, err-code@^3.0.1:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/err-code/-/err-code-3.0.1.tgz#a444c7b992705f2b120ee320b09972eef331c920"
+  integrity sha512-GiaH0KJUewYok+eeY05IIgjtAe4Yltygk9Wqp1V5yVWLdhf0hYZchRjNIT9bb0mSwRcIusT3cx7PJUf3zEIfUA==
 
 errno@^1.0.0:
   version "1.0.0"
@@ -9114,20 +9112,6 @@ libp2p-record@^0.10.4:
     protobufjs "^6.10.2"
     uint8arrays "^2.0.5"
 
-libp2p-tcp@0.17:
-  version "0.17.1"
-  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.17.1.tgz#7d6844fdfbe978f862dd8b7b812f80c0c0eb1d80"
-  integrity sha512-Kxqb0gEi1BZT0guhWbmeyG+XhJHqod6jM3NvSvjwUaD6XmKFVt9yj4IPGnTfKPOSrkcWwAUhk6Qbv0eKSHlCnw==
-  dependencies:
-    abortable-iterator "^3.0.0"
-    class-is "^1.1.0"
-    debug "^4.3.1"
-    err-code "^3.0.1"
-    libp2p-utils "^0.4.0"
-    mafmt "^10.0.0"
-    multiaddr "^10.0.0"
-    stream-to-it "^0.2.2"
-
 libp2p-tcp@^0.15.3:
   version "0.15.4"
   resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.15.4.tgz#571c57dae60e6118162228abfa28700e86d47dca"
@@ -9140,6 +9124,20 @@ libp2p-tcp@^0.15.3:
     libp2p-utils "^0.3.0"
     mafmt "^9.0.0"
     multiaddr "^9.0.1"
+    stream-to-it "^0.2.2"
+
+libp2p-tcp@^0.17.1:
+  version "0.17.1"
+  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.17.1.tgz#7d6844fdfbe978f862dd8b7b812f80c0c0eb1d80"
+  integrity sha512-Kxqb0gEi1BZT0guhWbmeyG+XhJHqod6jM3NvSvjwUaD6XmKFVt9yj4IPGnTfKPOSrkcWwAUhk6Qbv0eKSHlCnw==
+  dependencies:
+    abortable-iterator "^3.0.0"
+    class-is "^1.1.0"
+    debug "^4.3.1"
+    err-code "^3.0.1"
+    libp2p-utils "^0.4.0"
+    mafmt "^10.0.0"
+    multiaddr "^10.0.0"
     stream-to-it "^0.2.2"
 
 libp2p-utils@^0.3.0, libp2p-utils@^0.3.1:
@@ -10085,7 +10083,7 @@ mocha@^7.1.1, mocha@^7.1.2:
     yargs-parser "13.1.2"
     yargs-unparser "1.6.0"
 
-mocha@^9.0.0:
+mocha@^9.0.0, mocha@^9.0.2:
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/mocha/-/mocha-9.0.2.tgz#e84849b61f406a680ced85af76425f6f3108d1a0"
   integrity sha512-FpspiWU+UT9Sixx/wKimvnpkeW0mh6ROAKkIaPokj3xZgxeRhcna/k5X57jJghEr8X+Cgu/Vegf8zCX5ugSuTA==
@@ -12956,7 +12954,7 @@ sinon@^10.0.0:
     nise "^5.0.1"
     supports-color "^7.1.0"
 
-sinon@^11.0.0:
+sinon@^11.0.0, sinon@^11.1.1:
   version "11.1.1"
   resolved "https://registry.yarnpkg.com/sinon/-/sinon-11.1.1.tgz#99a295a8b6f0fadbbb7e004076f3ae54fc6eab91"
   integrity sha512-ZSSmlkSyhUWbkF01Z9tEbxZLF/5tRC9eojCdFh33gtQaP7ITQVaMWQHGuFM7Cuf/KEfihuh1tTl3/ABju3AQMg==
