@@ -208,27 +208,7 @@ class Hopr extends EventEmitter {
 
     this.addPreviousNodes(initialNodes)
 
-    ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
-      if (id.equals(this.id)) {
-        // Ignore announcements from ourself
-        return
-      }
-
-      const dialables = multiaddrs.filter((ma: Multiaddr) => {
-        const tuples = ma.tuples()
-        return tuples.length > 1 && tuples[0][0] != protocols.names['p2p'].code
-      })
-
-      // @ts-ignore
-      this.libp2p.peerStore.keyBook.set(id)
-
-      if (dialables.length > 0) {
-        for (const dialable of dialables) {
-          this.publicNodesEmitter.emit('addPublicNode', dialable)
-        }
-        this.libp2p.peerStore.addressBook.add(id, multiaddrs)
-      }
-    })
+    ethereum.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
@@ -331,7 +311,7 @@ class Hopr extends EventEmitter {
 
       if (peerId.equals(this.id)) {
         // Ignore announcements from ourself
-        return
+        continue
       }
 
       // @ts-ignore
@@ -344,6 +324,32 @@ class Hopr extends EventEmitter {
       }
 
       this.libp2p.peerStore.addressBook.add(peerId, [initialNode])
+    }
+  }
+
+  /**
+   * Called whenever a peer is announced
+   * @param peer newly announced peer
+   */
+  private onPeerAnnouncement(peer: { id: PeerId; multiaddrs: Multiaddr[] }): void {
+    if (peer.id.equals(this.id)) {
+      // Ignore announcements from ourself
+      return
+    }
+
+    const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
+      const tuples = ma.tuples()
+      return tuples.length > 1 && tuples[0][0] != protocols.names['p2p'].code
+    })
+
+    // @ts-ignore
+    this.libp2p.peerStore.keyBook.set(id)
+
+    if (dialables.length > 0) {
+      for (const dialable of dialables) {
+        this.publicNodesEmitter.emit('addPublicNode', dialable)
+      }
+      this.libp2p.peerStore.addressBook.add(peer.id, peer.multiaddrs)
     }
   }
 
