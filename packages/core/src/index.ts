@@ -208,7 +208,7 @@ class Hopr extends EventEmitter {
 
     this.addPreviousNodes(initialNodes)
 
-    ethereum.indexer.on('peer', this.onPeerAnnouncement.bind(this))
+    ethereum.indexer.on('peer', (peer: { id: PeerId; multiaddrs: Multiaddr[] }) => this.onPeerAnnouncement(peer))
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
