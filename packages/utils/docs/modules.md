@@ -189,7 +189,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L95)
+[libp2p/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L96)
 
 ___
 
@@ -199,7 +199,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L99)
+[libp2p/index.ts:100](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L100)
 
 ___
 
@@ -234,7 +234,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L257)
+[libp2p/index.ts:272](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L272)
 
 ___
 
@@ -259,7 +259,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L258)
+[libp2p/index.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L273)
 
 ___
 
@@ -615,7 +615,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L24)
+[libp2p/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L25)
 
 ___
 
@@ -715,7 +715,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[libp2p/index.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L41)
+[libp2p/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L42)
 
 ___
 
@@ -737,7 +737,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[libp2p/index.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L31)
+[libp2p/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L32)
 
 ___
 
@@ -905,7 +905,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L127)
+[libp2p/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L128)
 
 ___
 
@@ -1034,7 +1034,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[libp2p/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L68)
+[libp2p/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L69)
 
 ___
 
@@ -1100,7 +1100,7 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[libp2p/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L51)
+[libp2p/index.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L52)
 
 ___
 
@@ -1230,7 +1230,7 @@ whether embedded privKey is a secp256k1 key
 
 #### Defined in
 
-[libp2p/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L84)
+[libp2p/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L85)
 
 ___
 
@@ -1302,7 +1302,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:214](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L214)
+[libp2p/index.ts:229](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L229)
 
 ___
 
@@ -1326,7 +1326,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L230)
+[libp2p/index.ts:245](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L245)
 
 ___
 
@@ -1349,7 +1349,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:293](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L293)
+[libp2p/index.ts:308](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L308)
 
 ___
 
