@@ -7,7 +7,7 @@ import {
   PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS } from './constants'
+import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants'
 import debug from 'debug'
 import type NetworkPeers from './network/network-peers'
 const log = debug('hopr-core:channel-strategy')
@@ -29,7 +29,6 @@ export interface ChannelStrategy {
 
   tick(
     balance: BN,
-    newChannels: ChannelEntry[],
     currentChannels: ChannelEntry[],
     networkPeers: NetworkPeers,
     getRandomChannel: () => Promise<ChannelEntry>
@@ -38,6 +37,8 @@ export interface ChannelStrategy {
 
   onChannelWillClose(c: Channel): Promise<void> // Before a channel closes
   onWinningTicket(t: AcknowledgedTicket, channel: Channel): Promise<void>
+
+  tickInterval: number
 }
 
 /*
@@ -45,7 +46,7 @@ export interface ChannelStrategy {
  *
  * At present this does not take gas into consideration.
  */
-abstract class SaneDefaults {
+export abstract class SaneDefaults {
   async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
     log('auto redeeming')
     await c.redeemTicket(ack)
@@ -55,18 +56,15 @@ abstract class SaneDefaults {
     log('auto redeeming')
     await c.redeemAllTickets()
   }
+
+  tickInterval = CHECK_TIMEOUT
 }
 
 // Don't auto open any channels
 export class PassiveStrategy extends SaneDefaults implements ChannelStrategy {
   name = 'passive'
 
-  async tick(
-    _balance: BN,
-    _n: ChannelEntry[],
-    _c: ChannelEntry[],
-    _p: NetworkPeers
-  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+  async tick(_balance: BN, _c: ChannelEntry[], _p: NetworkPeers): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     return [[], []]
   }
 }
@@ -77,7 +75,6 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
 
   async tick(
     balance: BN,
-    _n: ChannelEntry[],
     currentChannels: ChannelEntry[],
     peers: NetworkPeers,
     getRandomChannel: () => Promise<ChannelEntry>

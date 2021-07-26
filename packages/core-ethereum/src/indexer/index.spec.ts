@@ -136,7 +136,8 @@ const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event
     newBlock,
     hoprChannels,
     newEvent,
-    indexer: new Indexer(0, db, chain, 1, 5),
+    indexer: new Indexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5),
+    chain,
     OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
       Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
     )
@@ -154,8 +155,8 @@ const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: E
   const chainAlice = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_A)
   const chainBob = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_B)
 
-  const indexerAlice = new Indexer(0, db, chainAlice, 1, 5)
-  const indexerBob = new Indexer(0, db, chainBob, 1, 5)
+  const indexerAlice = new Indexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5)
+  const indexerBob = new Indexer(Address.fromString(fixtures.ACCOUNT_B.address), db, 1, 5)
 
   return {
     db,
@@ -164,36 +165,38 @@ const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: E
     hoprChannels,
     newEvent,
     alice: {
-      indexer: indexerAlice
+      indexer: indexerAlice,
+      chain: chainAlice
     },
     bob: {
-      indexer: indexerBob
+      indexer: indexerBob,
+      chain: chainBob
     }
   }
 }
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
-    const { indexer } = await useFixtures()
+    const { indexer, chain } = await useFixtures()
 
-    await indexer.start()
+    await indexer.start(chain, 0)
     assert.strictEqual(indexer.status, 'started')
   })
 
   it('should stop indexer', async function () {
-    const { indexer } = await useFixtures()
+    const { indexer, chain } = await useFixtures()
 
-    await indexer.start()
+    await indexer.start(chain, 0)
     await indexer.stop()
     assert.strictEqual(indexer.status, 'stopped')
   })
 
   it('should process 1 past event', async function () {
-    const { indexer, OPENED_CHANNEL } = await useFixtures({
+    const { indexer, OPENED_CHANNEL, chain } = await useFixtures({
       latestBlockNumber: 2,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
-    await indexer.start()
+    await indexer.start(chain, 0)
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
@@ -203,11 +206,11 @@ describe('test indexer', function () {
   })
 
   it('should process all past events', async function () {
-    const { indexer } = await useFixtures({
+    const { indexer, chain } = await useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
-    await indexer.start()
+    await indexer.start(chain, 0)
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
@@ -217,11 +220,11 @@ describe('test indexer', function () {
   })
 
   it('should continue processing events', async function () {
-    const { indexer, newEvent, newBlock, OPENED_CHANNEL } = await useFixtures({
+    const { indexer, newEvent, newBlock, OPENED_CHANNEL, chain } = await useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
-    await indexer.start()
+    await indexer.start(chain, 0)
 
     newEvent(fixtures.OPENED_EVENT)
     newBlock()
@@ -239,24 +242,24 @@ describe('test indexer', function () {
   })
 
   it('should get public key of addresses', async function () {
-    const { indexer } = await useFixtures({
+    const { indexer, chain } = await useFixtures({
       latestBlockNumber: 2,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
     })
 
-    await indexer.start()
+    await indexer.start(chain, 0)
 
     const pubKey = await indexer.getPublicKeyOf(fixtures.PARTY_A.toAddress())
     assert.strictEqual(pubKey.toHex(), fixtures.PARTY_A.toHex())
   })
 
   it('should get all data from DB', async function () {
-    const { indexer, OPENED_CHANNEL } = await useFixtures({
+    const { indexer, OPENED_CHANNEL, chain } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
-    await indexer.start()
+    await indexer.start(chain, 0)
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
@@ -277,12 +280,12 @@ describe('test indexer', function () {
   })
 
   it('should handle provider error by restarting', async function () {
-    const { indexer, provider } = await useFixtures({
+    const { indexer, provider, chain } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
-    await indexer.start()
+    await indexer.start(chain, 0)
 
     provider.emit('error', new Error('MOCK'))
 
@@ -297,12 +300,12 @@ describe('test indexer', function () {
   })
 
   it('should contract error by restarting', async function () {
-    const { indexer, hoprChannels } = await useFixtures({
+    const { indexer, hoprChannels, chain } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
-    await indexer.start()
+    await indexer.start(chain, 0)
 
     hoprChannels.emit('error', new Error('MOCK'))
 
@@ -316,7 +319,7 @@ describe('test indexer', function () {
 
   it('should emit events on updated channels', async function () {
     this.timeout(5000)
-    const { indexer, newEvent, newBlock } = await useFixtures({
+    const { indexer, newEvent, newBlock, chain } = await useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
@@ -345,7 +348,7 @@ describe('test indexer', function () {
       }
     })
 
-    await indexer.start()
+    await indexer.start(chain, 0)
     const ev = {
       event: 'ChannelUpdate',
       transactionHash: '',
@@ -442,7 +445,7 @@ describe('test indexer', function () {
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
 
-    await Promise.all([alice.indexer.start(), bob.indexer.start()])
+    await Promise.all([alice.indexer.start(alice.chain, 0), bob.indexer.start(bob.chain, 0)])
     newEvent(fixtures.OPENED_EVENT)
 
     newBlock()

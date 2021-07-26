@@ -1,6 +1,7 @@
 import { getPaddingLength, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 import type Hopr from '@hoprnet/hopr-core'
+import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
 
 function booleanSetter(name: string) {
   return function setter(query: string, state: GlobalState): string {
@@ -28,12 +29,15 @@ export default class Settings extends AbstractCommand {
   }
 
   private setStrategy(query: string): string {
-    try {
-      this.node.setChannelStrategy(query as any)
-      return 'Strategy was set'
-    } catch {
-      return 'Could not set strategy. Try PASSIVE or PROMISCUOUS'
+    if (query == 'passive') {
+      this.node.setChannelStrategy(new PassiveStrategy())
+      return 'Strategy is now passive'
     }
+    if (query == 'promiscuous') {
+      this.node.setChannelStrategy(new PromiscuousStrategy())
+      return 'Strategy is now promiscuous'
+    }
+    return 'Could not set strategy. Try PASSIVE or PROMISCUOUS'
   }
 
   private getStrategy(): string {
