@@ -208,7 +208,7 @@ class Hopr extends EventEmitter {
 
     this.addPreviousNodes(initialNodes)
 
-    ethereum.indexer.on('peer', (peer: { id: PeerId; multiaddrs: Multiaddr[] }) => this.onPeerAnnouncement(peer))
+    ethereum.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
@@ -343,7 +343,7 @@ class Hopr extends EventEmitter {
     })
 
     // @ts-ignore
-    this.libp2p.peerStore.keyBook.set(id)
+    this.libp2p.peerStore.keyBook.set(peer.id)
 
     if (dialables.length > 0) {
       for (const dialable of dialables) {
