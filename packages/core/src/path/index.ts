@@ -60,13 +60,13 @@ export async function findPath(
   )
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
-    const currentPath = queue.peek()
+    const currentPath: ChannelPath = queue.peek()
     if (pathFrom(currentPath).length == hops) {
       log('Path of correct length found', debugPath(currentPath), ':', currentPath.weight.toString())
       return pathFrom(currentPath)
     }
 
-    const lastPeer = currentPath[currentPath.path.length - 1].destination
+    const lastPeer = currentPath.path[currentPath.path.length - 1].destination
     const newChannels = (await getOpenChannelsFromPeer(lastPeer)).filter((c: ChannelEntry) => {
       return (
         !destination.eq(c.destination) &&
