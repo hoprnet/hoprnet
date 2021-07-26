@@ -45,6 +45,19 @@ There's two design issues here:
 
 This was initially defined in #947.
 
+### Incentives for low-level relaying
+
+#### Problem statement
+
+HOPRd uses `hopr-connect` to bypass NATs in order to connect to other nodes in the network and deliver messages. `hopr-connect` itself uses a combination of STUN- and TURN-like to bypass NATs. Both of these methods rely on work done by other nodes.
+
+By default, every node offers these functionalities to all other nodes, without any direct compensation or countermeasure against over-usage.
+
+Questions to be answered:
+
+- Should nodes agree in relaying services for any other node?
+- If there are any incentives, how and where should nodes be able to claim them?
+
 ## Implementation
 
 _These discussions relate to the implementation of the HOPR protocol, or more particularly, `hoprd`. The protocol is defined by our yellowpaper, but the only existing implementation is located in `packages/hoprd`, as a Typescript/JavaScript node.js application._
