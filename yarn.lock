@@ -410,7 +410,7 @@ __metadata:
     "@hoprnet/hopr-utils": 1.75.0-next.10
     "@types/debug": ^4.1.6
     "@types/mocha": ^9.0.0
-    "@types/node": 14
+    "@types/node": 16
     "@types/simple-peer": ^9.11.1
     "@types/yargs": ^17.0.2
     abort-controller: 3.0.0
@@ -768,10 +768,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:14":
+"@types/node@npm:*":
   version: 14.14.31
   resolution: "@types/node@npm:14.14.31"
   checksum: 635dc8a0898a923621e02ca179e17baa39fdfa44f0096fcc1b7046c9b32317e74a99956a7b45ca0e8069874f51f4e7873a418239a318a4b6e7936f6510ac5992
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:16":
+  version: 16.4.3
+  resolution: "@types/node@npm:16.4.3"
+  checksum: 03195d10ef927ed0879500f002969fba75e6616714a53d91fe82dfdf4e0cd15228bf5c3a426d5447ed84b4947f2c07b40c317eddcbd2126552cc24bc88da7adc
   languageName: node
   linkType: hard
 

@@ -13,8 +13,8 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "engines": {
-    "node": ">= 14",
-    "yarn": "1"
+    "node": ">= 16",
+    "yarn": "2"
   },
   "files": [
     "lib",
@@ -50,7 +50,7 @@
   "devDependencies": {
     "@types/debug": "^4.1.6",
     "@types/mocha": "^9.0.0",
-    "@types/node": "14",
+    "@types/node": "16",
     "@types/simple-peer": "^9.11.1",
     "@types/yargs": "^17.0.2",
     "abort-controller": "3.0.0",
