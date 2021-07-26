@@ -67,7 +67,7 @@ export async function findPath(
     }
 
     const lastPeer = currentPath[currentPath.path.length - 1].destination
-    const newChannels = (await getOpenChannelsFromPeer(lastPeer)).filter((c) => {
+    const newChannels = (await getOpenChannelsFromPeer(lastPeer)).filter((c: ChannelEntry) => {
       return (
         !destination.eq(c.destination) &&
         networkQualityOf(c.destination) > NETWORK_QUALITY_THRESHOLD &&

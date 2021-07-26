@@ -1,7 +1,6 @@
 import assert from 'assert'
 import { findPath } from '.'
 import BN from 'bn.js'
-import { Indexer } from '@hoprnet/hopr-core-ethereum'
 import { Balance, PublicKey } from '@hoprnet/hopr-utils'
 
 function checkPath(path: PublicKey[], edges: Map<PublicKey, PublicKey[]>) {
@@ -53,11 +52,9 @@ describe('test pathfinder with some simple topologies', function () {
   ARROW.set(TEST_NODES[2], [TEST_NODES[3]])
   ARROW.set(TEST_NODES[3], [TEST_NODES[4]])
 
-  function fakeIndexer(edges: Map<PublicKey, PublicKey[]>, stakes: (i: PublicKey) => Balance): Indexer {
-    return {
-      getOpenChannelsFrom: (a: PublicKey) =>
+  function fakeChannels(edges: Map<PublicKey, PublicKey[]>, stakes: (i: PublicKey) => Balance): (p: PublicKey) => Promise<any[]> {
+    return  (a: PublicKey) =>
         Promise.resolve((edges.get(a) || []).map((b) => ({ source: a, destination: b, balance: stakes(b) as any })))
-    } as unknown as Indexer
   }
 
   it('should find a path through a reliable star', async function () {
@@ -66,7 +63,7 @@ describe('test pathfinder with some simple topologies', function () {
       fakePublicKey(6),
       2,
       RELIABLE_NETWORK,
-      fakeIndexer(STAR, STAKE_1).getOpenChannelsFrom
+      fakeChannels(STAR, STAKE_1)
     )
     checkPath(path, STAR)
     assert(path.length == 2, 'Should find a valid acyclic path')
@@ -78,7 +75,7 @@ describe('test pathfinder with some simple topologies', function () {
       fakePublicKey(6),
       2,
       RELIABLE_NETWORK,
-      fakeIndexer(STAR, STAKE_N).getOpenChannelsFrom
+      fakeChannels(STAR, STAKE_N)
     )
     checkPath(path, STAR)
     // @ts-ignore
@@ -93,7 +90,7 @@ describe('test pathfinder with some simple topologies', function () {
         fakePublicKey(6),
         4,
         RELIABLE_NETWORK,
-        fakeIndexer(STAR, STAKE_1).getOpenChannelsFrom
+        fakeChannels(STAR, STAKE_1)
       )
     } catch (e) {
       thrown = true
@@ -107,7 +104,7 @@ describe('test pathfinder with some simple topologies', function () {
       fakePublicKey(6),
       4,
       RELIABLE_NETWORK,
-      fakeIndexer(ARROW, STAKE_1).getOpenChannelsFrom
+      fakeChannels(ARROW, STAKE_1)
     )
     checkPath(path, ARROW)
     assert(path.length == 4, 'Should find a valid acyclic path')
@@ -121,7 +118,7 @@ describe('test pathfinder with some simple topologies', function () {
         fakePublicKey(6),
         4,
         UNRELIABLE_NETWORK,
-        fakeIndexer(ARROW, STAKE_1).getOpenChannelsFrom
+        fakeChannels(ARROW, STAKE_1)
       )
     } catch (e) {
       thrown = true
