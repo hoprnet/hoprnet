@@ -55,9 +55,8 @@ export async function findPath(
   let queue = new Heap<ChannelPath>(comparePath)
   let deadEnds = new Set<string>()
   let iterations = 0
-  await Promise.all(
-    (await getOpenChannelsFromPeer(start)).map(async (x) => queue.add({ weight: await weight(x), path: [x] }))
-  )
+  let initialChannels = await getOpenChannelsFromPeer(start)
+  await Promise.all(initialChannels.map(async (x) => queue.add({ weight: await weight(x), path: [x] })))
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath: ChannelPath = queue.peek()
@@ -75,16 +74,17 @@ export async function findPath(
         !deadEnds.has(c.destination.toHex())
       )
     })
-    // TODO sort
 
     if (newChannels.length == 0) {
       queue.pop()
       deadEnds.add(lastPeer.toHex())
     } else {
-      const toPush = Array.from(currentPath.path)
-      toPush.push(newChannels[0])
-      const w = await pathWeight(toPush)
-      queue.push({ weight: w, path: toPush })
+      for (let c of newChannels) {
+        const toPush = Array.from(currentPath.path)
+        toPush.push(c)
+        const w = await pathWeight(toPush)
+        queue.push({ weight: w, path: toPush })
+      }
     }
   }
 

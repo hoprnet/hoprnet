@@ -19,7 +19,7 @@ function checkPath(path: PublicKey[], edges: Map<PublicKey, PublicKey[]>) {
 }
 
 async function weight(c): Promise<BN> {
-  return c.balance.toBN()
+  return c.balance.toBN().addn(1)
 }
 
 export function fakePublicKey(i: number | string): PublicKey {
