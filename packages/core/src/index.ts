@@ -2,10 +2,11 @@ import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
 const MPLEX = require('libp2p-mplex')
-const KadDHT = require('libp2p-kad-dht')
+import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from 'libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
+import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
@@ -30,6 +31,7 @@ import {
   libp2pSubscribe,
   libp2pSendMessage,
   LibP2PHandlerFunction,
+  isSecp256k1PeerId,
   AcknowledgedTicket,
   ChannelStatus,
   MIN_NATIVE_BALANCE
@@ -48,7 +50,6 @@ import {
   ChannelsToClose
 } from './channel-strategy'
 import Debug from 'debug'
-import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
 
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
@@ -100,6 +101,7 @@ class Hopr extends EventEmitter {
   private db: HoprDB
   private paymentChannels: HoprCoreEthereum
   private addressSorter: AddressSorter
+  private publicNodesEmitter: HoprConnectOptions['publicNodes']
 
   public indexer: Indexer
 
@@ -114,9 +116,8 @@ class Hopr extends EventEmitter {
   public constructor(private id: PeerId, private options: HoprOptions) {
     super()
 
-    if (!id.privKey) {
-      // TODO - assert secp256k1?
-      throw new Error('Hopr Node must be initialized with an id with a private key')
+    if (!id.privKey || !isSecp256k1PeerId(id)) {
+      throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
     this.db = new HoprDB(
       PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(),
@@ -128,6 +129,8 @@ class Hopr extends EventEmitter {
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
       provider: this.options.provider
     })
+
+    this.publicNodesEmitter = new EventEmitter()
 
     if (this.options.preferLocalAddresses) {
       this.addressSorter = localAddressesFirst
@@ -176,11 +179,8 @@ class Hopr extends EventEmitter {
 
     const chain = await this.startedPaymentChannels()
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
-    const publicNodes = await chain.waitForPublicNodes()
-    if (publicNodes.length == 0) {
-      log('No public nodes have announced yet, we cannot rely on relay')
-    }
-    verbose('Using public nodes:', publicNodes)
+
+    const initialNodes = await chain.waitForPublicNodes()
 
     const libp2p = await LibP2P.create({
       peerId: this.id,
@@ -190,22 +190,21 @@ class Hopr extends EventEmitter {
         transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
         streamMuxer: [MPLEX],
         connEncryption: [NOISE],
-        // @ts-ignore //TODO 'Libp2pModules' does not contain types for DHT as ov v0.30 see js-libp2p/659
         dht: KadDHT
       },
       config: {
         transport: {
           HoprConnect: {
-            bootstrapServers: publicNodes
+            initialNodes,
+            publicNodes: this.publicNodesEmitter
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
-          }
+          } as HoprConnectOptions
         },
         dht: {
           enabled: true
         },
-        //@ts-ignore - bug in libp2p options
         relay: {
           enabled: false
         }
@@ -219,17 +218,39 @@ class Hopr extends EventEmitter {
     await libp2p.start()
     log('libp2p started')
     this.libp2p = libp2p
+
+    chain.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
+      if (id.equals(this.id)) {
+        // Ignore announcements from ourself
+        return
+      }
+
+      const dialables = multiaddrs.filter((ma: Multiaddr) => {
+        const tuples = ma.tuples()
+        return tuples.length > 1 && tuples[0][0] != protocols.names['p2p'].code
+      })
+
+      // @ts-ignore
+      this.libp2p.peerStore.keyBook.set(id)
+
+      if (dialables.length > 0) {
+        for (const dialable of dialables) {
+          this.publicNodesEmitter.emit('addPublicNode', dialable)
+        }
+        this.libp2p.peerStore.addressBook.add(id, multiaddrs)
+      }
+    })
+
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
       this.networkPeers.register(conn.remotePeer)
     })
 
-    // Feed previously announced addresses to DHT
-    for (const ma of publicNodes) {
-      this.libp2p.peerStore.addressBook.add(PeerId.createFromB58String(ma.getPeerId()), [ma])
-    }
-
-    this.networkPeers = new NetworkPeers(Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id))
+    this.networkPeers = new NetworkPeers(
+      Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id),
+      [this.id],
+      (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
+    )
 
     const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
       libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
@@ -249,20 +270,6 @@ class Hopr extends EventEmitter {
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
-
-    ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
-      const dialables = multiaddrs.filter((ma: Multiaddr) => {
-        const tuples = ma.tuples()
-        return tuples.length > 1 || tuples[0][0] != protocols.names['p2p'].code
-      })
-
-      // @ts-ignore
-      this.libp2p.peerStore.keyBook.set(id)
-
-      if (dialables.length > 0) {
-        this.libp2p.peerStore.addressBook.add(id, multiaddrs)
-      }
-    })
 
     log('announcing')
     await this.announce(this.options.announce)
@@ -430,8 +437,8 @@ class Hopr extends EventEmitter {
    * Gets the observed addresses of a given peer.
    * @param peer peer to query for
    */
-  public getObservedAddresses(peer: PeerId): LibP2PAddress[] {
-    return this.libp2p.peerStore.get(peer)?.addresses ?? []
+  public getObservedAddresses(peer: PeerId): Multiaddr[] {
+    return this.libp2p.peerStore.get(peer).addresses ?? []
   }
 
   /**

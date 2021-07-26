@@ -16,19 +16,23 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="e2e-security-test"
 source "${mydir}/../scripts/utils.sh"
 
+declare bad_token="bad_token"
+
 usage() {
   msg
-  msg "Usage: $0 <host> <rest_port> <admin_port>"
+  msg "Usage: $0 <host> <rest_port> <admin_port> <insecure_admin_port>"
   msg
 }
 
 declare host="${1}"
 declare rest_port="${2}"
 declare admin_port="${3}"
+declare insecure_admin_port="${4}"
 
 log "Security tests started"
 log "Rest API @ ${host}:${rest_port}"
 log "Admin websocket API @ ${host}:${admin_port}"
+log "No-auth admin websocket API @ ${host}:${insecure_admin_port}"
 
 # prefer local websocat binary over global version
 alias websocat=websocat
@@ -37,6 +41,7 @@ alias websocat=websocat
 # wait for input ports to be ready
 wait_for_port "${rest_port}" "${host}"
 wait_for_port "${admin_port}" "${host}"
+wait_for_port "${insecure_admin_port}" "${host}"
 
 declare http_status_code
 
@@ -94,5 +99,26 @@ if [[ "${ws_response}" != *"ws client connected [ authentication ENABLED ]"* ]];
   log "${ws_response}"
   exit 1
 fi
+
+log "No-auth admin websocket should auth with no token"
+ws_response=$(echo "info" | websocat ws://${host}:${insecure_admin_port}/ -0)
+if [[ "${ws_response}" != *"ws client connected [ authentication DISABLED ]"* ]]; then
+  log "⛔️ Didn't succeed ws authentication"
+  log "Expected response should contain: 'ws client connected [ authentication DISABLED ]' "
+  log "Actual response:"
+  log "${ws_response}"
+  exit 1
+fi
+
+log "No-auth admin websocket should auth with bad token"
+ws_response=$(echo "info" | websocat ws://${host}:${insecure_admin_port}/ -0 --header "Cookie:${bad_token}")
+if [[ "${ws_response}" != *"ws client connected [ authentication DISABLED ]"* ]]; then
+  log "⛔️ Didn't succeed ws authentication"
+  log "Expected response should contain: 'ws client connected [ authentication DISABLED ]' "
+  log "Actual response:"
+  log "${ws_response}"
+  exit 1
+fi
+
 
 log "Security tests finished successfully"

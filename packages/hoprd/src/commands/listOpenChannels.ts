@@ -32,6 +32,7 @@ export default class ListOpenChannels extends AbstractCommand {
     try {
       const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = selfPubKey.toAddress()
+
       const channelsFrom = (await this.node.getChannelsFrom(selfAddress)).filter(
         (channel) => channel.status !== ChannelStatus.Closed
       )
@@ -58,7 +59,7 @@ Balance:                ${styleValue(channel.balance.toFormattedString(), 'numbe
       for (const channel of channelsTo) {
         log(`
 Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
+From:                   ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
 Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)

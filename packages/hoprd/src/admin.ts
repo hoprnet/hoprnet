@@ -29,8 +29,8 @@ export class AdminServer {
   constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) {}
 
   authenticate(req): boolean {
-    if (this.apiToken === undefined) {
-      this.logs.log('web client connected [ authentication DISABLED ]')
+    if (!this.apiToken) {
+      this.logs.log('ws client connected [ authentication DISABLED ]')
       return true
     }
 
@@ -46,7 +46,7 @@ export class AdminServer {
     }
 
     if (!cookies || cookies['X-Auth-Token'] !== this.apiToken) {
-      this.logs.log('web client failed authentication')
+      this.logs.log('ws client failed authentication')
       return false
     }
     this.logs.log('ws client connected [ authentication ENABLED ]')
@@ -149,6 +149,8 @@ export class AdminServer {
           `  ${MIN_NATIVE_BALANCE} to ${addr}`
       )
     })
+
+    this.logs.logStatus(this.node.status === 'RUNNING' ? 'READY' : 'PENDING')
 
     // Setup some noise
     connectionReport(this.node, this.logs)

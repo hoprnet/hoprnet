@@ -6,37 +6,37 @@
 
 ### Enumerations
 
-- [ChannelStatus](enums/channelstatus.md)
+- [ChannelStatus](enums/ChannelStatus.md)
 
 ### Classes
 
-- [AccountEntry](classes/accountentry.md)
-- [AcknowledgedTicket](classes/acknowledgedticket.md)
-- [Address](classes/address.md)
-- [Balance](classes/balance.md)
-- [Challenge](classes/challenge.md)
-- [ChannelEntry](classes/channelentry.md)
-- [CurvePoint](classes/curvepoint.md)
-- [EthereumChallenge](classes/ethereumchallenge.md)
-- [HalfKey](classes/halfkey.md)
-- [HalfKeyChallenge](classes/halfkeychallenge.md)
-- [Hash](classes/hash.md)
-- [HoprDB](classes/hoprdb.md)
-- [NativeBalance](classes/nativebalance.md)
-- [PRG](classes/prg.md)
-- [PRP](classes/prp.md)
-- [PublicKey](classes/publickey.md)
-- [Response](classes/response.md)
-- [Signature](classes/signature.md)
-- [Snapshot](classes/snapshot.md)
-- [Ticket](classes/ticket.md)
-- [UINT256](classes/uint256.md)
-- [UnacknowledgedTicket](classes/unacknowledgedticket.md)
+- [AccountEntry](classes/AccountEntry.md)
+- [AcknowledgedTicket](classes/AcknowledgedTicket.md)
+- [Address](classes/Address.md)
+- [Balance](classes/Balance.md)
+- [Challenge](classes/Challenge.md)
+- [ChannelEntry](classes/ChannelEntry.md)
+- [CurvePoint](classes/CurvePoint.md)
+- [EthereumChallenge](classes/EthereumChallenge.md)
+- [HalfKey](classes/HalfKey.md)
+- [HalfKeyChallenge](classes/HalfKeyChallenge.md)
+- [Hash](classes/Hash.md)
+- [HoprDB](classes/HoprDB.md)
+- [NativeBalance](classes/NativeBalance.md)
+- [PRG](classes/PRG.md)
+- [PRP](classes/PRP.md)
+- [PublicKey](classes/PublicKey.md)
+- [Response](classes/Response.md)
+- [Signature](classes/Signature.md)
+- [Snapshot](classes/Snapshot.md)
+- [Ticket](classes/Ticket.md)
+- [UINT256](classes/UINT256.md)
+- [UnacknowledgedTicket](classes/UnacknowledgedTicket.md)
 
 ### Interfaces
 
-- [Intermediate](interfaces/intermediate.md)
-- [NetOptions](interfaces/netoptions.md)
+- [Intermediate](interfaces/Intermediate.md)
+- [NetOptions](interfaces/NetOptions.md)
 
 ### Type aliases
 
@@ -108,6 +108,7 @@
 - [isErrorOutOfNativeFunds](modules.md#iserroroutofnativefunds)
 - [isExpired](modules.md#isexpired)
 - [isMultiaddrLocal](modules.md#ismultiaddrlocal)
+- [isSecp256k1PeerId](modules.md#issecp256k1peerid)
 - [iterateHash](modules.md#iteratehash)
 - [lengthPrefixedToU8a](modules.md#lengthprefixedtou8a)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
@@ -188,17 +189,17 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L84)
+[libp2p/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L95)
 
 ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dht`: `boolean` ; `error`: `Error` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
+Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
 
 #### Defined in
 
-[libp2p/index.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L88)
+[libp2p/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L99)
 
 ___
 
@@ -210,8 +211,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ip4?` | [`NetOptions`](interfaces/netoptions.md) |
-| `ip6?` | [`NetOptions`](interfaces/netoptions.md) |
+| `ip4?` | [`NetOptions`](interfaces/NetOptions.md) |
+| `ip6?` | [`NetOptions`](interfaces/NetOptions.md) |
 
 #### Defined in
 
@@ -233,7 +234,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L246)
+[libp2p/index.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L257)
 
 ___
 
@@ -258,7 +259,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:247](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L247)
+[libp2p/index.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L258)
 
 ___
 
@@ -822,9 +823,9 @@ the challenge for the first ticket sent to the first relayer
 
 | Name | Type |
 | :------ | :------ |
-| `ackChallenge` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
-| `ownKey` | [`HalfKey`](classes/halfkey.md) |
-| `ticketChallenge` | [`Challenge`](classes/challenge.md) |
+| `ackChallenge` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+| `ownKey` | [`HalfKey`](classes/HalfKey.md) |
+| `ticketChallenge` | [`Challenge`](classes/Challenge.md) |
 
 #### Defined in
 
@@ -848,8 +849,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ackChallenge` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
-| `nextTicketChallenge` | [`Challenge`](classes/challenge.md) |
+| `ackChallenge` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+| `nextTicketChallenge` | [`Challenge`](classes/Challenge.md) |
 
 #### Defined in
 
@@ -859,7 +860,7 @@ ___
 
 ### deriveAckKeyShare
 
-▸ **deriveAckKeyShare**(`secret`): [`HalfKey`](classes/halfkey.md)
+▸ **deriveAckKeyShare**(`secret`): [`HalfKey`](classes/HalfKey.md)
 
 Comutes the key share that is embedded in the acknowledgement
 for a packet and thereby unlocks the incentive for the previous
@@ -873,7 +874,7 @@ relayer for transforming and delivering the packet
 
 #### Returns
 
-[`HalfKey`](classes/halfkey.md)
+[`HalfKey`](classes/HalfKey.md)
 
 #### Defined in
 
@@ -904,7 +905,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/index.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L116)
+[libp2p/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L127)
 
 ___
 
@@ -965,18 +966,18 @@ ___
 
 ### generateChannelId
 
-▸ **generateChannelId**(`source`, `destination`): [`Hash`](classes/hash.md)
+▸ **generateChannelId**(`source`, `destination`): [`Hash`](classes/Hash.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `source` | [`Address`](classes/address.md) |
-| `destination` | [`Address`](classes/address.md) |
+| `source` | [`Address`](classes/Address.md) |
+| `destination` | [`Address`](classes/Address.md) |
 
 #### Returns
 
-[`Hash`](classes/hash.md)
+[`Hash`](classes/Hash.md)
 
 #### Defined in
 
@@ -1209,6 +1210,30 @@ ___
 
 ___
 
+### isSecp256k1PeerId
+
+▸ **isSecp256k1PeerId**(`peer`): `boolean`
+
+Check if PeerId contains a secp256k1 privKey
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `peer` | `PeerId` | PeerId to check |
+
+#### Returns
+
+`boolean`
+
+whether embedded privKey is a secp256k1 key
+
+#### Defined in
+
+[libp2p/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L84)
+
+___
+
 ### iterateHash
 
 ▸ **iterateHash**(`seed`, `hashFunc`, `iterations`, `stepSize`, `hint?`): `Promise`<`Object`\>
@@ -1277,7 +1302,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L203)
+[libp2p/index.ts:214](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L214)
 
 ___
 
@@ -1301,7 +1326,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:219](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L219)
+[libp2p/index.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L230)
 
 ___
 
@@ -1324,7 +1349,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:282](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L282)
+[libp2p/index.ts:293](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L293)
 
 ___
 
@@ -1474,7 +1499,7 @@ incentive for relaying the packet
 | :------ | :------ | :------ |
 | `secret` | `Uint8Array` | shared secret with the creator of the packet |
 | `porBytes` | `Uint8Array` | PoR bitstring as included within the packet |
-| `challenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) | ticket challenge of the incoming ticket |
+| `challenge` | [`EthereumChallenge`](classes/EthereumChallenge.md) | ticket challenge of the incoming ticket |
 
 #### Returns
 
@@ -1692,7 +1717,7 @@ ___
 
 ### recoverIteratedHash
 
-▸ **recoverIteratedHash**(`hashValue`, `hashFunc`, `hint`, `maxIterations`, `stepSize?`, `indexHint?`): `Promise`<[`Intermediate`](interfaces/intermediate.md) \| `undefined`\>
+▸ **recoverIteratedHash**(`hashValue`, `hashFunc`, `hint`, `maxIterations`, `stepSize?`, `indexHint?`): `Promise`<[`Intermediate`](interfaces/Intermediate.md) \| `undefined`\>
 
 #### Parameters
 
@@ -1707,7 +1732,7 @@ ___
 
 #### Returns
 
-`Promise`<[`Intermediate`](interfaces/intermediate.md) \| `undefined`\>
+`Promise`<[`Intermediate`](interfaces/Intermediate.md) \| `undefined`\>
 
 #### Defined in
 
@@ -2117,7 +2142,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `halfKey` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
+| `halfKey` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
 
 #### Returns
 
@@ -2137,9 +2162,9 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ethereumChallenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) |
-| `ownKey` | [`HalfKey`](classes/halfkey.md) |
-| `ack` | [`HalfKey`](classes/halfkey.md) |
+| `ethereumChallenge` | [`EthereumChallenge`](classes/EthereumChallenge.md) |
+| `ownKey` | [`HalfKey`](classes/HalfKey.md) |
+| `ack` | [`HalfKey`](classes/HalfKey.md) |
 
 #### Returns
 
@@ -2159,9 +2184,9 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ethereumChallenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) |
-| `ownShare` | [`HalfKeyChallenge`](classes/halfkeychallenge.md) |
-| `ack` | [`HalfKey`](classes/halfkey.md) |
+| `ethereumChallenge` | [`EthereumChallenge`](classes/EthereumChallenge.md) |
+| `ownShare` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+| `ack` | [`HalfKey`](classes/HalfKey.md) |
 
 #### Returns
 
@@ -2181,8 +2206,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `ethereumChallenge` | [`EthereumChallenge`](classes/ethereumchallenge.md) |
-| `response` | [`Response`](classes/response.md) |
+| `ethereumChallenge` | [`EthereumChallenge`](classes/EthereumChallenge.md) |
+| `response` | [`Response`](classes/Response.md) |
 
 #### Returns
 
