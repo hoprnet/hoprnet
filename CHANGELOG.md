@@ -1,3 +1,30 @@
+<a name="0.2.35"></a>
+
+## [0.2.35](https://github.com/hoprnet/hopr-connect/compare/v0.2.34...v0.2.35) (2021-07-23)
+
+Changes:
+
+- less strict node version (#258)
+- use native yarn caching in GH actions (#257)
+
+<a name="0.2.34"></a>
+
+## [0.2.34](https://github.com/hoprnet/hopr-connect/compare/v0.2.33...v0.2.34) (2021-07-23)
+
+Changes:
+
+- dependency cleanup (#251)
+
+<a name="0.2.33"></a>
+
+## [0.2.33](https://github.com/hoprnet/hopr-connect/compare/v0.2.32...v0.2.33) (2021-07-22)
+
+Changes:
+
+- upgrade to `libp2p@0.32.1` (#249)
+- fix automated relay CI test (#242)
+- improved logging (#248)
+
 <a name="0.2.32"></a>
 
 ## [0.2.32](https://github.com/hoprnet/hopr-connect/compare/v0.2.31...v0.2.32) (2021-07-21)
