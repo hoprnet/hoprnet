@@ -76,7 +76,7 @@ class Channel {
       )
 
       await this.commitment.bumpCommitment()
-      this.events.emit('ticket:win', ack)
+      this.events.emit('ticket:win', ack, this)
       return ack
     } else {
       log(`Got a ticket that is not a win. Dropping ticket.`)
