@@ -52,31 +52,22 @@ describe('test pathfinder with some simple topologies', function () {
   ARROW.set(TEST_NODES[2], [TEST_NODES[3]])
   ARROW.set(TEST_NODES[3], [TEST_NODES[4]])
 
-  function fakeChannels(edges: Map<PublicKey, PublicKey[]>, stakes: (i: PublicKey) => Balance): (p: PublicKey) => Promise<any[]> {
-    return  (a: PublicKey) =>
-        Promise.resolve((edges.get(a) || []).map((b) => ({ source: a, destination: b, balance: stakes(b) as any })))
+  function fakeChannels(
+    edges: Map<PublicKey, PublicKey[]>,
+    stakes: (i: PublicKey) => Balance
+  ): (p: PublicKey) => Promise<any[]> {
+    return (a: PublicKey) =>
+      Promise.resolve((edges.get(a) || []).map((b) => ({ source: a, destination: b, balance: stakes(b) as any })))
   }
 
   it('should find a path through a reliable star', async function () {
-    const path = await findPath(
-      TEST_NODES[1],
-      fakePublicKey(6),
-      2,
-      RELIABLE_NETWORK,
-      fakeChannels(STAR, STAKE_1)
-    )
+    const path = await findPath(TEST_NODES[1], fakePublicKey(6), 2, RELIABLE_NETWORK, fakeChannels(STAR, STAKE_1))
     checkPath(path, STAR)
     assert(path.length == 2, 'Should find a valid acyclic path')
   })
 
   it('should find the most valuable path through a reliable star', async function () {
-    const path = await findPath(
-      TEST_NODES[1],
-      fakePublicKey(6),
-      2,
-      RELIABLE_NETWORK,
-      fakeChannels(STAR, STAKE_N)
-    )
+    const path = await findPath(TEST_NODES[1], fakePublicKey(6), 2, RELIABLE_NETWORK, fakeChannels(STAR, STAKE_N))
     checkPath(path, STAR)
     // @ts-ignore
     assert(path[1].id == 4, 'Last hop should be 4 (most valuable choice)')
@@ -85,13 +76,7 @@ describe('test pathfinder with some simple topologies', function () {
   it('should not find a path if it doesnt exist', async () => {
     let thrown = false
     try {
-      await findPath(
-        TEST_NODES[1],
-        fakePublicKey(6),
-        4,
-        RELIABLE_NETWORK,
-        fakeChannels(STAR, STAKE_1)
-      )
+      await findPath(TEST_NODES[1], fakePublicKey(6), 4, RELIABLE_NETWORK, fakeChannels(STAR, STAKE_1))
     } catch (e) {
       thrown = true
     }
@@ -99,13 +84,7 @@ describe('test pathfinder with some simple topologies', function () {
   })
 
   it('should find a path through a reliable arrow', async () => {
-    const path = await findPath(
-      TEST_NODES[0],
-      fakePublicKey(6),
-      4,
-      RELIABLE_NETWORK,
-      fakeChannels(ARROW, STAKE_1)
-    )
+    const path = await findPath(TEST_NODES[0], fakePublicKey(6), 4, RELIABLE_NETWORK, fakeChannels(ARROW, STAKE_1))
     checkPath(path, ARROW)
     assert(path.length == 4, 'Should find a valid acyclic path')
   })
@@ -113,13 +92,7 @@ describe('test pathfinder with some simple topologies', function () {
   it('should not find a path if a node is unreliable', async () => {
     let thrown = false
     try {
-      await findPath(
-        TEST_NODES[0],
-        fakePublicKey(6),
-        4,
-        UNRELIABLE_NETWORK,
-        fakeChannels(ARROW, STAKE_1)
-      )
+      await findPath(TEST_NODES[0], fakePublicKey(6), 4, UNRELIABLE_NETWORK, fakeChannels(ARROW, STAKE_1))
     } catch (e) {
       thrown = true
     }
