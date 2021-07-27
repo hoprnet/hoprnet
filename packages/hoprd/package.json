@@ -39,7 +39,7 @@
     "dids": "^2.1.0",
     "ethereumjs-wallet": "^1.0.1",
     "jazzicon": "^1.5.0",
-    "js-cookie": "^2.2.1",
+    "js-cookie": "^3.0.0",
     "key-did-provider-ed25519": "^1.1.0",
     "key-did-resolver": "^1.2.1",
     "next": "^11.0.0",
