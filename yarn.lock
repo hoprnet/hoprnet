@@ -686,6 +686,30 @@
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
 
+"@hoprnet/hopr-utils@1.75.0-next.16":
+  version "1.75.0-next.16"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.75.0-next.16.tgz#3b746e536f629ca5428073d30d6fde2b2aab3084"
+  integrity sha512-+QL2GDhMn3gv/l+jmRJlECfki7DtdbrmOt/J+YdTbsZNrLDEsKui/Cu+yr44DsqjtEVICHzOOnolglOGvHjdiw==
+  dependencies:
+    abort-controller "~3.0.0"
+    bignumber.js "^9.0.0"
+    bn.js "^5.2.0"
+    bs58 "^4.0.1"
+    chalk "^4.1.1"
+    ethers "^5.1.3"
+    futoin-hkdf "~1.4.1"
+    it-pipe "^1.1.0"
+    leveldown "^6.0.0"
+    levelup "^5.0.0"
+    libp2p "0.32.1"
+    libp2p-crypto "0.19.6"
+    memdown "^6.0.0"
+    multiaddr "^10.0.0"
+    multihashes "~4.0.1"
+    peer-id "0.15.1"
+    private-ip "^2.2.1"
+    secp256k1 "^4.0.2"
+
 "@hutson/parse-repository-url@^3.0.0":
   version "3.0.2"
   resolved "https://registry.yarnpkg.com/@hutson/parse-repository-url/-/parse-repository-url-3.0.2.tgz#98c23c950a3d9b6c8f0daed06da6c3af06981340"
