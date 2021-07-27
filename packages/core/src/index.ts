@@ -206,27 +206,9 @@ class Hopr extends EventEmitter {
     log('libp2p started')
     this.libp2p = libp2p
 
-    ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
-      if (id.equals(this.id)) {
-        // Ignore announcements from ourself
-        return
-      }
+    this.addPreviousNodes(initialNodes)
 
-      const dialables = multiaddrs.filter((ma: Multiaddr) => {
-        const tuples = ma.tuples()
-        return tuples.length > 1 && tuples[0][0] != protocols.names['p2p'].code
-      })
-
-      // @ts-ignore
-      this.libp2p.peerStore.keyBook.set(id)
-
-      if (dialables.length > 0) {
-        for (const dialable of dialables) {
-          this.publicNodesEmitter.emit('addPublicNode', dialable)
-        }
-        this.libp2p.peerStore.addressBook.add(id, multiaddrs)
-      }
-    })
+    ethereum.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
@@ -256,9 +238,8 @@ class Hopr extends EventEmitter {
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
-    log('announcing')
     await this.announce(this.options.announce)
-    log('announced, starting heartbeat')
+    log('announcing done, starting heartbeat')
 
     this.heartbeat.start()
     this.setChannelStrategy(this.options.strategy || 'passive')
@@ -317,6 +298,59 @@ class Hopr extends EventEmitter {
     }
 
     await this.setChannelStrategy('passive')
+  }
+
+  /**
+   * Populates libp2p's peerStore with previously announced nodes
+   * @param initialNodes previosly announced nodes
+   * @returns
+   */
+  private addPreviousNodes(initialNodes: Multiaddr[]): void {
+    for (const initialNode of initialNodes) {
+      const peerId = PeerId.createFromB58String(initialNode.getPeerId())
+
+      if (peerId.equals(this.id)) {
+        // Ignore announcements from ourself
+        continue
+      }
+
+      // @ts-ignore
+      this.libp2p.peerStore.keyBook.set(peerId)
+
+      const tuples = initialNode.tuples()
+
+      if (tuples.length == 0 || tuples[0][0] == protocols.names['p2p'].code) {
+        continue
+      }
+
+      this.libp2p.peerStore.addressBook.add(peerId, [initialNode])
+    }
+  }
+
+  /**
+   * Called whenever a peer is announced
+   * @param peer newly announced peer
+   */
+  private onPeerAnnouncement(peer: { id: PeerId; multiaddrs: Multiaddr[] }): void {
+    if (peer.id.equals(this.id)) {
+      // Ignore announcements from ourself
+      return
+    }
+
+    const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
+      const tuples = ma.tuples()
+      return tuples.length > 1 && tuples[0][0] != protocols.names['p2p'].code
+    })
+
+    // @ts-ignore
+    this.libp2p.peerStore.keyBook.set(peer.id)
+
+    if (dialables.length > 0) {
+      for (const dialable of dialables) {
+        this.publicNodesEmitter.emit('addPublicNode', dialable)
+      }
+      this.libp2p.peerStore.addressBook.add(peer.id, peer.multiaddrs)
+    }
   }
 
   private async tickChannelStrategy() {
@@ -420,7 +454,8 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Lists the addresses which the given node announces to other nodes
+   * List of addresses that is announced to other nodes
+   * @dev returned list can change at runtime
    * @param peer peer to query for, default self
    */
   public async getAnnouncedAddresses(peer: PeerId = this.getId()): Promise<Multiaddr[]> {
@@ -613,27 +648,29 @@ class Hopr extends EventEmitter {
   }
 
   private async announce(includeRouting: boolean = false): Promise<void> {
-    log('announcing self, include routing:', includeRouting)
     const chain = await this.paymentChannels
-    //const account = await chain.getAccount(await this.getEthereumAddress())
-    // exit if we already announced
-    //if (account.hasAnnounced()) return
 
     const multiaddrs = await this.getAnnouncedAddresses()
-    const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))
-    const ip6 = multiaddrs.find((s) => s.toString().includes('/ip6/'))
+
+    const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
+    const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
+
     const p2p = new Multiaddr('/p2p/' + this.getId().toB58String())
-    // exit if none of these multiaddrs are available
-    if (!ip4 && !ip6 && !p2p) return
+
+    const addrToAnnounce = ip4 ?? ip6 ?? p2p
+    const isRoutableAddress = (ip4 ?? ip6) != undefined
+
+    const ownAccount = await chain.getAccount(await this.getEthereumAddress())
+
+    if (ownAccount?.multiAddr?.equals(addrToAnnounce)) {
+      log(`intended address has already been announced, nothing to do`)
+      return
+    }
 
     try {
-      if (includeRouting && (ip4 || ip6)) {
-        log('announcing with routing', ip4 || ip6)
-        await chain.announce(ip4 || ip6)
-        return
-      }
-      log('announcing without routing', p2p.toString())
-      await chain.announce(p2p)
+      log(`announcing ${includeRouting && isRoutableAddress ? 'with' : 'without'} routing`)
+
+      await chain.announce(addrToAnnounce)
     } catch (err) {
       log('announce failed')
       await this.isOutOfFunds(err)
