@@ -70,19 +70,6 @@ describe('Commands', () => {
     await assertMatch(cmds, 'settings includeRecipient', /false/)
   })
 
-  it('settings strategy', async () => {
-    let mockNode: any = sinon.fake()
-    let setCalled = 'promiscuous'
-    mockNode.setChannelStrategy = (s: string) => {
-      setCalled = s
-    }
-    mockNode.getChannelStrategy = (): string => setCalled
-    let cmds = new mod.Commands(mockNode)
-    await assertMatch(cmds, 'settings strategy', /promiscuous/)
-    await assertMatch(cmds, 'settings strategy passive', /.*/)
-    assert(setCalled === 'passive')
-  })
-
   it('alias addresses', async () => {
     let mockNode: any = sinon.fake()
     mockNode.sendMessage = sinon.fake()

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.75.0-next.13",
+  "version": "1.75.0-next.16",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -17,7 +17,7 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "engines": {
-    "node": "14",
+    "node": "14 || 16",
     "yarn": "1"
   },
   "files": [
@@ -28,8 +28,8 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.75.0-next.13",
-    "@hoprnet/hopr-utils": "1.75.0-next.13",
+    "@hoprnet/hopr-ethereum": "1.75.0-next.16",
+    "@hoprnet/hopr-utils": "1.75.0-next.16",
     "async-mutex": "^0.3.0",
     "bn.js": "^5.2.0",
     "chalk": "^4.1.0",
