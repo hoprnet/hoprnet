@@ -17,7 +17,7 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "engines": {
-    "node": "14 || 16",
+    "node": "16",
     "yarn": "1"
   },
   "files": [
@@ -45,7 +45,7 @@
     "@types/levelup": "^4.3.0",
     "@types/memdown": "^3.0.0",
     "@types/mocha": "^9.0.0",
-    "@types/node": "14.14.35",
+    "@types/node": "16.4.1",
     "@types/secp256k1": "^4.0.2",
     "@types/sinon": "^10.0.0",
     "chai": "^4.3.4",

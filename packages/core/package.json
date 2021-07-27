@@ -13,7 +13,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "engines": {
-    "node": "14 || 16",
+    "node": "16",
     "yarn": "1"
   },
   "scripts": {
@@ -33,7 +33,7 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-connect": "0.2.34",
+    "@hoprnet/hopr-connect": "0.2.39",
     "@hoprnet/hopr-core-ethereum": "1.75.0-next.18",
     "@hoprnet/hopr-utils": "1.75.0-next.18",
     "abort-controller": "^3.0.0",
@@ -59,7 +59,7 @@
     "@types/levelup": "^4.3.3",
     "@types/memdown": "^3.0.0",
     "@types/mocha": "^9.0.0",
-    "@types/node": "14.14.35",
+    "@types/node": "16.4.1",
     "@types/secp256k1": "~4.0.2",
     "@types/sinon": "^10.0.2",
     "chai": "^4.3.4",

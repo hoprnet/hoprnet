@@ -1,2 +1,2 @@
-FROM node:14.15-buster@sha256:74a322375cbf1bfca73e3d41f39d4a04e4869c7defdf83f9663166989d1b553c AS base
+FROM node:16-buster-slim@sha256:028cd08984d88964f206077d56756ac594043cbd32b029e167ca23f824981df7 AS base
 RUN yarn hardhat node --config packages/ethereum/hardhat.config.ts > "/tmp/$DATAFILE-rpc.txt" 2>&1 &

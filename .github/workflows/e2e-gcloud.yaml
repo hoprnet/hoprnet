@@ -21,7 +21,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14]
+        node-version: [16]
         # only need to run on one OS since all testing is done on cloud VMs
         os: ['ubuntu-latest']
 
