@@ -15,31 +15,20 @@ import { Discovery } from './discovery'
 import { Filter } from './filter'
 import { dialHelper } from './utils'
 
-import type { PublicNodesEmitter } from './types'
+import type { PublicNodesEmitter, PeerStoreType } from './types'
 
 const log = debug('hopr-connect')
 const verbose = debug('hopr-connect:verbose')
 
 export type HoprConnectOptions = {
   publicNodes?: PublicNodesEmitter
-  initialNodes?: Multiaddr[]
+  initialNodes?: PeerStoreType[]
   interface?: string
   __noDirectConnections?: boolean
   __noWebRTCUpgrade?: boolean
   maxRelayedConnections?: number
 }
 
-/**
- * Adds the peerId of a Multiaddr to the given set
- * @param set set of PeerId strings
- * @param multiAddr multiaddr potentially containing a PeerId
- */
-function addPeerIdStringToSet(set: Set<string>, multiAddr: Multiaddr) {
-  const initialNodePeerId = multiAddr.getPeerId()
-  if (initialNodePeerId != undefined) {
-    set.add(initialNodePeerId)
-  }
-}
 /**
  * @class HoprConnect
  */
@@ -51,7 +40,7 @@ class HoprConnect implements Transport {
   public discovery: Discovery
 
   private publicNodes?: PublicNodesEmitter
-  private initialNodes?: Multiaddr[]
+  private initialNodes?: PeerStoreType[]
 
   private relayPeerIds?: Set<string>
 
@@ -134,10 +123,15 @@ class HoprConnect implements Transport {
       this.relayPeerIds = new Set<string>()
 
       for (const initialNode of this.initialNodes ?? []) {
-        addPeerIdStringToSet(this.relayPeerIds, initialNode)
+        this.relayPeerIds ??= new Set<string>()
+        this.relayPeerIds.add(initialNode.id.toB58String())
       }
 
-      this.publicNodes?.on('addPublicNode', (ma: Multiaddr) => addPeerIdStringToSet(this.relayPeerIds as any, ma))
+      this.publicNodes?.on('addPublicNode', (peer: PeerStoreType) => {
+        this.relayPeerIds ??= new Set<string>()
+        this.relayPeerIds.add(peer.id.toB58String())
+      })
+
       verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
     }
 
