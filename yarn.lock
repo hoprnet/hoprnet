@@ -685,10 +685,82 @@
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
 
+"@hoprnet/hopr-core-ethereum@1.75.0-next.13":
+  version "1.75.0-next.13"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-1.75.0-next.13.tgz#06f35e85fda08584f6974b1596f5fd0969878821"
+  integrity sha512-rMVU7BCQwgmzCI/JddTVWVfvslLmEx76YsNX40shrX/s0bBWHe9fH69Qfnheoe84L7tuDnSVy0WIL1qKUDMq6g==
+  dependencies:
+    "@hoprnet/hopr-ethereum" "1.75.0-next.13"
+    "@hoprnet/hopr-utils" "1.75.0-next.13"
+    async-mutex "^0.3.0"
+    bn.js "^5.2.0"
+    chalk "^4.1.0"
+    debug "^4.3.1"
+    ethers "^5.2.0"
+    heap-js "^2.1.2"
+    multiaddr "^10.0.0"
+    peer-id "0.15.1"
+    secp256k1 "^4.0.2"
+
+"@hoprnet/hopr-core@1.75.0-next.13":
+  version "1.75.0-next.13"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-1.75.0-next.13.tgz#9e4c2fd290ab7d34b4517ea400d21283924a876e"
+  integrity sha512-gH2diTWOHy+7ZX5dxrnKzyfDXFBmtTUYCOW7K5xv6ft5en2uwfu6q+zBB/Pl3z7S7Xo/rHjVFRFQ/c0o/Mz/1w==
+  dependencies:
+    "@hoprnet/hopr-connect" "0.2.34"
+    "@hoprnet/hopr-core-ethereum" "1.75.0-next.13"
+    "@hoprnet/hopr-utils" "1.75.0-next.13"
+    abort-controller "^3.0.0"
+    bn.js "5.2.0"
+    chalk "~4.1.1"
+    debug "^4.3.2"
+    heap-js "^2.1.6"
+    leveldown "~6.0.0"
+    levelup "~5.0.0"
+    libp2p "0.32.1"
+    libp2p-kad-dht "0.23.1"
+    libp2p-mplex "0.10.4"
+    libp2p-noise "^4.0.0"
+    multiaddr "^10.0.0"
+    peer-id "^0.15.1"
+    secp256k1 "~4.0.2"
+
+"@hoprnet/hopr-ethereum@1.75.0-next.13":
+  version "1.75.0-next.13"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.75.0-next.13.tgz#c653a6b4c6036982ae4388794877501d06b61a69"
+  integrity sha512-DOGt7yeZGowbxI4BzV1oPX/G5Av3tVEGKx4NtTTRI0xhAAQFJLLKm0znrolxdnZlH7fnimLZfmeBicCP+D2dEw==
+  dependencies:
+    "@openzeppelin/contracts" "4.2.0"
+    "@openzeppelin/contracts-v3-0-1" "npm:@openzeppelin/contracts@3.0.1"
+
 "@hoprnet/hopr-utils@1.75.0-next.10":
   version "1.75.0-next.10"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.75.0-next.10.tgz#5d320aa419d63825da5caeb5013aeee59064f472"
   integrity sha512-9Umo7TK3zCkJn7krSU8uZyWm4SejnmgQUbMwZS8SBhtJq9jSnJ/lmxx1X9F+ccBD1/hDKeYybM9qVbRCf9L6Wg==
+  dependencies:
+    abort-controller "~3.0.0"
+    bignumber.js "^9.0.0"
+    bn.js "^5.2.0"
+    bs58 "^4.0.1"
+    chalk "^4.1.1"
+    ethers "^5.1.3"
+    futoin-hkdf "~1.4.1"
+    it-pipe "^1.1.0"
+    leveldown "^6.0.0"
+    levelup "^5.0.0"
+    libp2p "0.32.1"
+    libp2p-crypto "0.19.6"
+    memdown "^6.0.0"
+    multiaddr "^10.0.0"
+    multihashes "~4.0.1"
+    peer-id "0.15.1"
+    private-ip "^2.2.1"
+    secp256k1 "^4.0.2"
+
+"@hoprnet/hopr-utils@1.75.0-next.13":
+  version "1.75.0-next.13"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.75.0-next.13.tgz#8840b332019202779ecb914fff4397a1b779153f"
+  integrity sha512-t9G7/RAZtRerIpejymSYVes7Ig/kMIsNCKh23YMAbjvjgr5wur8Yr32ZAcbKD6+amnOMFwHdvc2GKSdatCZp5g==
   dependencies:
     abort-controller "~3.0.0"
     bignumber.js "^9.0.0"
