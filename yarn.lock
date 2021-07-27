@@ -665,12 +665,13 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.2.0.tgz#f3933a44e365864f4dad5db94158106d511e8131"
   integrity sha512-sqKVVVOe5ivCaXDWivIJYVSaEgdQK9ul7a4Kity5Iw7u9+wBAPbX1RMSnLLmp7O4Vzj0WOWwMAJsTL00xwaNug==
 
-"@hoprnet/hopr-connect@0.2.34":
-  version "0.2.34"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.34.tgz#c44d3edeac76e70a96d3ced0aec6264223c6b3e8"
-  integrity sha512-SDwVyu0Y10TE6Fu5ArJ9Aw7AvPHYJquhQGDfAmTMvp1P5oa5ZFtJoZCYEpaUOGWdfnovhHFVs2/yLipxRHxyhQ==
+"@hoprnet/hopr-connect@0.2.39":
+  version "0.2.39"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.39.tgz#9ea43590e9fe12c53adc43f68e8e7325b51dcb90"
+  integrity sha512-Cuu73P1bflj9NLfgFzGo7lIgBPCY2v08ngAvgI/cOF/mtNNMC3Rp7eEU7K2d7Tz4MBQndBKJWcORAdEbBcy7Mg==
   dependencies:
-    "@hoprnet/hopr-utils" "1.75.0-next.10"
+    "@hoprnet/hopr-utils" "1.75.0-next.16"
+    abort-controller "3.0.0"
     abortable-iterator "^3.0.0"
     bl "^5.0"
     debug "^4.3.2"
@@ -684,30 +685,6 @@
     stream-to-it "^0.2.4"
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
-
-"@hoprnet/hopr-utils@1.75.0-next.10":
-  version "1.75.0-next.10"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.75.0-next.10.tgz#5d320aa419d63825da5caeb5013aeee59064f472"
-  integrity sha512-9Umo7TK3zCkJn7krSU8uZyWm4SejnmgQUbMwZS8SBhtJq9jSnJ/lmxx1X9F+ccBD1/hDKeYybM9qVbRCf9L6Wg==
-  dependencies:
-    abort-controller "~3.0.0"
-    bignumber.js "^9.0.0"
-    bn.js "^5.2.0"
-    bs58 "^4.0.1"
-    chalk "^4.1.1"
-    ethers "^5.1.3"
-    futoin-hkdf "~1.4.1"
-    it-pipe "^1.1.0"
-    leveldown "^6.0.0"
-    levelup "^5.0.0"
-    libp2p "0.32.1"
-    libp2p-crypto "0.19.6"
-    memdown "^6.0.0"
-    multiaddr "^10.0.0"
-    multihashes "~4.0.1"
-    peer-id "0.15.1"
-    private-ip "^2.2.1"
-    secp256k1 "^4.0.2"
 
 "@hutson/parse-repository-url@^3.0.0":
   version "3.0.2"
@@ -2387,7 +2364,7 @@ abbrev@1.0.x:
   resolved "https://registry.yarnpkg.com/abbrev/-/abbrev-1.0.9.tgz#91b4792588a7738c25f35dd6f63752a2f8776135"
   integrity sha1-kbR5JYinc4wl813W9jdSovh3YTU=
 
-abort-controller@^3.0.0, abort-controller@~3.0.0:
+abort-controller@3.0.0, abort-controller@^3.0.0, abort-controller@~3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/abort-controller/-/abort-controller-3.0.0.tgz#eaf54d53b62bae4138e809ca225c8439a6efb392"
   integrity sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==
