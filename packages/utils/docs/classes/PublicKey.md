@@ -17,6 +17,7 @@
 - [eq](PublicKey.md#eq)
 - [serialize](PublicKey.md#serialize)
 - [toAddress](PublicKey.md#toaddress)
+- [toB58String](PublicKey.md#tob58string)
 - [toHex](PublicKey.md#tohex)
 - [toPeerId](PublicKey.md#topeerid)
 - [toString](PublicKey.md#tostring)
@@ -76,7 +77,7 @@
 
 #### Defined in
 
-[types/primitives.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L74)
+[types/primitives.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L78)
 
 ___
 
@@ -105,6 +106,20 @@ ___
 #### Defined in
 
 [types/primitives.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L38)
+
+___
+
+### toB58String
+
+▸ **toB58String**(): `string`
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[types/primitives.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L74)
 
 ___
 
@@ -174,7 +189,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L82)
+[types/primitives.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L86)
 
 ___
 
@@ -194,7 +209,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L78)
+[types/primitives.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L82)
 
 ___
 
