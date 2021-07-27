@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.75.0-next.17",
+  "version": "1.75.0-next.18",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -42,7 +42,7 @@
     "memdown": "^6.0.0",
     "multiaddr": "^10.0.0",
     "multihashes": "~4.0.1",
-    "peer-id": "0.15.1",
+    "peer-id": "0.15.2",
     "private-ip": "^2.2.1",
     "secp256k1": "^4.0.2"
   },
