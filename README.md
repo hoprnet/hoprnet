@@ -284,6 +284,21 @@ locally by executing:
 ./scripts/run-integration-tests-locally.sh
 ```
 
+In some unique cases, some bugs might not had been picked up by our end-to-end
+testing and instead only show up when deployed to production. To avoid having
+to see these only after a time consuming build, you can deploy an `internal`
+testnet, which will deploy `1` node to our infrastructure manually (given that
+you have permissions to deploy).
+
+To do so, authenticate with `gcloud auth login`, and run the following script:
+
+```sh
+FUNDING_PRIV_KEY=$FUNDING_PRIV_KEY BS_PASSWORD= ./scripts/internal.sh
+```
+
+where `FUNDING_PRIV_KEY` is the wallet to be used to fund the node to be spin in
+our network.
+
 ## Tooling
 
 As some tools are only partially supported, please tag the respective team member
