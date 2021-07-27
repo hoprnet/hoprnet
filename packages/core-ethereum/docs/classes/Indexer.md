@@ -69,6 +69,7 @@ Also keeps track of the latest block number.
 - [start](Indexer.md#start)
 - [stop](Indexer.md#stop)
 - [waitForCommitment](Indexer.md#waitforcommitment)
+- [getEventListener](Indexer.md#geteventlistener)
 - [listenerCount](Indexer.md#listenercount)
 - [on](Indexer.md#on)
 - [once](Indexer.md#once)
@@ -195,7 +196,7 @@ EventEmitter.captureRejectionSymbol
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:43
+core-ethereum/node_modules/@types/node/events.d.ts:46
 
 ___
 
@@ -211,7 +212,7 @@ EventEmitter.captureRejections
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:49
+core-ethereum/node_modules/@types/node/events.d.ts:52
 
 ___
 
@@ -225,7 +226,7 @@ EventEmitter.defaultMaxListeners
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:50
+core-ethereum/node_modules/@types/node/events.d.ts:53
 
 ___
 
@@ -247,7 +248,7 @@ EventEmitter.errorMonitor
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:42
+core-ethereum/node_modules/@types/node/events.d.ts:45
 
 ## Methods
 
@@ -272,7 +273,7 @@ EventEmitter.addListener
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:62
+core-ethereum/node_modules/@types/node/events.d.ts:72
 
 ___
 
@@ -297,7 +298,7 @@ EventEmitter.emit
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:72
+core-ethereum/node_modules/@types/node/events.d.ts:82
 
 ___
 
@@ -315,7 +316,7 @@ EventEmitter.eventNames
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:77
+core-ethereum/node_modules/@types/node/events.d.ts:87
 
 ___
 
@@ -447,7 +448,7 @@ EventEmitter.getMaxListeners
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:69
+core-ethereum/node_modules/@types/node/events.d.ts:79
 
 ___
 
@@ -549,7 +550,7 @@ EventEmitter.listenerCount
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:73
+core-ethereum/node_modules/@types/node/events.d.ts:83
 
 ___
 
@@ -573,7 +574,7 @@ EventEmitter.listeners
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:70
+core-ethereum/node_modules/@types/node/events.d.ts:80
 
 ___
 
@@ -598,7 +599,7 @@ EventEmitter.off
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:66
+core-ethereum/node_modules/@types/node/events.d.ts:76
 
 ___
 
@@ -623,7 +624,7 @@ EventEmitter.on
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:63
+core-ethereum/node_modules/@types/node/events.d.ts:73
 
 ___
 
@@ -756,7 +757,7 @@ EventEmitter.once
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:64
+core-ethereum/node_modules/@types/node/events.d.ts:74
 
 ___
 
@@ -781,7 +782,7 @@ EventEmitter.prependListener
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:75
+core-ethereum/node_modules/@types/node/events.d.ts:85
 
 ___
 
@@ -806,7 +807,7 @@ EventEmitter.prependOnceListener
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:76
+core-ethereum/node_modules/@types/node/events.d.ts:86
 
 ___
 
@@ -858,7 +859,7 @@ EventEmitter.rawListeners
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:71
+core-ethereum/node_modules/@types/node/events.d.ts:81
 
 ___
 
@@ -882,7 +883,7 @@ EventEmitter.removeAllListeners
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:67
+core-ethereum/node_modules/@types/node/events.d.ts:77
 
 ___
 
@@ -907,7 +908,7 @@ EventEmitter.removeListener
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:65
+core-ethereum/node_modules/@types/node/events.d.ts:75
 
 ___
 
@@ -965,7 +966,7 @@ EventEmitter.setMaxListeners
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:68
+core-ethereum/node_modules/@types/node/events.d.ts:78
 
 ___
 
@@ -1050,6 +1051,33 @@ ___
 
 ___
 
+### getEventListener
+
+▸ `Static` **getEventListener**(`emitter`, `name`): `Function`[]
+
+Returns a list listener for a specific emitter event name.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `emitter` | `DOMEventTarget` \| `EventEmitter` |
+| `name` | `string` \| `symbol` |
+
+#### Returns
+
+`Function`[]
+
+#### Inherited from
+
+EventEmitter.getEventListener
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:34
+
+___
+
 ### listenerCount
 
 ▸ `Static` **listenerCount**(`emitter`, `event`): `number`
@@ -1073,13 +1101,13 @@ EventEmitter.listenerCount
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:31
+core-ethereum/node_modules/@types/node/events.d.ts:30
 
 ___
 
 ### on
 
-▸ `Static` **on**(`emitter`, `event`): `AsyncIterableIterator`<`any`\>
+▸ `Static` **on**(`emitter`, `event`, `options?`): `AsyncIterableIterator`<`any`\>
 
 #### Parameters
 
@@ -1087,6 +1115,7 @@ ___
 | :------ | :------ |
 | `emitter` | `EventEmitter` |
 | `event` | `string` |
+| `options?` | `StaticEventEmitterOptions` |
 
 #### Returns
 
@@ -1098,13 +1127,13 @@ EventEmitter.on
 
 #### Defined in
 
-core-ethereum/node_modules/@types/node/events.d.ts:28
+core-ethereum/node_modules/@types/node/events.d.ts:27
 
 ___
 
 ### once
 
-▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
+▸ `Static` **once**(`emitter`, `event`, `options?`): `Promise`<`any`[]\>
 
 #### Parameters
 
@@ -1112,6 +1141,29 @@ ___
 | :------ | :------ |
 | `emitter` | `NodeEventTarget` |
 | `event` | `string` \| `symbol` |
+| `options?` | `StaticEventEmitterOptions` |
+
+#### Returns
+
+`Promise`<`any`[]\>
+
+#### Inherited from
+
+EventEmitter.once
+
+#### Defined in
+
+core-ethereum/node_modules/@types/node/events.d.ts:25
+
+▸ `Static` **once**(`emitter`, `event`, `options?`): `Promise`<`any`[]\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `emitter` | `DOMEventTarget` |
+| `event` | `string` |
+| `options?` | `StaticEventEmitterOptions` |
 
 #### Returns
 
@@ -1124,24 +1176,3 @@ EventEmitter.once
 #### Defined in
 
 core-ethereum/node_modules/@types/node/events.d.ts:26
-
-▸ `Static` **once**(`emitter`, `event`): `Promise`<`any`[]\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `emitter` | `DOMEventTarget` |
-| `event` | `string` |
-
-#### Returns
-
-`Promise`<`any`[]\>
-
-#### Inherited from
-
-EventEmitter.once
-
-#### Defined in
-
-core-ethereum/node_modules/@types/node/events.d.ts:27
