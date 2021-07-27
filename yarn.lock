@@ -407,7 +407,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
-    "@hoprnet/hopr-utils": 1.75.0-next.10
+    "@hoprnet/hopr-utils": 1.75.0-next.16
     "@types/debug": ^4.1.6
     "@types/mocha": ^9.0.0
     "@types/node": 16
@@ -442,9 +442,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-utils@npm:1.75.0-next.10":
-  version: 1.75.0-next.10
-  resolution: "@hoprnet/hopr-utils@npm:1.75.0-next.10"
+"@hoprnet/hopr-utils@npm:1.75.0-next.16":
+  version: 1.75.0-next.16
+  resolution: "@hoprnet/hopr-utils@npm:1.75.0-next.16"
   dependencies:
     abort-controller: ~3.0.0
     bignumber.js: ^9.0.0
@@ -464,7 +464,7 @@ __metadata:
     peer-id: 0.15.1
     private-ip: ^2.2.1
     secp256k1: ^4.0.2
-  checksum: 30907b7ae8f829d012b364af2fbb010970ac56637f2ee424e5946a7c9963b86dba3bbbaf70c9238960232ba447ac5431b89839f1cc7fa0e23a786c9cf1004850
+  checksum: b7de911eae5b75a6356fe2a4ead5b3d8303f9f62a160070ad2f788e1e88ee9e7c709efa2f4318d5ccf84b52b7076553e2f39066b80da109132a104d8691b229a
   languageName: node
   linkType: hard
 
