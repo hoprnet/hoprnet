@@ -5,7 +5,7 @@ type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`
 type RemoveEventName = `remove${Suffix}`
 
-export type PeerStoreType = { id: PeerId, multiaddrs: Multiaddr[] }
+export type PeerStoreType = { id: PeerId; multiaddrs: Multiaddr[] }
 type NewNodeListener = (peer: PeerStoreType) => void
 
 export interface PublicNodesEmitter {
