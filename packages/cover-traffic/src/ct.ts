@@ -300,7 +300,9 @@ class CoverTrafficStrategy extends SaneDefaults {
     // Refresh open channels
     const ctChannels = []
     for (let c of currentChannels) {
-      if (c.status === ChannelStatus.Closed) { continue }
+      if (c.status === ChannelStatus.Closed) {
+        continue
+      }
       const q = await peers.qualityOf(c.destination)
       ctChannels.push({ destination: c.destination, latestQualityOf: q })
       if (q < 0.15) {
@@ -332,14 +334,23 @@ class CoverTrafficStrategy extends SaneDefaults {
     }
 
     let attempts = 0
-    while (currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE && Object.keys(state.nodes).length > 0 && attempts < 100) {
-      attempts ++
+    while (
+      currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE &&
+      Object.keys(state.nodes).length > 0 &&
+      attempts < 100
+    ) {
+      attempts++
       const c = await this.data.weightedRandomChoice()
       const q = await peers.qualityOf(c)
-      if (!currentChannels.find((x) => x.destination.eq(c)) && !c.eq(this.selfPub) && !toOpen.find(x => x[1].eq(c)) && q > 0.6) {
+      if (
+        !currentChannels.find((x) => x.destination.eq(c)) &&
+        !c.eq(this.selfPub) &&
+        !toOpen.find((x) => x[1].eq(c)) &&
+        q > 0.6
+      ) {
         toOpen.push([c, CHANNEL_STAKE])
       }
-      if ( q < 0.6 ){
+      if (q < 0.6) {
         console.error('low quality node skipped', c.toB58String(), q)
       }
     }
