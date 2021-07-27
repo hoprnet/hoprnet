@@ -52,7 +52,7 @@ class WebRTCUpgrader {
     const iceServers: RTCIceServer[] = []
     for (const entry of this.publicNodes) {
       iceServers.push({
-        urls: entry.multiaddrs.map(multiaddrToIceServer).join(',')
+        urls: entry.multiaddrs.map(multiaddrToIceServer)
       })
     }
 
