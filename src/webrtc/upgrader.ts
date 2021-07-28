@@ -71,9 +71,9 @@ class WebRTCUpgrader {
       return
     }
 
-    let found = this.publicNodes.find((entry: PeerStoreType) => entry.id.equals(peer.id))
+    let entry = this.publicNodes.find((entry: PeerStoreType) => entry.id.equals(peer.id))
 
-    if (found == undefined) {
+    if (entry == undefined) {
       const usableAddresses = peer.multiaddrs.filter((ma: Multiaddr) => {
         const tuples = ma.tuples()
 
@@ -84,7 +84,7 @@ class WebRTCUpgrader {
         this.publicNodes.unshift({ id: peer.id, multiaddrs: usableAddresses })
       }
     } else {
-      let before = found.multiaddrs.length
+      let before = entry.multiaddrs.length
 
       for (const ma of peer.multiaddrs) {
         const tuples = ma.tuples()
@@ -95,14 +95,14 @@ class WebRTCUpgrader {
           continue
         }
 
-        if (found.multiaddrs.some((existing: Multiaddr) => existing.equals(ma))) {
+        if (entry.multiaddrs.some((existing: Multiaddr) => existing.equals(ma))) {
           continue
         }
 
-        found.multiaddrs.unshift(ma)
+        entry.multiaddrs.unshift(ma)
       }
 
-      if (found.multiaddrs.length == before) {
+      if (entry.multiaddrs.length == before) {
         return
       }
     }
