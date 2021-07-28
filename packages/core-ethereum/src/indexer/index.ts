@@ -382,9 +382,12 @@ class Indexer extends EventEmitter {
     return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
   }
 
-  public async getPublicNodes(): Promise<Multiaddr[]> {
+  public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     return (await this.db.getAccounts((account: AccountEntry) => account.containsRouting())).map(
-      (account: AccountEntry) => account.multiAddr
+      (account: AccountEntry) => ({
+        id: account.getPublicKey().toPeerId(),
+        multiaddrs: [account.multiAddr]
+      })
     )
   }
 

@@ -58,6 +58,11 @@ interface NetOptions {
   port: number
 }
 
+type PeerStoreAddress = {
+  id: PeerId
+  multiaddrs: Multiaddr[]
+}
+
 export type ChannelStrategyNames = 'passive' | 'promiscuous'
 
 export type HoprOptions = {
@@ -169,6 +174,10 @@ class Hopr extends EventEmitter {
     const ethereum = await this.paymentChannels
     const initialNodes = await ethereum.waitForPublicNodes()
 
+    const recentlyAnnouncedNodes: PeerStoreAddress[] = []
+    const pushToInitialNodes = (peer: { id: PeerId; multiaddrs: Multiaddr[] }) => recentlyAnnouncedNodes.push(peer)
+    ethereum.on('peer', pushToInitialNodes)
+
     const libp2p = await LibP2P.create({
       peerId: this.id,
       addresses: { listen: getAddrs(this.id, this.options).map((x) => x.toString()) },
@@ -182,7 +191,7 @@ class Hopr extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            initialNodes,
+            initialNodes: initialNodes.map((addr) => addr.multiaddrs).flat(),
             publicNodes: this.publicNodesEmitter
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
@@ -206,8 +215,11 @@ class Hopr extends EventEmitter {
     log('libp2p started')
     this.libp2p = libp2p
 
-    this.addPreviousNodes(initialNodes)
+    console.log(`announced nodes`)
 
+    initialNodes.concat(recentlyAnnouncedNodes).forEach(this.onPeerAnnouncement.bind(this))
+
+    ethereum.indexer.off('peer', pushToInitialNodes)
     ethereum.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
@@ -301,33 +313,6 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Populates libp2p's peerStore with previously announced nodes
-   * @param initialNodes previosly announced nodes
-   * @returns
-   */
-  private addPreviousNodes(initialNodes: Multiaddr[]): void {
-    for (const initialNode of initialNodes) {
-      const peerId = PeerId.createFromB58String(initialNode.getPeerId())
-
-      if (peerId.equals(this.id)) {
-        // Ignore announcements from ourself
-        continue
-      }
-
-      // @ts-ignore
-      this.libp2p.peerStore.keyBook.set(peerId)
-
-      const tuples = initialNode.tuples()
-
-      if (tuples.length == 0 || tuples[0][0] == protocols.names['p2p'].code) {
-        continue
-      }
-
-      this.libp2p.peerStore.addressBook.add(peerId, [initialNode])
-    }
-  }
-
-  /**
    * Called whenever a peer is announced
    * @param peer newly announced peer
    */
@@ -337,19 +322,25 @@ class Hopr extends EventEmitter {
       return
     }
 
-    const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
-      const tuples = ma.tuples()
-      return tuples.length > 1 && tuples[0][0] != protocols.names['p2p'].code
-    })
-
     // @ts-ignore
     this.libp2p.peerStore.keyBook.set(peer.id)
 
-    if (dialables.length > 0) {
-      for (const dialable of dialables) {
-        this.publicNodesEmitter.emit('addPublicNode', dialable)
+    const dialables: Multiaddr[] = []
+
+    for (const ma of peer.multiaddrs) {
+      const tuples = ma.tuples()
+
+      if (tuples.length == 1 || tuples[0][0] == protocols.names['p2p'].code) {
+        continue
       }
-      this.libp2p.peerStore.addressBook.add(peer.id, peer.multiaddrs)
+
+      this.publicNodesEmitter.emit('addPublicNode', ma)
+
+      dialables.push(ma)
+    }
+
+    if (dialables.length > 0) {
+      this.libp2p.peerStore.addressBook.add(peer.id, dialables)
     }
   }
 

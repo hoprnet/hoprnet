@@ -1,4 +1,5 @@
 import type { Multiaddr } from 'multiaddr'
+import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import debug from 'debug'
@@ -134,7 +135,7 @@ export default class HoprEthereum extends EventEmitter {
     return this.chain.getInfo()
   }
 
-  public async waitForPublicNodes(): Promise<Multiaddr[]> {
+  public async waitForPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     return await this.indexer.getPublicNodes()
   }
 
