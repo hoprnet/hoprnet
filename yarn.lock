@@ -407,7 +407,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
-    "@hoprnet/hopr-utils": 1.75.0-next.16
+    "@hoprnet/hopr-utils": 1.75.0-next.19
     "@types/debug": ^4.1.7
     "@types/mocha": ^9.0.0
     "@types/node": 16
@@ -442,9 +442,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-utils@npm:1.75.0-next.16":
-  version: 1.75.0-next.16
-  resolution: "@hoprnet/hopr-utils@npm:1.75.0-next.16"
+"@hoprnet/hopr-utils@npm:1.75.0-next.19":
+  version: 1.75.0-next.19
+  resolution: "@hoprnet/hopr-utils@npm:1.75.0-next.19"
   dependencies:
     abort-controller: ~3.0.0
     bignumber.js: ^9.0.0
@@ -461,10 +461,10 @@ __metadata:
     memdown: ^6.0.0
     multiaddr: ^10.0.0
     multihashes: ~4.0.1
-    peer-id: 0.15.1
+    peer-id: 0.15.2
     private-ip: ^2.2.1
     secp256k1: ^4.0.2
-  checksum: b7de911eae5b75a6356fe2a4ead5b3d8303f9f62a160070ad2f788e1e88ee9e7c709efa2f4318d5ccf84b52b7076553e2f39066b80da109132a104d8691b229a
+  checksum: acd4e55472179ca7709abc1d586311f008fc1a939ec8d2af8e536a1a6e3c70f33621bc0312eafb40a66063689b1556e7121abd7f33b13cbe76e15e2059796e8e
   languageName: node
   linkType: hard
 
@@ -3728,23 +3728,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"peer-id@npm:0.15.1, peer-id@npm:^0.15.0":
-  version: 0.15.1
-  resolution: "peer-id@npm:0.15.1"
-  dependencies:
-    class-is: ^1.1.0
-    libp2p-crypto: ^0.19.0
-    minimist: ^1.2.5
-    multiformats: ^9.3.0
-    protobufjs: ^6.10.2
-    uint8arrays: ^2.0.5
-  bin:
-    peer-id: src/bin.js
-  checksum: eb116e03f4c396cde400e7f9c7b950359466b7ba08bdf60c911cc459289aa40ef409a574da91c223d9efc9d6ede8c8c863a41ff19a82a63a8578391eb2866a2c
-  languageName: node
-  linkType: hard
-
-"peer-id@npm:~0.15.2":
+"peer-id@npm:0.15.2, peer-id@npm:~0.15.2":
   version: 0.15.2
   resolution: "peer-id@npm:0.15.2"
   dependencies:
@@ -3757,6 +3741,22 @@ fsevents@~2.3.2:
   bin:
     peer-id: src/bin.js
   checksum: 8fe82ee0e07ce1c348db029f0cc6c76eb4f31d7f35871b3e2df448a8cad170fca400466155eeb0cbf9eee7bb7e0710ed472adfc64a75f1c2d930b066e2b40b97
+  languageName: node
+  linkType: hard
+
+"peer-id@npm:^0.15.0":
+  version: 0.15.1
+  resolution: "peer-id@npm:0.15.1"
+  dependencies:
+    class-is: ^1.1.0
+    libp2p-crypto: ^0.19.0
+    minimist: ^1.2.5
+    multiformats: ^9.3.0
+    protobufjs: ^6.10.2
+    uint8arrays: ^2.0.5
+  bin:
+    peer-id: src/bin.js
+  checksum: eb116e03f4c396cde400e7f9c7b950359466b7ba08bdf60c911cc459289aa40ef409a574da91c223d9efc9d6ede8c8c863a41ff19a82a63a8578391eb2866a2c
   languageName: node
   linkType: hard
 
