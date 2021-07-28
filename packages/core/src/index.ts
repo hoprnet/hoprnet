@@ -230,13 +230,11 @@ class Hopr extends EventEmitter {
 
     console.log(`announced nodes`)
 
-    initialNodes.concat(recentlyAnnouncedNodes).forEach(this.onPeerAnnouncement.bind(this))
-
     chain.indexer.off('peer', pushToInitialNodes)
     chain.indexer.on('peer', this.onPeerAnnouncement.bind(this))
-    initialNodes.forEach(this.onPeerAnnouncement)
 
-    chain.indexer.on('peer', this.onPeerAnnouncement.bind(this))
+    console.log(`recentlyAnnouncedNodes`, recentlyAnnouncedNodes)
+    initialNodes.concat(recentlyAnnouncedNodes).forEach(this.onPeerAnnouncement.bind(this))
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
@@ -346,10 +344,9 @@ class Hopr extends EventEmitter {
     this.libp2p.peerStore.keyBook.set(peer.id)
 
     if (dialables.length > 0) {
-      for (const dialable of dialables) {
-        this.publicNodesEmitter.emit('addPublicNode', dialable)
-      }
-      this.libp2p.peerStore.addressBook.add(peer.id, peer.multiaddrs)
+      this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
+
+      this.libp2p.peerStore.addressBook.add(peer.id, dialables)
     }
   }
 
