@@ -408,7 +408,7 @@ __metadata:
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
     "@hoprnet/hopr-utils": 1.75.0-next.16
-    "@types/debug": ^4.1.6
+    "@types/debug": ^4.1.7
     "@types/mocha": ^9.0.0
     "@types/node": 16
     "@types/simple-peer": ^9.11.1
@@ -426,11 +426,11 @@ __metadata:
     libp2p-interfaces: ^1.0.1
     libp2p-mplex: 0.10.4
     libp2p-noise: ^4.0
-    mocha: ^9.0.2
+    mocha: ^9.0.3
     multiaddr: ^10.0.0
     multihashes: ^4.0.2
     p-defer: 3
-    peer-id: ~0.15.1
+    peer-id: ~0.15.2
     prettier: ~2.3.2
     simple-peer: 9.11
     stream-to-it: ^0.2.4
@@ -747,10 +747,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/debug@npm:^4.1.6":
-  version: 4.1.6
-  resolution: "@types/debug@npm:4.1.6"
-  checksum: f2816703a81f2cecb9fe575ed73f69378f190f92e49aab01b5b1832166cd89b19d4e85999c955f8993d3dba36e78ffd1ac5f697449eff13a6a13de309dc6e0f5
+"@types/debug@npm:^4.1.7":
+  version: 4.1.7
+  resolution: "@types/debug@npm:4.1.7"
+  dependencies:
+    "@types/ms": "*"
+  checksum: cd865a371a4b4184b3f8e25461338fef3134b37ffed983d471f4538c4da7974f661edb25f80b41f2a46f951c735a8163758c094e8bf0869e3abc1f32e85f064b
   languageName: node
   linkType: hard
 
@@ -765,6 +767,13 @@ __metadata:
   version: 9.0.0
   resolution: "@types/mocha@npm:9.0.0"
   checksum: dac70c24e5e7f825a6f449035ebab1b7cfe99b5976b879a4039a516ade38fcc6c78fc4c4d953d27c62db1d9117372e129c6bfe08e2aab0c0a2a6e441335aba42
+  languageName: node
+  linkType: hard
+
+"@types/ms@npm:*":
+  version: 0.7.31
+  resolution: "@types/ms@npm:0.7.31"
+  checksum: 7ff9798a408aaa371f3d0059f013d09b6eb471cd62019f35924301608f57279943b5d322f497f2ea9ae65477e2a47c26dfd8dd833a4352f883a8a86c051f7125
   languageName: node
   linkType: hard
 
@@ -3107,9 +3116,9 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"mocha@npm:^9.0.2":
-  version: 9.0.2
-  resolution: "mocha@npm:9.0.2"
+"mocha@npm:^9.0.3":
+  version: 9.0.3
+  resolution: "mocha@npm:9.0.3"
   dependencies:
     "@ungap/promise-all-settled": 1.1.2
     ansi-colors: 4.1.1
@@ -3139,7 +3148,7 @@ fsevents@~2.3.2:
   bin:
     _mocha: bin/_mocha
     mocha: bin/mocha
-  checksum: 305d820f2e7237f54c2c034198978c1ef7c0cf99ddf0c511c8e65e0d7cd00a2b87f7826dc91afa080473152159c1402f419f18d67f831dc55ebc84710ee97823
+  checksum: 1d51b12960c2101a8057ab92463d50e8a5ca2543bd25ed99fbc2ebe562edac6a7ee21f11f912acdf2d2ac9664634d4fcadb87266a8507ab00b505feab4bab1d5
   languageName: node
   linkType: hard
 
@@ -3719,7 +3728,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"peer-id@npm:0.15.1, peer-id@npm:^0.15.0, peer-id@npm:~0.15.1":
+"peer-id@npm:0.15.1, peer-id@npm:^0.15.0":
   version: 0.15.1
   resolution: "peer-id@npm:0.15.1"
   dependencies:
@@ -3732,6 +3741,22 @@ fsevents@~2.3.2:
   bin:
     peer-id: src/bin.js
   checksum: eb116e03f4c396cde400e7f9c7b950359466b7ba08bdf60c911cc459289aa40ef409a574da91c223d9efc9d6ede8c8c863a41ff19a82a63a8578391eb2866a2c
+  languageName: node
+  linkType: hard
+
+"peer-id@npm:~0.15.2":
+  version: 0.15.2
+  resolution: "peer-id@npm:0.15.2"
+  dependencies:
+    class-is: ^1.1.0
+    libp2p-crypto: ^0.19.0
+    minimist: ^1.2.5
+    multiformats: ^9.3.0
+    protobufjs: ^6.10.2
+    uint8arrays: ^2.0.5
+  bin:
+    peer-id: src/bin.js
+  checksum: 8fe82ee0e07ce1c348db029f0cc6c76eb4f31d7f35871b3e2df448a8cad170fca400466155eeb0cbf9eee7bb7e0710ed472adfc64a75f1c2d930b066e2b40b97
   languageName: node
   linkType: hard
 
