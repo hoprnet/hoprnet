@@ -188,8 +188,9 @@ class Hopr extends EventEmitter {
     const initialNodes = await chain.waitForPublicNodes()
 
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
-    const pushToInitialNodes = (peer: { id: PeerId; multiaddrs: Multiaddr[] }) => recentlyAnnouncedNodes.push(peer)
-    chain.on('peer', pushToInitialNodes)
+    const pushToRecentlyAnnouncedNodes = (peer: { id: PeerId; multiaddrs: Multiaddr[] }) =>
+      recentlyAnnouncedNodes.push(peer)
+    chain.on('peer', pushToRecentlyAnnouncedNodes)
 
     const libp2p = await LibP2P.create({
       peerId: this.id,
@@ -228,13 +229,10 @@ class Hopr extends EventEmitter {
     log('libp2p started')
     this.libp2p = libp2p
 
-    console.log(`announced nodes`)
-
-    chain.indexer.off('peer', pushToInitialNodes)
     chain.indexer.on('peer', this.onPeerAnnouncement.bind(this))
+    chain.indexer.off('peer', pushToRecentlyAnnouncedNodes)
 
-    console.log(`recentlyAnnouncedNodes`, recentlyAnnouncedNodes)
-    initialNodes.concat(recentlyAnnouncedNodes).forEach(this.onPeerAnnouncement.bind(this))
+    recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
