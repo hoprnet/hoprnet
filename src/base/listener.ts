@@ -163,25 +163,25 @@ class Listener extends EventEmitter implements InterfaceListener {
       return
     }
 
-    let existingEntry = this.publicNodes.find((entry: NodeEntry) => entry.id.equals(peer.id))
+    let entry = this.publicNodes.find((entry: NodeEntry) => entry.id.equals(peer.id))
 
-    if (existingEntry != undefined) {
-      const newAddresses = usableAddresses.filter((ma: Multiaddr) => !existingEntry!.multiaddrs.includes(ma))
+    if (entry != undefined) {
+      const newAddresses = usableAddresses.filter((ma: Multiaddr) => !entry!.multiaddrs.includes(ma))
 
       if (newAddresses.length == 0) {
         // Nothing added so we can stop
         return
       }
 
-      existingEntry.multiaddrs = newAddresses.concat(existingEntry.multiaddrs)
+      entry.multiaddrs = newAddresses.concat(entry.multiaddrs)
     } else {
-      existingEntry = {
+      entry = {
         id: peer.id,
         multiaddrs: peer.multiaddrs,
         latency: Infinity
       }
 
-      this.publicNodes.push(existingEntry)
+      this.publicNodes.push(entry)
     }
 
     if (this.state != State.LISTENING) {
