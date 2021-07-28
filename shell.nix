@@ -23,9 +23,9 @@ mkShell {
     unstable.niv
     shellcheck
 
-    ## node, minimum recommended version is v14, see README for more details
-    unstable.nodejs-14_x # v14.16.1
-    (unstable.yarn.override { nodejs = nodejs-14_x; }) # v1.22.10
+    ## node, minimum recommended version is v16, see README for more details
+    unstable.nodejs-16_x # v16.5.0
+    (unstable.yarn.override { nodejs = nodejs-16_x; }) # v1.22.10
 
     ## python is required by node module bcrypto
     python3

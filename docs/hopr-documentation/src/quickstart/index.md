@@ -14,7 +14,7 @@ To get a HOPR node and start working testing the HOPR protocol, follow the next 
 
 ### 1. Fetch the latest version
 
-Start by fetching the latest version of `hoprd` from our [repository](https://github.com/hoprnet/hoprnet). You will need to have `node.js@v14`, `yarn` and other additional requirements to get started. For more information, read the repository's [README](https://github.com/hoprnet/hoprnet#readme).
+Start by fetching the latest version of `hoprd` from our [repository](https://github.com/hoprnet/hoprnet). You will need to have `node.js@v16`, `yarn` and other additional requirements to get started. For more information, read the repository's [README](https://github.com/hoprnet/hoprnet#readme).
 
 ```bash
 $ git clone git@github.com:hoprnet/hoprnet.git hoprnet && cd "$_"

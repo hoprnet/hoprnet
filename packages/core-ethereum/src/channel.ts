@@ -76,7 +76,7 @@ class Channel {
       )
 
       await this.commitment.bumpCommitment()
-      this.events.emit('ticket:win', ack)
+      this.events.emit('ticket:win', ack, this)
       return ack
     } else {
       log(`Got a ticket that is not a win. Dropping ticket.`)
@@ -136,8 +136,8 @@ class Channel {
   async initializeClosure() {
     const c = await this.usToThem()
     const counterpartyAddress = this.counterparty.toAddress()
-    if (c.status !== ChannelStatus.Open) {
-      throw Error('Channel status is not OPEN')
+    if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
+      throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
     return await this.chain.initiateChannelClosure(counterpartyAddress)
   }

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.75.0-next.13",
+  "version": "1.75.0-next.19",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -17,7 +17,7 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "engines": {
-    "node": "14",
+    "node": "16",
     "yarn": "1"
   },
   "files": [
@@ -28,8 +28,8 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.75.0-next.13",
-    "@hoprnet/hopr-utils": "1.75.0-next.13",
+    "@hoprnet/hopr-ethereum": "1.75.0-next.19",
+    "@hoprnet/hopr-utils": "1.75.0-next.19",
     "async-mutex": "^0.3.0",
     "bn.js": "^5.2.0",
     "chalk": "^4.1.0",
@@ -37,7 +37,7 @@
     "ethers": "^5.2.0",
     "heap-js": "^2.1.2",
     "multiaddr": "^10.0.0",
-    "peer-id": "0.15.1",
+    "peer-id": "0.15.2",
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
@@ -45,7 +45,7 @@
     "@types/levelup": "^4.3.0",
     "@types/memdown": "^3.0.0",
     "@types/mocha": "^9.0.0",
-    "@types/node": "14.14.35",
+    "@types/node": "16.4.1",
     "@types/secp256k1": "^4.0.2",
     "@types/sinon": "^10.0.0",
     "chai": "^4.3.4",
