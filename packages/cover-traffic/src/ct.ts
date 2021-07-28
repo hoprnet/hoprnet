@@ -9,7 +9,7 @@ import fs from 'fs'
 const CHANNELS_PER_COVER_TRAFFIC_NODE = 10
 const CHANNEL_STAKE = new BN('1000')
 const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
-const CT_INTERMEDIATE_HOPS = 3 // NB. min is 2
+const CT_INTERMEDIATE_HOPS = 2 // 3  // NB. min is 2
 const DB = './ct.json'
 
 const options: HoprOptions = {
@@ -188,12 +188,19 @@ class PersistedState {
     }
     const weights: Record<string, BN> = {}
     let total = new BN('0')
+    const ind = Math.random()
+
     for (const p of Object.values(s.nodes)) {
       weights[p.pub.toHex()] = importance(p.pub, s)
       total = total.add(weights[p.pub.toHex()])
     }
 
-    const ind = Math.random()
+    if (total.lten(0)){
+      // No important nodes - let's pick a random node for now.
+      const index = Math.floor(ind * Object.keys(s.nodes).length)
+      return Object.values(s.nodes)[index].pub
+    }
+
     let interval = total.muln(ind)
     for (let node of Object.keys(weights)) {
       interval = interval.sub(weights[node])
@@ -214,6 +221,11 @@ class PersistedState {
     //const s = await this.get()
     // TODO init
     //s.ctSent[p.toB58String()].forwardAttempts++
+  }
+
+  async openChannelCount(): Promise<number> {
+    const s = await this.get()
+    return Object.values(s.channels).filter(x => x.channel.status != ChannelStatus.Closed).length
   }
 }
 
@@ -265,7 +277,7 @@ export const sendCTMessage = async (
     data.log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
-    data.log('Could not find path - ' + startNode.toPeerId().toB58String())
+    data.log(`Could not find path: ${startNode.toB58String()} -> ${selfPub.toPeerId()} (${e})`)
     return false
   }
   try {
@@ -314,23 +326,26 @@ class CoverTrafficStrategy extends SaneDefaults {
     }
     await this.data.setCTChannels(ctChannels)
 
-    for (let openChannel of state.ctChannels) {
-      const channel = await this.data.findChannel(this.selfPub, openChannel.destination)
-      if (channel && channel.status == ChannelStatus.Open) {
-        const success = await sendCTMessage(
-          openChannel.destination,
-          this.selfPub,
-          async (path: PublicKey[]) => {
-            await this.node.sendMessage(new Uint8Array(1), openChannel.destination.toPeerId(), path)
-          },
-          this.data
-        )
-        if (!success) {
-          toClose.push(openChannel.destination)
+    if ((await this.data.openChannelCount()) > CT_INTERMEDIATE_HOPS + 1) {
+      for (let openChannel of state.ctChannels) {
+        const channel = await this.data.findChannel(this.selfPub, openChannel.destination)
+        if (channel && channel.status == ChannelStatus.Open) {
+          const success = await sendCTMessage(
+            openChannel.destination,
+            this.selfPub,
+            async (path: PublicKey[]) => {
+              await this.node.sendMessage(new Uint8Array(1), openChannel.destination.toPeerId(), path)
+            },
+            this.data
+          )
+          if (!success) {
+            toClose.push(openChannel.destination)
+          }
         }
+        // TODO handle waiting for commitment stalls
       }
-
-      // TODO handle waiting for commitment stalls
+    } else {
+      this.data.log('aborting send messages - less channels in network than hops required')
     }
 
     let attempts = 0
@@ -342,17 +357,22 @@ class CoverTrafficStrategy extends SaneDefaults {
       attempts++
       const c = await this.data.weightedRandomChoice()
       const q = await peers.qualityOf(c)
+
       if (
-        !currentChannels.find((x) => x.destination.eq(c)) &&
-        !c.eq(this.selfPub) &&
-        !toOpen.find((x) => x[1].eq(c)) &&
-        q > 0.6
+        currentChannels.filter(x => x.status !== ChannelStatus.Closed).find((x) => x.destination.eq(c)) ||
+        c.eq(this.selfPub) ||
+        toOpen.find((x) => x[1].eq(c)) 
       ) {
-        toOpen.push([c, CHANNEL_STAKE])
+        console.error('skipping node', c.toB58String()) 
+        continue
       }
+
       if (q < 0.6) {
         console.error('low quality node skipped', c.toB58String(), q)
+        continue
       }
+
+      toOpen.push([c, CHANNEL_STAKE])
     }
 
     this.data.log(

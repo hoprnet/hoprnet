@@ -384,6 +384,15 @@ class Hopr extends EventEmitter {
       chain.getRandomOpenChannel.bind(chain)
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
+
+
+    for (let channel of currentChannels) {
+      if (channel.status == ChannelStatus.PendingToClose) {
+        // attempt to finalize closure
+        closeChannels.push(channel.destination)
+      }
+    }
+
     for (let toClose of closeChannels) {
       verbose(`closing ${toClose}`)
       try {
