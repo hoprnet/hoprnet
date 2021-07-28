@@ -7,14 +7,16 @@ import { NOISE } from 'libp2p-noise'
 
 const MPLEX = require('libp2p-mplex')
 
-import { HoprConnect, HoprConnectOptions } from '../src'
+import { HoprConnect } from '../src'
+import type { HoprConnectOptions } from '../src'
 import { Multiaddr } from 'multiaddr'
 import pipe from 'it-pipe'
 import yargs from 'yargs/yargs'
 import { peerIdForIdentity, identityFromPeerId } from './identities'
-import PeerId from 'peer-id'
-import LibP2P from 'libp2p'
-import { WriteStream } from 'node:fs'
+import type PeerId from 'peer-id'
+import type LibP2P from 'libp2p'
+import type { WriteStream } from 'node:fs'
+import type { PeerStoreType } from '../src/types'
 
 const TEST_PROTOCOL = '/hopr-connect/test/0.0.1'
 
@@ -71,7 +73,7 @@ async function startNode({
 }: {
   peerId: PeerId
   port: number
-  bootstrapAddress?: Multiaddr
+  bootstrapAddress?: PeerStoreType
   noDirectConnections: boolean
   noWebRTCUpgrade: boolean
   pipeFileStream?: WriteStream
@@ -259,11 +261,14 @@ async function main() {
     })
     .parseSync()
 
-  let bootstrapAddress: Multiaddr | undefined
+  let bootstrapAddress: PeerStoreType | undefined
 
   if (argv.bootstrapPort != null && argv.bootstrapIdentityName != null) {
     const bootstrapPeerId = await peerIdForIdentity(argv.bootstrapIdentityName)
-    bootstrapAddress = new Multiaddr(`/ip4/127.0.0.1/tcp/${argv.bootstrapPort}/p2p/${bootstrapPeerId.toB58String()}`)
+    bootstrapAddress = {
+      id: bootstrapPeerId,
+      multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${argv.bootstrapPort}/p2p/${bootstrapPeerId.toB58String()}`)]
+    }
   }
   const peerId = await peerIdForIdentity(argv.identityName)
 
