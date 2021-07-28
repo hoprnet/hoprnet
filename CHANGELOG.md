@@ -1,3 +1,12 @@
+<a name="0.2.40"></a>
+
+## [0.2.40](https://github.com/hoprnet/hopr-connect/compare/v0.2.35...v0.2.40) (2021-07-28)
+
+Changes:
+
+- deprecate Node 14, now exclusively using Node 16
+- changed relay management API (#271)
+
 <a name="0.2.35"></a>
 
 ## [0.2.35](https://github.com/hoprnet/hopr-connect/compare/v0.2.34...v0.2.35) (2021-07-23)
