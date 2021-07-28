@@ -233,5 +233,7 @@ for i in `seq 1 10`; do
   run_command "${api1}" "send ${addr2},${addr3},${addr4},${addr5} 'hello, world'" "Message sent" 600
 done
 
-log "Node 1 send message to node 5"
-run_command "${api1}" "send ${addr5} 'hello, world'" "Message sent" 300
+for i in `seq 1 10`; do
+  log "Node 1 send message to node 5"
+  run_command "${api1}" "send ${addr5} 'hello, world'" "Message sent" 600
+done
