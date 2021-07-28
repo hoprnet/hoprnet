@@ -665,12 +665,12 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.2.0.tgz#f3933a44e365864f4dad5db94158106d511e8131"
   integrity sha512-sqKVVVOe5ivCaXDWivIJYVSaEgdQK9ul7a4Kity5Iw7u9+wBAPbX1RMSnLLmp7O4Vzj0WOWwMAJsTL00xwaNug==
 
-"@hoprnet/hopr-connect@0.2.39":
-  version "0.2.39"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.39.tgz#9ea43590e9fe12c53adc43f68e8e7325b51dcb90"
-  integrity sha512-Cuu73P1bflj9NLfgFzGo7lIgBPCY2v08ngAvgI/cOF/mtNNMC3Rp7eEU7K2d7Tz4MBQndBKJWcORAdEbBcy7Mg==
+"@hoprnet/hopr-connect@0.2.40":
+  version "0.2.40"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.40.tgz#a17aed985e0a43cd06bc40c3120b4b6c180ec17a"
+  integrity sha512-v/vfLLn6k2+Fliv5z2btV2/alkQdw+YCG3quuWPzCGGuigFbaaNMIeTD+8/JuhHsTaZp87HZ+N3KlipMHYkr0Q==
   dependencies:
-    "@hoprnet/hopr-utils" "1.75.0-next.16"
+    "@hoprnet/hopr-utils" "1.75.0-next.19"
     abort-controller "3.0.0"
     abortable-iterator "^3.0.0"
     bl "^5.0"
@@ -680,35 +680,11 @@
     multiaddr "^10.0.0"
     multihashes "^4.0.2"
     p-defer "3"
-    peer-id "~0.15.1"
+    peer-id "~0.15.2"
     simple-peer "9.11"
     stream-to-it "^0.2.4"
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
-
-"@hoprnet/hopr-utils@1.75.0-next.16":
-  version "1.75.0-next.16"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.75.0-next.16.tgz#3b746e536f629ca5428073d30d6fde2b2aab3084"
-  integrity sha512-+QL2GDhMn3gv/l+jmRJlECfki7DtdbrmOt/J+YdTbsZNrLDEsKui/Cu+yr44DsqjtEVICHzOOnolglOGvHjdiw==
-  dependencies:
-    abort-controller "~3.0.0"
-    bignumber.js "^9.0.0"
-    bn.js "^5.2.0"
-    bs58 "^4.0.1"
-    chalk "^4.1.1"
-    ethers "^5.1.3"
-    futoin-hkdf "~1.4.1"
-    it-pipe "^1.1.0"
-    leveldown "^6.0.0"
-    levelup "^5.0.0"
-    libp2p "0.32.1"
-    libp2p-crypto "0.19.6"
-    memdown "^6.0.0"
-    multiaddr "^10.0.0"
-    multihashes "~4.0.1"
-    peer-id "0.15.1"
-    private-ip "^2.2.1"
-    secp256k1 "^4.0.2"
 
 "@hutson/parse-repository-url@^3.0.0":
   version "3.0.2"
@@ -11236,22 +11212,10 @@ pbkdf2@^3.0.17, pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@0, peer-id@0.15.2, peer-id@^0.15.0, peer-id@^0.15.1, peer-id@~0.15.1:
+peer-id@0, peer-id@0.15.2, peer-id@^0.15.0, peer-id@^0.15.1, peer-id@~0.15.2:
   version "0.15.2"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.15.2.tgz#2718623df6f996daf2c8e44cbe4f4dc6257f406e"
   integrity sha512-3OMbup76F28gKsQK4rGheEJHwosnJGe2+Obsf1xFaS9DpUaG9/JK0rtguWVLbrkxPclsCceci8g3/ulg8jsORA==
-  dependencies:
-    class-is "^1.1.0"
-    libp2p-crypto "^0.19.0"
-    minimist "^1.2.5"
-    multiformats "^9.3.0"
-    protobufjs "^6.10.2"
-    uint8arrays "^2.0.5"
-
-peer-id@0.15.1:
-  version "0.15.1"
-  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.15.1.tgz#a64e78d9c9c1f86b68dfb9c06ee9458446ca4774"
-  integrity sha512-EoZig26nzPt922s1D/EOe2vJY3D1NCl/+G8rzI99G4HOrUcM94DI5MV8EWLv3ra5j9R/6n7TLgQIpZm2hpBaAA==
   dependencies:
     class-is "^1.1.0"
     libp2p-crypto "^0.19.0"
