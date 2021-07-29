@@ -50,7 +50,7 @@ Initially, each payment channel in HOPR is CLOSED which means that in order to t
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=9cm,height=9cm,keepaspectratio]{../yellowpaper/images/Element 16@3x.png}
+    \includegraphics[width=9cm,height=9cm,keepaspectratio]{../yellowpaper/images/states1.png}
 \label{fig:channel statuses}
     \caption{Channel statuses}
 \end{figure}
@@ -69,7 +69,7 @@ As long as the channel remains open, nodes can claim their incentives for forwar
 \paragraph{Closing a channel}
 Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
 Only the channel creator (let's say it's A) can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $PENDING\_TO\_CLOSE$. Other nodes should monitor blockchain events to be aware of this change and thus will have now time to claim not yet claimed tickets.
-\\~\\Once the timeout is done, (A) can call \textit{finalizeChannelClosure()} which turns the channel state into CLOSED. When channel is closed, funds (stake) are transfered automatically back to (A). Every ticket that wasn't redeemed while channel was open can't be redeemed after closure.
+\\~\\Once the timeout is done, (A) can call \textit{finalizeChannelClosure()} which turns the channel state into CLOSED. When channel is closed, funds (stake) are transfered automatically back to (A). Every ticket that wasn't redeemed while channel was open can't be redeemed after closure. This is guaranteed by using Channel Epoch which is explained in ticket section.
 
 \begin{comment}
 

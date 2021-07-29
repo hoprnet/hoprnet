@@ -20,7 +20,7 @@ the challenge is given together with the routing information by the packet.
     \\\textbf{Ticket Index $I$:} is set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops packets if this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with unchanged index.
     \\\textbf{Ticket challenge $T_c$:}  is set by the ticket issuer and used to check whether a ticket is redeemable before the packet is been relayed. The packet is dropped if that's not the case.
     \\\textbf{Ticket Epoch $\alpha$:} is used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha$ whenever a node resets a commitment which helps keeping track of updates to the on-chain commitments and invalidates tickets with the previous epoch.
-    \\\textbf{Channel Epoch $\zeta$:} is used to give each reincarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel lose their validity once a channel is reopened ($\alpha$'s count restarts again). This is due to the fact that $\zeta$ increments whenever a closed channel is re(-opened).
+    \\\textbf{Channel Epoch $\zeta$:} is used to give each reincarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel lose their validity once a channel is reopened ($\alpha$'s count restarts again). This is due to the fact that $\zeta$ increments whenever a closed channel is re()opened.
     \begin{comment}
 
 
@@ -82,13 +82,13 @@ If this is not the case, the node should drop the acknowledgement.
 \item Additionally, the node retrieves the next commitment value $comm_{i-1}$, checks that this value is not empty and that commitment is the hash of next commitment as follows:
 $$ comm_{i-1} != 0 \; and \; comm_{i}=h(comm_{i-1})$$
 \item The node then verifies that $r_i$ and $comm_{i-1}$ lead to a winning ticket.
-This is the case if $$h(t_h, r_i, comm_{i-1} ) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$ is a hash function.
+This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$ is a hash function.
 If this is not the case, the node should drop the ticket.
-The final recipient of the packet does not receive a ticket because message reception is not incentivized by the HOPR protocol.
+The final recipient of the packet does not receive a ticket because packet reception is not incentivized by the HOPR protocol.
 \item  The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. $$r_i*G=T_{c_i}$$
 It then replies with an acknowledgement that includes a response to the challenge.
 \item Ticket signer must be the ticket issuer. This is done using the $$ECDSA.recover()$$ ethereum function which recovers the private key used to sign $T= (t, Sig_I(t))$ and verifies if the associated public key is the issuer's public key. The packet is dropped if this test fails.
-\item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the account nonces (current values in the smart contract) $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
+\item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the current values in the smart contract $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
 where $\alpha_c$ and $\zeta_c$ represent the current values in the smart contract.
 \item The ticket hasn't been already redeemed and ticket index is strictly greater than the current value in the smart contract (replay protection).
      $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ the ticket index.
