@@ -3,14 +3,16 @@ pragma solidity ^0.8;
 pragma abicoder v2;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Multicall.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC1820Registry.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-contract HoprChannels is IERC777Recipient, ERC1820Implementer {
+contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
