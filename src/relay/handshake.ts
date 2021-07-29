@@ -167,7 +167,8 @@ class RelayHandshake {
     exists: InstanceType<typeof RelayState>['exists'],
     isActive: InstanceType<typeof RelayState>['isActive'],
     updateExisting: InstanceType<typeof RelayState>['updateExisting'],
-    createNew: InstanceType<typeof RelayState>['createNew']
+    createNew: InstanceType<typeof RelayState>['createNew'],
+    __relayFreeTimeout?: number
   ): Promise<void> {
     log(`handling relay request`)
 
@@ -269,7 +270,7 @@ class RelayHandshake {
         this.shaker.rest()
         destinationShaker.rest()
 
-        createNew(source, destination, this.shaker.stream, destinationShaker.stream)
+        createNew(source, destination, this.shaker.stream, destinationShaker.stream, __relayFreeTimeout)
         break
       default:
         this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))

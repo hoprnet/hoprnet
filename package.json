@@ -48,11 +48,15 @@
     "wrtc": "0.4.7"
   },
   "devDependencies": {
+    "@types/chai": "^4.2.21",
+    "@types/chai-spies": "^1.0.3",
     "@types/debug": "^4.1.7",
     "@types/mocha": "^9.0.0",
     "@types/node": "16",
     "@types/simple-peer": "^9.11.1",
     "@types/yargs": "^17.0.2",
+    "chai": "^4.3.4",
+    "chai-spies": "^1.0.0",
     "it-pair": "^1.0.0",
     "it-pipe": "^1.1.0",
     "it-pushable": "^1.4.2",

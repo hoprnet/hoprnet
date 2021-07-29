@@ -5,8 +5,7 @@
 import debug from 'debug'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
-// @TODO change this once freeing relay slot is working
-const DEFAULT_MAX_RELAYED_CONNECTIONS = Infinity
+const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
 
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
@@ -47,7 +46,8 @@ class Relay {
     private connHandler: ConnHandler | undefined,
     private webRTCUpgrader?: WebRTCUpgrader,
     private __noWebRTCUpgrade?: boolean,
-    private maxRelayedConnections: number = DEFAULT_MAX_RELAYED_CONNECTIONS
+    private maxRelayedConnections: number = DEFAULT_MAX_RELAYED_CONNECTIONS,
+    private __relayFreeTimeout?: number
   ) {
     this.relayState = new RelayState()
 
@@ -74,7 +74,8 @@ class Relay {
           this.relayState.exists.bind(this.relayState),
           this.relayState.isActive.bind(this.relayState),
           this.relayState.updateExisting.bind(this.relayState),
-          this.relayState.createNew.bind(this.relayState)
+          this.relayState.createNew.bind(this.relayState),
+          this.__relayFreeTimeout
         )
       }
     })

@@ -16,6 +16,7 @@ import { once, on, EventEmitter } from 'events'
 
 import { networkInterfaces } from 'os'
 import { u8aEquals } from '@hoprnet/hopr-utils'
+
 import type { PublicNodesEmitter, PeerStoreType } from '../types'
 
 /**

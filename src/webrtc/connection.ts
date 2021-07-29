@@ -115,6 +115,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this.sink = this._sink.bind(this)
 
     this.sinkFunction()
+    this.verbose(`!!! sinkFunction`)
 
     this.webRTCHandshakeTimeout = setTimeout(this.afterWebRTCUpgrade.bind(this), WEBRTC_UPGRADE_TIMEOUT)
   }
@@ -200,6 +201,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
     let sourceAttached = false
 
+    this.verbose(`FLOW: webrtc sink 1`)
+
     // First: use relayed connection
     await new Promise<void>((resolve) =>
       this.relayConn.sink(
@@ -269,6 +272,8 @@ class WebRTCConnection implements MultiaddrConnection {
                 if (this._webRTCAvailable) {
                   // Send DONE and migrate to direct WebRTC connection
                   this.verbose(`FLOW: webrtc sink: webrtc finished, handle`)
+                  // this.verbose(`FLOW: switched to webrtc, will try to close relayed connection`)
+
                   yield Uint8Array.of(MigrationStatus.DONE)
                   break
                 } else {
@@ -298,10 +303,12 @@ class WebRTCConnection implements MultiaddrConnection {
         )
       )
     )
-
     // Either stream is finished or WebRTC is available
 
     if (this._webRTCAvailable) {
+      this.verbose(`FLOW: sending UPGRADED to relay`)
+      this.relayConn.sendUpgraded()
+
       // WebRTC handshake was successful, now using direct connection
       this._sinkMigrated = true
       if (this._sourceMigrated) {
@@ -413,6 +420,8 @@ class WebRTCConnection implements MultiaddrConnection {
         }
 
         if (done) {
+          this.verbose(`FLOW: `)
+          this.relayConn.sendUpgraded()
           break
         }
       }

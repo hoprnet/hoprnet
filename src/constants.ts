@@ -40,7 +40,8 @@ export enum StatusMessages {
 
 export enum ConnectionStatusMessages {
   STOP,
-  RESTART
+  RESTART,
+  UPGRADED
 }
 
 export enum RelayPrefix {
