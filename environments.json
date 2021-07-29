@@ -1,7 +1,7 @@
 {
   "jungfrau": {
-    "release" : "1.70-1.71",
-    "network" : "xdai",
+    "release": "1.70-1.71",
+    "network": "xdai",
     "chainId": 100,
     "gas": "1 gwei",
     "gas-multiplier": 1.1,
@@ -11,7 +11,7 @@
     "deprecated": true
   },
 
-  "master" : {
+  "master": {
     "release": "^1.80",
     "network": "goerli",
     "chain-id": 5,
