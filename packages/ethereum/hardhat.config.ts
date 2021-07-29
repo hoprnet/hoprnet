@@ -12,22 +12,25 @@ import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { ethers } from 'ethers'
-import { networks, NetworkTag } from './constants'
+export type PublicNetworks = 'xdai' | 'goerli' | 'mumbai'
+export type Networks = 'hardhat' | 'localhost' | PublicNetworks
+export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'production'
+export type NetworkTag = DeploymentTypes | 'etherscan'
 
-const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, INFURA_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
-const GAS_MULTIPLIER = 1.1
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, /*INFURA_KEY, QUIKNODE_KEY,*/ DEVELOPMENT = false } = process.env
 
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
 process.env.ETHERSCAN_API_KEY = ETHERSCAN_KEY
 
-const hardhatConfig: HardhatUserConfig = {
-  defaultNetwork: 'hardhat',
-  networks: {
+const ENVIRONMENTS = require('../../environments.json')
+
+// TODO - I don't understand this
+const NETWORKS = {
     // hardhat-deploy cannot run deployments if the network is not hardhat
     // we use an ENV variable (which is specified in our NPM script)
     // to let hardhat know we want to run hardhat in 'development' mode
     // this essentially enables mining, see below
-    hardhat: {
+  hardhat: {
       live: false,
       tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
       saveDeployments: true,
@@ -69,7 +72,23 @@ const hardhatConfig: HardhatUserConfig = {
       url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     }
-  },
+}
+
+Object.keys(ENVIRONMENTS).forEach(k => {
+  const env = ENVIRONMENTS[k]
+  NETWORKS[k] = {
+    live: env.live,
+    tags: env.tags as NetworkTag[],
+    gasMultiplier: env['gas-multiplier'],
+    url: env['default-provider'], // TODO key substitution,
+    accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+  }
+})
+
+
+const hardhatConfig: HardhatUserConfig = {
+  defaultNetwork: 'hardhat',
+  networks: NETWORKS as any, // TODO
   namedAccounts: {
     deployer: 0
   },

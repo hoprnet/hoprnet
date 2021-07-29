@@ -4,6 +4,10 @@
     "network" : "xdai",
     "chainId": 100,
     "gas": "1 gwei",
+    "gas-multiplier": 1.1,
+    "tags": ['production'],
+    "live": true,
+    "default-provider": "https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/",
     "deprecated": true
   },
 
@@ -11,15 +15,22 @@
     "release": "^1.80",
     "network": "goerli",
     "chain-id": 5,
+    "gas-multiplier": 1.1,
     "default-provider": "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/",
     "channels-address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
     "token-address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190"
+    "live": true,
+    "tags": ["staging"],
   },
 
   "matic-mumbai": {
     "release": "^1.80",
     "network": "mumbai",
     "chain-id": 80001,
+    "default-provider": "https://polygon-mumbai.infura.io/v3/${INFURA_KEY}",
     "gas": "1 gwei"
+    "gas-multiplier": 1.1,
+    "live": false,
+    "tags": ["testing"],
   }
 }
