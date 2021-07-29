@@ -1,0 +1,11 @@
+{
+  "jungfrau": {
+    "release" : "1.70",
+    "network" : "xdai"
+  },
+
+  "master" : {
+    "release": "1.80",
+    "network": "goerli"
+  }
+}
