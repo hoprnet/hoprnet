@@ -85,8 +85,8 @@ It then replies with an acknowledgement that includes a response to the challeng
 \item Additionally, the node and the smart contract retrieve the next commitment value $comm_{i-1}$, checks that this value is not empty and that commitment is the hash of next commitment as follows:
 $$ comm_{i-1} != 0 \; and \; comm_{i}=h(comm_{i-1})$$
 \item Verify that $r_i$ and $comm_{i-1}$ lead to a winning ticket.
-This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$ is a hash function.
-If this is not the case, the node should drop the packet.
+This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$. The values are first ABI encoded, then hashed using keccak256 and last but not least converted to uint256.
+\\~\\If the check is not valid, the node should drop the packet.
 The final recipient of the packet does not receive a ticket because packet reception is not incentivized by the HOPR protocol.
 \item Ticket signer must be the ticket issuer. This is done using the $$ECDSA.recover()$$ ethereum function which recovers the private key used to sign $T= (t, Sig_I(t))$ and verifies if the associated public key is the issuer's public key. The packet is dropped if this test fails.
 \item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the current values in the smart contract $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
