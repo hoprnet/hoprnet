@@ -2,62 +2,51 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import BN from "bn.js";
-import { Contract, ContractOptions } from "web3-eth-contract";
-import { EventLog } from "web3-core";
-import { EventEmitter } from "events";
-import { ContractEvent, Callback, TransactionObject, BlockType } from "./types";
+import BN from 'bn.js'
+import { Contract, ContractOptions } from 'web3-eth-contract'
+import { EventLog } from 'web3-core'
+import { EventEmitter } from 'events'
+import { ContractEvent, Callback, TransactionObject, BlockType } from './types'
 
 interface EventOptions {
-  filter?: object;
-  fromBlock?: BlockType;
-  topics?: string[];
+  filter?: object
+  fromBlock?: BlockType
+  topics?: string[]
 }
 
 export class HoprChannels extends Contract {
-  constructor(
-    jsonInterface: any[],
-    address?: string,
-    options?: ContractOptions
-  );
-  clone(): HoprChannels;
+  constructor(jsonInterface: any[], address?: string, options?: ContractOptions)
+  clone(): HoprChannels
   methods: {
-    TOKENS_RECIPIENT_INTERFACE_HASH(): TransactionObject<string>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(): TransactionObject<string>
 
-    accounts(
-      arg0: string
-    ): TransactionObject<{
-      accountX: string;
-      hashedSecret: string;
-      counter: string;
-      oddY: string;
-      0: string;
-      1: string;
-      2: string;
-      3: string;
-    }>;
+    accounts(arg0: string): TransactionObject<{
+      accountX: string
+      hashedSecret: string
+      counter: string
+      oddY: string
+      0: string
+      1: string
+      2: string
+      3: string
+    }>
 
-    canImplementInterfaceForAddress(
-      interfaceHash: string | number[],
-      account: string
-    ): TransactionObject<string>;
+    canImplementInterfaceForAddress(interfaceHash: string | number[], account: string): TransactionObject<string>
 
-    channels(
-      arg0: string | number[]
-    ): TransactionObject<{
-      deposit: string;
-      partyABalance: string;
-      closureTime: string;
-      stateCounter: string;
-      closureByPartyA: boolean;
-      0: string;
-      1: string;
-      2: string;
-      3: string;
-      4: boolean;
-    }>;
+    channels(arg0: string | number[]): TransactionObject<{
+      deposit: string
+      partyABalance: string
+      closureTime: string
+      stateCounter: string
+      closureByPartyA: boolean
+      0: string
+      1: string
+      2: string
+      3: string
+      4: boolean
+    }>
 
-    claimChannelClosure(counterparty: string): TransactionObject<void>;
+    claimChannelClosure(counterparty: string): TransactionObject<void>
 
     fundChannelWithSig(
       additionalDeposit: number | string,
@@ -67,17 +56,13 @@ export class HoprChannels extends Contract {
       r: string | number[],
       s: string | number[],
       v: number | string
-    ): TransactionObject<void>;
+    ): TransactionObject<void>
 
-    init(
-      senderX: number | string,
-      senderY: number | string,
-      hashedSecret: string | number[]
-    ): TransactionObject<void>;
+    init(senderX: number | string, senderY: number | string, hashedSecret: string | number[]): TransactionObject<void>
 
-    initiateChannelClosure(counterparty: string): TransactionObject<void>;
+    initiateChannelClosure(counterparty: string): TransactionObject<void>
 
-    openChannel(counterparty: string): TransactionObject<void>;
+    openChannel(counterparty: string): TransactionObject<void>
 
     redeemTicket(
       preImage: string | number[],
@@ -88,15 +73,15 @@ export class HoprChannels extends Contract {
       r: string | number[],
       s: string | number[],
       v: number | string
-    ): TransactionObject<void>;
+    ): TransactionObject<void>
 
-    redeemedTickets(arg0: string | number[]): TransactionObject<boolean>;
+    redeemedTickets(arg0: string | number[]): TransactionObject<boolean>
 
-    secsClosure(): TransactionObject<string>;
+    secsClosure(): TransactionObject<string>
 
-    setHashedSecret(hashedSecret: string | number[]): TransactionObject<void>;
+    setHashedSecret(hashedSecret: string | number[]): TransactionObject<void>
 
-    token(): TransactionObject<string>;
+    token(): TransactionObject<string>
 
     tokensReceived(
       operator: string,
@@ -105,20 +90,17 @@ export class HoprChannels extends Contract {
       amount: number | string,
       userData: string | number[],
       operatorData: string | number[]
-    ): TransactionObject<void>;
-  };
+    ): TransactionObject<void>
+  }
   events: {
     SecretHashSet: ContractEvent<{
-      account: string;
-      secretHash: string;
-      counter: string;
-      0: string;
-      1: string;
-      2: string;
-    }>;
-    allEvents: (
-      options?: EventOptions,
-      cb?: Callback<EventLog>
-    ) => EventEmitter;
-  };
+      account: string
+      secretHash: string
+      counter: string
+      0: string
+      1: string
+      2: string
+    }>
+    allEvents: (options?: EventOptions, cb?: Callback<EventLog>) => EventEmitter
+  }
 }

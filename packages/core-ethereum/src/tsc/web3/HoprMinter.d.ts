@@ -2,72 +2,60 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import BN from "bn.js";
-import { Contract, ContractOptions } from "web3-eth-contract";
-import { EventLog } from "web3-core";
-import { EventEmitter } from "events";
-import { ContractEvent, Callback, TransactionObject, BlockType } from "./types";
+import BN from 'bn.js'
+import { Contract, ContractOptions } from 'web3-eth-contract'
+import { EventLog } from 'web3-core'
+import { EventEmitter } from 'events'
+import { ContractEvent, Callback, TransactionObject, BlockType } from './types'
 
 interface EventOptions {
-  filter?: object;
-  fromBlock?: BlockType;
-  topics?: string[];
+  filter?: object
+  fromBlock?: BlockType
+  topics?: string[]
 }
 
 export class HoprMinter extends Contract {
-  constructor(
-    jsonInterface: any[],
-    address?: string,
-    options?: ContractOptions
-  );
-  clone(): HoprMinter;
+  constructor(jsonInterface: any[], address?: string, options?: ContractOptions)
+  clone(): HoprMinter
   methods: {
-    accounts(
-      arg0: string
-    ): TransactionObject<{
-      balance: string;
-      lastClaim: string;
-      0: string;
-      1: string;
-    }>;
+    accounts(arg0: string): TransactionObject<{
+      balance: string
+      lastClaim: string
+      0: string
+      1: string
+    }>
 
-    amountToMint(): TransactionObject<string>;
+    amountToMint(): TransactionObject<string>
 
-    claim(): TransactionObject<void>;
+    claim(): TransactionObject<void>
 
-    claimFor(account: string): TransactionObject<void>;
+    claimFor(account: string): TransactionObject<void>
 
-    deadline(): TransactionObject<string>;
+    deadline(): TransactionObject<string>
 
-    duration(): TransactionObject<string>;
+    duration(): TransactionObject<string>
 
-    increaseBalance(
-      account: string,
-      amount: number | string
-    ): TransactionObject<void>;
+    increaseBalance(account: string, amount: number | string): TransactionObject<void>
 
-    maxAmount(): TransactionObject<string>;
+    maxAmount(): TransactionObject<string>
 
-    owner(): TransactionObject<string>;
+    owner(): TransactionObject<string>
 
-    renounceOwnership(): TransactionObject<void>;
+    renounceOwnership(): TransactionObject<void>
 
-    started(): TransactionObject<string>;
+    started(): TransactionObject<string>
 
-    token(): TransactionObject<string>;
+    token(): TransactionObject<string>
 
-    transferOwnership(newOwner: string): TransactionObject<void>;
-  };
+    transferOwnership(newOwner: string): TransactionObject<void>
+  }
   events: {
     OwnershipTransferred: ContractEvent<{
-      previousOwner: string;
-      newOwner: string;
-      0: string;
-      1: string;
-    }>;
-    allEvents: (
-      options?: EventOptions,
-      cb?: Callback<EventLog>
-    ) => EventEmitter;
-  };
+      previousOwner: string
+      newOwner: string
+      0: string
+      1: string
+    }>
+    allEvents: (options?: EventOptions, cb?: Callback<EventLog>) => EventEmitter
+  }
 }

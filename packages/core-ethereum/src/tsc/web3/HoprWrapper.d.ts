@@ -2,44 +2,33 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import BN from "bn.js";
-import { Contract, ContractOptions } from "web3-eth-contract";
-import { EventLog } from "web3-core";
-import { EventEmitter } from "events";
-import { ContractEvent, Callback, TransactionObject, BlockType } from "./types";
+import BN from 'bn.js'
+import { Contract, ContractOptions } from 'web3-eth-contract'
+import { EventLog } from 'web3-core'
+import { EventEmitter } from 'events'
+import { ContractEvent, Callback, TransactionObject, BlockType } from './types'
 
 interface EventOptions {
-  filter?: object;
-  fromBlock?: BlockType;
-  topics?: string[];
+  filter?: object
+  fromBlock?: BlockType
+  topics?: string[]
 }
 
 export class HoprWrapper extends Contract {
-  constructor(
-    jsonInterface: any[],
-    address?: string,
-    options?: ContractOptions
-  );
-  clone(): HoprWrapper;
+  constructor(jsonInterface: any[], address?: string, options?: ContractOptions)
+  clone(): HoprWrapper
   methods: {
-    TOKENS_RECIPIENT_INTERFACE_HASH(): TransactionObject<string>;
+    TOKENS_RECIPIENT_INTERFACE_HASH(): TransactionObject<string>
 
-    canImplementInterfaceForAddress(
-      interfaceHash: string | number[],
-      account: string
-    ): TransactionObject<string>;
+    canImplementInterfaceForAddress(interfaceHash: string | number[], account: string): TransactionObject<string>
 
-    onTokenTransfer(
-      from: string,
-      amount: number | string,
-      data: string | number[]
-    ): TransactionObject<boolean>;
+    onTokenTransfer(from: string, amount: number | string, data: string | number[]): TransactionObject<boolean>
 
-    owner(): TransactionObject<string>;
+    owner(): TransactionObject<string>
 
-    recoverTokens(): TransactionObject<void>;
+    recoverTokens(): TransactionObject<void>
 
-    renounceOwnership(): TransactionObject<void>;
+    renounceOwnership(): TransactionObject<void>
 
     tokensReceived(
       operator: string,
@@ -48,38 +37,35 @@ export class HoprWrapper extends Contract {
       amount: number | string,
       userData: string | number[],
       operatorData: string | number[]
-    ): TransactionObject<void>;
+    ): TransactionObject<void>
 
-    transferOwnership(newOwner: string): TransactionObject<void>;
+    transferOwnership(newOwner: string): TransactionObject<void>
 
-    wxHOPR(): TransactionObject<string>;
+    wxHOPR(): TransactionObject<string>
 
-    xHOPR(): TransactionObject<string>;
+    xHOPR(): TransactionObject<string>
 
-    xHoprAmount(): TransactionObject<string>;
-  };
+    xHoprAmount(): TransactionObject<string>
+  }
   events: {
     OwnershipTransferred: ContractEvent<{
-      previousOwner: string;
-      newOwner: string;
-      0: string;
-      1: string;
-    }>;
+      previousOwner: string
+      newOwner: string
+      0: string
+      1: string
+    }>
     Unwrapped: ContractEvent<{
-      account: string;
-      amount: string;
-      0: string;
-      1: string;
-    }>;
+      account: string
+      amount: string
+      0: string
+      1: string
+    }>
     Wrapped: ContractEvent<{
-      account: string;
-      amount: string;
-      0: string;
-      1: string;
-    }>;
-    allEvents: (
-      options?: EventOptions,
-      cb?: Callback<EventLog>
-    ) => EventEmitter;
-  };
+      account: string
+      amount: string
+      0: string
+      1: string
+    }>
+    allEvents: (options?: EventOptions, cb?: Callback<EventLog>) => EventEmitter
+  }
 }
