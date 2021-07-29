@@ -2,92 +2,74 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import BN from "bn.js";
-import { Contract, ContractOptions } from "web3-eth-contract";
-import { EventLog } from "web3-core";
-import { EventEmitter } from "events";
-import { ContractEvent, Callback, TransactionObject, BlockType } from "./types";
+import BN from 'bn.js'
+import { Contract, ContractOptions } from 'web3-eth-contract'
+import { EventLog } from 'web3-core'
+import { EventEmitter } from 'events'
+import { ContractEvent, Callback, TransactionObject, BlockType } from './types'
 
 interface EventOptions {
-  filter?: object;
-  fromBlock?: BlockType;
-  topics?: string[];
+  filter?: object
+  fromBlock?: BlockType
+  topics?: string[]
 }
 
 export class PermittableToken extends Contract {
-  constructor(
-    jsonInterface: any[],
-    address?: string,
-    options?: ContractOptions
-  );
-  clone(): PermittableToken;
+  constructor(jsonInterface: any[], address?: string, options?: ContractOptions)
+  clone(): PermittableToken
   methods: {
-    mintingFinished(): TransactionObject<boolean>;
+    mintingFinished(): TransactionObject<boolean>
 
-    name(): TransactionObject<string>;
+    name(): TransactionObject<string>
 
-    approve(_to: string, _value: number | string): TransactionObject<boolean>;
+    approve(_to: string, _value: number | string): TransactionObject<boolean>
 
-    setBridgeContract(_bridgeContract: string): TransactionObject<void>;
+    setBridgeContract(_bridgeContract: string): TransactionObject<void>
 
-    totalSupply(): TransactionObject<string>;
+    totalSupply(): TransactionObject<string>
 
-    transferFrom(
-      _sender: string,
-      _recipient: string,
-      _amount: number | string
-    ): TransactionObject<boolean>;
+    transferFrom(_sender: string, _recipient: string, _amount: number | string): TransactionObject<boolean>
 
-    PERMIT_TYPEHASH(): TransactionObject<string>;
+    PERMIT_TYPEHASH(): TransactionObject<string>
 
-    decimals(): TransactionObject<string>;
+    decimals(): TransactionObject<string>
 
-    DOMAIN_SEPARATOR(): TransactionObject<string>;
+    DOMAIN_SEPARATOR(): TransactionObject<string>
 
-    increaseAllowance(
-      _to: string,
-      _addedValue: number | string
-    ): TransactionObject<boolean>;
+    increaseAllowance(_to: string, _addedValue: number | string): TransactionObject<boolean>
 
-    transferAndCall(
-      _to: string,
-      _value: number | string,
-      _data: string | number[]
-    ): TransactionObject<boolean>;
+    transferAndCall(_to: string, _value: number | string, _data: string | number[]): TransactionObject<boolean>
 
-    mint(_to: string, _amount: number | string): TransactionObject<boolean>;
+    mint(_to: string, _amount: number | string): TransactionObject<boolean>
 
-    burn(_value: number | string): TransactionObject<void>;
+    burn(_value: number | string): TransactionObject<void>
 
-    version(): TransactionObject<string>;
+    version(): TransactionObject<string>
 
-    decreaseApproval(
-      _spender: string,
-      _subtractedValue: number | string
-    ): TransactionObject<boolean>;
+    decreaseApproval(_spender: string, _subtractedValue: number | string): TransactionObject<boolean>
 
-    claimTokens(_token: string, _to: string): TransactionObject<void>;
+    claimTokens(_token: string, _to: string): TransactionObject<void>
 
-    balanceOf(_owner: string): TransactionObject<string>;
+    balanceOf(_owner: string): TransactionObject<string>
 
-    renounceOwnership(): TransactionObject<void>;
+    renounceOwnership(): TransactionObject<void>
 
-    isBridge(_address: string): TransactionObject<boolean>;
+    isBridge(_address: string): TransactionObject<boolean>
 
-    finishMinting(): TransactionObject<boolean>;
+    finishMinting(): TransactionObject<boolean>
 
-    nonces(arg0: string): TransactionObject<string>;
+    nonces(arg0: string): TransactionObject<string>
 
     getTokenInterfacesVersion(): TransactionObject<{
-      major: string;
-      minor: string;
-      patch: string;
-      0: string;
-      1: string;
-      2: string;
-    }>;
+      major: string
+      minor: string
+      patch: string
+      0: string
+      1: string
+      2: string
+    }>
 
-    owner(): TransactionObject<string>;
+    owner(): TransactionObject<string>
 
     permit(
       _holder: string,
@@ -98,82 +80,69 @@ export class PermittableToken extends Contract {
       _v: number | string,
       _r: string | number[],
       _s: string | number[]
-    ): TransactionObject<void>;
+    ): TransactionObject<void>
 
-    symbol(): TransactionObject<string>;
+    symbol(): TransactionObject<string>
 
-    decreaseAllowance(
-      spender: string,
-      subtractedValue: number | string
-    ): TransactionObject<boolean>;
+    decreaseAllowance(spender: string, subtractedValue: number | string): TransactionObject<boolean>
 
-    transfer(_to: string, _value: number | string): TransactionObject<boolean>;
+    transfer(_to: string, _value: number | string): TransactionObject<boolean>
 
-    push(_to: string, _amount: number | string): TransactionObject<void>;
+    push(_to: string, _amount: number | string): TransactionObject<void>
 
-    move(
-      _from: string,
-      _to: string,
-      _amount: number | string
-    ): TransactionObject<void>;
+    move(_from: string, _to: string, _amount: number | string): TransactionObject<void>
 
-    bridgeContract(): TransactionObject<string>;
+    bridgeContract(): TransactionObject<string>
 
-    increaseApproval(
-      _spender: string,
-      _addedValue: number | string
-    ): TransactionObject<boolean>;
+    increaseApproval(_spender: string, _addedValue: number | string): TransactionObject<boolean>
 
-    allowance(_owner: string, _spender: string): TransactionObject<string>;
+    allowance(_owner: string, _spender: string): TransactionObject<string>
 
-    pull(_from: string, _amount: number | string): TransactionObject<void>;
+    pull(_from: string, _amount: number | string): TransactionObject<void>
 
-    transferOwnership(_newOwner: string): TransactionObject<void>;
+    transferOwnership(_newOwner: string): TransactionObject<void>
 
-    expirations(arg0: string, arg1: string): TransactionObject<string>;
-  };
+    expirations(arg0: string, arg1: string): TransactionObject<string>
+  }
   events: {
     Mint: ContractEvent<{
-      to: string;
-      amount: string;
-      0: string;
-      1: string;
-    }>;
-    MintFinished: ContractEvent<{}>;
-    OwnershipRenounced: ContractEvent<string>;
+      to: string
+      amount: string
+      0: string
+      1: string
+    }>
+    MintFinished: ContractEvent<{}>
+    OwnershipRenounced: ContractEvent<string>
     OwnershipTransferred: ContractEvent<{
-      previousOwner: string;
-      newOwner: string;
-      0: string;
-      1: string;
-    }>;
+      previousOwner: string
+      newOwner: string
+      0: string
+      1: string
+    }>
     Burn: ContractEvent<{
-      burner: string;
-      value: string;
-      0: string;
-      1: string;
-    }>;
+      burner: string
+      value: string
+      0: string
+      1: string
+    }>
     Transfer: ContractEvent<{
-      from: string;
-      to: string;
-      value: string;
-      data: string;
-      0: string;
-      1: string;
-      2: string;
-      3: string;
-    }>;
+      from: string
+      to: string
+      value: string
+      data: string
+      0: string
+      1: string
+      2: string
+      3: string
+    }>
     Approval: ContractEvent<{
-      owner: string;
-      spender: string;
-      value: string;
-      0: string;
-      1: string;
-      2: string;
-    }>;
-    allEvents: (
-      options?: EventOptions,
-      cb?: Callback<EventLog>
-    ) => EventEmitter;
-  };
+      owner: string
+      spender: string
+      value: string
+      0: string
+      1: string
+      2: string
+    }>
+    allEvents: (options?: EventOptions, cb?: Callback<EventLog>) => EventEmitter
+  }
 }

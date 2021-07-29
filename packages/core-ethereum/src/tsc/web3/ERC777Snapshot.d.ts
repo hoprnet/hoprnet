@@ -2,76 +2,60 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import BN from "bn.js";
-import { Contract, ContractOptions } from "web3-eth-contract";
-import { EventLog } from "web3-core";
-import { EventEmitter } from "events";
-import { ContractEvent, Callback, TransactionObject, BlockType } from "./types";
+import BN from 'bn.js'
+import { Contract, ContractOptions } from 'web3-eth-contract'
+import { EventLog } from 'web3-core'
+import { EventEmitter } from 'events'
+import { ContractEvent, Callback, TransactionObject, BlockType } from './types'
 
 interface EventOptions {
-  filter?: object;
-  fromBlock?: BlockType;
-  topics?: string[];
+  filter?: object
+  fromBlock?: BlockType
+  topics?: string[]
 }
 
 export class ERC777Snapshot extends Contract {
-  constructor(
-    jsonInterface: any[],
-    address?: string,
-    options?: ContractOptions
-  );
-  clone(): ERC777Snapshot;
+  constructor(jsonInterface: any[], address?: string, options?: ContractOptions)
+  clone(): ERC777Snapshot
   methods: {
     accountSnapshots(
       arg0: string,
       arg1: number | string
     ): TransactionObject<{
-      fromBlock: string;
-      value: string;
-      0: string;
-      1: string;
-    }>;
+      fromBlock: string
+      value: string
+      0: string
+      1: string
+    }>
 
-    allowance(holder: string, spender: string): TransactionObject<string>;
+    allowance(holder: string, spender: string): TransactionObject<string>
 
-    approve(
-      spender: string,
-      value: number | string
-    ): TransactionObject<boolean>;
+    approve(spender: string, value: number | string): TransactionObject<boolean>
 
-    authorizeOperator(operator: string): TransactionObject<void>;
+    authorizeOperator(operator: string): TransactionObject<void>
 
-    balanceOf(tokenHolder: string): TransactionObject<string>;
+    balanceOf(tokenHolder: string): TransactionObject<string>
 
-    balanceOfAt(
-      _owner: string,
-      _blockNumber: number | string
-    ): TransactionObject<string>;
+    balanceOfAt(_owner: string, _blockNumber: number | string): TransactionObject<string>
 
-    burn(
-      amount: number | string,
-      data: string | number[]
-    ): TransactionObject<void>;
+    burn(amount: number | string, data: string | number[]): TransactionObject<void>
 
-    decimals(): TransactionObject<string>;
+    decimals(): TransactionObject<string>
 
-    defaultOperators(): TransactionObject<string[]>;
+    defaultOperators(): TransactionObject<string[]>
 
-    granularity(): TransactionObject<string>;
+    granularity(): TransactionObject<string>
 
-    isOperatorFor(
-      operator: string,
-      tokenHolder: string
-    ): TransactionObject<boolean>;
+    isOperatorFor(operator: string, tokenHolder: string): TransactionObject<boolean>
 
-    name(): TransactionObject<string>;
+    name(): TransactionObject<string>
 
     operatorBurn(
       account: string,
       amount: number | string,
       data: string | number[],
       operatorData: string | number[]
-    ): TransactionObject<void>;
+    ): TransactionObject<void>
 
     operatorSend(
       sender: string,
@@ -79,112 +63,96 @@ export class ERC777Snapshot extends Contract {
       amount: number | string,
       data: string | number[],
       operatorData: string | number[]
-    ): TransactionObject<void>;
+    ): TransactionObject<void>
 
-    revokeOperator(operator: string): TransactionObject<void>;
+    revokeOperator(operator: string): TransactionObject<void>
 
-    send(
-      recipient: string,
-      amount: number | string,
-      data: string | number[]
-    ): TransactionObject<void>;
+    send(recipient: string, amount: number | string, data: string | number[]): TransactionObject<void>
 
-    symbol(): TransactionObject<string>;
+    symbol(): TransactionObject<string>
 
-    totalSupply(): TransactionObject<string>;
+    totalSupply(): TransactionObject<string>
 
-    totalSupplyAt(_blockNumber: number | string): TransactionObject<string>;
+    totalSupplyAt(_blockNumber: number | string): TransactionObject<string>
 
-    totalSupplySnapshots(
-      arg0: number | string
-    ): TransactionObject<{
-      fromBlock: string;
-      value: string;
-      0: string;
-      1: string;
-    }>;
+    totalSupplySnapshots(arg0: number | string): TransactionObject<{
+      fromBlock: string
+      value: string
+      0: string
+      1: string
+    }>
 
-    transfer(
-      recipient: string,
-      amount: number | string
-    ): TransactionObject<boolean>;
+    transfer(recipient: string, amount: number | string): TransactionObject<boolean>
 
-    transferFrom(
-      holder: string,
-      recipient: string,
-      amount: number | string
-    ): TransactionObject<boolean>;
-  };
+    transferFrom(holder: string, recipient: string, amount: number | string): TransactionObject<boolean>
+  }
   events: {
     Approval: ContractEvent<{
-      owner: string;
-      spender: string;
-      value: string;
-      0: string;
-      1: string;
-      2: string;
-    }>;
+      owner: string
+      spender: string
+      value: string
+      0: string
+      1: string
+      2: string
+    }>
     AuthorizedOperator: ContractEvent<{
-      operator: string;
-      tokenHolder: string;
-      0: string;
-      1: string;
-    }>;
+      operator: string
+      tokenHolder: string
+      0: string
+      1: string
+    }>
     Burned: ContractEvent<{
-      operator: string;
-      from: string;
-      amount: string;
-      data: string;
-      operatorData: string;
-      0: string;
-      1: string;
-      2: string;
-      3: string;
-      4: string;
-    }>;
+      operator: string
+      from: string
+      amount: string
+      data: string
+      operatorData: string
+      0: string
+      1: string
+      2: string
+      3: string
+      4: string
+    }>
     Minted: ContractEvent<{
-      operator: string;
-      to: string;
-      amount: string;
-      data: string;
-      operatorData: string;
-      0: string;
-      1: string;
-      2: string;
-      3: string;
-      4: string;
-    }>;
+      operator: string
+      to: string
+      amount: string
+      data: string
+      operatorData: string
+      0: string
+      1: string
+      2: string
+      3: string
+      4: string
+    }>
     RevokedOperator: ContractEvent<{
-      operator: string;
-      tokenHolder: string;
-      0: string;
-      1: string;
-    }>;
+      operator: string
+      tokenHolder: string
+      0: string
+      1: string
+    }>
     Sent: ContractEvent<{
-      operator: string;
-      from: string;
-      to: string;
-      amount: string;
-      data: string;
-      operatorData: string;
-      0: string;
-      1: string;
-      2: string;
-      3: string;
-      4: string;
-      5: string;
-    }>;
+      operator: string
+      from: string
+      to: string
+      amount: string
+      data: string
+      operatorData: string
+      0: string
+      1: string
+      2: string
+      3: string
+      4: string
+      5: string
+    }>
     Transfer: ContractEvent<{
-      from: string;
-      to: string;
-      value: string;
-      0: string;
-      1: string;
-      2: string;
-    }>;
-    allEvents: (
-      options?: EventOptions,
-      cb?: Callback<EventLog>
-    ) => EventEmitter;
-  };
+      from: string
+      to: string
+      value: string
+      0: string
+      1: string
+      2: string
+    }>
+    allEvents: (options?: EventOptions, cb?: Callback<EventLog>) => EventEmitter
+  }
 }

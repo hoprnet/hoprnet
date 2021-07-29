@@ -2,41 +2,27 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import BN from "bn.js";
-import { Contract, ContractOptions } from "web3-eth-contract";
-import { EventLog } from "web3-core";
-import { EventEmitter } from "events";
-import { ContractEvent, Callback, TransactionObject, BlockType } from "./types";
+import BN from 'bn.js'
+import { Contract, ContractOptions } from 'web3-eth-contract'
+import { EventLog } from 'web3-core'
+import { EventEmitter } from 'events'
+import { ContractEvent, Callback, TransactionObject, BlockType } from './types'
 
 interface EventOptions {
-  filter?: object;
-  fromBlock?: BlockType;
-  topics?: string[];
+  filter?: object
+  fromBlock?: BlockType
+  topics?: string[]
 }
 
 export class LegacyERC20 extends Contract {
-  constructor(
-    jsonInterface: any[],
-    address?: string,
-    options?: ContractOptions
-  );
-  clone(): LegacyERC20;
+  constructor(jsonInterface: any[], address?: string, options?: ContractOptions)
+  clone(): LegacyERC20
   methods: {
-    transferFrom(
-      _owner: string,
-      _spender: string,
-      _value: number | string
-    ): TransactionObject<void>;
+    transferFrom(_owner: string, _spender: string, _value: number | string): TransactionObject<void>
 
-    transfer(
-      _spender: string,
-      _value: number | string
-    ): TransactionObject<void>;
-  };
+    transfer(_spender: string, _value: number | string): TransactionObject<void>
+  }
   events: {
-    allEvents: (
-      options?: EventOptions,
-      cb?: Callback<EventLog>
-    ) => EventEmitter;
-  };
+    allEvents: (options?: EventOptions, cb?: Callback<EventLog>) => EventEmitter
+  }
 }
