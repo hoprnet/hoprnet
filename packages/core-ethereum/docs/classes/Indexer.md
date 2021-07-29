@@ -473,7 +473,7 @@ peer's open channels
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:415](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L415)
+[core-ethereum/src/indexer/index.ts:418](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L418)
 
 ___
 
@@ -499,11 +499,11 @@ ___
 
 ### getPublicNodes
 
-▸ **getPublicNodes**(): `Promise`<`Multiaddr`[]\>
+▸ **getPublicNodes**(): `Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
 
 #### Returns
 
-`Promise`<`Multiaddr`[]\>
+`Promise`<{ `id`: `PeerId` ; `multiaddrs`: `Multiaddr`[]  }[]\>
 
 #### Defined in
 
@@ -526,7 +526,7 @@ an open channel
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:398](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L398)
+[core-ethereum/src/indexer/index.ts:401](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L401)
 
 ___
 

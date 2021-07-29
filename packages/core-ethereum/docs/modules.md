@@ -32,7 +32,7 @@
 
 #### Defined in
 
-[core-ethereum/src/index.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L24)
+[core-ethereum/src/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L25)
 
 ## Variables
 
