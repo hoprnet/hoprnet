@@ -82,6 +82,47 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         Channel newState
     );
 
+    event ChannelClosureInitiated(
+        address indexed source,
+        address indexed destination,
+        uint32 closureInitiationTime
+    );
+
+    event ChannelClosureFinalized(
+        address indexed source,
+        address indexed destination,
+        uint32 closureFinalizationTime,
+        uint256 channelBalance
+    );
+
+    event ChannelBumped(
+        address indexed source,
+        address indexed destination,
+        bytes32 newCommitment,
+        uint256 ticketEpoch,
+        uint256 channelBalance
+    );
+
+    event TicketRedeemed(
+        address indexed source,
+        address indexed destination,
+        bytes32 nextCommitment,
+        uint256 ticketEpoch,
+        uint256 ticketIndex,
+        bytes32 proofOfRelaySecret,
+        uint256 amount,
+        uint256 winProb,
+        bytes signature
+    );
+
+    event TokensReceived(
+        address indexed from,
+        address indexed account1,
+        address indexed account2,
+        uint256 amount1,
+        uint256 amount2
+    );
+
     /**
      * @param _token HoprToken address
      * @param _secsClosure seconds until a channel can be closed
@@ -207,6 +248,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
             token.safeTransfer(msg.sender, amount);
           }
           emit ChannelUpdate(source, msg.sender, spendingChannel);
+          emit TicketRedeemed(source, msg.sender, nextCommitment, ticketEpoch, ticketIndex, proofOfRelaySecret, amount, winProb, signature);
     }
 
 
@@ -218,7 +260,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
      * before-hand. This notice period is called the 'cool-off' period.
      * The channel 'destination' should be monitoring blockchain events, thus
      * they should be aware that the closure has been triggered, as this
-     * method triggers a {ChannelUpdate} event.
+     * method triggers a {ChannelUpdate} and an {ChannelClosureInitiated} event.
      * After the cool-off period expires, the 'source' can call
      * 'finalizeChannelClosure' which withdraws the stake.
      * @param destination the address of the destination
@@ -231,12 +273,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
         channel.status = ChannelStatus.PENDING_TO_CLOSE;
         emit ChannelUpdate(msg.sender, destination, channel);
+        emit ChannelClosureInitiated(msg.sender, destination, _currentBlockTimestamp());
     }
 
     /**
      * @dev Finalize the channel closure, if cool-off period
      * is over it will close the channel and transfer funds
-     * to the sender. Then emits {ChannelUpdate} event.
+     * to the sender. Then emits {ChannelUpdate} and the
+     * {ChannelClosureFinalized} event.
      * @param destination the address of the counterparty
      */
     function finalizeChannelClosure(
@@ -250,6 +294,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
           token.transfer(msg.sender, channel.balance);
         }
 
+        emit ChannelClosureFinalized(msg.sender, destination, channel.closureTime, channel.balance);
         delete channel.balance;
         delete channel.closureTime;
         channel.status = ChannelStatus.CLOSED;
@@ -279,6 +324,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
           channel.status = ChannelStatus.OPEN;
         }
         emit ChannelUpdate(source, msg.sender, channel);
+        emit ChannelBumped(source, msg.sender, newCommitment, channel.ticketEpoch, channel.balance);
     }
 
     /**
@@ -320,6 +366,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
             if (amount2 > 0){
                 _fundChannel(account2, account1, amount2);
             }
+            emit TokensReceived(from, account1, account2, amount1, amount2);
         }
     }
 
