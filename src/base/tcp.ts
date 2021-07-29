@@ -1,6 +1,3 @@
-/// <reference path="../@types/stream-to-it.ts" />
-/// <reference path="../@types/libp2p.ts" />
-
 import net from 'net'
 import abortable, { AbortError } from 'abortable-iterator'
 import type { Socket, AddressInfo } from 'net'
@@ -14,17 +11,20 @@ const verbose = Debug('hopr-connect:verbose:tcp')
 
 export const SOCKET_CLOSE_TIMEOUT = 1000
 
-import type { MultiaddrConnection, Stream, DialOptions, StreamType } from 'libp2p'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+
 import { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
 import { toU8aStream } from '../utils'
-import { PeerId } from 'libp2p-interfaces'
+import type PeerId from 'peer-id'
+import type { Stream, StreamType, DialOptions } from '../types'
 
 /**
  * Class to encapsulate TCP sockets
  */
 class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
+  // @ts-ignore
   public sink: Stream['sink']
   public source: Stream['source']
 
@@ -127,12 +127,12 @@ class TCPConnection implements MultiaddrConnection {
    * @param options.signal Used to abort dial requests
    * @returns Resolves a TCP Socket
    */
-  public static create(ma: Multiaddr, self: PeerId, options?: DialOptions): Promise<MultiaddrConnection> {
+  public static create(ma: Multiaddr, self: PeerId, options?: DialOptions): Promise<TCPConnection> {
     if (options?.signal?.aborted) {
       throw new AbortError()
     }
 
-    return new Promise<MultiaddrConnection>((resolve, reject) => {
+    return new Promise<TCPConnection>((resolve, reject) => {
       const start = Date.now()
       const cOpts = ma.toOptions()
 

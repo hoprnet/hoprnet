@@ -1,21 +1,23 @@
-/// <reference path="../@types/libp2p.ts" />
-/// <reference path="../@types/libp2p-interfaces.ts" />
-
-import net, { AddressInfo, Socket as TCPSocket } from 'net'
-import dgram, { RemoteInfo } from 'dgram'
+import { createServer } from 'net'
+import type { AddressInfo, Socket as TCPSocket, Server as TCPServer } from 'net'
+import { createSocket } from 'dgram'
+import type { RemoteInfo, Socket as UDPSocket } from 'dgram'
 
 import { once, EventEmitter } from 'events'
-import { PeerStoreType, PublicNodesEmitter } from '../types'
-import debug from 'debug'
+import { PeerStoreType, PublicNodesEmitter, DialOptions } from '../types'
+import Debug from 'debug'
 import { green, red } from 'chalk'
 import { NetworkInterfaceInfo, networkInterfaces } from 'os'
 
 import AbortController from 'abort-controller'
-import type { AbortSignal } from 'abort-controller'
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, CODE_UDP, RELAY_CONTACT_TIMEOUT } from '../constants'
-import type { Connection, ConnHandler, MultiaddrConnection, Upgrader } from 'libp2p'
+import type { Connection } from 'libp2p'
+import type {
+  MultiaddrConnection,
+  Upgrader,
+  Listener as InterfaceListener
+} from 'libp2p-interfaces/src/transport/types'
 
-import type { Listener as InterfaceListener } from 'libp2p-interfaces'
 import type PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
@@ -24,9 +26,9 @@ import { getAddrs } from './addrs'
 import { isAnyAddress } from '../utils'
 import { TCPConnection } from './tcp'
 
-const log = debug('hopr-connect:listener')
-const error = debug('hopr-connect:listener:error')
-const verbose = debug('hopr-connect:verbose:listener')
+const log = Debug('hopr-connect:listener')
+const error = Debug('hopr-connect:listener:error')
+const verbose = Debug('hopr-connect:verbose:listener')
 
 // @TODO to be adjusted
 const MAX_RELAYS_PER_NODE = 7
@@ -74,8 +76,8 @@ type Address = { port: number; address: string }
 
 class Listener extends EventEmitter implements InterfaceListener {
   private __connections: MultiaddrConnection[]
-  private tcpSocket: net.Server
-  private udpSocket: dgram.Socket
+  private tcpSocket: TCPServer
+  private udpSocket: UDPSocket
 
   private state: State
 
@@ -90,7 +92,7 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   constructor(
-    private handler: ConnHandler | undefined,
+    private handler: ((conn: Connection) => void) | undefined,
     private upgrader: Upgrader,
     publicNodes: PublicNodesEmitter | undefined,
     private initialNodes: PeerStoreType[] = [],
@@ -104,8 +106,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     this.__connections = []
     this.upgrader = upgrader
 
-    this.tcpSocket = net.createServer()
-    this.udpSocket = dgram.createSocket({
+    this.tcpSocket = createServer()
+    this.udpSocket = createSocket({
       // @TODO
       // `udp6` does not seem to work in Node 12.x
       // can receive IPv6 packet and IPv4 after reconnecting the socket
@@ -392,7 +394,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
     }
 
-    maConn.conn.once('close', untrackConn)
+    ;(maConn.conn as EventEmitter).once('close', untrackConn)
   }
 
   /**
@@ -407,10 +409,12 @@ class Listener extends EventEmitter implements InterfaceListener {
     let conn: Connection
 
     try {
-      maConn = TCPConnection.fromSocket(socket, this.peerId)
+      maConn = TCPConnection.fromSocket(socket, this.peerId) as any
     } catch (err) {
       error(`inbound connection failed. ${err.message}`)
+    }
 
+    if (maConn == undefined) {
       socket.destroy()
       return
     }
@@ -656,9 +660,9 @@ class Listener extends EventEmitter implements InterfaceListener {
     return usableInterfaces[0].address
   }
 
-  private async connectToRelay(relay: Multiaddr, opts?: { signal: AbortSignal }): Promise<number> {
+  private async connectToRelay(relay: Multiaddr, opts?: DialOptions): Promise<number> {
     let conn: Connection | undefined
-    let maConn: MultiaddrConnection | undefined
+    let maConn: TCPConnection | undefined
 
     const start = Date.now()
 
@@ -666,7 +670,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       maConn = await TCPConnection.create(relay, this.peerId, opts)
     } catch (err) {
       if (maConn != undefined) {
-        await attemptClose(maConn)
+        await attemptClose(maConn as any)
       }
     }
 
@@ -675,7 +679,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     try {
-      conn = await this.upgrader.upgradeOutbound(maConn)
+      conn = await this.upgrader.upgradeOutbound(maConn as any)
     } catch (err) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
         error(
@@ -697,7 +701,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       return -1
     }
 
-    this.trackConn(maConn)
+    this.trackConn(maConn as any)
 
     this.handler?.(conn)
 

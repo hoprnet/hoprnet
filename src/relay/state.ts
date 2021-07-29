@@ -1,6 +1,4 @@
-/// <reference path="../@types/libp2p.ts" />
-
-import { Stream } from 'libp2p'
+import { Stream } from '../types'
 import type PeerId from 'peer-id'
 
 import { u8aCompare } from '@hoprnet/hopr-utils'

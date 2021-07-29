@@ -1,5 +1,7 @@
-type Multiaddr = import('multiaddr').Multiaddr
-type PeerId = import('peer-id')
+import type { Multiaddr } from 'multiaddr'
+import type PeerId from 'peer-id'
+import type BL from 'bl'
+import type { PromiseValue } from '@hoprnet/hopr-utils'
 
 type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`
@@ -44,3 +46,14 @@ export interface PublicNodesEmitter {
   removeListener(event: RemoveEventName, listener: (removeNode: PeerId) => void): this
   removeListener(event: string | symbol, listener: (...args: any[]) => void): this
 }
+
+export type StreamType = Buffer | BL | Uint8Array
+
+export type Stream<T = StreamType> = {
+  sink: (source: Stream['source']) => Promise<void>
+  source: AsyncGenerator<T, void>
+}
+
+export type StreamResult = PromiseValue<ReturnType<Stream['source']['next']>>
+
+export type DialOptions = { signal?: AbortSignal }

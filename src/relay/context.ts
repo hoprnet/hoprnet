@@ -1,10 +1,11 @@
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 
-import Defer, { DeferredPromise } from 'p-defer'
+import type { DeferredPromise } from 'p-defer'
+import Defer from 'p-defer'
 import EventEmitter from 'events'
 
-import type { Stream, StreamResult } from 'libp2p'
+import type { Stream, StreamResult } from '../types'
 
 import Debug from 'debug'
 

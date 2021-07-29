@@ -10,6 +10,7 @@ import { EventEmitter, once } from 'events'
 import Pair from 'it-pair'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
 import handshake from 'it-handshake'
+import { StreamType } from '../types'
 
 describe('test status message sorting', function () {
   it('sort status messages', function () {
@@ -34,8 +35,8 @@ describe('relay connection', function () {
   })
 
   it('ping message', async function () {
-    const AliceRelay = Pair()
-    const RelayAlice = Pair()
+    const AliceRelay = Pair<StreamType>()
+    const RelayAlice = Pair<StreamType>()
 
     new RelayConnection({
       stream: {
@@ -48,7 +49,7 @@ describe('relay connection', function () {
       onReconnect: async () => {}
     })
 
-    const relayShaker = handshake<Uint8Array>({
+    const relayShaker = handshake({
       sink: RelayAlice.sink,
       source: AliceRelay.source
     })
@@ -61,8 +62,8 @@ describe('relay connection', function () {
   })
 
   it('forward payload', async function () {
-    const AliceRelay = Pair()
-    const RelayAlice = Pair()
+    const AliceRelay = Pair<StreamType>()
+    const RelayAlice = Pair<StreamType>()
 
     const alice = new RelayConnection({
       stream: {
@@ -75,12 +76,12 @@ describe('relay connection', function () {
       onReconnect: async () => {}
     })
 
-    const relayShaker = handshake<Uint8Array>({
+    const relayShaker = handshake({
       sink: RelayAlice.sink,
       source: AliceRelay.source
     })
 
-    const aliceShaker = handshake<Uint8Array>({
+    const aliceShaker = handshake({
       source: alice.source,
       sink: alice.sink
     })
@@ -100,8 +101,8 @@ describe('relay connection', function () {
   })
 
   it('stop a relayed connection from the relay', async function () {
-    const AliceRelay = Pair()
-    const RelayAlice = Pair()
+    const AliceRelay = Pair<StreamType>()
+    const RelayAlice = Pair<StreamType>()
 
     const alice = new RelayConnection({
       stream: {
@@ -114,7 +115,7 @@ describe('relay connection', function () {
       onReconnect: async () => {}
     })
 
-    const relayShaker = handshake<Uint8Array>({
+    const relayShaker = handshake({
       sink: RelayAlice.sink,
       source: AliceRelay.source
     })
@@ -140,8 +141,8 @@ describe('relay connection', function () {
   })
 
   it('stop a relayed connection from the client', async function () {
-    const AliceRelay = Pair()
-    const RelayAlice = Pair()
+    const AliceRelay = Pair<StreamType>()
+    const RelayAlice = Pair<StreamType>()
 
     const alice = new RelayConnection({
       stream: {
@@ -154,7 +155,7 @@ describe('relay connection', function () {
       onReconnect: async () => {}
     })
 
-    const relayShaker = handshake<Uint8Array>({
+    const relayShaker = handshake({
       sink: RelayAlice.sink,
       source: AliceRelay.source
     })
@@ -187,8 +188,8 @@ describe('relay connection', function () {
   })
 
   it('reconnect before using stream and use new stream', async function () {
-    const AliceRelay = Pair()
-    const RelayAlice = Pair()
+    const AliceRelay = Pair<StreamType>()
+    const RelayAlice = Pair<StreamType>()
 
     let aliceAfterReconnect: RelayConnection | undefined
 
@@ -205,12 +206,12 @@ describe('relay connection', function () {
       }
     })
 
-    const aliceShakerBeforeReconnect = handshake<Uint8Array>({
+    const aliceShakerBeforeReconnect = handshake({
       source: alice.source,
       sink: alice.sink
     })
 
-    const relayShaker = handshake<Uint8Array>({
+    const relayShaker = handshake({
       sink: RelayAlice.sink,
       source: AliceRelay.source
     })
@@ -226,7 +227,7 @@ describe('relay connection', function () {
 
     assert(aliceAfterReconnect != undefined)
 
-    const aliceShaker = handshake<Uint8Array>({
+    const aliceShaker = handshake({
       sink: aliceAfterReconnect.sink,
       source: aliceAfterReconnect.source
     })
@@ -245,8 +246,8 @@ describe('relay connection', function () {
   })
 
   it('reconnect before using stream and use new stream', async function () {
-    const AliceRelay = Pair()
-    const RelayAlice = Pair()
+    const AliceRelay = Pair<StreamType>()
+    const RelayAlice = Pair<StreamType>()
 
     let aliceAfterReconnect: RelayConnection | undefined
 
@@ -263,12 +264,12 @@ describe('relay connection', function () {
       }
     })
 
-    const aliceShakerBeforeReconnect = handshake<Uint8Array>({
+    const aliceShakerBeforeReconnect = handshake({
       source: alice.source,
       sink: alice.sink
     })
 
-    const relayShaker = handshake<Uint8Array>({
+    const relayShaker = handshake({
       sink: RelayAlice.sink,
       source: AliceRelay.source
     })
@@ -298,7 +299,7 @@ describe('relay connection', function () {
 
       assert(aliceAfterReconnect != undefined)
 
-      const aliceShaker = handshake<Uint8Array>({
+      const aliceShaker = handshake({
         sink: aliceAfterReconnect.sink,
         source: aliceAfterReconnect.source
       })
@@ -329,8 +330,8 @@ describe('relay connection', function () {
 
     const webRTC = new WebRTC()
 
-    const AliceRelay = Pair()
-    const RelayAlice = Pair()
+    const AliceRelay = Pair<StreamType>()
+    const RelayAlice = Pair<StreamType>()
 
     new RelayConnection({
       stream: {
@@ -347,7 +348,7 @@ describe('relay connection', function () {
       }
     })
 
-    const relayShaker = handshake<Uint8Array>({
+    const relayShaker = handshake({
       sink: RelayAlice.sink,
       source: AliceRelay.source
     })
@@ -385,8 +386,8 @@ describe('relay connection', function () {
 
     const webRTC = new WebRTC()
 
-    const AliceRelay = Pair()
-    const RelayAlice = Pair()
+    const AliceRelay = Pair<StreamType>()
+    const RelayAlice = Pair<StreamType>()
 
     let webRTCAfterReconnect: WebRTC | undefined
 
@@ -408,7 +409,7 @@ describe('relay connection', function () {
       }
     })
 
-    const relayShaker = handshake<Uint8Array>({
+    const relayShaker = handshake({
       sink: RelayAlice.sink,
       source: AliceRelay.source
     })

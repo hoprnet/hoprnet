@@ -1,9 +1,9 @@
-/// <reference path="../@types/libp2p.ts" />
+/// <reference path="../@types/stream-to-it.ts" />
 
 import assert from 'assert'
 import { Listener } from './listener'
 import { Multiaddr } from 'multiaddr'
-import type { MultiaddrConnection, Upgrader } from 'libp2p'
+import type { MultiaddrConnection, Upgrader } from 'libp2p-interfaces/src/transport/types'
 import dgram from 'dgram'
 import type { Socket, RemoteInfo } from 'dgram'
 import { handleStunRequest } from './stun'
@@ -191,7 +191,7 @@ describe('check listening to sockets', function () {
 
     for (let i = 0; i < 2; i++) {
       listener = new Listener(
-        () => {},
+        undefined,
         undefined as unknown as Upgrader,
         undefined,
         await Promise.all(stunServers.map((s: Socket) => getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${s.address().port}`))),

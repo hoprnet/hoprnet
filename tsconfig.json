@@ -1,10 +1,9 @@
 {
   "compilerOptions": {
-    "lib": ["es2020", "dom"],
+    "lib": ["es2021", "dom"],
     "module": "commonjs",
-    "target": "es2020",
+    "target": "es2021",
     "declaration": true,
-    "skipLibCheck": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "sourceMap": true,
@@ -12,7 +11,9 @@
     "noImplicitReturns": true,
     "strict": true,
     "outDir": "lib",
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "typeRoots": ["node_modules/@types", "src/@types"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"]
 }

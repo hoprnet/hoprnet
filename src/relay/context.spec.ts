@@ -1,6 +1,5 @@
 /// <reference path="../@types/it-handshake.ts" />
 /// <reference path="../@types/it-pair.ts" />
-/// <reference path="../@types/libp2p.ts" />
 
 import { RelayContext, DEFAULT_PING_TIMEOUT } from './context'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
@@ -8,24 +7,24 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
 import handshake from 'it-handshake'
 
-import type { StreamType } from 'libp2p'
+import type { StreamType } from '../types'
 import assert from 'assert'
 
 describe('relay swtich context', function () {
   it('forward payload messages', async function () {
-    const nodeToRelay = Pair()
-    const relayToNode = Pair()
+    const nodeToRelay = Pair<StreamType>()
+    const relayToNode = Pair<StreamType>()
 
     const ctx = new RelayContext({
       source: nodeToRelay.source,
       sink: relayToNode.sink
     })
 
-    const nodeShaker = handshake<StreamType>({
+    const nodeShaker = handshake({
       source: relayToNode.source,
       sink: nodeToRelay.sink
     })
-    const destinationShaker = handshake<StreamType>(ctx)
+    const destinationShaker = handshake(ctx)
 
     const firstMessage = new TextEncoder().encode('first message')
     nodeShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...firstMessage]))
@@ -39,15 +38,15 @@ describe('relay swtich context', function () {
   })
 
   it('ping comes back in time', async function () {
-    const nodeToRelay = Pair()
-    const relayToNode = Pair()
+    const nodeToRelay = Pair<StreamType>()
+    const relayToNode = Pair<StreamType>()
 
     const ctx = new RelayContext({
       source: nodeToRelay.source,
       sink: relayToNode.sink
     })
 
-    const nodeShaker = handshake<StreamType>({
+    const nodeShaker = handshake({
       source: relayToNode.source,
       sink: nodeToRelay.sink
     })
@@ -65,15 +64,15 @@ describe('relay swtich context', function () {
   it('ping timeout', async function () {
     this.timeout(DEFAULT_PING_TIMEOUT + 2e3)
 
-    const nodeToRelay = Pair()
-    const relayToNode = Pair()
+    const nodeToRelay = Pair<StreamType>()
+    const relayToNode = Pair<StreamType>()
 
     const ctx = new RelayContext({
       source: nodeToRelay.source,
       sink: relayToNode.sink
     })
 
-    const nodeShaker = handshake<StreamType>({
+    const nodeShaker = handshake({
       source: relayToNode.source,
       sink: nodeToRelay.sink
     })
@@ -97,15 +96,15 @@ describe('relay swtich context', function () {
   })
 
   it('stop a stream', async function () {
-    const nodeToRelay = Pair()
-    const relayToNode = Pair()
+    const nodeToRelay = Pair<StreamType>()
+    const relayToNode = Pair<StreamType>()
 
     const ctx = new RelayContext({
       source: nodeToRelay.source,
       sink: relayToNode.sink
     })
 
-    const nodeShaker = handshake<StreamType>({
+    const nodeShaker = handshake({
       source: relayToNode.source,
       sink: nodeToRelay.sink
     })
@@ -125,19 +124,19 @@ describe('relay swtich context', function () {
   })
 
   it('update stream', async function () {
-    const nodeToRelay = Pair()
-    const relayToNode = Pair()
+    const nodeToRelay = Pair<StreamType>()
+    const relayToNode = Pair<StreamType>()
 
     const ctx = new RelayContext({
       source: nodeToRelay.source,
       sink: relayToNode.sink
     })
 
-    const nodeShaker = handshake<StreamType>({
+    const nodeShaker = handshake({
       source: relayToNode.source,
       sink: nodeToRelay.sink
     })
-    const destinationShaker = handshake<StreamType>(ctx)
+    const destinationShaker = handshake(ctx)
 
     // Sending messages should work before stream switching
     const firstMessage = new TextEncoder().encode('first message')
@@ -156,15 +155,15 @@ describe('relay swtich context', function () {
     const UPDATE_ATTEMPTS = 5
 
     for (let i = 0; i < UPDATE_ATTEMPTS; i++) {
-      const nodeToRelayAfterUpdate = Pair()
-      const relayToNodeAfterUpdate = Pair()
+      const nodeToRelayAfterUpdate = Pair<StreamType>()
+      const relayToNodeAfterUpdate = Pair<StreamType>()
 
       ctx.update({
         source: nodeToRelayAfterUpdate.source,
         sink: relayToNodeAfterUpdate.sink
       })
 
-      const nodeShakerAfterUpdate = handshake<StreamType>({
+      const nodeShakerAfterUpdate = handshake({
         source: relayToNodeAfterUpdate.source,
         sink: nodeToRelayAfterUpdate.sink
       })

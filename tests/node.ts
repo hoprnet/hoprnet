@@ -1,5 +1,8 @@
+/// <reference path="../src/@types/stream-to-it.ts" />
+/// <reference path="../src/@types/it-handshake.ts" />
+
 import libp2p from 'libp2p'
-import type { Stream, Connection } from 'libp2p'
+import type { Connection, HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 
@@ -14,9 +17,8 @@ import pipe from 'it-pipe'
 import yargs from 'yargs/yargs'
 import { peerIdForIdentity, identityFromPeerId } from './identities'
 import type PeerId from 'peer-id'
-import type LibP2P from 'libp2p'
-import type { WriteStream } from 'node:fs'
-import type { PeerStoreType } from '../src/types'
+import type { WriteStream } from 'fs'
+import type { PeerStoreType, Stream } from '../src/types'
 
 const TEST_PROTOCOL = '/hopr-connect/test/0.0.1'
 
@@ -93,10 +95,10 @@ async function startNode({
   const node = await libp2p.create({
     peerId,
     addresses: {
-      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toB58String()}`)]
+      listen: [`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toB58String()}`]
     },
     modules: {
-      transport: [HoprConnect],
+      transport: [HoprConnect as any],
       streamMuxer: [MPLEX],
       connEncryption: [NOISE]
     },
@@ -110,7 +112,7 @@ async function startNode({
     },
     dialer: {
       // Temporary fix
-      addressSorter: (ma: Multiaddr) => ma
+      addressSorter: (ma: any) => ma
     }
   })
 
@@ -121,8 +123,12 @@ async function startNode({
     return identityFromPeerId(connection.remotePeer)
   }
 
-  node.handle(TEST_PROTOCOL, async ({ connection, stream }: { connection?: Connection; stream: Stream }) => {
-    pipe(stream.source, createEchoReplier(await identityNameForConnection(connection), pipeFileStream), stream.sink)
+  node.handle(TEST_PROTOCOL, async (conn: HandlerProps) => {
+    pipe(
+      conn.stream.source,
+      createEchoReplier(await identityNameForConnection(conn.connection), pipeFileStream),
+      conn.stream.sink
+    )
   })
 
   await node.start()
@@ -156,7 +162,7 @@ async function executeCommands({
   cmds,
   pipeFileStream
 }: {
-  node: LibP2P
+  node: libp2p
   cmds: CmdDef[]
   pipeFileStream?: WriteStream
 }) {

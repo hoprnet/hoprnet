@@ -1,5 +1,8 @@
 declare module 'it-handshake' {
-  type Stream = import('libp2p').Stream
+  type Stream<T> = {
+    sink: (source: Stream<T>['source']) => Promise<void>
+    source: AsyncGenerator<T, void>
+  }
 
   export type Handshake<T> = {
     reader: {
@@ -9,10 +12,10 @@ declare module 'it-handshake' {
       end(): void
       push(msg: T): void
     }
-    stream: Stream
+    stream: Stream<T>
     rest(): void
     write(msg: T): void
     read(): Promise<T>
   }
-  export default function <T>(stream: Stream): Handshake<T>
+  export default function <T>(stream: Stream<T>): Handshake<T>
 }

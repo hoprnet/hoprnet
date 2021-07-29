@@ -1,9 +1,4 @@
-/// <reference path="../@types/it-handshake.ts" />
-/// <reference path="../@types/libp2p.ts" />
-/// <reference path="../@types/libp2p-interfaces.ts" />
-
-import { Stream } from 'libp2p'
-import { BLInterface } from 'bl'
+import { Stream, StreamType } from '../types'
 import handshake, { Handshake } from 'it-handshake'
 import PeerId from 'peer-id'
 
@@ -70,16 +65,14 @@ type HandleResponse =
       counterparty: PeerId
     }
 
-export type StreamResult = Buffer | Uint8Array | BLInterface
-
 /**
  * Encapsulates the relay handshake procedure
  */
 class RelayHandshake {
-  private shaker: Handshake<StreamResult>
+  private shaker: Handshake<StreamType>
 
   constructor(stream: Stream) {
-    this.shaker = handshake<StreamResult>(stream)
+    this.shaker = handshake(stream)
   }
 
   /**
@@ -105,7 +98,7 @@ class RelayHandshake {
   async initiate(relay: PeerId, destination: PeerId): Promise<Response> {
     this.shaker.write(destination.pubKey.marshal())
 
-    let chunk: StreamResult | undefined
+    let chunk: StreamType | undefined
     try {
       chunk = await this.shaker.read()
     } catch (err) {
@@ -172,7 +165,7 @@ class RelayHandshake {
   ): Promise<void> {
     log(`handling relay request`)
 
-    let chunk: StreamResult | undefined
+    let chunk: StreamType | undefined
 
     try {
       chunk = await this.shaker.read()
@@ -242,11 +235,11 @@ class RelayHandshake {
       return
     }
 
-    const destinationShaker = handshake<StreamResult>(toDestination)
+    const destinationShaker = handshake(toDestination)
 
     destinationShaker.write(source.pubKey.marshal())
 
-    let destinationChunk: StreamResult | undefined
+    let destinationChunk: StreamType | undefined
 
     try {
       destinationChunk = await destinationShaker.read()
@@ -287,7 +280,7 @@ class RelayHandshake {
    * @returns a duplex stream with the initiator
    */
   async handle(source: PeerId): Promise<HandleResponse> {
-    let chunk: Uint8Array | BLInterface | undefined
+    let chunk: StreamType | undefined
     try {
       chunk = await this.shaker.read()
     } catch (err) {

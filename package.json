@@ -16,11 +16,7 @@
     "node": "16"
   },
   "files": [
-    "lib",
-    "!**/*.spec.ts",
-    "!**/*.spec.d.ts",
-    "!**/*.spec.js",
-    "!**/*.spec.js.map"
+    "lib"
   ],
   "scripts": {
     "lint": "prettier --check .",

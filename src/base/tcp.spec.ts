@@ -1,6 +1,3 @@
-/// <reference path="../@types/libp2p.ts" />
-/// <reference path="../@types/libp2p-interfaces.ts" />
-
 import { createServer, Socket } from 'net'
 import type { AddressInfo } from 'net'
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'
@@ -10,6 +7,7 @@ import { Multiaddr } from 'multiaddr'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import assert from 'assert'
+import type { EventEmitter } from 'events'
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {
@@ -53,7 +51,7 @@ describe('test TCP connection', function () {
 
     conn.close()
 
-    await once(conn.conn, 'close')
+    await once(conn.conn as EventEmitter, 'close')
 
     assert(conn.conn.destroyed)
 
