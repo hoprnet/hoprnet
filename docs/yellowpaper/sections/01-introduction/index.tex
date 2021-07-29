@@ -50,8 +50,15 @@ HOPR leverages existing mechanisms such as the Sphinx packet format
     \item \textbf{Incentivization}: This is biggest innovation of the HOPR
         protocol. Other technologies have no baked in incentive framework, thus
         new users are not particularly encouraged to use the technology. By
-        giving every user an incentive to use the HOPR network, the barrier
-        of adoption is drastically lowered and opens up the target user group.
+        giving every user an incentive to use the HOPR network, the barrier of
+        adoption is drastically lowered and opens up the target user group. HOPR
+        nodes have the chance to receive payments for each packet they process
+        and forward. The payments are probabilistic which ensures nodes don't
+        (de-)prioritized other nodes and/or packets. To maximize the received
+        incentives a node operator must ensure good connectivity to the network,
+        availability of the node, computational capacity to process packets and
+        committed funds so it may reward other nodes as
+        well.
 
 \end{itemize}
 
@@ -84,10 +91,9 @@ intermediary which is involved in moving the data between these parties.
 \label{sec:stateoftheart}
 
 Research and existing technologies which are relevant in the scope of the HOPR
-protocol can be divided into two groups: (1)
-\hyperref[sec:privacyprotocols]{Privacy protocols} cover means to hide a user's
-information; (2) \hyperref[sec:l2protocols]{Ethereum layer 2 scalability
-approaches} allow systems to perform micro-payments via the Ethereum blockchain.
+protocol can be divided into two groups: (1) \nameref{sec:privacyprotocols} cover
+means to hide a user's information; (2) \nameref{sec:l2protocols} allow systems
+to perform micro-payments via the Ethereum blockchain.
 
 \subsubsection{Privacy protocols}
 \label{sec:privacyprotocols}
@@ -218,7 +224,7 @@ services. E.g. Mysterium \cite{mysterium}, an open source dVPN built upon a P2P
 architecture, uses a smart contract on top of Ethereum to make sure
 that the VPN service is paid for adequately.
 
-\subsubsection{Scalability Layer 2 protocols}
+\subsubsection{Scalability Layer 2 Protocols}
 \label{sec:l2protocols}
 
 Blockchain technology (mostly public blockchains like Bitcoin and Ethereum) suffers from a major scalability issue which is due to the fact that every node in the network needs to process every transaction, validate it and stores a copy of the entire state. The number of transactions Ethereum can process for example cannot exceed that of a single node which is currently 15 transactions per second.

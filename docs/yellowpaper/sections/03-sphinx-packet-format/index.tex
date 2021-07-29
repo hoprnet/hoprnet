@@ -87,7 +87,11 @@ for $0\le i < v-1$
 \end{align}
 where $\phi_0=\epsilon$ is an empty string. $\phi_i$ is generated using the shared secret $s_{i-1}$ and used to ensure the header packets remain constant in size as layers of encryption are added or removed. Upon receiving a packet, the processing node extracts the information destined for it from the route information and the per-hop payload. The extraction is done by deobfuscating and left-shifting the field. This would make the field shorter at each hop, allowing an attacker to deduce the route length. For this reason, the field is pre-padded before forwarding. Since the padding is part of the HMAC, the origin node will have to pre-generate an identical padding (to that which each hop will generate) in order to compute the HMACs correctly for each hop.
     \\~\\$\beta_i$ is computed as the concatenation of $Z$ and a sequence of padding which is then encrypted by XORing with the output of a pseudo-random number generator seeded with shared key $s_{v-1}$ of node $v-1$. The result is finally concatenated with $\phi$ to ensure the header packets remain constant in size.
-    \\In the original Sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence where $I$ is used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$. We don't use $I$ since we don't currently use SURBs. We also include a $hint$ and $challenge$ values in $\beta$ that are defined in \nameref{ProofOfRelay} section. These values aren't included in the original Sphinx paper but will be needed for the HOPR protocol.
+    \\In the original Sphinx paper, $Z$ is concatenated with an identifier $I$
+    and $0$ padding sequence where $I$ is used for SURBs (Single-Use-Reply
+    Blocks) such that $I \in \{0, 1\}^\kappa$. We don't use $I$ since we don't
+    currently use SURBs. We also include a $hint$ and $challenge$ values in
+    $\beta$ that are defined in the \nameref{sec:proofofrelay} section. These values aren't included in the original Sphinx paper but will be needed for the HOPR protocol.
     \\~\\Since $(A)$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them.
     \newline Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
 which is encoded in the header.
