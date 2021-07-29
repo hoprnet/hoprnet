@@ -9,6 +9,11 @@ RUN bash -c ". .nvm/nvm.sh && \
         nvm alias default 16"
 ENV PATH=/home/gitpod/.nvm/versions/node/v${NODE_VERSION}/bin:$PATH
 
+# Install yarn (without node)
+RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - && \
+    echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list && \
+    sudo apt update && sudo apt install --no-install-recommends yarn
+
 # Switch to the root user to install system wide tools
 USER root
 
