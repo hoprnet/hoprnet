@@ -1,5 +1,14 @@
 FROM gitpod/workspace-full
 
+# Install & use custom Node.js version
+ENV NODE_VERSION=16
+RUN bash -c ". .nvm/nvm.sh && \
+        nvm deactivate && \
+        nvm uninstall 14.17.3 && \
+        nvm install 16 && \
+        nvm alias default 16"
+ENV PATH=/home/gitpod/.nvm/versions/node/v${NODE_VERSION}/bin:$PATH
+
 # Switch to the root user to install system wide tools
 USER root
 
