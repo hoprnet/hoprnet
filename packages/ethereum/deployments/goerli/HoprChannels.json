@@ -1,6 +1,6 @@
 {
-  "address": "0x11843E6d3042288cBEC10919cB7f55fBD265B10b",
-  "transactionHash": "0x3ca75d27db53e7beaad3355ac3464580abf84450474b47574fb23bfcb2ed42e2",
+  "address": "0x83780Ea9bACd5D2FA58B3c963f94D666bbBFD0C5",
+  "transactionHash": "0xb7e2cc3105b8dacedbf6e138b951c78f1dc07e6c744c6a8a8e9c6c9d27f874d2",
   "abi": [
     {
       "inputs": [
@@ -280,6 +280,25 @@
       ],
       "name": "initiateChannelClosure",
       "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "data",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "multicall",
+      "outputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "results",
+          "type": "bytes[]"
+        }
+      ],
       "stateMutability": "nonpayable",
       "type": "function"
     },
