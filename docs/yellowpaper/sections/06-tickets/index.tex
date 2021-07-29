@@ -72,20 +72,21 @@ If this is not the case, then the node should drop the packet.
 
 \subsection{Ticket Redemption}
 
-In order to unlock the ticket, the node (ticket recipient) stores it within its database until it receives an acknowledgement containing $s_{i+1}$ from the next downstream node. The challenge can be computed from acknowledgement as $T_{c_i}=ack_i*G$. The node checks the following in order to redeem tickets:
+In order to unlock the ticket, the node (ticket recipient) stores it within its database until it receives an acknowledgement containing $s_{i+1}$ from the next downstream node. HOPR uses acknowledgements to prove the correct transformation of mixnet packets as well as their delivery to the next downstream node.
+\\The challenge can be computed from acknowledgement as $T_{c_i}=ack_i*G$. The node checks the following in order to redeem tickets:
 \begin{itemize}
 \item Once the node receives an acknowledgement, it checks whether it stores an unacknowledged ticket for the received acknowledgement.
 If this is not the case, the node should drop the acknowledgement.
 \newline The node then computes the response to the challenge (which we can also refer to as \textit{proof of relay secret}) given in the ticket as $$r_i=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
 \item  The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. $$r_i*G=T_{c_i}$$
-It then replies with an acknowledgement that includes a response to the challenge.
+It then replies with an acknowledgement that includes a response to the challenge. If this is not the case, the node should drop the packet.
 \\~\\  Both the node and the smart contract do the following checks which if not verified to be true, the node dropps the packet and the smart contract check reverts:
 \item Channel \textbf{exists} and is \textbf{open} or \textbf{pending to close}. The check happens locally and not on-chain using the blockchain indexer in order not to reveal any metadata. If the node does not have a record about the channel or considers the channel to be in a state different from \textbf{open} or \textbf{pending to close}, the ticket is dropped and the reception of the accompanying packet is rejected.
 \item Additionally, the node and the smart contract retrieve the next commitment value $comm_{i-1}$, checks that this value is not empty and that commitment is the hash of next commitment as follows:
 $$ comm_{i-1} != 0 \; and \; comm_{i}=h(comm_{i-1})$$
 \item Verify that $r_i$ and $comm_{i-1}$ lead to a winning ticket.
 This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$ is a hash function.
-If this is not the case, the node should drop the ticket.
+If this is not the case, the node should drop the packet.
 The final recipient of the packet does not receive a ticket because packet reception is not incentivized by the HOPR protocol.
 \item Ticket signer must be the ticket issuer. This is done using the $$ECDSA.recover()$$ ethereum function which recovers the private key used to sign $T= (t, Sig_I(t))$ and verifies if the associated public key is the issuer's public key. The packet is dropped if this test fails.
 \item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the current values in the smart contract $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
