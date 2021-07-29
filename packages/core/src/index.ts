@@ -188,8 +188,7 @@ class Hopr extends EventEmitter {
     const initialNodes = await chain.waitForPublicNodes()
 
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
-    const pushToRecentlyAnnouncedNodes = (peer: { id: PeerId; multiaddrs: Multiaddr[] }) =>
-      recentlyAnnouncedNodes.push(peer)
+    const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
     chain.on('peer', pushToRecentlyAnnouncedNodes)
 
     const libp2p = await LibP2P.create({
