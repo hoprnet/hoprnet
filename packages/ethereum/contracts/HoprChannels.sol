@@ -2,7 +2,6 @@
 pragma solidity ^0.8;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Multicall.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC1820Registry.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol";
@@ -13,7 +12,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
-    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     // required by ERC1820 spec
@@ -129,8 +127,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 amount1,
         uint256 amount2
     ) external {
-        require(amount1.add(amount2) > 0, "amount must be greater than 0");
-        token.safeTransferFrom(msg.sender, address(this), amount1.add(amount2));
+        require(amount1 + amount2 > 0, "amount must be greater than 0");
+        token.safeTransferFrom(msg.sender, address(this), amount1 + amount2);
         if (amount1 > 0){
           _fundChannel(account1, account2, amount1);
         }
@@ -197,13 +195,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
           spendingChannel.ticketIndex = ticketIndex;
           spendingChannel.commitment = nextCommitment;
-          spendingChannel.balance = spendingChannel.balance.sub(amount);
+          spendingChannel.balance = spendingChannel.balance - amount;
           (, Channel storage earningChannel) = _getChannel(
               msg.sender,
               source
           );
           if (earningChannel.status == ChannelStatus.OPEN) {
-            earningChannel.balance = earningChannel.balance.add(amount);
+            earningChannel.balance = earningChannel.balance + amount;
             emit ChannelUpdate(msg.sender, source, earningChannel);
           } else {
             token.safeTransfer(msg.sender, amount);
@@ -276,7 +274,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
         require(newCommitment != bytes32(0), "Cannot set empty commitment");
         channel.commitment = newCommitment;
-        channel.ticketEpoch = channel.ticketEpoch.add(1);
+        channel.ticketEpoch = channel.ticketEpoch + 1;
         if (channel.status == ChannelStatus.WAITING_FOR_COMMITMENT){
           channel.status = ChannelStatus.OPEN;
         }
@@ -314,7 +312,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
             uint256 amount2;
 
             (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
-            require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
+            require(amount == amount1 + amount2, "amount sent must be equal to amount specified");
 
             if (amount1 > 0){
                 _fundChannel(account1, account2, amount1);
@@ -345,7 +343,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel"); 
         if (channel.status == ChannelStatus.CLOSED) {
           // We are reopening the channel
-          channel.channelEpoch = channel.channelEpoch.add(1);
+          channel.channelEpoch = channel.channelEpoch + 1;
           channel.ticketEpoch = 0; // As we've incremented the channel epoch, we can restart the ticket counter
           channel.ticketIndex = 0;
 
@@ -356,7 +354,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
           }
         }
 
-        channel.balance = channel.balance.add(amount);
+        channel.balance = channel.balance + amount;
         emit ChannelUpdate(source, dest, channel);
     }
 
