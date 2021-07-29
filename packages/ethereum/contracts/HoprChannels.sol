@@ -2,16 +2,16 @@
 pragma solidity ^0.8;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Multicall.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC1820Registry.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-contract HoprChannels is IERC777Recipient, ERC1820Implementer {
-    using SafeMath for uint256;
+contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     using SafeERC20 for IERC20;
 
     // required by ERC1820 spec
@@ -82,6 +82,47 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         Channel newState
     );
 
+    event ChannelClosureInitiated(
+        address indexed source,
+        address indexed destination,
+        uint32 closureInitiationTime
+    );
+
+    event ChannelClosureFinalized(
+        address indexed source,
+        address indexed destination,
+        uint32 closureFinalizationTime,
+        uint256 channelBalance
+    );
+
+    event ChannelBumped(
+        address indexed source,
+        address indexed destination,
+        bytes32 newCommitment,
+        uint256 ticketEpoch,
+        uint256 channelBalance
+    );
+
+    event TicketRedeemed(
+        address indexed source,
+        address indexed destination,
+        bytes32 nextCommitment,
+        uint256 ticketEpoch,
+        uint256 ticketIndex,
+        bytes32 proofOfRelaySecret,
+        uint256 amount,
+        uint256 winProb,
+        bytes signature
+    );
+
+    event TokensReceived(
+        address indexed from,
+        address indexed account1,
+        address indexed account2,
+        uint256 amount1,
+        uint256 amount2
+    );
+
     /**
      * @param _token HoprToken address
      * @param _secsClosure seconds until a channel can be closed
@@ -127,8 +168,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 amount1,
         uint256 amount2
     ) external {
-        require(amount1.add(amount2) > 0, "amount must be greater than 0");
-        token.safeTransferFrom(msg.sender, address(this), amount1.add(amount2));
+        require(amount1 + amount2 > 0, "amount must be greater than 0");
+        token.safeTransferFrom(msg.sender, address(this), amount1 + amount2);
         if (amount1 > 0){
           _fundChannel(account1, account2, amount1);
         }
@@ -195,18 +236,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
           spendingChannel.ticketIndex = ticketIndex;
           spendingChannel.commitment = nextCommitment;
-          spendingChannel.balance = spendingChannel.balance.sub(amount);
+          spendingChannel.balance = spendingChannel.balance - amount;
           (, Channel storage earningChannel) = _getChannel(
               msg.sender,
               source
           );
           if (earningChannel.status == ChannelStatus.OPEN) {
-            earningChannel.balance = earningChannel.balance.add(amount);
+            earningChannel.balance = earningChannel.balance + amount;
             emit ChannelUpdate(msg.sender, source, earningChannel);
           } else {
             token.safeTransfer(msg.sender, amount);
           }
           emit ChannelUpdate(source, msg.sender, spendingChannel);
+          emit TicketRedeemed(source, msg.sender, nextCommitment, ticketEpoch, ticketIndex, proofOfRelaySecret, amount, winProb, signature);
     }
 
 
@@ -218,7 +260,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * before-hand. This notice period is called the 'cool-off' period.
      * The channel 'destination' should be monitoring blockchain events, thus
      * they should be aware that the closure has been triggered, as this
-     * method triggers a {ChannelUpdate} event.
+     * method triggers a {ChannelUpdate} and an {ChannelClosureInitiated} event.
      * After the cool-off period expires, the 'source' can call
      * 'finalizeChannelClosure' which withdraws the stake.
      * @param destination the address of the destination
@@ -231,12 +273,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
         channel.status = ChannelStatus.PENDING_TO_CLOSE;
         emit ChannelUpdate(msg.sender, destination, channel);
+        emit ChannelClosureInitiated(msg.sender, destination, _currentBlockTimestamp());
     }
 
     /**
      * @dev Finalize the channel closure, if cool-off period
      * is over it will close the channel and transfer funds
-     * to the sender. Then emits {ChannelUpdate} event.
+     * to the sender. Then emits {ChannelUpdate} and the
+     * {ChannelClosureFinalized} event.
      * @param destination the address of the counterparty
      */
     function finalizeChannelClosure(
@@ -250,6 +294,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           token.transfer(msg.sender, channel.balance);
         }
 
+        emit ChannelClosureFinalized(msg.sender, destination, channel.closureTime, channel.balance);
         delete channel.balance;
         delete channel.closureTime;
         channel.status = ChannelStatus.CLOSED;
@@ -274,11 +319,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         require(newCommitment != bytes32(0), "Cannot set empty commitment");
         channel.commitment = newCommitment;
-        channel.ticketEpoch = channel.ticketEpoch.add(1);
+        channel.ticketEpoch = channel.ticketEpoch + 1;
         if (channel.status == ChannelStatus.WAITING_FOR_COMMITMENT){
           channel.status = ChannelStatus.OPEN;
         }
         emit ChannelUpdate(source, msg.sender, channel);
+        emit ChannelBumped(source, msg.sender, newCommitment, channel.ticketEpoch, channel.balance);
     }
 
     /**
@@ -312,7 +358,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             uint256 amount2;
 
             (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
-            require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
+            require(amount == amount1 + amount2, "amount sent must be equal to amount specified");
 
             if (amount1 > 0){
                 _fundChannel(account1, account2, amount1);
@@ -320,6 +366,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             if (amount2 > 0){
                 _fundChannel(account2, account1, amount2);
             }
+            emit TokensReceived(from, account1, account2, amount1, amount2);
         }
     }
 
@@ -343,7 +390,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel"); 
         if (channel.status == ChannelStatus.CLOSED) {
           // We are reopening the channel
-          channel.channelEpoch = channel.channelEpoch.add(1);
+          channel.channelEpoch = channel.channelEpoch + 1;
           channel.ticketEpoch = 0; // As we've incremented the channel epoch, we can restart the ticket counter
           channel.ticketIndex = 0;
 
@@ -354,7 +401,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           }
         }
 
-        channel.balance = channel.balance.add(amount);
+        channel.balance = channel.balance + amount;
         emit ChannelUpdate(source, dest, channel);
     }
 
