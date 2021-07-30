@@ -135,7 +135,7 @@ export async function dialHelper(
   } catch (err) {
     error(
       // prettier-ignore
-      `Querying the DHT for ${green(destination.toB58String())} failed. Knwon addresses:\n` +
+      `Querying the DHT for ${green(destination.toB58String())} failed. Known addresses:\n` +
       `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n` +
       `${err.message}`
     )
