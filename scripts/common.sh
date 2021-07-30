@@ -6,11 +6,16 @@ declare tmp="/tmp"
 [[ -d "${tmp}" && -h "${tmp}" ]] && tmp="/var/tmp"
 [[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
 
+function free_port {
+    local port="${1}"
+    if lsof -i ":${port}" -s TCP:LISTEN > /dev/null; then
+        lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} 
+    fi
+}
+
 function free_ports {
-    for port in ${alice_port} ${bob_port} ${charly_port} ${dave_port} ${ed_port}; do
-        if lsof -i ":${port}" -s TCP:LISTEN > /dev/null; then
-          lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} 
-        fi
+    for port in ${alice_port} ${alice2_port} ${bob_port} ${charly_port} ${dave_port} ${ed_port}; do
+        free_port ${port}    
     done
 }
 
@@ -68,13 +73,13 @@ if [[ "${yarn_version_parsed[0]}" != "2" ]]; then
 fi
 
 function remove_logs {
-  for file in "${alice_log}" "${bob_log}" "${charly_log}" "${dave_log}" "${ed_log}" "${alice_pipe}" "${bob_pipe}"; do 
+  for file in "${alice_log}" ${alice2_log} "${bob_log}" "${charly_log}" "${dave_log}" "${ed_log}" "${alice_pipe}" ${alice2_pipe} "${bob_pipe}"; do 
     rm -Rf ${file}
   done  
 }
 
 function ensure_ports {
-  for port in ${alice_port} ${bob_port} ${charly_port} ${dave_port}; do
+  for port in ${alice_port} ${alice2_port} ${bob_port} ${charly_port} ${dave_port}; do
     ensure_port_is_free ${port}
   done
 }
@@ -83,6 +88,9 @@ declare flow_log
 declare alice_log
 declare alice_pipe
 declare alice_port
+declare alice2_log
+declare alice2_pipe
+declare alice2_port
 declare bob_log
 declare bob_pipe
 declare bob_port
@@ -100,6 +108,10 @@ function setup {
     alice_log="${tmp}/hopr-connect-${test_name}-alice.log"
     alice_pipe="${tmp}/hopr-connect-${test_name}-alice-pipe.log"
     alice_port=11090
+
+    alice2_log="${tmp}/hopr-connect-${test_name}-alice2.log"
+    alice2_pipe="${tmp}/hopr-connect-${test_name}-alice2-pipe.log"
+    alice2_port=11096
 
     bob_log="${tmp}/hopr-connect-${test_name}-bob.log"
     bob_pipe="${tmp}/hopr-connect-${test_name}-bob-pipe.log"
@@ -121,6 +133,7 @@ function setup {
     ensure_ports
 
     log "alice logs -> ${alice_log}"
+    log "alice2 logs -> ${alice2_log}"
     log "alice msgs -> ${alice_pipe}"
     log "bob logs -> ${bob_log}"
     log "bob msgs -> ${bob_pipe}"
