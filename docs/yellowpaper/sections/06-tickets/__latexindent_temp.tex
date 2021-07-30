@@ -82,7 +82,7 @@ If this is not the case, the node should drop the acknowledgement.
 It then replies with an acknowledgement that includes a response to the challenge. If this is not the case, the node should drop the packet.
 \\~\\  Both the node and the smart contract do the following checks which if not verified to be true, the node dropps the packet and the smart contract check reverts:
 \item Channel \textbf{exists} and is \textbf{open} or \textbf{pending to close}. The check happens locally and not on-chain using the blockchain indexer in order not to reveal any metadata. If the node does not have a record about the channel or considers the channel to be in a state different from \textbf{open} or \textbf{pending to close}, the ticket is dropped and the reception of the accompanying packet is rejected.
-\item Additionally, the node and the smart contract retrieve the next commitment value $comm_{i-1}$, checks that this value is not empty and that commitment is the hash of next commitment as follows:
+\item Additionally, the node and the smart contract retrieve the next commitment value $comm_{i-1}$, checks that this value is not empty and that commitment is the opening of the next commitment as follows:
 $$ comm_{i-1} != 0 \; and \; comm_{i}=h(comm_{i-1})$$
 \item Verify that $r_i$ and $comm_{i-1}$ lead to a winning ticket.
 This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$. The values are first ABI encoded, then hashed using keccak256 and last but not least converted to uint256.
@@ -95,7 +95,7 @@ where $\alpha_c$ and $\zeta_c$ represent the current values in the smart contrac
      $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ the ticket index.
 \item Amount of ticket must be greater than 0: $$\sigma>0$$ where $\sigma$ is the ticket amount.
 
-\item Channel must have enough funds to cover the costs for the ticket: $$ C_b>\sigma$$ where $C_b$ is the channel balance.
+\item Channel must have enough funds to cover the value transfer for the ticket: $$ C_b>\sigma$$ where $C_b$ is the channel balance.
 
 
 

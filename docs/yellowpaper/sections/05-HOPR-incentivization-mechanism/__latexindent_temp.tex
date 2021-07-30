@@ -1,34 +1,68 @@
-\subsection{On-chain Commitment}
+\subsection{Proof Of Relay}
+\label{sec:proofofrelay}
 
-HOPR uses a commitment scheme to deposit values on-chain and reveal them once a node redeems an incentive for relaying packets. This comes with the benefit that the redeeming party discloses a secret that is unknown to the issuer of the incentive until it is claimed on-chain. The $\textbf{opening}$ $\mathsf{Open}$ and the $\textbf{response}$ $r$ to the PoR challenge (or as we call them in the smart contract \textit{nextCommitment} and \textit{proofOfRelaySecret}) are then used to prove to the smart contract that the node is legitimate to claim the funds.
+HOPR incentivizes packet transformation and delivery using a mechanism called
+“Proof-Of-Relay”. This mechanism guarantees that nodes relay services are
+verifiable.
 
-\begin{defnsub}
-    % Currently leaving out further details such as unconditionally/computationally binding / hiding
-    A commitment scheme $\mathsf{C_m} = (\mathsf{Commit}, \mathsf{Open})$ is a protocol between two parties, $A$ and $B$, that gives $A$ the opportunity to store a value $comm = \mathsf{Commit}(x)$ at $B$. The value $x$ stays unknown to $B$ until $A$ decides to reveal it to $B$.
-    Such that for any $m\in \mathbb{M}$, $(c,d)\leftarrow \mathsf{Commit(m)}$ is the commitment/opening pair for $m$ where $c = c(m)$ serves as the commitment value, and $d = d(m)$ as the opening value.
-    \\~\\ \noindent\textbf{Hiding:} A commitment scheme is called \textbf{computational hiding} if the following holds:
-    $$\forall \;x\neq x' \; \{\mathsf{Commit}_k(x,U_k)\}_{k\in\mathbb{N}}\approx\{{\mathsf{Commit}_k(x',U_k)}\}_{k\in\mathbb{N}}$$ which means both probability ensembles are computationally indistinguashable such that $U_{k}$ is the uniform distribution over the $2^{k}$ opening values for the security parameter $k$.
-    \\~\\\noindent\textbf{Binding:} A commitment scheme is called \textbf{computational binding} if for all bounded polynomial adversary \textit{Adv} algorithms that run in time $t$ and output $x,x',open,open'$ the following holds:
-    $$P	[ \,x\neq x' \; and \; \mathsf{Commit}(x,open)={\mathsf{Commit}(x',open')}] \,\leq \epsilon$$ A Computationally bounded adversary means that the adversary has limitations on their computational resources. 
+\paragraph{Construction}
+\begin{itemize}
+    \item Every packet is sent together with a ticket (check ticket section).
+    \item Each ticket contains a challenge.
+    \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket (check ticket section).
+\end{itemize}
 
-\end{defnsub}
+\subsubsection{Challenge}
 
-\subsubsection{Commitment phase}
+$(A)$ creates a shared group element $\alpha_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key that's generated from the master DH sphinx key and will be used to derive new keys $s_i^{(0)}$ and $s_{i}^{(1)}$. 
+The first key $s_i^{(0)}$ will be used as the node's \textit{own key share} and the second key $s_i^{(1)}$ will be used as the \textit{acknowledgement key} which will be embedded in the acknowledgement for a packet and thereby unlocks the incentive for the previous relayer for transforming and delivering the packet.
+    \paragraph{Key derivation}
+    We first create a "session secret" $s_i$ then we use it as a seed to derive subkeys $s_i^{(0)},s_i^{(1)}$ for each node on the route. We do so using a HKDF (HMAC-based Key Derivation Function) which is a cryptographic hash function that derives one or more secret keys from a secret value using a pseudorandom function. The key derivation works as follows:
+    \begin{itemize}
+        \item Extract: Creates a pseudo-random key $s_i$   
+        $$HKDF.extract(h_b, |h_b|, (\alpha_i* privKey) || pubKey)$$   
 
-Once a node is the destination of a HOPR unidirectional channel, it derives a master key $comm_0$ from its private key and uses it to create an iterated commitment $comm_i$ such that for every $i \in \mathbb{N}_0$ and $i > 0$ it holds that $$ \mathsf{Open}(comm_{i}, comm_{i-1}) = \top $$
-which means opening $comm_{i}$ with $comm_{i-1}$ holds true.
-The iterated commitment is computed as $$comm_n = h^n(comm_0)$$ where $h$ is a preimage-resistant hash function (we use keccak256 hash function which is used in Ethereum) and $comm_0$ is derived as 
-$$ comm_0 = \mathsf{h}(privKey,chainId, contractAddr, channelId, channelEpoch)$$
-The master key is supposed to be pseudo-random such that all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \le n$ are indistinguishable for the ticket issuer from random numbers of the same length. This is necessary in order to ensure that the ticket issuer is unable to determine whether a ticket is a win or not when issuing the ticket. This makes it infeasible for the ticket issuer to tweak the challenge to such that it cannot be a win.
-\\~\\When dispatching a transaction that opens the payment channel, the commitment $comm_n$ is stored in the channel structure in the smart contract and the smart contract will force the ticket recipient to reveal $comm_{n-1}$ when redeeming a ticket issued in this channel.
-The number of iterations $n$ can be chosen as a constant and should reflect the number of tickets a node intends to redeem within a channel.
+        \item Expand: This step takes the output of the previous one $s_i$ as a seed and creates an output key material $s_i^{(0)},s_i^{(1)}$ which is expanded from hashes of $s_i$ and an optional info message (salt). The process goes as follows:
+        $$HKDF.expand(h_b, |h_b|,s_i, |s_i|, hashKey)$$
+    \end{itemize}
+    where $||$ is concatenation and $*$ is scalar multiplication on the curve. $h_b$ is blake2s256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudo random key used as a seed and $|s_i|$ is its length, $hashKey$ is an identifier used to create a "virtual" hash function for each purpose, e.g. for the PRG, one for PRP, etc. and as well as for the PoR scheme. In case the result of HKDF does not lead to a field element, $hashKey$ is padded until that's the case.
+    \\~\\ The sender $(A)$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
+    The value “hint” or $H$ is computed as 
+    \begin{align}  
+        H_i&=s_{i+1}^{(1)}*G
+         \end{align}
+    where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the sphinx section). 
+    \newline The hint for party $n_i$ is used to check whether the returned value $s_{i+1}'^{(1)}$ matches the promised value $s_{i+1}^{(1)}$ by checking whether $H_i$ equals $s_{i+1}'^{(1)}*G$. 
+   \\The sender $(A)$ also creates a challenge $T_{c_i}$ such that 
+   \begin{align}  
+    T_{c_i}&=(s_i^{(0)}+s_{i+1}^{(1)})*G
+     \end{align}
+   Since “Proof-Of-Relay” is used to make the relay services of nodes verifiable, it is the duty of each node to check that given challenges are derivable from the given and the expected information.
+Packets with inappropriate challenges should be dropped as they might not lead to winning tickets.
+\\The values $H_i$ and $T_{c_i}$ are sent with the routing information $\beta_i$ as follows:
+$$\beta_i=y_{i+1}\|H_i\|T_{c_i}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]}$$
+By decrypting $\beta_i$, each mix node $n_i$ will retrieve the public key of the next downstream node and both the hint and challenge which will be used in the Proof Of Relay to make sure relay services are verifiable.
 
-\subsubsection{Opening phase}
-
-In order to redeem a ticket, a node has to reveal the opening to the current commitment $comm_i$ that is stored in the smart contract for the channel. Since the opening $comm_{i-1}$ allows the ticket issuer to determine whether a ticket is going to be a win, the ticket recipient should keep $comm_{i-1}$ until it is used to redeem a ticket.
-Tickets lead to a win if: $$\mathsf{h}( t_h, r_i, comm_{i-1} ) < P_w$$ where $P_w$ is the ticket's winning probability and $$t_h=\mathsf{h}(t) \;and\; \mathsf{Open}(comm_i, comm_{i-1}) = \top$$ Since $comm_{0}$ is known to the ticket recipient, the ticket recipient can compute the opening as $comm_{n-1} = \mathsf{h}^{n-1}(comm_0)$.
-Once redeeming a ticket, the smart contract verifies that $$\mathsf{Open}(comm_i, comm_{i-1}) = \top$$ and sets $channel.comm[redeemer] \leftarrow comm_{i-1}$. Hence next time, the node redeems a ticket, it has to reveal $comm_{i-2}$.
-In addition, each node is granted the right to reset the commitment to a new value which is necessary especially once a node reveals $comm_0$ and therefore is with high probability unable to compute a value $r$ such that $$\mathsf{Open}(comm_0,r) \neq \bot$$ where $\bot$ represents the truth value "false".
-\\~\\Since this mechanism can be abused by the ticket recipient to tweak the entropy that is used to determine whether a ticket is a win or not, the smart contract keeps track on resets of the on-chain commitment and sets $$channel.ticketEpoch[redeemer] \leftarrow channel.ticketEpoch[redeemer] +1$$  and thereby invalidates all previously unredeemed tickets.
-
-
+\begin{comment}
+ \begin{figure}[H]
+    \centering
+    \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
+        \hline
+        $\alpha$ & $\beta$                   & $\gamma$ \\
+                 & \begin{tabular}{| c m{2em} | m{3em} | m{6em} |}
+            \hline
+            \multicolumn{2}{| c |}{$Y_B$} & $hint_B$                 & $challenge_{BC}$ \\
+            \hline
+            \multicolumn{2}{| c |}{$Y_C$} & $hint_C$                 & $random$         \\
+            \hline
+            \multicolumn{2}{| c |}{$Y_D$} & $hint_D$                 & $random$         \\
+            \hline
+            End                           & \multicolumn{3}{| l |}{}                    \\
+            \hline
+        \end{tabular} &          \\[3em]
+        \hline
+    \end{tabular}
+    \caption{Sphinx with PoR}
+    \label{fig:Sphinx with PoR}
+\end{figure}
+\end{comment}

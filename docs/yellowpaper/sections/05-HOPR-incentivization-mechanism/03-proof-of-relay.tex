@@ -20,7 +20,7 @@ The first key $s_i^{(0)}$ will be used as the node's \textit{own key share} and 
     We first create a "session secret" $s_i$ then we use it as a seed to derive subkeys $s_i^{(0)},s_i^{(1)}$ for each node on the route. We do so using a HKDF (HMAC-based Key Derivation Function) which is a cryptographic hash function that derives one or more secret keys from a secret value using a pseudorandom function. The key derivation works as follows:
     \begin{itemize}
         \item Extract: Creates a pseudo-random key $s_i$   
-        $$HKDF.extract(h_b, |h_b|, \alpha_i* privKey || pubKey)$$   
+        $$HKDF.extract(h_b, |h_b|, (\alpha_i* privKey) || pubKey)$$   
 
         \item Expand: This step takes the output of the previous one $s_i$ as a seed and creates an output key material $s_i^{(0)},s_i^{(1)}$ which is expanded from hashes of $s_i$ and an optional info message (salt). The process goes as follows:
         $$HKDF.expand(h_b, |h_b|,s_i, |s_i|, hashKey)$$
