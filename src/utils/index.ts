@@ -3,10 +3,12 @@ import type LibP2P from 'libp2p'
 import type { Stream, StreamType } from '../types'
 import Debug from 'debug'
 import { green } from 'chalk'
-import AbortController, { AbortSignal } from 'abort-controller'
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
-import { AddressInfo } from 'net'
+import AbortController from 'abort-controller'
+import type { AbortSignal } from 'abort-controller'
+import type PeerId from 'peer-id'
+import type { Multiaddr } from 'multiaddr'
+import type { AddressInfo } from 'net'
+import type { Address } from 'libp2p/src/peer-store/address-book'
 
 const verbose = Debug('hopr-connect:dialer:verbose')
 const error = Debug('hopr-connect:dialer:error')
@@ -59,6 +61,10 @@ export function eagerIterator<T>(iterator: AsyncIterator<T>): AsyncGenerator<T> 
   })()
 }
 
+function renderPeerStoreAddresses(addresses: Address[], delimiter: string = '\n  '): string {
+  return addresses.map((addr: Address) => addr.multiaddr.toString()).join(delimiter)
+}
+
 export async function dialHelper(
   libp2p: LibP2P,
   destination: PeerId,
@@ -72,7 +78,7 @@ export async function dialHelper(
         timeout: number
         signal?: AbortSignal
       }
-): Promise<Omit<HandlerProps, 'connection'> | undefined> {
+): Promise<Omit<HandlerProps, 'connection'> | void> {
   let signal: AbortSignal
   let timeout: NodeJS.Timeout | undefined
   if (opts.signal == undefined) {
@@ -128,11 +134,10 @@ export async function dialHelper(
     dhtResponse = await (libp2p._dht as any).findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     error(
-      `Querying the DHT for ${destination.toB58String()} failed. Knwon addresses:\n  ${(
-        libp2p.peerStore.get(destination)?.addresses ?? []
-      )
-        .map((addr: any) => addr.multiaddr.toString())
-        .join('\n  ')}.\n${err.message}`
+      // prettier-ignore
+      `Querying the DHT for ${green(destination.toB58String())} failed. Knwon addresses:\n` +
+      `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n` +
+      `${err.message}`
     )
   }
 
@@ -155,13 +160,10 @@ export async function dialHelper(
     verbose(`Dial after DHT request successful`)
   } catch (err) {
     error(
-      `Cannot connect to ${green(
-        destination.toB58String()
-      )}. New addresses after DHT request did not lead to a connection. Used addresses:\n  ${(
-        libp2p.peerStore.get(destination)?.addresses ?? []
-      )
-        .map((addr: any) => addr.multiaddr.toString())
-        .join('\n  ')}\n${err.message}}\n${err.message}`
+      // prettier-ignore
+      `Cannot connect to ${green(destination.toB58String())}. New addresses after DHT request did not lead to a connection. Used addresses:\n` +
+      `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}\n` +
+      `${err.message}`
     )
     return
   }
@@ -172,9 +174,6 @@ export async function dialHelper(
     }
     return struct
   }
-
-  // Let Typescript figure out the correct type
-  return
 }
 
 export function nodeToMultiaddr(addr: AddressInfo): Parameters<typeof Multiaddr.fromNodeAddress>[0] {
