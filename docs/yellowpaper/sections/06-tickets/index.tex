@@ -89,13 +89,14 @@ This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the tic
 \\~\\If the check is not valid, the node should drop the packet.
 The final recipient of the packet does not receive a ticket because packet reception is not incentivized by the HOPR protocol.
 \item Ticket signer must be the ticket issuer. This is done using the $$ECDSA.recover()$$ ethereum function which recovers the private key used to sign $T= (t, Sig_I(t))$ and verifies if the associated public key is the issuer's public key. The packet is dropped if this test fails.
-\item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the current values in the smart contract $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
-where $\alpha_c$ and $\zeta_c$ represent the current values in the smart contract.
 \item The ticket hasn't been already redeemed and ticket index is strictly greater than the current value in the smart contract (replay protection).
      $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ the ticket index.
 \item Amount of ticket must be greater than 0: $$\sigma>0$$ where $\sigma$ is the ticket amount.
 
 \item Channel must have enough funds to cover the value transfer for the ticket: $$ C_b>\sigma$$ where $C_b$ is the channel balance.
+\\~\\ The smart contract also verifies that:
+\item Ticket Epoch $\alpha$ and channel Epoch $\zeta$ must be equal to the current values in the smart contract $$\alpha=\alpha_c \;\; and \;\; \zeta=\zeta_c$$
+where $\alpha_c$ and $\zeta_c$ represent the current values in the smart contract.
 
 
 
