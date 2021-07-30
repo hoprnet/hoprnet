@@ -25,6 +25,9 @@ declare tmp="/tmp"
 [[ -d "${tmp}" && -h "${tmp}" ]] && tmp="/var/tmp"
 [[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
 
+
+declare flow_log="${tmp}/hopr-connect-flow.log"
+
 declare alice_log="${tmp}/hopr-connect-alice.log"
 declare alice_pipe="${tmp}/hopr-connect-alice-pipe.log"
 declare alice_port=11090
@@ -39,8 +42,11 @@ declare charly_port=11092
 declare dave_log="${tmp}/hopr-connect-dave.log"
 declare dave_port=11093
 
+declare ed_log="${tmp}/hopr-connect-ed.log"
+declare ed_port=11094
+
 function free_ports {
-    for port in ${alice_port} ${bob_port} ${charly_port} ${dave_port}; do
+    for port in ${alice_port} ${bob_port} ${charly_port} ${dave_port} ${ed_port}; do
         if lsof -i ":${port}" -s TCP:LISTEN > /dev/null; then
           lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} 
         fi
@@ -111,7 +117,7 @@ done
 log "Test started"
 
 # remove logs
-for file in "${alice_log}" "${bob_log}" "${charly_log}" "${dave_log}" "${alice_pipe}" "${bob_pipe}"; do 
+for file in "${alice_log}" "${bob_log}" "${charly_log}" "${dave_log}" "${ed_log}" "${alice_pipe}" "${bob_pipe}"; do 
   rm -Rf ${file}
 done
 
@@ -121,6 +127,8 @@ log "bob logs -> ${bob_log}"
 log "bob msgs -> ${bob_pipe}"
 log "charly logs -> ${charly_log}"
 log "dave logs -> ${dave_log}"
+log "ed logs -> ${ed_log}"
+log "common flow log -> ${flow_log}"
 
 # run alice (client)
 # should be able to send 'test from alice' to bob through relay charly
@@ -142,6 +150,10 @@ start_node tests/node.ts \
         'relayIdentityName': 'charly',
         'targetIdentityName': 'bob',
         'msg': 'test from alice'
+      },
+      {
+        'cmd': 'wait',
+        'waitForSecs': 2
       },
       { 
         'cmd': 'hangup',
@@ -187,8 +199,8 @@ start_node tests/node.ts "${charly_log}" \
   --identityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --maxRelayedConnections 1
-
+  --maxRelayedConnections 1 \
+  --relayFreeTimeout 2000 # to simulate relay being busy
 
 # run dave (client)
 # should try connecting to bob through relay charly and get RELAY_FULL error
@@ -216,12 +228,49 @@ start_node tests/node.ts "${dave_log}" \
   --noDirectConnections true \
   --noWebRTCUpgrade false
 
+# run ed (client)
+# should try connecting to bob through relay charly after alice finishes talking to bob and succeed
+start_node tests/node.ts "${ed_log}" \
+  "[ {
+        'cmd': 'wait',
+        'waitForSecs': 6
+      },
+      {
+        'cmd': 'dial',
+        'targetIdentityName': 'charly',
+        'targetPort': ${charly_port}
+      },
+      {
+        'cmd': 'msg',
+        'relayIdentityName': 'charly',
+        'targetIdentityName': 'bob',
+        'msg': 'test from ed'
+      }
+    ]" \
+  --port ${ed_port} \
+  --identityName 'ed' \
+  --bootstrapPort ${charly_port} \
+  --bootstrapIdentityName 'charly' \
+  --noDirectConnections true \
+  --noWebRTCUpgrade false
+
 # wait till nodes finish communicating
 wait_for_regex_in_file "${alice_log}" "all tasks executed"
 wait_for_regex_in_file "${bob_log}" "all tasks executed"
 wait_for_regex_in_file "${charly_log}" "all tasks executed"
+wait_for_regex_in_file "${ed_log}" "all tasks executed"
+
+# dave should have failed to complete
 wait_for_regex_in_file "${dave_log}" "Answer was: <FAIL_RELAY_FULL>"
 wait_for_regex_in_file "${dave_log}" "dialProtocol to bob failed"
+
+# create global flow log
+rm -Rf "${flow_log}"
+cat "${alice_log}" | sed -En 's/hopr-connect.*FLOW: /alice: /p' >> "${flow_log}"
+cat "${bob_log}" | sed -En 's/hopr-connect.*FLOW: /bob: /p' >> "${flow_log}"
+cat "${charly_log}" | sed -En 's/hopr-connect.*FLOW: /charly: /p' >> "${flow_log}"
+cat "${dave_log}" | sed -En 's/hopr-connect.*FLOW: /dave: /p' >> "${flow_log}"
+sort -k1,1 --stable --output "${flow_log}" "${flow_log}"
 
 expect_file_content "${alice_pipe}" \
 ">bob: test from alice
@@ -229,6 +278,8 @@ expect_file_content "${alice_pipe}" \
 
 expect_file_content "${bob_pipe}" \
 "<alice: test from alice
->alice: echo: test from alice"
+>alice: echo: test from alice
+<ed: test from ed
+>ed: echo: test from ed"
 
 log "Test succesful"

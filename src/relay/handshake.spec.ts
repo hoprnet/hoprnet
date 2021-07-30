@@ -1,12 +1,12 @@
 /// <reference path="../@types/it-pair.ts" />
 
-import { RelayHandshake, RelayHandshakeMessage, StreamResult } from './handshake'
+import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
 import PeerId from 'peer-id'
 import Defer from 'p-defer'
 import assert from 'assert'
-import { Stream } from 'libp2p'
+import { Stream, StreamType } from '../types'
 
 describe('test relay handshake', function () {
   let initiator: PeerId, relay: PeerId, destination: PeerId
@@ -18,8 +18,8 @@ describe('test relay handshake', function () {
   })
 
   it('check initiating sequence', async function () {
-    const initiatorToRelay = Pair()
-    const relayToInitiator = Pair()
+    const initiatorToRelay = Pair<StreamType>()
+    const relayToInitiator = Pair<StreamType>()
 
     const initiatorReceived = Defer()
 
@@ -46,7 +46,7 @@ describe('test relay handshake', function () {
           source: (async function* () {
             yield Uint8Array.from([RelayHandshakeMessage.OK])
           })(),
-          sink: async function (source: AsyncIterable<StreamResult>) {
+          sink: async function (source: Stream['source']) {
             for await (const msg of source) {
               if (u8aEquals(msg.slice(), initiator.pubKey.marshal())) {
                 initiatorReceived.resolve()
@@ -65,8 +65,8 @@ describe('test relay handshake', function () {
   })
 
   it('check forwarding sequence', async function () {
-    const relayToDestination = Pair()
-    const destinationToRelay = Pair()
+    const relayToDestination = Pair<StreamType>()
+    const destinationToRelay = Pair<StreamType>()
 
     const okReceived = Defer()
 
@@ -74,7 +74,7 @@ describe('test relay handshake', function () {
       source: (async function* () {
         yield destination.pubKey.marshal()
       })(),
-      sink: async (source: AsyncIterable<StreamResult>) => {
+      sink: async (source: Stream['source']) => {
         for await (const msg of source) {
           if (msg.slice()[0] == RelayHandshakeMessage.OK) {
             okReceived.resolve()
@@ -108,11 +108,11 @@ describe('test relay handshake', function () {
   })
 
   it('should send messages after handshake', async function () {
-    const initiatorToRelay = Pair()
-    const relayToInitiator = Pair()
+    const initiatorToRelay = Pair<StreamType>()
+    const relayToInitiator = Pair<StreamType>()
 
-    const relayToDestination = Pair()
-    const destinationToRelay = Pair()
+    const relayToDestination = Pair<StreamType>()
+    const destinationToRelay = Pair<StreamType>()
 
     const initiatorHandshake = new RelayHandshake({
       source: relayToInitiator.source,

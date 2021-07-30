@@ -1,5 +1,8 @@
+/// <reference path="../src/@types/stream-to-it.ts" />
+/// <reference path="../src/@types/it-handshake.ts" />
+
 import libp2p from 'libp2p'
-import type { Stream, Connection } from 'libp2p'
+import type { Connection, HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 
@@ -7,14 +10,15 @@ import { NOISE } from 'libp2p-noise'
 
 const MPLEX = require('libp2p-mplex')
 
-import { HoprConnect, HoprConnectOptions } from '../src'
+import { HoprConnect } from '../src'
+import type { HoprConnectOptions } from '../src'
 import { Multiaddr } from 'multiaddr'
 import pipe from 'it-pipe'
 import yargs from 'yargs/yargs'
 import { peerIdForIdentity, identityFromPeerId } from './identities'
-import PeerId from 'peer-id'
-import LibP2P from 'libp2p'
-import { WriteStream } from 'node:fs'
+import type PeerId from 'peer-id'
+import type { WriteStream } from 'fs'
+import type { PeerStoreType, Stream } from '../src/types'
 
 const TEST_PROTOCOL = '/hopr-connect/test/0.0.1'
 
@@ -67,31 +71,34 @@ async function startNode({
   noDirectConnections,
   noWebRTCUpgrade,
   pipeFileStream,
-  maxRelayedConnections
+  maxRelayedConnections,
+  relayFreeTimeout
 }: {
   peerId: PeerId
   port: number
-  bootstrapAddress?: Multiaddr
+  bootstrapAddress?: PeerStoreType
   noDirectConnections: boolean
   noWebRTCUpgrade: boolean
   pipeFileStream?: WriteStream
   maxRelayedConnections?: number
+  relayFreeTimeout?: number
 }) {
   console.log(`starting node, bootstrap address ${bootstrapAddress}`)
   const connectOpts: HoprConnectOptions = {
     initialNodes: bootstrapAddress ? [bootstrapAddress] : [],
     __noDirectConnections: noDirectConnections,
     __noWebRTCUpgrade: noWebRTCUpgrade,
-    maxRelayedConnections
+    maxRelayedConnections,
+    __relayFreeTimeout: relayFreeTimeout
   }
 
   const node = await libp2p.create({
     peerId,
     addresses: {
-      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toB58String()}`)]
+      listen: [`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toB58String()}`]
     },
     modules: {
-      transport: [HoprConnect],
+      transport: [HoprConnect as any],
       streamMuxer: [MPLEX],
       connEncryption: [NOISE]
     },
@@ -105,7 +112,7 @@ async function startNode({
     },
     dialer: {
       // Temporary fix
-      addressSorter: (ma: Multiaddr) => ma
+      addressSorter: (ma: any) => ma
     }
   })
 
@@ -116,8 +123,12 @@ async function startNode({
     return identityFromPeerId(connection.remotePeer)
   }
 
-  node.handle(TEST_PROTOCOL, async ({ connection, stream }: { connection?: Connection; stream: Stream }) => {
-    pipe(stream.source, createEchoReplier(await identityNameForConnection(connection), pipeFileStream), stream.sink)
+  node.handle(TEST_PROTOCOL, async (conn: HandlerProps) => {
+    pipe(
+      conn.stream.source,
+      createEchoReplier(await identityNameForConnection(conn.connection), pipeFileStream),
+      conn.stream.sink
+    )
   })
 
   await node.start()
@@ -151,7 +162,7 @@ async function executeCommands({
   cmds,
   pipeFileStream
 }: {
-  node: LibP2P
+  node: libp2p
   cmds: CmdDef[]
   pipeFileStream?: WriteStream
 }) {
@@ -254,16 +265,22 @@ async function main() {
     .option('maxRelayedConnections', {
       type: 'number'
     })
+    .option('relayFreeTimeout', {
+      type: 'number'
+    })
     .coerce({
       script: (input) => JSON.parse(input.replace(/'/g, '"'))
     })
     .parseSync()
 
-  let bootstrapAddress: Multiaddr | undefined
+  let bootstrapAddress: PeerStoreType | undefined
 
   if (argv.bootstrapPort != null && argv.bootstrapIdentityName != null) {
     const bootstrapPeerId = await peerIdForIdentity(argv.bootstrapIdentityName)
-    bootstrapAddress = new Multiaddr(`/ip4/127.0.0.1/tcp/${argv.bootstrapPort}/p2p/${bootstrapPeerId.toB58String()}`)
+    bootstrapAddress = {
+      id: bootstrapPeerId,
+      multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${argv.bootstrapPort}/p2p/${bootstrapPeerId.toB58String()}`)]
+    }
   }
   const peerId = await peerIdForIdentity(argv.identityName)
 
@@ -280,7 +297,8 @@ async function main() {
     noDirectConnections: argv.noDirectConnections,
     noWebRTCUpgrade: argv.noWebRTCUpgrade,
     pipeFileStream,
-    maxRelayedConnections: argv.maxRelayedConnections
+    maxRelayedConnections: argv.maxRelayedConnections,
+    relayFreeTimeout: argv.relayFreeTimeout
   })
 
   await executeCommands({ node, cmds: argv.script, pipeFileStream })

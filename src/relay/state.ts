@@ -1,6 +1,4 @@
-/// <reference path="../@types/libp2p.ts" />
-
-import { Stream } from 'libp2p'
+import { Stream } from '../types'
 import type PeerId from 'peer-id'
 
 import { u8aCompare } from '@hoprnet/hopr-utils'
@@ -99,9 +97,9 @@ class RelayState {
    * @param toSource duplex stream to source
    * @param toDestination duplex stream to destination
    */
-  createNew(source: PeerId, destination: PeerId, toSource: Stream, toDestination: Stream) {
-    const toSourceContext = new RelayContext(toSource)
-    const toDestinationContext = new RelayContext(toDestination)
+  createNew(source: PeerId, destination: PeerId, toSource: Stream, toDestination: Stream, __relayFreeTimeout?: number) {
+    const toSourceContext = new RelayContext(toSource, __relayFreeTimeout)
+    const toDestinationContext = new RelayContext(toDestination, __relayFreeTimeout)
 
     toSourceContext.sink(toDestinationContext.source)
     toDestinationContext.sink(toSourceContext.source)
@@ -113,6 +111,9 @@ class RelayState {
 
     toSourceContext.once('close', this.cleanListener(source, destination))
     toSourceContext.once('close', this.cleanListener(destination, source))
+
+    toSourceContext.once('upgrade', this.cleanListener(source, destination))
+    toSourceContext.once('upgrade', this.cleanListener(destination, source))
 
     this.relayedConnections.set(RelayState.getId(source, destination), relayedConnection)
   }

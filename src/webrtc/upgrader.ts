@@ -2,7 +2,7 @@ import SimplePeer from 'simple-peer'
 import debug from 'debug'
 
 import type { Multiaddr } from 'multiaddr'
-import type { PublicNodesEmitter } from '../types'
+import type { PublicNodesEmitter, PeerStoreType } from '../types'
 import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants'
 import type PeerId from 'peer-id'
 
@@ -31,33 +31,16 @@ function isUsableMultiaddr(tuples: ReturnType<Multiaddr['tuples']>) {
   return tuples[0].length >= 2 && tuples[0][0] == CODE_IP4 && [CODE_UDP, CODE_TCP].includes(tuples[1][0])
 }
 
-function removeMultiaddrFromList(iceServers: RTCIceServer[], iceServerUrl: string): RTCIceServer[] {
-  let result = []
-  for (const iceServer of iceServers) {
-    if (Array.isArray(iceServer.urls)) {
-      if (!iceServer.urls.some((url: string) => iceServerUrl === url)) {
-        result.push(iceServer)
-      }
-      continue
-    }
-
-    if (iceServer.urls !== iceServerUrl) {
-      result.push(iceServer)
-    }
-  }
-
-  return result
-}
-
 /**
  * Encapsulate configuration used to create WebRTC instances
  */
 class WebRTCUpgrader {
   public rtcConfig?: RTCConfiguration
-  private publicNodes: Map<string, Multiaddr[]>
+  private publicNodes: PeerStoreType[]
 
-  constructor(publicNodes?: PublicNodesEmitter, initialNodes?: Multiaddr[]) {
-    this.publicNodes = new Map<string, Multiaddr[]>()
+  constructor(publicNodes?: PublicNodesEmitter, initialNodes?: PeerStoreType[]) {
+    this.publicNodes = []
+
     initialNodes?.forEach(this.onNewPublicNode.bind(this))
 
     publicNodes?.on('addPublicNode', this.onNewPublicNode.bind(this))
@@ -65,7 +48,21 @@ class WebRTCUpgrader {
     publicNodes?.on('removePublicNode', this.onOfflineNode.bind(this))
   }
 
-  private onNewPublicNode(ma: Multiaddr) {
+  private publicNodesToRTCServers(): RTCIceServer[] {
+    const iceServers: RTCIceServer[] = []
+    for (const entry of this.publicNodes) {
+      iceServers.push({
+        urls:
+          entry.multiaddrs.length == 1
+            ? multiaddrToIceServer(entry.multiaddrs[0])
+            : entry.multiaddrs.map(multiaddrToIceServer)
+      })
+    }
+
+    return iceServers
+  }
+
+  private onNewPublicNode(peer: PeerStoreType) {
     if (
       this.rtcConfig != undefined &&
       this.rtcConfig.iceServers != undefined &&
@@ -74,36 +71,45 @@ class WebRTCUpgrader {
       return
     }
 
-    const tuples = ma.tuples()
+    let entry = this.publicNodes.find((entry: PeerStoreType) => entry.id.equals(peer.id))
 
-    // Also try "TCP addresses" as we expect that node is listening on TCP *and* UDP
-    if (!isUsableMultiaddr(tuples)) {
-      verbose(`Dropping potential STUN ${ma.toString()} because format is invalid`)
-      return
-    }
+    if (entry == undefined) {
+      const usableAddresses = peer.multiaddrs.filter((ma: Multiaddr) => {
+        const tuples = ma.tuples()
 
-    const maPeerId = ma.getPeerId() ?? 'unknownPeer'
+        return isUsableMultiaddr(tuples)
+      })
 
-    let found = this.publicNodes.get(maPeerId)
-    if (found) {
-      if (!found.some((existing: Multiaddr) => existing.equals(ma))) {
-        found.push(ma)
+      if (usableAddresses.length > 0) {
+        this.publicNodes.unshift({ id: peer.id, multiaddrs: usableAddresses })
       }
     } else {
-      found = [ma]
+      let before = entry.multiaddrs.length
+
+      for (const ma of peer.multiaddrs) {
+        const tuples = ma.tuples()
+
+        // Also try "TCP addresses" as we expect that node is listening on TCP *and* UDP
+        if (!isUsableMultiaddr(tuples)) {
+          verbose(`Dropping potential STUN ${ma.toString()} because format is invalid`)
+          continue
+        }
+
+        if (entry.multiaddrs.some((existing: Multiaddr) => existing.equals(ma))) {
+          continue
+        }
+
+        entry.multiaddrs.unshift(ma)
+      }
+
+      if (entry.multiaddrs.length == before) {
+        return
+      }
     }
-
-    this.publicNodes.set(maPeerId, found)
-
-    const iceServerUrl = multiaddrToIceServer(ma)
-
-    const iceServers = removeMultiaddrFromList(this.rtcConfig?.iceServers ?? [], iceServerUrl)
-
-    iceServers.unshift({ urls: iceServerUrl })
 
     this.rtcConfig = {
       ...this.rtcConfig,
-      iceServers
+      iceServers: this.publicNodesToRTCServers()
     }
   }
 
@@ -112,15 +118,11 @@ class WebRTCUpgrader {
       return
     }
 
-    let found = this.publicNodes.get(peer.toB58String())
-    if (found) {
-      let iceServers = this.rtcConfig.iceServers
-      for (const ma of found) {
-        iceServers = removeMultiaddrFromList(iceServers, multiaddrToIceServer(ma))
-      }
-      this.rtcConfig.iceServers = iceServers
+    this.publicNodes = this.publicNodes.filter((entry: PeerStoreType) => !entry.id.equals(peer))
 
-      this.publicNodes.delete(peer.toB58String())
+    this.rtcConfig = {
+      ...this.rtcConfig,
+      iceServers: this.publicNodesToRTCServers()
     }
   }
 

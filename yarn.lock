@@ -407,15 +407,19 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
-    "@hoprnet/hopr-utils": 1.75.0-next.10
-    "@types/debug": ^4.1.6
-    "@types/mocha": ^8.2.3
-    "@types/node": 14
+    "@hoprnet/hopr-utils": 1.75.0-next.19
+    "@types/chai": ^4.2.21
+    "@types/chai-spies": ^1.0.3
+    "@types/debug": ^4.1.7
+    "@types/mocha": ^9.0.0
+    "@types/node": 16
     "@types/simple-peer": ^9.11.1
     "@types/yargs": ^17.0.2
     abort-controller: 3.0.0
     abortable-iterator: ^3.0.0
     bl: ^5.0
+    chai: ^4.3.4
+    chai-spies: ^1.0.0
     debug: ^4.3.2
     heap-js: ^2.1.6
     it-handshake: ^2.0.0
@@ -426,11 +430,11 @@ __metadata:
     libp2p-interfaces: ^1.0.1
     libp2p-mplex: 0.10.4
     libp2p-noise: ^4.0
-    mocha: ^9.0.2
+    mocha: ^9.0.3
     multiaddr: ^10.0.0
     multihashes: ^4.0.2
     p-defer: 3
-    peer-id: ~0.15.1
+    peer-id: ~0.15.2
     prettier: ~2.3.2
     simple-peer: 9.11
     stream-to-it: ^0.2.4
@@ -442,9 +446,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-utils@npm:1.75.0-next.10":
-  version: 1.75.0-next.10
-  resolution: "@hoprnet/hopr-utils@npm:1.75.0-next.10"
+"@hoprnet/hopr-utils@npm:1.75.0-next.19":
+  version: 1.75.0-next.19
+  resolution: "@hoprnet/hopr-utils@npm:1.75.0-next.19"
   dependencies:
     abort-controller: ~3.0.0
     bignumber.js: ^9.0.0
@@ -461,10 +465,10 @@ __metadata:
     memdown: ^6.0.0
     multiaddr: ^10.0.0
     multihashes: ~4.0.1
-    peer-id: 0.15.1
+    peer-id: 0.15.2
     private-ip: ^2.2.1
     secp256k1: ^4.0.2
-  checksum: 30907b7ae8f829d012b364af2fbb010970ac56637f2ee424e5946a7c9963b86dba3bbbaf70c9238960232ba447ac5431b89839f1cc7fa0e23a786c9cf1004850
+  checksum: acd4e55472179ca7709abc1d586311f008fc1a939ec8d2af8e536a1a6e3c70f33621bc0312eafb40a66063689b1556e7121abd7f33b13cbe76e15e2059796e8e
   languageName: node
   linkType: hard
 
@@ -747,10 +751,28 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/debug@npm:^4.1.6":
-  version: 4.1.6
-  resolution: "@types/debug@npm:4.1.6"
-  checksum: f2816703a81f2cecb9fe575ed73f69378f190f92e49aab01b5b1832166cd89b19d4e85999c955f8993d3dba36e78ffd1ac5f697449eff13a6a13de309dc6e0f5
+"@types/chai-spies@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "@types/chai-spies@npm:1.0.3"
+  dependencies:
+    "@types/chai": "*"
+  checksum: 2cb0bf2d30648281048cd721e85f201e8d2469eabcd42553036fd05cb94c034bb83625173fe409abab4c8244436c5d8979ede8b8b7bbd577e79f91abab22faa8
+  languageName: node
+  linkType: hard
+
+"@types/chai@npm:*, @types/chai@npm:^4.2.21":
+  version: 4.2.21
+  resolution: "@types/chai@npm:4.2.21"
+  checksum: fc7d32fbae47ad6d3576bcb8cf24a243af03c93bb97cd9456a5415da888ab78a03800dcc4cc25a21ad1b493bcdaee7377f163bc4dd8db463c3530dafddea205c
+  languageName: node
+  linkType: hard
+
+"@types/debug@npm:^4.1.7":
+  version: 4.1.7
+  resolution: "@types/debug@npm:4.1.7"
+  dependencies:
+    "@types/ms": "*"
+  checksum: cd865a371a4b4184b3f8e25461338fef3134b37ffed983d471f4538c4da7974f661edb25f80b41f2a46f951c735a8163758c094e8bf0869e3abc1f32e85f064b
   languageName: node
   linkType: hard
 
@@ -761,17 +783,31 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/mocha@npm:^8.2.3":
-  version: 8.2.3
-  resolution: "@types/mocha@npm:8.2.3"
-  checksum: 5cba26124eb9d6b9b2fab66111488a54e6254162bac855282cb46f1467c5c4debe78ddeba15ab2264d5e4669fbfd403e433b6363106d2dfbe122d660c1e298e2
+"@types/mocha@npm:^9.0.0":
+  version: 9.0.0
+  resolution: "@types/mocha@npm:9.0.0"
+  checksum: dac70c24e5e7f825a6f449035ebab1b7cfe99b5976b879a4039a516ade38fcc6c78fc4c4d953d27c62db1d9117372e129c6bfe08e2aab0c0a2a6e441335aba42
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:14":
+"@types/ms@npm:*":
+  version: 0.7.31
+  resolution: "@types/ms@npm:0.7.31"
+  checksum: 7ff9798a408aaa371f3d0059f013d09b6eb471cd62019f35924301608f57279943b5d322f497f2ea9ae65477e2a47c26dfd8dd833a4352f883a8a86c051f7125
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:*":
   version: 14.14.31
   resolution: "@types/node@npm:14.14.31"
   checksum: 635dc8a0898a923621e02ca179e17baa39fdfa44f0096fcc1b7046c9b32317e74a99956a7b45ca0e8069874f51f4e7873a418239a318a4b6e7936f6510ac5992
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:16":
+  version: 16.4.3
+  resolution: "@types/node@npm:16.4.3"
+  checksum: 03195d10ef927ed0879500f002969fba75e6616714a53d91fe82dfdf4e0cd15228bf5c3a426d5447ed84b4947f2c07b40c317eddcbd2126552cc24bc88da7adc
   languageName: node
   linkType: hard
 
@@ -1025,6 +1061,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"assertion-error@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "assertion-error@npm:1.1.0"
+  checksum: 7bbc9fa2ff51618b0ea3c4ae13dbafe6dfb71b11c267aa93c749489355f55d0b844403bfc3dc8b9a98b0f21837fa2b59191c8a8f76e65303d06498fab4867f4c
+  languageName: node
+  linkType: hard
+
 "async@npm:^3.2.0":
   version: 3.2.0
   resolution: "async@npm:3.2.0"
@@ -1262,6 +1305,29 @@ __metadata:
   languageName: node
   linkType: hard
 
+"chai-spies@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "chai-spies@npm:1.0.0"
+  peerDependencies:
+    chai: "*"
+  checksum: d7182238fca0b9e3da1b4b7e05ae5bff9e464795e48889a57ebf63b120b34e09a7fe6ad9f54bebd6fc9310f3f34abec7da71305cb90fd30f6b9e52eeaec95206
+  languageName: node
+  linkType: hard
+
+"chai@npm:^4.3.4":
+  version: 4.3.4
+  resolution: "chai@npm:4.3.4"
+  dependencies:
+    assertion-error: ^1.1.0
+    check-error: ^1.0.2
+    deep-eql: ^3.0.1
+    get-func-name: ^2.0.0
+    pathval: ^1.1.1
+    type-detect: ^4.0.5
+  checksum: ea3e6547b9a8d367f203e83b71632ec6a801f6380393594907968479aea15e411e4317211f46e03eda092a97f6812118b69b05bbded51b01224d193cc3f4b9b3
+  languageName: node
+  linkType: hard
+
 "chalk@npm:^4.1.0, chalk@npm:^4.1.1":
   version: 4.1.1
   resolution: "chalk@npm:4.1.1"
@@ -1269,6 +1335,13 @@ __metadata:
     ansi-styles: ^4.1.0
     supports-color: ^7.1.0
   checksum: 445c12db7aeed0046500a1e4184d31209a77d165654c885a789c41c8598a6a95bd2392180987cac572c967b93a2a730dda778bb7f87fa06ca63fd8592f8cc59f
+  languageName: node
+  linkType: hard
+
+"check-error@npm:^1.0.2":
+  version: 1.0.2
+  resolution: "check-error@npm:1.0.2"
+  checksum: 1460ad12da600b277575f53b7512d6e59005a34e3235ae62cfe12ff5d83b68a6ff568841907eb5f041c3f468d1385ea9fcfd22344df02175d28ea8a8b9330940
   languageName: node
   linkType: hard
 
@@ -1447,6 +1520,15 @@ __metadata:
   version: 4.0.0
   resolution: "decamelize@npm:4.0.0"
   checksum: 3846161a3b6ba7043dd0e8cb8101676fcbd92a60bd228e63fe17116ebfaddff8d730e33c9e93a9e02c049c53e0e37013174225f27b95bb21d703359999a4aab9
+  languageName: node
+  linkType: hard
+
+"deep-eql@npm:^3.0.1":
+  version: 3.0.1
+  resolution: "deep-eql@npm:3.0.1"
+  dependencies:
+    type-detect: ^4.0.0
+  checksum: eff42bc2d4d889dec8fd925fa9c013fa4d641842b98b502f436b9f2865460c8330f79fb7dbdb924a1e844b97b40843ed952f3847fb1e388a35bd4ef6e3d64184
   languageName: node
   linkType: hard
 
@@ -1896,6 +1978,13 @@ fsevents@~2.3.2:
   version: 2.0.5
   resolution: "get-caller-file@npm:2.0.5"
   checksum: 9dd9e1e2591039ee4c38c897365b904f66f1e650a8c1cb7b7db8ce667fa63e88cc8b13282b74df9d93de481114b3304a0487880d31cd926dfda6efe71455855d
+  languageName: node
+  linkType: hard
+
+"get-func-name@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "get-func-name@npm:2.0.0"
+  checksum: c72d3857cd05338fc61e52c385da67d553e42c226e141da11684aecb3e017a753bf7120411731fbc30768edf68f9c359dc202757703b3a851da54b2b17a9828d
   languageName: node
   linkType: hard
 
@@ -3100,9 +3189,9 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"mocha@npm:^9.0.2":
-  version: 9.0.2
-  resolution: "mocha@npm:9.0.2"
+"mocha@npm:^9.0.3":
+  version: 9.0.3
+  resolution: "mocha@npm:9.0.3"
   dependencies:
     "@ungap/promise-all-settled": 1.1.2
     ansi-colors: 4.1.1
@@ -3132,7 +3221,7 @@ fsevents@~2.3.2:
   bin:
     _mocha: bin/_mocha
     mocha: bin/mocha
-  checksum: 305d820f2e7237f54c2c034198978c1ef7c0cf99ddf0c511c8e65e0d7cd00a2b87f7826dc91afa080473152159c1402f419f18d67f831dc55ebc84710ee97823
+  checksum: 1d51b12960c2101a8057ab92463d50e8a5ca2543bd25ed99fbc2ebe562edac6a7ee21f11f912acdf2d2ac9664634d4fcadb87266a8507ab00b505feab4bab1d5
   languageName: node
   linkType: hard
 
@@ -3712,7 +3801,30 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"peer-id@npm:0.15.1, peer-id@npm:^0.15.0, peer-id@npm:~0.15.1":
+"pathval@npm:^1.1.1":
+  version: 1.1.1
+  resolution: "pathval@npm:1.1.1"
+  checksum: 81cd01d46cd0cd90fb7a8e0d576f8cb4cbbd0832ed00da14362be32ad79e855cf8ecf7e92fc0c267fdfc2766bd1d8fb3de43a51081e142ffb1fc814958fb8d8f
+  languageName: node
+  linkType: hard
+
+"peer-id@npm:0.15.2, peer-id@npm:~0.15.2":
+  version: 0.15.2
+  resolution: "peer-id@npm:0.15.2"
+  dependencies:
+    class-is: ^1.1.0
+    libp2p-crypto: ^0.19.0
+    minimist: ^1.2.5
+    multiformats: ^9.3.0
+    protobufjs: ^6.10.2
+    uint8arrays: ^2.0.5
+  bin:
+    peer-id: src/bin.js
+  checksum: 8fe82ee0e07ce1c348db029f0cc6c76eb4f31d7f35871b3e2df448a8cad170fca400466155eeb0cbf9eee7bb7e0710ed472adfc64a75f1c2d930b066e2b40b97
+  languageName: node
+  linkType: hard
+
+"peer-id@npm:^0.15.0":
   version: 0.15.1
   resolution: "peer-id@npm:0.15.1"
   dependencies:
@@ -4491,6 +4603,13 @@ fsevents@~2.3.2:
   version: 0.14.5
   resolution: "tweetnacl@npm:0.14.5"
   checksum: e1c9d52e2e9f582fd0df9ea26ba5a9ab88b9a38b69625d8e55c5e8870a4832ac8c32f8854b41fce7b59f97258bb103535363f9eda7050aa70e75824b972c7dde
+  languageName: node
+  linkType: hard
+
+"type-detect@npm:^4.0.0, type-detect@npm:^4.0.5":
+  version: 4.0.8
+  resolution: "type-detect@npm:4.0.8"
+  checksum: e01dc6ac9098192a7859fb86c7b4073709a4e13a5cc02c54d54412378bb099563fda7a7a85640f33e3a7c2e8189182eb1511f263e67f402b2d63fe81afdde785
   languageName: node
   linkType: hard
 

@@ -1,12 +1,11 @@
-/// <reference path="./@types/libp2p.ts" />
-
-import debug from 'debug'
+import Debug from 'debug'
 import { CODE_IP4, CODE_IP6, CODE_P2P, USE_WEBRTC } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
-import type { Upgrader, DialOptions, ConnHandler, default as libp2p } from 'libp2p'
-import { Transport, Connection } from 'libp2p-interfaces'
+import type { Upgrader } from 'libp2p-interfaces/src/transport/types'
+import type { default as libp2p, Connection } from 'libp2p'
+import { Transport } from 'libp2p-interfaces/src/transport/types'
 import chalk from 'chalk'
 import { TCPConnection, Listener } from './base'
 import { WebRTCUpgrader } from './webrtc'
@@ -15,35 +14,25 @@ import { Discovery } from './discovery'
 import { Filter } from './filter'
 import { dialHelper } from './utils'
 
-import type { PublicNodesEmitter } from './types'
+import type { PublicNodesEmitter, PeerStoreType, DialOptions } from './types'
 
-const log = debug('hopr-connect')
-const verbose = debug('hopr-connect:verbose')
+const log = Debug('hopr-connect')
+const verbose = Debug('hopr-connect:verbose')
 
 export type HoprConnectOptions = {
   publicNodes?: PublicNodesEmitter
-  initialNodes?: Multiaddr[]
+  initialNodes?: PeerStoreType[]
   interface?: string
   __noDirectConnections?: boolean
   __noWebRTCUpgrade?: boolean
   maxRelayedConnections?: number
+  __relayFreeTimeout?: number
 }
 
 /**
- * Adds the peerId of a Multiaddr to the given set
- * @param set set of PeerId strings
- * @param multiAddr multiaddr potentially containing a PeerId
- */
-function addPeerIdStringToSet(set: Set<string>, multiAddr: Multiaddr) {
-  const initialNodePeerId = multiAddr.getPeerId()
-  if (initialNodePeerId != undefined) {
-    set.add(initialNodePeerId)
-  }
-}
-/**
  * @class HoprConnect
  */
-class HoprConnect implements Transport {
+class HoprConnect implements Transport<DialOptions, any> {
   get [Symbol.toStringTag]() {
     return 'HoprConnect'
   }
@@ -51,7 +40,7 @@ class HoprConnect implements Transport {
   public discovery: Discovery
 
   private publicNodes?: PublicNodesEmitter
-  private initialNodes?: Multiaddr[]
+  private initialNodes?: PeerStoreType[]
 
   private relayPeerIds?: Set<string>
 
@@ -65,7 +54,7 @@ class HoprConnect implements Transport {
   private _addressFilter: Filter
   private _libp2p: libp2p
 
-  private connHandler?: ConnHandler
+  private connHandler: ((conn: Connection) => void) | undefined
 
   constructor(
     opts: {
@@ -101,8 +90,8 @@ class HoprConnect implements Transport {
     this.discovery = new Discovery()
 
     this.relay = new Relay(
-      (peer: PeerId, protocol: string, options: { timeout: number } | { signal: AbortSignal }) =>
-        dialHelper(opts.libp2p, peer, protocol, options as any),
+      (peer: PeerId, protocol: string, options: { timeout: number } | DialOptions) =>
+        dialHelper(opts.libp2p, peer, protocol, options as any) as any,
       opts.libp2p.dialer,
       opts.libp2p.connectionManager,
       opts.libp2p.handle.bind(opts.libp2p),
@@ -111,7 +100,8 @@ class HoprConnect implements Transport {
       this.connHandler,
       this._webRTCUpgrader,
       opts.__noWebRTCUpgrade,
-      opts.maxRelayedConnections
+      opts.maxRelayedConnections,
+      opts.__relayFreeTimeout
     )
 
     // Used for testing
@@ -128,16 +118,21 @@ class HoprConnect implements Transport {
     }
 
     if (this.__noDirectConnections) {
-      // Whenever we don't allow direct connection, we need to store
+      // Whenever we don't allow direct connections, we need to store
       // the known relays and make sure that we allow direct connections
       // to them.
       this.relayPeerIds = new Set<string>()
 
       for (const initialNode of this.initialNodes ?? []) {
-        addPeerIdStringToSet(this.relayPeerIds, initialNode)
+        this.relayPeerIds ??= new Set<string>()
+        this.relayPeerIds.add(initialNode.id.toB58String())
       }
 
-      this.publicNodes?.on('addPublicNode', (ma: Multiaddr) => addPeerIdStringToSet(this.relayPeerIds as any, ma))
+      this.publicNodes?.on('addPublicNode', (peer: PeerStoreType) => {
+        this.relayPeerIds ??= new Set<string>()
+        this.relayPeerIds.add(peer.id.toB58String())
+      })
+
       verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
     }
 
@@ -245,14 +240,14 @@ class HoprConnect implements Transport {
    * @param relays potential relays that we can use
    * @param options optional dial options
    */
-  private async dialWithRelay(relay: PeerId, destination: PeerId, options?: DialOptions): Promise<Connection> {
+  private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
     let conn = await this.relay.connect(relay, destination, options)
 
     if (conn == undefined) {
       throw Error(`Could not establish relayed connection.`)
     }
 
-    return await this._upgrader.upgradeOutbound(conn)
+    return await this._upgrader.upgradeOutbound(conn as any)
   }
 
   /**
@@ -266,7 +261,7 @@ class HoprConnect implements Transport {
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
-    return await this._upgrader.upgradeOutbound(maConn)
+    return await this._upgrader.upgradeOutbound(maConn as any)
   }
 
   /**

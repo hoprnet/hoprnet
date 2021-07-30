@@ -1,11 +1,10 @@
 /// <reference path="../@types/it-handshake.ts" />
 /// <reference path="../@types/it-pair.ts" />
-/// <reference path="../@types/libp2p.ts" />
 
 import handshake from 'it-handshake'
 import Pair from 'it-pair'
 
-import type { StreamType } from 'libp2p'
+import type { StreamType } from '../types'
 
 import assert from 'assert'
 import PeerId from 'peer-id'
@@ -37,18 +36,18 @@ describe('relay state management', function () {
 
     assert(!(await state.isActive(initiator, destination)), 'empty state must not be active')
 
-    const initiatorToRelay = Pair()
-    const relayToInitiator = Pair()
+    const initiatorToRelay = Pair<StreamType>()
+    const relayToInitiator = Pair<StreamType>()
 
-    const destinationToRelay = Pair()
-    const relayToDestination = Pair()
+    const destinationToRelay = Pair<StreamType>()
+    const relayToDestination = Pair<StreamType>()
 
-    const initiatorShaker = handshake<StreamType>({
+    const initiatorShaker = handshake({
       source: relayToInitiator.source,
       sink: initiatorToRelay.sink
     })
 
-    const destinationShaker = handshake<StreamType>({
+    const destinationShaker = handshake({
       source: relayToDestination.source,
       sink: destinationToRelay.sink
     })
@@ -104,15 +103,15 @@ describe('relay state management', function () {
       u8aEquals((await initiatorShaker.read()).slice(), Uint8Array.from([RelayPrefix.PAYLOAD, ...destinationHello]))
     )
 
-    const initiatorToRelayAfterUpdate = Pair()
-    const relayToInitiatorAfterUpdate = Pair()
+    const initiatorToRelayAfterUpdate = Pair<StreamType>()
+    const relayToInitiatorAfterUpdate = Pair<StreamType>()
 
     state.updateExisting(initiator, destination, {
       source: initiatorToRelayAfterUpdate.source,
       sink: relayToInitiatorAfterUpdate.sink
     })
 
-    const initiatorShakerAfterUpdate = handshake<StreamType>({
+    const initiatorShakerAfterUpdate = handshake({
       source: relayToInitiatorAfterUpdate.source,
       sink: initiatorToRelayAfterUpdate.sink
     })
@@ -139,18 +138,18 @@ describe('relay state management', function () {
     const state = new RelayState()
 
     assert(!state.exists(initiator, destination))
-    const initiatorToRelay = Pair()
-    const relayToInitiator = Pair()
+    const initiatorToRelay = Pair<StreamType>()
+    const relayToInitiator = Pair<StreamType>()
 
-    const destinationToRelay = Pair()
-    const relayToDestination = Pair()
+    const destinationToRelay = Pair<StreamType>()
+    const relayToDestination = Pair<StreamType>()
 
-    const initiatorShaker = handshake<StreamType>({
+    const initiatorShaker = handshake({
       source: relayToInitiator.source,
       sink: initiatorToRelay.sink
     })
 
-    const destinationShaker = handshake<StreamType>({
+    const destinationShaker = handshake({
       source: relayToDestination.source,
       sink: destinationToRelay.sink
     })
