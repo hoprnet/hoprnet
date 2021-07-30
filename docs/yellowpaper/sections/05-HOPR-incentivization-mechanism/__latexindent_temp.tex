@@ -15,13 +15,13 @@ network.
 \\\textbf{Acknowledgements} are messages which allow every node to acknowledge the
 processing of a packet to the previous node. This acknowledgement contains the
 cryptographic material to unlock the possible payout for the previous node. Note
-that acknowledgement is always sent to the previous node.
+that acknowledgement is always sent to the previous node. In vanilla payment channels, the latest acknowledgement contains all previous incentives plus the incentive for the most recent interaction as explained below:
 
 \begin{align}
 value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
 \end{align}
 where $n$ is the total number of mixnet packets transformed.
-\\If B received $ACK_n$ for $packet_n$ before sending $packet_{n-1}$, it has no
+\\~\\If B received $ACK_n$ for $packet_n$ before sending $packet_{n-1}$, it has no
 incentive to process $packet_{n-1}$ rather than $packet_{n}$. To avoid these
 false incentives the HOPR protocol utilizes \textbf{probabilistic payments}.
 In probabilistic payments the payouts use \textit{tickets} (further explained in
