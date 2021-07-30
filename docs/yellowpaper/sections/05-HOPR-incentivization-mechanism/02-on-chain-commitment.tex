@@ -1,6 +1,7 @@
 \subsection{On-chain Commitment}
 
 HOPR uses a commitment scheme to deposit values on-chain and reveal them once a node redeems an incentive for relaying packets. This comes with the benefit that the redeeming party discloses a secret that is unknown to the issuer of the incentive until it is claimed on-chain. The $\textbf{opening}$ $\mathsf{Open}$ and the $\textbf{response}$ $r$ to the PoR challenge (or as we call them in the smart contract \textit{nextCommitment} and \textit{proofOfRelaySecret}) are then used to prove to the smart contract that the node is legitimate to claim the funds.
+\\~\\HOPR uses a computationally hiding and binding commitment scheme as explained below:
 
 \begin{defnsub}
     % Currently leaving out further details such as unconditionally/computationally binding / hiding
@@ -19,7 +20,8 @@ Once a node is the destination of a HOPR unidirectional channel, it derives a ma
 which means opening $comm_{i}$ with $comm_{i-1}$ holds true.
 The iterated commitment is computed as $$comm_n = h^n(comm_0)$$ where $h$ is a preimage-resistant hash function (we use keccak256 hash function which is used in Ethereum) and $comm_0$ is derived as 
 $$ comm_0 = \mathsf{h}(privKey,chainId, contractAddr, channelId, channelEpoch)$$
-The master key is supposed to be pseudo-random such that all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \le n$ are indistinguishable for the ticket issuer from random numbers of the same length. This is necessary in order to ensure that the ticket issuer is unable to determine whether a ticket is a win or not when issuing the ticket. This makes it infeasible for the ticket issuer to tweak the challenge to such that it cannot be a win.
+This will be implemented in the future and there will be further research conducted to verify if such design would reveal some information about the private key or not. 
+\\The master key is supposed to be pseudo-random such that all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \le n$ are indistinguishable for the ticket issuer from random numbers of the same length. This is necessary in order to ensure that the ticket issuer is unable to determine whether a ticket is a win or not when issuing the ticket. This makes it infeasible for the ticket issuer to tweak the challenge to such that it cannot be a win.
 \\~\\When dispatching a transaction that opens the payment channel, the commitment $comm_n$ is stored in the channel structure in the smart contract and the smart contract will force the ticket recipient to reveal $comm_{n-1}$ when redeeming a ticket issued in this channel.
 The number of iterations $n$ can be chosen as a constant and should reflect the number of tickets a node intends to redeem within a channel.
 
@@ -29,6 +31,6 @@ In order to redeem a ticket, a node has to reveal the opening to the current com
 Tickets lead to a win if: $$\mathsf{h}( t_h, r_i, comm_{i-1} ) < P_w$$ where $P_w$ is the ticket's winning probability and $$t_h=\mathsf{h}(t) \;and\; \mathsf{Open}(comm_i, comm_{i-1}) = \top$$ Since $comm_{0}$ is known to the ticket recipient, the ticket recipient can compute the opening as $comm_{n-1} = \mathsf{h}^{n-1}(comm_0)$.
 Once redeeming a ticket, the smart contract verifies that $$\mathsf{Open}(comm_i, comm_{i-1}) = \top$$ and sets $channel.comm[redeemer] \leftarrow comm_{i-1}$. Hence next time, the node redeems a ticket, it has to reveal $comm_{i-2}$.
 In addition, each node is granted the right to reset the commitment to a new value which is necessary especially once a node reveals $comm_0$ and therefore is with high probability unable to compute a value $r$ such that $$\mathsf{Open}(comm_0,r) \neq \bot$$ where $\bot$ represents the truth value "false".
-\\~\\Since this mechanism can be abused by the ticket recipient to tweak the entropy that is used to determine whether a ticket is a win or not, the smart contract keeps track on resets of the on-chain commitment and sets $$channel.ticketEpoch[redeemer] \leftarrow channel.ticketEpoch[redeemer] +1$$  and thereby invalidates all previously unredeemed tickets.
+\\~\\Since this mechanism can be abused by the ticket recipient to tweak the entropy that is used to determine whether a ticket is a win or not, the smart contract keeps track on resets of the on-chain commitment and sets $$channel[redeemer].ticketEpoch \leftarrow channel[redeemer].ticketEpoch +1$$  and thereby invalidates all previously unredeemed tickets.
 
 

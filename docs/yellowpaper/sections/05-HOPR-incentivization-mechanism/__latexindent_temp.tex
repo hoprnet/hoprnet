@@ -1,91 +1,36 @@
-\subsection{Probabilistic Payments}
+\subsection{On-chain Commitment}
 
-In traditional payment channels, two parties A and B lock some funds within a
-smart contract, make transactions off-chain and only commit the aggregation
-on-chain. Thus, a channel is bidirectional which means that both A and B can
-send and receive transactions within the same channel. The HOPR protocol uses
-unidirectional channels to implement bidirectional channel behavior where a channel is created from A to B and another from B to A. 
-The channel creator is the sole owner of funds in the channel and the one able to create tickets. A channel created from
-party $A$ to party $B$ is different from a channel created from party $B$ to
-party $A$.
+HOPR uses a commitment scheme to deposit values on-chain and reveal them once a node redeems an incentive for relaying packets. This comes with the benefit that the redeeming party discloses a secret that is unknown to the issuer of the incentive until it is claimed on-chain. The $\textbf{opening}$ $\mathsf{Open}$ and the $\textbf{response}$ $r$ to the PoR challenge (or as we call them in the smart contract \textit{nextCommitment} and \textit{proofOfRelaySecret}) are then used to prove to the smart contract that the node is legitimate to claim the funds.
+\\~\\HOPR uses a computationally hiding and binding commitment scheme as explained below:
 
- $$A\rightarrow B \neq B\rightarrow A$$
-This separation reflects the directional nature of packets flowing through the
-network.
-\\\textbf{Acknowledgements} are messages which allow every node to acknowledge the
-processing of a packet to the previous node. This acknowledgement contains the
-cryptographic material to unlock the possible payout for the previous node. Note
-that acknowledgement is always sent to the previous node and using acknowledgments with vanilla payment channels results in accumulated incentives where the latest acknowledgement contains all previous incentives plus the incentive for the most recent interaction as explained below:
+\begin{defnsub}
+    % Currently leaving out further details such as unconditionally/computationally binding / hiding
+    A commitment scheme $\mathsf{C_m} = (\mathsf{Commit}, \mathsf{Open})$ is a protocol between two parties, $A$ and $B$, that gives $A$ the opportunity to store a value $comm = \mathsf{Commit}(x)$ at $B$. The value $x$ stays unknown to $B$ until $A$ decides to reveal it to $B$.
+    Such that for any $m\in \mathbb{M}$, $(c,d)\leftarrow \mathsf{Commit(m)}$ is the commitment/opening pair for $m$ where $c = c(m)$ serves as the commitment value, and $d = d(m)$ as the opening value.
+    \\~\\ \noindent\textbf{Hiding:} A commitment scheme is called \textbf{computational hiding} if the following holds:
+    $$\forall \;x\neq x' \; \{\mathsf{Commit}_k(x,U_k)\}_{k\in\mathbb{N}}\approx\{{\mathsf{Commit}_k(x',U_k)}\}_{k\in\mathbb{N}}$$ which means both probability ensembles are computationally indistinguashable such that $U_{k}$ is the uniform distribution over the $2^{k}$ opening values for the security parameter $k$.
+    \\~\\\noindent\textbf{Binding:} A commitment scheme is called \textbf{computational binding} if for all bounded polynomial adversary \textit{Adv} algorithms that run in time $t$ and output $x,x',open,open'$ the following holds:
+    $$P	[ \,x\neq x' \; and \; \mathsf{Commit}(x,open)={\mathsf{Commit}(x',open')}] \,\leq \epsilon$$ A Computationally bounded adversary means that the adversary has limitations on their computational resources. 
 
-\begin{align}
-value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
-\end{align}
-where $n$ is the total number of mixnet packets transformed.
-\\~\\If B received $ACK_n$ for $packet_n$ before sending $packet_{n-1}$, it has no
-incentive to process $packet_{n-1}$ rather than $packet_{n}$. To avoid these
-false incentives the HOPR protocol utilizes probabilistic payments.
-In probabilistic payments the payouts use \textit{tickets} (further explained in
-section \nameref{sec:tickets}). A ticket can be either a win or a loss with a
-certain winning probability. This means nodes are incentivized to continue
-relaying packets as they don’t know which ticket is a win. To a node each
-ticket has the same value it is being claimed, thus the HOPR protocol
-encourages nodes to claim tickets independently from each other.
+\end{defnsub}
 
-\begin{align}
- value ( ACK_i )  &  =value ( ACK_j ) \quad for \quad i,j\in \{1,n\}
-\end{align}
-If we assume the price stays the same. There is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
+\subsubsection{Commitment phase}
 
-\subsubsection{Channel Management}
-Initially, each payment channel in HOPR is CLOSED which means that in order to transfer packets, those channels have to be opened. There are four distinct channel statuses which are represented in the following scheme:
+Once a node is the destination of a HOPR unidirectional channel, it derives a master key $comm_0$ from its private key and uses it to create an iterated commitment $comm_i$ such that for every $i \in \mathbb{N}_0$ and $i > 0$ it holds that $$ \mathsf{Open}(comm_{i}, comm_{i-1}) = \top $$
+which means opening $comm_{i}$ with $comm_{i-1}$ holds true.
+The iterated commitment is computed as $$comm_n = h^n(comm_0)$$ where $h$ is a preimage-resistant hash function (we use keccak256 hash function which is used in Ethereum) and $comm_0$ is derived as 
+$$ comm_0 = \mathsf{h}(privKey,chainId, contractAddr, channelId, channelEpoch)$$
+This will be implemented in the future and there will be further research conducted to verify if such design would reveal some information about the private key or not. 
+\\The master key is supposed to be pseudo-random such that all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \le n$ are indistinguishable for the ticket issuer from random numbers of the same length. This is necessary in order to ensure that the ticket issuer is unable to determine whether a ticket is a win or not when issuing the ticket. This makes it infeasible for the ticket issuer to tweak the challenge to such that it cannot be a win.
+\\~\\When dispatching a transaction that opens the payment channel, the commitment $comm_n$ is stored in the channel structure in the smart contract and the smart contract will force the ticket recipient to reveal $comm_{n-1}$ when redeeming a ticket issued in this channel.
+The number of iterations $n$ can be chosen as a constant and should reflect the number of tickets a node intends to redeem within a channel.
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=9cm,height=9cm,keepaspectratio]{../yellowpaper/images/states1.png}
-\label{fig:channel statuses}
-    \caption{Channel statuses}
-\end{figure}
+\subsubsection{Opening phase}
 
-\paragraph{Opening a channel} Nodes can OPEN channels to other nodes by the following:
-A calls the method \textit{fundChannelMulti()} such that:
-$$fundChannelMulti(A: <\lambda>, B:<\mu> )$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender A for A and B. Both values can also be equal or any of them could be zero. This function opens two unidirectional channels $A\rightarrow B$ and $B\rightarrow A$ if both staked amounts are specified. If not, only the channel $A\rightarrow B$ is opened where $A$ is the sender and $B$ is the recipient.
-The channel is then on state \textit{WAITING\_FOR\_COMMITMENT}.
-\\~\\The destination address of the channel must now commit in order for the channel between both parties to be open.
-The channel destination (let's say it's B) can now call \textit{bumpChannel()} function to make a new set of commitments towards this channel. This call will trigger an onchain event \textit{ChannelIsOpened} and bumbs the ticket epoch to ensure tickets with the previous epoch are invalidated
+In order to redeem a ticket, a node has to reveal the opening to the current commitment $comm_i$ that is stored in the smart contract for the channel. Since the opening $comm_{i-1}$ allows the ticket issuer to determine whether a ticket is going to be a win, the ticket recipient should keep $comm_{i-1}$ until it is used to redeem a ticket.
+Tickets lead to a win if: $$\mathsf{h}( t_h, r_i, comm_{i-1} ) < P_w$$ where $P_w$ is the ticket's winning probability and $$t_h=\mathsf{h}(t) \;and\; \mathsf{Open}(comm_i, comm_{i-1}) = \top$$ Since $comm_{0}$ is known to the ticket recipient, the ticket recipient can compute the opening as $comm_{n-1} = \mathsf{h}^{n-1}(comm_0)$.
+Once redeeming a ticket, the smart contract verifies that $$\mathsf{Open}(comm_i, comm_{i-1}) = \top$$ and sets $channel.comm[redeemer] \leftarrow comm_{i-1}$. Hence next time, the node redeems a ticket, it has to reveal $comm_{i-2}$.
+In addition, each node is granted the right to reset the commitment to a new value which is necessary especially once a node reveals $comm_0$ and therefore is with high probability unable to compute a value $r$ such that $$\mathsf{Open}(comm_0,r) \neq \bot$$ where $\bot$ represents the truth value "false".
+\\~\\Since this mechanism can be abused by the ticket recipient to tweak the entropy that is used to determine whether a ticket is a win or not, the smart contract keeps track on resets of the on-chain commitment and sets $$channel[redeemer].ticketEpoch \leftarrow channel[redeemer].ticketEpoch +1$$  and thereby invalidates all previously unredeemed tickets.
 
-\paragraph{Redeem tickets}
-As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call.
-\\~\\If/when B tries to redeem a ticket from the channel $A\rightarrow B$ (spending channel) but also there is an open channel $B\rightarrow A$ (earning channel), B's rewards will go to $B\rightarrow A$. Otherwise, rewards will be sent directly to B.
 
-\paragraph{Closing a channel}
-Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
-Only the channel creator (let's say it's A) can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $PENDING\_TO\_CLOSE$. Other nodes should monitor blockchain events to be aware of this change and thus will have now time to claim not yet claimed tickets.
-\\~\\Once the timeout is done, (A) can call \textit{finalizeChannelClosure()} which turns the channel state into CLOSED. When channel is closed, funds (stake) are transfered automatically back to (A). Every ticket that wasn't redeemed while channel was open can't be redeemed after closure. This is guaranteed by using Channel Epoch which is explained in ticket section.
-
-\begin{comment}
-
-\begin{figure}[H]
-    \centering
-    \begin{tikzpicture}[looseness=1,auto]
-        \path (0,0) node (closed) [ellipse,draw] {$Closed$};
-        \path (-1,-1)  node (commitment) [ellipse,draw,align=left] {$Waiting$\\$Commitment$};
-        \path (5,0)  node (open) [ellipse,draw] {$Open$};
-        \path (2.5,-1)  node (pending) [ellipse,draw,align=left] {$Pending$\\$Timeout$};
-
-        \draw [->,draw](closed) to [bend left] node {\textsf{fund()}} (commitment);
-        \draw [->,draw](commitment) to [bend left] node {\textsf{fund()}} (open);
-        \draw [->,draw](open) to [bend left] node [align=center] {\textsf{initiateChannelClosure()}} (pending);
-        \draw [->,draw](pending) to [bend left] node {\textsf{finalizeChannelClosure()}} (closed);
-
-        \path[->] (open) edge [out=+120,in=+60,distance=2em,below] node [align=center,above] {\textsf{redeemTicket()}}  (open);
-    \end{tikzpicture}
-    \label{fig:channel workflow}
-    \caption{Channel workflow}
-\end{figure}
-\end{comment}
-
-\begin{comment}
-  \draw [->,draw](commitment) to [bend left] node {\textsf{fund()}} (open);
-    \draw [->,draw](open) to [bend left] node [align=center] {\textsf{initiateChannelClosure()}} (pending);
-    \draw [->,draw](pending) to [bend left] node {\textsf{finalizeChannelClosure()}} (closed);  
-\end{comment}
