@@ -4,8 +4,8 @@ In traditional payment channels, two parties A and B lock some funds within a
 smart contract, make transactions off-chain and only commit the aggregation
 on-chain. Thus, a channel is bidirectional which means that both A and B can
 send and receive transactions within the same channel. The HOPR protocol uses
-unidirectional channels where the channel creator is the sole owner of
-funds in the channel and the one able to create tickets. A channel created from
+unidirectional channels to implement bidirectional channel behavior where a channel is created from A to B and another from B to A. 
+The channel creator is the sole owner of funds in the channel and the one able to create tickets. A channel created from
 party $A$ to party $B$ is different from a channel created from party $B$ to
 party $A$.
 
@@ -16,8 +16,6 @@ network.
 processing of a packet to the previous node. This acknowledgement contains the
 cryptographic material to unlock the possible payout for the previous node. Note
 that acknowledgement is always sent to the previous node.
-\\An acknowledgement contains all previous incentives plus the incentive for the
-most recent interaction.
 
 \begin{align}
 value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
