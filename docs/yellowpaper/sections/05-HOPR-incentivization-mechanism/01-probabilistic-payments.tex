@@ -48,14 +48,14 @@ Initially, each payment channel in HOPR is CLOSED which means that in order to t
 
 \paragraph{Opening a channel} Nodes can OPEN channels to other nodes by the following:
 A calls the method \textit{fundChannelMulti()} such that:
-$$fundChannelMulti(A: <\lambda>, B:<\mu> )$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender A for A and B. Both values can also be equal or any of them could be zero. This function opens two unidirectional channels $A\rightarrow B$ and $B\rightarrow A$ if both staked amounts are specified. If not, only the channel $A\rightarrow B$ is opened where $A$ is the sender and $B$ is the recipient.
-The channel is then on state \textit{WAITING\_FOR\_COMMITMENT}.
-\\~\\The destination address of the channel must now commit in order for the channel between both parties to be open.
+$$fundChannelMulti(A: <\lambda>, B:<\mu> )$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender A for A and B. This function opens two unidirectional channels $A\rightarrow B$ and $B\rightarrow A$ if both staked amounts are specified and are $>0$. If only $\lambda>0$,  then only one channel is opened $A\rightarrow B$ where $A$ is the sender and $B$ is the recipient. $B$ in this case can call the same function again specifying that $\mu>0$ and $\lambda=0$ which will open the channel $B\rightarrow A$.
+Both channels are then on state \textit{WAITING\_FOR\_COMMITMENT}.
+\\~\\The destination address of the channel must now set an on-chain commitment in order for the channel between both parties to be open.
 The channel destination (let's say it's B) can now call \textit{bumpChannel()} function to make a new set of commitments towards this channel. This call will trigger an onchain event \textit{ChannelIsOpened} and bumbs the ticket epoch to ensure tickets with the previous epoch are invalidated
 
 \paragraph{Redeem tickets}
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call.
-\\~\\If/when B tries to redeem a ticket from the channel $A\rightarrow B$ (spending channel) but also there is an open channel $B\rightarrow A$ (earning channel), B's rewards will go to $B\rightarrow A$. Otherwise, rewards will be sent directly to B.
+\\~\\If/when B tries to redeem a ticket from the channel $A\rightarrow B$ (spending channel) but also there is an open channel $B\rightarrow A$ (earning channel), B's rewards will go to $B\rightarrow A$. Otherwise, rewards will be sent directly to B. The fact that both these channels exist is to implement bidirectional channel behavior.
 
 \paragraph{Closing a channel}
 Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
