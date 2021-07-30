@@ -1,6 +1,6 @@
 \subsection{On-chain Commitment}
 
-HOPR uses a commitment scheme to deposit values on-chain and reveal them once a node redeems an incentive for relaying packets. This comes with the benefit that the redeeming party discloses a secret that is unknown to the issuer of the incentive until it is claimed on-chain. The $\textbf{opening}$ $\mathsf{Open}$ and the $\textbf{response}$ $r$ to the PoR challenge (or as we call them in the smart contract \textit{nextCommitment} and \textit{proofOfRelaySecret}) are then used by the smart contract to determine whether the ticket has been redeemed or not.
+HOPR uses a commitment scheme to deposit values on-chain and reveal them once a node redeems an incentive for relaying packets. This comes with the benefit that the redeeming party discloses a secret that is unknown to the issuer of the incentive until it is claimed on-chain. The $\textbf{opening}$ $\mathsf{Open}$ and the $\textbf{response}$ $r$ to the PoR challenge (or as we call them in the smart contract \textit{nextCommitment} and \textit{proofOfRelaySecret}) are then used to prove to the smart contract that the node is legitimate to claim the funds.
 
 \begin{defnsub}
     % Currently leaving out further details such as unconditionally/computationally binding / hiding

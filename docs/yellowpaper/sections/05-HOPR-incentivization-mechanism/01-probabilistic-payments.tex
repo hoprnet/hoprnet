@@ -4,31 +4,26 @@ In traditional payment channels, two parties A and B lock some funds within a
 smart contract, make transactions off-chain and only commit the aggregation
 on-chain. Thus, a channel is bidirectional which means that both A and B can
 send and receive transactions within the same channel. The HOPR protocol uses
-\textbf{unidirectional channels} where the channel creator is the sole owner of
+unidirectional channels where the channel creator is the sole owner of
 funds in the channel and the one able to create tickets. A channel created from
 party $A$ to party $B$ is different from a channel created from party $B$ to
 party $A$.
 
  $$A\rightarrow B \neq B\rightarrow A$$
-
 This separation reflects the directional nature of packets flowing through the
 network.
-
-\textbf{Acknowledgements} are messages which allow every node to acknowledge the
+\\\textbf{Acknowledgements} are messages which allow every node to acknowledge the
 processing of a packet to the previous node. This acknowledgement contains the
 cryptographic material to unlock the possible payout for the previous node. Note
 that acknowledgement is always sent to the previous node.
-
-An acknowledgement contains all previous incentives plus the incentive for the
+\\An acknowledgement contains all previous incentives plus the incentive for the
 most recent interaction.
 
 \begin{align}
 value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
 \end{align}
-
 where $n$ is the total number of mixnet packets transformed.
-
-If B received $ACK_n$ for $packet_n$ before sending $packet_{n-1}$, it has no
+\\If B received $ACK_n$ for $packet_n$ before sending $packet_{n-1}$, it has no
 incentive to process $packet_{n-1}$ rather than $packet_{n}$. To avoid these
 false incentives the HOPR protocol utilizes \textbf{probabilistic payments}.
 In probabilistic payments the payouts use \textit{tickets} (further explained in
@@ -41,11 +36,9 @@ encourages nodes to claim tickets independently from each other.
 \begin{align}
  value ( ACK_i )  &  =value ( ACK_j ) \quad for \quad i,j\in \{1,n\}
 \end{align}
-
 There is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
 
 \subsubsection{Channel Management}
-
 Initially, each payment channel in HOPR is CLOSED which means that in order to transfer packets, those channels have to be opened. There are four distinct channel statuses which are represented in the following scheme:
 
 \begin{figure}[H]
