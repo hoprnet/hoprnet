@@ -15,7 +15,7 @@ network.
 \\\textbf{Acknowledgements} are messages which allow every node to acknowledge the
 processing of a packet to the previous node. This acknowledgement contains the
 cryptographic material to unlock the possible payout for the previous node. Note
-that acknowledgement is always sent to the previous node. In vanilla payment channels, the latest acknowledgement contains all previous incentives plus the incentive for the most recent interaction as explained below:
+that acknowledgement is always sent to the previous node and using acknowledgments with vanilla payment channels results in accumulated incentives where the latest acknowledgement contains all previous incentives plus the incentive for the most recent interaction as explained below:
 
 \begin{align}
 value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
@@ -23,7 +23,7 @@ value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
 where $n$ is the total number of mixnet packets transformed.
 \\~\\If B received $ACK_n$ for $packet_n$ before sending $packet_{n-1}$, it has no
 incentive to process $packet_{n-1}$ rather than $packet_{n}$. To avoid these
-false incentives the HOPR protocol utilizes \textbf{probabilistic payments}.
+false incentives the HOPR protocol utilizes probabilistic payments.
 In probabilistic payments the payouts use \textit{tickets} (further explained in
 section \nameref{sec:tickets}). A ticket can be either a win or a loss with a
 certain winning probability. This means nodes are incentivized to continue
@@ -34,7 +34,7 @@ encourages nodes to claim tickets independently from each other.
 \begin{align}
  value ( ACK_i )  &  =value ( ACK_j ) \quad for \quad i,j\in \{1,n\}
 \end{align}
-There is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
+If we assume the price stays the same. There is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
 
 \subsubsection{Channel Management}
 Initially, each payment channel in HOPR is CLOSED which means that in order to transfer packets, those channels have to be opened. There are four distinct channel statuses which are represented in the following scheme:
