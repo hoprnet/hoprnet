@@ -88,7 +88,7 @@ $$ comm_{i-1} != 0 \; and \; comm_{i}=h(comm_{i-1})$$
 This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$. The values are first ABI encoded, then hashed using keccak256 and last but not least converted to uint256.
 \\~\\If the check is not valid, the node should drop the packet.
 The final recipient of the packet does not receive a ticket because packet reception is not incentivized by the HOPR protocol.
-\item Ticket signer must be the ticket issuer. This is done using the $$ECDSA.recover()$$ ethereum function which recovers the private key used to sign $T= (t, Sig_I(t))$ and verifies if the associated public key is the issuer's public key. The packet is dropped if this test fails.
+\item Ticket signer must be the ticket issuer. Both node and smart contract verify if the public key associated to the private key used to sign $$T= (t, Sig_I(t))$$ is the issuer's public key. The packet is dropped if this test fails.
 \item The ticket hasn't been already redeemed and ticket index is strictly greater than the current value in the smart contract (replay protection).
      $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ the ticket index.
 \item Amount of ticket must be greater than 0: $$\sigma>0$$ where $\sigma$ is the ticket amount.
