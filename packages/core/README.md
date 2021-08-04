@@ -7,7 +7,7 @@ HOPR is a privacy-preserving messaging **protocol** which enables the creation o
 
 This repository is the source code of the TypeScript implementation ([`hopr-core`](https://www.npmjs.com/package/@hoprnet/hopr-core)) of HOPR.
 
-For further information about HOPR, please see our [online documentation](https://docs.hoprnet.io/home/).
+For further information about HOPR, please see our [online documentation](https://docs.hoprnet.org/).
 
 ## Testnet
 
