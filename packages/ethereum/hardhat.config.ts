@@ -69,7 +69,6 @@ const hardhatConfig: HardhatUserConfig = {
       url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     }
-
   },
   namedAccounts: {
     deployer: 0
