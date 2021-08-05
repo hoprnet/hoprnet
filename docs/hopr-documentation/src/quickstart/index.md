@@ -4,13 +4,13 @@ description: Your 5 minutes hello world using HOPR.
 
 # Getting started
 
-This page will guide you installing and running a HOPR node in your computer on a local testnet.
+This page will guide you through installing and running a HOPR node in your computer on a local testnet.
 
 ## Local environment
 
-The following instructions are meant for you to run a local HOPR node. As a result, you will not be able to connect to other peers other than yourself and test your node locally. To learn how to run a "live" HOPR node, please go to [Install a HOPR node](../install-hoprd/index.md).
+The following instructions are meant for you to run a local HOPR node. As a result, you will not be able to connect to peers other than yourself and can only test your node locally. To learn how to run a "live" HOPR node, please go to [Install a HOPR node](../install-hoprd/index.md).
 
-To get a HOPR node and start working testing the HOPR protocol, follow the next instructions.
+To get a HOPR node and start testing the HOPR protocol, follow the next instructions.
 
 ### 1. Fetch the latest version
 

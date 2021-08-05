@@ -26,20 +26,20 @@ This was initially brought up in #743.
 
 #### Problem statement
 
-Cover traffic should be allocated proportional to the total amount of (a) HOPR tgokens staked + (b) unreleased tokens (for early token buyers & team).
+Cover traffic should be allocated proportional to the total amount of (a) HOPR tokens staked + (b) unreleased tokens (for early token buyers & team).
 
 #### Discussion
 
-There's two design issues here:
+There are two design issues here:
 
-- (a) how do we get total HOPR tokens staked by a node? e.g. sum of all amounts from funding events that the node paid minus the sum of all mounts from funding events which have a corresponding closing event. There's a few challenges here:
+- (a) how do we get total HOPR tokens staked by a node? e.g. sum of all amounts from funding events that the node paid minus the sum of all amounts from funding events which have a corresponding closing event. There are a few challenges here:
 
   - find all relevant events
   - assemble pub key from event
   - turn pub key into Ethereum address
-  - find out if the key/address was partyA or B and who funded what
+  - find out if the key/address was party A or B and who funded what
 
-- (b) how do we link unreleased tokens that is assigned to an Ethereum address via the allocator contract (see #684) to a HOPR account of a node. This could be done via a linking smart contract that gets consumed here. Such a contract would be called for the beneficiary of the unreleased tokens (address noted in allocator contract) with a parameter of the HOPR pub key that it's assigning it's cover traffic to).
+- (b) how do we link unreleased tokens that are assigned to an Ethereum address via the allocator contract (see #684) to a HOPR account of a node. This could be done via a linking smart contract that gets consumed here. Such a contract would be called for the beneficiary of the unreleased tokens (address noted in allocator contract) with a parameter of the HOPR pub key that it's assigning it's cover traffic to).
 
 #### Additional notes
 
@@ -94,9 +94,9 @@ Initially saw in #430.
 
 #### Problem statement
 
-Currently, HOPR is using BN.js and BigNumber.js . BN.js was introduced by Web3.js which got replaced by Ethers.js, hence HOPR is using multiple libraries to work with "big numbera" (32 bytes (Ethereum) rather 4 bytes (Javascript)).
+Currently, HOPR is using BN.js and BigNumber.js . BN.js was introduced by Web3.js which got replaced by Ethers.js, hence HOPR is using multiple libraries to work with "big numbers" (32 bytes (Ethereum) rather 4 bytes (Javascript)).
 
-Streamlining HOPR to use only library will make things easier and prevents from converting to one or the other representation of "big numbers".
+Streamlining HOPR to use a single library will make things easier and prevent from converting to one or the other representation of "big numbers".
 
 ## Ecosystem
 
