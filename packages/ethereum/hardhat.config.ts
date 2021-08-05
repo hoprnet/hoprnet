@@ -61,6 +61,13 @@ const hardhatConfig: HardhatUserConfig = {
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+    },
+    polygon: {
+      ...networks.polygon,
+      live: false,
+      tags: ['testing'] as NetworkTag[],
+      url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
+      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     }
   },
   namedAccounts: {
