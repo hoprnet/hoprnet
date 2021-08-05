@@ -164,7 +164,7 @@ ___
 
 ### PublicNetworks
 
-Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"`` \| ``"mumbai"``
+Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"`` \| ``"mumbai"`` \| ``"polygon"``
 
 #### Defined in
 
