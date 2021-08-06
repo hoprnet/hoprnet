@@ -16,12 +16,9 @@ let
 in
 with stable;
 mkShell {
+  name = "hoprnet";
   buildInputs = [
     ## base
-    git
-    lsof
-    unstable.niv
-    shellcheck
 
     ## node, minimum recommended version is v16, see README for more details
     unstable.nodejs-16_x # v16.5.0
