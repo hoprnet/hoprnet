@@ -1,6 +1,6 @@
 # Commands
 
-This page will give a short overview of the different commands you can run from your node, and the syntax for using them.
+This page gives a short overview of the different commands you can run from your node, and the syntax for using them.
 
 ```eval_rst
 .. ATTENTION::
@@ -19,7 +19,9 @@ Type `version` to see the version of hoprd that you're running.
 
 ## address
 
-Type `address` to see the two addresses associated with your node. The top address is your HOPR address, which is used for interacting with other nodes in the HOPR network which includes sending and receiving messages. By default, this only shows the last five characters. Click them to expand and see the full address.
+Type `address` to see the two addresses associated with your node.
+
+The top address is your HOPR address, which is used for interacting with other nodes in the HOPR network which includes sending and receiving messages. By default, this only shows the last five characters. Click them to expand and see the full address.
 
 The bottom address is your native address, used for funding with native and HOPR tokens.
 
@@ -38,7 +40,7 @@ By default, hoprd runs in `passive` mode, this means that your node will not att
 
 ## ping
 
-Type `ping [HOPR address]` to attempt to pings another node. You should receive a pong and a latency report. This can be used to assess the health of the target node and your own node.
+Type `ping [HOPR address]` to attempt to ping another node. You should receive a pong and a latency report. This can be used to assess the health of the target node and your own node.
 
 ## peers
 
@@ -67,7 +69,7 @@ Type `withdraw [amount] [native / hopr] [address]` to withdraw the specified amo
 
 ## open
 
-Type `open [HOPR addresss] [HOPR amount]` to manually opens a payment channel to the specified node and fund it with the specified amount of HOPR tokens. Make sure you have sufficient native tokens to pay the gas fees.
+Type `open [HOPR addresss] [HOPR amount]` to manually open a payment channel to the specified node and fund it with the specified amount of HOPR tokens. Make sure you have sufficient native tokens to pay the gas fees.
 
 ## channels
 
@@ -79,7 +81,7 @@ Type `close [HOPR address]` to close an open channel. Once you've initiated chan
 
 ## tickets
 
-Type `tickets` to displays information about your redeemed and unredeemed tickets. Tickets are earned by relaying data and can be redeemed for HOPR tokens.
+Type `tickets` to display information about your redeemed and unredeemed tickets. Tickets are earned by relaying data and can be redeemed for HOPR tokens.
 
 ## redeemTickets
 
@@ -89,7 +91,7 @@ Type `redeemTickets` to attempt to redeem your earned tickets for HOPR. Make sur
 
 This feature is work in progress and may contain bugs.
 
-Type `covertraffic start` to being generating cover traffic messages. Type `covertraffic stop` to stop the cover traffic. You can type `covertraffic stats` to see the current status and reliability of your cover traffic.
+Type `covertraffic start` to begin generating cover traffic messages. Type `covertraffic stop` to stop the cover traffic. You can type `covertraffic stats` to see the current status and reliability of your cover traffic.
 
 ## quit
 

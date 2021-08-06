@@ -18,8 +18,8 @@ On xDAI, the HOPR Token, called _xHOPR_, is deployed in [this address](https://b
 
 ## Running HOPRd
 
-With this command, we will run hoprd and store logs,
-when running this command the first time, it will create folder `db` in the current
+With this command, we will run hoprd and store logs.
+When running this command the first time, it will create a folder `db` in the current
 working directory where it will store the encrypted key to your node and your off-chain
 private data.
 
