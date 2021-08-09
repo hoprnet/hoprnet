@@ -24,7 +24,13 @@ jobs:
             latexmk -c
             mv main.pdf whitepaper.pdf
 
+      - name: Check if changed
+        id: check-changed
+        run: |
+          echo "::set-output name=changed::$(git status --porcelain)"
+
       - name: Commit latest version
+        if: steps.check-changed.outputs.changed != ''
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR LaTeX build robot"
