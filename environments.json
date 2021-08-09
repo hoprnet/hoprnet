@@ -3,16 +3,21 @@
     "id": "master",
     "network_id": "goerli",
     "deploy_block": 0,
-    "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190"
+    "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
+    "channels_contract_address": "0x71B1BA4C741Dc9B1FFFB3EA22a831707eCc826B6"
   },
   {
     "id": "jungfrau",
     "deploy_block": 0,
-    "network_id": "xdai"
+    "network_id": "xdai",
+    "channels_contract_address": "0xf4Ff7E5bf2cC7eF89196c8086982F6f5Ec502685",
+    "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1"
   },
   {
     "id": "matic-mumbai",
     "network_id": "mumbai",
-    "deploy_block": 0
+    "deploy_block": 0,
+    "channels_contract_address": "0xf4Ff7E5bf2cC7eF89196c8086982F6f5Ec502685",
+    "token_contract_address": "0x566a5c774bb8ABE1A88B4f187e24d4cD55C207A5"
   }
 ]
