@@ -99,7 +99,7 @@ particular branch to deploy on every change.
    the PM Lead of the week will code-freeze `master` by creating a `release/**` branch
    tracking `master`. Release specific changes will be done in this branch to trigger
    this particular release, which requires to insert name and release version of the new milestone
-   in the file `scripts/environment.sh` and a `CHANGELOG.md` file.
+   in the file `scripts/environment.sh` as well as `packages/avado/Dockerfile` and add an entry to `CHANGELOG.md`.
 
 2. The information about the release, how to test and what commands to run, are
    then shared within our #release channel. On the #testing channel, team members are expected
