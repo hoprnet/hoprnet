@@ -1,2 +1,1 @@
-[diff "pdf"]
-    textconv = hexdump -v -C
+*.pdf binary diff=hexdump -v -C
