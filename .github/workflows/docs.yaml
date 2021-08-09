@@ -6,6 +6,8 @@ env:
 on:
   push:
     branches: ['**']
+    paths-ignore:
+      - '**/docs/**/*'
 
 jobs:
   docs:
