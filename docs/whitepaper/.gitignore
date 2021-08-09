@@ -3,11 +3,8 @@
 *.fls
 *.log
 *.out
-*.bbl
-*.blg
 *.synctex.gz
-*.xdv
 
 # Built PDF files
 *.pdf
-!yellowpaper.pdf
+!whitepaper.pdf

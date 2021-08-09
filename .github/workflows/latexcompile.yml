@@ -1,9 +1,8 @@
-name: build yellowpaper
-
+name: Build LaTeX document
 on:
   push:
     paths:
-      'docs/yellowpaper/**/*.tex'
+      'docs/whitepaper/**/*.tex'
 
 jobs:
   build_latex:
@@ -19,20 +18,19 @@ jobs:
           run: |
             apk add make
             tlmgr update --self
-            tlmgr install preprint blindtext makecell multirow float comment
-            tlmgr install algorithm2e ifoddpage relsize # add algorithm2e
-            cd docs/yellowpaper
+            tlmgr install preprint blindtext makecell multirow
+            cd docs/whitepaper
             latexmk -pdf
             latexmk -c
-            mv main.pdf yellowpaper.pdf
+            mv main.pdf whitepaper.pdf
 
-      - name: Commit generated .pdf file
+      - name: Commit latest version
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR LaTeX build robot"
-          git add docs/yellowpaper/yellowpaper.pdf
-          git commit -a -m "chore(build): update yellowpaper" || true
-          git pull origin ${{ github.ref }} --rebase
+          git add docs/whitepaper/whitepaper.pdf
+          git commit -a -m "Update whitepaper" || true
+          git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
       # This should go into a release workflow
       # - name: Get the version
