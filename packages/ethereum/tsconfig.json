@@ -4,7 +4,7 @@
     "outDir": "lib",
     "resolveJsonModule": true
   },
-  "include": ["hardhat.config.ts", "index.ts", "test", "tasks", "deploy"],
+  "include": ["hardhat.config.ts", "constants.ts", "index.ts", "test", "tasks", "deploy"],
   "exclude": ["lib", "types"],
   "typedocOptions": {
     "entryPoints": ["index.ts"],
