@@ -1,0 +1,2 @@
+[diff "pdf"]
+    textconv = hexdump -v -C
