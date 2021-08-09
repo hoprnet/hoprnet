@@ -7,7 +7,7 @@ on:
   push:
     branches: ['**']
     paths-ignore:
-      - '**/hoprnet/docs/**/*'
+      - 'docs/**/*'
 
 jobs:
   docs:
