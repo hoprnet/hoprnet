@@ -1,0 +1,43 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "description": {
+                "type": "string"
+            },
+            "id": {
+                "type": "string"
+            },
+            "chain_id": {
+                "type": "integer"
+            },
+            "gas": {
+                "type": "string"
+            },
+            "gas_multiplier": {
+                "type": "number"
+            },
+            "default_provider": {
+                "type": "string"
+            },
+            "native_token_name": {
+                "type": "string"
+            },
+            "hopr_token_name": {
+                "type": "string"
+            }
+        },
+        "required": [
+            "description",
+            "id",
+            "chain_id",
+            "gas",
+            "gas_multiplier",
+            "default_provider",
+            "native_token_name",
+            "hopr_token_name"
+        ]
+    }
+}
