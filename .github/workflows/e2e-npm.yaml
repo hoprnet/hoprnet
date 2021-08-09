@@ -10,7 +10,7 @@ on:
   push:
     branches: ['master', 'release/**', 'debug-e2e-npm/**']
     paths-ignore:
-      - '**/docs/**/*'
+      - 'docs/**/*'
 
 jobs:
   e2e-npm:

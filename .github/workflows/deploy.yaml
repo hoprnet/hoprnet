@@ -10,7 +10,7 @@ on:
   push:
     branches: ['master', 'release/**', 'avado', 'debug-deploy/**']
     paths-ignore:
-      - '**/docs/**/*'
+      - 'docs/**/*'
 
 concurrency:
   # limit invocations of this workflow to one at a time to prevent race
