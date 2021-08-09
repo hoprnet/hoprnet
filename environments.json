@@ -3,7 +3,6 @@
     "id": "master",
     "network_id": "goerli",
     "deploy_block": 0,
-    "channels_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
     "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190"
   },
   {

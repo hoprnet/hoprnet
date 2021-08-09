@@ -1,0 +1,31 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string"
+            },
+            "network_id": {
+                "type": "string"
+            },
+            "deploy_block": {
+                "type": "integer"
+            },
+            "channels_contract_address": {
+                "type": "string"
+            },
+            "token_contract_address": {
+                "type": "string"
+            }
+        },
+        "required": [
+            "id",
+            "network_id",
+            "deploy_block",
+            "channels_contract_address",
+            "token_contract_address"
+        ]
+    }
+}
