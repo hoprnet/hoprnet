@@ -3,7 +3,7 @@
 source scripts/utils.sh
 
 # These will be cleaned up and machines stopped
-OLD_RELEASES='paphos stirling zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly internal integration-test'
+OLD_RELEASES='moscow paphos stirling zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly internal integration-test'
 
 # ===== Load env variables for the current github ref =====
 # Takes:
@@ -25,7 +25,7 @@ get_environment() {
 
   case "$BRANCH" in release/*)
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE)
-    
+
     if [ "$VERSION_MAJ_MIN" == '1.75' ]; then
       RELEASE_NAME='constantine'
       return
@@ -35,7 +35,7 @@ get_environment() {
       RELEASE_NAME='moscow'
       return
     fi
-    
+
     if [ "$VERSION_MAJ_MIN" == '1.73' ]; then
       RELEASE_NAME='paphos'
       return
