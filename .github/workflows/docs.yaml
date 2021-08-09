@@ -44,7 +44,9 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
-        run: yarn
+        run: |
+          pwd
+          yarn
 
       - name: Generate docs
         run: ./scripts/regenerate-typedocs.sh
