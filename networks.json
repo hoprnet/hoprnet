@@ -6,7 +6,8 @@
         "gas": "1 gwei",
         "gas_multiplier": 1.1,
         "default_provider": "https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/",
-        "native_token_name": "wxHOPR"
+        "native_token_name": "xDAI",
+        "hopr_token_name": "wxHOPR"
     },
     {
         "id": "goerli",
@@ -14,7 +15,7 @@
         "chain_id": 5,
         "gas_multiplier": 1.1,
         "default_provider": "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/",
-        "native_token_name": "wxHOPR"
+        "native_token_name": "gETH"
     },
     {
         "id": "mumbai",
@@ -22,7 +23,6 @@
         "chain_id": 80001,
         "default_provider": "https://polygon-mumbai.infura.io/v3/${INFURA_KEY}",
         "gas": "1 gwei",
-        "gas_multiplier": 1.1,
-        "native_token_name": "wxHOPR"
+        "gas_multiplier": 1.1
     }
 ]
