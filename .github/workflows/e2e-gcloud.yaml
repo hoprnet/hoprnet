@@ -13,6 +13,8 @@ on:
     branches: ['debug-e2e-gcloud/**']
     paths-ignore:
       - 'docs/**/*'
+      - 'packages/*/docs/**/*'
+
 
 jobs:
   e2e-gcloud:

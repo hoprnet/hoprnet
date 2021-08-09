@@ -5,6 +5,7 @@ on:
     branches: ['**']
     paths-ignore:
       - 'docs/**/*'
+      - 'packages/*/docs/**/*'
 
 jobs:
   build_and_test:

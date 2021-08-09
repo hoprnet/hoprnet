@@ -11,6 +11,8 @@ on:
     branches: ['**']
     paths-ignore:
       - 'docs/**/*'
+      - 'packages/*/docs/**/*'
+
 
 jobs:
   source-e2e:
