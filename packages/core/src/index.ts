@@ -367,7 +367,6 @@ class Hopr extends EventEmitter {
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
 
-
     for (let channel of currentChannels) {
       if (channel.status == ChannelStatus.PendingToClose) {
         // attempt to finalize closure
