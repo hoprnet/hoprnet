@@ -71,6 +71,8 @@
 - [initiateChannelClosure(address)](ChannelsMock.md#initiatechannelclosure(address))
 - [listenerCount](ChannelsMock.md#listenercount)
 - [listeners](ChannelsMock.md#listeners)
+- [multicall](ChannelsMock.md#multicall)
+- [multicall(bytes[])](ChannelsMock.md#multicall(bytes[]))
 - [off](ChannelsMock.md#off)
 - [on](ChannelsMock.md#on)
 - [once](ChannelsMock.md#once)
@@ -213,6 +215,8 @@ ___
 | `getTicketLuckInternal(bytes32,bytes32,bytes32)` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `multicall` | (`data`: `BytesLike`[], `overrides?`: `CallOverrides`) => `Promise`<`string`[]\> |
+| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `CallOverrides`) => `Promise`<`string`[]\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<`number`\> |
@@ -228,7 +232,7 @@ Contract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:739
+packages/ethereum/types/ChannelsMock.d.ts:775
 
 ___
 
@@ -282,6 +286,8 @@ ___
 | `getTicketLuckInternal(bytes32,bytes32,bytes32)` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `multicall` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
@@ -297,7 +303,7 @@ Contract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:1031
+packages/ethereum/types/ChannelsMock.d.ts:1167
 
 ___
 
@@ -310,7 +316,12 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `Announcement` | (`account`: `string`, `multiaddr`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `ChannelBumped` | (`source`: `string`, `destination`: `string`, `newCommitment`: ``null``, `ticketEpoch`: ``null``, `channelBalance`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
+| `ChannelClosureFinalized` | (`source`: `string`, `destination`: `string`, `closureFinalizationTime`: ``null``, `channelBalance`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`, `BigNumber`], `Object`\> |
+| `ChannelClosureInitiated` | (`source`: `string`, `destination`: `string`, `closureInitiationTime`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`], `Object`\> |
 | `ChannelUpdate` | (`source`: `string`, `destination`: `string`, `newState`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, [`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }], `Object`\> |
+| `TicketRedeemed` | (`source`: `string`, `destination`: `string`, `nextCommitment`: ``null``, `ticketEpoch`: ``null``, `ticketIndex`: ``null``, `proofOfRelaySecret`: ``null``, `amount`: ``null``, `winProb`: ``null``, `signature`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`, `string`, `BigNumber`, `BigNumber`, `string`], `Object`\> |
+| `TokensReceived` | (`from`: `string`, `account1`: `string`, `account2`: `string`, `amount1`: ``null``, `amount2`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
 
 #### Overrides
 
@@ -318,7 +329,7 @@ Contract.filters
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:980
+packages/ethereum/types/ChannelsMock.d.ts:1023
 
 ___
 
@@ -358,6 +369,8 @@ ___
 | `getTicketLuckInternal(bytes32,bytes32,bytes32)` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `multicall` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<[`number`]\> |
@@ -373,7 +386,7 @@ Contract.functions
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:249
+packages/ethereum/types/ChannelsMock.d.ts:265
 
 ___
 
@@ -387,7 +400,7 @@ Contract.interface
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:247
+packages/ethereum/types/ChannelsMock.d.ts:263
 
 ___
 
@@ -427,6 +440,8 @@ ___
 | `getTicketLuckInternal(bytes32,bytes32,bytes32)` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `multicall` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
@@ -442,7 +457,7 @@ Contract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:1254
+packages/ethereum/types/ChannelsMock.d.ts:1400
 
 ___
 
@@ -504,7 +519,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:497
+packages/ethereum/types/ChannelsMock.d.ts:523
 
 ___
 
@@ -524,7 +539,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:499
+packages/ethereum/types/ChannelsMock.d.ts:525
 
 ___
 
@@ -544,7 +559,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:501
+packages/ethereum/types/ChannelsMock.d.ts:527
 
 ___
 
@@ -564,7 +579,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:503
+packages/ethereum/types/ChannelsMock.d.ts:529
 
 ___
 
@@ -659,7 +674,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:507
+packages/ethereum/types/ChannelsMock.d.ts:533
 
 ___
 
@@ -680,7 +695,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:512
+packages/ethereum/types/ChannelsMock.d.ts:538
 
 ___
 
@@ -704,7 +719,7 @@ Contract.attach
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:208
+packages/ethereum/types/ChannelsMock.d.ts:224
 
 ___
 
@@ -726,7 +741,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:517
+packages/ethereum/types/ChannelsMock.d.ts:543
 
 ___
 
@@ -748,7 +763,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:523
+packages/ethereum/types/ChannelsMock.d.ts:549
 
 ___
 
@@ -770,7 +785,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:529
+packages/ethereum/types/ChannelsMock.d.ts:555
 
 ___
 
@@ -792,7 +807,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:535
+packages/ethereum/types/ChannelsMock.d.ts:561
 
 ___
 
@@ -813,7 +828,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:541
+packages/ethereum/types/ChannelsMock.d.ts:567
 
 ___
 
@@ -834,7 +849,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:556
+packages/ethereum/types/ChannelsMock.d.ts:582
 
 ___
 
@@ -855,7 +870,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:571
+packages/ethereum/types/ChannelsMock.d.ts:597
 
 ___
 
@@ -876,7 +891,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:576
+packages/ethereum/types/ChannelsMock.d.ts:602
 
 ___
 
@@ -900,7 +915,7 @@ Contract.connect
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:207
+packages/ethereum/types/ChannelsMock.d.ts:223
 
 ___
 
@@ -918,7 +933,7 @@ Contract.deployed
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:209
+packages/ethereum/types/ChannelsMock.d.ts:225
 
 ___
 
@@ -988,7 +1003,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:581
+packages/ethereum/types/ChannelsMock.d.ts:607
 
 ___
 
@@ -1009,7 +1024,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:586
+packages/ethereum/types/ChannelsMock.d.ts:612
 
 ___
 
@@ -1033,7 +1048,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:591
+packages/ethereum/types/ChannelsMock.d.ts:617
 
 ___
 
@@ -1057,7 +1072,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:599
+packages/ethereum/types/ChannelsMock.d.ts:625
 
 ___
 
@@ -1079,7 +1094,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:607
+packages/ethereum/types/ChannelsMock.d.ts:633
 
 ___
 
@@ -1101,7 +1116,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:613
+packages/ethereum/types/ChannelsMock.d.ts:639
 
 ___
 
@@ -1128,7 +1143,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:619
+packages/ethereum/types/ChannelsMock.d.ts:645
 
 ___
 
@@ -1155,7 +1170,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:630
+packages/ethereum/types/ChannelsMock.d.ts:656
 
 ___
 
@@ -1182,7 +1197,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:641
+packages/ethereum/types/ChannelsMock.d.ts:667
 
 ___
 
@@ -1209,7 +1224,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:652
+packages/ethereum/types/ChannelsMock.d.ts:678
 
 ___
 
@@ -1232,7 +1247,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:663
+packages/ethereum/types/ChannelsMock.d.ts:689
 
 ___
 
@@ -1255,7 +1270,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:670
+packages/ethereum/types/ChannelsMock.d.ts:696
 
 ___
 
@@ -1276,7 +1291,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:677
+packages/ethereum/types/ChannelsMock.d.ts:703
 
 ___
 
@@ -1297,7 +1312,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:682
+packages/ethereum/types/ChannelsMock.d.ts:708
 
 ___
 
@@ -1352,7 +1367,7 @@ Contract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:211
+packages/ethereum/types/ChannelsMock.d.ts:227
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -1372,7 +1387,49 @@ Contract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:234
+packages/ethereum/types/ChannelsMock.d.ts:250
+
+___
+
+### multicall
+
+▸ **multicall**(`data`, `overrides?`): `Promise`<`ContractTransaction`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `BytesLike`[] |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
+
+#### Returns
+
+`Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/types/ChannelsMock.d.ts:713
+
+___
+
+### multicall(bytes[])
+
+▸ **multicall(bytes[])**(`data`, `overrides?`): `Promise`<`ContractTransaction`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `BytesLike`[] |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
+
+#### Returns
+
+`Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/types/ChannelsMock.d.ts:718
 
 ___
 
@@ -1404,7 +1461,7 @@ Contract.off
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:214
+packages/ethereum/types/ChannelsMock.d.ts:230
 
 ▸ **off**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1425,7 +1482,7 @@ Contract.off
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:235
+packages/ethereum/types/ChannelsMock.d.ts:251
 
 ___
 
@@ -1457,7 +1514,7 @@ Contract.on
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:218
+packages/ethereum/types/ChannelsMock.d.ts:234
 
 ▸ **on**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1478,7 +1535,7 @@ Contract.on
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:236
+packages/ethereum/types/ChannelsMock.d.ts:252
 
 ___
 
@@ -1510,7 +1567,7 @@ Contract.once
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:222
+packages/ethereum/types/ChannelsMock.d.ts:238
 
 ▸ **once**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1531,7 +1588,7 @@ Contract.once
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:237
+packages/ethereum/types/ChannelsMock.d.ts:253
 
 ___
 
@@ -1564,7 +1621,7 @@ Contract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:241
+packages/ethereum/types/ChannelsMock.d.ts:257
 
 ___
 
@@ -1592,7 +1649,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:687
+packages/ethereum/types/ChannelsMock.d.ts:723
 
 ___
 
@@ -1620,7 +1677,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:699
+packages/ethereum/types/ChannelsMock.d.ts:735
 
 ___
 
@@ -1651,7 +1708,7 @@ Contract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:230
+packages/ethereum/types/ChannelsMock.d.ts:246
 
 ▸ **removeAllListeners**(`eventName?`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1671,7 +1728,7 @@ Contract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:239
+packages/ethereum/types/ChannelsMock.d.ts:255
 
 ___
 
@@ -1703,7 +1760,7 @@ Contract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:226
+packages/ethereum/types/ChannelsMock.d.ts:242
 
 ▸ **removeListener**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1724,7 +1781,7 @@ Contract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:238
+packages/ethereum/types/ChannelsMock.d.ts:254
 
 ___
 
@@ -1744,7 +1801,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:711
+packages/ethereum/types/ChannelsMock.d.ts:747
 
 ___
 
@@ -1764,7 +1821,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:713
+packages/ethereum/types/ChannelsMock.d.ts:749
 
 ___
 
@@ -1784,7 +1841,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:715
+packages/ethereum/types/ChannelsMock.d.ts:751
 
 ___
 
@@ -1804,7 +1861,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:717
+packages/ethereum/types/ChannelsMock.d.ts:753
 
 ___
 
@@ -1830,7 +1887,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:719
+packages/ethereum/types/ChannelsMock.d.ts:755
 
 ___
 
@@ -1856,7 +1913,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:729
+packages/ethereum/types/ChannelsMock.d.ts:765
 
 ___
 

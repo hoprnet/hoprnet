@@ -7,11 +7,15 @@
 ### Classes
 
 - [LibP2P](classes/LibP2P.md)
+- [PassiveStrategy](classes/PassiveStrategy.md)
+- [PromiscuousStrategy](classes/PromiscuousStrategy.md)
+- [SaneDefaults](classes/SaneDefaults.md)
 - [default](classes/default.md)
 
 ### Type aliases
 
-- [ChannelStrategyNames](modules.md#channelstrategynames)
+- [ChannelsToClose](modules.md#channelstoclose)
+- [ChannelsToOpen](modules.md#channelstoopen)
 - [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
 
@@ -38,15 +42,29 @@
 - [PROTOCOL\_STRING](modules.md#protocol_string)
 - [VERSION](modules.md#version)
 
+### Functions
+
+- [findPath](modules.md#findpath)
+
 ## Type aliases
 
-### ChannelStrategyNames
+### ChannelsToClose
 
-Ƭ **ChannelStrategyNames**: ``"passive"`` \| ``"promiscuous"``
+Ƭ **ChannelsToClose**: `PublicKey`
 
 #### Defined in
 
-[packages/core/src/index.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L61)
+[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
+
+___
+
+### ChannelsToOpen
+
+Ƭ **ChannelsToOpen**: [`PublicKey`, `BN`]
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L15)
 
 ___
 
@@ -63,18 +81,18 @@ ___
 | `connector?` | `HoprCoreEthereum` |
 | `createDbIfNotExist?` | `boolean` |
 | `dbPath?` | `string` |
+| `forceCreateDB?` | `boolean` |
 | `hosts?` | `Object` |
 | `hosts.ip4?` | `NetOptions` |
 | `hosts.ip6?` | `NetOptions` |
-| `network` | `string` |
 | `password?` | `string` |
 | `preferLocalAddresses?` | `boolean` |
 | `provider` | `string` |
-| `strategy?` | [`ChannelStrategyNames`](modules.md#channelstrategynames) |
+| `strategy?` | `ChannelStrategy` |
 
 #### Defined in
 
-[packages/core/src/index.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L63)
+[packages/core/src/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L73)
 
 ___
 
@@ -84,7 +102,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L85)
+[packages/core/src/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L95)
 
 ## Variables
 
@@ -285,3 +303,35 @@ ___
 #### Defined in
 
 [packages/core/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L7)
+
+## Functions
+
+### findPath
+
+▸ **findPath**(`start`, `destination`, `hops`, `networkQualityOf`, `getOpenChannelsFromPeer`, `weight?`): `Promise`<`Path`\>
+
+Find a path through the payment channels.
+
+Depth first search through potential paths based on weight
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `start` | `PublicKey` |
+| `destination` | `PublicKey` |
+| `hops` | `number` |
+| `networkQualityOf` | (`p`: `PublicKey`) => `number` |
+| `getOpenChannelsFromPeer` | (`p`: `PublicKey`) => `Promise`<`ChannelEntry`[]\> |
+| `weight` | (`edge`: `ChannelEntry`) => `Promise`<`BN`\> |
+
+#### Returns
+
+`Promise`<`Path`\>
+
+path as Array<PeerId> (including start, but not including
+destination
+
+#### Defined in
+
+[packages/core/src/path/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/path/index.ts#L38)

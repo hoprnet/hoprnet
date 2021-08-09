@@ -65,6 +65,11 @@ interface NetOptions {
   port: number
 }
 
+type PeerStoreAddress = {
+  id: PeerId
+  multiaddrs: Multiaddr[]
+}
+
 export type HoprOptions = {
   provider: string
   announce?: boolean
@@ -182,6 +187,10 @@ class Hopr extends EventEmitter {
 
     const initialNodes = await chain.waitForPublicNodes()
 
+    const recentlyAnnouncedNodes: PeerStoreAddress[] = []
+    const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
+    chain.on('peer', pushToRecentlyAnnouncedNodes)
+
     const libp2p = await LibP2P.create({
       peerId: this.id,
       addresses: { listen: getAddrs(this.id, this.options).map((x) => x.toString()) },
@@ -219,9 +228,10 @@ class Hopr extends EventEmitter {
     log('libp2p started')
     this.libp2p = libp2p
 
-    this.addPreviousNodes(initialNodes)
-
     chain.indexer.on('peer', this.onPeerAnnouncement.bind(this))
+    chain.indexer.off('peer', pushToRecentlyAnnouncedNodes)
+
+    recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
@@ -313,33 +323,6 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Populates libp2p's peerStore with previously announced nodes
-   * @param initialNodes previosly announced nodes
-   * @returns
-   */
-  private addPreviousNodes(initialNodes: Multiaddr[]): void {
-    for (const initialNode of initialNodes) {
-      const peerId = PeerId.createFromB58String(initialNode.getPeerId())
-
-      if (peerId.equals(this.id)) {
-        // Ignore announcements from ourself
-        continue
-      }
-
-      // @ts-ignore
-      this.libp2p.peerStore.keyBook.set(peerId)
-
-      const tuples = initialNode.tuples()
-
-      if (tuples.length == 0 || tuples[0][0] == protocols.names['p2p'].code) {
-        continue
-      }
-
-      this.libp2p.peerStore.addressBook.add(peerId, [initialNode])
-    }
-  }
-
-  /**
    * Called whenever a peer is announced
    * @param peer newly announced peer
    */
@@ -358,10 +341,9 @@ class Hopr extends EventEmitter {
     this.libp2p.peerStore.keyBook.set(peer.id)
 
     if (dialables.length > 0) {
-      for (const dialable of dialables) {
-        this.publicNodesEmitter.emit('addPublicNode', dialable)
-      }
-      this.libp2p.peerStore.addressBook.add(peer.id, peer.multiaddrs)
+      this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
+
+      this.libp2p.peerStore.addressBook.add(peer.id, dialables)
     }
   }
 
@@ -639,7 +621,6 @@ class Hopr extends EventEmitter {
   }
 
   private async announce(includeRouting: boolean = false): Promise<void> {
-    log('announcing self, include routing:', includeRouting)
     const chain = await this.startedPaymentChannels()
     const multiaddrs = await this.getAnnouncedAddresses()
 

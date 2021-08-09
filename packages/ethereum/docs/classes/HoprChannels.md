@@ -61,6 +61,8 @@
 - [initiateChannelClosure(address)](HoprChannels.md#initiatechannelclosure(address))
 - [listenerCount](HoprChannels.md#listenercount)
 - [listeners](HoprChannels.md#listeners)
+- [multicall](HoprChannels.md#multicall)
+- [multicall(bytes[])](HoprChannels.md#multicall(bytes[]))
 - [off](HoprChannels.md#off)
 - [on](HoprChannels.md#on)
 - [once](HoprChannels.md#once)
@@ -193,6 +195,8 @@ ___
 | `fundChannelMulti(address,address,uint256,uint256)` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `multicall` | (`data`: `BytesLike`[], `overrides?`: `CallOverrides`) => `Promise`<`string`[]\> |
+| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `CallOverrides`) => `Promise`<`string`[]\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<`number`\> |
@@ -208,7 +212,7 @@ Contract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:518
+packages/ethereum/types/HoprChannels.d.ts:554
 
 ___
 
@@ -252,6 +256,8 @@ ___
 | `fundChannelMulti(address,address,uint256,uint256)` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `multicall` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
@@ -267,7 +273,7 @@ Contract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:730
+packages/ethereum/types/HoprChannels.d.ts:866
 
 ___
 
@@ -280,7 +286,12 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `Announcement` | (`account`: `string`, `multiaddr`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `ChannelBumped` | (`source`: `string`, `destination`: `string`, `newCommitment`: ``null``, `ticketEpoch`: ``null``, `channelBalance`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
+| `ChannelClosureFinalized` | (`source`: `string`, `destination`: `string`, `closureFinalizationTime`: ``null``, `channelBalance`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`, `BigNumber`], `Object`\> |
+| `ChannelClosureInitiated` | (`source`: `string`, `destination`: `string`, `closureInitiationTime`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`], `Object`\> |
 | `ChannelUpdate` | (`source`: `string`, `destination`: `string`, `newState`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, [`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }], `Object`\> |
+| `TicketRedeemed` | (`source`: `string`, `destination`: `string`, `nextCommitment`: ``null``, `ticketEpoch`: ``null``, `ticketIndex`: ``null``, `proofOfRelaySecret`: ``null``, `amount`: ``null``, `winProb`: ``null``, `signature`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`, `string`, `BigNumber`, `BigNumber`, `string`], `Object`\> |
+| `TokensReceived` | (`from`: `string`, `account1`: `string`, `account2`: `string`, `amount1`: ``null``, `amount2`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
 
 #### Overrides
 
@@ -288,7 +299,7 @@ Contract.filters
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:679
+packages/ethereum/types/HoprChannels.d.ts:722
 
 ___
 
@@ -318,6 +329,8 @@ ___
 | `fundChannelMulti(address,address,uint256,uint256)` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `multicall` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<[`number`]\> |
@@ -333,7 +346,7 @@ Contract.functions
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:188
+packages/ethereum/types/HoprChannels.d.ts:204
 
 ___
 
@@ -347,7 +360,7 @@ Contract.interface
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:186
+packages/ethereum/types/HoprChannels.d.ts:202
 
 ___
 
@@ -377,6 +390,8 @@ ___
 | `fundChannelMulti(address,address,uint256,uint256)` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `multicall` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
@@ -392,7 +407,7 @@ Contract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:873
+packages/ethereum/types/HoprChannels.d.ts:1019
 
 ___
 
@@ -454,7 +469,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:356
+packages/ethereum/types/HoprChannels.d.ts:382
 
 ___
 
@@ -474,7 +489,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:358
+packages/ethereum/types/HoprChannels.d.ts:384
 
 ___
 
@@ -494,7 +509,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:360
+packages/ethereum/types/HoprChannels.d.ts:386
 
 ___
 
@@ -514,7 +529,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:362
+packages/ethereum/types/HoprChannels.d.ts:388
 
 ___
 
@@ -609,7 +624,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:366
+packages/ethereum/types/HoprChannels.d.ts:392
 
 ___
 
@@ -630,7 +645,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:371
+packages/ethereum/types/HoprChannels.d.ts:397
 
 ___
 
@@ -654,7 +669,7 @@ Contract.attach
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:147
+packages/ethereum/types/HoprChannels.d.ts:163
 
 ___
 
@@ -676,7 +691,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:376
+packages/ethereum/types/HoprChannels.d.ts:402
 
 ___
 
@@ -698,7 +713,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:382
+packages/ethereum/types/HoprChannels.d.ts:408
 
 ___
 
@@ -720,7 +735,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:388
+packages/ethereum/types/HoprChannels.d.ts:414
 
 ___
 
@@ -742,7 +757,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:394
+packages/ethereum/types/HoprChannels.d.ts:420
 
 ___
 
@@ -763,7 +778,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:400
+packages/ethereum/types/HoprChannels.d.ts:426
 
 ___
 
@@ -784,7 +799,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:415
+packages/ethereum/types/HoprChannels.d.ts:441
 
 ___
 
@@ -808,7 +823,7 @@ Contract.connect
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:146
+packages/ethereum/types/HoprChannels.d.ts:162
 
 ___
 
@@ -826,7 +841,7 @@ Contract.deployed
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:148
+packages/ethereum/types/HoprChannels.d.ts:164
 
 ___
 
@@ -896,7 +911,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:430
+packages/ethereum/types/HoprChannels.d.ts:456
 
 ___
 
@@ -917,7 +932,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:435
+packages/ethereum/types/HoprChannels.d.ts:461
 
 ___
 
@@ -941,7 +956,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:440
+packages/ethereum/types/HoprChannels.d.ts:466
 
 ___
 
@@ -965,7 +980,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:448
+packages/ethereum/types/HoprChannels.d.ts:474
 
 ___
 
@@ -986,7 +1001,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:456
+packages/ethereum/types/HoprChannels.d.ts:482
 
 ___
 
@@ -1007,7 +1022,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:461
+packages/ethereum/types/HoprChannels.d.ts:487
 
 ___
 
@@ -1062,7 +1077,7 @@ Contract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:150
+packages/ethereum/types/HoprChannels.d.ts:166
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -1082,7 +1097,49 @@ Contract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:173
+packages/ethereum/types/HoprChannels.d.ts:189
+
+___
+
+### multicall
+
+▸ **multicall**(`data`, `overrides?`): `Promise`<`ContractTransaction`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `BytesLike`[] |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
+
+#### Returns
+
+`Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/types/HoprChannels.d.ts:492
+
+___
+
+### multicall(bytes[])
+
+▸ **multicall(bytes[])**(`data`, `overrides?`): `Promise`<`ContractTransaction`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `data` | `BytesLike`[] |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
+
+#### Returns
+
+`Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/types/HoprChannels.d.ts:497
 
 ___
 
@@ -1114,7 +1171,7 @@ Contract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:153
+packages/ethereum/types/HoprChannels.d.ts:169
 
 ▸ **off**(`eventName`, `listener`): [`HoprChannels`](HoprChannels.md)
 
@@ -1135,7 +1192,7 @@ Contract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:174
+packages/ethereum/types/HoprChannels.d.ts:190
 
 ___
 
@@ -1167,7 +1224,7 @@ Contract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:157
+packages/ethereum/types/HoprChannels.d.ts:173
 
 ▸ **on**(`eventName`, `listener`): [`HoprChannels`](HoprChannels.md)
 
@@ -1188,7 +1245,7 @@ Contract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:175
+packages/ethereum/types/HoprChannels.d.ts:191
 
 ___
 
@@ -1220,7 +1277,7 @@ Contract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:161
+packages/ethereum/types/HoprChannels.d.ts:177
 
 ▸ **once**(`eventName`, `listener`): [`HoprChannels`](HoprChannels.md)
 
@@ -1241,7 +1298,7 @@ Contract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:176
+packages/ethereum/types/HoprChannels.d.ts:192
 
 ___
 
@@ -1274,7 +1331,7 @@ Contract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:180
+packages/ethereum/types/HoprChannels.d.ts:196
 
 ___
 
@@ -1302,7 +1359,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:466
+packages/ethereum/types/HoprChannels.d.ts:502
 
 ___
 
@@ -1330,7 +1387,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:478
+packages/ethereum/types/HoprChannels.d.ts:514
 
 ___
 
@@ -1361,7 +1418,7 @@ Contract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:169
+packages/ethereum/types/HoprChannels.d.ts:185
 
 ▸ **removeAllListeners**(`eventName?`): [`HoprChannels`](HoprChannels.md)
 
@@ -1381,7 +1438,7 @@ Contract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:178
+packages/ethereum/types/HoprChannels.d.ts:194
 
 ___
 
@@ -1413,7 +1470,7 @@ Contract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:165
+packages/ethereum/types/HoprChannels.d.ts:181
 
 ▸ **removeListener**(`eventName`, `listener`): [`HoprChannels`](HoprChannels.md)
 
@@ -1434,7 +1491,7 @@ Contract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:177
+packages/ethereum/types/HoprChannels.d.ts:193
 
 ___
 
@@ -1454,7 +1511,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:490
+packages/ethereum/types/HoprChannels.d.ts:526
 
 ___
 
@@ -1474,7 +1531,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:492
+packages/ethereum/types/HoprChannels.d.ts:528
 
 ___
 
@@ -1494,7 +1551,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:494
+packages/ethereum/types/HoprChannels.d.ts:530
 
 ___
 
@@ -1514,7 +1571,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:496
+packages/ethereum/types/HoprChannels.d.ts:532
 
 ___
 
@@ -1540,7 +1597,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:498
+packages/ethereum/types/HoprChannels.d.ts:534
 
 ___
 
@@ -1566,7 +1623,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:508
+packages/ethereum/types/HoprChannels.d.ts:544
 
 ___
 

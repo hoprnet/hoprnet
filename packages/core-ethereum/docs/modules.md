@@ -15,6 +15,15 @@
 
 - [RedeemTicketResponse](modules.md#redeemticketresponse)
 
+### Variables
+
+- [CONFIRMATIONS](modules.md#confirmations)
+- [INDEXER\_BLOCK\_RANGE](modules.md#indexer_block_range)
+
+### Functions
+
+- [createChainWrapper](modules.md#createchainwrapper)
+
 ## Type aliases
 
 ### RedeemTicketResponse
@@ -23,4 +32,45 @@
 
 #### Defined in
 
-[core-ethereum/src/index.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L24)
+[core-ethereum/src/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L25)
+
+## Variables
+
+### CONFIRMATIONS
+
+• `Const` **CONFIRMATIONS**: ``8``
+
+#### Defined in
+
+[core-ethereum/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L7)
+
+___
+
+### INDEXER\_BLOCK\_RANGE
+
+• `Const` **INDEXER\_BLOCK\_RANGE**: ``2000``
+
+#### Defined in
+
+[core-ethereum/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L8)
+
+## Functions
+
+### createChainWrapper
+
+▸ **createChainWrapper**(`providerURI`, `privateKey`): `Promise`<`Object`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `providerURI` | `string` |
+| `privateKey` | `Uint8Array` |
+
+#### Returns
+
+`Promise`<`Object`\>
+
+#### Defined in
+
+[core-ethereum/src/ethereum.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L40)

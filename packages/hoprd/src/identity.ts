@@ -53,7 +53,11 @@ export async function serializeKeyPair(peerId: PeerId, password: string, useWeak
  *
  * @param encryptedSerializedKeyPair the encoded and encrypted key pair
  */
-export async function deserializeKeyPair(serialized: Uint8Array, password: string, useWeakCrypto = false) {
+export async function deserializeKeyPair(
+  serialized: Uint8Array,
+  password: string,
+  useWeakCrypto = false
+): Promise<PeerId> {
   const decoded = JSON.parse(new TextDecoder().decode(serialized))
 
   if (decoded.crypto.kdfparams.n == 1 && useWeakCrypto != true) {

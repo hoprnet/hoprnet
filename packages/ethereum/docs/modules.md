@@ -66,6 +66,8 @@
 - [LegacyERC20\_\_factory](classes/LegacyERC20__factory.md)
 - [MintableToken](classes/MintableToken.md)
 - [MintableToken\_\_factory](classes/MintableToken__factory.md)
+- [Multicall](classes/Multicall.md)
+- [Multicall\_\_factory](classes/Multicall__factory.md)
 - [Ownable](classes/Ownable.md)
 - [Ownable\_\_factory](classes/Ownable__factory.md)
 - [PermittableToken](classes/PermittableToken.md)
@@ -162,7 +164,7 @@ ___
 
 ### PublicNetworks
 
-Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"`` \| ``"mumbai"``
+Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"`` \| ``"mumbai"`` \| ``"polygon"``
 
 #### Defined in
 
