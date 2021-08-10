@@ -34,7 +34,7 @@
   - [End-to-End Testing](#end-to-end-testing)
     - [Running Tests Locally](#running-tests-locally)
     - [Running Tests on Google Cloud Platform](#running-tests-on-google-cloud-platform)
-- [Deploy]
+- [Deploy](#deploy)
   - [Using Google Cloud Platform](#using-google-cloud-platform)
   - [Using Google Cloud Platform and a Default Topology](#using-google-cloud-platform-and-a-default-topology)
 - [Tooling](#tooling)
@@ -381,7 +381,7 @@ To launch nodes using the `xDai` network one would execute (with the
 placeholders replaced accordingly):
 
 ```sh
-HOPRD_PROVIDER="<URL_TO_AN_XDAI_ENDPOINT" \
+HOPRD_PROVIDER="<URL_TO_AN_XDAI_ENDPOINT>" \
 HOPRD_TOKEN_CONTRACT="<ADDRESS_OF_TOKEN_CONTRACT_ON_XDAI>" \
   ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
 ```
