@@ -20,10 +20,15 @@ const main: DeployFunction = async function (_hre: HardhatRuntimeEnvironment) {
   for (const contract of contracts) {
     const filePath = join(basePath, contract)
     const data = require(filePath)
+    const compilerData = await _hre.artifacts.getBuildInfo('contracts/HoprToken.sol:HoprToken')
     const slimmed = {
       address: data.address,
       transactionHash: data.transactionHash,
       blockNumber: data.receipt.blockNumber,
+      metadata: {
+        solcVersion: compilerData.solcVersion,
+        input: compilerData.input
+      },
       abi: data.abi
     }
 
