@@ -34,6 +34,9 @@
   - [End-to-End Testing](#end-to-end-testing)
     - [Running Tests Locally](#running-tests-locally)
     - [Running Tests on Google Cloud Platform](#running-tests-on-google-cloud-platform)
+- [Deploy]
+  - [Using Google Cloud Platform](#using-google-cloud-platform)
+  - [Using Google Cloud Platform and a Default Topology](#using-google-cloud-platform-and-a-default-topology)
 - [Tooling](#tooling)
 - [Contact](#contact)
 - [License](#license)
@@ -345,6 +348,69 @@ Read the full help information of the script in case of questions:
 ./scripts/run-integration-tests-gcloud.sh --help
 ```
 
+## Deploy
+
+The deployment nodes and networks is mostly orchestrated through the script
+files in `scripts/` which are executed by the Github Actions CI workflows.
+Therefore, all common and minimal networks do not require manual steps to be
+deployed.
+
+### Using Google Cloud Platform
+
+However, sometimes it is useful to deploy additional nodes or specific versions
+of `hoprd`. To accomplish that its possible to create a cluster on GCP using the
+following scripts:
+
+```sh
+./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+```
+
+Read the full help information of the script in case of questions:
+
+```sh
+./scripts/setup-gcloud-cluster.sh --help
+```
+
+The script requires a few environment variables to be set, but will inform the
+user if one is missing. It will create a cluster of 6 nodes. By default these
+nodes will use the latest Docker image of `hoprd` and run on the `Goerli`
+network. Different versions and different target networks can be configured
+through the parameters and environment variables.
+
+To launch nodes using the `xDai` network one would execute (with the
+placeholders replaced accordingly):
+
+```sh
+HOPRD_PROVIDER="<URL_TO_AN_XDAI_ENDPOINT" \
+HOPRD_TOKEN_CONTRACT="<ADDRESS_OF_TOKEN_CONTRACT_ON_XDAI>" \
+  ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+```
+
+A previously started cluster can be destroyed, which includes all running nodes,
+by using the same script but setting the cleanup switch:
+
+```sh
+HOPRD_PERFORM_CLEANUP=true \
+  ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+```
+
+### Using Google Cloud Platform and a Default Topology
+
+The creation of a `hoprd` cluster on GCP can be enhanced by providing a topology
+script to the creation script:
+
+```sh
+./scripts/setup-gcloud-cluster.sh \
+  my-custom-cluster-without-name \
+  gcr.io/hoprassociation/hoprd:latest \
+  `pwd`/scripts/topologies/full_interconnected_cluster.sh
+```
+
+After the normal cluster creation the topology script will then open channels
+between all nodes so they are fully interconnected. Custom topology scripts can
+be easily added and used in the same manner. Refer to the referenced scripts as
+a guideline on how to get started.
+
 ## Tooling
 
 As some tools are only partially supported, please tag the respective team member
@@ -353,7 +419,7 @@ whenever you need an issue about a particular tool.
 | Maintainer       | Technology  |
 | :--------------- | :---------: |
 | @jjperezaguinaga | Visual Code |
-| @tolbrino        |     Nix     |
+| @tolbrino        | Nix         |
 
 ## Contact
 
