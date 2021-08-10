@@ -1,1 +1,1 @@
-*.pdf binary diff=md5sum
+*.pdf diff=pdfhash

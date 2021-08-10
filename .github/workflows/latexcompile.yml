@@ -27,7 +27,8 @@ jobs:
       - name: Check if changed
         id: check-changed
         run: |
-          git status --porcelain
+          git config diff.pdfhash.textconv md5sum
+          git diff
           echo "::set-output name=changed::$(git status --porcelain)"
 
       - name: Commit latest version
