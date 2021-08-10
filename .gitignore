@@ -20,3 +20,4 @@ packages/ethereum/types/
 packages/ethereum/lib/types/
 packages/utils/lib/types/
 /types/
+.direnv/
