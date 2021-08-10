@@ -220,7 +220,7 @@ yarn run:faucet:all
 
 ### Unit testing
 
-We use [mocha][9] for our tests. You can run our test suite across all 
+We use [mocha][9] for our tests. You can run our test suite across all
 packages using the following command:
 
 ```sh
@@ -233,7 +233,7 @@ To run tests of a single package (e.g. hoprd) execute:
 yarn --cwd packages/hoprd test
 ```
 
-To run tests of a single test suite (e.g. Identity) within a 
+To run tests of a single test suite (e.g. Identity) within a
 package (e.g. hoprd) execute:
 
 For instance, to run only the `Identity` test suite in `hoprd`, you need to
@@ -314,7 +314,7 @@ a NPM package.
 
 If no parameter is given the NPM package which correlates to the most recent Git
 tag will be used, otherwise the first parameter is used as the NPM package
-version to test. 
+version to test.
 
 Read the full help information of the script in case of questions:
 
@@ -419,7 +419,7 @@ whenever you need an issue about a particular tool.
 | Maintainer       | Technology  |
 | :--------------- | :---------: |
 | @jjperezaguinaga | Visual Code |
-| @tolbrino        | Nix         |
+| @tolbrino        |     Nix     |
 
 ## Contact
 
