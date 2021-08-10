@@ -6,12 +6,7 @@ function load_json(file_path: string): any {
     return JSON.parse(content)
 }
 
-function validate_file(file_path: string, schema_path: string) {
-    console.log(`testing ${file_path} against ${schema_path}`)
-
-    const data = load_json(file_path)
-    const schema = load_json(schema_path)
-
+function validate_data(data, schema: string) {
     const res = validate(data, schema)
     for (const err of res.errors) {
         console.log(err.stack)
@@ -19,7 +14,12 @@ function validate_file(file_path: string, schema_path: string) {
     if (res.errors.length > 0) {
         throw new Error(`validation failed`)
     }
-    console.log(`schema test ok`)
 }
 
-validate_file('./environments.json', './environments_schema.json')
+const env_data = load_json('./environments.json')
+const env_schema = load_json('./environments_schema.json')
+
+console.log(`testing environments.json against schema`)
+validate_data(env_data, env_schema)
+console.log(`schema test ok`)
+
