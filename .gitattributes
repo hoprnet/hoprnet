@@ -1,1 +1,1 @@
-*.pdf binary diff=hexdump -v -C
+*.pdf binary diff=md5sum
