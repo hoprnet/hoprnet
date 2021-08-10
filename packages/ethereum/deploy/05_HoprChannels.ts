@@ -1,7 +1,7 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { DeploymentTypes } from '../constants'
-import { durations } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex } from '@hoprnet/hopr-utils'
 
 const closures: {
   [key in DeploymentTypes]: number
@@ -19,11 +19,14 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const hoprToken = await deployments.get('HoprToken')
 
-  await deployments.deploy('HoprChannels', {
+  const result = await deployments.deterministic('HoprChannels', {
     from: deployer.address,
     args: [hoprToken.address, Math.floor((closures[deploymentType] ?? closures.testing) / 1e3)],
+    salt: u8aToHex(new TextEncoder().encode(process.env['DEPLOY_LABEL'] ?? require('../package.json').version)),
     log: true
   })
+
+  await result.deploy()
 }
 
 export default main

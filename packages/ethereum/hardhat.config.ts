@@ -89,7 +89,7 @@ const hardhatConfig: HardhatUserConfig = {
     tests: './test',
     cache: './hardhat/cache',
     artifacts: './hardhat/artifacts',
-    deployments: './deployments'
+    deployments: `./deployments/${process.env['DEPLOY_LABEL'] ? `${process.env['DEPLOY_LABEL']}` : 'default'}`
   },
   typechain: {
     outDir: './types',
