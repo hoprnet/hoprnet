@@ -1,0 +1,16 @@
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.bbl
+*.blg
+*.synctex.gz
+*.xdv
+
+# Built PDF files
+*.pdf
+!yellowpaper.pdf
+
+# temp latex files
+**/__latexindent_temp.tex
