@@ -12,7 +12,8 @@ on:
     # branches: ['master', 'release/**', 'debug-e2e-gcloud/**']
     branches: ['debug-e2e-gcloud/**']
     paths-ignore:
-      - '**/docs/**/*'
+      - 'docs/**/*'
+      - 'packages/*/docs/**/*'
 
 jobs:
   e2e-gcloud:

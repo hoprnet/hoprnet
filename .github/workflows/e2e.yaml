@@ -10,7 +10,8 @@ on:
   push:
     branches: ['**']
     paths-ignore:
-      - '**/docs/**/*'
+      - 'docs/**/*'
+      - 'packages/*/docs/**/*'
 
 jobs:
   source-e2e:
