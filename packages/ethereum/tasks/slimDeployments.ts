@@ -13,14 +13,15 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     '..',
     'deployments',
     process.env['DEPLOY_LABEL'] ?? 'default',
-    hre.network.name == 'hardhat' ? 'localhost' : hre.network.name
+    hre.network.name === 'hardhat' ? 'localhost' : hre.network.name
   )
   const contracts = (await readdir(basePath)).filter((file) => file.endsWith('.json'))
 
   for (const contract of contracts) {
     const filePath = join(basePath, contract)
     const data = require(filePath)
-    const compilerData = await hre.artifacts.getBuildInfo('contracts/HoprToken.sol:HoprToken')
+    const contractName = contract.replace('.json', '')
+    const compilerData = await hre.artifacts.getBuildInfo(`contracts/${contractName}.sol:${contractName}`)
     const slimmed = {
       address: data.address,
       transactionHash: data.transactionHash,
