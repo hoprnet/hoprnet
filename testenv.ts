@@ -23,4 +23,3 @@ function validate_file(file_path: string, schema_path: string) {
 }
 
 validate_file('./environments.json', './environments_schema.json')
-validate_file('./networks.json', './networks_schema.json')
