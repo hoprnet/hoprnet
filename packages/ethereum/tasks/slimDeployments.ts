@@ -7,20 +7,20 @@ import { readdir, writeFile } from 'fs/promises'
 // after a deployment, `hardhat-deploy` populates `deployments`
 // folder with various artifacts, this task loops through `deployments`
 // folder and removes data that are optional & will end up being commited
-const main: DeployFunction = async function (_hre: HardhatRuntimeEnvironment) {
+const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const basePath = join(
     __dirname,
     '..',
     'deployments',
     process.env['DEPLOY_LABEL'] ?? 'default',
-    _hre.network.name == 'hardhat' ? 'localhost' : _hre.network.name
+    hre.network.name == 'hardhat' ? 'localhost' : hre.network.name
   )
   const contracts = (await readdir(basePath)).filter((file) => file.endsWith('.json'))
 
   for (const contract of contracts) {
     const filePath = join(basePath, contract)
     const data = require(filePath)
-    const compilerData = await _hre.artifacts.getBuildInfo('contracts/HoprToken.sol:HoprToken')
+    const compilerData = await hre.artifacts.getBuildInfo('contracts/HoprToken.sol:HoprToken')
     const slimmed = {
       address: data.address,
       transactionHash: data.transactionHash,
