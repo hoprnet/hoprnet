@@ -14,10 +14,12 @@
                 "type": "integer"
             },
             "gas": {
-                "type": "string"
+                "type": "string",
+                "minimum": 0
             },
             "gas_multiplier": {
-                "type": "number"
+                "type": "number",
+                "minimum": 1.0
             },
             "default_provider": {
                 "type": "string"
