@@ -71,6 +71,30 @@ type PeerStoreAddress = {
   multiaddrs: Multiaddr[]
 }
 
+export type Network = {
+  id: string
+  description: string
+  chain_id: number
+  default_provider: string
+  gas: string
+  gas_multiplier: number
+  native_token_name: string
+  hopr_token_name: string
+}
+
+export type Environment = {
+  id: string
+  network_id: string
+  deploy_block: number
+  token_contract_address: string
+  channels_contract_address: string
+}
+
+export type ProtocolConfig = {
+  environments: Environment[]
+  networks: Network[]
+}
+
 export type HoprOptions = {
   provider: string
   announce?: boolean
