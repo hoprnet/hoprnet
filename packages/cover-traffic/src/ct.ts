@@ -195,7 +195,7 @@ class PersistedState {
       total = total.add(weights[p.pub.toHex()])
     }
 
-    if (total.lten(0)){
+    if (total.lten(0)) {
       // No important nodes - let's pick a random node for now.
       const index = Math.floor(ind * Object.keys(s.nodes).length)
       return Object.values(s.nodes)[index].pub
@@ -225,7 +225,7 @@ class PersistedState {
 
   async openChannelCount(): Promise<number> {
     const s = await this.get()
-    return Object.values(s.channels).filter(x => x.channel.status != ChannelStatus.Closed).length
+    return Object.values(s.channels).filter((x) => x.channel.status != ChannelStatus.Closed).length
   }
 }
 
@@ -359,11 +359,11 @@ class CoverTrafficStrategy extends SaneDefaults {
       const q = await peers.qualityOf(c)
 
       if (
-        currentChannels.filter(x => x.status !== ChannelStatus.Closed).find((x) => x.destination.eq(c)) ||
+        currentChannels.filter((x) => x.status !== ChannelStatus.Closed).find((x) => x.destination.eq(c)) ||
         c.eq(this.selfPub) ||
-        toOpen.find((x) => x[1].eq(c)) 
+        toOpen.find((x) => x[1].eq(c))
       ) {
-        console.error('skipping node', c.toB58String()) 
+        console.error('skipping node', c.toB58String())
         continue
       }
 
