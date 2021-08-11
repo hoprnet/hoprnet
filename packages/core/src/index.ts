@@ -858,6 +858,10 @@ class Hopr extends EventEmitter {
     return await ethereum.getPublicKeyOf(addr)
   }
 
+  public async signArbitraryMessage(message: Uint8Array) {
+    return await this.id.privKey.sign(message);
+  }
+
   public async getEthereumAddress(): Promise<Address> {
     const ethereum = await this.startedPaymentChannels()
     return ethereum.getPublicKey().toAddress()

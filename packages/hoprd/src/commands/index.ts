@@ -8,6 +8,7 @@ import ListOpenChannels from './listOpenChannels'
 import ListConnectedPeers from './listConnected'
 import { OpenChannel } from './openChannel'
 import Ping from './ping'
+import Sign from './sign'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
 import { SendMessage } from './sendMessage'
@@ -46,6 +47,7 @@ export class Commands {
       new PrintAddress(node),
       new PrintBalance(node),
       new RedeemTickets(node),
+      new Sign(node),
       new StopNode(node),
       new Version(node),
       new Tickets(node),

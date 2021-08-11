@@ -41,7 +41,9 @@ export class AdminServer {
     if (req.url) {
       const query = parse(req.url).query
       const [_, apiToken] = query && query.split('=') || []
-      return apiToken == this.apiToken
+      if (apiToken == this.apiToken) {
+        return true
+      }
     }
 
     let cookies: ReturnType<typeof cookie.parse> | undefined
