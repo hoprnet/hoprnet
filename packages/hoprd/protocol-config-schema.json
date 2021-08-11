@@ -1,82 +1,79 @@
 {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "type": "object",
-    "properties": {
-        "environments": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string"
-                    },
-                    "network_id": {
-                        "type": "string"
-                    },
-                    "channel_contract_deploy_block": {
-                        "type": "integer"
-                    },
-                    "token_contract_address": {
-                        "type": "string"
-                    },
-                    "channels_contract_address": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "id",
-                    "network_id",
-                    "channel_contract_deploy_block",
-                    "token_contract_address",
-                    "channels_contract_address"
-                ]
-            }
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "environments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "network_id": {
+            "type": "string"
+          },
+          "channel_contract_deploy_block": {
+            "type": "integer"
+          },
+          "token_contract_address": {
+            "type": "string"
+          },
+          "channels_contract_address": {
+            "type": "string"
+          }
         },
-        "networks": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "description": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "string"
-                    },
-                    "chain_id": {
-                        "type": "integer"
-                    },
-                    "gas": {
-                        "type": "string"
-                    },
-                    "gas_multiplier": {
-                        "type": "number"
-                    },
-                    "default_provider": {
-                        "type": "string"
-                    },
-                    "native_token_name": {
-                        "type": "string"
-                    },
-                    "hopr_token_name": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "description",
-                    "id",
-                    "chain_id",
-                    "gas",
-                    "gas_multiplier",
-                    "default_provider",
-                    "native_token_name",
-                    "hopr_token_name"
-                ]
-            }
-        }
+        "required": [
+          "id",
+          "network_id",
+          "channel_contract_deploy_block",
+          "token_contract_address",
+          "channels_contract_address"
+        ]
+      }
     },
-    "required": [
-        "environments",
-        "networks"
-    ]
+    "networks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "chain_id": {
+            "type": "integer"
+          },
+          "gas": {
+            "type": "string"
+          },
+          "gas_multiplier": {
+            "type": "number"
+          },
+          "default_provider": {
+            "type": "string"
+          },
+          "native_token_name": {
+            "type": "string"
+          },
+          "hopr_token_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "id",
+          "chain_id",
+          "gas",
+          "gas_multiplier",
+          "default_provider",
+          "native_token_name",
+          "hopr_token_name"
+        ]
+      }
+    }
+  },
+  "required": ["environments", "networks"]
 }
