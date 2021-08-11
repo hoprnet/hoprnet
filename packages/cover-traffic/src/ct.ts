@@ -11,6 +11,7 @@ const CHANNEL_STAKE = new BN('1000')
 const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
 const CT_INTERMEDIATE_HOPS = 2 // 3  // NB. min is 2
 const DB = './ct.json'
+const MESSAGE_FAIL_THRESHOLD = 1000 // Failed sends to channel before we autoclose
 
 const options: HoprOptions = {
   //provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
@@ -44,7 +45,8 @@ export type State = {
   channels: Record<string, ChannelData>
   log: string[]
   ctChannels: OpenChannels[]
-  block: BN
+  block: BN,
+  messageFails: Record<string, number>
 }
 
 class PersistedState {
@@ -63,7 +65,7 @@ class PersistedState {
         channels: {},
         log: [],
         ctChannels: [],
-
+        messageFails: {},
         block: new BN('0')
       }
     }
@@ -79,6 +81,7 @@ class PersistedState {
         destination: PublicKey.fromPeerId(PeerId.createFromB58String(p)),
         latestQualityOf: 0
       })),
+      messageFails: {},
       block: new BN(json.block)
     }
     json.nodes.forEach((n) => {
@@ -227,6 +230,23 @@ class PersistedState {
     const s = await this.get()
     return Object.values(s.channels).filter((x) => x.channel.status != ChannelStatus.Closed).length
   }
+
+  async messageFails(dest: PublicKey): Promise<number> {
+    return (await this.get()).messageFails[dest.toB58String()] || 0
+  }
+
+  async incrementMessageFails(dest: PublicKey) {
+    const s = await this.get()
+    const prev = s.messageFails[dest.toB58String()] || 0
+    s.messageFails[dest.toB58String()] = prev + 1
+    await this.set(s)
+  }
+
+  async resetMessageFails(dest: PublicKey){
+    const s = await this.get()
+    s.messageFails[dest.toB58String()] = 0 
+    await this.set(s)
+  }
 }
 
 export const addBN = (a: BN, b: BN): BN => a.add(b)
@@ -323,6 +343,10 @@ class CoverTrafficStrategy extends SaneDefaults {
       if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
         toClose.push(c.destination)
       }
+      if (await this.data.messageFails(c.destination) > MESSAGE_FAIL_THRESHOLD) {
+        await this.data.resetMessageFails(c.destination)
+        toClose.push(c.destination)
+      }
     }
     await this.data.setCTChannels(ctChannels)
 
@@ -339,7 +363,7 @@ class CoverTrafficStrategy extends SaneDefaults {
             this.data
           )
           if (!success) {
-            toClose.push(openChannel.destination)
+            await this.data.incrementMessageFails(openChannel.destination)
           }
         }
         // TODO handle waiting for commitment stalls
