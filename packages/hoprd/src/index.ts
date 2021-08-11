@@ -12,13 +12,20 @@ import setupAPI from './api'
 import { getIdentity } from './identity'
 import path from 'path'
 import { passwordStrength } from 'check-password-strength'
+import type { ProtocolConfig } from '@hoprnet/hopr-core'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
+
+const pkg = require('../../../package.json')
 
 const argv = yargs(process.argv.slice(2))
   .option('provider', {
     describe: 'A provider url for the Network you specified',
     default: 'https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/'
+  })
+  .option('environment', {
+    describe: 'Environment id, one of the ids defined in protocol-config.json',
+    default: pkg.hopr.environment_id
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -160,7 +167,8 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     announce: argv.announce,
     hosts: parseHosts(),
     announceLocalAddresses: argv.testAnnounceLocalAddresses,
-    preferLocalAddresses: argv.testPreferLocalAddresses
+    preferLocalAddresses: argv.testPreferLocalAddresses,
+    environment: undefined
   }
 
   if (argv.password !== undefined) {
@@ -169,6 +177,16 @@ async function generateNodeOptions(): Promise<HoprOptions> {
 
   if (argv.data && argv.data !== '') {
     options.dbPath = argv.data
+  }
+
+  const protocolConfig = require('../protocol-config.json') as ProtocolConfig
+  for (const environment of protocolConfig.environments) {
+    if (environment.id === argv.environment) {
+      options.environment = environment
+    }
+  }
+  if (!options.environment) {
+    throw new Error(`failed to find environment with id ${argv.environment} in protocol-config.json`)
   }
 
   return options

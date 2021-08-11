@@ -115,6 +115,7 @@ export type HoprOptions = {
   // when true, addresses will be sorted local first
   // when false, addresses will be sorted public first
   preferLocalAddresses?: boolean
+  environment: Environment
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -132,6 +133,7 @@ class Hopr extends EventEmitter {
   private paymentChannels: HoprCoreEthereum
   private addressSorter: AddressSorter
   private publicNodesEmitter: HoprConnectOptions['publicNodes']
+  private environment: Environment
 
   public indexer: Indexer
 
@@ -172,6 +174,9 @@ class Hopr extends EventEmitter {
       log('Addresses are sorted by default')
     }
     this.indexer = this.paymentChannels.indexer // TODO temporary
+
+    this.environment = options.environment
+    log(`using environment: ${this.environment.id}`)
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
