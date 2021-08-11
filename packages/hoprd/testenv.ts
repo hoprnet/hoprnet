@@ -1,8 +1,8 @@
 import { validate } from 'jsonschema'
 import fs from 'fs'
 
-const env_data = load_json('./environments.json')
-const env_schema = load_json('./environments_schema.json')
+const env_data = load_json('./protocol-config.json')
+const env_schema = load_json('./protocol-config-schema.json')
 
 type Network = {
     id: string
@@ -23,17 +23,17 @@ type Environment = {
     channels_contract_address: string
 }
 
-type Environments = {
+type ProtocolConfig = {
     environments: Environment[],
     networks: Network[]
 }
 
-function load_json(file_path: string): Environments {
+function load_json(file_path: string): ProtocolConfig {
     const content = fs.readFileSync(file_path, 'utf-8')
     return JSON.parse(content)
 }
 
-function validate_data(data: Environments, schema: any) {
+function validate_data(data: ProtocolConfig, schema: any) {
     const res = validate(data, schema)
     for (const err of res.errors) {
         console.log(err.stack)
