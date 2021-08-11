@@ -19,7 +19,7 @@
     "clean": "rimraf ./lib",
     "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "next build hopr-admin",
-    "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit",
+    "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
     "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin --init --rest",

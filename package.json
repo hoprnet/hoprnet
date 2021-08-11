@@ -42,6 +42,10 @@
     "ts-node": "^10.1.0",
     "yargs": "^17.0.1"
   },
+  "hopr": {
+    "description": "master",
+    "environment_id": "master"
+  },
   "prettier": {
     "tabWidth": 2,
     "semi": false,
