@@ -1,8 +1,6 @@
 import { validate } from 'jsonschema'
 import fs from 'fs'
 
-const env_data = load_json('./protocol-config.json')
-const env_schema = load_json('./protocol-config-schema.json')
 
 type Network = {
     id: string
@@ -43,25 +41,30 @@ function validate_data(data: ProtocolConfig, schema: any) {
     }
 }
 
-function get_network(id: string): Network | null {
-    for (const network of env_data.networks) {
-        if (network.id === id) {
-            return network
+describe('protocol config', async function () {
+    it('should conform to schema', async function () {
+        const env_data = load_json('./protocol-config.json')
+        const env_schema = load_json('./protocol-config-schema.json')
+
+        validate_data(env_data, env_schema)
+    })
+
+    it('should be internally consistent', async function () {
+        function get_network(id: string): Network | null {
+            for (const network of env_data.networks) {
+                if (network.id === id) {
+                    return network
+                }
+            }
+            return null
         }
-    }
-    return null
-}
 
-console.log(`testing environments.json against schema`)
-validate_data(env_data, env_schema)
-console.log(`schema test ok`)
+        const env_data = load_json('./protocol-config.json')
 
-console.log(`testing environments.json integrity`)
-for (const env of env_data.environments) {
-    if (get_network(env.network_id) == null) {
-        throw new Error(`no such network: ${env.network_id}`)
-    }
-}
-
-console.log(`integrity test ok`)
-
+        for (const env of env_data.environments) {
+            if (get_network(env.network_id) == null) {
+                throw new Error(`no such network: ${env.network_id}`)
+            }
+        }
+    })
+})
