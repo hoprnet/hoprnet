@@ -20,6 +20,8 @@ workflow to streamline the process we use to implement the HOPR protocol.
 - All PR‘s must pass all status checks/tests before merging.
 - Releases can be merged back to `master`, but not always necessary.
 - When in conflict, chat and engage with the team.
+- An Epic must contain a problem, a solution, and a list of sub-issues.
+- An epic's solution must be approved before implementation starts.
 
 ## Releases
 
