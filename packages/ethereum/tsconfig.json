@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "lib"
   },
-  "include": ["hardhat.config.ts", "constants.ts", "index.ts", "test", "tasks", "deploy"],
+  "include": ["type-extension.ts", "hardhat.config.ts", "constants.ts", "index.ts", "test", "tasks", "deploy"],
   "exclude": ["lib", "types"],
   "typedocOptions": {
     "entryPoints": ["index.ts"],

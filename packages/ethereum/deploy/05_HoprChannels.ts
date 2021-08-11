@@ -12,6 +12,8 @@ const closures: {
   production: durations.minutes(5)
 }
 
+const ENVIRONMENT_FLAG = 'ENVIRONMENT_FLAG'
+
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { ethers, deployments, getNamedAccounts, network } = hre
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
@@ -19,10 +21,17 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const hoprToken = await deployments.get('HoprToken')
 
+  let salt: string
+  if (process.env[ENVIRONMENT_FLAG]) {
+    salt = process.env[ENVIRONMENT_FLAG]
+  } else {
+    salt = require('../package.json').version
+  }
+
   const result = await deployments.deterministic('HoprChannels', {
     from: deployer.address,
     args: [hoprToken.address, Math.floor((closures[deploymentType] ?? closures.testing) / 1e3)],
-    salt: u8aToHex(new TextEncoder().encode(process.env['DEPLOY_LABEL'] ?? require('../package.json').version)),
+    salt: u8aToHex(new TextEncoder().encode(salt)),
     log: true
   })
 
