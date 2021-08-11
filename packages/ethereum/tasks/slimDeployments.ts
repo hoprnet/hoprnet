@@ -15,7 +15,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     process.env['DEPLOY_LABEL'] ?? 'default',
     hre.network.name === 'hardhat' ? 'localhost' : hre.network.name
   )
-  const contracts = (await readdir(basePath)).filter((file) => file.endsWith('.json'))
+  const contracts = (await readdir(basePath)).filter((filename: string) => filename.endsWith('.json'))
 
   for (const contract of contracts) {
     const filePath = join(basePath, contract)
