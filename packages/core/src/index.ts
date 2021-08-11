@@ -859,7 +859,7 @@ class Hopr extends EventEmitter {
   }
 
   public async signArbitraryMessage(message: Uint8Array) {
-    return await this.id.privKey.sign(message);
+    return await this.id.privKey.sign(message)
   }
 
   public async getEthereumAddress(): Promise<Address> {
