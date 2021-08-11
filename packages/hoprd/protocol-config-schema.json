@@ -13,7 +13,7 @@
                     "network_id": {
                         "type": "string"
                     },
-                    "deploy_block": {
+                    "channel_contract_deploy_block": {
                         "type": "integer"
                     },
                     "token_contract_address": {
@@ -26,7 +26,7 @@
                 "required": [
                     "id",
                     "network_id",
-                    "deploy_block",
+                    "channel_contract_deploy_block",
                     "token_contract_address",
                     "channels_contract_address"
                 ]

@@ -3,13 +3,13 @@
     {
       "id": "master",
       "network_id": "goerli",
-      "deploy_block": 0,
+      "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
       "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
     },
     {
       "id": "jungfrau",
-      "deploy_block": 0,
+      "channel_contract_deploy_block": 0,
       "network_id": "xdai",
       "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6",
       "token_contract_address": "0xd4fdec44db9d44b8f2b6d529620f9c0c7066a2c1"
@@ -17,14 +17,14 @@
     {
       "id": "matic-mumbai",
       "network_id": "mumbai",
-      "deploy_block": 0,
+      "channel_contract_deploy_block": 0,
       "channels_contract_address": "0xf4ff7e5bf2cc7ef89196c8086982f6f5ec502685",
       "token_contract_address": "0x566a5c774bb8abe1a88b4f187e24d4cd55c207a5"
     },
     {
       "id": "matic-polygon",
       "network_id": "polygon",
-      "deploy_block": 0,
+      "channel_contract_deploy_block": 0,
       "channels_contract_address": "0xd8f4e1867bbff6647b80bc624d22bd552eb81eef",
       "token_contract_address": "0x6f80d1a3ab9006548c2fbb180879b87364d63bf7"
     }
