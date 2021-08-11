@@ -12,8 +12,6 @@ const closures: {
   production: durations.minutes(5)
 }
 
-const ENVIRONMENT_FLAG = 'ENVIRONMENT_FLAG'
-
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { ethers, deployments, getNamedAccounts, network } = hre
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
@@ -22,10 +20,10 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const hoprToken = await deployments.get('HoprToken')
 
   let salt: string
-  if (process.env[ENVIRONMENT_FLAG]) {
-    salt = process.env[ENVIRONMENT_FLAG]
-  } else {
+  if (hre.environment === 'default') {
     salt = require('../package.json').version
+  } else {
+    salt = hre.environment
   }
 
   const result = await deployments.deterministic('HoprChannels', {
