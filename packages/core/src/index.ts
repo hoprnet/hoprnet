@@ -862,6 +862,9 @@ class Hopr extends EventEmitter {
     return await ethereum.getPublicKeyOf(addr)
   }
 
+  // NB: The prefix "HOPR Signed Message: " is added as a security precaution.
+  // Without it, the node could be convinced to sign a message like an Ethereum
+  // transaction draining it's connected wallet funds, since they share the key.
   public async signMessage(message: Uint8Array) {
     return await this.id.privKey.sign(u8aConcat(new TextEncoder().encode('HOPR Signed Message: '), message))
   }
