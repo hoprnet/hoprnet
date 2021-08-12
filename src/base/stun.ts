@@ -5,6 +5,7 @@ import { Multiaddr } from 'multiaddr'
 import debug from 'debug'
 import { randomSubset } from '@hoprnet/hopr-utils'
 import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants'
+import { ipToU8aAddress, isPrivateAddress } from '../utils'
 
 const log = debug('hopr-connect:stun:error')
 const error = debug('hopr-connect:stun:error')
@@ -50,23 +51,39 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
   const consoleBackup = console.log
   console.log = log
 
-  if (req.loadBuffer(data)) {
-    // if STUN message is BINDING_REQUEST and valid content
-    if (req.isBindingRequest({ fingerprint: true })) {
-      verbose(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
+  try {
+    if (req.loadBuffer(data)) {
+      // if STUN message is BINDING_REQUEST and valid content
+      if (req.isBindingRequest({ fingerprint: true })) {
+        verbose(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
 
-      const res = req.createBindingResponse(true).setXorMappedAddressAttribute(rinfo).setFingerprintAttribute()
+        const res = req.createBindingResponse(true).setXorMappedAddressAttribute(rinfo).setFingerprintAttribute()
 
-      socket.send(res.toBuffer(), rinfo.port, rinfo.address)
-    } else if (!req.isBindingResponseSuccess()) {
-      error(`Received a STUN message that is not a binding request. Dropping message.`)
+        socket.send(res.toBuffer(), rinfo.port, rinfo.address)
+      } else if (!req.isBindingResponseSuccess()) {
+        error(`Received a STUN message that is not a binding request. Dropping message.`)
+      }
+    } else {
+      error(`Received a message that is not a STUN message. Dropping message.`)
     }
-  } else {
-    error(`Received a message that is not a STUN message. Dropping message.`)
+  } catch (err) {
+    consoleBackup(err)
+  } finally {
+    console.log = consoleBackup
   }
-  console.log = consoleBackup
+}
+type Address = {
+  address: string
+  family: string
+  port: number
 }
 
+type Request = {
+  multiaddr: Multiaddr
+  tId: string
+  failed?: boolean
+  response?: Address
+}
 /**
  * Tries to determine the external IPv4 address
  * @returns Addrs+Port or undefined if the STUN response are ambiguous (e.g. bidirectional NAT)
@@ -76,51 +93,135 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
  */
 export function getExternalIp(
   multiAddrs: Multiaddr[] | undefined,
-  socket: Socket
+  socket: Socket,
+  runningLocally = false
 ): Promise<ConnectionInfo | undefined> {
-  return new Promise<ConnectionInfo | undefined>(async (resolve, reject) => {
+  return new Promise<ConnectionInfo | undefined>(async (resolve) => {
     let usableMultiaddrs: Multiaddr[]
+    let usingPublicServers = false
+
     if (multiAddrs == undefined || multiAddrs.length == 0) {
+      if (runningLocally) {
+        // Do not try to contact public STUN servers when running locally
+        resolve(undefined)
+        return
+      }
+      // Use public STUN servers if no own STUN servers are given
+      usingPublicServers = true
       usableMultiaddrs = randomSubset(PUBLIC_STUN_SERVERS, DEFAULT_PARALLEL_STUN_CALLS)
+      verbose(`No own STUN servers given. Using ${usableMultiaddrs.map((ma: Multiaddr) => ma.toString()).join(', ')}`)
     } else if (multiAddrs.length > DEFAULT_PARALLEL_STUN_CALLS) {
+      // Limit number of STUN servers to contact
       usableMultiaddrs = randomSubset(multiAddrs, DEFAULT_PARALLEL_STUN_CALLS)
     } else {
       usableMultiaddrs = multiAddrs
     }
 
-    verbose(`Getting external IP by using ${usableMultiaddrs.map((m) => m.toString()).join(',')}`)
-    const tids = Array.from({ length: usableMultiaddrs.length }).map(stun.generateTransactionId)
+    verbose(`Trying to determine external IP by using ${usableMultiaddrs.map((m) => m.toString()).join(',')}`)
 
-    const results: ConnectionInfo[] = []
+    let requests = generateRequests(usableMultiaddrs)
+    let results = decodeIncomingSTUNResponses(requests, socket, STUN_TIMEOUT)
+    sendStunRequests(requests, socket)
 
-    let timeout: NodeJS.Timeout
+    let responses = (await results).filter((request: Request) => request.response)
 
-    const done = () => {
-      socket.removeListener('message', msgHandler)
+    if (responses.length == 0 && (usingPublicServers || runningLocally)) {
+      // We have already contacted public and this did not lead to a result
+      // hence we cannot determine public IP address
+      resolve(undefined)
+      return
+    }
+
+    if ([0, 1].includes(responses.length) && !runningLocally && !usingPublicServers) {
+      // Received too less results to see if addresses are ambiguous,
+      // let's try some public servers
+      usableMultiaddrs = randomSubset(PUBLIC_STUN_SERVERS, DEFAULT_PARALLEL_STUN_CALLS)
+      verbose(
+        `Using own STUN servers did not lead to a result. Trying ${usableMultiaddrs
+          .map((ma: Multiaddr) => ma.toString())
+          .join(', ')}`
+      )
+
+      requests = generateRequests(usableMultiaddrs)
+      results = decodeIncomingSTUNResponses(requests, socket, STUN_TIMEOUT)
+      sendStunRequests(requests, socket)
+
+      responses.push(...(await results).filter((request: Request) => request.response))
+    }
+
+    if (responses.length == 0) {
+      // Even contacting public STUN servers did not lead
+      resolve(undefined)
+      return
+    }
+
+    let intepretedResults = intepreteResults(responses)
+
+    if (intepretedResults.ambiguous) {
+      resolve(undefined)
+      return
+    } else {
+      resolve(intepretedResults.publicAddress)
+    }
+  })
+}
+
+/**
+ * Send requests to given STUN servers
+ * @param usableMultiaddrs multiaddrs to use for STUN requests
+ * @param tIds transaction IDs to use, necessary to link requests and responses
+ * @param socket the socket to send the STUN requests
+ * @returns usable transaction IDs and the corresponding multiaddrs
+ */
+function sendStunRequests(addrs: Request[], socket: Socket): void {
+  for (const addr of addrs) {
+    if (![CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6].includes(addr.multiaddr.tuples()[0][0])) {
+      error(`Cannot contact STUN server ${addr.multiaddr.toString()} due invalid address.`)
+      continue
+    }
+
+    let nodeAddress: ReturnType<Multiaddr['nodeAddress']>
+    try {
+      nodeAddress = addr.multiaddr.nodeAddress()
+    } catch (err) {
+      error(err)
+      continue
+    }
+
+    const res = stun.createBindingRequest(addr.tId).setFingerprintAttribute()
+
+    verbose(`STUN request sent to ${nodeAddress.address}:${nodeAddress.port}`)
+    socket.send(res.toBuffer(), nodeAddress.port, nodeAddress.address, (err: any) => err && error(err.message))
+  }
+}
+
+function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: number = STUN_TIMEOUT) {
+  return new Promise<Request[]>((resolve) => {
+    let responsesReceived = 0
+
+    let done: () => void
+    let listener: (msg: Buffer) => void
+    let finished = false
+
+    const timeout = setTimeout(() => {
+      log(`STUN timeout. None of the selected STUN servers replied.`)
+      done()
+    }, ms)
+
+    done = () => {
+      if (finished) {
+        return
+      }
+      finished = true
+
+      socket.removeListener('message', listener)
 
       clearTimeout(timeout)
 
-      if (results.length == 0) {
-        error(`STUN Timeout. Could not complete STUN request in time.`)
-        resolve(undefined)
-        return
-      }
-
-      if (results.length == 1) {
-        resolve(results[0])
-        return
-      }
-
-      for (const result of results) {
-        if (result.port != results[0].port) {
-          return resolve(undefined)
-        }
-      }
-
-      resolve(results[0])
+      resolve(addrs)
     }
 
-    const msgHandler = (msg: Buffer) => {
+    listener = (msg: Buffer) => {
       const res = stun.createBlank()
 
       // Overwrite console.log because 'webrtc-stun' package
@@ -128,88 +229,106 @@ export function getExternalIp(
       const consoleBackup = console.log
       console.log = log
 
-      if (!res.loadBuffer(msg)) {
-        error(`Could not decode STUN response`)
-        console.log = consoleBackup
-        return
-      }
+      try {
+        if (!res.loadBuffer(msg)) {
+          error(`Could not decode STUN response`)
+          console.log = consoleBackup
+          return
+        }
 
-      const index: number = tids.findIndex((tid: string) => res.isBindingResponseSuccess({ transactionId: tid }))
-
-      if (index < 0) {
-        error(`Received STUN response with invalid transactionId. Dropping response.`)
-        console.log = consoleBackup
-        return
-      }
-
-      tids.splice(index, 1)
-      const attr = res.getXorMappedAddressAttribute() ?? res.getMappedAddressAttribute()
-
-      console.log = consoleBackup
-
-      if (attr == null) {
-        error(`STUN response seems to have neither MappedAddress nor XORMappedAddress set. Dropping message`)
-        return
-      }
-
-      verbose(`Received STUN response. External address seems to be: ${attr.address}:${attr.port}`)
-
-      if (results.push(attr) == usableMultiaddrs.length) {
-        done()
-      }
-    }
-
-    socket.on('message', msgHandler)
-
-    const allSent = performStunRequests(usableMultiaddrs, tids, socket)
-
-    if (allSent.length > 0) {
-      const sendResults = await Promise.all(allSent)
-
-      if (!sendResults.some((resultOk: boolean) => resultOk)) {
-        reject(
-          new Error(
-            `Cannot send any STUN packets. Tried with: ${usableMultiaddrs
-              .map((ma: Multiaddr) => ma.toString())
-              .join(', ')}`
-          )
+        const index: number = addrs.findIndex((addr: Request) =>
+          res.isBindingResponseSuccess({ transactionId: addr.tId })
         )
-      }
 
-      timeout = setTimeout(() => done(), STUN_TIMEOUT)
-    } else {
-      reject(new Error(`Cannot detect external IP address using STUN`))
+        if (index < 0) {
+          error(`Received STUN response with invalid transactionId. Dropping response.`)
+          console.log = consoleBackup
+          return
+        }
+
+        const attr = res.getXorMappedAddressAttribute() ?? res.getMappedAddressAttribute()
+
+        console.log = consoleBackup
+
+        if (attr == null) {
+          error(`STUN response seems to have neither MappedAddress nor XORMappedAddress set. Dropping message`)
+          return
+        }
+
+        verbose(`Received STUN response. External address seems to be: ${attr.address}:${attr.port}`)
+
+        if (addrs[index].response != undefined) {
+          verbose(`Recieved duplicate response. Dropping message`)
+          return
+        }
+
+        addrs[index].response = attr
+        responsesReceived++
+
+        if (responsesReceived == addrs.length) {
+          done()
+        }
+      } catch (err) {
+        consoleBackup(err)
+      } finally {
+        console.log = consoleBackup
+      }
     }
+
+    socket.on('message', listener)
   })
 }
 
-function performStunRequests(usableMultiaddrs: Multiaddr[], tIds: string[], socket: Socket): Promise<boolean>[] {
-  const result: Promise<boolean>[] = []
+function intepreteResults(
+  results: Request[],
+  runningLocally = false
+):
+  | {
+      ambiguous: true
+    }
+  | {
+      ambiguous: false
+      publicAddress: Address
+    } {
+  let addrs: Address[] = []
 
-  for (const [index, ma] of usableMultiaddrs.entries()) {
-    if (![CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6].includes(ma.tuples()[0][0])) {
-      error(`Cannot contact STUN server ${ma.toString()} due invalid address.`)
+  for (const result of results) {
+    if (!result.response) {
       continue
     }
 
-    const nodeAddress = ma.nodeAddress()
-
-    const res = stun.createBindingRequest(tIds[index]).setFingerprintAttribute()
-
-    verbose(`STUN request sent to ${nodeAddress.address}:${nodeAddress.port}`)
-
-    result.push(
-      new Promise<boolean>((resolve) => {
-        socket.send(res.toBuffer(), nodeAddress.port, nodeAddress.address, (err: any) => {
-          if (err) {
-            resolve(false)
-          } else {
-            resolve(true)
-          }
-        })
-      })
-    )
+    switch (result.response.family) {
+      case 'IPv6':
+        // STUN over IPv6 is not yet supported
+        break
+      case 'IPv4':
+        const u8aAddr = ipToU8aAddress(result.response.address, 'IPv4')
+        // If running locally, get only local addresses,
+        // otherwise only get public addresses
+        if (isPrivateAddress(u8aAddr, 'IPv4') == runningLocally) {
+          addrs.push(result.response)
+        }
+        break
+      default:
+        error(`Invalid STUN respone. Got family: ${result.response.family}`)
+        break
+    }
   }
 
-  return result
+  const ambiguous = addrs
+    .slice(1)
+    .some((addr: Address) => addr.address !== addrs[0].address || addr.port != addrs[0].port)
+
+  if (ambiguous) {
+    return { ambiguous }
+  } else {
+    return { ambiguous, publicAddress: addrs[0] }
+  }
+}
+
+function generateRequests(multiAddrs: Multiaddr[]): Request[] {
+  return multiAddrs.map<Request>((multiaddr: Multiaddr) => ({
+    multiaddr,
+    tId: stun.generateTransactionId()
+  }))
 }

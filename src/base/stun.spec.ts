@@ -1,6 +1,12 @@
 import dgram from 'dgram'
 import type { Socket, RemoteInfo } from 'dgram'
-import { getExternalIp, handleStunRequest, DEFAULT_PARALLEL_STUN_CALLS, PUBLIC_STUN_SERVERS } from './stun'
+import {
+  getExternalIp,
+  handleStunRequest,
+  DEFAULT_PARALLEL_STUN_CALLS,
+  PUBLIC_STUN_SERVERS,
+  STUN_TIMEOUT
+} from './stun'
 import { nodeToMultiaddr } from '../utils'
 import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
@@ -88,22 +94,43 @@ describe('test STUN', function () {
       servers[0].socket
     )
 
-    assert(Date.now() - before >= 0, `should not resolve before timeout ends`)
+    assert(Date.now() - before >= STUN_TIMEOUT, `should not resolve before timeout ends`)
     assert(result != undefined, `Timeout should not lead to empty result`)
   })
 
-  it('should not fail on DNS requests', async function () {
-    await assert.rejects(
-      async () =>
-        await getExternalIp([new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`)], servers[0].socket),
-      {
-        name: 'Error',
-        message: 'Cannot send any STUN packets. Tried with: /dns4/totallyinvalidurl.hoprnet.org/udp/12345'
-      }
+  it('should try other STUN servers after DNS failure', async function () {
+    const before = Date.now()
+    const response = await getExternalIp(
+      [new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`)],
+      servers[0].socket
     )
 
+    assert(response != undefined, `STUN request must be successful`)
+
+    assert(Date.now() - before >= STUN_TIMEOUT, `STUN request must produce at least one timeout`)
+  })
+
+  it('should not try other STUN servers if running locally', async function () {
+    const before = Date.now()
+    const response = await getExternalIp(
+      [new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`)],
+      servers[0].socket,
+      true
+    )
+
+    assert(response == undefined, `STUN request must not be successful`)
+
+    assert(Date.now() - before >= STUN_TIMEOUT, `STUN request must produce at least one timeout`)
+  })
+
+  // TODO check ambiguous results
+
+  it('should not fail on DNS failures', async function () {
     const stunResult = await getExternalIp(
-      [new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`), ...PUBLIC_STUN_SERVERS],
+      [
+        new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`),
+        ...PUBLIC_STUN_SERVERS.slice(DEFAULT_PARALLEL_STUN_CALLS - 1)
+      ],
       servers[0].socket
     )
 
