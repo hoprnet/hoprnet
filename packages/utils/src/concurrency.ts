@@ -1,6 +1,6 @@
 // Create a limiter to resolve a single function that
 // returns a promise at a time.
-// eg. 
+// eg.
 //
 // let limiter = oneAtATime()
 // limiter(() => Promise.resolve('1'))
