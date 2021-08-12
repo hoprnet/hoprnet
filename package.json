@@ -15,6 +15,7 @@
     "test": "lerna run test --stream",
     "test:core": "yarn build:core && lerna exec --scope @hoprnet/hopr-core yarn test",
     "test:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn test",
+    "test:utils": "lerna exec --scope @hoprnet/hopr-utils -- yarn test",
     "test:contracts": "lerna exec --scope @hoprnet/hopr-ethereum -- yarn test",
     "run:network": "lerna exec --scope @hoprnet/hopr-ethereum -- yarn network",
     "run:hoprd:goerli": "lerna exec --scope @hoprnet/hoprd -- yarn start --host=0.0.0.0:9060 --adminPort=2970 --restPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --testNoAuthentication",
