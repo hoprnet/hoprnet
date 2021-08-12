@@ -163,7 +163,6 @@ function parseHosts(): HoprOptions['hosts'] {
 async function generateNodeOptions(): Promise<HoprOptions> {
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
-    provider: argv.provider,
     announce: argv.announce,
     hosts: parseHosts(),
     announceLocalAddresses: argv.testAnnounceLocalAddresses,
@@ -182,9 +181,21 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   const protocolConfig = require('../protocol-config.json') as ProtocolConfig
   for (const environment of protocolConfig.environments) {
     if (environment.id === argv.environment) {
-      options.environment = environment
+      for (const network of protocolConfig.networks) {
+        if (network.id === environment.network_id) {
+          options.environment = {
+            id: environment.id,
+            network,
+            channel_contract_deploy_block: environment.channel_contract_deploy_block,
+            token_contract_address: environment.token_contract_address,
+            channels_contract_address: environment.channels_contract_address
+          }
+        }
+      }
+
     }
   }
+
   if (!options.environment) {
     throw new Error(`failed to find environment with id ${argv.environment} in protocol-config.json`)
   }

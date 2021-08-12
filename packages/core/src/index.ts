@@ -85,7 +85,7 @@ export type Network = {
 export type Environment = {
   id: string
   network_id: string
-  deploy_block: number
+  channel_contract_deploy_block: number
   token_contract_address: string
   channels_contract_address: string
 }
@@ -95,8 +95,15 @@ export type ProtocolConfig = {
   networks: Network[]
 }
 
+export type ResolvedEnvironment = {
+  id: string
+  network: Network
+  channel_contract_deploy_block: number
+  token_contract_address: string
+  channels_contract_address: string
+}
+
 export type HoprOptions = {
-  provider: string
   announce?: boolean
   dbPath?: string
   createDbIfNotExist?: boolean
@@ -115,7 +122,7 @@ export type HoprOptions = {
   // when true, addresses will be sorted local first
   // when false, addresses will be sorted public first
   preferLocalAddresses?: boolean
-  environment: Environment
+  environment: ResolvedEnvironment
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -133,7 +140,7 @@ class Hopr extends EventEmitter {
   private paymentChannels: HoprCoreEthereum
   private addressSorter: AddressSorter
   private publicNodesEmitter: HoprConnectOptions['publicNodes']
-  private environment: Environment
+  private environment: ResolvedEnvironment
 
   public indexer: Indexer
 
@@ -159,7 +166,7 @@ class Hopr extends EventEmitter {
       options.forceCreateDB
     )
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      provider: this.options.provider
+      provider: this.environment.network.default_provider
     })
 
     this.publicNodesEmitter = new EventEmitter()
