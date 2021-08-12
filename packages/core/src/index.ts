@@ -165,6 +165,8 @@ class Hopr extends EventEmitter {
       options.dbPath,
       options.forceCreateDB
     )
+    this.environment = options.environment
+
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
       provider: this.environment.network.default_provider
     })
@@ -182,7 +184,6 @@ class Hopr extends EventEmitter {
     }
     this.indexer = this.paymentChannels.indexer // TODO temporary
 
-    this.environment = options.environment
     log(`using environment: ${this.environment.id}`)
   }
 
