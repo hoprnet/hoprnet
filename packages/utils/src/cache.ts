@@ -1,5 +1,10 @@
 import { isExpired } from '.'
 
+// Cache the result of a function until expiry, and return that.
+//
+// ie.
+//
+// let cachedFunction = cacheNoArgAsyncFunction<ReturnType>(expensiveAsyncFunction, 500)
 export function cacheNoArgAsyncFunction<T>(func: () => Promise<T>, expiry: number) {
   let cachedValue: T
   let updatedAt: number
