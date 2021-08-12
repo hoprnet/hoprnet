@@ -244,6 +244,7 @@ class Hopr extends EventEmitter {
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
 
+    // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
     const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
       libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
     const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
@@ -347,6 +348,8 @@ class Hopr extends EventEmitter {
     }
   }
 
+  // On the strategy interval, poll the strategy to see what channel changes
+  // need to be made.
   private async tickChannelStrategy() {
     verbose('strategy tick', this.status)
     if (this.status != 'RUNNING') {

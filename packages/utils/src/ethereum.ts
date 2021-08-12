@@ -1,5 +1,9 @@
 import { errors } from 'ethers'
 
+// These functions allow us to differentiate between error messages from
+// interacting with the chain.
+
+
 export function isErrorOutOfNativeFunds(error: any): boolean {
   // https://github.com/ethers-io/ethers.js/blob/bde861436ebef572d04ae8a7a111b8b954b4571c/packages/providers/src.ts/json-rpc-provider.ts#L52
   return [error?.code, String(error)].includes(errors.INSUFFICIENT_FUNDS)
