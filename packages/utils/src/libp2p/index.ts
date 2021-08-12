@@ -16,6 +16,7 @@ import type { PromiseValue } from '../typescript'
 export * from './privKeyToPeerId'
 export * from './pubKeyToPeerId'
 export * from './addressSorters'
+export * from './verifySignatureFromPeerId'
 
 /**
  * Regular expresion used to match b58Strings
