@@ -149,6 +149,7 @@
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
 - [validatePoRHint](modules.md#validateporhint)
 - [validatePoRResponse](modules.md#validateporresponse)
+- [verifySignatureFromPeerId](modules.md#verifysignaturefrompeerid)
 - [wait](modules.md#wait)
 
 ## Type aliases
@@ -189,7 +190,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L96)
+[libp2p/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L97)
 
 ___
 
@@ -199,7 +200,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:100](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L100)
+[libp2p/index.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L101)
 
 ___
 
@@ -234,7 +235,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:272](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L272)
+[libp2p/index.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L273)
 
 ___
 
@@ -259,7 +260,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L273)
+[libp2p/index.ts:274](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L274)
 
 ___
 
@@ -615,7 +616,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L25)
+[libp2p/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L26)
 
 ___
 
@@ -715,7 +716,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[libp2p/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L42)
+[libp2p/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L43)
 
 ___
 
@@ -737,7 +738,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[libp2p/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L32)
+[libp2p/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L33)
 
 ___
 
@@ -905,7 +906,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L128)
+[libp2p/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L129)
 
 ___
 
@@ -1034,7 +1035,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[libp2p/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L69)
+[libp2p/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L70)
 
 ___
 
@@ -1100,7 +1101,7 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[libp2p/index.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L52)
+[libp2p/index.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L53)
 
 ___
 
@@ -1230,7 +1231,7 @@ whether embedded privKey is a secp256k1 key
 
 #### Defined in
 
-[libp2p/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L85)
+[libp2p/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L86)
 
 ___
 
@@ -1302,7 +1303,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:229](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L229)
+[libp2p/index.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L230)
 
 ___
 
@@ -1326,7 +1327,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:245](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L245)
+[libp2p/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L246)
 
 ___
 
@@ -1349,7 +1350,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:308](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L308)
+[libp2p/index.ts:309](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L309)
 
 ___
 
@@ -2216,6 +2217,34 @@ ___
 #### Defined in
 
 [crypto/por/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L132)
+
+___
+
+### verifySignatureFromPeerId
+
+▸ **verifySignatureFromPeerId**(`peerId`, `message`, `signature`): `Promise`<`boolean`\>
+
+Verifies a given signature comes from a specific PeerId, based on the
+signature generated and the PeerId id.
+
+**`notice`** Currently we assume that the peerId was generated with a sec256k1
+key, but no other tests had been done for additional keys (e.g. Curve25519)
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `peerId` | `string` | the base58String representation of the PeerId |
+| `message` | `string` | the message signed by the given PeerId |
+| `signature` | `string` | the generated signature created by the PeerId |
+
+#### Returns
+
+`Promise`<`boolean`\>
+
+#### Defined in
+
+[libp2p/verifySignatureFromPeerId.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/verifySignatureFromPeerId.ts#L15)
 
 ___
 
