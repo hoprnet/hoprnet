@@ -13,6 +13,12 @@ function hashFunction(msg: Uint8Array): Uint8Array {
   return Hash.create(msg).serialize().slice(0, Hash.SIZE)
 }
 
+// See the specification for a full description of what this is for, but
+// essentially we want to post a 'commitment' to each ticket, that allows
+// later verification by giving a 'preimage' of that commitment.
+//
+// We need to persist this string of commitments in the database, and support
+// syncing back and forth with those that have been persisted on chain.
 export class Commitment {
   private initialized: boolean = false
 

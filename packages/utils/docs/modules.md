@@ -693,7 +693,7 @@ ___
 
 #### Defined in
 
-[cache.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/cache.ts#L3)
+[cache.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/cache.ts#L8)
 
 ___
 
@@ -1120,7 +1120,7 @@ ___
 
 #### Defined in
 
-[ethereum.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L14)
+[ethereum.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L17)
 
 ___
 
@@ -1140,7 +1140,7 @@ ___
 
 #### Defined in
 
-[ethereum.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L8)
+[ethereum.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L11)
 
 ___
 
@@ -1160,7 +1160,7 @@ ___
 
 #### Defined in
 
-[ethereum.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L3)
+[ethereum.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L6)
 
 ___
 
@@ -1445,7 +1445,7 @@ ___
 
 #### Defined in
 
-[concurrency.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/concurrency.ts#L1)
+[concurrency.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/concurrency.ts#L8)
 
 ___
 
