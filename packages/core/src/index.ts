@@ -309,7 +309,7 @@ class Hopr extends EventEmitter {
     )
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db, protocol_msg)
+    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db, protocol_msg, protocol_ack)
 
     await this.announce(this.options.announce)
     log('announcing done, starting heartbeat')

@@ -17,7 +17,8 @@ export class PacketForwardInteraction {
     private chain: HoprCoreEthereum,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB,
-    private protocol_msg: string
+    private protocol_msg: string,
+    private protocol_ack: string,
   ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
     this.subscribe(protocol_msg, this.handlePacket.bind(this))
@@ -47,6 +48,6 @@ export class PacketForwardInteraction {
       await this.interact(pubKeyToPeerId(packet.nextHop), packet)
     }
 
-    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocol_msg)
+    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocol_ack)
   }
 }
