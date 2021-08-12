@@ -34,7 +34,8 @@ import {
   isSecp256k1PeerId,
   AcknowledgedTicket,
   ChannelStatus,
-  MIN_NATIVE_BALANCE
+  MIN_NATIVE_BALANCE,
+  u8aConcat
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -858,8 +859,8 @@ class Hopr extends EventEmitter {
     return await ethereum.getPublicKeyOf(addr)
   }
 
-  public async signArbitraryMessage(message: Uint8Array) {
-    return await this.id.privKey.sign(message)
+  public async signMessage(message: Uint8Array) {
+    return await this.id.privKey.sign(u8aConcat(new TextEncoder().encode('HOPR Signed Message: '), message))
   }
 
   public async getEthereumAddress(): Promise<Address> {

@@ -26,7 +26,7 @@ export class AdminServer {
   private wsServer: any
   private cmds: Commands
 
-  constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) {}
+  constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) { }
 
   authenticate(req): boolean {
     if (!this.apiToken) {
@@ -38,6 +38,11 @@ export class AdminServer {
       return false
     }
 
+    // Other clients different to `hoprd` might pass the `apiToken` via a
+    // query param since they won't be on the same domain the node is hosted,
+    // and thus, unable to set the `apiToken` via cookies. Using `req.url` we
+    // can detect these cases and provide the ability for any client that
+    // knows the `apiToken` to reach your HOPR node.
     if (req.url) {
       const query = parse(req.url).query
       const [_, apiToken] = (query && query.split('=')) || []
@@ -145,16 +150,16 @@ export class AdminServer {
     this.node.on('hopr:warning:unfunded', (addr) => {
       this.logs.log(
         `- The account associated with this node has no ${Balance.SYMBOL},\n` +
-          `  in order to send messages, or open channels, you will need to send` +
-          `  at least ${MIN_BALANCE} to ${addr}`
+        `  in order to send messages, or open channels, you will need to send` +
+        `  at least ${MIN_BALANCE} to ${addr}`
       )
     })
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       this.logs.log(
         `- The account associated with this node has no ${NativeBalance.SYMBOL},\n` +
-          `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  ${MIN_NATIVE_BALANCE} to ${addr}`
+        `  in order to fund gas for protocol overhead you will need to send\n` +
+        `  ${MIN_NATIVE_BALANCE} to ${addr}`
       )
     })
 
@@ -166,7 +171,7 @@ export class AdminServer {
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
 
-    this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
+    this.cmds.execute(() => { }, `alias ${node.getId().toB58String()} me`)
   }
 }
 

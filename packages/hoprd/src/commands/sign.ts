@@ -14,7 +14,7 @@ export default class Sign extends AbstractCommand {
   }
 
   public help() {
-    return 'Signs any arbitrary message with a node’s key'
+    return 'Signs a message with a node’s key and the prefix "HOPR Signed Message: "'
   }
 
   public async execute(log, query: string): Promise<void> {
@@ -23,7 +23,7 @@ export default class Sign extends AbstractCommand {
     }
 
     try {
-      const signature = await this.node.signArbitraryMessage(new TextEncoder().encode(query))
+      const signature = await this.node.signMessage(new TextEncoder().encode(query))
       return log(`Signed message: ${u8aToHex(signature)}`)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
