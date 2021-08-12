@@ -8538,11 +8538,11 @@ key-did-provider-ed25519@^1.1.0:
     uint8arrays "^2.1.5"
 
 key-did-resolver@^1.2.1:
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/key-did-resolver/-/key-did-resolver-1.2.1.tgz#5a97ccaa6799e2a503ec0d6aaadd1304a32d1315"
-  integrity sha512-nq4pLXfMzpHUNpf6VkqPhnI+zU+kUrh9VRof4+i1exIgKBxo2sefRREu5pD9u9/rAUgA+9Gv9D/ENGEUCtqJaw==
+  version "1.3.1"
+  resolved "https://registry.yarnpkg.com/key-did-resolver/-/key-did-resolver-1.3.1.tgz#d524d6907acca5684c4fe0aba15107dede101711"
+  integrity sha512-rS/TwfxRQp7mVOphHsnqnd8/hK2GleCXwX8DAsL45pRZf6H1nOI0pj6zex+kvklsPMz4pwOREp4TOxejB2iGqw==
   dependencies:
-    "@stablelib/ed25519" "^1.0.1"
+    "@stablelib/ed25519" "^1.0.2"
     multibase "~4.0.2"
     uint8arrays "^2.0.5"
     varint "^6.0.0"
