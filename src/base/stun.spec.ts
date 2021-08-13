@@ -98,18 +98,24 @@ describe('test STUN', function () {
       .slice(1)
       .map((server: ServerType) => Multiaddr.fromNodeAddress(nodeToMultiaddr(server.socket.address()), 'udp'))
 
-    const result = await getExternalIp(multiAddrs, servers[0].socket)
+    let result = await getExternalIp(multiAddrs, servers[0].socket)
 
-    // FIXME this fails when running behind a bidirectional NAT
-    assert(result != undefined, `STUN request must be successful`)
+    if (result == undefined) {
+      // It seems that we're running behind a bidirectional NAT. Test STUN in local mode
+      result = await getExternalIp(multiAddrs, servers[0].socket, true)
 
-    const u8aAddress = ipToU8aAddress(result.address, 'IPv4')
+      assert(result != undefined, `STUN request must be successful`)
 
-    // FIXME this fails when running behind a bidirectional NAT
-    assert(
-      !isLocalhost(u8aAddress, 'IPv4') && !isPrivateAddress(u8aAddress, 'IPv4'),
-      'Result must be a public IPv4 address'
-    )
+      assert(isLocalhost(ipToU8aAddress(result.address, 'IPv4'), 'IPv4'))
+    } else {
+      // NAT seems to be honest or running on a machine with public IPv4 address
+      const u8aAddress = ipToU8aAddress(result.address, 'IPv4')
+
+      // Check that returned is a public address
+      assert(!isLocalhost(u8aAddress, 'IPv4'), `Returned address must not be localhost`)
+
+      assert(!isPrivateAddress(u8aAddress, 'IPv4'), `Returned address must not be a local address`)
+    }
 
     /*
      // DISABLED - with IP4 the address changes from 0.0.0.0 to 127.0.0.1
@@ -209,9 +215,11 @@ describe('test STUN', function () {
       true
     )
 
+    assert(responseWhenRunningLocally != undefined, 'STUN request must be successful')
+
     assert(
-      responseWhenRunningLocally != undefined && responseWhenRunningLocally.address === '127.0.0.1',
-      `Ambiguous results from local STUN servers should `
+      responseWhenRunningLocally.address === '127.0.0.1',
+      `When running all nodes on localhost, response must be localhost`
     )
   })
 
