@@ -322,7 +322,7 @@ function getUsableResults(results: Request[], runningLocally = false): Request[]
         }
         break
       default:
-        error(`Invalid STUN respone. Got family: ${result.response.family}`)
+        error(`Invalid STUN response. Got family: ${result.response.family}`)
         break
     }
   }
