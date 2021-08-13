@@ -4,6 +4,10 @@
 
 ## Table of contents
 
+### Namespaces
+
+- [LibP2P](modules/LibP2P.md)
+
 ### Classes
 
 - [LibP2P](classes/LibP2P.md)
