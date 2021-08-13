@@ -72,7 +72,7 @@
       "ts"
     ],
     "spec": [
-      "src/base/stun.spec.ts"
+      "src/**/*.spec.ts"
     ],
     "require": [
       "ts-node/register"
