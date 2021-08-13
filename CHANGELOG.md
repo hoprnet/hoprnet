@@ -1,3 +1,11 @@
+<a name="0.2.41"></a>
+
+## [0.2.41](https://github.com/hoprnet/hopr-connect/compare/v0.2.40...v0.2.41) (2021-08-13)
+
+Changes:
+
+- improved STUN logic, now filtering STUN responses containing local addresses (#283)
+
 <a name="0.2.40"></a>
 
 ## [0.2.40](https://github.com/hoprnet/hopr-connect/compare/v0.2.35...v0.2.40) (2021-07-28)
