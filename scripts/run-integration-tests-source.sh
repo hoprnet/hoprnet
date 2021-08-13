@@ -117,7 +117,7 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="e2e-test" \
-    --provider=http://127.0.0.1:8545/ \
+    --environment hardhat-localhost \
     --rest \
     --restPort "${rest_port}" \
     --testAnnounceLocalAddresses \
