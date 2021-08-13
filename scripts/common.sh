@@ -37,9 +37,7 @@ function start_node {
     declare rest_args=${@:4}
 
     DEBUG=hopr-connect*,simple-peer \
-    yarn dlx \
-    ts-node \
-        "${filename}" \
+    yarn run spawn-test-node \
         > "${log_file}" \
         ${rest_args} \
         --script "${script}" \
