@@ -8,26 +8,31 @@ A binary operation `*`  on a set `G` is a mapping from GxG to `G`, which associa
 **Definition:** A group `(G,)` consists of a set `G` together with a binary operation  for which the following properties are satisfied:
 
 1. Associativity:
-![formula](https://render.githubusercontent.com/render/math?math=(x\times y)\times z=x\times (y\times z), 	\forall x,y,z\in G)
+<img src="https://render.githubusercontent.com/render/math?math=(x\star y)\star z=x\star (y\star z),\forall x,y,z\in G ">
+
 2. Neutral element:
-![formula](https://render.githubusercontent.com/render/math?math=\exists!e\in G, e\times x=x=x\times e, \forall x\in G)
+<img src="https://render.githubusercontent.com/render/math?math=\exists!e\in G, e\star x=x=x\star e, \forall x\in G ">
+
 3. Inverse element:
-![formula](https://render.githubusercontent.com/render/math?math=\forall x\in G,\exists !x'\in G, x\times x'=e=x'\times x) where `e` is the neutral element of `G`.
-A group `G` is **abelian** or **(commutative)** if :
-![formula](https://render.githubusercontent.com/render/math?math=xy=yx, x,yG.)
+<img src="https://render.githubusercontent.com/render/math?math=\forall x\in G,\exists !x'\in G, x\star x'=e=x'\star x "> 
+
+where `e` is the neutral element of `G`. A group `G` is **abelian** or **(commutative)** if :
+
+<img src="https://render.githubusercontent.com/render/math?math=x\star y=y\star x, \forall x,y\in G ">
 
 
 **Finite groups**
-Let n=#G= number of elements in G. Then
-gn=e for all gG. 
+Let `n=#G`= number of elements in G. Then
+<img src="https://render.githubusercontent.com/render/math?math=g^n=e, \forall g\in G ">
+ 
 
 
 ### Cyclic groups
 
-**Definition:** A group `G` is said to be cyclic, with generator g, if every element of `G` is of the form `gx for some integer x.
+**Definition:** A group `G` is said to be cyclic, with generator `g`, if every element of `G` is of the form `g^x` for some integer `x`.
 
-
-A finite group G  of n elements is cyclic, if there exist an element (or elements) gG with g,g2,g3,...............gn=e=G and g is a generator of G.
+A finite group `G`  of `n` elements is cyclic, if there exist an element (or elements) 
+<img src="https://render.githubusercontent.com/render/math?math=g\in G"> with <img src="https://render.githubusercontent.com/render/math?math=\{g,g^2,g^3,...............g^n=e\}=G"> and `g` is a generator of `G`.
 
 ### Cyclic Groups & Cryptographic Applications
 
