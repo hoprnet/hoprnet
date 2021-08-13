@@ -8,7 +8,7 @@ env:
 
 on:
   push:
-    branches: ['**']
+    branches: ['**', '!testnet/**']
     paths-ignore:
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
