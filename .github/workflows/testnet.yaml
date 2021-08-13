@@ -105,9 +105,6 @@ jobs:
         run: |
           docker-compose build
           sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#c11c4bd
-          avadosdk increase minor
-          sed -i "s/version\"[ ]*:[ ]*\"[0-9]*\.[0-9]*\.[0-9]*\"/version\": \"${AVADO_VERSION}\"/" \
-            ./dappnode_package.json
           cat ./dappnode_package.json
           sudo avadosdk build --provider http://80.208.229.228:5001
           git add dappnode_package.json docker-compose.yml releases.json
