@@ -42,6 +42,7 @@ export const DEFAULT_PARALLEL_STUN_CALLS = 4
  * @param socket Node.JS socket to use
  * @param data received packet
  * @param rinfo Addr+Port of the incoming connection
+ * @param __fakeRInfo [testing] overwrite incoming information to intentionally send misleading STUN response
  */
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo, __fakeRInfo?: RemoteInfo): void {
   const req = stun.createBlank()
@@ -94,6 +95,7 @@ type Request = {
  *
  * @param multiAddrs Multiaddrs to use as STUN servers
  * @param socket Node.JS socket to use for the STUN request
+ * @param runningLocally set to true when running a local testnet
  */
 export async function getExternalIp(
   multiAddrs: Multiaddr[] | undefined,

@@ -100,12 +100,12 @@ describe('test STUN', function () {
 
     const result = await getExternalIp(multiAddrs, servers[0].socket)
 
-    // FIXME this fails when running behind a birectional NAT
+    // FIXME this fails when running behind a bidirectional NAT
     assert(result != undefined, `STUN request must be successful`)
 
     const u8aAddress = ipToU8aAddress(result.address, 'IPv4')
 
-    // FIXME this fails when running behind a birectional NAT
+    // FIXME this fails when running behind a bidirectional NAT
     assert(
       !isLocalhost(u8aAddress, 'IPv4') && !isPrivateAddress(u8aAddress, 'IPv4'),
       'Result must be a public IPv4 address'
@@ -194,7 +194,10 @@ describe('test STUN', function () {
       true
     )
 
-    assert(responseWhenRunningLocally == undefined, `Ambiguous results from local STUN servers should `)
+    assert(
+      responseWhenRunningLocally == undefined,
+      `Ambiguous results from local STUN servers should not lead to successful STUN response`
+    )
 
     await Promise.all(tweakedServers.map(closeSTUNServer))
   })
