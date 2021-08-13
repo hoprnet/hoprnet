@@ -33,7 +33,7 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-connect": "0.2.40",
+    "@hoprnet/hopr-connect": "0.2.41",
     "@hoprnet/hopr-core-ethereum": "1.76.0-next.4",
     "@hoprnet/hopr-utils": "1.76.0-next.4",
     "abort-controller": "^3.0.0",

@@ -22,11 +22,11 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const data = require(filePath)
     const contractName = contract.replace('.json', '')
     const compilerData =
-      data.compilerData ?? (await hre.artifacts.getBuildInfo(`contracts/${contractName}.sol:${contractName}`))
+      (await hre.artifacts.getBuildInfo(`contracts/${contractName}.sol:${contractName}`)) ?? data.compilerData
     const slimmed = {
       address: data.address,
       transactionHash: data.transactionHash,
-      blockNumber: data.blockNumber ?? data.receipt.blockNumber,
+      blockNumber: data.receipt ? data.receipt.blockNumber : data.blockNumber,
       metadata: {
         solcVersion: compilerData.solcVersion,
         input: compilerData.input
