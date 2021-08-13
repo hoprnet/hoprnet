@@ -315,8 +315,16 @@ function getUsableResults(results: Request[], runningLocally = false): Request[]
         break
       case 'IPv4':
         const u8aAddr = ipToU8aAddress(result.response.address, 'IPv4')
-        // If running locally, get only local addresses,
-        // otherwise only get public addresses
+        // Disitinguish two use cases:
+        // Unit tests:
+        // - run several instances on one machine, hence STUN response is expected to be
+        //   'localhost:somePort'
+        // CI tests / large E2E tests:
+        // - run several instances on multiple machines running in the *same* local network
+        //   hence STUN response is expected to be a local address
+        // Disclaimer:
+        // the mixed use case, meaning some instances running on the same machine and some
+        // instances running on machines in the same network is not expected
         if ((isPrivateAddress(u8aAddr, 'IPv4') || isLocalhost(u8aAddr, 'IPv4')) == runningLocally) {
           filtered.push(result)
         }
