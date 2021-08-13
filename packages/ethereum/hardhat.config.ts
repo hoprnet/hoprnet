@@ -1,4 +1,4 @@
-import type { SolcUserConfig } from 'hardhat/types'
+import type { HardhatRuntimeEnvironment, HardhatConfig, SolcUserConfig } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
 // load hardhat plugins
@@ -10,15 +10,27 @@ import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
 // rest
-import { HardhatUserConfig, task, types } from 'hardhat/config'
+import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
 import { ethers } from 'ethers'
 import { networks, NetworkTag } from './constants'
 
-const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, INFURA_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
+const {
+  DEPLOYER_WALLET_PRIVATE_KEY,
+  ETHERSCAN_KEY,
+  INFURA_KEY,
+  QUIKNODE_KEY,
+  DEVELOPMENT = false,
+  ENVIRONMENT_ID = 'default'
+} = process.env
 const GAS_MULTIPLIER = 1.1
 
-// set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
-process.env.ETHERSCAN_API_KEY = ETHERSCAN_KEY
+extendConfig((config: HardhatConfig) => {
+  config.etherscan.apiKey = ETHERSCAN_KEY
+})
+
+extendEnvironment((hre: HardhatRuntimeEnvironment) => {
+  hre.environment = ENVIRONMENT_ID
+})
 
 const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
@@ -89,7 +101,7 @@ const hardhatConfig: HardhatUserConfig = {
     tests: './test',
     cache: './hardhat/cache',
     artifacts: './hardhat/artifacts',
-    deployments: './deployments'
+    deployments: `./deployments/${ENVIRONMENT_ID}`
   },
   typechain: {
     outDir: './types',

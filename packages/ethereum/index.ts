@@ -13,7 +13,11 @@ export type ContractData = {
   abi: any
 }
 
-export const getContractData = (network: Networks, contract: ContractNames): ContractData => {
+export const getContractData = (
+  network: Networks,
+  contract: ContractNames,
+  environmentId: string = 'default'
+): ContractData => {
   // hack: required for E2E tests to pass
   // when a contract changes we redeploy it, this causes the deployments folder to change
   // unlike normal the release workflow, when running the E2E tests, we build the project
@@ -24,7 +28,7 @@ export const getContractData = (network: Networks, contract: ContractNames): Con
     : join(__dirname, 'deployments')
 
   try {
-    return require(join(deploymentsPath, network, `${contract}.json`))
+    return require(join(deploymentsPath, environmentId, network, `${contract}.json`))
   } catch {
     throw Error(`contract data for ${contract} from network ${network} not found`)
   }
