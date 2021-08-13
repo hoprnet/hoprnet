@@ -96,21 +96,6 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - name: Set avado version
-        id: set-version
-        run: |
-          # Hack version if we are in master (they don't support prerelease versions)
-          # Set this to an arbitrary number less than 1
-          declare version="0.100.0"
-          if [[ "${HOPR_GITHUB_REF}" == refs/heads/testnet/* ]]; then
-             # only assing the proper version only on release branches because
-             # only there we have simple semver versions
-            version="$(scripts/get-package-version.sh)"
-          fi
-          echo "::set-output name=vsn::${version}"
-        env:
-          HOPR_PACKAGE: hoprd
-
       - name: Build Avado
         working-directory: packages/avado
         env:
