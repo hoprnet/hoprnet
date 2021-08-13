@@ -1,6 +1,13 @@
 {
   "environments": [
     {
+      "id": "hardhat-localhost",
+      "network_id": "hardhat",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
+      "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}"
+    },
+    {
       "id": "master",
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
@@ -30,6 +37,16 @@
     }
   ],
   "networks": [
+    {
+      "description": "Hardhat is an Ethereum development environment",
+      "id": "hardhat",
+      "chain_id": 1,
+      "gas": "1 gwei",
+      "gas_multiplier": 1.1,
+      "default_provider": "http://127.0.0.1:8545/",
+      "native_token_name": "ETH",
+      "hopr_token_name": "wxHOPR"
+    },
     {
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
       "id": "xdai",
