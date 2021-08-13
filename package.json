@@ -45,6 +45,7 @@
     "wrtc": "0.4.7"
   },
   "devDependencies": {
+    "@types/bn.js": "^5.1.0",
     "@types/chai": "^4.2.21",
     "@types/chai-spies": "^1.0.3",
     "@types/debug": "^4.1.7",
