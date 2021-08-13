@@ -5,6 +5,22 @@ __metadata:
   version: 4
   cacheKey: 7
 
+"@cspotcode/source-map-consumer@npm:0.8.0":
+  version: 0.8.0
+  resolution: "@cspotcode/source-map-consumer@npm:0.8.0"
+  checksum: fc32215a353c7b3d039f5d4b93329200264daeabb0739dcf53eb78f779e37e5f5c281aad281f86781c930011d354612aafab887304451a46f16b10f0f919297f
+  languageName: node
+  linkType: hard
+
+"@cspotcode/source-map-support@npm:0.6.1":
+  version: 0.6.1
+  resolution: "@cspotcode/source-map-support@npm:0.6.1"
+  dependencies:
+    "@cspotcode/source-map-consumer": 0.8.0
+  checksum: eda5227576981f3a16bd1b0940f11bffe96a7dad36da6f2e5e3a8ee5b3ecb153359df08084684509adc63ffe12e14894b6f6f8f9423780895cf7cd9d66c8bbd6
+  languageName: node
+  linkType: hard
+
 "@ethersproject/abi@npm:5.1.2, @ethersproject/abi@npm:^5.1.0":
   version: 5.1.2
   resolution: "@ethersproject/abi@npm:5.1.2"
@@ -438,7 +454,7 @@ __metadata:
     prettier: ~2.3.2
     simple-peer: 9.11
     stream-to-it: ^0.2.4
-    ts-node: ^10.1.0
+    ts-node: ^10.2.0
     typescript: ^4.3.5
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
@@ -735,10 +751,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tsconfig/node16@npm:^1.0.1":
-  version: 1.0.1
-  resolution: "@tsconfig/node16@npm:1.0.1"
-  checksum: c389a4a81c291a27b96705de7fbe46d29aa4eb771450a41dfc075d89e1fdd63141898043a0d9f627460a1c409d06635a044dc4b3a4516173769a7d0a1558c51d
+"@tsconfig/node16@npm:^1.0.2":
+  version: 1.0.2
+  resolution: "@tsconfig/node16@npm:1.0.2"
+  checksum: 57310e88858be59b36603e5d9bd7bd1714d16402ef1e536c01521ad3b207833a2fc64d260d362cae07bf4e50759a3aba3958c2faf9c42b52c4c817be60a93123
   languageName: node
   linkType: hard
 
@@ -913,6 +929,22 @@ __metadata:
     level-supports: ^2.0.0
     queue-microtask: ^1.2.3
   checksum: d6f1ce9cc9d51d066310dedd4f897d2cd1a3abab64775114acf477a00e34646c0a44abd89b6848f0b21608926a44717135f4f6dacc9f397d550fef8529a7311b
+  languageName: node
+  linkType: hard
+
+"acorn-walk@npm:^8.1.1":
+  version: 8.1.1
+  resolution: "acorn-walk@npm:8.1.1"
+  checksum: 611ed68ed745414d46ccd4ccd5a4469a9420be4af59126ab66d1c51e1e48fe80bf41cce48a27efbfb777d6eea221f73f57a19d129f3114cae49fedc9a2b21a5b
+  languageName: node
+  linkType: hard
+
+"acorn@npm:^8.4.1":
+  version: 8.4.1
+  resolution: "acorn@npm:8.4.1"
+  bin:
+    acorn: bin/acorn
+  checksum: 37720df0ecd48baf87506aff228aedc7e73379df9e9309f0b89aaff18bb3d08af892d47c0f19d5ef1723066ca74157b00adcfea9a62b21a493c91babb7d22bc3
   languageName: node
   linkType: hard
 
@@ -1254,13 +1286,6 @@ __metadata:
   version: 0.2.13
   resolution: "buffer-crc32@npm:0.2.13"
   checksum: 0340e848d6fd87e49ef6f1067f31b2a8d2e71b433e9bb62ff3d9bc2499146f0be586b5b80b0d099c7110a226161b21cb6cd80162dd5a51d9ebdb03da58b99637
-  languageName: node
-  linkType: hard
-
-"buffer-from@npm:^1.0.0":
-  version: 1.1.1
-  resolution: "buffer-from@npm:1.1.1"
-  checksum: 540ceb79c4f5bfcadaabbc18324fa84c50dc52905084be7c03596a339cf5a88513bee6831ce9b36ddd046fab09257a7c80686e129d0559a0cfd141da196ad956
   languageName: node
   linkType: hard
 
@@ -4303,23 +4328,6 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"source-map-support@npm:^0.5.17":
-  version: 0.5.19
-  resolution: "source-map-support@npm:0.5.19"
-  dependencies:
-    buffer-from: ^1.0.0
-    source-map: ^0.6.0
-  checksum: 59d4efaae97755155b078413ecba63517e3ef054cc7ab767bbd30e6f3054be2ae8e8f5cce7eef53b7eb93e98fe27a58dd8f5e7abfb13144ba420ddaf5267bbb2
-  languageName: node
-  linkType: hard
-
-"source-map@npm:^0.6.0":
-  version: 0.6.1
-  resolution: "source-map@npm:0.6.1"
-  checksum: 8647829a0611724114022be455ca1c8a2c8ae61df81c5b3667d9b398207226a1e21174fb7bbf0b4dbeb27ac358222afb5a14f1c74a62a62b8883b012e5eb1270
-  languageName: node
-  linkType: hard
-
 "sprintf-js@npm:1.1.2":
   version: 1.1.2
   resolution: "sprintf-js@npm:1.1.2"
@@ -4556,19 +4564,21 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"ts-node@npm:^10.1.0":
-  version: 10.1.0
-  resolution: "ts-node@npm:10.1.0"
+"ts-node@npm:^10.2.0":
+  version: 10.2.0
+  resolution: "ts-node@npm:10.2.0"
   dependencies:
+    "@cspotcode/source-map-support": 0.6.1
     "@tsconfig/node10": ^1.0.7
     "@tsconfig/node12": ^1.0.7
     "@tsconfig/node14": ^1.0.0
-    "@tsconfig/node16": ^1.0.1
+    "@tsconfig/node16": ^1.0.2
+    acorn: ^8.4.1
+    acorn-walk: ^8.1.1
     arg: ^4.1.0
     create-require: ^1.1.0
     diff: ^4.0.1
     make-error: ^1.1.1
-    source-map-support: ^0.5.17
     yn: 3.1.1
   peerDependencies:
     "@swc/core": ">=1.2.50"
@@ -4586,7 +4596,7 @@ fsevents@~2.3.2:
     ts-node-script: dist/bin-script.js
     ts-node-transpile-only: dist/bin-transpile.js
     ts-script: dist/bin-script-deprecated.js
-  checksum: d1b582dc3624061d86c2657507e21c3875919b7d108db16cde5507f2aa75b025be2e09b35ec607900eb525e429ebd14f0cf1c5f4b81292a191c0f8c7bfdf0720
+  checksum: 7633bc5d27b08202a4d3e0c9a8def2933e98daf6316cb94992e21975f1432e28aeb34d601f69b912f61a1b2515677cb5f4015cab4848bcf4691c4bf1f6736963
   languageName: node
   linkType: hard
 

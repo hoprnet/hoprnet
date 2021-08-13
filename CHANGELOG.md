@@ -5,6 +5,7 @@
 Changes:
 
 - improved STUN logic, now filtering STUN responses containing local addresses (#283)
+- package upgrade: `ts-node@10.2.0`
 
 <a name="0.2.40"></a>
 
