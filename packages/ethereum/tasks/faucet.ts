@@ -32,7 +32,7 @@ async function main(
 
   let hoprTokenAddress: string
   try {
-    const contract = await getContractData(network.name as Networks, 'HoprToken')
+    const contract = getContractData(network.name as Networks, 'HoprToken')
     hoprTokenAddress = contract.address
   } catch {
     console.error('⛓  You need to ensure the network deployed the contracts')
