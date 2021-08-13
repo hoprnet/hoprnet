@@ -5,7 +5,7 @@ import { Multiaddr } from 'multiaddr'
 import debug from 'debug'
 import { randomSubset } from '@hoprnet/hopr-utils'
 import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../constants'
-import { ipToU8aAddress, isPrivateAddress } from '../utils'
+import { ipToU8aAddress, isLocalhost, isPrivateAddress } from '../utils'
 
 const log = debug('hopr-connect:stun:error')
 const error = debug('hopr-connect:stun:error')
@@ -43,7 +43,7 @@ export const DEFAULT_PARALLEL_STUN_CALLS = 4
  * @param data received packet
  * @param rinfo Addr+Port of the incoming connection
  */
-export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo): void {
+export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo, __fakeRInfo?: RemoteInfo): void {
   const req = stun.createBlank()
 
   // Overwrite console.log because 'webrtc-stun' package
@@ -57,7 +57,10 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
       if (req.isBindingRequest({ fingerprint: true })) {
         verbose(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
 
-        const res = req.createBindingResponse(true).setXorMappedAddressAttribute(rinfo).setFingerprintAttribute()
+        const res = req
+          .createBindingResponse(true)
+          .setXorMappedAddressAttribute(__fakeRInfo ?? rinfo)
+          .setFingerprintAttribute()
 
         socket.send(res.toBuffer(), rinfo.port, rinfo.address)
       } else if (!req.isBindingResponseSuccess()) {
@@ -72,6 +75,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
     console.log = consoleBackup
   }
 }
+
 type Address = {
   address: string
   family: string
@@ -91,79 +95,95 @@ type Request = {
  * @param multiAddrs Multiaddrs to use as STUN servers
  * @param socket Node.JS socket to use for the STUN request
  */
-export function getExternalIp(
+export async function getExternalIp(
   multiAddrs: Multiaddr[] | undefined,
   socket: Socket,
   runningLocally = false
 ): Promise<ConnectionInfo | undefined> {
-  return new Promise<ConnectionInfo | undefined>(async (resolve) => {
-    let usableMultiaddrs: Multiaddr[]
-    let usingPublicServers = false
+  let usableMultiaddrs: Multiaddr[]
+  let usingPublicServers = false
 
-    if (multiAddrs == undefined || multiAddrs.length == 0) {
-      if (runningLocally) {
-        // Do not try to contact public STUN servers when running locally
-        resolve(undefined)
-        return
-      }
-      // Use public STUN servers if no own STUN servers are given
-      usingPublicServers = true
-      usableMultiaddrs = randomSubset(PUBLIC_STUN_SERVERS, DEFAULT_PARALLEL_STUN_CALLS)
-      verbose(`No own STUN servers given. Using ${usableMultiaddrs.map((ma: Multiaddr) => ma.toString()).join(', ')}`)
-    } else if (multiAddrs.length > DEFAULT_PARALLEL_STUN_CALLS) {
-      // Limit number of STUN servers to contact
-      usableMultiaddrs = randomSubset(multiAddrs, DEFAULT_PARALLEL_STUN_CALLS)
-    } else {
-      usableMultiaddrs = multiAddrs
-    }
-
-    verbose(`Trying to determine external IP by using ${usableMultiaddrs.map((m) => m.toString()).join(',')}`)
-
-    let requests = generateRequests(usableMultiaddrs)
-    let results = decodeIncomingSTUNResponses(requests, socket, STUN_TIMEOUT)
-    sendStunRequests(requests, socket)
-
-    let responses = (await results).filter((request: Request) => request.response)
-
-    if (responses.length == 0 && (usingPublicServers || runningLocally)) {
-      // We have already contacted public and this did not lead to a result
-      // hence we cannot determine public IP address
-      resolve(undefined)
+  if (multiAddrs == undefined || multiAddrs.length == 0) {
+    if (runningLocally) {
+      // Do not try to contact public STUN servers when running locally
       return
     }
+    // Use public STUN servers if no own STUN servers are given
+    usingPublicServers = true
+    usableMultiaddrs = randomSubset(PUBLIC_STUN_SERVERS, DEFAULT_PARALLEL_STUN_CALLS)
+    verbose(`No own STUN servers given. Using ${usableMultiaddrs.map((ma: Multiaddr) => ma.toString()).join(', ')}`)
+  } else if (multiAddrs.length > DEFAULT_PARALLEL_STUN_CALLS) {
+    // Limit number of STUN servers to contact
+    usableMultiaddrs = randomSubset(multiAddrs, DEFAULT_PARALLEL_STUN_CALLS)
+  } else {
+    usableMultiaddrs = multiAddrs
+  }
 
-    if ([0, 1].includes(responses.length) && !runningLocally && !usingPublicServers) {
-      // Received too less results to see if addresses are ambiguous,
-      // let's try some public servers
-      usableMultiaddrs = randomSubset(PUBLIC_STUN_SERVERS, DEFAULT_PARALLEL_STUN_CALLS)
-      verbose(
-        `Using own STUN servers did not lead to a result. Trying ${usableMultiaddrs
-          .map((ma: Multiaddr) => ma.toString())
-          .join(', ')}`
-      )
+  verbose(`Trying to determine external IP by using ${usableMultiaddrs.map((m) => m.toString()).join(',')}`)
 
-      requests = generateRequests(usableMultiaddrs)
-      results = decodeIncomingSTUNResponses(requests, socket, STUN_TIMEOUT)
-      sendStunRequests(requests, socket)
+  let responses = await performSTUNRequests(usableMultiaddrs, socket, STUN_TIMEOUT)
 
-      responses.push(...(await results).filter((request: Request) => request.response))
-    }
+  if (responses.length == 0 && (usingPublicServers || runningLocally)) {
+    // We have already contacted public and this did not lead to a result
+    // hence we cannot determine public IP address
+    return
+  }
 
-    if (responses.length == 0) {
-      // Even contacting public STUN servers did not lead
-      resolve(undefined)
-      return
-    }
+  if ([0, 1].includes(responses.length) && !runningLocally && !usingPublicServers) {
+    // Received too less results to see if addresses are ambiguous,
+    // let's try some public servers
+    usingPublicServers = true
+    usableMultiaddrs = randomSubset(PUBLIC_STUN_SERVERS, DEFAULT_PARALLEL_STUN_CALLS)
+    verbose(
+      `Using own STUN servers did not lead to a result. Trying ${usableMultiaddrs
+        .map((ma: Multiaddr) => ma.toString())
+        .join(', ')}`
+    )
 
-    let intepretedResults = intepreteResults(responses)
+    responses.push(...(await performSTUNRequests(usableMultiaddrs, socket, STUN_TIMEOUT)))
+  }
 
-    if (intepretedResults.ambiguous) {
-      resolve(undefined)
-      return
-    } else {
-      resolve(intepretedResults.publicAddress)
-    }
-  })
+  if (responses.length == 0) {
+    // Even contacting public STUN servers did not lead
+    return
+  }
+
+  let filteredResults = getUsableResults(responses, runningLocally)
+
+  if ([0, 1].includes(filteredResults.length) && !runningLocally && !usingPublicServers) {
+    // Received results were not usable to determine public IP address
+    // now trying public ones
+    verbose(
+      `Using own STUN servers did not lead to a result. Trying ${usableMultiaddrs
+        .map((ma: Multiaddr) => ma.toString())
+        .join(', ')}`
+    )
+    usingPublicServers = true
+    usableMultiaddrs = randomSubset(PUBLIC_STUN_SERVERS, DEFAULT_PARALLEL_STUN_CALLS)
+    responses.push(...(await performSTUNRequests(usableMultiaddrs, socket, STUN_TIMEOUT)))
+
+    filteredResults = getUsableResults(responses, runningLocally)
+  }
+
+  const interpreted = intepreteResults(filteredResults)
+
+  if (interpreted.ambiguous) {
+    return undefined
+  } else {
+    return interpreted.publicAddress
+  }
+}
+
+async function performSTUNRequests(
+  multiAddrs: Multiaddr[],
+  socket: Socket,
+  timeout = STUN_TIMEOUT
+): Promise<Request[]> {
+  let requests = generateRequests(multiAddrs)
+  let results = decodeIncomingSTUNResponses(requests, socket, timeout)
+  sendStunRequests(requests, socket)
+
+  return (await results).filter((request: Request) => request.response)
 }
 
 /**
@@ -279,18 +299,8 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
   })
 }
 
-function intepreteResults(
-  results: Request[],
-  runningLocally = false
-):
-  | {
-      ambiguous: true
-    }
-  | {
-      ambiguous: false
-      publicAddress: Address
-    } {
-  let addrs: Address[] = []
+function getUsableResults(results: Request[], runningLocally = false): Request[] {
+  let filtered: Request[] = []
 
   for (const result of results) {
     if (!result.response) {
@@ -305,8 +315,8 @@ function intepreteResults(
         const u8aAddr = ipToU8aAddress(result.response.address, 'IPv4')
         // If running locally, get only local addresses,
         // otherwise only get public addresses
-        if (isPrivateAddress(u8aAddr, 'IPv4') == runningLocally) {
-          addrs.push(result.response)
+        if ((isPrivateAddress(u8aAddr, 'IPv4') || isLocalhost(u8aAddr, 'IPv4')) == runningLocally) {
+          filtered.push(result)
         }
         break
       default:
@@ -315,14 +325,31 @@ function intepreteResults(
     }
   }
 
-  const ambiguous = addrs
+  return filtered
+}
+
+function intepreteResults(results: Request[]):
+  | {
+      ambiguous: true
+    }
+  | {
+      ambiguous: false
+      publicAddress: Address
+    } {
+  if (results.length == 0 || results[0].response == undefined) {
+    return { ambiguous: true }
+  }
+  const ambiguous = results
     .slice(1)
-    .some((addr: Address) => addr.address !== addrs[0].address || addr.port != addrs[0].port)
+    .some(
+      (req: Request) =>
+        req.response?.address !== results[0].response?.address || req.response?.port != results[0].response?.port
+    )
 
   if (ambiguous) {
     return { ambiguous }
   } else {
-    return { ambiguous, publicAddress: addrs[0] }
+    return { ambiguous, publicAddress: results[0].response }
   }
 }
 

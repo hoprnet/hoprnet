@@ -20,6 +20,40 @@ type ServerType = {
   index: number
 }
 
+/**
+ * Creates a STUN server that answers with tweaked STUN responses to simulate
+ * ambiguous results from STUN servers
+ * @param port fake port
+ * @param address fake address
+ * @returns STUN server answering with falsy responses
+ */
+async function getAmbigousSTUNServer(port: number, address?: string) {
+  const socket = dgram.createSocket('udp4')
+
+  const listeningPromise = once(socket, 'listening')
+  socket.bind()
+
+  socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
+    handleStunRequest(socket, msg, rinfo, {
+      ...rinfo,
+      address: address ?? rinfo.address,
+      port
+    })
+  })
+
+  await listeningPromise
+
+  return socket
+}
+
+function closeSTUNServer(socket: Socket) {
+  const closePromise = once(socket, 'close')
+
+  socket.close()
+
+  return closePromise
+}
+
 describe('test STUN', function () {
   let servers: ServerType[]
 
@@ -123,7 +157,52 @@ describe('test STUN', function () {
     assert(Date.now() - before >= STUN_TIMEOUT, `STUN request must produce at least one timeout`)
   })
 
-  // TODO check ambiguous results
+  it('should understand ambiguous results', async function () {
+    const BASE_PUBLIC_ADDRESS = `1.2.3.`
+    const tweakedServers = await Promise.all(
+      Array.from({ length: 2 }, (_, index: number) =>
+        getAmbigousSTUNServer(index, BASE_PUBLIC_ADDRESS.concat(index.toString()))
+      )
+    )
+
+    const response = await getExternalIp(
+      tweakedServers.map((socket: Socket) => new Multiaddr(`/ip4/127.0.0.1/udp/${socket.address().port}`)),
+      servers[0].socket
+    )
+
+    assert(response == undefined, `Ambigous results from local STUN servers must detected as bidirectional NAT`)
+
+    await Promise.all(tweakedServers.map(closeSTUNServer))
+  })
+
+  it('should understand ambiguous results when running in local testnet', async function () {
+    const tweakedServers = await Promise.all(
+      Array.from({ length: 2 }, (_, index: number) => getAmbigousSTUNServer(index))
+    )
+
+    const responseWhenRunningLocally = await getExternalIp(
+      tweakedServers.map((socket: Socket) => new Multiaddr(`/ip4/127.0.0.1/udp/${socket.address().port}`)),
+      servers[0].socket,
+      true
+    )
+
+    assert(responseWhenRunningLocally == undefined, `Ambiguous results from local STUN servers should `)
+
+    await Promise.all(tweakedServers.map(closeSTUNServer))
+  })
+
+  it('should return local IP address when running in local testnet', async function () {
+    const responseWhenRunningLocally = await getExternalIp(
+      servers.slice(1).map((server: ServerType) => new Multiaddr(`/ip4/127.0.0.1/udp/${server.socket.address().port}`)),
+      servers[0].socket,
+      true
+    )
+
+    assert(
+      responseWhenRunningLocally != undefined && responseWhenRunningLocally.address === '127.0.0.1',
+      `Ambiguous results from local STUN servers should `
+    )
+  })
 
   it('should not fail on DNS failures', async function () {
     const stunResult = await getExternalIp(
