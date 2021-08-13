@@ -93,8 +93,8 @@ describe('test STUN', function () {
     )
   })
 
-  it('should perform a STUN request', async function () {
-    const multiAddrs = servers.map((server: ServerType) =>
+  it.only('should perform a STUN request', async function () {
+    const multiAddrs = servers.slice(1).map((server: ServerType) =>
       Multiaddr.fromNodeAddress(nodeToMultiaddr(server.socket.address()), 'udp')
     )
 

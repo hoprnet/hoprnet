@@ -24,7 +24,7 @@
     "spawn-test-node": "ts-node tests/node.ts",
     "clean": "rm -Rf ./lib",
     "build": "yarn clean && tsc -p .",
-    "test": "yarn node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --reporter=tap --full-trace --exit",
+    "test": "DEBUG=hopr* yarn node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --reporter=tap --full-trace --exit",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
@@ -72,7 +72,7 @@
       "ts"
     ],
     "spec": [
-      "src/**/*.spec.ts"
+      "src/base/stun.spec.ts"
     ],
     "require": [
       "ts-node/register"
