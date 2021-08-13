@@ -424,6 +424,7 @@ __metadata:
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
     "@hoprnet/hopr-utils": 1.75.0-next.19
+    "@types/bn.js": ^5.1.0
     "@types/chai": ^4.2.21
     "@types/chai-spies": ^1.0.3
     "@types/debug": ^4.1.7
@@ -764,6 +765,15 @@ __metadata:
   dependencies:
     "@types/node": "*"
   checksum: 5abc8901fc12ea784bc7e497cda0c1d6c29465b32fca929eba57ca9ca7f62f082147ea448a5d796ed7095c0bbb4a1b6a00fcfae832cdee1038013d94813e51c6
+  languageName: node
+  linkType: hard
+
+"@types/bn.js@npm:^5.1.0":
+  version: 5.1.0
+  resolution: "@types/bn.js@npm:5.1.0"
+  dependencies:
+    "@types/node": "*"
+  checksum: e33009f99b19bfbef4591704c2deb18f3c55dc433435091895d462846b97bc22ec0440ff0a05439bc7e3a25b07f8bfd2c43215ee50523e4238a9e2865f98578e
   languageName: node
   linkType: hard
 
