@@ -459,7 +459,7 @@ class Hopr extends EventEmitter {
    * @param peer peer to query for
    */
   public getObservedAddresses(peer: PeerId): Multiaddr[] {
-    return this.libp2p.peerStore.get(peer).addresses ?? []
+    return (this.libp2p.peerStore.get(peer).addresses ?? []).map((addr) => addr.multiaddr)
   }
 
   /**
