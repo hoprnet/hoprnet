@@ -7,7 +7,7 @@ import {
   PUBLIC_STUN_SERVERS,
   STUN_TIMEOUT
 } from './stun'
-import { nodeToMultiaddr } from '../utils'
+import { ipToU8aAddress, isLocalhost, isPrivateAddress, nodeToMultiaddr } from '../utils'
 import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
 import { once } from 'events'
@@ -100,9 +100,17 @@ describe('test STUN', function () {
 
     const result = await getExternalIp(multiAddrs, servers[0].socket)
 
+    // FIXME this fails when running behind a birectional NAT
     assert(result != undefined, `STUN request must be successful`)
 
-    assert(servers[0].socket.address().port === result.port, 'Ports should match')
+    const u8aAddress = ipToU8aAddress(result.address, 'IPv4')
+
+    // FIXME this fails when running behind a birectional NAT
+    assert(
+      !isLocalhost(u8aAddress, 'IPv4') && !isPrivateAddress(u8aAddress, 'IPv4'),
+      'Result must be a public IPv4 address'
+    )
+
     /*
      // DISABLED - with IP4 the address changes from 0.0.0.0 to 127.0.0.1
      // IPV6 doesn't work at present.
