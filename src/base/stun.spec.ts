@@ -27,7 +27,7 @@ type ServerType = {
  * @param address fake address
  * @returns STUN server answering with falsy responses
  */
-async function getAmbigousSTUNServer(port: number, address?: string) {
+async function getAmbiguousSTUNServer(port: number, address?: string) {
   const socket = dgram.createSocket('udp4')
 
   const listeningPromise = once(socket, 'listening')
@@ -169,7 +169,7 @@ describe('test STUN', function () {
     const BASE_PUBLIC_ADDRESS = `1.2.3.`
     const tweakedServers = await Promise.all(
       Array.from({ length: 2 }, (_, index: number) =>
-        getAmbigousSTUNServer(index, BASE_PUBLIC_ADDRESS.concat(index.toString()))
+        getAmbiguousSTUNServer(index, BASE_PUBLIC_ADDRESS.concat(index.toString()))
       )
     )
 
@@ -178,14 +178,14 @@ describe('test STUN', function () {
       servers[0].socket
     )
 
-    assert(response == undefined, `Ambigous results from local STUN servers must detected as bidirectional NAT`)
+    assert(response == undefined, `Ambiguous results from local STUN servers must detected as bidirectional NAT`)
 
     await Promise.all(tweakedServers.map(closeSTUNServer))
   })
 
   it('should understand ambiguous results when running in local testnet', async function () {
     const tweakedServers = await Promise.all(
-      Array.from({ length: 2 }, (_, index: number) => getAmbigousSTUNServer(index))
+      Array.from({ length: 2 }, (_, index: number) => getAmbiguousSTUNServer(index))
     )
 
     const responseWhenRunningLocally = await getExternalIp(
