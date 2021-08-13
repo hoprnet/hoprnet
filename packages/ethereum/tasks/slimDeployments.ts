@@ -26,7 +26,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const slimmed = {
       address: data.address,
       transactionHash: data.transactionHash,
-      blockNumber: data.receipt.blockNumber ?? data.blockNumber,
+      blockNumber: data.receipt ? data.receipt.blockNumber : data.blockNumber,
       metadata: {
         solcVersion: compilerData.solcVersion,
         input: compilerData.input
