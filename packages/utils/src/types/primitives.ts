@@ -252,7 +252,7 @@ export class Signature {
 }
 
 export class Balance {
-  constructor(private bn: BN) { }
+  constructor(private bn: BN) {}
 
   static get SYMBOL(): string {
     return `mHOPR`
@@ -297,7 +297,7 @@ export class Balance {
 }
 
 export class NativeBalance {
-  constructor(private bn: BN) { }
+  constructor(private bn: BN) {}
 
   static get SYMBOL(): string {
     return `MATIC`
