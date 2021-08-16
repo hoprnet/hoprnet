@@ -1,3 +1,3 @@
 FROM gcr.io/hoprassociation/hoprd:latest-matic
 
-ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd", "--password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0'", "--init", "--admin", "--adminHost", "0.0.0.0", "--identity", "/app/db/.hopr-identity", "--apiToken='m4+1C-t35TnE+'", "--healthCheck", "--healthCheckHost", "0.0.0.0", "--provider", "https://polygon-mainnet.infura.io/v3/51d4d972f30c4d92b61f2b3898fccaf6"]
+ENTRYPOINT ["/usr/bin/tini", "--", "yarn", "hoprd", "--password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0'", "--init", "--admin", "--adminHost", "0.0.0.0", "--identity", "/app/db/.hopr-identity", "--apiToken='m4+1C-t35TnE+!_*2021%'", "--healthCheck", "--healthCheckHost", "0.0.0.0", "--provider", "https://polygon-mainnet.infura.io/v3/51d4d972f30c4d92b61f2b3898fccaf6"]
