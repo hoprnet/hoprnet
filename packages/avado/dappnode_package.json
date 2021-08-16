@@ -14,7 +14,9 @@
     ],
     "ports": [
       "3000:3000/tcp",
-      "3001:3001/tcp"
+      "3001:3001/tcp",
+      "8080:8080/tcp",
+      "9091:9091/tcp"
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
     "hash": "/ipfs/Qmbb4zBM1E1CJuJWsPApzV8HerzbUGqoybNagNQZijEpz5",
