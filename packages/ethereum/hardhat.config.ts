@@ -12,17 +12,15 @@ import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
 import { ethers } from 'ethers'
-import { networks, NetworkTag } from './constants'
+import type { Network } from '@hoprnet/hopr-core'
+export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'production'
+export type NetworkTag = DeploymentTypes | 'etherscan'
 
 const {
   DEPLOYER_WALLET_PRIVATE_KEY,
   ETHERSCAN_KEY,
-  INFURA_KEY,
-  QUIKNODE_KEY,
-  DEVELOPMENT = false,
   ENVIRONMENT_ID = 'default'
 } = process.env
-const GAS_MULTIPLIER = 1.1
 
 extendConfig((config: HardhatConfig) => {
   config.etherscan.apiKey = ETHERSCAN_KEY
@@ -32,56 +30,61 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
   hre.environment = ENVIRONMENT_ID
 })
 
+const PROTOCOL_CONFIG = require('../hoprd/protocol-config.json')
+
+// // TODO - I don't understand this
+// const NETWORKS = {
+//   // hardhat-deploy cannot run deployments if the network is not hardhat
+//   // we use an ENV variable (which is specified in our NPM script)
+//   // to let hardhat know we want to run hardhat in 'development' mode
+//   // this essentially enables mining, see below
+//   hardhat: {
+//     live: false,
+//     tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
+//     saveDeployments: true,
+//     mining: DEVELOPMENT
+//       ? {
+//         auto: true, // every transaction will trigger a new block (without this deployments fail)
+//         interval: [1000, 3000] // mine new block every 1 - 3s
+//       }
+//       : undefined
+//   }
+// }
+
+// Object.keys(ENVIRONMENTS).forEach(k => {
+//   const env = ENVIRONMENTS[k]
+//   NETWORKS[k] = {
+//     live: env.live,
+//     tags: env.tags as NetworkTag[],
+//     gasMultiplier: env['gas-multiplier'],
+//     url: env['default-provider'], // TODO key substitution,
+//     accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+//   }
+// })
+
+function networkToHardhatNetwork(input: Network): any {
+  return {
+    live: true, // @TODO
+    tags: [],
+    gasMultiplier: input.gas_multiplier,
+    url: input.default_provider,
+    accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+  }
+}
+
+
+const networks = {}
+
+for (const network of PROTOCOL_CONFIG.networks) {
+  const hardhatNetwork = networkToHardhatNetwork(network)
+  networks[network.id] = hardhatNetwork
+}
+
+console.log(networks)
+
 const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
-  networks: {
-    // hardhat-deploy cannot run deployments if the network is not hardhat
-    // we use an ENV variable (which is specified in our NPM script)
-    // to let hardhat know we want to run hardhat in 'development' mode
-    // this essentially enables mining, see below
-    hardhat: {
-      live: false,
-      tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
-      saveDeployments: true,
-      mining: DEVELOPMENT
-        ? {
-            auto: true, // every transaction will trigger a new block (without this deployments fail)
-            interval: [1000, 3000] // mine new block every 1 - 3s
-          }
-        : undefined
-    },
-    goerli: {
-      ...networks.goerli,
-      live: true,
-      tags: ['staging'] as NetworkTag[],
-      gasMultiplier: GAS_MULTIPLIER,
-      url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
-      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-    },
-    xdai: {
-      ...networks.xdai,
-      live: true,
-      tags: ['production'] as NetworkTag[],
-      gasMultiplier: GAS_MULTIPLIER,
-      url: `https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/`,
-      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-    },
-    mumbai: {
-      ...networks.mumbai,
-      live: false,
-      tags: ['testing'] as NetworkTag[],
-      gasMultiplier: GAS_MULTIPLIER,
-      url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
-      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-    },
-    polygon: {
-      ...networks.polygon,
-      live: false,
-      tags: ['testing'] as NetworkTag[],
-      url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
-      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-    }
-  },
+  networks,
   namedAccounts: {
     deployer: 0
   },
