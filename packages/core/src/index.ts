@@ -168,14 +168,14 @@ class Hopr extends EventEmitter {
     )
     this.environment = options.environment
 
-    function insert_env_vars(input: string) {
+    function expand_env_vars(input: string) {
       return input.replace(/\$\{(.*)\}/g, (_, var_name) => {
         return process.env[var_name]
       })
     }
 
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      provider: insert_env_vars(this.environment.network.default_provider)
+      provider: expand_env_vars(this.environment.network.default_provider)
     })
 
     this.publicNodesEmitter = new EventEmitter()
