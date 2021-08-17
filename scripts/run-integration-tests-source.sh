@@ -76,7 +76,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096 19097; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -200,6 +200,7 @@ ensure_port_is_free 19093
 ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
+ensure_port_is_free 19097
 # }}}
 
 # --- Running Mock Blockchain --- {{{
@@ -219,7 +220,7 @@ setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
 setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost" # should not be able to talk to the rest
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -248,7 +249,7 @@ ${mydir}/../test/security-test.sh \
 
 # --- Run protocol test --- {{{
 ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305"
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
 # -- Verify node6 has executed the commands {{{
@@ -257,6 +258,3 @@ grep -E "^HOPR Balance: +1 HOPR$" "${node6_log}"
 grep -E "^ETH Balance: +1 xDAI$" "${node6_log}"
 grep -E "^Running on: localhost$" "${node6_log}"
 # }}}
-
-# -- Verify node7 was NOT able to talk to others (different environment)
-log "Verifying nodes are clustered according to environments"
