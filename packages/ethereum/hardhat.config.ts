@@ -62,14 +62,47 @@ const PROTOCOL_CONFIG = require('../hoprd/protocol-config.json')
 //   }
 // })
 
+
+// chainId?: number;
+//   from?: string;
+//   gas?: "auto" | number;
+//   gasPrice?: "auto" | number;
+//   gasMultiplier?: number;
+//   initialBaseFeePerGas?: number;
+//   hardfork?: string;
+//   mining?: HardhatNetworkMiningUserConfig;
+//   accounts?: HardhatNetworkAccountsUserConfig;
+//   blockGasLimit?: number;
+//   minGasPrice?: number | string;
+//   throwOnTransactionFailures?: boolean;
+//   throwOnCallFailures?: boolean;
+//   allowUnlimitedContractSize?: boolean;
+//   initialDate?: string;
+//   loggingEnabled?: boolean;
+//   forking?: HardhatNetworkForkingUserConfig;
+
 function networkToHardhatNetwork(input: Network): any {
-  return {
-    live: true, // @TODO
-    tags: [],
+  let res: any = {
+    chainId: input.chain_id,
+    // live: true, // @TODO
+    // tags: [],
     gasMultiplier: input.gas_multiplier,
-    url: input.default_provider,
     accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
   }
+
+  if (input.id !== 'hardhat') {
+    res.live = true
+    res.url = input.default_provider
+  } else {
+    res.live = false
+    res.saveDeployments = true
+    res.mining = {
+      auto: true, // every transaction will trigger a new block (without this deployments fail)
+      interval: [1000, 3000] // mine new block every 1 - 3s
+    }
+  }
+
+  return res
 }
 
 
