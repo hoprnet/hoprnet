@@ -32,69 +32,17 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 
 const PROTOCOL_CONFIG = require('../hoprd/protocol-config.json')
 
-// // TODO - I don't understand this
-// const NETWORKS = {
-//   // hardhat-deploy cannot run deployments if the network is not hardhat
-//   // we use an ENV variable (which is specified in our NPM script)
-//   // to let hardhat know we want to run hardhat in 'development' mode
-//   // this essentially enables mining, see below
-//   hardhat: {
-//     live: false,
-//     tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
-//     saveDeployments: true,
-//     mining: DEVELOPMENT
-//       ? {
-//         auto: true, // every transaction will trigger a new block (without this deployments fail)
-//         interval: [1000, 3000] // mine new block every 1 - 3s
-//       }
-//       : undefined
-//   }
-// }
-
-// Object.keys(ENVIRONMENTS).forEach(k => {
-//   const env = ENVIRONMENTS[k]
-//   NETWORKS[k] = {
-//     live: env.live,
-//     tags: env.tags as NetworkTag[],
-//     gasMultiplier: env['gas-multiplier'],
-//     url: env['default-provider'], // TODO key substitution,
-//     accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-//   }
-// })
-
-
-// chainId?: number;
-//   from?: string;
-//   gas?: "auto" | number;
-//   gasPrice?: "auto" | number;
-//   gasMultiplier?: number;
-//   initialBaseFeePerGas?: number;
-//   hardfork?: string;
-//   mining?: HardhatNetworkMiningUserConfig;
-//   accounts?: HardhatNetworkAccountsUserConfig;
-//   blockGasLimit?: number;
-//   minGasPrice?: number | string;
-//   throwOnTransactionFailures?: boolean;
-//   throwOnCallFailures?: boolean;
-//   allowUnlimitedContractSize?: boolean;
-//   initialDate?: string;
-//   loggingEnabled?: boolean;
-//   forking?: HardhatNetworkForkingUserConfig;
-
 function networkToHardhatNetwork(input: Network): any {
   let res: any = {
     chainId: input.chain_id,
-    // live: true, // @TODO
-    // tags: [],
     gasMultiplier: input.gas_multiplier,
+    live: input.live,
   }
 
-  if (input.id !== 'hardhat') {
-    res.live = true
+  if (input.live) {
     res.url = input.default_provider
     res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
   } else {
-    res.live = false
     res.tags = ['development']
     res.saveDeployments = true
     res.mining = {
@@ -102,10 +50,8 @@ function networkToHardhatNetwork(input: Network): any {
       interval: [1000, 3000] // mine new block every 1 - 3s
     }
   }
-
   return res
 }
-
 
 const networks = {}
 
@@ -113,8 +59,6 @@ for (const network of PROTOCOL_CONFIG.networks) {
   const hardhatNetwork = networkToHardhatNetwork(network)
   networks[network.id] = hardhatNetwork
 }
-
-console.log(networks)
 
 const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',

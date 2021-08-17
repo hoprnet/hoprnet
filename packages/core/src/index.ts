@@ -75,6 +75,7 @@ export type Network = {
   id: string
   description: string
   chain_id: number
+  live: boolean
   default_provider: string
   gas: string
   gas_multiplier: number
