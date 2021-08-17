@@ -16,6 +16,7 @@ import { findPath } from './path'
 
 import { protocols, Multiaddr } from 'multiaddr'
 import chalk from 'chalk'
+import { expand_env_vars } from '@hoprnet/hopr-utils'
 
 import PeerId from 'peer-id'
 import {
@@ -167,12 +168,6 @@ class Hopr extends EventEmitter {
       options.forceCreateDB
     )
     this.environment = options.environment
-
-    function expand_env_vars(input: string) {
-      return input.replace(/\$\{(.*)\}/g, (_, var_name) => {
-        return process.env[var_name]
-      })
-    }
 
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
       provider: expand_env_vars(this.environment.network.default_provider)
