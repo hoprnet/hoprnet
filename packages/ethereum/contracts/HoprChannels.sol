@@ -37,6 +37,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
                   +------>+Waiting For Commitment+----+
                           +----------------------+
 
+     * @dev (Note a channel can go directly from WAITING_FOR_COMMITMENT to PENDING_TO_CLOSE if the opening channel so chooses.)
      */
     enum ChannelStatus { CLOSED, WAITING_FOR_COMMITMENT, OPEN, PENDING_TO_CLOSE }
 
