@@ -3,8 +3,8 @@ name: build yellowpaper
 on:
   push:
     paths:
-      'docs/yellowpaper/**/*.tex'
-      'docs/yellowpaper/*.tex'
+      - 'docs/yellowpaper/**/*.tex'
+      - 'docs/yellowpaper/*.tex'
 
 jobs:
   build_latex:
