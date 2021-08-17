@@ -169,13 +169,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 amount2
     ) external {
         require(amount1 + amount2 > 0, "amount must be greater than 0");
-        token.transferFrom(msg.sender, address(this), amount1 + amount2);
         if (amount1 > 0){
           _fundChannel(account1, account2, amount1);
         }
         if (amount2 > 0){
           _fundChannel(account2, account1, amount2);
         }
+
+        token.transferFrom(msg.sender, address(this), amount1 + amount2);
     }
 
     /**
@@ -292,15 +293,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
         require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
 
-        if (channel.balance > 0) {
-          token.transfer(msg.sender, channel.balance);
-        }
-
         emit ChannelClosureFinalized(msg.sender, destination, channel.closureTime, channel.balance);
         delete channel.balance;
         delete channel.closureTime;
         channel.status = ChannelStatus.CLOSED;
         emit ChannelUpdate(msg.sender, destination, channel);
+
+        if (channel.balance > 0) {
+          token.transfer(msg.sender, channel.balance);
+        }
+
     }
 
     /**
