@@ -24,6 +24,7 @@ const argv = yargs(process.argv.slice(2))
     default: 'https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/'
   })
   .option('environment', {
+    array: true,
     describe: 'Environment id, one of the ids defined in protocol-config.json',
     default: pkg.hopr.environment_id
   })
@@ -139,6 +140,9 @@ const argv = yargs(process.argv.slice(2))
     boolean: true,
     describe: 'no remote authentication for easier testing',
     default: false
+  })
+  .coerce({
+    environment: env => env[env.length - 1]
   })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
@@ -268,6 +272,8 @@ async function main() {
   }
 
   logs.log('Creating HOPR Node')
+  console.log(`env: ${argv.environment}`)
+
   let options = await generateNodeOptions()
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
