@@ -45,15 +45,15 @@ $G^*$is the set of non-identity elements of G. $h_b$ is a pre-image resistant ha
 $h_b:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field of non-identity elements of $\mathbb{Z}_q$ (field of integers). We use the BLAKE2s hash function \cite{blake2}.
     \\~\\Each node $i$ has a private key $x_{i}\in \mathbb{Z}^*_q$ and a public key $y_{i}=g^{x_{i}}\in G^*$.
     The $\alpha_i$ are the group elements which, when combined with the nodes’ public keys, allow computing a shared key for each via Diffie-Hellman (DH) key exchange, and so the first node in the user-chosen route can forward the packet to the next, and only that mix-node can decrypt it.
-    The $s_i$ are the DH shared secrets, $b_i$ are the blinding factors.
+The $s_i$ are the DH shared secrets, $b_i$ are the blinding factors.
 
-    \paragraph{Key derivation}
-    The sender $(A)$ picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new keys for every packet.
-    \newline $(A)$ randomly picks a path consisting of intermediate nodes $(B)$, $(C)$,$(D)$ and the final destination of the packet $(Z)$.
-    \newline $(A)$ performs an offline Diffie-Hellman key exchange with each of these nodes and derives shared keys with each of them.
-    \newline $(A)$ computes a sequence of $r$ tuples (in our case r=4)  $$(\alpha_0,s_0,b_0),.................,(\alpha_{r-1},s_{r-1},b_{r-1})$$ as follows:
-    $$\alpha_0=g^x,s_0=y^x_B,b_0=h_b(a_0,s_0)$$
-    and
+\paragraph{Key derivation}
+The sender $(A)$ picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new keys for every packet.
+\newline $(A)$ randomly picks a path consisting of intermediate nodes $(B)$, $(C)$,$(D)$ and the final destination of the packet $(Z)$.
+\newline $(A)$ performs an offline Diffie-Hellman key exchange with each of these nodes and derives shared keys with each of them.
+\newline $(A)$ computes a sequence of $r$ tuples (in our case r=4)  $$(\alpha_0,s_0,b_0),.................,(\alpha_{r-1},s_{r-1},b_{r-1})$$ as follows:
+$$\alpha_0=g^x,s_0=y^x_B,b_0=h_b(a_0,s_0)$$
+and
 \begin{equation}
     \begin{cases}
         \alpha_i=g^{x\Pi_{i=1}^{i=r-1}b_i}\\
@@ -62,28 +62,27 @@ $h_b:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field
     \end{cases}\,.
     \label{eq:1}
 \end{equation}
-for $1\le i < r-1$. 
+for $1\le i < r-1$.
 \\~\\Where $y_1, y_2,y_3$ and $y_4$ are the public keys of the nodes $B,C, D$ and $Z$  which we assume to be available to $A$ .
 
-    \paragraph{Routing information}
-    Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and $(D)$ as well as message $END$ to tell $(Z)$ that it is the final receiver of the message. 
-    The END message is a distinguished prefix byte that's added to the final receiver's compressed public key.
-    For ECDSA public key compression, the $x$ coordinate would be the only one used and would be prepended by $02$. 
-    \\The $y$ coordinate will be extracted from $x$ by resolving the elliptic curve equation $Y^2=X^3+aX+b$, with two given $a$ and $b$ parameters. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is $0\times 02$ or $0\times 03$, depending on that bit).
-    \\The routing information looks as the following:
+\paragraph{Routing information}
+Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and $(D)$ as well as message $END$ to tell $(Z)$ that it is the final receiver of the message. 
+The END message is a distinguished prefix byte that's added to the final receiver's compressed public key.
+For ECDSA public key compression, the $x$ coordinate would be the only one used and would be prepended by $02$. 
+\\The $y$ coordinate will be extracted from $x$ by resolving the elliptic curve equation $Y^2=X^3+aX+b$, with two given $a$ and $b$ parameters. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is $0\times 02$ or $0\times 03$, depending on that bit).
+\\The routing information looks as the following:
 
-
-    \begin{align}  
-            \beta_{v-1} &=(y_Z\|0_{(2(r-v)+2)\kappa-|Z|}\oplus \rho(h_{\rho}(s_{v-1}))_{[ \,0....(2(r-v)+3)\kappa-1\,]})\|\phi_{v-1}\\
-            and &\nonumber \\
-            \beta_i &=y_{i+1}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]} 
-            \label{eq:2}
-    \end{align}
-for $0\le i < v-1$
-    \\~\\Such that $y_Z$ is the destination's public key in a compressed form (only the x-coordinate with size 32bytes instead of 64) and $|y_Z|$ is its length. $\rho$ is a pseudo-random generator (PRG) and $h_{\rho}$ is the hash function used to key $\rho$.
-    $v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string such that
-    \begin{align}  
-        \phi_i&=\{ \phi_{i-1}\|0_{2\kappa}\}\oplus \rho(h_{\rho}(s_{i-1}))_{[ \,(2(r-i)+3)\kappa..(2r+3)\kappa-1\,]}
+\begin{align}  
+    \beta_{v-1} &=(y_Z\|0_{(2(r-v)+2)\kappa-|Z|}\oplus \rho(h_{\rho}(s_{v-1}))_{[ \,0....(2(r-v)+3)\kappa-1\,]})\|\phi_{v-1}\\
+    and &\nonumber \\
+    \beta_i &=y_{i+1}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]} 
+    \label{eq:2}
+\end{align}
+$0\le i < v-1$
+\\~\\Such that $y_Z$ is the destination's public key in a compressed form (only the x-coordinate with size 32bytes instead of 64) and $|y_Z|$ is its length. $\rho$ is a pseudo-random generator (PRG) and $h_{\rho}$ is the hash function used to key $\rho$.
+$v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string such that
+\begin{align}  
+    \phi_i&=\{ \phi_{i-1}\|0_{2\kappa}\}\oplus \rho(h_{\rho}(s_{i-1}))_{[ \,(2(r-i)+3)\kappa..(2r+3)\kappa-1\,]}
 \end{align}
 where $\phi_0=\epsilon$ is an empty string. $\phi_i$ is generated using the shared secret $s_{i-1}$ and used to ensure the header packets remain constant in size as layers of encryption are added or removed. Upon receiving a packet, the processing node extracts the information destined for it from the route information and the per-hop payload. The extraction is done by deobfuscating and left-shifting the field. This would make the field shorter at each hop, allowing an attacker to deduce the route length. For this reason, the field is pre-padded before forwarding. Since the padding is part of the HMAC, the origin node will have to pre-generate an identical padding (to that which each hop will generate) in order to compute the HMACs correctly for each hop.
     \\~\\$\beta_i$ is computed as the concatenation of $Z$ and a sequence of padding which is then encrypted by XORing with the output of a pseudo-random number generator seeded with shared key $s_{v-1}$ of node $v-1$. The result is finally concatenated with $\phi$ to ensure the header packets remain constant in size.
@@ -200,5 +199,3 @@ Within HOPR, the following cryptographic primitives were used:
         and thus no additional information is being revealed.
 
 \end{itemize}
-
-
