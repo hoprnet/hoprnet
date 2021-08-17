@@ -87,14 +87,15 @@ function networkToHardhatNetwork(input: Network): any {
     // live: true, // @TODO
     // tags: [],
     gasMultiplier: input.gas_multiplier,
-    accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
   }
 
   if (input.id !== 'hardhat') {
     res.live = true
     res.url = input.default_provider
+    res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
   } else {
     res.live = false
+    res.tags = ['development']
     res.saveDeployments = true
     res.mining = {
       auto: true, // every transaction will trigger a new block (without this deployments fail)
