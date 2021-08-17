@@ -55,6 +55,7 @@ declare node3_dir="${tmp}/hopr-npm-node-3"
 declare node4_dir="${tmp}/hopr-npm-node-4"
 declare node5_dir="${tmp}/hopr-npm-node-5"
 declare node6_dir="${tmp}/hopr-npm-node-6"
+declare node7_dir="${tmp}/hopr-npm-node-7"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -62,6 +63,7 @@ declare node3_log="${node3_dir}.log"
 declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
+declare node7_log="${node7_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
@@ -69,6 +71,7 @@ declare node3_id="${node3_dir}.id"
 declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
+declare node7_id="${node7_dir}.id"
 
 declare hardhat_rpc_log="${tmp}/hopr-npm-hardhat-rpc.log"
 
@@ -194,6 +197,10 @@ log "\tnode6"
 log "\t\tdata dir: ${node6_dir} (will be removed)"
 log "\t\tlog: ${node6_log}"
 log "\t\tid: ${node6_id}"
+log "\tnode7"
+log "\t\tdata dir: ${node7_dir} (will be removed)"
+log "\t\tlog: ${node7_log}"
+log "\t\tid: ${node7_id}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -229,6 +236,7 @@ setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "${npm_
 setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${npm_package_version}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${npm_package_version}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${npm_package_version}" "--run \"info;balance\""
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -238,6 +246,7 @@ fund_node 13303 "${node3_log}"
 fund_node 13304 "${node4_log}"
 fund_node 13305 "${node5_log}"
 fund_node 13306 "${node6_log}"
+fund_node 13307 "${node7_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
@@ -247,6 +256,7 @@ wait_for_port 19093 "127.0.0.1" "${node3_log}"
 wait_for_port 19094 "127.0.0.1" "${node4_log}"
 wait_for_port 19095 "127.0.0.1" "${node5_log}"
 # no need to wait for node 6 since that will stop right away
+wait_for_port 19097 "127.0.0.1" "${node7_log}"
 # }}}
 
 # --- Run security tests --- {{{
@@ -256,7 +266,7 @@ ${mydir}/../test/security-test.sh \
 
 # --- Run test --- {{{
 ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305"
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
 # -- Verify node6 has executed the commands {{{
