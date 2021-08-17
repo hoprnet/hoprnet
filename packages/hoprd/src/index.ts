@@ -19,10 +19,6 @@ const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 const pkg = require('../../../package.json')
 
 const argv = yargs(process.argv.slice(2))
-  .option('provider', {
-    describe: 'A provider url for the Network you specified',
-    default: 'https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/'
-  })
   .option('environment', {
     array: true,
     describe: 'Environment id, one of the ids defined in protocol-config.json',
