@@ -8,6 +8,13 @@
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}"
     },
     {
+      "id": "hardhat-localhost2",
+      "network_id": "hardhat",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
+      "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}"
+    },
+    {
       "id": "master",
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
