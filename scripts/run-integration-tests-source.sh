@@ -240,6 +240,7 @@ wait_for_port 19093 "127.0.0.1" "${node3_log}"
 wait_for_port 19094 "127.0.0.1" "${node4_log}"
 wait_for_port 19095 "127.0.0.1" "${node5_log}"
 # no need to wait for node 6 since that will stop right away
+wait_for_port 19097 "127.0.0.1" "${node7_log}"
 # }}}
 
 # --- Run security tests --- {{{
