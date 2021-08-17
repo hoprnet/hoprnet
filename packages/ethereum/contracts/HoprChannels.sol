@@ -169,7 +169,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 amount2
     ) external {
         require(amount1 + amount2 > 0, "amount must be greater than 0");
-        token.transfer(msg.sender, address(this), amount1 + amount2);
+        token.transferFrom(msg.sender, address(this), amount1 + amount2);
         if (amount1 > 0){
           _fundChannel(account1, account2, amount1);
         }
