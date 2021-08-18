@@ -87,7 +87,6 @@ export default function Home() {
           type="text"
           autoFocus
           placeholder="type 'help' for full list of commands"
-          disabled={!isNodeReady}
         />
       </div>
 
