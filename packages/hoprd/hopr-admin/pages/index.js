@@ -67,7 +67,6 @@ export default function Home() {
     }
   }, [])
 
-  const isNodeReady = !connecting && ready && !authFailed
   const cookie = Cookies.get('X-Auth-Token')
 
   return (
@@ -82,13 +81,7 @@ export default function Home() {
       <Logs messages={messages} connecting={connecting} authRequired={authFailed} />
 
       <div className="send">
-        <input
-          id="command"
-          type="text"
-          autoFocus
-          placeholder="type 'help' for full list of commands"
-          disabled={!isNodeReady}
-        />
+        <input id="command" type="text" autoFocus placeholder="type 'help' for full list of commands" />
       </div>
 
       {(authFailed || cookie === null) && <TokenInput handleTokenSet={handleTokenSet} />}
