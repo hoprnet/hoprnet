@@ -67,7 +67,6 @@ export default function Home() {
     }
   }, [])
 
-  const isNodeReady = !connecting && ready && !authFailed
   const cookie = Cookies.get('X-Auth-Token')
 
   return (
