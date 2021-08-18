@@ -81,12 +81,7 @@ export default function Home() {
       <Logs messages={messages} connecting={connecting} authRequired={authFailed} />
 
       <div className="send">
-        <input
-          id="command"
-          type="text"
-          autoFocus
-          placeholder="type 'help' for full list of commands"
-        />
+        <input id="command" type="text" autoFocus placeholder="type 'help' for full list of commands" />
       </div>
 
       {(authFailed || cookie === null) && <TokenInput handleTokenSet={handleTokenSet} />}
