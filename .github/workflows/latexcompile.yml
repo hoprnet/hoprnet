@@ -2,9 +2,9 @@ name: build yellowpaper
 
 on:
   push:
+    branches: ['master', 'yellowpaper/**']
     paths:
-      - 'docs/yellowpaper/**/*.tex'
-      - 'docs/yellowpaper/*.tex'
+      - 'docs/yellowpaper/**'
 
 jobs:
   build_latex:
@@ -22,7 +22,10 @@ jobs:
             tlmgr update --self
             tlmgr install preprint blindtext makecell multirow float comment
             tlmgr install algorithm2e ifoddpage relsize # add algorithm2e
-            make -f docs/yellowpaper/Makefile
+            make -C docs/yellowpaper/
+
+      - name: 'Configure Git info'
+        run: ./scripts/configure-git-info.sh
 
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
