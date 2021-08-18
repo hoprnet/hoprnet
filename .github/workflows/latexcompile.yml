@@ -2,6 +2,7 @@ name: build yellowpaper
 
 on:
   push:
+    branches: ['master', 'yellowpaper/**']
     paths:
       - 'docs/yellowpaper/**'
 
