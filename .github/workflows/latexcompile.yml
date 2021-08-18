@@ -22,7 +22,7 @@ jobs:
             tlmgr update --self
             tlmgr install preprint blindtext makecell multirow float comment
             tlmgr install algorithm2e ifoddpage relsize # add algorithm2e
-            make -f docs/yellowpaper
+            make -f docs/yellowpaper/Makefile
 
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
