@@ -34,7 +34,7 @@ particular branch to deploy on every change.
 ```
 
 
-   release/moscow          master          jjpa/solves-channels-1556
+   release/constantine          master          jjpa/solves-channels-1556
 
          x                   │                       x
          x                   │                       x
@@ -75,7 +75,7 @@ particular branch to deploy on every change.
 
 ```
 
-   hotfix/patch-moscow    release/moscow          master
+   hotfix/patch-constantine    release/constantine          master
 
          x                   x                       x 1.74.0-next.44
          x                   │ ◄─────────────────────x

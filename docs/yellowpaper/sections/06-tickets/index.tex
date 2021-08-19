@@ -1,16 +1,24 @@
 \section{Tickets}
 \label{sec:tickets}
 
-In the HOPR protocol, nodes that have staked funds within a payment channel can issue tickets that are used for payment to other nodes.
-Tickets are used for probabilistic payments; every ticket is bound to a specific payment channel and cannot be spent elsewhere.
-They are redeemable at most once and they lose their value when the channel is closed or when the commitment is reset. A commitment is a secret on-chain value that is used to verify whether a ticket is a win or not when it's revealed in order to redeem it.
+In the HOPR protocol, nodes that have staked funds within a payment channel can
+issue tickets that are used for payment to other nodes. Tickets are used for
+\nameref{sec:probabilisticpayments}; every ticket is bound to a specific payment
+channel and cannot be spent elsewhere. They are redeemable at most once and they
+lose their value when the payment channel is closed or when the commitment is reset. A
+commitment is a secret on-chain value that is used to verify whether a ticket is
+a win or not when it's revealed in order to redeem it.
 
 \subsection{Ticket Issuance}
 
-A ticket can be issued once two nodes have established a payment channel with each other which means that at least one of them has locked HOPR tokens.
-\newline The ticket issuer A (A could also be the packet creator) selects the winning probability of the ticket and the relay fee to use and sets amount to:
+A ticket can be issued when two nodes have established a payment channel with
+each other which means that at least one of them has staked HOPR tokens.
+
+The ticket issuer $A$ (could also be the packet creator) selects the
+winning probability of the ticket and the relay fee to use and sets amount to:
 $$\sigma=\dfrac{L\times F}{P_w}$$
-where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee and $P_w$ is the ticket's winning probability.
+where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path
+length, $F$ is the relay fee and $P_w$ is the ticket's winning probability.
 \\~\\$(A)$ issues a ticket for the next downstream node,
 the challenge is given together with the routing information by the packet.
 \\$(A)$ does not know whether the ticket is a win or not.

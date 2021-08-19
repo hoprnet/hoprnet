@@ -1,58 +1,91 @@
 \section{Path Selection}
-HOPR uses a random selection algorithm to determine the identities of nodes participating in the network relaying service.
-The selection is divided into two steps:
+\label{sec:pathselection}
+
+In order to facilitate packets flowing through the HOPR network each node needs
+to decide which path a packet is sent on. That decision making, called
+\textbf{Path Selection}, needs to be performed for every packet. HOPR uses a
+random selection algorithm to determine the identities of nodes participating in
+the network relaying service generally and for a particular packet.
+The selection process is divided into two steps:
+
 \begin{enumerate}
-    \item Pre-selection:
-          During this phase, a subset $m<<n$ nodes will be selected based on different factors:
+
+    \item \textbf{Pre-Selection:}
+          Initially, a subset $m<<n$ nodes will be selected based on these factors:
           \begin{itemize}
-              \item Availability
-              \item Payment channel graph
-              \item Stake
+              \item Node Availability
+              \item Payment Channel Graph
+              \item Payment Channel Stake
           \end{itemize}
-          Each node gets a weight that is proportional to the previously mentioned factors.
-          Once an edge is selected, it is added to the current path. All paths are then sorted according to their weight. 
-    \item Random selection: Each edge (from node $a$ to $b$) within the subset $m$ is assigned a random number $r_i$. Edges are then sorted by $$r_i*weight(edge_i)$$ The path with the largest weight is expanded next using a priority queue mechanism.
+          Each node receives a weight that is proportional to these factors.
+
+    \item \textbf{Random Selection:} Each edge (from node $A$ to $B$) within the subset
+      $m$ is assigned a random number $r_i$. Edges are then sorted by
+      $$r_i*weight(edge_i)$$. The path with the largest weight is expanded next
+      using a priority queue mechanism.
+
 \end{enumerate}
+
 \begin{algorithm}[H]
     \SetAlgoNoLine
     \DontPrintSemicolon
-    $ V := Nodes$\;
-    $ E := \{ (x, y) \in V \times V \ | \ channel(x,y).state = OPEN \}$\;
+    $V := Nodes$\;
+    $M := MaxSelectionIterations$\;
+    $A := MinNodeAvailability$\;
+    $P := RequiredPathLength$\;
     \;
+    $openChannels \leftarrow \{ (x, y) \in V \times V \ | \ x \ne y \land getChannel(x,y).state = OPEN \}$\;
     $queue \leftarrow new \ PriorityQueue()$\;
-    $queue.addAll(\{ (x,y) \in E \ | \ x = self \})$\;
+    $queue.addAll(\{ (x,y) \in openChannels \ | \ x = self \})$\;
     $deadEnds \leftarrow \emptyset$\;
     $iterations \leftarrow 0$\;
-    \While{$(!queue.isEmpty())\land iterations < maxIterations$}{
-        $current \leftarrow queue.pop()$\;
-        $currentNode \leftarrow lastNode(current)$\;
-
-        \If{$|current|= l$}{
+    \;
+    \While{$!queue.isEmpty() \land iterations < M$}{
+        $current \leftarrow queue.peek()$\;
+        \If{$|current| = P$}{
             \Return{$current$}
         }
-        $open \leftarrow \{ (x, y) \in E \ | \ x = currentNode \land y \notin deadEnds$ \}\;
-        $open \leftarrow open.sort(weight)$\;
+        \;
+        $currentNode \leftarrow lastNode(current)$\;
+        $open \leftarrow \{ (x, y) \in E \ | \ x = currentNode \land y \notin deadEnds \land y \ne currentNode \land availability(y) > A$ \}\;
+        $open \leftarrow open.sort(weight_fun)$\;
+        \;
         \eIf{$open = \emptyset$} {
+            $queue.pop()$\;
             $deadEnds \leftarrow deadEnds \cup currentNode$\;
         } {
-            $toPush \leftarrow \{ (current_0, ..., current_{|current| - 1}, o) \ | \ o \in open \})$\;
-            $queue.push(toPush)$\;
+            $newPath \leftarrow \{ (current_0, ..., current_{|current| - 1}, o) \ | \ o \in open \})$\;
+            $queue.push(newPath)$\;
         }
+        \;
         $iterations \leftarrow iterations + 1$\;
     }
     \Return{$\bot$}
     \caption{Path selection in HOPR}
 \end{algorithm}
 
-\subsection{Availability}
-Availability is estimated using the heartbeat protocol.
-Each node maintains a list of neighbor nodes in the network and either ping or passively listen to them in order to determine whether they are online or offline.
-A node is considered online if the ping response (“PONG”) comes back within a certain timeframe. Otherwise, the node is considered offline and its waiting time for the next PING attempt is doubled.
+\subsection{Node Availability}
+\label{sec:nodeavailability}
 
+Availability of a node is estimated using a heartbeat protocol. Each node maintains a
+list of neighbor nodes in the HOPR network. A node will \textit{ping} neighbors and
+respond to \textit{pings} from other nodes in order to determine whether they are online or offline.
+A node is considered online if the ping response (“PONG”) comes back within a
+certain timeframe. Otherwise, the node is considered offline and its waiting
+time for the next PING attempt is doubled. Newly working pings will improve a
+neighbors availability gradually again.
 
 \subsection{Payment channel graph}
-Every node that intends to send messages needs to have a basic understanding about the topology of the network which means whether the channel is open and funded with enough HOPR tokens for the relaying service. In case no existing payment channel is open, the sender creates a new channel and funds it with enough HOPR tokens
 
-\subsection{Stake}
-The HOPR tokens are used to create payment channels with other nodes in the network and thereby staked in the HOPR network. The node will then use the HOPR token to cover transaction costs when interacting with the blockchain. The more stake a node locks the higher probability that it would be chosen as a relayer.
+Every node that intends to send messages needs to have a basic understanding
+about the topology of the network which means whether the channel is open and
+funded with enough HOPR tokens for the relaying service. In case no existing
+payment channel is open, the sender creates a new channel and funds it with
+enough HOPR tokens.
 
+\subsection{Payment channel stake}
+
+The HOPR tokens are used to create payment channels with other nodes in the
+network and thereby staked in the HOPR network. The node will then use the HOPR
+token to cover transaction costs when interacting with the blockchain. The more
+stake a node locks the higher probability that it would be chosen as a relayer.

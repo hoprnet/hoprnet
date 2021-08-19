@@ -2,14 +2,18 @@
 \label{sec:proofofrelay}
 
 HOPR incentivizes packet transformation and delivery using a mechanism called
-“Proof-Of-Relay”. This mechanism guarantees that nodes relay services are
+\textbf{Proof Of Relay}. This mechanism guarantees that a node's relay services are
 verifiable.
 
 \paragraph{Construction}
+
 \begin{itemize}
-    \item Every packet is sent together with a ticket (check ticket section).
+    \item Every packet is sent together with a ticket.
     \item Each ticket contains a challenge.
-    \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket (check ticket section).
+    \item The validity of a ticket can only be checked on reception of the
+        packet but the on-chain logic enforces a solution to the challenge
+        stated in the ticket.
+
 \end{itemize}
 
 \subsubsection{Challenge}
