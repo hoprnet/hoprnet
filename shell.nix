@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs ? import <nixpkgs> {}, ... }:
 let
   linuxPkgs = with pkgs; lib.optional stdenv.isLinux (
     inotifyTools

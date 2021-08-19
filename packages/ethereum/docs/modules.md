@@ -215,14 +215,15 @@ packages/ethereum/types/commons.ts:15
 
 ### getContractData
 
-▸ `Const` **getContractData**(`network`, `contract`): [`ContractData`](modules.md#contractdata)
+▸ `Const` **getContractData**(`network`, `contract`, `environmentId?`): [`ContractData`](modules.md#contractdata)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `network` | [`Networks`](modules.md#networks) |
-| `contract` | [`ContractNames`](modules.md#contractnames) |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `network` | [`Networks`](modules.md#networks) | `undefined` |
+| `contract` | [`ContractNames`](modules.md#contractnames) | `undefined` |
+| `environmentId` | `string` | `'default'` |
 
 #### Returns
 

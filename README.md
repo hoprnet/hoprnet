@@ -31,7 +31,12 @@
 - [Develop](#develop)
 - [Test](#test)
   - [Github Actions CI](#github-actions-ci)
-  - [End-to-End Test](#end-to-end-test)
+  - [End-to-End Testing](#end-to-end-testing)
+    - [Running Tests Locally](#running-tests-locally)
+    - [Running Tests on Google Cloud Platform](#running-tests-on-google-cloud-platform)
+- [Deploy](#deploy)
+  - [Using Google Cloud Platform](#using-google-cloud-platform)
+  - [Using Google Cloud Platform and a Default Topology](#using-google-cloud-platform-and-a-default-topology)
 - [Tooling](#tooling)
 - [Contact](#contact)
 - [License](#license)
@@ -62,19 +67,19 @@ npm install @hoprnet/hoprd@1.73
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `latest` tag represents the `master` branch, while the `latest-moscow` tag
+The `latest` tag represents the `master` branch, while the `latest-constantine` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:latest-moscow
+docker pull gcr.io/hoprassociation/hoprd:latest-constantine
 ```
 
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest-moscow'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest-constantine'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -97,12 +102,12 @@ You will need to clone the `hoprnet` repo first:
 git clone https://github.com/hoprnet/hoprnet
 ```
 
-If you have [direnv][2] and [lorri][3] set up properly your `nix-shell` will be
+If you have [direnv][2] set up properly your `nix-shell` will be
 configured automatically upon entering the `hoprnet` directory and enabling it
 via `direnv allow`. Otherwise you must enter the `nix-shell` manually:
 
 ```sh
-nix-shell
+nix develop
 ```
 
 Now you may follow the instructions in [Develop](#develop).
@@ -215,24 +220,27 @@ yarn run:faucet:all
 
 ### Unit testing
 
-We use [mocha][9] for our tests. You can run our test suite across all our
-multiple packages using the following command:
+We use [mocha][9] for our tests. You can run our test suite across all
+packages using the following command:
 
 ```sh
 yarn test
 ```
 
-#### Test a feature
+To run tests of a single package (e.g. hoprd) execute:
 
-By default, we run all our tests in parallel, but if you want to test a
-unique feature, you can run a specific package test by passing the `grep`
-flag to test command.
+```sh
+yarn --cwd packages/hoprd test
+```
+
+To run tests of a single test suite (e.g. Identity) within a
+package (e.g. hoprd) execute:
 
 For instance, to run only the `Identity` test suite in `hoprd`, you need to
 run the following:
 
 ```sh
-yarn test:hoprd --grep "Identity"
+yarn --cwd packages/hoprd test --grep "Identity"
 ```
 
 In a similar fashion, our contracts can be tested in isolation. For now, you
@@ -275,29 +283,133 @@ act -j build
 
 For more information please refer to [act][8]'s documentation.
 
-### End-to-End Test
+### End-to-End Testing
+
+#### Running Tests Locally
 
 End-to-end testing is usually performed by the CI, but can also be performed
 locally by executing:
 
 ```sh
-./scripts/run-integration-tests-locally.sh
+./scripts/run-integration-tests-source.sh
 ```
+
+Read the full help information of the script in case of questions:
+
+```sh
+./scripts/run-integration-tests-source.sh --help
+```
+
+That command will spawn multiple `hoprd` nodes locally from the local
+source-code and run the tests against this cluster of nodes. The tests can be
+found in the files `test/*.sh`. The script will cleanup all nodes once completed
+unless instructed otherwise.
+
+An alternative to using the local source-code is running the tests against
+a NPM package.
+
+```sh
+./scripts/run-integration-tests-npm.sh
+```
+
+If no parameter is given the NPM package which correlates to the most recent Git
+tag will be used, otherwise the first parameter is used as the NPM package
+version to test.
+
+Read the full help information of the script in case of questions:
+
+```sh
+./scripts/run-integration-tests-npm.sh --help
+```
+
+#### Running Tests on Google Cloud Platform
 
 In some unique cases, some bugs might not had been picked up by our end-to-end
 testing and instead only show up when deployed to production. To avoid having
-to see these only after a time consuming build, you can deploy an `internal`
-testnet, which will deploy `1` node to our infrastructure manually (given that
-you have permissions to deploy).
+to see these only after a time consuming build, a cluster of nodes can be
+deployed to Google Cloud Platform which is then used to run tests against it.
 
-To do so, authenticate with `gcloud auth login`, and run the following script:
+A requirement for this setup is a working `gcloud` configuration locally.
+The easiest approach would be to authenticate with `gcloud auth login`.
+
+The cluster creation and tests can be run with:
 
 ```sh
-FUNDING_PRIV_KEY=$FUNDING_PRIV_KEY BS_PASSWORD= ./scripts/internal.sh
+FUNDING_PRIV_KEY=mysecretaccountprivkey \
+  ./scripts/run-integration-tests-gcloud.sh
 ```
 
-where `FUNDING_PRIV_KEY` is the wallet to be used to fund the node to be spin in
-our network.
+The given account private key is used to fund the test nodes to be able to
+perform throughout the tests. Thus the account must have enough funds available.
+
+Read the full help information of the script in case of questions:
+
+```sh
+./scripts/run-integration-tests-gcloud.sh --help
+```
+
+## Deploy
+
+The deployment nodes and networks is mostly orchestrated through the script
+files in `scripts/` which are executed by the Github Actions CI workflows.
+Therefore, all common and minimal networks do not require manual steps to be
+deployed.
+
+### Using Google Cloud Platform
+
+However, sometimes it is useful to deploy additional nodes or specific versions
+of `hoprd`. To accomplish that its possible to create a cluster on GCP using the
+following scripts:
+
+```sh
+./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+```
+
+Read the full help information of the script in case of questions:
+
+```sh
+./scripts/setup-gcloud-cluster.sh --help
+```
+
+The script requires a few environment variables to be set, but will inform the
+user if one is missing. It will create a cluster of 6 nodes. By default these
+nodes will use the latest Docker image of `hoprd` and run on the `Goerli`
+network. Different versions and different target networks can be configured
+through the parameters and environment variables.
+
+To launch nodes using the `xDai` network one would execute (with the
+placeholders replaced accordingly):
+
+```sh
+HOPRD_PROVIDER="<URL_TO_AN_XDAI_ENDPOINT>" \
+HOPRD_TOKEN_CONTRACT="<ADDRESS_OF_TOKEN_CONTRACT_ON_XDAI>" \
+  ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+```
+
+A previously started cluster can be destroyed, which includes all running nodes,
+by using the same script but setting the cleanup switch:
+
+```sh
+HOPRD_PERFORM_CLEANUP=true \
+  ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+```
+
+### Using Google Cloud Platform and a Default Topology
+
+The creation of a `hoprd` cluster on GCP can be enhanced by providing a topology
+script to the creation script:
+
+```sh
+./scripts/setup-gcloud-cluster.sh \
+  my-custom-cluster-without-name \
+  gcr.io/hoprassociation/hoprd:latest \
+  `pwd`/scripts/topologies/full_interconnected_cluster.sh
+```
+
+After the normal cluster creation the topology script will then open channels
+between all nodes so they are fully interconnected. Custom topology scripts can
+be easily added and used in the same manner. Refer to the referenced scripts as
+a guideline on how to get started.
 
 ## Tooling
 
@@ -325,7 +437,6 @@ whenever you need an issue about a particular tool.
 
 [1]: https://nixos.org/learn.html
 [2]: https://search.nixos.org/packages?channel=20.09&show=direnv&from=0&size=50&sort=relevance&query=direnv
-[3]: https://search.nixos.org/packages?channel=20.09&show=lorri&from=0&size=50&sort=relevance&query=lorri
 [4]: https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL
 [6]: https://www.npmjs.com/package/@hoprnet/hoprd
 [7]: https://www.youtube.com/watch?v=d0Eb6haIUu4

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.76.0-next.0",
+  "version": "1.76.0-next.13",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -19,7 +19,7 @@
     "clean": "rimraf ./lib",
     "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "next build hopr-admin",
-    "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit",
+    "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
     "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin --init --rest",
@@ -30,8 +30,8 @@
   "dependencies": {
     "@ceramicnetwork/http-client": "^1.0.6",
     "@ceramicnetwork/stream-tile": "^1.0.6",
-    "@hoprnet/hopr-core": "1.76.0-next.0",
-    "@hoprnet/hopr-utils": "1.76.0-next.0",
+    "@hoprnet/hopr-core": "1.76.0-next.13",
+    "@hoprnet/hopr-utils": "1.76.0-next.4",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
     "check-password-strength": "^2.0.3",

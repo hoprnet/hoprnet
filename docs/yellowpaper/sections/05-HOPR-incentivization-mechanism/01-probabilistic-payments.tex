@@ -1,66 +1,108 @@
 \subsection{Probabilistic Payments}
+\label{sec:probabilisticpayments}
 
-In traditional payment channels, two parties A and B lock some funds within a
+In traditional payment channels, two parties $A$ and $B$ lock some funds within a
 smart contract, make transactions off-chain and only commit the aggregation
-on-chain. Thus, a channel is bidirectional which means that both A and B can
-send and receive transactions within the same channel. The HOPR protocol uses
-unidirectional channels to implement bidirectional channel behavior where a channel is created from A to B and another from B to A. 
-The channel creator is the sole owner of funds in the channel and the one able to create tickets. A channel created from
-party $A$ to party $B$ is different from a channel created from party $B$ to
-party $A$.
+on-chain. Thus, a payment channel is bidirectional which means that both $A$ and $B$ can
+send and receive transactions within the same payment channel. The HOPR protocol uses
+unidirectional payment channels to implement bidirectional payment channel behavior where a
+payment channel is created from A to B and another from $B$ to $A$. The payment channel creator is
+the sole owner of funds in the payment channel and the one able to create
+\textbf{tickets}, encapsulated funds which are described in detail in
+\nameref{sec:tickets}. A payment channel created from party $A$ to party $B$ is
+different from a payment channel created from party $B$ to party $A$.
 
- $$A\rightarrow B \neq B\rightarrow A$$
+$$A\rightarrow B \neq B\rightarrow A$$
+
 This separation reflects the directional nature of packets flowing through the
-network.
-\\\textbf{Acknowledgements} are messages which allow every node to acknowledge the
-processing of a packet to the previous node. This acknowledgement contains the
-cryptographic material to unlock the possible payout for the previous node. Note
-that acknowledgement is always sent to the previous node and using acknowledgments with vanilla payment channels results in accumulated incentives where the latest acknowledgement contains all previous incentives plus the incentive for the most recent interaction as explained below:
+network. Also each payment channel's logic is easier to verify.
+
+\paragraph{Acknowledgements} are messages which allow every node to acknowledge
+the processing of a packet to the previous node. This acknowledgement contains
+the cryptographic material to unlock the possible payout for the previous node.
+Note that an acknowledgement is always sent to the previous node and using
+acknowledgments with vanilla payment channels results in accumulated incentives
+where the latest acknowledgement contains all previous incentives plus the
+incentive for the most recent interaction as explained below:
 
 \begin{align}
 value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
 \end{align}
 where $n$ is the total number of mixnet packets transformed.
-\\~\\If B received $ACK_n$ for $packet_n$ before sending $packet_{n-1}$, it has no
-incentive to process $packet_{n-1}$ rather than $packet_{n}$. To avoid these
-false incentives the HOPR protocol utilizes probabilistic payments.
-In probabilistic payments the payouts use \textit{tickets} (further explained in
-section \nameref{sec:tickets}). A ticket can be either a win or a loss with a
-certain winning probability. This means nodes are incentivized to continue
-relaying packets as they don’t know which ticket is a win. To a node each
-ticket has the same value it is being claimed, thus the HOPR protocol
-encourages nodes to claim tickets independently from each other.
+
+An issue arises when $B$ received $ACK_n$ for $packet_n$ before sending
+$packet_{n-1}$. At that point $B$ would have no incentive to process
+$packet_{n-1}$ rather than $packet_{n}$. To avoid such false incentives the HOPR
+protocol utilizes probabilistic payments. A \textit{ticket} can be either a win
+or a loss with a winning probability which is lower than 100 percent. This means
+nodes are incentivized to continue relaying packets as they don’t know which
+ticket is a win and will lead to a payout. To a node each ticket has the same
+value untul it is being claimed, thus the HOPR protocol encourages nodes to
+claim tickets independently from each other.
 
 \begin{align}
- value ( ACK_i )  &  =value ( ACK_j ) \quad for \quad i,j\in \{1,n\}
+value ( ACK_i )  &  =value ( ACK_j ) \quad for \quad i,j\in \{1,n\}
 \end{align}
-If we assume the price stays the same. There is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
 
-\subsubsection{Channel Management}
-Initially, each payment channel in HOPR is CLOSED which means that in order to transfer packets, those channels have to be opened. There are four distinct channel statuses which are represented in the following scheme:
+If we assume the price stays the same, there is no added value in pretending
+packet loss or intentionally changing the order in which packets are processed.
+On the contrary a node would reduce its potential payouts when not forwarding
+packets as fast as possible or not at all.
+
+\subsection{Payment Channel Management}
+\label{sec:paymentchannelmanagement}
+
+Initially, each payment channel is \textit{Closed}. For node $A$ to be able to
+transfer packets to node $B$ it has to open a payment channel first. There are
+four distinct payment channel states which are represented in the following
+scheme:
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=9cm,height=9cm,keepaspectratio]{../yellowpaper/images/states2.png}
-\label{fig:channel statuses}
-    \caption{Channel statuses}
+    \label{fig:payment channel states}
+    \caption{Payment channel states}
 \end{figure}
 
-\paragraph{Opening a channel} Nodes can OPEN channels to other nodes by the following:
-A calls the method \textit{fundChannelMulti()} such that:
-$$fundChannelMulti(A: <\lambda>, B:<\mu> )$$ where $\lambda$ and $\mu$ are the amounts to be staked by the sender A for A and B. This function opens two unidirectional channels $A\rightarrow B$ and $B\rightarrow A$ if both staked amounts are specified and are $>0$. If only $\lambda>0$,  then only one channel is opened $A\rightarrow B$ where $A$ is the sender and $B$ is the recipient. $B$ in this case can call the same function again specifying that $\mu>0$ and $\lambda=0$ which will open the channel $B\rightarrow A$.
-Both channels are then on state \textit{WAITING\_FOR\_COMMITMENT}.
-\\~\\The destination address of the channel must now set an on-chain commitment in order for the channel between both parties to be open.
-The channel destination (let's say it's B) can now call \textit{bumpChannel()} function to make a new set of commitments towards this channel. This call will trigger an onchain event \textit{ChannelIsOpened} and bumbs the ticket epoch to ensure tickets with the previous epoch are invalidated
+\paragraph{Opening a channel} can be done by node $A$ by transferring funds to
+the payment channels contract \textit{HoprChannels} and include the following
+\textit{userdata}:
+
+$$[A: address, B: address, \lambda: uint8, \mu: uint8], \mu = 0$$
+
+$\lambda$ is the amount to be staked by the sender $A$. This will open a
+unidirectional payment channel from $A$ to $B$. The payment channel will start
+in state \textit{Waiting for commitment}. The destination address $B$ of the
+payment channel must now set an on-chain commitment in order for the payment
+channel between both parties to become \textit{Open}. This is done by $B$
+calling the \textit{bumpChannel()} function to make a new set of commitments
+towards this payment channel. This call will trigger an on-chain event
+\textit{ChannelIsOpened} and bumps the ticket epoch to ensure tickets with the
+previous epochs are invalidated.
 
 \paragraph{Redeem tickets}
-As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call.
-\\~\\If/when B tries to redeem a ticket from the channel $A\rightarrow B$ (spending channel) but also there is an open channel $B\rightarrow A$ (earning channel), B's rewards will go to $B\rightarrow A$. Otherwise, rewards will be sent directly to B. The fact that both these channels exist is to implement bidirectional channel behavior.
+As long as the channel remains open, nodes can claim their incentives for
+forwarding packets via tickets. Tickets are redeemed by dispatching a
+\textit{redeemTicket()} call to an \textit{Open} payment channel.
+
+When $B$ tries to redeem a ticket from the channel $A\rightarrow B$ (spending
+channel) but also there is an open channel $B\rightarrow A$ (earning channel),
+$B$'s rewards will be transferred to $B\rightarrow A$ (earning channel).
+Otherwise, rewards will be sent directly to $B$.
 
 \paragraph{Closing a channel}
-Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
-Only the channel creator (let's say it's A) can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $PENDING\_TO\_CLOSE$. Other nodes should monitor blockchain events to be aware of this change and thus will have now time to claim not yet claimed tickets.
-\\~\\Once the timeout is done, (A) can call \textit{finalizeChannelClosure()} which turns the channel state into CLOSED. When channel is closed, funds (stake) are transfered automatically back to (A). Every ticket that wasn't redeemed while channel was open can't be redeemed after closure. This is guaranteed by using Channel Epoch which is explained in ticket section.
+Nodes can close a payment channel in order to access their previously staked
+funds. Only the payment channel creator can initiate the process by calling
+\textit{initiateChannelClosure()}. This changes the state to $Pending to close$
+which is a limited timeframe (grace period) during which other nodes can redeem
+so far unredeemed tickets. Therefore, nodes should monitor blockchain events to
+be aware of this payment channel state change.
+Once the timeframe has completed, the payment channel creator can call
+\textit{finalizeChannelClosure()} which turns the payment channel state into
+$Closed$. When a payment channel is closed, funds (stake) are transfered
+automatically back to the payment channel creator. Every ticket that wasn't
+redeemed while payment channel was open can not be redeemed after closure. This
+is guaranteed by using a channel epoch.
 
 \begin{comment}
 
