@@ -197,7 +197,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   }
 
   if (!options.environment) {
-    throw new Error(`failed to find environment with id ${argv.environment} in protocol-config.json`)
+    throw new Error(`failed to find environment with id ${argv.environment} in the supported protocol configuration`)
   }
 
   return options
