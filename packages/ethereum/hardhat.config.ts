@@ -12,7 +12,6 @@ import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
 import { ethers } from 'ethers'
-import type { Network } from '@hoprnet/hopr-core'
 export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'production'
 export type NetworkTag = DeploymentTypes | 'etherscan'
 
@@ -32,7 +31,7 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 
 const PROTOCOL_CONFIG = require('../hoprd/protocol-config.json')
 
-function networkToHardhatNetwork(input: Network): any {
+function networkToHardhatNetwork(input: any): any {
   let res: any = {
     chainId: input.chain_id,
     gasMultiplier: input.gas_multiplier,
