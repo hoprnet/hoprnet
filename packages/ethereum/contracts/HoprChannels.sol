@@ -23,23 +23,31 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
     /**
      * @dev Possible channel states.
-
-            finalizeChannelClosure()
-            (After delay)+----------------+   initiateChannelClosure()
-                 +-------+Pending To Close| <---------+
-                 |       +----------------+           |
-                 |                                    |
-              +--v---+                             +--+-+
-              |Closed+---------------------------->+Open|
-              +---+--+    tokensReceived()         +--+-+
-                  |       (If already committed)      ^
-                  |                                   |
- tokensReceived() |                                   | bumpChannel()
-                  |       +----------------------+    |
-                  +------>+Waiting For Commitment+----+
-                          +----------------------+
-
-     */
+             finalizeChannelClosure()    +----------------------+                                    
+                  (After delay)          |                      | initiateChannelClosure()                 
+                        +----------------+   Pending To Close   |<-----------------+                 
+                        |                |                      |                  |                 
+                        |                +----------------------+                  |                 
+                        |                              ^                           |                 
+                        |                              |                           |                 
+                        |                              |  initiateChannelClosure() |                 
+                        |                              |  (If not committed)       |                 
+                        v                              |                           |                 
+                 +------------+                        +-+                    +----+-----+           
+                 |            |                          |                    |          |           
+                 |   Closed   +--------------------------+--------------------+   Open   |           
+                 |            |    tokensReceived()      |                    |          |           
+                 +------+-----+ (If already committed) +-+                    +----------+           
+                        |                              |                           ^                 
+                        |                              |                           |                 
+                        |                              |                           |                 
+       tokensReceived() |                              |                           | bumpChannel() 
+                        |              +---------------+------------+              |                 
+                        |              |                            |              |                 
+                        +--------------+   Waiting For Commitment   +--------------+                 
+                                       |                            |                                
+                                       +----------------------------+  
+    */
     enum ChannelStatus { CLOSED, WAITING_FOR_COMMITMENT, OPEN, PENDING_TO_CLOSE }
 
     /**
