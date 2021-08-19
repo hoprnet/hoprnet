@@ -197,7 +197,10 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   }
 
   if (!options.environment) {
-    throw new Error(`failed to find environment with id ${argv.environment} in the supported protocol configuration`)
+    const supportedEnvs: string = protocolConfig.environments
+      .map(env => env.id)
+      .join(', ')
+    throw new Error(`failed to find environment with id '${argv.environment}' in the supported protocol configuration, supported environments: ${supportedEnvs}`)
   }
 
   return options
@@ -268,7 +271,7 @@ async function main() {
   }
 
   logs.log('Creating HOPR Node')
-  console.log(`env: ${argv.environment}`)
+  logs.log(`env: ${argv.environment}`)
 
   let options = await generateNodeOptions()
   if (argv.dryRun) {
