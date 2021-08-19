@@ -20,8 +20,8 @@ export function u8aEquals(a: Uint8Array, b: Uint8Array, ...arrays: Uint8Array[])
       if (arr == undefined) {
         return false
       }
-      canUse32 &&= arr.byteOffset % 4 == 0
-      canUse16 &&= arr.byteOffset % 2 == 0
+      canUse32 = canUse32 && arr.byteOffset % 4 == 0
+      canUse16 = canUse16 && arr.byteOffset % 2 == 0
 
       if (aLength != arr.length) {
         return false
