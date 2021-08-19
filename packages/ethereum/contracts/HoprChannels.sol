@@ -22,18 +22,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), address(0), uint256(0), uint256(0)).length;
 
     /**
-     * @dev Possible channel statuses.
+     * @dev Possible channel states.
 
-            Finalize Closure
-            (After delay)+----------------+   Initiate Closure
+            finalizeChannelClosure()
+            (After delay)+----------------+   initiateChannelClosure()
                  +-------+Pending To Close| <---------+
                  |       +----------------+           |
                  |                                    |
               +--v---+                             +--+-+
               |Closed+---------------------------->+Open|
-              +---+--+ Fund (If already committed) +--+-+
-                  |                                   ^
-             Fund |                                   | Bump Commitment
+              +---+--+    tokensReceived()         +--+-+
+                  |       (If already committed)      ^
+                  |                                   |
+ tokensReceived() |                                   | bumpChannel()
                   |       +----------------------+    |
                   +------>+Waiting For Commitment+----+
                           +----------------------+
