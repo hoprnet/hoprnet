@@ -176,6 +176,10 @@ log "Node 7 should not be able to talk to Node 1 (different environment id)"
 result=$(run_command ${api7} "ping ${addr1}" "Could not ping node. Timeout." 600)
 log "-- ${result}"
 
+log "Node 1 should not be able to talk to Node 7 (different environment id)"
+result=$(run_command ${api1} "ping ${addr7}" "Could not ping node. Timeout." 600)
+log "-- ${result}"
+
 log "Node 2 has no unredeemed ticket value"
 result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR" 600)
 log "-- ${result}"
