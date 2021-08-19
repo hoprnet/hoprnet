@@ -250,7 +250,7 @@ class PersistedState {
 }
 
 export const addBN = (a: BN, b: BN): BN => a.add(b)
-export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().toString())
+export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().integerValue().toFixed(), 10)
 
 export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
   Object.values(state.channels)
