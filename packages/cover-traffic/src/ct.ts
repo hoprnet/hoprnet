@@ -45,7 +45,7 @@ export type State = {
   channels: Record<string, ChannelData>
   log: string[]
   ctChannels: OpenChannels[]
-  block: BN,
+  block: BN
   messageFails: Record<string, number>
 }
 
@@ -242,9 +242,9 @@ class PersistedState {
     await this.set(s)
   }
 
-  async resetMessageFails(dest: PublicKey){
+  async resetMessageFails(dest: PublicKey) {
     const s = await this.get()
-    s.messageFails[dest.toB58String()] = 0 
+    s.messageFails[dest.toB58String()] = 0
     await this.set(s)
   }
 }
@@ -343,7 +343,7 @@ class CoverTrafficStrategy extends SaneDefaults {
       if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
         toClose.push(c.destination)
       }
-      if (await this.data.messageFails(c.destination) > MESSAGE_FAIL_THRESHOLD) {
+      if ((await this.data.messageFails(c.destination)) > MESSAGE_FAIL_THRESHOLD) {
         await this.data.resetMessageFails(c.destination)
         toClose.push(c.destination)
       }
