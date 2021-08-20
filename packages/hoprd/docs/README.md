@@ -40,8 +40,8 @@ Options:
   --init                        initialize a database if it doesn't already exist  [boolean] [default: false]
   --privateKey                  A private key to be used for your node wallet, to quickly boot your node [string] [default: undefined]
   --adminHost                   Host to listen to for admin console  [default: "localhost"]
-  --adminPort                   Port to listen to for admin console  [default: 3000]
-  --environment                 Environment id to run in [string] [default: defined by release] 
+  --adminPort                   Port to listen to for admin console  [default: 3000
+  --environment                 Environment id to run in [string] [default: defined by release]
   --testAnnounceLocalAddresses  For testing local testnets. Announce local addresses.  [boolean] [default: false]
   --testPreferLocalAddresses    For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
   --testUseWeakCrypto           weaker crypto for faster node startup  [boolean] [default: false]
