@@ -37,14 +37,14 @@ function networkToHardhatNetwork(input: any): any {
     gas: Number(utils.parseUnits(parsedGas[0], parsedGas[1])),
     gasMultiplier: input.gas_multiplier,
     live: input.live,
-    tags: [],
+    tags: []
   }
 
   if (input.live) {
     try {
       res.url = expandVars(input.default_provider, process.env)
     } catch (_) {
-      res.url = "invalid_url"
+      res.url = 'invalid_url'
     }
     res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     res.companionNetworks = {}
