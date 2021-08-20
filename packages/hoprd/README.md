@@ -18,7 +18,6 @@ Options:
   --help                        Show help  [boolean]
   --version                     Show version number  [boolean]
   --network                     Which network to run the HOPR node on  [choices: "ETHEREUM"] [default: "ETHEREUM"]
-  --provider                    A provider url for the Network you specified  [default: "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"]
   --host                        The network host to run the HOPR node on.  [default: "0.0.0.0:9091"]
   --announce                    Announce public IP to the network  [boolean] [default: false]
   --admin                       Run an admin interface on localhost:3000, requires --apiToken  [boolean] [default: false]

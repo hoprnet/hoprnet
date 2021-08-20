@@ -122,7 +122,6 @@ Options:
   --help                        Show help  [boolean]
   --version                     Show version number  [boolean]
   --network                     Which network to run the HOPR node on  [choices: "ETHEREUM"] [default: "ETHEREUM"]
-  --provider                    A provider url for the Network you specified  [default: "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"]
   --host                        The network host to run the HOPR node on.  [default: "0.0.0.0:9091"]
   --announce                    Announce public IP to the network  [boolean] [default: false]
   --admin                       Run an admin interface on localhost:3000, requires --apiToken  [boolean] [default: false]
@@ -180,7 +179,7 @@ hoprd
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs
+hoprd --identity /app/db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --admin --adminHost 0.0.0.0 --forwardLogs --apiToken <MY_TOKEN> --environment jungfrau
 ```
 
 Here is a short break-down of each argument.
@@ -196,6 +195,9 @@ hoprd
   --adminHost 0.0.0.0                    # set IP of the Rest API to the container's external IP so it can be reached on your host
   --forwardLogs                          # enable the node's log forwarding to the ceramic network
   --apiToken <MY_TOKEN> # specify password for accessing admin panel and REST API(REQUIRED)
+  --environment jungfrau # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+                         # each release has a default environment id set, but the user can override this value
+                         # nodes from different environments are **not able** to communicate
 ```
 
 ## Develop
