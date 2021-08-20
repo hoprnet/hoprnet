@@ -73,7 +73,7 @@
       "live": true,
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
-      "default_provider": "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/",
+      "default_provider": "https://goerli.infura.io/v3/${INFURA_KEY}",
       "native_token_name": "gETH",
       "hopr_token_name": "wxHOPR"
     },

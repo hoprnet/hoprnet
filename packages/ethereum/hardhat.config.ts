@@ -18,6 +18,7 @@ export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'productio
 export type NetworkTag = DeploymentTypes | 'etherscan'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, ENVIRONMENT_ID = 'default' } = process.env
+import { expandVars } from '@hoprnet/hopr-utils'
 
 extendConfig((config: HardhatConfig) => {
   config.etherscan.apiKey = ETHERSCAN_KEY
@@ -40,7 +41,7 @@ function networkToHardhatNetwork(input: any): any {
   }
 
   if (input.live) {
-    res.url = input.default_provider
+    res.url = expandVars(input.default_provider, process.env)
     res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     res.companionNetworks = {}
     res.mining = undefined
