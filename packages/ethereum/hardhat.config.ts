@@ -13,7 +13,7 @@ import '@typechain/hardhat'
 
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
-// import { ethers } from 'ethers'
+import { ethers } from 'ethers'
 export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'production'
 export type NetworkTag = DeploymentTypes | 'etherscan'
 
