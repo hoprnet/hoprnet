@@ -4,13 +4,14 @@ import debug from 'debug'
 import { Hash } from '@hoprnet/hopr-utils'
 import { randomInteger, limitConcurrency, LibP2PHandlerFunction, u8aEquals, DialOpts } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'
-import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../constants'
+import { HEARTBEAT_TIMEOUT } from '../constants'
 import { randomBytes } from 'crypto'
 
 const log = debug('hopr-core:heartbeat')
 
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
+  private protocolHeartbeat: string
 
   constructor(
     private networkPeers: NetworkPeerStore,
@@ -21,9 +22,11 @@ export default class Heartbeat {
       msg: Uint8Array,
       opts: DialOpts
     ) => Promise<Uint8Array[]>,
-    private hangUp: (addr: PeerId) => Promise<void>
+    private hangUp: (addr: PeerId) => Promise<void>,
+    environmentId: string
   ) {
-    subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true)
+    this.protocolHeartbeat = `hopr/${environmentId}/heartbeat`
+    subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true)
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array {
@@ -39,7 +42,7 @@ export default class Heartbeat {
     const expectedResponse = Hash.create(challenge).serialize()
 
     try {
-      const pingResponse = await this.sendMessageAndExpectResponse(id, PROTOCOL_HEARTBEAT, challenge, {
+      const pingResponse = await this.sendMessageAndExpectResponse(id, this.protocolHeartbeat, challenge, {
         timeout: HEARTBEAT_TIMEOUT
       })
 
