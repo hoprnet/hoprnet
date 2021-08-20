@@ -35,7 +35,7 @@ function networkToHardhatNetwork(input: any): any {
   // const gas = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
   let res: any = {
     chainId: input.chain_id,
-    // gas, @TODO: figure out why the unit tests are failing with gas limit enabled 
+    // gas, @TODO: figure out why the unit tests are failing with gas limit enabled
     gasMultiplier: input.gas_multiplier,
     live: input.live,
     tags: []
