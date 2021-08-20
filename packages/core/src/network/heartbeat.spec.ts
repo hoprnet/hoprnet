@@ -25,7 +25,7 @@ describe('unit test heartbeat', async () => {
   beforeEach(async () => {
     clock = sinon.useFakeTimers(Date.now())
     peers = new NetworkPeerStore([], [await PeerId.create({ keyType: 'secp256k1' })])
-    heartbeat = new TestingHeartbeat(peers, subscribe, send, hangUp)
+    heartbeat = new TestingHeartbeat(peers, subscribe, send, hangUp, 'protocolHeartbeat')
   })
 
   afterEach(() => {
@@ -57,7 +57,7 @@ describe('unit test heartbeat', async () => {
     let generateMock = (i: string | number) => {
       let id = fakePeerId(i)
       let peers = new NetworkPeerStore([], [id])
-      let heartbeat = new TestingHeartbeat(peers, subscribe, send, hangUp)
+      let heartbeat = new TestingHeartbeat(peers, subscribe, send, hangUp, 'protocolHeartbeat')
       return { peers, id, heartbeat }
     }
 

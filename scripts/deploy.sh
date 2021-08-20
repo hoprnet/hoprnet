@@ -4,45 +4,58 @@ set -e #u
 shopt -s expand_aliases
 #set -o xtrace
 
+set -x
+
 source scripts/environments.sh
 source scripts/testnet.sh
 source scripts/cleanup.sh
 
 # ---- On Deployment -----
 #
-# This is run on pushes to master, or release/**
+# This finds matching entries in packages/hoprd/releases.json and deploys accordingly
 #
 # ENV Variables:
 # - GITHUB_REF: ie. `/refs/heads/mybranch`
-# - RPC: provider address, ie `https://rpc-mainnet.matic.network`
-# - RPC_NETWORK: provider network id, e.g. xdai
 # - FUNDING_PRIV_KEY: funding private key, raw
 # - BS_PASSWORD: database password
 
-if [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "goerli" ]; then
-  RPC="https://goerli.infura.io/v3/${INFURA_KEY}"
-elif [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "xdai" ]; then
-  RPC="https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"
-elif [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "polygon" ]; then
-  RPC="https://provider-proxy.hoprnet.workers.dev/matic_rio"
-elif [ "${RPC_NETWORK:-}" != "xdai" ] && [ "${RPC_NETWORK:-}" != "goerli" ]; then
-  echo "Missing supported RPC_NETWORK"
-  exit 1
-fi
+_jq() {
+  echo "$1" | base64 --decode | jq -r "$2"
+}
 
-# Get version from package.json if not already set
-if [ -z "${RELEASE:-}" ]; then
-  RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
-fi
+echo "Looking for releases to deploy (GITHUB_REF == ${GITHUB_REF})"
 
-# Get RELEASE_NAME, from environment
-get_environment
+# iterate through releases with git_ref == $GITHUB_REF
+for row in $(cat packages/hoprd/releases.json | ./node_modules/.bin/strip-json-comments | jq -r ".[] | select(.git_ref==\"${GITHUB_REF}\") | @base64"); do
+  declare release_id=$(_jq "${row}" ".id")
+  declare deprecated=$(_jq "${row}" ".deprecated")
+  declare environment_id=$(_jq "${row}" ".environment_id")
+  declare version_major=$(_jq "${row}" ".version_major")
+  declare version_minor=$(_jq "${row}" ".version_minor")
+  declare docker_image=$(_jq "${row}" ".docker_image")
 
-TESTNET_NAME="$RELEASE_NAME-$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
-TESTNET_SIZE=3
+  if [ "${deprecated}" == "true" ]; then
+    echo "${release_id} deprecated, skipping"
+    continue
+  fi
 
-echo "Cleaning up before deploy"
-cleanup
+  declare version_maj_min
+  if [ "${version_major}" != "null" ] && [ "${version_minor}" != "null" ]; then
+    version_maj_min="${version_major}.${version_minor}"
+  else
+    version_maj_min="unversioned"
+  fi
+  declare testnet_name="$release_id-$(echo "$version_maj_min" | sed 's/\./-/g')"
+  declare testnet_size=3
 
-echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes and image hoprd:$RELEASE"
-start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" "${RPC}"
+  echo "Deploying release ${release_id}"
+  echo " version: ${version_maj_min}"
+  echo " environment ${environment_id}"
+  echo " docker image: ${docker_image}"
+  echo " testnet name: ${testnet_name}"
+
+  echo "Cleaning up testnet"
+  cleanup_instance "${testnet_name}"
+  echo "Starting testnet"
+  start_testnet $testnet_name $testnet_size $docker_image $environment_id
+done

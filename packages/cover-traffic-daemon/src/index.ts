@@ -1,15 +1,18 @@
 #!/usr/bin/env node
-import { PersistedState } from './state'
-import type { PeerData, State } from './state'
-import type { HoprOptions } from '@hoprnet/hopr-core'
-import Hopr from '@hoprnet/hopr-core'
+
+import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
+
+import Hopr, { resolveEnvironment, supportedEnvironments, defaultEnvironment } from '@hoprnet/hopr-core'
+import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
+
+import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
-import { ChannelEntry, privKeyToPeerId, PublicKey } from '@hoprnet/hopr-utils'
+
 import type PeerId from 'peer-id'
-import BN from 'bn.js'
-import { debug } from '@hoprnet/hopr-utils'
+import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import type { PeerData, State } from './state'
 
 const log = debug('hopr:cover-traffic')
 
@@ -19,10 +22,9 @@ function stopGracefully(signal: number) {
 }
 
 const argv = yargs(process.argv.slice(2))
-  .option('provider', {
-    describe: 'A provider url for the network this node shall operate on',
-    default: 'https://provider-proxy.hoprnet.workers.dev/matic_rio',
-    string: true
+  .option('environment', {
+    string: true,
+    describe: 'Environment id, one of the ids defined in protocol-config.json'
   })
   .option('privateKey', {
     describe: 'A private key to be used for the node',
@@ -32,20 +34,30 @@ const argv = yargs(process.argv.slice(2))
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
-async function generateNodeOptions(): Promise<HoprOptions> {
+async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
   const options: HoprOptions = {
-    provider: argv.provider,
+    announce: false,
     createDbIfNotExist: true,
-    password: '',
+    environment: environment,
     forceCreateDB: true,
-    announce: false
+    password: ''
   }
 
   return options
 }
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
-  const options = await generateNodeOptions()
+  // We require the environment to be set either on the command-line or as a
+  // de<Plug>_failt setting (used in releases npm/docker).
+  const environment_id = argv.environment || defaultEnvironment()
+  if (!environment_id) {
+    throw new Error(
+      `please specify --environment <environment id>, supported environments:\n\n${supportedEnvironments().join('\n')}`
+    )
+  }
+  const environment = resolveEnvironment(environment_id)
+
+  const options = await generateNodeOptions(environment)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }
@@ -61,7 +73,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     data.setNode(peer)
   }
 
-  log('creating a node...')
+  log('creating a node')
   const node = new Hopr(peerId, options)
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)

@@ -47,6 +47,7 @@ declare node3_dir="${tmp}/${node_prefix}-3"
 declare node4_dir="${tmp}/${node_prefix}-4"
 declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
+declare node6_dir="${tmp}/${node_prefix}-7"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -54,6 +55,7 @@ declare node3_log="${node3_dir}.log"
 declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
+declare node7_log="${node7_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
@@ -61,6 +63,7 @@ declare node3_id="${node3_dir}.id"
 declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
+declare node7_id="${node7_dir}.id"
 
 declare password="e2e-test"
 
@@ -78,7 +81,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096 19097; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -122,7 +125,7 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="${password}" \
-    --provider=http://127.0.0.1:8545/ \
+    --environment hardhat-localhost \
     --rest \
     --restPort "${rest_port}" \
     --testAnnounceLocalAddresses \
@@ -160,6 +163,10 @@ log "\tnode6"
 log "\t\tdata dir: ${node6_dir} (will be removed)"
 log "\t\tlog: ${node6_log}"
 log "\t\tid: ${node6_id}"
+log "\tnode7"
+log "\t\tdata dir: ${node7_dir} (will be removed)"
+log "\t\tlog: ${node7_log}"
+log "\t\tid: ${node7_id}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -176,6 +183,7 @@ ensure_port_is_free 19093
 ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
+ensure_port_is_free 19097
 # }}}
 
 # --- Cleanup old deployments to localhost {{{
@@ -200,6 +208,7 @@ setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
 setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
 # }}}
 
 #  --- Wait until started --- {{{
@@ -217,7 +226,7 @@ yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \
-  --network localhost \
+  --network hardhat-localhost \
   --password "${password}"
 # }}}
 
@@ -228,6 +237,7 @@ wait_for_regex ${node3_log} "STARTED NODE"
 wait_for_regex ${node4_log} "STARTED NODE"
 wait_for_regex ${node5_log} "STARTED NODE"
 # no need to wait for node 6 since that will stop right away
+wait_for_port 19097 "127.0.0.1" "${node7_log}"
 # }}}
 
 # --- Run security tests --- {{{
@@ -237,7 +247,7 @@ ${mydir}/../test/security-test.sh \
 
 # --- Run protocol test --- {{{
 ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305"
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
 # -- Verify node6 has executed the commands {{{
