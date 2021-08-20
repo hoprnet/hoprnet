@@ -14,10 +14,10 @@ export function timer(fn: () => void): number {
  * @returns a string with variables resolved to the actual values
  */
 export function expandVars(input: string, vars: { [key: string]: any }) {
-  return input.replace(/\$\{(.*)\}/g, (_, var_name) => {
-    if (!(var_name in vars)) {
-      throw new Error(`failed to expand vars in string '${input}', var ${var_name} not defined`)
+  return input.replace(/\$\{(.*)\}/g, (_, varName) => {
+    if (!(varName in vars)) {
+      throw new Error(`failed to expand vars in string '${input}', var ${varName} not defined`)
     }
-    return vars[var_name]
+    return vars[varName]
   })
 }
