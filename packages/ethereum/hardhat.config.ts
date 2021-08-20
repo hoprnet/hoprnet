@@ -41,7 +41,11 @@ function networkToHardhatNetwork(input: any): any {
   }
 
   if (input.live) {
-    res.url = expandVars(input.default_provider, process.env)
+    try {
+      res.url = expandVars(input.default_provider, process.env)
+    } catch (_) {
+      res.url = "invalid_url"
+    }
     res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     res.companionNetworks = {}
     res.mining = undefined
