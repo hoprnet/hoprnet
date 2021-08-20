@@ -17,15 +17,15 @@ export class PacketForwardInteraction {
     private chain: HoprCoreEthereum,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB,
-    private protocol_msg: string,
-    private protocol_ack: string,
+    private protocolMsg: string,
+    private protocolAck: string,
   ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
-    this.subscribe(protocol_msg, this.handlePacket.bind(this))
+    this.subscribe(protocolMsg, this.handlePacket.bind(this))
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
-    await this.sendMessage(counterparty, this.protocol_msg, packet.serialize(), {
+    await this.sendMessage(counterparty, this.protocolMsg, packet.serialize(), {
       timeout: FORWARD_TIMEOUT
     })
   }
@@ -48,6 +48,6 @@ export class PacketForwardInteraction {
       await this.interact(pubKeyToPeerId(packet.nextHop), packet)
     }
 
-    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocol_ack)
+    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey, this.protocolAck)
   }
 }

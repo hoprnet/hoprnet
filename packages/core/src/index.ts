@@ -293,13 +293,13 @@ class Hopr extends EventEmitter {
       libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
-    const protocol_heartbeat = `hopr/${this.environment.id}/heartbeat`
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup, protocol_heartbeat)
+    const protocolHeartbeat = `hopr/${this.environment.id}/heartbeat`
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup, protocolHeartbeat)
 
     const ethereum = await this.startedPaymentChannels()
 
-    const protocol_msg = `hopr/${this.environment.id}/msg`
-    const protocol_ack = `hopr/${this.environment.id}/ack`
+    const protocolMsg = `hopr/${this.environment.id}/msg`
+    const protocolAck = `hopr/${this.environment.id}/ack`
 
     subscribeToAcknowledgements(
       subscribe,
@@ -307,11 +307,11 @@ class Hopr extends EventEmitter {
       ethereum,
       this.getId(),
       (ack) => this.emit('message-acknowledged:' + ack.ackChallenge.toHex()),
-      protocol_ack
+      protocolAck
     )
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db, protocol_msg, protocol_ack)
+    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db, protocolMsg, protocolAck)
 
     await this.announce(this.options.announce)
     log('announcing done, starting heartbeat')

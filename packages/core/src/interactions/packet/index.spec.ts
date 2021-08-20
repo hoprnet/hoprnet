@@ -136,9 +136,9 @@ describe('packet interaction', function () {
 
     subscribeToAcknowledgements(libp2pSelf.subscribe, db, chainSelf as any, self, () => {
       defer.resolve()
-    }, "protocol_ack")
+    }, "protocolAck")
 
-    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send, counterparty, "protocol_ack")
+    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send, counterparty, "protocolAck")
 
     await defer.promise
   })
@@ -172,14 +172,14 @@ describe('packet interaction', function () {
       chainSender as any,
       console.log,
       db,
-      'protocol_msg',
-      'protocol_ack'
+      'protocolMsg',
+      'protocolAck'
     )
 
     // TODO: improve
-    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, chainRelay0 as any, console.log, db, 'protocol_msg', 'protocol_ack')
-    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, chainRelay1 as any, console.log, db, 'protocol_msg', 'protocol_ack')
-    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, chainRelay2 as any, console.log, db, 'protocol_msg', 'protocol_ack')
+    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, chainRelay0 as any, console.log, db, 'protocolMsg', 'protocolAck')
+    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, chainRelay1 as any, console.log, db, 'protocolMsg', 'protocolAck')
+    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, chainRelay2 as any, console.log, db, 'protocolMsg', 'protocolAck')
     new PacketForwardInteraction(
       libp2pReceiver.subscribe,
       libp2pReceiver.send,
@@ -191,8 +191,8 @@ describe('packet interaction', function () {
         }
       },
       db,
-      'protocol_msg',
-      'protocol_ack'
+      'protocolMsg',
+      'protocolAck'
     )
 
     senderInteraction.interact(relay0, packet)

@@ -14,7 +14,7 @@ export function subscribeToAcknowledgements(
   chain: HoprCoreEthereum,
   pubKey: PeerId,
   onMessage: (ackMessage: Acknowledgement) => void,
-  protocol_ack: string,
+  protocolAck: string,
 ) {
   async function handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
@@ -36,16 +36,16 @@ export function subscribeToAcknowledgements(
   }
 
   const limitConcurrency = oneAtATime()
-  subscribe(protocol_ack, (msg: Uint8Array, remotePeer: PeerId) =>
+  subscribe(protocolAck, (msg: Uint8Array, remotePeer: PeerId) =>
     limitConcurrency(() => handleAcknowledgement(msg, remotePeer))
   )
 }
 
-export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMessage: any, privKey: PeerId, protocol_ack: string): void {
+export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMessage: any, privKey: PeerId, protocolAck: string): void {
   setImmediate(async () => {
     const ack = packet.createAcknowledgement(privKey)
 
-    sendMessage(destination, protocol_ack, ack.serialize(), {
+    sendMessage(destination, protocolAck, ack.serialize(), {
       timeout: ACKNOWLEDGEMENT_TIMEOUT
     })
   })

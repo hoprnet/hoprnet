@@ -22,9 +22,9 @@ export default class Heartbeat {
       opts: DialOpts
     ) => Promise<Uint8Array[]>,
     private hangUp: (addr: PeerId) => Promise<void>,
-    private protocol_heartbeat: string
+    private protocolHeartbeat: string
   ) {
-    subscribe(protocol_heartbeat, this.handleHeartbeatRequest.bind(this), true)
+    subscribe(protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true)
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array {
@@ -40,7 +40,7 @@ export default class Heartbeat {
     const expectedResponse = Hash.create(challenge).serialize()
 
     try {
-      const pingResponse = await this.sendMessageAndExpectResponse(id, this.protocol_heartbeat, challenge, {
+      const pingResponse = await this.sendMessageAndExpectResponse(id, this.protocolHeartbeat, challenge, {
         timeout: HEARTBEAT_TIMEOUT
       })
 
