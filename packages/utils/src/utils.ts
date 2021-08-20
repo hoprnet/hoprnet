@@ -10,13 +10,14 @@ export function timer(fn: () => void): number {
 /**
  * 
  * @param input a string containing templated references to environment variables e.g. 'foo ${bar}'
+ * @param vars a key-value vars storage object, e.g. { 'bar': 'bar_value' }
  * @returns a string with variables resolved to the actual values
  */
-export function expand_env_vars(input: string) {
+export function expandVars(input: string, vars: { [key: string]: any }) {
   return input.replace(/\$\{(.*)\}/g, (_, var_name) => {
-    if (!(var_name in process.env)) {
-      throw new Error(`failed to expand env vars in string '${input}', env var ${var_name} not defined`)
+    if (!(var_name in vars)) {
+      throw new Error(`failed to expand vars in string '${input}', var ${var_name} not defined`)
     }
-    return process.env[var_name]
+    return vars[var_name]
   })
 }
