@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.76.0-next.8",
+  "version": "1.76.0-next.18",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -35,7 +35,7 @@
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.0.1"
   },
   "devDependencies": {
-    "@hoprnet/hopr-utils": "1.76.0-next.4",
+    "@hoprnet/hopr-utils": "1.76.0-next.18",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
@@ -49,7 +49,7 @@
     "chai": "^4.3.4",
     "dotenv": "^10.0.0",
     "ethereum-waffle": "^3.3.0",
-    "ethers": "5.4.4",
+    "ethers": "5.4.5",
     "hardhat": "^2.4.1",
     "hardhat-deploy": "^0.8.9",
     "hardhat-gas-reporter": "^1.0.4",
@@ -59,7 +59,7 @@
     "ts-generator": "^0.1.1",
     "ts-node": "^10.1.0",
     "typechain": "^4.0.3",
-    "typedoc": "0.21.5",
+    "typedoc": "0.21.6",
     "typedoc-plugin-markdown": "3.10.4",
     "typescript": "4.3.5"
   },
