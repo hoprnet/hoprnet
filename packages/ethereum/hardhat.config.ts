@@ -29,24 +29,6 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 
 const PROTOCOL_CONFIG = require('../hoprd/protocol-config.json')
 
-// chainId?: number;
-// from?: string;
-// gas: "auto" | number;
-// gasPrice: "auto" | number;
-// gasMultiplier: number;
-// url: string;
-// timeout: number;
-// httpHeaders: { [name: string]: string };
-// accounts: HttpNetworkAccountsConfig;
-
-// live: boolean;
-// saveDeployments: boolean;
-// tags: string[];
-// deploy?: string[];
-// companionNetworks: {
-//     [name: string]: string;
-// };
-
 function networkToHardhatNetwork(input: any): any {
   const parsedGas = input.gas.split(' ')
   let res: any = {
