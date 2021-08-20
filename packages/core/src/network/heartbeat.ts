@@ -11,6 +11,7 @@ const log = debug('hopr-core:heartbeat')
 
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
+  private protocolHeartbeat: string
 
   constructor(
     private networkPeers: NetworkPeerStore,
@@ -22,9 +23,10 @@ export default class Heartbeat {
       opts: DialOpts
     ) => Promise<Uint8Array[]>,
     private hangUp: (addr: PeerId) => Promise<void>,
-    private protocolHeartbeat: string
+    environmentId: string
   ) {
-    subscribe(protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true)
+    this.protocolHeartbeat = `hopr/${environmentId}/heartbeat`
+    subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true)
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array {

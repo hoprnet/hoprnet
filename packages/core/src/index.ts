@@ -293,8 +293,7 @@ class Hopr extends EventEmitter {
       libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
-    const protocolHeartbeat = `hopr/${this.environment.id}/heartbeat`
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup, protocolHeartbeat)
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup, this.environment.id)
 
     const ethereum = await this.startedPaymentChannels()
 
