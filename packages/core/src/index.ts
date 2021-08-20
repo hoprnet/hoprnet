@@ -261,7 +261,13 @@ class Hopr extends EventEmitter {
       libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup, this.environment.id)
+    this.heartbeat = new Heartbeat(
+      this.networkPeers,
+      subscribe,
+      sendMessageAndExpectResponse,
+      hangup,
+      this.environment.id
+    )
 
     const ethereum = await this.startedPaymentChannels()
 
@@ -278,7 +284,16 @@ class Hopr extends EventEmitter {
     )
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db, protocolMsg, protocolAck)
+    this.forward = new PacketForwardInteraction(
+      subscribe,
+      sendMessage,
+      this.getId(),
+      ethereum,
+      onMessage,
+      this.db,
+      protocolMsg,
+      protocolAck
+    )
 
     await this.announce(this.options.announce)
     log('announcing done, starting heartbeat')

@@ -14,7 +14,7 @@ export function subscribeToAcknowledgements(
   chain: HoprCoreEthereum,
   pubKey: PeerId,
   onMessage: (ackMessage: Acknowledgement) => void,
-  protocolAck: string,
+  protocolAck: string
 ) {
   async function handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
@@ -41,7 +41,13 @@ export function subscribeToAcknowledgements(
   )
 }
 
-export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMessage: any, privKey: PeerId, protocolAck: string): void {
+export function sendAcknowledgement(
+  packet: Packet,
+  destination: PeerId,
+  sendMessage: any,
+  privKey: PeerId,
+  protocolAck: string
+): void {
   setImmediate(async () => {
     const ack = packet.createAcknowledgement(privKey)
 

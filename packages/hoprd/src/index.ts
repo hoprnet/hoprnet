@@ -138,7 +138,7 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .coerce({
-    environment: env => env[env.length - 1]
+    environment: (env) => env[env.length - 1]
   })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
@@ -192,15 +192,14 @@ async function generateNodeOptions(): Promise<HoprOptions> {
           }
         }
       }
-
     }
   }
 
   if (!options.environment) {
-    const supportedEnvs: string = protocolConfig.environments
-      .map(env => env.id)
-      .join(', ')
-    throw new Error(`failed to find environment with id '${argv.environment}' in the supported protocol configuration, supported environments: ${supportedEnvs}`)
+    const supportedEnvs: string = protocolConfig.environments.map((env) => env.id).join(', ')
+    throw new Error(
+      `failed to find environment with id '${argv.environment}' in the supported protocol configuration, supported environments: ${supportedEnvs}`
+    )
   }
 
   return options

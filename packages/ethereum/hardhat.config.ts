@@ -15,11 +15,7 @@ import { ethers } from 'ethers'
 export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'production'
 export type NetworkTag = DeploymentTypes | 'etherscan'
 
-const {
-  DEPLOYER_WALLET_PRIVATE_KEY,
-  ETHERSCAN_KEY,
-  ENVIRONMENT_ID = 'default'
-} = process.env
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, ENVIRONMENT_ID = 'default' } = process.env
 
 extendConfig((config: HardhatConfig) => {
   config.etherscan.apiKey = ETHERSCAN_KEY
@@ -35,7 +31,7 @@ function networkToHardhatNetwork(input: any): any {
   let res: any = {
     chainId: input.chain_id,
     gasMultiplier: input.gas_multiplier,
-    live: input.live,
+    live: input.live
   }
 
   if (input.live) {

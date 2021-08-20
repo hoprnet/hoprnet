@@ -8,7 +8,7 @@ export function timer(fn: () => void): number {
 }
 
 /**
- * 
+ *
  * @param input a string containing templated references to environment variables e.g. 'foo ${bar}'
  * @param vars a key-value vars storage object, e.g. { 'bar': 'bar_value' }
  * @returns a string with variables resolved to the actual values

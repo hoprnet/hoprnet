@@ -18,7 +18,7 @@ export class PacketForwardInteraction {
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB,
     private protocolMsg: string,
-    private protocolAck: string,
+    private protocolAck: string
   ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
     this.subscribe(protocolMsg, this.handlePacket.bind(this))
