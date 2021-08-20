@@ -9,6 +9,8 @@ import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
+import { utils } from 'ethers'
+
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
 import { ethers } from 'ethers'
@@ -27,16 +29,39 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 
 const PROTOCOL_CONFIG = require('../hoprd/protocol-config.json')
 
+// chainId?: number;
+// from?: string;
+// gas: "auto" | number;
+// gasPrice: "auto" | number;
+// gasMultiplier: number;
+// url: string;
+// timeout: number;
+// httpHeaders: { [name: string]: string };
+// accounts: HttpNetworkAccountsConfig;
+
+// live: boolean;
+// saveDeployments: boolean;
+// tags: string[];
+// deploy?: string[];
+// companionNetworks: {
+//     [name: string]: string;
+// };
+
 function networkToHardhatNetwork(input: any): any {
+  const parsedGas = input.gas.split(' ')
   let res: any = {
     chainId: input.chain_id,
+    gas: Number(utils.parseUnits(parsedGas[0], parsedGas[1])),
     gasMultiplier: input.gas_multiplier,
-    live: input.live
+    live: input.live,
+    tags: [],
   }
 
   if (input.live) {
     res.url = input.default_provider
     res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+    res.companionNetworks = {}
+    res.mining = undefined
   } else {
     res.tags = ['development']
     res.saveDeployments = true
