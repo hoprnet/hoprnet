@@ -9,7 +9,7 @@ import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
-import { utils } from 'ethers'
+// import { utils } from 'ethers'
 
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
