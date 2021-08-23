@@ -18,7 +18,7 @@ const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 const argv = yargs(process.argv.slice(2))
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/'
+    default: 'https://polygon-mainnet.infura.io/v3/51d4d972f30c4d92b61f2b3898fccaf6'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
