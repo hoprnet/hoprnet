@@ -36,7 +36,7 @@ function networkToHardhatNetwork(input: any): any {
     gasPrice: 'auto',
     gasMultiplier: input.gas_multiplier,
     live: input.live,
-    tags: input.tags,
+    tags: input.tags
   }
 
   if (input.gas) {

@@ -7,8 +7,8 @@ export type Network = {
   gas?: string // e.g. '1 gwei'
   gas_multiplier: number // e.g. 1.1
   native_token_name: string
-  hopr_token_name: string,
-  tags: string[],
+  hopr_token_name: string
+  tags: string[]
 }
 
 export type Environment = {
