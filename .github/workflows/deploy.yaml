@@ -362,6 +362,9 @@ jobs:
         id: set-rpc-network
         run: |
           declare network
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/wildhorn ]]; then
+            network="polygon"
+          fi
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
             network="xdai"
           fi
