@@ -423,7 +423,11 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
     await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2) // TODO secret per account
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    blockTimestamp = (await ethers.provider.getBlock(ethers.provider.getBlockNumber())).timestamp
+    const blockNumber = await ethers.provider.getBlockNumber()
+    const block = await ethers.provider.getBlock(blockNumber)
+    console.log(`bn: ${blockNumber}`)
+    console.log(`block: ${block}`)
+    blockTimestamp = block.timestamp
   })
 
   it('should redeem ticket for account A', async function () {
