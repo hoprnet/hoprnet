@@ -133,6 +133,8 @@ validate_node_eth_address "${api2}"
 validate_node_eth_address "${api3}"
 validate_node_eth_address "${api4}"
 validate_node_eth_address "${api5}"
+# we don't need node6 because it's short-living
+validate_node_eth_address "${api7}"
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
@@ -140,6 +142,8 @@ validate_node_balance_gt0 "${api2}"
 validate_node_balance_gt0 "${api3}"
 validate_node_balance_gt0 "${api4}"
 validate_node_balance_gt0 "${api5}"
+# we don't need node6 because it's short-living
+validate_node_balance_gt0 "${api7}"
 log "Nodes are funded"
 
 declare addr1 addr2 addr3 addr4 addr5 result
@@ -148,14 +152,15 @@ addr2="$(get_hopr_address "${api2}")"
 addr3="$(get_hopr_address "${api3}")"
 addr4="$(get_hopr_address "${api4}")"
 addr5="$(get_hopr_address "${api5}")"
-
+# we don't need node6 because it's short-living
 addr7="$(get_hopr_address "${api7}")"
+
 log "hopr addr1: ${addr1}"
 log "hopr addr2: ${addr2}"
 log "hopr addr3: ${addr3}"
 log "hopr addr4: ${addr4}"
 log "hopr addr5: ${addr5}"
-
+# we don't need node6 because it's short-living
 log "hopr addr7: ${addr7}"
 
 log "Check peers"
