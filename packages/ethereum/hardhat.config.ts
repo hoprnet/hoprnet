@@ -38,7 +38,7 @@ function networkToHardhatNetwork(input: any): any {
     // gas, @TODO: figure out why the unit tests are failing with gas limit enabled
     gasMultiplier: input.gas_multiplier,
     live: input.live,
-    tags: []
+    tags: input.tags,
   }
 
   if (input.live) {
@@ -51,7 +51,6 @@ function networkToHardhatNetwork(input: any): any {
     res.companionNetworks = {}
     res.mining = undefined
   } else {
-    res.tags = ['development']
     res.saveDeployments = true
     res.mining = {
       auto: true, // every transaction will trigger a new block (without this deployments fail)
