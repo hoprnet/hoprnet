@@ -126,7 +126,7 @@ validate_node_balance_gt0() {
   fi
 }
 
-log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5} ${api6} ${api7}"
+log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
 
 validate_node_eth_address "${api1}"
 validate_node_eth_address "${api2}"
@@ -148,14 +148,14 @@ addr2="$(get_hopr_address "${api2}")"
 addr3="$(get_hopr_address "${api3}")"
 addr4="$(get_hopr_address "${api4}")"
 addr5="$(get_hopr_address "${api5}")"
-addr6="$(get_hopr_address "${api6}")"
+
 addr7="$(get_hopr_address "${api7}")"
 log "hopr addr1: ${addr1}"
 log "hopr addr2: ${addr2}"
 log "hopr addr3: ${addr3}"
 log "hopr addr4: ${addr4}"
 log "hopr addr5: ${addr5}"
-log "hopr addr6: ${addr6}"
+
 log "hopr addr7: ${addr7}"
 
 log "Check peers"
