@@ -1,5 +1,4 @@
 {
-  "$schema": "http://json-schema.org/draft-04/schema#",
   "type": "object",
   "properties": {
     "environments": {
@@ -29,7 +28,8 @@
           "channel_contract_deploy_block",
           "token_contract_address",
           "channels_contract_address"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     "networks": {
@@ -42,6 +42,9 @@
           },
           "id": {
             "type": "string"
+          },
+          "live": {
+            "type": "boolean"
           },
           "chain_id": {
             "type": "integer"
@@ -60,20 +63,29 @@
           },
           "hopr_token_name": {
             "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "description",
           "id",
           "chain_id",
-          "gas",
           "gas_multiplier",
           "default_provider",
           "native_token_name",
           "hopr_token_name"
-        ]
+        ],
+        "additionalProperties": false
       }
     }
   },
-  "required": ["environments", "networks"]
+  "required": [
+    "environments",
+    "networks"
+  ]
 }
