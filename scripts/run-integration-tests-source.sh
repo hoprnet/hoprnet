@@ -85,9 +85,9 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
-  trap cleanup SIGINT SIGTERM ERR EXIT
-fi
+# if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
+#   trap cleanup SIGINT SIGTERM ERR EXIT
+# fi
 
 # $1 = rest port
 # $2 = node port
