@@ -9,7 +9,7 @@ import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
-// import { utils } from 'ethers'
+import { utils } from 'ethers'
 
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
@@ -31,14 +31,17 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 const PROTOCOL_CONFIG = require('../hoprd/protocol-config.json')
 
 function networkToHardhatNetwork(input: any): any {
-  // const parsedGas = input.gas.split(' ')
-  // const gas = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
   let res: any = {
     chainId: input.chain_id,
-    // gas, @TODO: figure out why the unit tests are failing with gas limit enabled
+    gasPrice: 'auto',
     gasMultiplier: input.gas_multiplier,
     live: input.live,
     tags: input.tags,
+  }
+
+  if (input.gas) {
+    const parsedGas = input.gas.split(' ')
+    res.gas = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
   }
 
   if (input.live) {

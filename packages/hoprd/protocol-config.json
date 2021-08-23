@@ -49,7 +49,6 @@
       "id": "hardhat",
       "chain_id": 1,
       "live": false,
-      "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
