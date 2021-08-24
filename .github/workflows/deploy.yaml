@@ -8,7 +8,7 @@ env:
 
 on:
   push:
-    branches: ['**']
+    branches: ['master', 'release/**', 'avado', 'debug-deploy/**']
     paths-ignore:
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
@@ -226,7 +226,7 @@ jobs:
 
       - name: Verify the correct hoprd package version has been bundled
         run: |
-          docker run --pull always ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} --version
+          declare v=$(docker run --pull always ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
           [ "${v}" = "${HOPR_PACKAGE_VERSION}" ]
         env:
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
