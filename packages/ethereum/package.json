@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.76.0-next.20",
+  "version": "1.76.0-next.21",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -35,7 +35,7 @@
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.0.1"
   },
   "devDependencies": {
-    "@hoprnet/hopr-utils": "1.76.0-next.18",
+    "@hoprnet/hopr-utils": "1.76.0-next.21",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
