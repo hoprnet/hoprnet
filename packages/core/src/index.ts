@@ -990,4 +990,4 @@ export { Hopr as default, LibP2P }
 export * from './constants'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
-export type { ProtocolConfig } from './environment'
+export type { ProtocolConfig, Network } from './environment'
