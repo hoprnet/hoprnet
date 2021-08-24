@@ -44,6 +44,8 @@ WORKDIR /app
 # copy over the contents of node_modules etc
 COPY --from=build /app .
 
+COPY package.json .
+
 # create directory which is later used for the database, so that it inherits
 # permissions when mapped to a volume
 RUN mkdir db
