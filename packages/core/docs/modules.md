@@ -21,6 +21,7 @@
 - [ChannelsToClose](modules.md#channelstoclose)
 - [ChannelsToOpen](modules.md#channelstoopen)
 - [HoprOptions](modules.md#hoproptions)
+- [Network](modules.md#network)
 - [NodeStatus](modules.md#nodestatus)
 - [ProtocolConfig](modules.md#protocolconfig)
 
@@ -96,6 +97,31 @@ ___
 
 ___
 
+### Network
+
+Ƭ **Network**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `chain_id` | `number` |
+| `default_provider` | `string` |
+| `description` | `string` |
+| `gas?` | `string` |
+| `gas_multiplier` | `number` |
+| `hopr_token_name` | `string` |
+| `id` | `string` |
+| `live` | `boolean` |
+| `native_token_name` | `string` |
+| `tags` | `string`[] |
+
+#### Defined in
+
+[packages/core/src/environment.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L1)
+
+___
+
 ### NodeStatus
 
 Ƭ **NodeStatus**: ``"UNINITIALIZED"`` \| ``"INITIALIZING"`` \| ``"RUNNING"`` \| ``"DESTROYED"``
@@ -115,11 +141,11 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `environments` | `Environment`[] |
-| `networks` | `Network`[] |
+| `networks` | [`Network`](modules.md#network)[] |
 
 #### Defined in
 
-[packages/core/src/environment.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L21)
+[packages/core/src/environment.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L22)
 
 ## Variables
 
