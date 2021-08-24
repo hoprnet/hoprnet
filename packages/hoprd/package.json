@@ -13,7 +13,8 @@
   "files": [
     "lib",
     "hopr-admin/.next",
-    "hoprd-default.sh"
+    "hoprd-default.sh",
+    "protocol-config.json"
   ],
   "scripts": {
     "clean": "rimraf ./lib",
