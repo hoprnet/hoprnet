@@ -20,7 +20,6 @@
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
     "hash": "/ipfs/QmWKpE1d6zKYi3WDZ1SbGnnPGaCzrg8ZFjJd5tyYVudHL7",
-    "size": 68345896,
     "restart": "always"
   },
   "author": "HOPR",
