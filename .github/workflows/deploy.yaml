@@ -376,6 +376,8 @@ jobs:
       - name: Run start script
         if: ${{ !env.ACT }}
         run: |
+          # get latest version
+          git pull
           # need to install tools first which may be used during deployment
           yarn
           # set release to intermediate docker build for debugging PRs

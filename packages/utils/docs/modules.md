@@ -95,6 +95,7 @@
 - [decodePoRBytes](modules.md#decodeporbytes)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
 - [dial](modules.md#dial)
+- [expandVars](modules.md#expandvars)
 - [forwardTransform](modules.md#forwardtransform)
 - [gcd](modules.md#gcd)
 - [generateChannelId](modules.md#generatechannelid)
@@ -133,6 +134,7 @@
 - [serializeToU8a](modules.md#serializetou8a)
 - [stringToU8a](modules.md#stringtou8a)
 - [timeoutAfter](modules.md#timeoutafter)
+- [timer](modules.md#timer)
 - [toLengthPrefixedU8a](modules.md#tolengthprefixedu8a)
 - [toU8a](modules.md#tou8a)
 - [u8aAdd](modules.md#u8aadd)
@@ -907,6 +909,29 @@ Contains a baseline protection against dialing same addresses twice.
 #### Defined in
 
 [libp2p/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L129)
+
+___
+
+### expandVars
+
+▸ **expandVars**(`input`, `vars`): `string`
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `input` | `string` | a string containing templated references to environment variables e.g. 'foo ${bar}' |
+| `vars` | `Object` | a key-value vars storage object, e.g. { 'bar': 'bar_value' } |
+
+#### Returns
+
+`string`
+
+a string with variables resolved to the actual values
+
+#### Defined in
+
+[utils.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L16)
 
 ___
 
@@ -1839,6 +1864,26 @@ ___
 #### Defined in
 
 [timeout.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/timeout.ts#L5)
+
+___
+
+### timer
+
+▸ **timer**(`fn`): `number`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[utils.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L3)
 
 ___
 

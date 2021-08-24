@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
@@ -19,25 +18,35 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
     // used by {tokensReceived} to distinguish which function to call after tokens are sent
-    uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), address(0), uint256(0), uint256(0)).length;
+    uint256 public immutable FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), address(0), uint256(0), uint256(0)).length;
 
     /**
-     * @dev Possible channel statuses.
-
-            Finalize Closure
-            (After delay)+----------------+   Initiate Closure
-                 +-------+Pending To Close| <---------+
-                 |       +----------------+           |
-                 |                                    |
-              +--v---+                             +--+-+
-              |Closed+---------------------------->+Open|
-              +---+--+ Fund (If already committed) +--+-+
-                  |                                   ^
-             Fund |                                   | Bump Commitment
-                  |       +----------------------+    |
-                  +------>+Waiting For Commitment+----+
-                          +----------------------+
-
+     * @dev Possible channel states.
+     *
+     *         finalizeChannelClosure()    +----------------------+                                    
+     *              (After delay)          |                      | initiateChannelClosure()                 
+     *                    +----------------+   Pending To Close   |<-----------------+                 
+     *                    |                |                      |                  |                 
+     *                    |                +----------------------+                  |                 
+     *                    |                              ^                           |                 
+     *                    |                              |                           |                 
+     *                    |                              |  initiateChannelClosure() |                 
+     *                    |                              |  (If not committed)       |                 
+     *                    v                              |                           |                 
+     *             +------------+                        +-+                    +----+-----+           
+     *             |            |                          |                    |          |           
+     *             |   Closed   +--------------------------+--------------------+   Open   |           
+     *             |            |    tokensReceived()      |                    |          |           
+     *             +------+-----+ (If already committed) +-+                    +----------+           
+     *                    |                              |                           ^                 
+     *                    |                              |                           |                 
+     *                    |                              |                           |                 
+     *   tokensReceived() |                              |                           | bumpChannel() 
+     *                    |              +---------------+------------+              |                 
+     *                    |              |                            |              |                 
+     *                    +--------------+   Waiting For Commitment   +--------------+                 
+     *                                   |                            |                                
+     *                                   +----------------------------+  
      */
     enum ChannelStatus { CLOSED, WAITING_FOR_COMMITMENT, OPEN, PENDING_TO_CLOSE }
 
@@ -63,13 +72,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     /**
      * @dev HoprToken, the token that will be used to settle payments
      */
-    IERC20 public token;
+    IERC20 public immutable token;
 
     /**
      * @dev Seconds it takes until we can finalize channel closure once,
      * channel closure has been initialized.
      */
-    uint32 public secsClosure;
+    uint32 public immutable secsClosure;
 
     event Announcement(
         address indexed account,
@@ -169,13 +178,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 amount2
     ) external {
         require(amount1 + amount2 > 0, "amount must be greater than 0");
-        token.safeTransferFrom(msg.sender, address(this), amount1 + amount2);
         if (amount1 > 0){
           _fundChannel(account1, account2, amount1);
         }
         if (amount2 > 0){
           _fundChannel(account2, account1, amount2);
         }
+
+        token.transferFrom(msg.sender, address(this), amount1 + amount2);
     }
 
     /**
@@ -241,14 +251,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
               msg.sender,
               source
           );
+
+          emit ChannelUpdate(source, msg.sender, spendingChannel);
+          emit TicketRedeemed(source, msg.sender, nextCommitment, ticketEpoch, ticketIndex, proofOfRelaySecret, amount, winProb, signature);
+
           if (earningChannel.status == ChannelStatus.OPEN) {
             earningChannel.balance = earningChannel.balance + amount;
             emit ChannelUpdate(msg.sender, source, earningChannel);
           } else {
-            token.safeTransfer(msg.sender, amount);
+            token.transfer(msg.sender, amount);
           }
-          emit ChannelUpdate(source, msg.sender, spendingChannel);
-          emit TicketRedeemed(source, msg.sender, nextCommitment, ticketEpoch, ticketIndex, proofOfRelaySecret, amount, winProb, signature);
     }
 
 
@@ -289,16 +301,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         (, Channel storage channel) = _getChannel(msg.sender, destination);
         require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
         require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
-
-        if (channel.balance > 0) {
-          token.transfer(msg.sender, channel.balance);
-        }
-
+        uint256 amountToTransfer = channel.balance;
         emit ChannelClosureFinalized(msg.sender, destination, channel.closureTime, channel.balance);
         delete channel.balance;
         delete channel.closureTime;
         channel.status = ChannelStatus.CLOSED;
         emit ChannelUpdate(msg.sender, destination, channel);
+
+        if (amountToTransfer > 0) {
+          token.transfer(msg.sender, amountToTransfer);
+        }
+
     }
 
     /**

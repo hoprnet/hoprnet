@@ -1,6 +1,20 @@
 {
   "environments": [
     {
+      "id": "hardhat-localhost",
+      "network_id": "hardhat",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
+      "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}"
+    },
+    {
+      "id": "hardhat-localhost2",
+      "network_id": "hardhat",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
+      "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}"
+    },
+    {
       "id": "master",
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
@@ -31,44 +45,63 @@
   ],
   "networks": [
     {
+      "description": "Hardhat is an Ethereum development environment",
+      "id": "hardhat",
+      "chain_id": 1,
+      "live": false,
+      "gas_multiplier": 1.1,
+      "default_provider": "http://127.0.0.1:8545/",
+      "native_token_name": "ETH",
+      "hopr_token_name": "wxHOPR",
+      "tags": ["development"]
+    },
+    {
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
       "id": "xdai",
       "chain_id": 100,
+      "live": true,
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "default_provider": "https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/",
       "native_token_name": "xDAI",
-      "hopr_token_name": "wxHOPR"
+      "hopr_token_name": "wxHOPR",
+      "tags": ["production"]
     },
     {
       "id": "goerli",
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
       "chain_id": 5,
+      "live": true,
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
-      "default_provider": "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/",
+      "default_provider": "https://goerli.infura.io/v3/${INFURA_KEY}",
       "native_token_name": "gETH",
-      "hopr_token_name": "wxHOPR"
+      "hopr_token_name": "wxHOPR",
+      "tags": ["staging"]
     },
     {
       "id": "mumbai",
       "description": "Mumbai Testnet is a testnet for Polygon protocol",
       "chain_id": 80001,
+      "live": true,
       "default_provider": "https://polygon-mumbai.infura.io/v3/${INFURA_KEY}",
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
-      "hopr_token_name": "wxHOPR"
+      "hopr_token_name": "wxHOPR",
+      "tags": ["testing"]
     },
     {
       "id": "polygon",
       "description": "Polygon, previously known as MATIC network, is an interchain scalability solution that gives an infrastructure for creating blockchain networks that can interface with each other",
       "chain_id": 137,
+      "live": true,
       "default_provider": "https://polygon.infura.io/v3/${INFURA_KEY}",
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
-      "hopr_token_name": "wxHOPR"
+      "hopr_token_name": "wxHOPR",
+      "tags": ["testing"]
     }
   ]
 }
