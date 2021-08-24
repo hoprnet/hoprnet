@@ -73,6 +73,10 @@
     "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
   },
+  "hopr": {
+    "description": "master",
+    "environment_id": "master"
+  },
   "publishConfig": {
     "access": "public"
   }
