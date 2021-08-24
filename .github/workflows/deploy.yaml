@@ -8,7 +8,7 @@ env:
 
 on:
   push:
-    branches: ['master', 'release/**', 'avado', 'debug-deploy/**']
+    branches: ['**']
     paths-ignore:
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
