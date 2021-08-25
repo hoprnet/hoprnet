@@ -86,9 +86,7 @@ gcloud_get_image_running_on_vm() {
 # $2 = container-image
 # $3 = disk name
 # $4 = mount path
-# $5 = chain provider
 gcloud_update_container_with_image() {
-  local rpc=${5}
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
@@ -104,7 +102,6 @@ gcloud_update_container_with_image() {
     --container-arg="--identity" --container-arg="${4}/.hopr-identity" \
     --container-arg="--init" \
     --container-arg="--password" --container-arg="${password}" \
-    --container-arg="--provider" --container-arg="${rpc}" \
     --container-arg="--rest" \
     --container-arg="--restHost" --container-arg="0.0.0.0" \
     --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
@@ -176,7 +173,6 @@ gcloud_create_or_update_instance_template() {
     --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
     --container-arg="--init" \
     --container-arg="--password" --container-arg="${password}" \
-    --container-arg="--provider" --container-arg="${rpc}" \
     --container-arg="--rest" \
     --container-arg="--restHost" --container-arg="0.0.0.0" \
     --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \

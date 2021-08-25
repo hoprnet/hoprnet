@@ -116,7 +116,6 @@ run_command(){
 
 # $1 = vm name
 # $2 = docker image
-# $3 = chain provider
 update_if_existing() {
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
     log "Container exists, updating" 1>&2
@@ -126,7 +125,7 @@ update_if_existing() {
       return 0
     fi
     log "Previous GCloud VM Image: $PREV"
-    gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db" "${3}"
+    gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db" 
 
     # prevent docker images overloading the disk space
     gcloud_cleanup_docker_images "$1"
@@ -138,14 +137,12 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
-# $3 = chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  local rpc=${3}
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
-  if [ "$(update_if_existing $1 $2 ${rpc})" = "no container" ]; then
+  if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
@@ -160,7 +157,6 @@ start_testnode_vm() {
       --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
       --container-arg="--init" \
       --container-arg="--password" --container-arg="${password}" \
-      --container-arg="--provider" --container-arg="${rpc}" \
       --container-arg="--rest" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
