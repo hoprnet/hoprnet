@@ -25,7 +25,7 @@
       "id": "matic-polygon",
       "network_id": "polygon",
       "channel_contract_deploy_block": 0,
-      "channels_contract_address": "0xd8f4e1867bbff6647b80bc624d22bd552eb81eef",
+      "channels_contract_address": "0x3cd4b4d97dcad4ee772bc4f0fb0e7605fc86a85b",
       "token_contract_address": "0x6f80d1a3ab9006548c2fbb180879b87364d63bf7"
     }
   ],
