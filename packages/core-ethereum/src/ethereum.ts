@@ -1,4 +1,4 @@
-import type { ContractTransaction } from 'ethers'
+import type { ContractTransaction, UnsignedTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
 import {
@@ -23,7 +23,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
-import TransactionManager from './transaction-manager'
+import TransactionManager, { TransactionPayload } from './transaction-manager'
 import Debug from 'debug'
 import { CONFIRMATIONS } from './constants'
 
@@ -91,23 +91,49 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     return response
   }
 
+
+/**
+ * 
+ * @param checkDuplicate If 
+ * @param method 
+ * @param rest 
+ * @returns 
+ */
   async function sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
+    checkDuplicate: Boolean,
+    populatedTx: UnsignedTransaction,
     method: T,
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
-    const gasPrice = networkInfo?.gas
+    const gasPrice = networkInfo?.gas ?? await provider.getGasPrice();
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
-
+    
     log('Sending transaction %o', {
       gasLimit,
       gasPrice,
       nonce
     })
 
+    const essentialTxPayload: TransactionPayload = {
+      to: populatedTx.to,
+      data: populatedTx.data as string,
+      value: BigNumber.from(populatedTx.value ?? 0)
+    }
+    log('essentialTxPayload %o', essentialTxPayload);
+
     try {
+      if (checkDuplicate && transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)) {
+        // check duplicated pending/mined transaction against transaction manager
+        // if transaction manager has a transaction with the same payload that is mined or is pending but with
+        // a higher or equal nonce, halt.
+        log('checkDuplicate %s and %s', checkDuplicate, transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice));
+        return;
+        // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
+      }
+
       // send transaction to our ethereum provider
       // TODO: better type this, make it less hacky
       transaction = await method(
@@ -127,10 +153,13 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     }
 
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
-    transactions.addToPending(transaction.hash, { nonce })
+    transactions.addToPending(transaction.hash, { nonce, gasPrice }, essentialTxPayload)
     nonceLock.releaseLock()
 
     try {
+      await waitForConfirmations(transaction.hash, 1, 30e3)
+      log('Transaction with nonce %d and hash %s mined', nonce, transaction.hash)
+      transactions.moveToMined(transaction.hash)
       await waitForConfirmations(transaction.hash, CONFIRMATIONS, 30e3)
       log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
       transactions.moveToConfirmed(transaction.hash)
@@ -163,13 +192,15 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   async function announce(multiaddr: Multiaddr): Promise<string> {
-    return (await sendTransaction(channels.announce, multiaddr.bytes)).hash
+    const populatedTx = await channels.populateTransaction.announce(multiaddr.bytes);
+    return (await sendTransaction(true, populatedTx, channels.announce, multiaddr.bytes)).hash
   }
 
   async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     if (currency === 'NATIVE') {
       const nonceLock = await nonceTracker.getNonceLock(address)
       try {
+        // FIXME: track pending tx
         const transaction = await wallet.sendTransaction({
           to: recipient,
           value: BigNumber.from(amount),
@@ -182,7 +213,9 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         throw err
       }
     } else {
-      return (await sendTransaction(token.transfer, recipient, amount)).hash
+      const populatedTx = await token.populateTransaction.transfer(recipient, amount);
+      // FIXME: hardcoded flag
+      return (await sendTransaction(true, populatedTx, token.transfer, recipient, amount)).hash
     }
   }
 
@@ -195,7 +228,17 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     counterpartyFund: Balance
   ): Promise<Receipt> {
     const totalFund = myFund.toBN().add(counterpartyFund.toBN())
+    const populatedTx = await token.populateTransaction.send(channels.address,
+      totalFund.toString(),
+      abiCoder.encode(
+        ['address', 'address', 'uint256', 'uint256'],
+        [me.toHex(), counterparty.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
+      )
+    );
+    // FIXME: hardcoded flag
     const transaction = await sendTransaction(
+      true,
+      populatedTx,
       token.send,
       channels.address,
       totalFund.toString(),
@@ -214,7 +257,18 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     counterparty: Address,
     amount: Balance
   ): Promise<Receipt> {
+    const populatedTx = await token.populateTransaction.send(
+      channels.address,
+      amount.toBN().toString(),
+      abiCoder.encode(
+        ['address', 'address', 'uint256', 'uint256'],
+        [me.toHex(), counterparty.toHex(), amount.toBN().toString(), '0']
+      )
+    );
+    // FIXME: hardcoded flag
     const transaction = await sendTransaction(
+      true,
+      populatedTx,
       token.send,
       channels.address,
       amount.toBN().toString(),
@@ -227,13 +281,16 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const transaction = await sendTransaction(channels.finalizeChannelClosure, counterparty.toHex())
+    const populatedTx = await channels.populateTransaction.finalizeChannelClosure(counterparty.toHex());
+    const transaction = await sendTransaction(true, populatedTx, channels.finalizeChannelClosure, counterparty.toHex()) // FIXME: hardcoded flag
     return transaction.hash
     // TODO: catch race-condition
   }
 
   async function initiateChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const transaction = await sendTransaction(channels.initiateChannelClosure, counterparty.toHex())
+    const populatedTx = await channels.populateTransaction.initiateChannelClosure(counterparty.toHex());
+
+    const transaction = await sendTransaction(true, populatedTx, channels.initiateChannelClosure, counterparty.toHex()) // FIXME: hardcoded flag
     return transaction.hash
     // TODO: catch race-condition
   }
@@ -244,7 +301,20 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     ackTicket: AcknowledgedTicket,
     ticket: Ticket
   ): Promise<Receipt> {
+    const populatedTx = await channels.populateTransaction.redeemTicket(
+      counterparty.toHex(),
+      ackTicket.preImage.toHex(),
+      ackTicket.ticket.epoch.serialize(),
+      ackTicket.ticket.index.serialize(),
+      ackTicket.response.toHex(),
+      ticket.amount.toBN().toString(),
+      ticket.winProb.toBN().toString(),
+      ticket.signature.serializeEthereum()
+    );
+
     const transaction = await sendTransaction(
+      true,
+      populatedTx,
       channels.redeemTicket,
       counterparty.toHex(),
       ackTicket.preImage.toHex(),
@@ -254,12 +324,13 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
       ticket.signature.serializeEthereum()
-    )
+    )  // FIXME: hardcoded flag
     return transaction.hash
   }
 
   async function setCommitment(channels: HoprChannels, counterparty: Address, commitment: Hash): Promise<Receipt> {
-    const transaction = await sendTransaction(channels.bumpChannel, counterparty.toHex(), commitment.toHex())
+    const populatedTx = await channels.populateTransaction.bumpChannel(counterparty.toHex(), commitment.toHex());
+    const transaction = await sendTransaction(true, populatedTx, channels.bumpChannel, counterparty.toHex(), commitment.toHex())  // FIXME: hardcoded flag
     return transaction.hash
   }
 

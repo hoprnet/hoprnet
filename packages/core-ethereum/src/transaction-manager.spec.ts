@@ -1,7 +1,9 @@
 import { expect } from 'chai'
-import TransactionManager from './transaction-manager'
+import { BigNumber } from 'ethers'
+import TransactionManager, { TransactionPayload } from './transaction-manager'
 
-const TX: [string, { nonce: number }] = ['0', { nonce: 0 }]
+const TX: [string, { nonce: number, gasPrice: number }] = ['0', { nonce: 0, gasPrice: 100 }]
+const PAYLOAD: TransactionPayload = {to: '0x0', data: '0x123', value: BigNumber.from('1')}
 
 describe('transaction-manager', function () {
   let transactionManager: TransactionManager
@@ -11,7 +13,7 @@ describe('transaction-manager', function () {
   })
 
   it('should add transaction to pending', function () {
-    transactionManager.addToPending(TX[0], TX[1])
+    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
 
     expect(transactionManager.pending.size).to.equal(1)
     expect(transactionManager.pending.get(TX[0]).nonce).to.equal(TX[1].nonce)
@@ -19,7 +21,7 @@ describe('transaction-manager', function () {
   })
 
   it('should move transaction from pending to confirmed', function () {
-    transactionManager.addToPending(TX[0], TX[1])
+    transactionManager.addToPending(TX[0], TX[1],PAYLOAD)
     transactionManager.moveToConfirmed(TX[0])
 
     expect(transactionManager.pending.size).to.equal(0)
@@ -28,7 +30,7 @@ describe('transaction-manager', function () {
   })
 
   it('should remove transaction from pending', function () {
-    transactionManager.addToPending(TX[0], TX[1])
+    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
     transactionManager.remove(TX[0])
 
     expect(transactionManager.pending.size).to.equal(0)
@@ -36,7 +38,7 @@ describe('transaction-manager', function () {
   })
 
   it('should remove transaction from confirmed', function () {
-    transactionManager.addToPending(TX[0], TX[1])
+    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
     transactionManager.moveToConfirmed(TX[0])
     transactionManager.remove(TX[0])
 
@@ -49,12 +51,12 @@ describe('transaction-manager', function () {
 
     // generate mock txs
     for (let i = 0; i < 7; i++) {
-      txs.push([String(i), { nonce: i }])
+      txs.push([String(i), { nonce: i, gasPrice: 1 }])
     }
 
     // add them to confirmed
     for (const [hash, tx] of txs) {
-      transactionManager.addToPending(hash, tx)
+      transactionManager.addToPending(hash, tx, PAYLOAD)
       transactionManager.moveToConfirmed(hash)
     }
 

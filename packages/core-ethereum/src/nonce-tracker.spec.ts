@@ -3,6 +3,7 @@ import NonceTracker, { Transaction } from './nonce-tracker'
 import { durations, Address } from '@hoprnet/hopr-utils'
 
 const USER_ADDRESS = Address.fromString('0x7d3517b0d011698406d6e0aed8453f0be2697926')
+const GAS_PRICE = 100;
 
 describe('nonce-tracker', function () {
   let nonceTracker: NonceTracker
@@ -276,7 +277,7 @@ describe('nonce-tracker', function () {
 
 const genTx = (opts: { nonce: number; createdAt?: number }): Transaction => {
   const { createdAt = new Date().getTime() } = opts
-  return { ...opts, from: USER_ADDRESS.toHex(), createdAt }
+  return { ...opts, from: USER_ADDRESS.toHex(), createdAt, gasPrice: GAS_PRICE }
 }
 
 const genMultiTx = (opts: {
