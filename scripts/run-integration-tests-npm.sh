@@ -261,7 +261,7 @@ ${mydir}/../test/integration-test.sh \
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
-grep -E "^HOPR Balance: +1 HOPR$" "${node6_log}"
-grep -E "^ETH Balance: +1 xDAI$" "${node6_log}"
+grep -E "^HOPR Balance: +1 mHOPR$" "${node6_log}"
+grep -E "^ETH Balance: +1 MATIC$" "${node6_log}"
 grep -E "^Running on: localhost$" "${node6_log}"
 # }}}
