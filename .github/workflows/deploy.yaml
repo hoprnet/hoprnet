@@ -88,6 +88,14 @@ jobs:
           QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
           NETWORK: xdai
 
+      - name: '[SMART-CONTRACTS] Deploy on Polygon'
+        if: ${{ !env.ACT }}
+        run: ./scripts/deploy-smart-contracts.sh
+        env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
+          NETWORK: polygon
+
       - name: '[SMART-CONTRACTS] Deploy on hardhat localhost'
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
