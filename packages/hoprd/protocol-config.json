@@ -58,17 +58,17 @@
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
-      "hopr_token_name": "wxHOPR"
+      "hopr_token_name": "mHOPR"
     },
     {
       "id": "polygon",
       "description": "Polygon, previously known as MATIC network, is an interchain scalability solution that gives an infrastructure for creating blockchain networks that can interface with each other",
       "chain_id": 137,
-      "default_provider": "https://polygon.infura.io/v3/${INFURA_KEY}",
+      "default_provider": "https://polygon-mainnet.infura.io/v3/${INFURA_KEY}",
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
-      "hopr_token_name": "wxHOPR"
+      "hopr_token_name": "mHOPR"
     }
   ]
 }

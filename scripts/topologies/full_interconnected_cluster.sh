@@ -120,7 +120,7 @@ validate_node_balance_gt0() {
   eth_balance="$(echo -e "$balance" | grep -c " MATIC" || true)"
   hopr_balance="$(echo -e "$balance" | grep -c " mHOPR" || true)"
 
-  if [[ "$eth_balance" != "0" && "$hopr_balance" != "Hopr Balance: 0 HOPR" ]]; then
+  if [[ "$eth_balance" != "0" && "$hopr_balance" != "Hopr Balance: 0 mHOPR" ]]; then
     log "$1 is funded"
   else
     log "⛔️ $1 Node has an invalid balance: $eth_balance, $hopr_balance"
