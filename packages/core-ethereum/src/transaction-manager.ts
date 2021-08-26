@@ -47,11 +47,11 @@ class TranscationManager {
   public existInMinedOrPendingWithHigherFee(payload: TransactionPayload, gasPrice: number | BigNumber): Boolean {
     // Using isDeepStrictEqual to compare TransactionPayload objects, see
     // https://nodejs.org/api/util.html#util_util_isdeepstrictequal_val1_val2
-    const index = Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload));
+    const index = Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload))
     if (index < 0) {
       return false
     }
-    
+
     const hash = Array.from(this.payloads.keys())[index]
     if (!this.mined.get(hash) && BigNumber.from(this.pending.get(hash).gasPrice).lt(BigNumber.from(gasPrice))) {
       return false
