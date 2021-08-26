@@ -69,7 +69,7 @@ function wait_for_port() {
   until ${cmd}; do
     log "Waiting ${delay} seconds for port to be reachable ${host}:${port}"
     if [ -s "${log_file}" ]; then
-      log "Last 5 logs from ${log_file}:"
+      log "Last 5 logs:"
       tail -n 5 "${log_file}" | sed "s/^/\\t/"
     fi
     sleep ${delay}

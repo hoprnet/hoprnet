@@ -15,7 +15,7 @@ source "${mydir}/../scripts/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5> <node_api_6> <node_api_7>"
+  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5>"
   msg
 }
 
@@ -28,16 +28,12 @@ test -z "${2:-}" && { msg "Missing 2nd parameter"; usage; exit 1; }
 test -z "${3:-}" && { msg "Missing 3rd parameter"; usage; exit 1; }
 test -z "${4:-}" && { msg "Missing 4th parameter"; usage; exit 1; }
 test -z "${5:-}" && { msg "Missing 5th parameter"; usage; exit 1; }
-test -z "${6:-}" && { msg "Missing 6th parameter"; usage; exit 1; }
-test -z "${7:-}" && { msg "Missing 7th parameter"; usage; exit 1; }
 
 declare api1="${1}"
 declare api2="${2}"
 declare api3="${3}"
 declare api4="${4}"
 declare api5="${5}"
-declare api6="${6}"
-declare api7="${7}"
 
 # $1 = endpoint
 # $2 = Hopr command
@@ -126,7 +122,7 @@ validate_node_balance_gt0() {
   fi
 }
 
-log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5} ${api6} ${api7}"
+log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}"
 
 validate_node_eth_address "${api1}"
 validate_node_eth_address "${api2}"
@@ -148,15 +144,11 @@ addr2="$(get_hopr_address "${api2}")"
 addr3="$(get_hopr_address "${api3}")"
 addr4="$(get_hopr_address "${api4}")"
 addr5="$(get_hopr_address "${api5}")"
-addr6="$(get_hopr_address "${api6}")"
-addr7="$(get_hopr_address "${api7}")"
 log "hopr addr1: ${addr1}"
 log "hopr addr2: ${addr2}"
 log "hopr addr3: ${addr3}"
 log "hopr addr4: ${addr4}"
 log "hopr addr5: ${addr5}"
-log "hopr addr6: ${addr6}"
-log "hopr addr7: ${addr7}"
 
 log "Check peers"
 result=$(run_command ${api1} "peers" 'peers have announced themselves' 600)
@@ -170,14 +162,6 @@ done
 
 log "Node 2 ping node 3"
 result=$(run_command ${api2} "ping ${addr3}" "Pong received in:" 600)
-log "-- ${result}"
-
-log "Node 7 should not be able to talk to Node 1 (different environment id)"
-result=$(run_command ${api7} "ping ${addr1}" "Could not ping node. Timeout." 600)
-log "-- ${result}"
-
-log "Node 1 should not be able to talk to Node 7 (different environment id)"
-result=$(run_command ${api1} "ping ${addr7}" "Could not ping node. Timeout." 600)
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
