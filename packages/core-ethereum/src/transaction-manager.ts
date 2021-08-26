@@ -50,7 +50,7 @@ class TranscationManager {
     if (Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload)) >= 0) {
       return false
     }
-    const hash = [...this.payloads].find(([_, val]) => val == payload)[0]
+    const hash = [...this.payloads].find(([_, pl]) => isDeepStrictEqual(pl, payload))[0]
     if (!this.mined.get(hash) && BigNumber.from(this.pending.get(hash).gasPrice).lt(BigNumber.from(gasPrice))) {
       return false
     }
