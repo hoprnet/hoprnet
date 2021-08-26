@@ -2,8 +2,8 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import TransactionManager, { TransactionPayload } from './transaction-manager'
 
-const TX: [string, { nonce: number, gasPrice: number }] = ['0', { nonce: 0, gasPrice: 100 }]
-const PAYLOAD: TransactionPayload = {to: '0x0', data: '0x123', value: BigNumber.from('1')}
+const TX: [string, { nonce: number; gasPrice: number }] = ['0', { nonce: 0, gasPrice: 100 }]
+const PAYLOAD: TransactionPayload = { to: '0x0', data: '0x123', value: BigNumber.from('1') }
 
 describe('transaction-manager', function () {
   let transactionManager: TransactionManager
@@ -21,7 +21,7 @@ describe('transaction-manager', function () {
   })
 
   it('should move transaction from pending to confirmed', function () {
-    transactionManager.addToPending(TX[0], TX[1],PAYLOAD)
+    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
     transactionManager.moveToConfirmed(TX[0])
 
     expect(transactionManager.pending.size).to.equal(0)

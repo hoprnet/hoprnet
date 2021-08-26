@@ -1,6 +1,6 @@
 import Debug from 'debug'
 import { BigNumber } from 'ethers'
-import {isDeepStrictEqual} from 'util';
+import { isDeepStrictEqual } from 'util'
 const log = Debug('hopr-core-ethereum:transcation-manager')
 
 export type TransactionPayload = {
@@ -47,14 +47,14 @@ class TranscationManager {
   public existInMinedOrPendingWithHigherFee(payload: TransactionPayload, gasPrice: number | BigNumber): Boolean {
     // Using isDeepStrictEqual to compare TransactionPayload objects, see
     // https://nodejs.org/api/util.html#util_util_isdeepstrictequal_val1_val2
-    if (Array.from(this.payloads.values()).findIndex(pl => isDeepStrictEqual(pl, payload)) >= 0) {
-      return false;
+    if (Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload)) >= 0) {
+      return false
     }
-    const hash = [...this.payloads].find(([_, val]) => val == payload)[0];
+    const hash = [...this.payloads].find(([_, val]) => val == payload)[0]
     if (!this.mined.get(hash) && BigNumber.from(this.pending.get(hash).gasPrice).lt(BigNumber.from(gasPrice))) {
-      return false;
-    } 
-    return true;
+      return false
+    }
+    return true
   }
 
   /**
@@ -62,25 +62,29 @@ class TranscationManager {
    * @param hash transaction hash
    * @param transaction object
    */
-  public addToPending(hash: string, transaction: Omit<Transaction, 'createdAt'>, transactionPayload: TransactionPayload): void {
+  public addToPending(
+    hash: string,
+    transaction: Omit<Transaction, 'createdAt'>,
+    transactionPayload: TransactionPayload
+  ): void {
     if (this.pending.has(hash)) return
 
     log('Adding pending transaction %s %i', hash, transaction.nonce)
     this.payloads.set(hash, transactionPayload)
-    this.pending.set(hash, { nonce: transaction.nonce, createdAt: this._getTime(), gasPrice: transaction.gasPrice})
+    this.pending.set(hash, { nonce: transaction.nonce, createdAt: this._getTime(), gasPrice: transaction.gasPrice })
   }
 
   /**
    * Moves transcation from pending to mined
    * @param hash transaction hash
    */
-    public moveToMined(hash: string): void {
-      if (!this.pending.has(hash)) return
+  public moveToMined(hash: string): void {
+    if (!this.pending.has(hash)) return
 
-      log('Moving transaction to confirmed %s', hash)
-      this.mined.set(hash, this.pending.get(hash))
-      this.pending.delete(hash)
-    }
+    log('Moving transaction to confirmed %s', hash)
+    this.mined.set(hash, this.pending.get(hash))
+    this.pending.delete(hash)
+  }
 
   /**
    * Moves transcation from pending to confirmed. Delete payload

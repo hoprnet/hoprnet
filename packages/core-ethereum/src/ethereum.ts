@@ -97,15 +97,14 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     return response
   }
 
-
-/**
- * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen 
- * to the response until reaching block confirmation.
- * @param checkDuplicate If the flag is true (default), check if an unconfirmed (pending/mined) transaction with the same payload has been sent
- * @param method contract method
- * @param rest contract arguments
- * @returns Promise of a ContractTransaction
- */
+  /**
+   * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
+   * to the response until reaching block confirmation.
+   * @param checkDuplicate If the flag is true (default), check if an unconfirmed (pending/mined) transaction with the same payload has been sent
+   * @param method contract method
+   * @param rest contract arguments
+   * @returns Promise of a ContractTransaction
+   */
   async function sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
     checkDuplicate: Boolean,
     populatedTx: UnsignedTransaction,
@@ -113,11 +112,11 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
-    const gasPrice = networkInfo?.gas ?? await provider.getGasPrice();
+    const gasPrice = networkInfo?.gas ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
-    
+
     log('Sending transaction %o', {
       gasLimit,
       gasPrice,
@@ -129,15 +128,19 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       data: populatedTx.data as string,
       value: BigNumber.from(populatedTx.value ?? 0)
     }
-    log('essentialTxPayload %o', essentialTxPayload);
+    log('essentialTxPayload %o', essentialTxPayload)
 
     try {
       if (checkDuplicate && transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)) {
         // check duplicated pending/mined transaction against transaction manager
         // if transaction manager has a transaction with the same payload that is mined or is pending but with
         // a higher or equal nonce, halt.
-        log('checkDuplicate %s and %s', checkDuplicate, transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice));
-        return;
+        log(
+          'checkDuplicate %s and %s',
+          checkDuplicate,
+          transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
+        )
+        return
         // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
       }
 
@@ -171,10 +174,12 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         (nonce: number, hash: string) => {
           log('Transaction with nonce %d and hash %s mined', nonce, hash)
           transactions.moveToMined(hash)
-        }, (nonce: number, hash: string) => {
+        },
+        (nonce: number, hash: string) => {
           log('Transaction with nonce %d and hash %s confirmed', nonce, hash)
           transactions.moveToConfirmed(hash)
-        })
+        }
+      )
     } catch (error) {
       const isRevertedErr = [error?.code, String(error)].includes(errors.CALL_EXCEPTION)
       const isAlreadyKnownErr =
@@ -204,7 +209,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   async function announce(multiaddr: Multiaddr): Promise<string> {
-    const populatedTx = await channels.populateTransaction.announce(multiaddr.bytes);
+    const populatedTx = await channels.populateTransaction.announce(multiaddr.bytes)
     return (await sendTransaction(true, populatedTx, channels.announce, multiaddr.bytes)).hash
   }
 
@@ -225,7 +230,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         throw err
       }
     } else {
-      const populatedTx = await token.populateTransaction.transfer(recipient, amount);
+      const populatedTx = await token.populateTransaction.transfer(recipient, amount)
       return (await sendTransaction(checkDuplicate, populatedTx, token.transfer, recipient, amount)).hash
     }
   }
@@ -239,13 +244,14 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     counterpartyFund: Balance
   ): Promise<Receipt> {
     const totalFund = myFund.toBN().add(counterpartyFund.toBN())
-    const populatedTx = await token.populateTransaction.send(channels.address,
+    const populatedTx = await token.populateTransaction.send(
+      channels.address,
       totalFund.toString(),
       abiCoder.encode(
         ['address', 'address', 'uint256', 'uint256'],
         [me.toHex(), counterparty.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
       )
-    );
+    )
     const transaction = await sendTransaction(
       checkDuplicate,
       populatedTx,
@@ -274,7 +280,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         ['address', 'address', 'uint256', 'uint256'],
         [me.toHex(), counterparty.toHex(), amount.toBN().toString(), '0']
       )
-    );
+    )
     const transaction = await sendTransaction(
       checkDuplicate,
       populatedTx,
@@ -290,16 +296,26 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const populatedTx = await channels.populateTransaction.finalizeChannelClosure(counterparty.toHex());
-    const transaction = await sendTransaction(checkDuplicate, populatedTx, channels.finalizeChannelClosure, counterparty.toHex())
+    const populatedTx = await channels.populateTransaction.finalizeChannelClosure(counterparty.toHex())
+    const transaction = await sendTransaction(
+      checkDuplicate,
+      populatedTx,
+      channels.finalizeChannelClosure,
+      counterparty.toHex()
+    )
     return transaction.hash
     // TODO: catch race-condition
   }
 
   async function initiateChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const populatedTx = await channels.populateTransaction.initiateChannelClosure(counterparty.toHex());
+    const populatedTx = await channels.populateTransaction.initiateChannelClosure(counterparty.toHex())
 
-    const transaction = await sendTransaction(checkDuplicate, populatedTx, channels.initiateChannelClosure, counterparty.toHex())
+    const transaction = await sendTransaction(
+      checkDuplicate,
+      populatedTx,
+      channels.initiateChannelClosure,
+      counterparty.toHex()
+    )
     return transaction.hash
     // TODO: catch race-condition
   }
@@ -319,7 +335,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
       ticket.signature.serializeEthereum()
-    );
+    )
 
     const transaction = await sendTransaction(
       checkDuplicate,
@@ -338,8 +354,14 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   async function setCommitment(channels: HoprChannels, counterparty: Address, commitment: Hash): Promise<Receipt> {
-    const populatedTx = await channels.populateTransaction.bumpChannel(counterparty.toHex(), commitment.toHex());
-    const transaction = await sendTransaction(checkDuplicate, populatedTx, channels.bumpChannel, counterparty.toHex(), commitment.toHex())
+    const populatedTx = await channels.populateTransaction.bumpChannel(counterparty.toHex(), commitment.toHex())
+    const transaction = await sendTransaction(
+      checkDuplicate,
+      populatedTx,
+      channels.bumpChannel,
+      counterparty.toHex(),
+      commitment.toHex()
+    )
     return transaction.hash
   }
 
