@@ -73,7 +73,9 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   async function waitForConfirmations(
     transactionHash: string,
     confimations: number,
-    timeout: number
+    timeout: number,
+    onMined: (nonce: number, hash: string) => void,
+    onConfirmed: (nonce: number, hash: string) => void
   ): Promise<providers.TransactionResponse> {
     const wait = 1e3
     let started = 0
@@ -81,7 +83,11 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
     while (started < timeout) {
       response = await provider.getTransaction(transactionHash)
-      if (response && response.confirmations >= confimations) break
+      if (response && response.confirmations == 0) onMined(response.nonce, response.hash)
+      if (response && response.confirmations >= confimations) {
+        onConfirmed(response.nonce, response.hash)
+        break
+      }
       // wait 1 sec
       await new Promise((resolve) => setTimeout(resolve, wait))
       started += wait
@@ -93,11 +99,12 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
 
 /**
- * 
- * @param checkDuplicate If 
- * @param method 
- * @param rest 
- * @returns 
+ * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen 
+ * to the response until reaching block confirmation.
+ * @param checkDuplicate If the flag is true (default), check if an unconfirmed (pending/mined) transaction with the same payload has been sent
+ * @param method contract method
+ * @param rest contract arguments
+ * @returns Promise of a ContractTransaction
  */
   async function sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
     checkDuplicate: Boolean,
@@ -157,12 +164,17 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     nonceLock.releaseLock()
 
     try {
-      await waitForConfirmations(transaction.hash, 1, 30e3)
-      log('Transaction with nonce %d and hash %s mined', nonce, transaction.hash)
-      transactions.moveToMined(transaction.hash)
-      await waitForConfirmations(transaction.hash, CONFIRMATIONS, 30e3)
-      log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
-      transactions.moveToConfirmed(transaction.hash)
+      await waitForConfirmations(
+        transaction.hash,
+        CONFIRMATIONS,
+        30e3,
+        (nonce: number, hash: string) => {
+          log('Transaction with nonce %d and hash %s mined', nonce, hash)
+          transactions.moveToMined(hash)
+        }, (nonce: number, hash: string) => {
+          log('Transaction with nonce %d and hash %s confirmed', nonce, hash)
+          transactions.moveToConfirmed(hash)
+        })
     } catch (error) {
       const isRevertedErr = [error?.code, String(error)].includes(errors.CALL_EXCEPTION)
       const isAlreadyKnownErr =
