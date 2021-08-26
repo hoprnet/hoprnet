@@ -94,7 +94,7 @@ class TranscationManager {
     if (!this.mined.has(hash)) return
 
     log('Moving transaction to confirmed %s', hash)
-    this.confirmed.set(hash, this.pending.get(hash))
+    this.confirmed.set(hash, this.mined.get(hash))
     this.mined.delete(hash)
     this.payloads.delete(hash)
   }
