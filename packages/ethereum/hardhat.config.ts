@@ -9,8 +9,6 @@ import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
-import { utils } from 'ethers'
-
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
 import { ethers } from 'ethers'
@@ -18,7 +16,6 @@ export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'productio
 export type NetworkTag = DeploymentTypes | 'etherscan'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, ENVIRONMENT_ID = 'default' } = process.env
-import { expandVars } from '@hoprnet/hopr-utils'
 
 extendConfig((config: HardhatConfig) => {
   config.etherscan.apiKey = ETHERSCAN_KEY
@@ -33,27 +30,15 @@ const PROTOCOL_CONFIG = require('../hoprd/protocol-config.json')
 function networkToHardhatNetwork(input: any): any {
   let res: any = {
     chainId: input.chain_id,
-    gasPrice: 'auto',
     gasMultiplier: input.gas_multiplier,
-    live: input.live,
-    tags: input.tags
-  }
-
-  if (input.gas) {
-    const parsedGas = input.gas.split(' ')
-    res.gas = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
+    live: input.live
   }
 
   if (input.live) {
-    try {
-      res.url = expandVars(input.default_provider, process.env)
-    } catch (_) {
-      res.url = 'invalid_url'
-    }
+    res.url = input.default_provider
     res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-    res.companionNetworks = {}
-    res.mining = undefined
   } else {
+    res.tags = ['development']
     res.saveDeployments = true
     res.mining = {
       auto: true, // every transaction will trigger a new block (without this deployments fail)

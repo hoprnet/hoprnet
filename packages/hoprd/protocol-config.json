@@ -49,11 +49,11 @@
       "id": "hardhat",
       "chain_id": 1,
       "live": false,
+      "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
-      "hopr_token_name": "wxHOPR",
-      "tags": ["development"]
+      "hopr_token_name": "wxHOPR"
     },
     {
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
@@ -64,8 +64,7 @@
       "gas_multiplier": 1.1,
       "default_provider": "https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/",
       "native_token_name": "xDAI",
-      "hopr_token_name": "wxHOPR",
-      "tags": ["production"]
+      "hopr_token_name": "wxHOPR"
     },
     {
       "id": "goerli",
@@ -74,10 +73,9 @@
       "live": true,
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
-      "default_provider": "https://goerli.infura.io/v3/${INFURA_KEY}",
+      "default_provider": "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/",
       "native_token_name": "gETH",
-      "hopr_token_name": "wxHOPR",
-      "tags": ["staging"]
+      "hopr_token_name": "wxHOPR"
     },
     {
       "id": "mumbai",
@@ -88,8 +86,7 @@
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
-      "hopr_token_name": "wxHOPR",
-      "tags": ["testing"]
+      "hopr_token_name": "wxHOPR"
     },
     {
       "id": "polygon",
@@ -100,8 +97,7 @@
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
-      "hopr_token_name": "wxHOPR",
-      "tags": ["testing"]
+      "hopr_token_name": "wxHOPR"
     }
   ]
 }
