@@ -102,7 +102,6 @@ jobs:
           HOPR_GIT_MSG: "Update smart contract deployments"
 
       - name: '[NPM] Publish prerelease version (On pushes to master)'
-        if: ${{ github.ref == 'refs/heads/master' }}
         run: |
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
           ./scripts/publish-pre-release.sh
@@ -121,7 +120,6 @@ jobs:
           HOPR_PACKAGE: hoprd
 
       - name: '[NPM] Wait for package to be accessible'
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: |
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
           ./scripts/wait-for-npm-package.sh
@@ -234,7 +232,6 @@ jobs:
           HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
 
       - name: Add additional tags to new Docker image (on master and release branches)
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: |
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION}
         env:
@@ -243,7 +240,6 @@ jobs:
           HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
 
       - name: Add tag latest to new Docker image on master
-        if: ${{ !env.ACT }} && ${{ github.ref == 'refs/heads/master' }}
         run: |
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:latest
         env:
