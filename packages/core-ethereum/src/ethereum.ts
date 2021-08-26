@@ -37,7 +37,7 @@ const knownNetworks = Object.entries(networks).map(([name, data]) => ({
 export type Receipt = string
 export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>
 
-export async function createChainWrapper(providerURI: string, privateKey: Uint8Array) {
+export async function createChainWrapper(providerURI: string, privateKey: Uint8Array, checkDuplicate: Boolean = true) {
   const provider = providerURI.startsWith('http')
     ? new providers.JsonRpcProvider(providerURI)
     : new providers.WebSocketProvider(providerURI)
@@ -226,8 +226,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       }
     } else {
       const populatedTx = await token.populateTransaction.transfer(recipient, amount);
-      // FIXME: hardcoded flag
-      return (await sendTransaction(true, populatedTx, token.transfer, recipient, amount)).hash
+      return (await sendTransaction(checkDuplicate, populatedTx, token.transfer, recipient, amount)).hash
     }
   }
 
@@ -247,9 +246,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         [me.toHex(), counterparty.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
       )
     );
-    // FIXME: hardcoded flag
     const transaction = await sendTransaction(
-      true,
+      checkDuplicate,
       populatedTx,
       token.send,
       channels.address,
@@ -277,9 +275,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         [me.toHex(), counterparty.toHex(), amount.toBN().toString(), '0']
       )
     );
-    // FIXME: hardcoded flag
     const transaction = await sendTransaction(
-      true,
+      checkDuplicate,
       populatedTx,
       token.send,
       channels.address,
@@ -294,7 +291,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
   async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
     const populatedTx = await channels.populateTransaction.finalizeChannelClosure(counterparty.toHex());
-    const transaction = await sendTransaction(true, populatedTx, channels.finalizeChannelClosure, counterparty.toHex()) // FIXME: hardcoded flag
+    const transaction = await sendTransaction(checkDuplicate, populatedTx, channels.finalizeChannelClosure, counterparty.toHex())
     return transaction.hash
     // TODO: catch race-condition
   }
@@ -302,7 +299,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   async function initiateChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
     const populatedTx = await channels.populateTransaction.initiateChannelClosure(counterparty.toHex());
 
-    const transaction = await sendTransaction(true, populatedTx, channels.initiateChannelClosure, counterparty.toHex()) // FIXME: hardcoded flag
+    const transaction = await sendTransaction(checkDuplicate, populatedTx, channels.initiateChannelClosure, counterparty.toHex())
     return transaction.hash
     // TODO: catch race-condition
   }
@@ -325,7 +322,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     );
 
     const transaction = await sendTransaction(
-      true,
+      checkDuplicate,
       populatedTx,
       channels.redeemTicket,
       counterparty.toHex(),
@@ -336,13 +333,13 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
       ticket.signature.serializeEthereum()
-    )  // FIXME: hardcoded flag
+    )
     return transaction.hash
   }
 
   async function setCommitment(channels: HoprChannels, counterparty: Address, commitment: Hash): Promise<Receipt> {
     const populatedTx = await channels.populateTransaction.bumpChannel(counterparty.toHex(), commitment.toHex());
-    const transaction = await sendTransaction(true, populatedTx, channels.bumpChannel, counterparty.toHex(), commitment.toHex())  // FIXME: hardcoded flag
+    const transaction = await sendTransaction(checkDuplicate, populatedTx, channels.bumpChannel, counterparty.toHex(), commitment.toHex())
     return transaction.hash
   }
 
