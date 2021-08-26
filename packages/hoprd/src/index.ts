@@ -16,7 +16,7 @@ import type { ProtocolConfig } from '@hoprnet/hopr-core'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
-const pkg = require('../../../package.json')
+const pkg = require('../package.json')
 
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
