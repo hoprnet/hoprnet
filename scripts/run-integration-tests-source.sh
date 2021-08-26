@@ -6,7 +6,7 @@ test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; 
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
-set -x
+
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
@@ -80,9 +80,9 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-# if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
-#   trap cleanup SIGINT SIGTERM ERR EXIT
-# fi
+if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
+  trap cleanup SIGINT SIGTERM ERR EXIT
+fi
 
 # $1 = rest port
 # $2 = node port
