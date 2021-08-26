@@ -51,7 +51,7 @@
     "ethereum-waffle": "^3.3.0",
     "ethers": "5.4.5",
     "hardhat": "^2.4.1",
-    "hardhat-deploy": "^0.8.9",
+    "hardhat-deploy": "^0.9.0",
     "hardhat-gas-reporter": "^1.0.4",
     "multiaddr": "^10.0.0",
     "rimraf": "^3.0.2",
