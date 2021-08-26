@@ -224,11 +224,11 @@ fund_node 13306 "${node6_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_port 19091 "127.0.0.1" "${node1_log}"
-wait_for_port 19092 "127.0.0.1" "${node2_log}"
-wait_for_port 19093 "127.0.0.1" "${node3_log}"
-wait_for_port 19094 "127.0.0.1" "${node4_log}"
-wait_for_port 19095 "127.0.0.1" "${node5_log}"
+wait_for_port 19501 "127.0.0.1" "${node1_log}"
+wait_for_port 19502 "127.0.0.1" "${node2_log}"
+wait_for_port 19503 "127.0.0.1" "${node3_log}"
+wait_for_port 19504 "127.0.0.1" "${node4_log}"
+wait_for_port 19505 "127.0.0.1" "${node5_log}"
 # no need to wait for node 6 since that will stop right away
 # }}}
 

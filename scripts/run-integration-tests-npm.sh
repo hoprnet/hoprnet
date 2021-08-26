@@ -232,12 +232,12 @@ setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${npm_
 # }}}
 
 #  --- Fund nodes --- {{{
-fund_node 13301 "${node1_log}"
-fund_node 13302 "${node2_log}"
-fund_node 13303 "${node3_log}"
-fund_node 13304 "${node4_log}"
-fund_node 13305 "${node5_log}"
-fund_node 13306 "${node6_log}"
+fund_node 19501 "${node1_log}"
+fund_node 19502 "${node2_log}"
+fund_node 19503 "${node3_log}"
+fund_node 19504 "${node4_log}"
+fund_node 19505 "${node5_log}"
+fund_node 19506 "${node6_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
