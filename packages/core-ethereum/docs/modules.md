@@ -38,7 +38,7 @@
 
 ### CONFIRMATIONS
 
-• `Const` **CONFIRMATIONS**: ``8``
+• `Const` **CONFIRMATIONS**: ``100``
 
 #### Defined in
 
