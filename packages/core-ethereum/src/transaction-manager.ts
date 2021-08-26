@@ -1,5 +1,6 @@
 import Debug from 'debug'
 import { BigNumber } from 'ethers'
+import {isDeepStrictEqual} from 'util';
 const log = Debug('hopr-core-ethereum:transcation-manager')
 
 export type TransactionPayload = {
@@ -44,7 +45,9 @@ class TranscationManager {
    * @param gasPrice gas price associated with the payload
    */
   public existInMinedOrPendingWithHigherFee(payload: TransactionPayload, gasPrice: number | BigNumber): Boolean {
-    if (!Array.from(this.payloads.values()).includes(payload)) {
+    // Using isDeepStrictEqual to compare TransactionPayload objects, see
+    // https://nodejs.org/api/util.html#util_util_isdeepstrictequal_val1_val2
+    if (Array.from(this.payloads.values()).findIndex(pl => isDeepStrictEqual(pl, payload)) >= 0) {
       return false;
     }
     const hash = [...this.payloads].find(([_, val]) => val == payload)[0];
@@ -68,7 +71,7 @@ class TranscationManager {
   }
 
   /**
-   * Moves transcation from pending to confirmed
+   * Moves transcation from pending to mined
    * @param hash transaction hash
    */
     public moveToMined(hash: string): void {
