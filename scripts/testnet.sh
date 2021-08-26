@@ -138,10 +138,9 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
-# $3 = chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  local rpc=${3}
+  local rpc="goerli" # temp
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
