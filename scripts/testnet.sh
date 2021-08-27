@@ -21,7 +21,10 @@ declare min_funds_hopr=0.5
 # $1 = role (ie. node-4)
 # $2 = network name
 vm_name() {
-  echo "$2-$1"
+  local role = ${1}
+  local network_name = ${2}
+
+  echo "${network_name}-${role}"
 }
 
 # $1 = vm name
@@ -40,7 +43,7 @@ wallet_balance() {
 
 # $1 = chain provider
 funding_wallet_address() {
-  local rpc="${1}"
+  local rpc = ${1}
 
   # the value of FUNDING_PRIV_KEY must be prefixed with 0x
   yarn run --silent ethers --rpc "${rpc}" --account ${FUNDING_PRIV_KEY} eval 'accounts[0].getAddress().then(a => a)'
@@ -138,18 +141,21 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
+# $3 = environment id
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  local rpc="goerli" # temp
+  local vm_name = ${1}
+  local docker_image = ${2}
+  local environment_id=${3}
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
-  if [ "$(update_if_existing $1 $2 ${rpc})" = "no container" ]; then
-    gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
+  if [ "$(update_if_existing ${vm_name} ${docker_image} ${rpc})" = "no container" ]; then
+    gcloud compute instances create-with-container ${vm_name} $GCLOUD_DEFAULTS \
+      --create-disk name=$(disk_name ${vm_name}),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
-      --container-image=$2 \
+      --container-image=${docker_image} \
       --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--announce" \
@@ -159,7 +165,7 @@ start_testnode_vm() {
       --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
       --container-arg="--init" \
       --container-arg="--password" --container-arg="${password}" \
-      --container-arg="--provider" --container-arg="${rpc}" \
+      --container-arg="--environment" --container-arg="${environment_id}" \
       --container-arg="--rest" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
@@ -177,23 +183,28 @@ start_chain_provider(){
   #hardhat node --config packages/ethereum/hardhat.config.ts
 }
 
-# $1 = network name
+# $1 = testnet name
 # $2 = docker image
 # $3 = node number
-# $4 = chain provider
+# $4 = environment id
 start_testnode() {
   local vm ip eth_address
 
+  local testnet_name = ${1}
+  local docker_image = ${2}
+  local node_number = ${3}
+  local environment_id = ${4}
+
   # start or update vm
-  vm=$(vm_name "node-$3" $1)
-  log "- Starting test node $vm with $2 ${4}"
-  start_testnode_vm $vm $2 ${4}
+  vm=$(vm_name "node-${node_number}" ${testnet_name})
+  log "- Starting test node ${vm} with ${docker_image} ${environment_id}"
+  start_testnode_vm ${vm} ${docker_image} ${environment_id}
 
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
-  wait_until_node_is_ready $ip
+  wait_until_node_is_ready ${ip}
   eth_address=$(get_eth_address "${ip}")
-  fund_if_empty "${eth_address}" "${4}"
+  fund_if_empty "${eth_address}" "${environment_id}"
 }
 
 # $1 authorized keys file
