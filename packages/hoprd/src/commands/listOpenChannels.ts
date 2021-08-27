@@ -59,7 +59,7 @@ Balance:                ${styleValue(channel.balance.toFormattedString(), 'numbe
       for (const channel of channelsTo) {
         log(`
 Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-From:                   ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
+From:                   ${styleValue(channel.source.toPeerId().toB58String(), 'peerId')}
 Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)
