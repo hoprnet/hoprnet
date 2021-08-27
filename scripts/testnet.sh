@@ -18,22 +18,23 @@ source "${mydir}/dns.sh"
 declare min_funds=0.01291
 declare min_funds_hopr=0.5
 
-# $1 = role (ie. node-4)
-# $2 = network name
+# $1=role (ie. node-4)
+# $2=network name
 vm_name() {
-  local role = ${1}
-  local network_name = ${2}
+  local role="${1}"
+  local network_name="${2}"
 
   echo "${network_name}-${role}"
 }
 
-# $1 = vm name
+# $1=vm name
 disk_name() {
-  echo "$1-dsk"
+  local vm_name="${1}"
+  echo "${vm_name}-dsk"
 }
 
-# $1 = account (hex)
-# $2 = chain provider
+# $1=account (hex)
+# $2=chain provider
 wallet_balance() {
   local address=${1}
   local rpc=${2}
@@ -41,17 +42,17 @@ wallet_balance() {
   yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('$1').then(b => formatEther(b))"
 }
 
-# $1 = chain provider
+# $1=chain provider
 funding_wallet_address() {
-  local rpc = ${1}
+  local rpc=${1}
 
   # the value of FUNDING_PRIV_KEY must be prefixed with 0x
   yarn run --silent ethers --rpc "${rpc}" --account ${FUNDING_PRIV_KEY} eval 'accounts[0].getAddress().then(a => a)'
 }
 
-# $1 = account (hex)
-# $2 = chain provider
-# $3 = optional: hopr token contract
+# $1=account (hex)
+# $2=chain provider
+# $3=optional: hopr token contract
 fund_if_empty() {
   local address="${1}"
   local rpc="${2}"
@@ -64,7 +65,7 @@ fund_if_empty() {
   log "Checking balance of funding wallet ${funding_address} using RPC ${rpc}"
   funding_balance="$(wallet_balance "${funding_address}" "${rpc}")"
 
-  if [ "${funding_balance}" = '0.0' ]; then
+  if [ "${funding_balance}"='0.0' ]; then
     log "Wallet ${funding_address} has zero balance and cannot fund node ${address}"
   else
     log "Funding wallet ${funding_address} has enough funds: ${funding_balance}"
@@ -72,7 +73,7 @@ fund_if_empty() {
     balance="$(wallet_balance "${address}" "${rpc}")"
 
     log "Balance of ${address} is ${balance}"
-    if [ "${balance}" = '0.0' ]; then
+    if [ "${balance}"='0.0' ]; then
       # need to wait to make retries work
       local ethers_opts="--rpc ${rpc} --account ${FUNDING_PRIV_KEY} --yes --wait"
 
@@ -88,8 +89,8 @@ fund_if_empty() {
   fi
 }
 
-# $1 = IP
-# $2 = optional: port, defaults to 3001
+# $1=IP
+# $2=optional: port, defaults to 3001
 get_eth_address(){
   local ip=${1}
   local port=${2:-3001}
@@ -99,8 +100,8 @@ get_eth_address(){
   try_cmd "${cmd}" 30 5
 }
 
-# $1 = IP
-# $2 = optional: port, defaults to 3001
+# $1=IP
+# $2=optional: port, defaults to 3001
 get_hopr_address() {
   local ip=${1}
   local port=${2:-3001}
@@ -110,17 +111,21 @@ get_hopr_address() {
   try_cmd "${cmd}" 30 5
 }
 
-# $1 = IP
-# $2 = Hopr command
-# $3 = optional: port
+# $1=IP
+# $2=Hopr command
+# $3=optional: port
 run_command(){
   curl --silent -X POST --data "${2}" "${1}:${3:-3001}/api/v1/command"
 }
 
-# $1 = vm name
-# $2 = docker image
-# $3 = chain provider
+# $1=vm name
+# $2=docker image
+# $3=chain provider
 update_if_existing() {
+  local vm_name=${1}
+  local docker_image=${2}
+  local 
+
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
     log "Container exists, updating" 1>&2
     PREV=$(gcloud_get_image_running_on_vm $1)
@@ -139,18 +144,18 @@ update_if_existing() {
 
 }
 
-# $1 = vm name
-# $2 = docker image
-# $3 = environment id
+# $1=vm name
+# $2=docker image
+# $3=environment id
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  local vm_name = ${1}
-  local docker_image = ${2}
+  local vm_name=${1}
+  local docker_image=${2}
   local environment_id=${3}
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
-  if [ "$(update_if_existing ${vm_name} ${docker_image} ${rpc})" = "no container" ]; then
+  if [ "$(update_if_existing ${vm_name} ${docker_image} ${rpc})"="no container" ]; then
     gcloud compute instances create-with-container ${vm_name} $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name ${vm_name}),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
@@ -173,7 +178,7 @@ start_testnode_vm() {
   fi
 }
 
-# $1 = vm name
+# $1=vm name
 # Run a VM with a hardhat instance
 start_chain_provider(){
   gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
@@ -183,17 +188,17 @@ start_chain_provider(){
   #hardhat node --config packages/ethereum/hardhat.config.ts
 }
 
-# $1 = testnet name
-# $2 = docker image
-# $3 = node number
-# $4 = environment id
+# $1=testnet name
+# $2=docker image
+# $3=node number
+# $4=environment id
 start_testnode() {
   local vm ip eth_address
 
-  local testnet_name = ${1}
-  local docker_image = ${2}
-  local node_number = ${3}
-  local environment_id = ${4}
+  local testnet_name=${1}
+  local docker_image=${2}
+  local node_number=${3}
+  local environment_id=${4}
 
   # start or update vm
   vm=$(vm_name "node-${node_number}" ${testnet_name})
@@ -223,10 +228,10 @@ add_keys() {
 # either update or start VM's to create a network of
 # N nodes
 
-# $1 = network name
-# $2 = number of nodes
-# $3 = docker image
-# $4 = chain provider
+# $1=network name
+# $2=number of nodes
+# $3=docker image
+# $4=chain provider
 start_testnet() {
   for i in $(seq 1 $2);
   do
