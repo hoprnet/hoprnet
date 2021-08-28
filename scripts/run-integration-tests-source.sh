@@ -145,9 +145,9 @@ function fund_node() {
     exit 1
   fi
 
-  log "Funding 1 ETH and 1 HOPR to ${eth_address}"
+  log "Funding 1 ETH and 10 HOPR to ${eth_address}"
   yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-    --address "${eth_address}" --network localhost --ishopraddress true
+    --address "${eth_address}" --network localhost --ishopraddress true --amount 10
 }
 
 # --- Log test info {{{

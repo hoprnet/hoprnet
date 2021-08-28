@@ -51,8 +51,10 @@ async function main(
   console.log(`💧💰 Sending ${etherAmount} ETH to ${nodeAddress} on network ${network.name}`)
   await send(signer, tx)
 
-  console.log(`💧🟡 Sending ${ethers.utils.formatEther(amount)} HOPR to ${nodeAddress} on network ${network.name}`)
-  await hoprToken.mint(nodeAddress, amount, ethers.constants.HashZero, ethers.constants.HashZero, {
+  const finalAmount = ethers.utils.parseEther(amount).toString()
+
+  console.log(`💧🟡 Sending ${ethers.utils.formatEther(finalAmount)} HOPR to ${nodeAddress} on network ${network.name}`)
+  await hoprToken.mint(nodeAddress, finalAmount, ethers.constants.HashZero, ethers.constants.HashZero, {
     gasLimit: 200e3
   })
 }
