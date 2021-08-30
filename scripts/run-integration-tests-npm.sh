@@ -160,9 +160,9 @@ function fund_node() {
     exit 1
   fi
 
-  log "Funding 1 ETH and 1 HOPR to ${eth_address}"
+  log "Funding 1 ETH and 10 HOPR to ${eth_address}"
   yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-    --address "${eth_address}" --network localhost --ishopraddress true
+    --address "${eth_address}" --network localhost --ishopraddress true --amount 10
 }
 
 # --- Log test info {{{
@@ -262,7 +262,7 @@ ${mydir}/../test/integration-test.sh \
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
-grep -E "^HOPR Balance: +1 HOPR$" "${node6_log}"
+grep -E "^HOPR Balance: +10 HOPR$" "${node6_log}"
 grep -E "^ETH Balance: +1 xDAI$" "${node6_log}"
 grep -E "^Running on: localhost$" "${node6_log}"
 # }}}
