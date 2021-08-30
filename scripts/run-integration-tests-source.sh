@@ -73,7 +73,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096 20001 20002 20003 20004 20005 20006; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -87,6 +87,7 @@ fi
 # $1 = rest port
 # $2 = node port
 # $3 = admin port
+# $4 = health check port
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
@@ -95,10 +96,11 @@ function setup_node() {
   local rest_port=${1}
   local node_port=${2}
   local admin_port=${3}
-  local dir=${4}
-  local log=${5}
-  local id=${6}
-  local additional_args=${7:-""}
+  local health_check_port=${4}
+  local dir=${5}
+  local log=${6}
+  local id=${7}
+  local additional_args=${8:-""}
 
   log "Run node ${id} on rest port ${rest_port}"
 
@@ -110,6 +112,9 @@ function setup_node() {
     --admin \
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \
+    --heathCheck \
+    --healthCheckHost "127.0.0.1" \
+    --healthCheckPort ${health_check_port} \
     --announce \
     --api-token "e2e-API-token^^" \
     --data="${dir}" \
@@ -193,6 +198,12 @@ ensure_port_is_free 19093
 ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
+ensure_port_is_free 20001
+ensure_port_is_free 20002
+ensure_port_is_free 20003
+ensure_port_is_free 20004
+ensure_port_is_free 20005
+ensure_port_is_free 20006
 # }}}
 
 # --- Running Mock Blockchain --- {{{
@@ -206,12 +217,12 @@ wait_for_http_port 8545 "127.0.0.1" "${hardhat_rpc_log}" "${wait_delay}" "${wait
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
-setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
-setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+setup_node 13301 19091 19501 20001 "${node1_dir}" "${node1_log}" "${node1_id}"
+setup_node 13302 19092 19502 20002 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
+setup_node 13303 19093 19503 20003 "${node3_dir}" "${node3_log}" "${node3_id}"
+setup_node 13304 19094 19504 20004 "${node4_dir}" "${node4_log}" "${node4_id}"
+setup_node 13305 19095 19505 20005 "${node5_dir}" "${node5_log}" "${node5_id}"
+setup_node 13306 19096 19506 20006 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -223,12 +234,12 @@ fund_node 13305 "${node5_log}"
 fund_node 13306 "${node6_log}"
 # }}}
 
-#  --- Wait for ports to be bound --- {{{
-wait_for_port 19501 "127.0.0.1" "${node1_log}"
-wait_for_port 19502 "127.0.0.1" "${node2_log}"
-wait_for_port 19503 "127.0.0.1" "${node3_log}"
-wait_for_port 19504 "127.0.0.1" "${node4_log}"
-wait_for_port 19505 "127.0.0.1" "${node5_log}"
+#  --- Wait for health check ports ports to be bound --- {{{
+wait_for_port 20001 "127.0.0.1" "${node1_log}"
+wait_for_port 20002 "127.0.0.1" "${node2_log}"
+wait_for_port 20003 "127.0.0.1" "${node3_log}"
+wait_for_port 20004 "127.0.0.1" "${node4_log}"
+wait_for_port 20005 "127.0.0.1" "${node5_log}"
 # no need to wait for node 6 since that will stop right away
 # }}}
 
