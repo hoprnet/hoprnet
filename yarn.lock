@@ -8957,7 +8957,7 @@ libnpmpublish@^4.0.0:
     semver "^7.1.3"
     ssri "^8.0.1"
 
-libp2p-crypto@0.19.6, libp2p-crypto@^0.19.0, libp2p-crypto@^0.19.4, libp2p-crypto@^0.19.5:
+libp2p-crypto@0.19.6:
   version "0.19.6"
   resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.19.6.tgz#d9792614eb2a94db9c6c8a249719a3cae39e15f5"
   integrity sha512-oZaAomSLnEJPEvJaj4Dmp+JDuKsTndbdmdod9rCe8lX5f9hMP3p3wRADOeVGhgleiQ3LH+3XmFuULARMNXLiRw==
@@ -8972,6 +8972,23 @@ libp2p-crypto@0.19.6, libp2p-crypto@^0.19.0, libp2p-crypto@^0.19.4, libp2p-crypt
     protobufjs "^6.10.2"
     secp256k1 "^4.0.0"
     uint8arrays "^2.1.4"
+    ursa-optional "^0.10.1"
+
+libp2p-crypto@0.19.7, libp2p-crypto@^0.19.0, libp2p-crypto@^0.19.4, libp2p-crypto@^0.19.5:
+  version "0.19.7"
+  resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.19.7.tgz#e96a95bd430e672a695209fe0fbd2bcbd348bc35"
+  integrity sha512-Qb5o/3WFKF2j6mYSt4UBPyi2kbKl3jYV0podBJoJCw70DlpM5Xc+oh3fFY9ToSunu8aSQQ5GY8nutjXgX/uGRA==
+  dependencies:
+    err-code "^3.0.1"
+    is-typedarray "^1.0.0"
+    iso-random-stream "^2.0.0"
+    keypair "^1.0.1"
+    multiformats "^9.4.5"
+    node-forge "^0.10.0"
+    pem-jwk "^2.0.0"
+    protobufjs "^6.11.2"
+    secp256k1 "^4.0.0"
+    uint8arrays "^3.0.0"
     ursa-optional "^0.10.1"
 
 libp2p-interfaces@^1.0.0:
@@ -11532,7 +11549,7 @@ proto-list@~1.2.1:
   resolved "https://registry.yarnpkg.com/proto-list/-/proto-list-1.2.4.tgz#212d5bfe1318306a420f6402b8e26ff39647a849"
   integrity sha1-IS1b/hMYMGpCD2QCuOJv85ZHqEk=
 
-protobufjs@^6.10.1, protobufjs@^6.10.2:
+protobufjs@^6.10.1, protobufjs@^6.10.2, protobufjs@^6.11.2:
   version "6.11.2"
   resolved "https://registry.yarnpkg.com/protobufjs/-/protobufjs-6.11.2.tgz#de39fabd4ed32beaa08e9bb1e30d08544c1edf8b"
   integrity sha512-4BQJoPooKJl2G9j3XftkIXjoC9C0Av2NOrWmbLWT1vH32GcSUHjM0Arra6UfTsVyfMAuFzaLucXn1sadxJydAw==
