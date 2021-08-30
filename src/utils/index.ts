@@ -137,7 +137,7 @@ export async function dialHelper(
       // prettier-ignore
       `Querying the DHT for ${green(destination.toB58String())} failed. Known addresses:\n` +
       `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n` +
-      `${err.message}`
+      `${err instanceof Error ? err.message : err}`
     )
   }
 
@@ -163,7 +163,7 @@ export async function dialHelper(
       // prettier-ignore
       `Cannot connect to ${green(destination.toB58String())}. New addresses after DHT request did not lead to a connection. Used addresses:\n` +
       `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}\n` +
-      `${err.message}`
+      `${err instanceof Error ? err.message : err}`
     )
     return
   }
