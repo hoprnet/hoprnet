@@ -468,19 +468,22 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           break
         }
 
-        if (result == undefined && this._sourceSwitched) {
-          migrationDone.resolve()
-          continue
+        if (this._streamClosed) {
+          this.verbose(`FLOW: stream closed`)
+          break
         }
 
-        if (this._streamClosed) {
-          break
+        if (result == undefined && this._sourceSwitched) {
+          migrationDone.resolve()
+          this.verbose(`FLOW: migration done`)
+          continue
         }
 
         const received = result as StreamResult
 
         if (received.done) {
           // @TODO how to proceed ???
+          this.verbose(`FLOW: received done`)
           break
         }
 
