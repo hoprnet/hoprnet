@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.76.6",
+  "version": "1.76.7",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -28,7 +28,7 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.76.6",
+    "@hoprnet/hopr-ethereum": "1.76.7",
     "@hoprnet/hopr-utils": "1.76.5",
     "async-mutex": "^0.3.0",
     "bn.js": "^5.2.0",
