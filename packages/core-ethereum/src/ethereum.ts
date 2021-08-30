@@ -116,7 +116,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
           {
             gasLimit,
             gasPrice,
-            nonce
+            nonce,
+            chainId
           }
         ]
       )
