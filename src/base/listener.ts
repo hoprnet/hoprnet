@@ -411,7 +411,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     try {
       maConn = TCPConnection.fromSocket(socket, this.peerId) as any
     } catch (err) {
-      error(`inbound connection failed. ${err.message}`)
+      error(`inbound connection failed. ${err instanceof Error ? err.message : err}`)
     }
 
     if (maConn == undefined) {
@@ -423,7 +423,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     try {
       conn = await this.upgrader.upgradeInbound(maConn)
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
         error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
       } else {
@@ -465,7 +465,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       try {
         this.udpSocket.bind(port)
       } catch (err) {
-        error(`Could not bind to UDP socket. ${err.message}`)
+        error(`Could not bind to UDP socket.${err instanceof Error ? ` ${err.message}` : err}`)
         reject(err)
       }
     })
@@ -492,7 +492,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       try {
         this.tcpSocket.listen(opts)
       } catch (err) {
-        error(`Could not bind to TCP socket. ${err.message}`)
+        error(`Could not bind to TCP socket.${err instanceof Error ? ` ${err.message}` : err}`)
         reject(err)
       }
     })
@@ -553,7 +553,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     try {
       externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
     } catch (err) {
-      error(err.message)
+      error(err instanceof Error ? err.message : err)
       return
     }
 
@@ -680,7 +680,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     try {
       conn = await this.upgrader.upgradeOutbound(maConn as any)
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
         error(
           `outbound connection to potential relay node failed because encryption failed. Maybe connected to the wrong node?`
