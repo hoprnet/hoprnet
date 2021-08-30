@@ -40,7 +40,7 @@
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:485
+node_modules/libp2p/dist/src/index.d.ts:487
 
 ___
 
@@ -50,7 +50,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:492
+node_modules/libp2p/dist/src/index.d.ts:494
 
 ___
 
@@ -66,7 +66,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:486
+node_modules/libp2p/dist/src/index.d.ts:488
 
 ___
 
@@ -76,7 +76,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:495
+node_modules/libp2p/dist/src/index.d.ts:497
 
 ___
 
@@ -86,7 +86,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:498
+node_modules/libp2p/dist/src/index.d.ts:500
 
 ___
 
@@ -107,7 +107,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:506
+node_modules/libp2p/dist/src/index.d.ts:508
 
 ___
 
@@ -125,7 +125,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:475
+node_modules/libp2p/dist/src/index.d.ts:477
 
 ___
 
@@ -141,7 +141,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:514
+node_modules/libp2p/dist/src/index.d.ts:516
 
 ___
 
@@ -162,7 +162,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:451
+node_modules/libp2p/dist/src/index.d.ts:453
 
 ___
 
@@ -186,7 +186,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:440
+node_modules/libp2p/dist/src/index.d.ts:442
 
 ___
 
@@ -213,7 +213,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:414
+node_modules/libp2p/dist/src/index.d.ts:416
 
 ___
 
@@ -229,7 +229,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:523
+node_modules/libp2p/dist/src/index.d.ts:525
 
 ___
 
@@ -239,7 +239,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:489
+node_modules/libp2p/dist/src/index.d.ts:491
 
 ___
 
@@ -249,7 +249,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:491
+node_modules/libp2p/dist/src/index.d.ts:493
 
 ___
 
@@ -259,7 +259,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:493
+node_modules/libp2p/dist/src/index.d.ts:495
 
 ___
 
@@ -269,7 +269,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:494
+node_modules/libp2p/dist/src/index.d.ts:496
 
 ___
 
@@ -285,7 +285,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:517
+node_modules/libp2p/dist/src/index.d.ts:519
 
 ___
 
@@ -295,7 +295,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:499
+node_modules/libp2p/dist/src/index.d.ts:501
 
 ___
 
@@ -305,7 +305,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:496
+node_modules/libp2p/dist/src/index.d.ts:498
 
 ___
 
@@ -321,7 +321,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:520
+node_modules/libp2p/dist/src/index.d.ts:522
 
 ___
 
@@ -331,7 +331,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:497
+node_modules/libp2p/dist/src/index.d.ts:499
 
 ___
 
@@ -350,7 +350,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:500
+node_modules/libp2p/dist/src/index.d.ts:502
 
 ___
 
@@ -369,7 +369,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:526
+node_modules/libp2p/dist/src/index.d.ts:528
 
 ___
 
@@ -379,7 +379,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:490
+node_modules/libp2p/dist/src/index.d.ts:492
 
 ___
 
@@ -395,4 +395,4 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:434
+node_modules/libp2p/dist/src/index.d.ts:436
