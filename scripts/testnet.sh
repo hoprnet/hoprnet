@@ -120,11 +120,11 @@ run_command(){
 
 # $1=vm name
 # $2=docker image
-# $3=chain provider
+# $3=chain provider rpc
 update_if_existing() {
   local vm_name=${1}
   local docker_image=${2}
-  local 
+  local rpc=${3}
 
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
     log "Container exists, updating" 1>&2
@@ -154,6 +154,8 @@ start_testnode_vm() {
   local environment_id=${3}
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
+
+  local rpc="http://localhost:8545" # TODO: proper rpc extraction
 
   if [ "$(update_if_existing ${vm_name} ${docker_image} ${rpc})"="no container" ]; then
     gcloud compute instances create-with-container ${vm_name} $GCLOUD_DEFAULTS \
