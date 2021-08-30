@@ -448,7 +448,7 @@ __metadata:
     libp2p-mplex: 0.10.4
     libp2p-noise: ^4.0
     mocha: ^9.1.1
-    multiaddr: ^10.0.1
+    multiaddr: ^10.0.0
     multihashes: ^4.0.2
     p-defer: 3
     peer-id: ^0.15.3
@@ -1638,17 +1638,6 @@ __metadata:
     native-fetch: ^3.0.0
     receptacle: ^1.3.2
   checksum: 4b785aebaef12b27a6d1ff60d28b0846a4dfb99c593bc6c641de6d2024c06c4cc412a0ec3a0fa1922c5b5d2efae2907d8ae6ce745641899adfabf1133be6e54c
-  languageName: node
-  linkType: hard
-
-"dns-over-http-resolver@npm:^1.2.3":
-  version: 1.2.3
-  resolution: "dns-over-http-resolver@npm:1.2.3"
-  dependencies:
-    debug: ^4.3.1
-    native-fetch: ^3.0.0
-    receptacle: ^1.3.2
-  checksum: 3cc1a1d77fc43e7a8a12453da987b80860ac96dc1031386c5eb1a39154775a87cfa1d50c0eaa5ea5e397e898791654608f6e2acf03f750f4098ab8822bb7d928
   languageName: node
   linkType: hard
 
@@ -3375,20 +3364,6 @@ fsevents@~2.3.2:
     uint8arrays: ^2.1.3
     varint: ^6.0.0
   checksum: ced881c8a2430e88c780a1eac8a296142c307cd59d9e646de3aef5f4e95d002320644a82445e7f373039d594b8903faadc974509ef8b5481318d8b5364d9dab5
-  languageName: node
-  linkType: hard
-
-"multiaddr@npm:^10.0.1":
-  version: 10.0.1
-  resolution: "multiaddr@npm:10.0.1"
-  dependencies:
-    dns-over-http-resolver: ^1.2.3
-    err-code: ^3.0.1
-    is-ip: ^3.1.0
-    multiformats: ^9.4.5
-    uint8arrays: ^3.0.0
-    varint: ^6.0.0
-  checksum: d53aaf7efd52ee5e6413ef36ececd29239ceb5c1f048c1fa9b820442226dc232067312d25e509a2571a14047465fb934dd35029c7f3166f4d02d13e3c501925d
   languageName: node
   linkType: hard
 
