@@ -8541,7 +8541,7 @@ just-extend@^4.0.2:
   resolved "https://registry.yarnpkg.com/just-extend/-/just-extend-4.2.1.tgz#ef5e589afb61e5d66b24eca749409a8939a8c744"
   integrity sha512-g3UB796vUFIY90VIv/WX3L2c8CS2MdWUww3CNrYmqza1Fg0DURc2K/O4YrnklBdQarSJ/y8JnJYDGc+1iumQjg==
 
-k-bucket@^5.0.0:
+k-bucket@^5.1.0:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/k-bucket/-/k-bucket-5.1.0.tgz#db2c9e72bd168b432e3f3e8fc092e2ccb61bff89"
   integrity sha512-Fac7iINEovXIWU20GPnOMLUbjctiS+cnmyjC4zAUgvs3XPf1vo9akfCHkigftSic/jiKqKl+KA3a/vFcJbHyCg==
@@ -9010,10 +9010,10 @@ libp2p-interfaces@^1.0.0:
     protobufjs "^6.10.2"
     uint8arrays "^2.1.3"
 
-libp2p-kad-dht@0.23.1:
-  version "0.23.1"
-  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.23.1.tgz#8c00446411834269dcda8340091a7294bb73fade"
-  integrity sha512-zHIIpIYqcwOAu8IPvpcTJIEyHWRnlOnXq0yIxK2Pq7B4/gEry7HyM7Jr/GtzcD1XL54+XodiEei3+AfQsLhqdw==
+libp2p-kad-dht@0.23.2:
+  version "0.23.2"
+  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.23.2.tgz#b5fe6715729aae7f2563467a543fbaec75d45668"
+  integrity sha512-bwKY15upVSNOCE0g2gaiQOucWd9MALP/x3HcmGp0lmbMW4QvfOku+6FWmqZns5Jbk1wP25vbTkMy5bmYkTGQrw==
   dependencies:
     abort-controller "^3.0.0"
     debug "^4.3.1"
@@ -9024,12 +9024,12 @@ libp2p-kad-dht@0.23.1:
     it-first "^1.0.4"
     it-length-prefixed "^5.0.2"
     it-pipe "^1.1.0"
-    k-bucket "^5.0.0"
+    k-bucket "^5.1.0"
     libp2p-crypto "^0.19.5"
     libp2p-interfaces "^1.0.0"
     libp2p-record "^0.10.4"
     multiaddr "^10.0.0"
-    multiformats "^9.0.0"
+    multiformats "^9.4.5"
     p-map "^4.0.0"
     p-queue "^6.6.2"
     p-timeout "^4.1.0"
@@ -9037,7 +9037,7 @@ libp2p-kad-dht@0.23.1:
     peer-id "^0.15.0"
     protobufjs "^6.10.2"
     streaming-iterables "^6.0.0"
-    uint8arrays "^2.1.4"
+    uint8arrays "^3.0.0"
     varint "^6.0.0"
     xor-distance "^2.0.0"
 
