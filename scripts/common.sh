@@ -65,8 +65,8 @@ fi
 
 declare yarn_version=$(yarn -v)
 declare yarn_version_parsed=( ${yarn_version//./ } )
-if [[ "${yarn_version_parsed[0]}" != "2" ]]; then
-    log "⛔️ yarn v2.x.x required, ${yarn_version} found"
+if [[ "${yarn_version_parsed[0]}" != "3" ]]; then
+    log "⛔️ yarn v3.x.x required, ${yarn_version} found"
     exit 1
 fi
 

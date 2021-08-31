@@ -411,7 +411,12 @@ class Listener extends EventEmitter implements InterfaceListener {
     try {
       maConn = TCPConnection.fromSocket(socket, this.peerId) as any
     } catch (err) {
-      error(`inbound connection failed. ${err.message}`)
+      if (err instanceof Error) {
+        error(`inbound connection failed. ${err.message}`)
+      } else {
+        console.trace()
+        error(`inbound connection failed with non-error instance`, err)
+      }
     }
 
     if (maConn == undefined) {
@@ -423,7 +428,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     try {
       conn = await this.upgrader.upgradeInbound(maConn)
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
         error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
       } else {
@@ -451,24 +456,7 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param port binding port
    */
   private async listenUDP(port: number): Promise<number> {
-    await new Promise<void>((resolve, reject) => {
-      this.udpSocket.once('error', (err: any) => {
-        this.udpSocket.removeListener('listening', resolve)
-        reject(err)
-      })
-
-      this.udpSocket.once('listening', () => {
-        this.udpSocket.removeListener('error', reject)
-        resolve()
-      })
-
-      try {
-        this.udpSocket.bind(port)
-      } catch (err) {
-        error(`Could not bind to UDP socket. ${err.message}`)
-        reject(err)
-      }
-    })
+    await this.bindToPort('UDP', { port })
 
     return this.udpSocket.address().port
   }
@@ -477,29 +465,74 @@ class Listener extends EventEmitter implements InterfaceListener {
    * Binds the process to a TCP socket
    * @param opts host and port to bind to
    */
-  private async listenTCP(opts?: { host: string; port: number }): Promise<number> {
-    await new Promise<void>((resolve, reject) => {
-      this.tcpSocket.once('error', (err: any) => {
-        this.tcpSocket.removeListener('listening', resolve)
-        reject(err)
-      })
-
-      this.tcpSocket.once('listening', () => {
-        this.tcpSocket.removeListener('error', reject)
-        resolve()
-      })
-
-      try {
-        this.tcpSocket.listen(opts)
-      } catch (err) {
-        error(`Could not bind to TCP socket. ${err.message}`)
-        reject(err)
-      }
-    })
-
-    log('Listening on %s', this.tcpSocket.address())
+  private async listenTCP(opts?: { host?: string; port: number }): Promise<number> {
+    await this.bindToPort('TCP', opts)
 
     return (this.tcpSocket.address() as AddressInfo).port
+  }
+
+  private bindToPort(protocol: 'UDP' | 'TCP', opts?: { host?: string; port: number }) {
+    return new Promise<void>((resolve, reject) => {
+      let socket: TCPServer | UDPSocket
+      let done = false
+
+      switch (protocol) {
+        case 'TCP':
+          socket = this.tcpSocket
+          break
+        case 'UDP':
+          socket = this.udpSocket
+          break
+        default:
+          throw Error(`Can only handle 'TCP' and 'UDP' but got ${protocol}`)
+      }
+
+      const errListener = (err: any) => {
+        socket.removeListener('listening', successListener)
+        if (!done) {
+          done = true
+          reject(err)
+        }
+      }
+
+      const successListener = () => {
+        socket.removeListener('error', errListener)
+        if (!done) {
+          done = true
+          resolve()
+        }
+      }
+
+      socket.once('error', errListener)
+      socket.once('listening', successListener)
+
+      try {
+        switch (protocol) {
+          case 'TCP':
+            ;(socket as TCPServer).listen(opts)
+            break
+          case 'UDP':
+            ;(socket as UDPSocket).bind(opts?.port)
+            break
+        }
+      } catch (err) {
+        socket.removeListener('error', errListener)
+        socket.removeListener('listening', successListener)
+
+        error(`Could not bind to ${protocol} socket.`)
+        if (err instanceof Error) {
+          error(err.message)
+        } else {
+          console.trace()
+          error(`Non-error instance was thrown.`, err)
+        }
+
+        if (!done) {
+          done = true
+          reject(err)
+        }
+      }
+    })
   }
 
   /**
@@ -553,7 +586,15 @@ class Listener extends EventEmitter implements InterfaceListener {
     try {
       externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
     } catch (err) {
-      error(err.message)
+      error(`Determining public IP failed`)
+
+      if (err instanceof Error) {
+        error(err.message)
+      } else {
+        console.trace()
+        error(`Non-error instance was thrown`, err)
+      }
+
       return
     }
 
@@ -680,7 +721,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     try {
       conn = await this.upgrader.upgradeOutbound(maConn as any)
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'ERR_ENCRYPTION_FAILED') {
         error(
           `outbound connection to potential relay node failed because encryption failed. Maybe connected to the wrong node?`
