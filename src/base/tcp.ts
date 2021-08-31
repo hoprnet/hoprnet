@@ -153,10 +153,7 @@ class TCPConnection implements MultiaddrConnection {
 
       const onTimeout = () => {
         log('connnection timeout %s:%s', cOpts.host, cOpts.port)
-        const err = new Error(`connection timeout after ${Date.now() - start}ms`)
-        // Note: this will result in onError() being called
-        rawSocket.emit('error', err)
-        done()
+        done(new Error(`connection timeout after ${Date.now() - start}ms`))
       }
 
       const onConnect = () => {
