@@ -483,7 +483,7 @@ class Listener extends EventEmitter implements InterfaceListener {
           socket = this.udpSocket
           break
         default:
-          throw Error()
+          throw Error(`Can only handle 'TCP' and 'UDP' but got ${protocol}`)
       }
 
       const errListener = (err: any) => {
