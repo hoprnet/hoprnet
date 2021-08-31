@@ -38,7 +38,9 @@ TESTNET_NAME="local-debug"
 TESTNET_SIZE=3
 
 echo "Cleaning up before deploy"
-cleanup
+#cleanup
+
+cleanup_instance "${TESTNET_NAME}"
 
 echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes and image hoprd:$RELEASE, environment id: $ENVIRONMENT_ID"
 start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" $ENVIRONMENT_ID
