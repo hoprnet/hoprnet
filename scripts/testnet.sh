@@ -33,8 +33,16 @@ disk_name() {
   echo "${vm_name}-dsk"
 }
 
+# $1=environment id
+get_rpc() {
+  local environment_id="${1}"
+  local network_id=$(cat packages/hoprd/protocol-config.json | jq -r ".environments[] | select(.id==\"${environment_id}\") | .network_id")
+  local unresolved_rpc=$(cat packages/hoprd/protocol-config.json | jq -r ".networks[] | select(.id==\"${network_id}\") | .default_provider")
+  echo "${unresolved_rpc}" | envsubst  
+}
+
 # $1=account (hex)
-# $2=chain provider
+# $2=rpc
 wallet_balance() {
   local address=${1}
   local rpc=${2}
@@ -42,7 +50,7 @@ wallet_balance() {
   yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('$1').then(b => formatEther(b))"
 }
 
-# $1=chain provider
+# $1=rpc
 funding_wallet_address() {
   local rpc=${1}
 
@@ -51,14 +59,16 @@ funding_wallet_address() {
 }
 
 # $1=account (hex)
-# $2=chain provider
+# $2=environment_id
 # $3=optional: hopr token contract
 fund_if_empty() {
   local address="${1}"
-  local rpc="${2}"
+  local environment_id="${2}"
   local token_contract="${3:-}"
 
   local funding_address funding_balance balance
+
+  local rpc=$(get_rpc "${environment_id}")
 
   funding_address=$(funding_wallet_address "${rpc}")
 
@@ -155,7 +165,7 @@ start_testnode_vm() {
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
-  local rpc="http://localhost:8545" # TODO: proper rpc extraction
+  local rpc=$(get_rpc "${environment_id}")
 
   if [ "$(update_if_existing ${vm_name} ${docker_image} ${environment_id})"="no container" ]; then
     gcloud compute instances create-with-container ${vm_name} $GCLOUD_DEFAULTS \

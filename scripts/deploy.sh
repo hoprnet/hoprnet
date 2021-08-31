@@ -29,7 +29,6 @@ if [ -z "${ENVIRONMENT_ID:-}" ]; then
   ENVIRONMENT_ID=$(node -p -e "require('./packages/hoprd/package.json').hopr.environment_id")
 fi
 
-
 # Get RELEASE_NAME, from environment
 get_environment
 
