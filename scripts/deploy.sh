@@ -4,6 +4,8 @@ set -e #u
 shopt -s expand_aliases
 #set -o xtrace
 
+set -x
+
 source scripts/environments.sh
 source scripts/testnet.sh
 source scripts/cleanup.sh
