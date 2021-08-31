@@ -106,6 +106,7 @@ class RelayHandshake {
       if (err instanceof Error) {
         error(err.message)
       } else {
+        console.trace()
         error(`Non-error instance was thrown.`, err)
       }
     }
@@ -313,6 +314,7 @@ class RelayHandshake {
       if (err instanceof Error) {
         error(err.message)
       } else {
+        console.trace()
         error(`Non-error instance was thrown.`, err)
       }
     }

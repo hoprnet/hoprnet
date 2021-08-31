@@ -414,6 +414,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       if (err instanceof Error) {
         error(`inbound connection failed. ${err.message}`)
       } else {
+        console.trace()
         error(`inbound connection failed with non-error instance`, err)
       }
     }
@@ -522,6 +523,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         if (err instanceof Error) {
           error(err.message)
         } else {
+          console.trace()
           error(`Non-error instance was thrown.`, err)
         }
 
@@ -589,6 +591,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       if (err instanceof Error) {
         error(err.message)
       } else {
+        console.trace()
         error(`Non-error instance was thrown`, err)
       }
 

@@ -141,6 +141,7 @@ export async function dialHelper(
     if (err instanceof Error) {
       error(err.message)
     } else {
+      console.trace()
       error(`Non-error message was thrown`, err)
     }
   }
@@ -173,6 +174,7 @@ export async function dialHelper(
     if (err instanceof Error) {
       error(err.message)
     } else {
+      console.trace()
       error(`Non-error instance was thrown`, err)
     }
 
