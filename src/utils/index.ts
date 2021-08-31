@@ -134,11 +134,15 @@ export async function dialHelper(
     dhtResponse = await (libp2p._dht as any).findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     error(
-      // prettier-ignore
       `Querying the DHT for ${green(destination.toB58String())} failed. Known addresses:\n` +
-      `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n` +
-      `${err instanceof Error ? err.message : err}`
+        `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n`
     )
+
+    if (err instanceof Error) {
+      error(err.message)
+    } else {
+      error(`Non-error message was thrown`, err)
+    }
   }
 
   const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
@@ -160,11 +164,18 @@ export async function dialHelper(
     verbose(`Dial after DHT request successful`)
   } catch (err) {
     error(
-      // prettier-ignore
-      `Cannot connect to ${green(destination.toB58String())}. New addresses after DHT request did not lead to a connection. Used addresses:\n` +
-      `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}\n` +
-      `${err instanceof Error ? err.message : err}`
+      `Cannot connect to ${green(
+        destination.toB58String()
+      )}. New addresses after DHT request did not lead to a connection. Used addresses:\n` +
+        `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}\n`
     )
+
+    if (err instanceof Error) {
+      error(err.message)
+    } else {
+      error(`Non-error instance was thrown`, err)
+    }
+
     return
   }
 
