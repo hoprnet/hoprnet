@@ -47,7 +47,7 @@ wallet_balance() {
   local address=${1}
   local rpc=${2}
 
-  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('$1').then(b => formatEther(b))"
+  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('${address}').then(b => formatEther(b))"
 }
 
 # $1=rpc
