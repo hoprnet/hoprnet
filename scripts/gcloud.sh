@@ -102,6 +102,11 @@ gcloud_update_container_with_image() {
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
+  log "${vm_name}"
+  log "${container_name}"
+  log "${disk_image}"
+  log "${mount_path}"
+
   log "Updating container on vm:${vm_name} - ${$container_name} (disk: ${disk_image}:${mount_path})"
   gcloud compute instances update-container $1 $ZONE \
     --container-image=${container_image} --container-mount-disk name=${disk_image},mount-path="${mount_path}" \

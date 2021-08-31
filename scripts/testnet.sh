@@ -120,11 +120,11 @@ run_command(){
 
 # $1=vm name
 # $2=docker image
-# $3=chain provider rpc
+# $3=environment id
 update_if_existing() {
   local vm_name=${1}
   local docker_image=${2}
-  local rpc=${3}
+  local environment_id=${3}
 
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
     log "Container exists, updating" 1>&2
@@ -134,10 +134,10 @@ update_if_existing() {
       return 0
     fi
     log "Previous GCloud VM Image: $PREV"
-    gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db" "${3}"
+    gcloud_update_container_with_image "${vm_name}" "${docker_image}" "$(disk_name ${vm_name})" "/app/db" "${environment_id}"
 
     # prevent docker images overloading the disk space
-    gcloud_cleanup_docker_images "$1"
+    gcloud_cleanup_docker_images "${vm_name}"
   else
     echo "no container"
   fi
@@ -157,7 +157,7 @@ start_testnode_vm() {
 
   local rpc="http://localhost:8545" # TODO: proper rpc extraction
 
-  if [ "$(update_if_existing ${vm_name} ${docker_image} ${rpc})"="no container" ]; then
+  if [ "$(update_if_existing ${vm_name} ${docker_image} ${environment_id})"="no container" ]; then
     gcloud compute instances create-with-container ${vm_name} $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name ${vm_name}),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
