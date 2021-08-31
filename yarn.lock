@@ -84,12 +84,12 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
-"@ceramicnetwork/common@^1.2.1":
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/@ceramicnetwork/common/-/common-1.2.1.tgz#fbc37c282909450a2a297b019587d465e7c17874"
-  integrity sha512-t2twzQyS2mGrMXGjyh0FAmGKVuh0X6hjSXGqVka28npQQ0RrFMTwYOYaaLFg6iNREe4GJiDvUUAnoz9PpfqZeg==
+"@ceramicnetwork/common@^1.2.1", "@ceramicnetwork/common@^1.3.0":
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/@ceramicnetwork/common/-/common-1.3.0.tgz#318b6c27df22766c09666a7d7815dc5a5211aba5"
+  integrity sha512-KD96Fp84THtKEA5tVmtjw0i8uw3ewYaGtVYUF/eTn7gs1UGkzi3os3TW3mLZfXKoivoKq/5EioPDlB30HfALag==
   dependencies:
-    "@ceramicnetwork/streamid" "^1.1.1"
+    "@ceramicnetwork/streamid" "^1.1.2"
     "@overnightjs/logger" "^1.2.0"
     cids "~1.1.6"
     cross-fetch "^3.1.4"
@@ -122,20 +122,20 @@
     eip55 "^2.1.0"
 
 "@ceramicnetwork/stream-tile@^1.0.6", "@ceramicnetwork/stream-tile@^1.1.1":
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/@ceramicnetwork/stream-tile/-/stream-tile-1.1.1.tgz#9db3dc7f7809a5f7505fb573acf97f724fd7c1d5"
-  integrity sha512-xaYNxi3cW1KQ5NRaCAS5r3IaJgl5FRf3Gda3gEYOIy1u7rihEI+Q7HF+5Q2ULsWtZZLMF9UF+LjxuNBOEeOnMg==
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@ceramicnetwork/stream-tile/-/stream-tile-1.2.0.tgz#527bff80f9a4b236d5bed828a9f354cc6dbedadf"
+  integrity sha512-d5IooWfWql9duS7cZoamQ2Z0vGJ7KM+mM2Ep9AxUbpBf+oHXexQdy9JOftxWlv37hmYZbjxcmP5rrJrig7cTTQ==
   dependencies:
-    "@ceramicnetwork/common" "^1.2.1"
-    "@ceramicnetwork/streamid" "^1.1.1"
+    "@ceramicnetwork/common" "^1.3.0"
+    "@ceramicnetwork/streamid" "^1.1.2"
     "@stablelib/random" "^1.0.0"
     fast-json-patch "^2.2.1"
     uint8arrays "^2.0.5"
 
-"@ceramicnetwork/streamid@^1.1.1":
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/@ceramicnetwork/streamid/-/streamid-1.1.1.tgz#4986880f81049a85f47713cb839a4883d606fd6e"
-  integrity sha512-oa4SZtH1/TnUj/XeaL5/Mh7yYZccLpvI6ag4yldmtAoJr1x488mrvKpk/p95pvsCVu+4W355eS1eSzlJjnNRhw==
+"@ceramicnetwork/streamid@^1.1.1", "@ceramicnetwork/streamid@^1.1.2":
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/@ceramicnetwork/streamid/-/streamid-1.1.2.tgz#d1457ce8818cf4876dd46e86738b5b4daddd2457"
+  integrity sha512-b5D44gs6T3MJRYyoJe/IFgnP/k0R/2k8txHZOFisHfYSMSzjMNgryH6Q8bz368x+HdvU5vQvxmqIVz8gvM5qZg==
   dependencies:
     cids "~1.1.6"
     multibase "~4.0.2"
