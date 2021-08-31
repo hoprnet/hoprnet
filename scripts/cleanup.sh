@@ -37,7 +37,7 @@ cleanup_instance() {
     local name=$(echo "$instance" | awk '{ print $1 }')
     echo "- stopping $name"
     gcloud compute instances stop $name $ZONE
-  done < <(gcloud compute instances list --filter="name~'^${release_name}-' AND status=RUNNING" | tail -n +2)
+  done < <(gcloud compute instances list --filter="name~'^${release_name}-'" | tail -n +2)
 
   while read -r instance; do
     local name=$(echo "$instance" | awk '{ print $1 }')
