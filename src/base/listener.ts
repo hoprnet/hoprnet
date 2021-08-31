@@ -518,7 +518,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         socket.removeListener('error', errListener)
         socket.removeListener('listening', successListener)
 
-        error(`Could not bind to UDP socket.`)
+        error(`Could not bind to ${protocol} socket.`)
         if (err instanceof Error) {
           error(err.message)
         } else {
