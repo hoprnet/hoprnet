@@ -125,8 +125,10 @@ function setupDashboard(selfPub: PublicKey) {
   return update
 }
 
-const priv = process.argv[2]
-const peerId = privKeyToPeerId(priv)
-const selfPub = PublicKey.fromPeerId(peerId)
-const update = setupDashboard(selfPub)
-main(update, peerId)
+if (require.main === module) {
+  const priv = process.argv[2]
+  const peerId = privKeyToPeerId(priv)
+  const selfPub = PublicKey.fromPeerId(peerId)
+  const update = setupDashboard(selfPub)
+  main(update, peerId)
+}
