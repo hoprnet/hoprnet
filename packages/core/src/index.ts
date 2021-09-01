@@ -137,8 +137,12 @@ class Hopr extends EventEmitter {
     )
     this.environment = options.environment
 
+    const provider = expandVars(this.environment.network.default_provider, process.env)
+    log(`using environment: ${this.environment.id}`)
+    log(`using provider URL: ${provider}`)
+
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      provider: expandVars(this.environment.network.default_provider, process.env)
+      provider,
     })
 
     this.publicNodesEmitter = new EventEmitter()
@@ -154,7 +158,7 @@ class Hopr extends EventEmitter {
     }
     this.indexer = this.paymentChannels.indexer // TODO temporary
 
-    log(`using environment: ${this.environment.id}`)
+
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
