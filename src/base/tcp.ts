@@ -110,7 +110,7 @@ class TCPConnection implements MultiaddrConnection {
       await this._stream.sink(
         this._signal != undefined ? (abortable(u8aStream, this._signal) as Stream['source']) : u8aStream
       )
-    } catch (err) {
+    } catch (err: any) {
       // If aborted we can safely ignore
       if (err.type !== 'aborted') {
         // If the source errored the socket will already have been destroyed by
