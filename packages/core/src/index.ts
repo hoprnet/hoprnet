@@ -16,7 +16,6 @@ import { findPath } from './path'
 
 import { protocols, Multiaddr } from 'multiaddr'
 import chalk from 'chalk'
-import { expandVars } from '@hoprnet/hopr-utils'
 
 import PeerId from 'peer-id'
 import {
@@ -58,7 +57,6 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
 import { localAddressesFirst, AddressSorter, backoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
-import type { ResolvedEnvironment } from './environment'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -74,6 +72,7 @@ type PeerStoreAddress = {
 }
 
 export type HoprOptions = {
+  provider: string
   announce?: boolean
   dbPath?: string
   createDbIfNotExist?: boolean
@@ -92,7 +91,6 @@ export type HoprOptions = {
   // when true, addresses will be sorted local first
   // when false, addresses will be sorted public first
   preferLocalAddresses?: boolean
-  environment: ResolvedEnvironment
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -110,7 +108,6 @@ class Hopr extends EventEmitter {
   private paymentChannels: HoprCoreEthereum
   private addressSorter: AddressSorter
   private publicNodesEmitter: HoprConnectOptions['publicNodes']
-  private environment: ResolvedEnvironment
 
   public indexer: Indexer
 
@@ -135,10 +132,8 @@ class Hopr extends EventEmitter {
       options.dbPath,
       options.forceCreateDB
     )
-    this.environment = options.environment
-
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      provider: expandVars(this.environment.network.default_provider, process.env)
+      provider: this.options.provider
     })
 
     this.publicNodesEmitter = new EventEmitter()
@@ -153,8 +148,6 @@ class Hopr extends EventEmitter {
       log('Addresses are sorted by default')
     }
     this.indexer = this.paymentChannels.indexer // TODO temporary
-
-    log(`using environment: ${this.environment.id}`)
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
@@ -261,39 +254,16 @@ class Hopr extends EventEmitter {
       libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
-    this.heartbeat = new Heartbeat(
-      this.networkPeers,
-      subscribe,
-      sendMessageAndExpectResponse,
-      hangup,
-      this.environment.id
-    )
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
 
     const ethereum = await this.startedPaymentChannels()
 
-    const protocolMsg = `hopr/${this.environment.id}/msg`
-    const protocolAck = `hopr/${this.environment.id}/ack`
-
-    subscribeToAcknowledgements(
-      subscribe,
-      this.db,
-      ethereum,
-      this.getId(),
-      (ack) => this.emit('message-acknowledged:' + ack.ackChallenge.toHex()),
-      protocolAck
+    subscribeToAcknowledgements(subscribe, this.db, ethereum, this.getId(), (ack) =>
+      this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     )
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(
-      subscribe,
-      sendMessage,
-      this.getId(),
-      ethereum,
-      onMessage,
-      this.db,
-      protocolMsg,
-      protocolAck
-    )
+    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
     await this.announce(this.options.announce)
     log('announcing done, starting heartbeat')
@@ -988,4 +958,3 @@ export { Hopr as default, LibP2P }
 export * from './constants'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
-export type { ProtocolConfig, Network } from './environment'

@@ -21,9 +21,7 @@
 - [ChannelsToClose](modules.md#channelstoclose)
 - [ChannelsToOpen](modules.md#channelstoopen)
 - [HoprOptions](modules.md#hoproptions)
-- [Network](modules.md#network)
 - [NodeStatus](modules.md#nodestatus)
-- [ProtocolConfig](modules.md#protocolconfig)
 
 ### Variables
 
@@ -41,6 +39,11 @@
 - [NETWORK\_QUALITY\_THRESHOLD](modules.md#network_quality_threshold)
 - [PACKET\_SIZE](modules.md#packet_size)
 - [PATH\_RANDOMNESS](modules.md#path_randomness)
+- [PROTOCOL\_ACKNOWLEDGEMENT](modules.md#protocol_acknowledgement)
+- [PROTOCOL\_HEARTBEAT](modules.md#protocol_heartbeat)
+- [PROTOCOL\_ONCHAIN\_KEY](modules.md#protocol_onchain_key)
+- [PROTOCOL\_PAYMENT\_CHANNEL](modules.md#protocol_payment_channel)
+- [PROTOCOL\_STRING](modules.md#protocol_string)
 - [VERSION](modules.md#version)
 
 ### Functions
@@ -82,43 +85,18 @@ ___
 | `connector?` | `HoprCoreEthereum` |
 | `createDbIfNotExist?` | `boolean` |
 | `dbPath?` | `string` |
-| `environment` | `ResolvedEnvironment` |
 | `forceCreateDB?` | `boolean` |
 | `hosts?` | `Object` |
 | `hosts.ip4?` | `NetOptions` |
 | `hosts.ip6?` | `NetOptions` |
 | `password?` | `string` |
 | `preferLocalAddresses?` | `boolean` |
+| `provider` | `string` |
 | `strategy?` | `ChannelStrategy` |
 
 #### Defined in
 
-[packages/core/src/index.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L76)
-
-___
-
-### Network
-
-Ƭ **Network**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `chain_id` | `number` |
-| `default_provider` | `string` |
-| `description` | `string` |
-| `gas?` | `string` |
-| `gas_multiplier` | `number` |
-| `hopr_token_name` | `string` |
-| `id` | `string` |
-| `live` | `boolean` |
-| `native_token_name` | `string` |
-| `tags` | `string`[] |
-
-#### Defined in
-
-[packages/core/src/environment.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L1)
+[packages/core/src/index.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L74)
 
 ___
 
@@ -128,24 +106,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L98)
-
-___
-
-### ProtocolConfig
-
-Ƭ **ProtocolConfig**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `environments` | `Environment`[] |
-| `networks` | [`Network`](modules.md#network)[] |
-
-#### Defined in
-
-[packages/core/src/environment.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L22)
+[packages/core/src/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L96)
 
 ## Variables
 
@@ -155,7 +116,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L26)
+[packages/core/src/constants.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L33)
 
 ___
 
@@ -165,7 +126,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L9)
+[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
 
 ___
 
@@ -185,7 +146,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L11)
+[packages/core/src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L18)
 
 ___
 
@@ -195,7 +156,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
+[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
 
 ___
 
@@ -205,7 +166,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
+[packages/core/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L23)
 
 ___
 
@@ -215,7 +176,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L20)
+[packages/core/src/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L27)
 
 ___
 
@@ -225,7 +186,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L24)
+[packages/core/src/constants.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L31)
 
 ___
 
@@ -235,7 +196,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L18)
+[packages/core/src/constants.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L25)
 
 ___
 
@@ -245,7 +206,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
+[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
 
 ___
 
@@ -255,7 +216,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
+[packages/core/src/constants.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L29)
 
 ___
 
@@ -265,7 +226,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L23)
+[packages/core/src/constants.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L30)
 
 ___
 
@@ -285,7 +246,57 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
+[packages/core/src/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L28)
+
+___
+
+### PROTOCOL\_ACKNOWLEDGEMENT
+
+• `Const` **PROTOCOL\_ACKNOWLEDGEMENT**: `string`
+
+#### Defined in
+
+[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
+
+___
+
+### PROTOCOL\_HEARTBEAT
+
+• `Const` **PROTOCOL\_HEARTBEAT**: `string`
+
+#### Defined in
+
+[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
+
+___
+
+### PROTOCOL\_ONCHAIN\_KEY
+
+• `Const` **PROTOCOL\_ONCHAIN\_KEY**: `string`
+
+#### Defined in
+
+[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
+
+___
+
+### PROTOCOL\_PAYMENT\_CHANNEL
+
+• `Const` **PROTOCOL\_PAYMENT\_CHANNEL**: `string`
+
+#### Defined in
+
+[packages/core/src/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L13)
+
+___
+
+### PROTOCOL\_STRING
+
+• `Const` **PROTOCOL\_STRING**: `string`
+
+#### Defined in
+
+[packages/core/src/constants.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L11)
 
 ___
 

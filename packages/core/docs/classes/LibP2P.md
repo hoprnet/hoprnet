@@ -220,11 +220,11 @@ node_modules/libp2p/dist/src/index.d.ts:112
 
 ### \_config
 
-• **\_config**: { `dht`: { `enabled`: `boolean` ; `kBucketSize`: `number` ; `randomWalk`: { `enabled`: `boolean` ; `interval`: `number` ; `queriesPerPeriod`: `number` ; `timeout`: `number`  }  } ; `nat`: { `enabled`: `boolean` ; `externalIp`: ``null`` ; `gateway`: ``null`` ; `keepAlive`: `boolean` ; `pmp`: { `enabled`: `boolean`  } ; `ttl`: `number`  } ; `peerDiscovery`: { `autoDial`: `boolean`  } ; `pubsub`: { `enabled`: `boolean`  } ; `relay`: { `advertise`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `ttl`: `number`  } ; `autoRelay`: { `enabled`: `boolean` ; `maxListeners`: `number`  } ; `enabled`: `boolean` ; `hop`: { `active`: `boolean` ; `enabled`: `boolean`  }  } ; `transport`: {}  } & [`Libp2pConfig`](../modules/LibP2P.md#libp2pconfig)
+• **\_config**: { `dht`: { `enabled`: `boolean` ; `kBucketSize`: `number` ; `randomWalk`: { `enabled`: `boolean` ; `interval`: `number` ; `queriesPerPeriod`: `number` ; `timeout`: `number`  }  } ; `nat`: { `enabled`: `boolean` ; `externalIp`: ``null`` ; `gateway`: ``null`` ; `keepAlive`: `boolean` ; `pmp`: { `enabled`: `boolean`  } ; `ttl`: `number`  } ; `peerDiscovery`: { `autoDial`: `boolean`  } ; `protocolPrefix`: `string` ; `pubsub`: { `enabled`: `boolean`  } ; `relay`: { `advertise`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `ttl`: `number`  } ; `autoRelay`: { `enabled`: `boolean` ; `maxListeners`: `number`  } ; `enabled`: `boolean` ; `hop`: { `active`: `boolean` ; `enabled`: `boolean`  }  } ; `transport`: {}  } & [`Libp2pConfig`](../modules/LibP2P.md#libp2pconfig)
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:210
+node_modules/libp2p/dist/src/index.d.ts:211
 
 ___
 
@@ -234,7 +234,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:274
+node_modules/libp2p/dist/src/index.d.ts:276
 
 ___
 
@@ -244,7 +244,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:256
+node_modules/libp2p/dist/src/index.d.ts:258
 
 ___
 
@@ -254,7 +254,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:300
+node_modules/libp2p/dist/src/index.d.ts:302
 
 ___
 
@@ -270,7 +270,7 @@ minConnections.
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:400
+node_modules/libp2p/dist/src/index.d.ts:402
 
 ___
 
@@ -280,7 +280,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:209
+node_modules/libp2p/dist/src/index.d.ts:210
 
 ___
 
@@ -292,7 +292,7 @@ Called when libp2p has started and before it returns
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:391
+node_modules/libp2p/dist/src/index.d.ts:393
 
 ___
 
@@ -307,13 +307,13 @@ Known peers may be emitted.
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:286
+node_modules/libp2p/dist/src/index.d.ts:288
 
 ___
 
 ### \_options
 
-• **\_options**: { `addresses`: { `announce`: `never`[] ; `listen`: `never`[] ; `noAnnounce`: `never`[] ; `announceFilter`: (`multiaddrs`: `Multiaddr`[]) => `Multiaddr`[]  } ; `config`: { `dht`: { `enabled`: `boolean` ; `kBucketSize`: `number` ; `randomWalk`: { `enabled`: `boolean` ; `interval`: `number` ; `queriesPerPeriod`: `number` ; `timeout`: `number`  }  } ; `nat`: { `enabled`: `boolean` ; `externalIp`: ``null`` ; `gateway`: ``null`` ; `keepAlive`: `boolean` ; `pmp`: { `enabled`: `boolean`  } ; `ttl`: `number`  } ; `peerDiscovery`: { `autoDial`: `boolean`  } ; `pubsub`: { `enabled`: `boolean`  } ; `relay`: { `advertise`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `ttl`: `number`  } ; `autoRelay`: { `enabled`: `boolean` ; `maxListeners`: `number`  } ; `enabled`: `boolean` ; `hop`: { `active`: `boolean` ; `enabled`: `boolean`  }  } ; `transport`: {}  } ; `connectionManager`: { `minConnections`: `number`  } ; `dialer`: { `addressSorter`: (`addresses`: `Address`[]) => `Address`[] ; `dialTimeout`: `number` ; `maxDialsPerPeer`: `number` ; `maxParallelDials`: `number` ; `resolvers`: { `dnsaddr`: `any`  }  } ; `host`: { `agentVersion`: `string`  } ; `metrics`: { `enabled`: `boolean`  } ; `peerRouting`: { `refreshManager`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `interval`: `number`  }  } ; `peerStore`: { `persistence`: `boolean` ; `threshold`: `number`  } ; `transportManager`: { `faultTolerance`: `number`  }  } & [`Libp2pOptions`](../modules/LibP2P.md#libp2poptions) & [`constructorOptions`](../modules/LibP2P.md#constructoroptions)
+• **\_options**: { `addresses`: { `announce`: `never`[] ; `listen`: `never`[] ; `noAnnounce`: `never`[] ; `announceFilter`: (`multiaddrs`: `Multiaddr`[]) => `Multiaddr`[]  } ; `config`: { `dht`: { `enabled`: `boolean` ; `kBucketSize`: `number` ; `randomWalk`: { `enabled`: `boolean` ; `interval`: `number` ; `queriesPerPeriod`: `number` ; `timeout`: `number`  }  } ; `nat`: { `enabled`: `boolean` ; `externalIp`: ``null`` ; `gateway`: ``null`` ; `keepAlive`: `boolean` ; `pmp`: { `enabled`: `boolean`  } ; `ttl`: `number`  } ; `peerDiscovery`: { `autoDial`: `boolean`  } ; `protocolPrefix`: `string` ; `pubsub`: { `enabled`: `boolean`  } ; `relay`: { `advertise`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `ttl`: `number`  } ; `autoRelay`: { `enabled`: `boolean` ; `maxListeners`: `number`  } ; `enabled`: `boolean` ; `hop`: { `active`: `boolean` ; `enabled`: `boolean`  }  } ; `transport`: {}  } ; `connectionManager`: { `minConnections`: `number`  } ; `dialer`: { `addressSorter`: (`addresses`: `Address`[]) => `Address`[] ; `dialTimeout`: `number` ; `maxDialsPerPeer`: `number` ; `maxParallelDials`: `number` ; `resolvers`: { `dnsaddr`: `any`  }  } ; `host`: { `agentVersion`: `string`  } ; `metrics`: { `enabled`: `boolean`  } ; `peerRouting`: { `refreshManager`: { `bootDelay`: `number` ; `enabled`: `boolean` ; `interval`: `number`  }  } ; `peerStore`: { `persistence`: `boolean` ; `threshold`: `number`  } ; `transportManager`: { `faultTolerance`: `number`  }  } & [`Libp2pOptions`](../modules/LibP2P.md#libp2poptions) & [`constructorOptions`](../modules/LibP2P.md#constructoroptions)
 
 #### Defined in
 
@@ -331,7 +331,7 @@ Initializes and starts peer discovery services
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:407
+node_modules/libp2p/dist/src/index.d.ts:409
 
 ___
 
@@ -341,7 +341,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:255
+node_modules/libp2p/dist/src/index.d.ts:257
 
 ___
 
@@ -351,7 +351,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:208
+node_modules/libp2p/dist/src/index.d.ts:209
 
 ___
 
@@ -361,7 +361,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:202
+node_modules/libp2p/dist/src/index.d.ts:203
 
 ___
 
@@ -371,7 +371,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:257
+node_modules/libp2p/dist/src/index.d.ts:259
 
 ___
 
@@ -381,7 +381,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:278
+node_modules/libp2p/dist/src/index.d.ts:280
 
 ___
 
@@ -391,7 +391,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:200
+node_modules/libp2p/dist/src/index.d.ts:201
 
 ___
 
@@ -401,7 +401,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:271
+node_modules/libp2p/dist/src/index.d.ts:273
 
 ___
 
@@ -411,7 +411,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:273
+node_modules/libp2p/dist/src/index.d.ts:275
 
 ___
 
@@ -421,7 +421,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:259
+node_modules/libp2p/dist/src/index.d.ts:261
 
 ___
 
@@ -431,7 +431,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:258
+node_modules/libp2p/dist/src/index.d.ts:260
 
 ___
 
@@ -441,7 +441,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:262
+node_modules/libp2p/dist/src/index.d.ts:264
 
 ___
 
@@ -451,7 +451,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:199
+node_modules/libp2p/dist/src/index.d.ts:200
 
 ___
 
@@ -461,7 +461,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:277
+node_modules/libp2p/dist/src/index.d.ts:279
 
 ___
 
@@ -471,7 +471,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:201
+node_modules/libp2p/dist/src/index.d.ts:202
 
 ___
 
@@ -481,7 +481,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:276
+node_modules/libp2p/dist/src/index.d.ts:278
 
 ___
 
@@ -491,7 +491,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:263
+node_modules/libp2p/dist/src/index.d.ts:265
 
 ___
 
@@ -501,7 +501,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:272
+node_modules/libp2p/dist/src/index.d.ts:274
 
 ___
 
@@ -511,7 +511,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:261
+node_modules/libp2p/dist/src/index.d.ts:263
 
 ___
 
@@ -521,7 +521,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:260
+node_modules/libp2p/dist/src/index.d.ts:262
 
 ___
 
@@ -604,7 +604,7 @@ Gets a Map of the current connections. The keys are the stringified
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:316
+node_modules/libp2p/dist/src/index.d.ts:318
 
 ___
 
@@ -625,7 +625,7 @@ ignored though observed addresses will still be included.
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:363
+node_modules/libp2p/dist/src/index.d.ts:365
 
 ## Methods
 
@@ -648,7 +648,7 @@ node_modules/libp2p/dist/src/index.d.ts:363
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:352
+node_modules/libp2p/dist/src/index.d.ts:354
 
 ___
 
@@ -662,7 +662,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:385
+node_modules/libp2p/dist/src/index.d.ts:387
 
 ___
 
@@ -712,7 +712,7 @@ peer will be added to the nodes `peerStore`
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:326
+node_modules/libp2p/dist/src/index.d.ts:328
 
 ___
 
@@ -741,7 +741,7 @@ and the `MuxedStream` will be returned together with the successful negotiated p
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:340
+node_modules/libp2p/dist/src/index.d.ts:342
 
 ___
 
@@ -825,7 +825,7 @@ Registers the `handler` for each protocol
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:270
+node_modules/libp2p/dist/src/index.d.ts:272
 
 ___
 
@@ -847,7 +847,7 @@ Disconnects all connections to the given `peer`
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:370
+node_modules/libp2p/dist/src/index.d.ts:372
 
 ___
 
@@ -861,7 +861,7 @@ ___
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:309
+node_modules/libp2p/dist/src/index.d.ts:311
 
 ___
 
@@ -928,7 +928,7 @@ Imports the private key as 'self', if needed.
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:308
+node_modules/libp2p/dist/src/index.d.ts:310
 
 ___
 
@@ -1025,7 +1025,7 @@ Pings the given peer in order to obtain the operation latency.
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:377
+node_modules/libp2p/dist/src/index.d.ts:379
 
 ___
 
@@ -1188,7 +1188,7 @@ Starts the libp2p node and all its subsystems
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:292
+node_modules/libp2p/dist/src/index.d.ts:294
 
 ___
 
@@ -1206,7 +1206,7 @@ Stop the libp2p node by closing its listeners and open connections
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:299
+node_modules/libp2p/dist/src/index.d.ts:301
 
 ___
 
@@ -1229,7 +1229,7 @@ will no longer be supported on streams.
 
 #### Defined in
 
-node_modules/libp2p/dist/src/index.d.ts:384
+node_modules/libp2p/dist/src/index.d.ts:386
 
 ___
 

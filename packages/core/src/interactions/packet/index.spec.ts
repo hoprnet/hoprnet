@@ -134,18 +134,11 @@ describe('packet interaction', function () {
 
     const defer = Defer()
 
-    subscribeToAcknowledgements(
-      libp2pSelf.subscribe,
-      db,
-      chainSelf as any,
-      self,
-      () => {
-        defer.resolve()
-      },
-      'protocolAck'
-    )
+    subscribeToAcknowledgements(libp2pSelf.subscribe, db, chainSelf as any, self, () => {
+      defer.resolve()
+    })
 
-    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send, counterparty, 'protocolAck')
+    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send, counterparty)
 
     await defer.promise
   })
@@ -178,42 +171,13 @@ describe('packet interaction', function () {
       sender,
       chainSender as any,
       console.log,
-      db,
-      'protocolMsg',
-      'protocolAck'
+      db
     )
 
     // TODO: improve
-    new PacketForwardInteraction(
-      libp2pRelay0.subscribe,
-      libp2pRelay0.send,
-      relay0,
-      chainRelay0 as any,
-      console.log,
-      db,
-      'protocolMsg',
-      'protocolAck'
-    )
-    new PacketForwardInteraction(
-      libp2pRelay1.subscribe,
-      libp2pRelay1.send,
-      relay1,
-      chainRelay1 as any,
-      console.log,
-      db,
-      'protocolMsg',
-      'protocolAck'
-    )
-    new PacketForwardInteraction(
-      libp2pRelay2.subscribe,
-      libp2pRelay2.send,
-      relay2,
-      chainRelay2 as any,
-      console.log,
-      db,
-      'protocolMsg',
-      'protocolAck'
-    )
+    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, chainRelay0 as any, console.log, db)
+    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, chainRelay1 as any, console.log, db)
+    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, chainRelay2 as any, console.log, db)
     new PacketForwardInteraction(
       libp2pReceiver.subscribe,
       libp2pReceiver.send,
@@ -224,9 +188,7 @@ describe('packet interaction', function () {
           msgDefer.resolve()
         }
       },
-      db,
-      'protocolMsg',
-      'protocolAck'
+      db
     )
 
     senderInteraction.interact(relay0, packet)
