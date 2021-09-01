@@ -61,7 +61,7 @@ class Relay {
 
       const shaker = new RelayHandshake(stream as any)
 
-      log(`handling relay request from ${connection.remotePeer}`)
+      log(`handling relay request from ${connection.remotePeer.toB58String()}`)
       log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
 
       if (this.relayState.relayedConnectionCount() >= this.maxRelayedConnections) {
