@@ -286,7 +286,8 @@ export const sendCTMessage = async (
   sendMessage: (path: PublicKey[]) => Promise<void>,
   data: PersistedState
 ): Promise<boolean> => {
-  const weight = async (edge: ChannelEntry): Promise<BN> => await randomWeightedImportance(edge.destination, await data.get())
+  const weight = async (edge: ChannelEntry): Promise<BN> =>
+    await randomWeightedImportance(edge.destination, await data.get())
   let path
   try {
     path = await findPath(
