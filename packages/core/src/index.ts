@@ -142,7 +142,7 @@ class Hopr extends EventEmitter {
     log(`using provider URL: ${provider}`)
 
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      provider,
+      provider
     })
 
     this.publicNodesEmitter = new EventEmitter()
@@ -157,8 +157,6 @@ class Hopr extends EventEmitter {
       log('Addresses are sorted by default')
     }
     this.indexer = this.paymentChannels.indexer // TODO temporary
-
-
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
