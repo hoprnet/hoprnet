@@ -75,7 +75,7 @@ fund_if_empty() {
   log "Checking balance of funding wallet ${funding_address} using RPC ${rpc}"
   funding_balance="$(wallet_balance "${funding_address}" "${rpc}")"
 
-  if [ "${funding_balance}"='0.0' ]; then
+  if [ "${funding_balance}" == '0.0' ]; then
     log "Wallet ${funding_address} has zero balance and cannot fund node ${address}"
   else
     log "Funding wallet ${funding_address} has enough funds: ${funding_balance}"
@@ -83,7 +83,7 @@ fund_if_empty() {
     balance="$(wallet_balance "${address}" "${rpc}")"
 
     log "Balance of ${address} is ${balance}"
-    if [ "${balance}"='0.0' ]; then
+    if [ "${balance}" == '0.0' ]; then
       # need to wait to make retries work
       local ethers_opts="--rpc ${rpc} --account ${FUNDING_PRIV_KEY} --yes --wait"
 
