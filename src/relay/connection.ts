@@ -88,8 +88,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _destroyedPromise: DeferredPromise<void>
   private _statusMessagePromise: DeferredPromise<void>
   private _closePromise: DeferredPromise<void>
+  private _sinkSourcePromise: DeferredPromise<void>
 
-  private _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
+  private _onReconnect: ((newStream: RelayConnection, counterparty: PeerId) => Promise<void>) | undefined
 
   public destroyed: boolean
 
@@ -113,7 +114,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     self: PeerId
     relay: PeerId
     counterparty: PeerId
-    onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
+    onReconnect?: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
     webRTC?: WebRTC
   }) {
     super()
@@ -156,10 +157,13 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._statusMessagePromise = Defer<void>()
     this._sinkSwitchPromise = Defer<void>()
     this._sourceSwitchPromise = Defer<void>()
+    this._sinkSourcePromise = Defer<void>()
 
     this.source = this.createSource()
 
-    this._stream.sink(this.sinkFunction())
+    this._stream.sink(this.sinkFunction() as unknown as Stream['source']).catch((err) => {
+      this._sinkSourcePromise.reject(err)
+    })
 
     this.sink = this.attachSinkSource.bind(this)
   }
@@ -195,7 +199,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   /**
    * Send UPGRADED status msg to the relay, so it can free the slot
    */
-  sendUpgraded() {
+  public sendUpgraded() {
     this.verbose(`FLOW: sending UPGRADED`)
     this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.UPGRADED))
   }
@@ -268,8 +272,22 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       await this._migrationDone.promise
     }
 
+    let deferred = Defer<void>()
     this._sinkSourceAttached = true
-    this._sinkSourceAttachedPromise.resolve(toU8aStream(source))
+    this._sinkSourceAttachedPromise.resolve(
+      toU8aStream(
+        (async function* () {
+          try {
+            yield* source
+            deferred.resolve()
+          } catch (err) {
+            deferred.reject(err)
+          }
+        })()
+      )
+    )
+
+    return Promise.race([deferred.promise, this._sinkSourcePromise.promise])
   }
 
   /**
@@ -513,7 +531,9 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             this.log(`RESTART received. Ending stream ...`)
             this.emit(`restart`)
 
-            this._onReconnect(this.switch(), this._counterparty)
+            let switchedConnection = this.switch()
+
+            this._onReconnect?.(switchedConnection, this._counterparty)
 
             continue
           }
