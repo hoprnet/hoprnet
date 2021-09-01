@@ -17,18 +17,8 @@
       "3001:3001/tcp"
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
-<<<<<<< HEAD
     "hash": "/ipfs/QmQoE2Wqb3qfd75aoEig4Q7tQPcLdaA9ykqnaySSYTX8Q6",
     "size": 60498772,
-=======
-<<<<<<< HEAD
-    "hash": "/ipfs/Qmbt2RVxdUGBsCm5XDsoNVbnXzL1b6i3G2kNP8yrd7Zb7y",
-    "size": 60514044,
-=======
-    "hash": "/ipfs/QmbhcCCE5fne5hPUFVTF4y1ah6tuN5FSE6Lhv9thYs6ZMX",
-    "size": 60502832,
->>>>>>> 3a32e268d (added protocol-config to npm (#2293))
->>>>>>> ca4967ff9 (added protocol-config to npm (#2293))
     "restart": "always"
   },
   "author": "HOPR",
