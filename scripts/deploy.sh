@@ -32,8 +32,7 @@ fi
 # Get RELEASE_NAME, from environment
 get_environment
 
-# TESTNET_NAME="$RELEASE_NAME-$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
-TESTNET_NAME="local-debug"
+TESTNET_NAME="$RELEASE_NAME-$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
 TESTNET_SIZE=3
 
 echo "Cleaning up before deploy"
