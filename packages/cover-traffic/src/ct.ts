@@ -12,6 +12,7 @@ const MINIMUM_STAKE_BEFORE_CLOSURE = new BN('0')
 const CT_INTERMEDIATE_HOPS = 2 // 3  // NB. min is 2
 const DB = './ct.json'
 const MESSAGE_FAIL_THRESHOLD = 1000 // Failed sends to channel before we autoclose
+const CT_PATH_RANDOMNESS = 0.2
 
 const options: HoprOptions = {
   //provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
@@ -269,6 +270,11 @@ export const importance = (p: PublicKey, state: State): BN =>
     )
     .reduce(addBN, new BN('0'))
 
+export const randomWeightedImportance = (p: PublicKey, state: State): BN => {
+  const randomComponent = 1 + Math.random() * CT_PATH_RANDOMNESS
+  return importance(p, state).muln(randomComponent)
+}
+
 export const findChannel = (src: PublicKey, dest: PublicKey, state: State): ChannelEntry =>
   Object.values(state.channels)
     .map((c: ChannelData): ChannelEntry => c.channel)
@@ -280,7 +286,7 @@ export const sendCTMessage = async (
   sendMessage: (path: PublicKey[]) => Promise<void>,
   data: PersistedState
 ): Promise<boolean> => {
-  const weight = async (edge: ChannelEntry): Promise<BN> => await importance(edge.destination, await data.get())
+  const weight = async (edge: ChannelEntry): Promise<BN> => await randomWeightedImportance(edge.destination, await data.get())
   let path
   try {
     path = await findPath(
