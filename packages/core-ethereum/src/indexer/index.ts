@@ -1,17 +1,28 @@
-import PeerId from 'peer-id'
-import type { Event, EventNames } from './types'
-import type { ChainWrapper } from '../ethereum'
-import chalk from 'chalk'
 import BN from 'bn.js'
-import Heap from 'heap-js'
-import { randomChoice, HoprDB, stringToU8a, ChannelStatus } from '@hoprnet/hopr-utils'
-import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Snapshot } from '@hoprnet/hopr-utils'
-import { isConfirmedBlock, snapshotComparator } from './utils'
-import { Commitment } from '../commitment'
 import Debug from 'debug'
-import { Multiaddr } from 'multiaddr'
+import Heap from 'heap-js'
+import PeerId from 'peer-id'
+import chalk from 'chalk'
 import { EventEmitter } from 'events'
-import Defer, { DeferredPromise } from 'p-defer'
+import { Multiaddr } from 'multiaddr'
+import {
+  randomChoice,
+  HoprDB,
+  stringToU8a,
+  ChannelStatus,
+  Address,
+  ChannelEntry,
+  Defer,
+  AccountEntry,
+  Hash,
+  PublicKey,
+  Snapshot
+} from '@hoprnet/hopr-utils'
+
+import type { ChainWrapper } from '../ethereum'
+import type { Event, EventNames } from './types'
+import { Commitment } from '../commitment'
+import { isConfirmedBlock, snapshotComparator } from './utils'
 
 const log = Debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
@@ -26,7 +37,7 @@ class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
-  private pendingCommitments: Map<string, DeferredPromise<void>>
+  private pendingCommitments: Map<string, Defer<void>>
   private chain: ChainWrapper
   private genesisBlock: number
 
@@ -37,7 +48,7 @@ class Indexer extends EventEmitter {
     private blockRange: number
   ) {
     super()
-    this.pendingCommitments = new Map<string, DeferredPromise<void>>()
+    this.pendingCommitments = new Map<string, Defer<void>>()
   }
 
   /**
@@ -339,7 +350,7 @@ class Indexer extends EventEmitter {
       return waiting.promise
     }
 
-    waiting = Defer()
+    waiting = new Defer()
 
     this.pendingCommitments.set(channelId.toHex(), waiting)
   }
