@@ -63,5 +63,6 @@
   },
   "engines": {
     "node": "16"
-  }
+  },
+  "stableVersion": "1.76.0-next.31"
 }

@@ -51,8 +51,6 @@ jobs:
       - name: '[BUILD] Install dependencies / link / build'
         run: |
           yarn
-          yarn setup
-          yarn util:link
           yarn build
 
       - name: '[SMART-CONTRACTS] Deploy on Goerli'
