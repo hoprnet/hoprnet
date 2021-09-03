@@ -203,6 +203,8 @@ class Hopr extends EventEmitter {
         dht: KadDHT
       },
       config: {
+        // @ts-ignore
+        protocolPrefix: 'hopr',
         transport: {
           HoprConnect: {
             initialNodes,
