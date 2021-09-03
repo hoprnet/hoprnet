@@ -19,5 +19,5 @@ DEBUG=hopr* node ./lib/dashboard.js <Private key as hex>
 Example:
 
 ```sh
-DEBUG=hopr* node ./lib/dashboard.js 0x5d09dea41b9d7510f1bd40099da3ac524f9f3e674d03c78a9c4bec742587cbd3
+node ./lib/dashboard.js 0x5d09dea41b9d7510f1bd40099da3ac524f9f3e674d03c78a9c4bec742587cbd3
 ```

@@ -9,3 +9,6 @@ lib
 
 # Exclude built npm packages
 *.tgz
+
+# CT database
+ct.json
