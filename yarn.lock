@@ -1002,7 +1002,7 @@ __metadata:
     leveldown: ~6.0.0
     levelup: ~5.0.0
     libp2p: 0.32.4
-    libp2p-kad-dht: 0.23.2
+    libp2p-kad-dht: 0.24.0
     libp2p-mplex: 0.10.4
     libp2p-tcp: ^0.17.2
     memdown: ^6.0.0
@@ -9364,6 +9364,13 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
+"it-length@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "it-length@npm:1.0.3"
+  checksum: 74b5f974101c2a63de952984988f82824a788b0db052a63163fcfd6f719625fc1e119ffd0f9220d0dae06076101870733be8e8c711738da23b76f1af43c0bea0
+  languageName: node
+  linkType: hard
+
 "it-map@npm:^1.0.4":
   version: 1.0.5
   resolution: "it-map@npm:1.0.5"
@@ -10332,17 +10339,17 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p-kad-dht@npm:0.23.2":
-  version: 0.23.2
-  resolution: "libp2p-kad-dht@npm:0.23.2"
+"libp2p-kad-dht@npm:0.24.0":
+  version: 0.24.0
+  resolution: "libp2p-kad-dht@npm:0.24.0"
   dependencies:
-    abort-controller: ^3.0.0
     debug: ^4.3.1
     err-code: ^3.0.0
     hashlru: ^2.3.0
     heap: ~0.2.6
     interface-datastore: ^5.1.1
     it-first: ^1.0.4
+    it-length: ^1.0.3
     it-length-prefixed: ^5.0.2
     it-pipe: ^1.1.0
     k-bucket: ^5.1.0
@@ -10354,14 +10361,12 @@ fsevents@~2.1.1:
     p-map: ^4.0.0
     p-queue: ^6.6.2
     p-timeout: ^4.1.0
-    p-times: ^3.0.0
     peer-id: ^0.15.0
     protobufjs: ^6.10.2
     streaming-iterables: ^6.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-    xor-distance: ^2.0.0
-  checksum: 861839acfa3156a030a31dafa5e117543a509d484329245bd9b003463053c66e748919c331a1e13ff345154c3595115d24fb77e272d8a2e68080f3b5b1fdbc94
+  checksum: 0de8cf6e722392316317a8ab39738f53edd144a857ace990e0cac838644d0c02948793ee9313b9597dc41d578edbb983579b8000025c2ce897bda44192de27c7
   languageName: node
   linkType: hard
 
@@ -12633,15 +12638,6 @@ fsevents@~2.1.1:
   version: 4.1.0
   resolution: "p-timeout@npm:4.1.0"
   checksum: 321fec524c23a754e3f1487f2b0a5516fd32aba960d5610490eac56f8a0114b549a93f9919ffc05aa68956dc52e8330e0519f3ddf951d208d19c845f9cd778de
-  languageName: node
-  linkType: hard
-
-"p-times@npm:^3.0.0":
-  version: 3.0.0
-  resolution: "p-times@npm:3.0.0"
-  dependencies:
-    p-map: ^4.0.0
-  checksum: 8c2946267602adfe767a8e9e6373f4e9f72f70ea2eb8c2fe128faf19093fa2eec951d12de6b61dbcd848514d6cd1421cf5f9be42e206fd6eb3ac57b503dc1c26
   languageName: node
   linkType: hard
 
@@ -17618,13 +17614,6 @@ resolve@1.17.0:
   version: 1.8.0
   resolution: "xmlhttprequest@npm:1.8.0"
   checksum: c891cf0d7884b4f5cce835aa01f1965727cd352cbd2d7a2e0605bf11ec99ae2198364cca54656ec8b2581a5704dee6c2bf9911922a0ff2a71b613455d32e81b7
-  languageName: node
-  linkType: hard
-
-"xor-distance@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "xor-distance@npm:2.0.0"
-  checksum: 4c5c629272317b14c215f503b5f21bf618166483f2c78cae6f680be6dd8799230817c883d7b2f9292cc91d1b555776af8fd4a8b04d01ade14e0b219a257aa82d
   languageName: node
   linkType: hard
 
