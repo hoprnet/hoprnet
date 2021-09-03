@@ -91,7 +91,7 @@ function setupDashboard(selfPub: PublicKey) {
         ])
     })
 
-    var l
+    var l: string
     while ((l = state.log.pop())) {
       logs.log(l)
     }
@@ -100,7 +100,7 @@ function setupDashboard(selfPub: PublicKey) {
       headers: ['Dest', 'Status', '#Sent', '#Fwd', 'Q', 'Balance'],
       data: state.ctChannels.map((c: OpenChannels) => {
         const chan = findChannel(selfPub, c.destination, state)
-        let status
+        let status: string
         let balance = '-'
         let stats = state.channels[c.destination.toB58String()] || ({} as any)
         if (chan) {
