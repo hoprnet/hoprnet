@@ -60,7 +60,7 @@ export class HoprDB {
 
     log('using db at ', dbPath)
     if (forceCreate) {
-      log('force create - wipe old database and create anew')
+      log('force create - wipe old database and create a new')
       rmSync(dbPath, { recursive: true, force: true })
       mkdirSync(dbPath, { recursive: true })
     }
