@@ -55,7 +55,7 @@
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:20
+packages/utils/lib/types/channelEntry.d.ts:20
 
 ## Properties
 
@@ -65,7 +65,7 @@ utils/lib/types/channelEntry.d.ts:20
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:13
+packages/utils/lib/types/channelEntry.d.ts:13
 
 ___
 
@@ -75,7 +75,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:18
+packages/utils/lib/types/channelEntry.d.ts:18
 
 ___
 
@@ -85,7 +85,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:19
+packages/utils/lib/types/channelEntry.d.ts:19
 
 ___
 
@@ -95,7 +95,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:14
+packages/utils/lib/types/channelEntry.d.ts:14
 
 ___
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:12
+packages/utils/lib/types/channelEntry.d.ts:12
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:11
+packages/utils/lib/types/channelEntry.d.ts:11
 
 ___
 
@@ -125,7 +125,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:17
+packages/utils/lib/types/channelEntry.d.ts:17
 
 ___
 
@@ -135,7 +135,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:15
+packages/utils/lib/types/channelEntry.d.ts:15
 
 ___
 
@@ -145,7 +145,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:16
+packages/utils/lib/types/channelEntry.d.ts:16
 
 ## Accessors
 
@@ -159,7 +159,7 @@ utils/lib/types/channelEntry.d.ts:16
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:21
+packages/utils/lib/types/channelEntry.d.ts:21
 
 ## Methods
 
@@ -173,7 +173,7 @@ utils/lib/types/channelEntry.d.ts:21
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:26
+packages/utils/lib/types/channelEntry.d.ts:26
 
 ___
 
@@ -187,7 +187,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:24
+packages/utils/lib/types/channelEntry.d.ts:24
 
 ___
 
@@ -201,7 +201,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:25
+packages/utils/lib/types/channelEntry.d.ts:25
 
 ___
 
@@ -215,7 +215,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:27
+packages/utils/lib/types/channelEntry.d.ts:27
 
 ___
 
@@ -235,7 +235,7 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:22
+packages/utils/lib/types/channelEntry.d.ts:22
 
 ___
 
@@ -256,4 +256,4 @@ ___
 
 #### Defined in
 
-utils/lib/types/channelEntry.d.ts:23
+packages/utils/lib/types/channelEntry.d.ts:23

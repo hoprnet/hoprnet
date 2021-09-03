@@ -17,6 +17,7 @@
 - [Challenge](classes/Challenge.md)
 - [ChannelEntry](classes/ChannelEntry.md)
 - [CurvePoint](classes/CurvePoint.md)
+- [Defer](classes/Defer.md)
 - [EthereumChallenge](classes/EthereumChallenge.md)
 - [HalfKey](classes/HalfKey.md)
 - [HalfKeyChallenge](classes/HalfKeyChallenge.md)

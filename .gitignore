@@ -21,3 +21,12 @@ packages/ethereum/lib/types/
 packages/utils/lib/types/
 /types/
 .direnv/
+
+# yarn v2 specific
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*

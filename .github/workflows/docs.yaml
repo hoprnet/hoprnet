@@ -24,6 +24,7 @@ jobs:
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
+          cache: yarn
 
       - name: Install Yarn (only when using ACT)
         if: ${{ env.ACT == 'true' }}
@@ -32,16 +33,6 @@ jobs:
           echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
           apt update
           apt install --no-install-recommends yarn
-
-      - name: Restore cache of node modules.
-        uses: actions/cache@v2
-        if: ${{ !env.ACT }}
-        id: nodejs-cache
-        with:
-          path: |
-            node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
         run: yarn
