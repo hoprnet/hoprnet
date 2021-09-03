@@ -3,7 +3,7 @@ import { SaneDefaults } from '@hoprnet/hopr-core'
 import type Hopr from '@hoprnet/hopr-core'
 import type BN from 'bn.js'
 import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
-import { PersistedState } from './state'
+import type { PersistedState } from './state'
 import { sendCTMessage } from './utils'
 import {
   CT_INTERMEDIATE_HOPS,

@@ -1,6 +1,6 @@
 import blessed from 'blessed'
 import contrib from 'blessed-contrib'
-import { State, OpenChannels } from './state'
+import type { State, OpenChannels } from './state'
 import { findChannel, totalChannelBalanceFor, findChannelsFrom, importance } from './utils'
 import { main } from '.'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'

@@ -2,7 +2,7 @@ import { findPath } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
 import { PublicKey, ChannelEntry } from '@hoprnet/hopr-utils'
-import { State, ChannelData, PersistedState } from './state'
+import type { State, ChannelData, PersistedState } from './state'
 import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
 
 export const addBN = (a: BN, b: BN): BN => a.add(b)
@@ -41,9 +41,8 @@ export const sendCTMessage = async (
   sendMessage: (path: PublicKey[]) => Promise<void>,
   data: PersistedState
 ): Promise<boolean> => {
-  const weight = async (edge: ChannelEntry): Promise<BN> =>
-    await randomWeightedImportance(edge.destination, await data.get())
-  let path
+  const weight = async (edge: ChannelEntry): Promise<BN> => randomWeightedImportance(edge.destination, data.get())
+  let path: PublicKey[]
   try {
     path = await findPath(
       startNode,
