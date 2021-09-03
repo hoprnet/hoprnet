@@ -1004,7 +1004,7 @@ __metadata:
     libp2p: 0.32.4
     libp2p-kad-dht: 0.23.2
     libp2p-mplex: 0.10.4
-    libp2p-tcp: ^0.17.1
+    libp2p-tcp: ^0.17.2
     memdown: ^6.0.0
     mocha: ^9.0.2
     multiaddr: ^10.0.0
@@ -10393,9 +10393,9 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p-tcp@npm:^0.17.1":
-  version: 0.17.1
-  resolution: "libp2p-tcp@npm:0.17.1"
+"libp2p-tcp@npm:^0.17.2":
+  version: 0.17.2
+  resolution: "libp2p-tcp@npm:0.17.2"
   dependencies:
     abortable-iterator: ^3.0.0
     class-is: ^1.1.0
@@ -10405,7 +10405,7 @@ fsevents@~2.1.1:
     mafmt: ^10.0.0
     multiaddr: ^10.0.0
     stream-to-it: ^0.2.2
-  checksum: 69951a3cd2a0444f635673b30df80e95e053e3e08cc585d473ca40533d4c5a3eb93fd241da0349f58cdda4270c4e202a0f53b59e147fcda826d65401153214fb
+  checksum: 97a0c3e4296831470023a97e2722bf87c29ca54e842fe9f71b2a50c33d23818f8fbada7eb2f27a9574bb6fa30ae889eac1e736e10cc42d18d80dae8cb312f858
   languageName: node
   linkType: hard
 
