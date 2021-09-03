@@ -13,7 +13,7 @@ DEBUG=hopr* node ./lib/index.js 0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f
 ## CT Dashboard
 
 ```
-DEBUG=hopr* node ./lib/dashboard.js <Private key as hex>
+node ./lib/dashboard.js <Private key as hex>
 ```
 
 Example:
