@@ -910,9 +910,14 @@ __metadata:
   resolution: "@hoprnet/cover-traffic@workspace:packages/cover-traffic"
   dependencies:
     "@hoprnet/hopr-core": "workspace:packages/core"
+    "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@types/blessed": 0.1.19
+    bignumber: 1.1.0
     blessed: ^0.1.81
     blessed-contrib: ^4.10.0
+    bn.js: 5.2.0
     mocha: 9.1.1
+    peer-id: 0.15.3
     typedoc: 0.21.9
     typedoc-plugin-markdown: 3.10.4
     typescript: 4.4.2
@@ -1982,6 +1987,15 @@ __metadata:
   version: 5.0.2
   resolution: "@types/abstract-leveldown@npm:5.0.2"
   checksum: 1fd89d622b6bd1edaa7a469e2bfbf615b7f9d2dca1e55d10d3d89cbb0db7e8a8bfca555413d60c8f4dfbbe5e4ec49058c5a02559f61a22b22fc0015bda2f6d00
+  languageName: node
+  linkType: hard
+
+"@types/blessed@npm:0.1.19":
+  version: 0.1.19
+  resolution: "@types/blessed@npm:0.1.19"
+  dependencies:
+    "@types/node": "*"
+  checksum: 255e6f5ffdfcea15400d01ee468585f04b72d0a263bd1972e9ae236157d24e5e01524591d751b992afe761a67b648bc296633935c6018425593175c7d055775d
   languageName: node
   linkType: hard
 
@@ -3668,6 +3682,13 @@ __metadata:
   version: 9.0.1
   resolution: "bignumber.js@npm:9.0.1"
   checksum: 6e72f6069d9db32fc8d27561164de9f811b15f9144be61f323d8b36150a239eea50c92e20ba38af2ba5e717af10b8ef12db8f9948fe2ff02bf17ede5239d15d3
+  languageName: node
+  linkType: hard
+
+"bignumber@npm:1.1.0":
+  version: 1.1.0
+  resolution: "bignumber@npm:1.1.0"
+  checksum: 300f2c04fb8aa538b9e73e9c1f2c84abc06c5c7f2e8b10c8864ff540b6ff890c6665f1563c5a29f9f9b48ce131bebef245f32043082266bbb07fd098b60e341b
   languageName: node
   linkType: hard
 

@@ -24,10 +24,15 @@
   ],
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
+    "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "bignumber": "1.1.0",
     "blessed": "^0.1.81",
-    "blessed-contrib": "^4.10.0"
+    "blessed-contrib": "^4.10.0",
+    "bn.js": "5.2.0",
+    "peer-id": "0.15.3"
   },
   "devDependencies": {
+    "@types/blessed": "0.1.19",
     "mocha": "9.1.1",
     "typedoc": "0.21.9",
     "typedoc-plugin-markdown": "3.10.4",

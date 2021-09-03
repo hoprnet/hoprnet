@@ -1,5 +1,4 @@
-import { ChannelsToOpen, ChannelsToClose } from '@hoprnet/hopr-core'
-import { SaneDefaults } from '@hoprnet/hopr-core'
+import { ChannelsToOpen, ChannelsToClose, SaneDefaults } from '@hoprnet/hopr-core'
 import type Hopr from '@hoprnet/hopr-core'
 import type BN from 'bn.js'
 import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
@@ -31,7 +30,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     const toOpen = []
     const toClose = []
-    const state = await this.data.get()
+    const state = this.data.get()
 
     // Refresh open channels
     const ctChannels = []
