@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/cover-traffic",
   "description": "Generate chaffing traffic",
-  "version": "1.76.0-next.0",
+  "version": "1.76.7",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -25,7 +25,7 @@
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "bignumber": "1.1.0",
+    "bignumber.js": "9.0.1",
     "blessed": "^0.1.81",
     "blessed-contrib": "^4.10.0",
     "bn.js": "5.2.0",

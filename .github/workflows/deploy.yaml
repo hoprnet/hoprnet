@@ -340,6 +340,9 @@ jobs:
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
             network="xdai"
           fi
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/wildhorn ]]; then
+            network="polygon"
+          fi
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/master ]]; then
             network="goerli"
           fi

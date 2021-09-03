@@ -912,7 +912,7 @@ __metadata:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/blessed": 0.1.19
-    bignumber: 1.1.0
+    bignumber.js: 9.0.1
     blessed: ^0.1.81
     blessed-contrib: ^4.10.0
     bn.js: 5.2.0
@@ -3678,17 +3678,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bignumber.js@npm:^9.0.0, bignumber.js@npm:^9.0.1":
+"bignumber.js@npm:9.0.1, bignumber.js@npm:^9.0.0, bignumber.js@npm:^9.0.1":
   version: 9.0.1
   resolution: "bignumber.js@npm:9.0.1"
   checksum: 6e72f6069d9db32fc8d27561164de9f811b15f9144be61f323d8b36150a239eea50c92e20ba38af2ba5e717af10b8ef12db8f9948fe2ff02bf17ede5239d15d3
-  languageName: node
-  linkType: hard
-
-"bignumber@npm:1.1.0":
-  version: 1.1.0
-  resolution: "bignumber@npm:1.1.0"
-  checksum: 300f2c04fb8aa538b9e73e9c1f2c84abc06c5c7f2e8b10c8864ff540b6ff890c6665f1563c5a29f9f9b48ce131bebef245f32043082266bbb07fd098b60e341b
   languageName: node
   linkType: hard
 
