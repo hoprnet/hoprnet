@@ -35,7 +35,8 @@ import {
   AcknowledgedTicket,
   ChannelStatus,
   MIN_NATIVE_BALANCE,
-  u8aConcat
+  u8aConcat,
+  AccountEntry
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -78,7 +79,6 @@ export type HoprOptions = {
   createDbIfNotExist?: boolean
   forceCreateDB?: boolean
   password?: string
-  connector?: HoprCoreEthereum
   strategy?: ChannelStrategy
   hosts?: {
     ip4?: NetOptions
@@ -91,6 +91,9 @@ export type HoprOptions = {
   // when true, addresses will be sorted local first
   // when false, addresses will be sorted public first
   preferLocalAddresses?: boolean
+
+  // Disable usage of persistent database to start temporary nodes
+  disablePersistence?: boolean
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -125,13 +128,18 @@ class Hopr extends EventEmitter {
     if (!id.privKey || !isSecp256k1PeerId(id)) {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
-    this.db = new HoprDB(
-      PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(),
-      options.createDbIfNotExist,
-      VERSION,
-      options.dbPath,
-      options.forceCreateDB
-    )
+    if (options.disablePersistence) {
+      this.db = HoprDB.createMock()
+    } else {
+      this.db = new HoprDB(
+        PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(),
+        options.createDbIfNotExist,
+        VERSION,
+        options.dbPath,
+        options.forceCreateDB
+      )
+    }
+
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
       provider: this.options.provider
     })
@@ -445,6 +453,13 @@ class Hopr extends EventEmitter {
     }
 
     return (await this.libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
+  }
+
+  public async getAnnouncingNodes<U = AccountEntry>(map?: (account: AccountEntry) => U) {
+    // make sure indexer and core connector have been started
+    await this.startedPaymentChannels()
+
+    return await this.db.getAccounts((account: AccountEntry) => account.hasAnnounced(), map)
   }
 
   /**

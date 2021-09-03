@@ -125,24 +125,31 @@ export class HoprDB {
     return coerce(u8a)
   }
 
-  private async getAll<T>(
+  private async getAll<T, U = T>(
     prefix: Uint8Array,
     deserialize: (u: Uint8Array) => T,
-    filter: (o: T) => boolean
-  ): Promise<T[]> {
-    const res: T[] = []
+    filter: (o: T) => boolean,
+    map?: (o: T) => U
+  ): Promise<U[]> {
+    const res: U[] = []
     const prefixKeyed = this.keyOf(prefix)
-    return new Promise<T[]>((resolve, reject) => {
+    return new Promise<typeof map extends undefined ? T[] : U[]>((resolve, reject) => {
       this.db
         .createReadStream()
         .on('error', reject)
-        .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
+        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           if (!u8aEquals(key.subarray(0, prefixKeyed.length), prefixKeyed)) {
             return
           }
           const obj = deserialize(Uint8Array.from(value))
-          if (filter(obj)) {
-            res.push(obj)
+          if (!filter(obj)) {
+            return
+          }
+
+          if (map != undefined) {
+            res.push(map(obj))
+          } else {
+            res.push(obj as unknown as U)
           }
         })
         .on('end', () => resolve(res))
@@ -350,9 +357,12 @@ export class HoprDB {
     await this.put(createAccountKey(account.address), account.serialize())
   }
 
-  async getAccounts(filter?: (account: AccountEntry) => boolean) {
+  async getAccounts<U = AccountEntry>(
+    filter?: (account: AccountEntry) => boolean,
+    map?: (account: AccountEntry) => U
+  ): Promise<U[]> {
     filter = filter || (() => true)
-    return this.getAll<AccountEntry>(ACCOUNT_PREFIX, AccountEntry.deserialize, filter)
+    return this.getAll<AccountEntry, U>(ACCOUNT_PREFIX, AccountEntry.deserialize, filter, map)
   }
 
   public async getRedeemedTicketsValue(): Promise<Balance> {

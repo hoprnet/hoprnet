@@ -302,7 +302,7 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
-    let channel
+    let channel: ChannelEntry
     try {
       channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
     } catch (e) {
