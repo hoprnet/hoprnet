@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+# prevent souring of this script, only allow execution
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
-test -z "${HOPR_PACKAGE:-}" && (echo "Missing environment variable HOPR_PACKAGE"; exit 1)
-test -z "${HOPR_PACKAGE_VERSION:-}" && (echo "Missing environment variable HOPR_PACKAGE_VERSION"; exit 1)
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -Eeuo pipefail
 
-npm view "@hoprnet/${HOPR_PACKAGE:-}@${HOPR_PACKAGE_VERSION:-}" --json
+declare pkg pkg_vsn pkg_name mydir
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+declare HOPR_LOG_ID="get-npm-package-info"
+source "${mydir}/utils.sh"
+
+pkg=${HOPR_PACKAGE:-hoprd}
+pkg_vsn=${HOPR_PACKAGE_VERSION:-$(HOPR_PACKAGE=${pkg} ${mydir}/get-package-version.sh)}
+pkg_name="@hoprnet/${pkg}"
+
+log "Get npm package info for ${pkg_name}@${pkg_vsn}"
+npm view "${pkg_name}@${pkg_vsn}" --json

@@ -11,7 +11,6 @@ import 'solidity-coverage'
 import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
-import { ethers } from 'ethers'
 import { networks, NetworkTag } from './constants'
 
 const {
@@ -117,7 +116,7 @@ task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR 
   return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
 })
   .addParam<string>('address', 'HoprToken address', undefined, types.string)
-  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', ethers.utils.parseEther('1').toString(), types.string)
+  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', '1', types.string)
   .addOptionalParam<boolean>(
     'ishopraddress',
     'Whether the address passed is a HOPR address or not',

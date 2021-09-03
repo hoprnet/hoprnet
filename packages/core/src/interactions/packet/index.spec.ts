@@ -5,27 +5,27 @@ import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
 import {
-  PublicKey,
+  AcknowledgedTicket,
   Address,
+  Balance,
+  Challenge,
+  Defer,
+  HalfKey,
+  Hash,
+  HoprDB,
+  PRICE_PER_PACKET,
+  PublicKey,
+  Response,
   Ticket,
   UINT256,
-  HoprDB,
-  Challenge,
-  deriveAckKeyShare,
   UnacknowledgedTicket,
-  HalfKey,
-  AcknowledgedTicket,
-  Response,
-  Balance,
   createPoRValuesForSender,
-  Hash,
-  u8aEquals,
-  PRICE_PER_PACKET
+  deriveAckKeyShare,
+  u8aEquals
 } from '@hoprnet/hopr-utils'
 
 import { AcknowledgementChallenge, Packet } from '../../messages'
 import { PacketForwardInteraction } from './forward'
-import Defer from 'p-defer'
 
 const SECRET_LENGTH = 32
 
@@ -132,7 +132,7 @@ describe('packet interaction', function () {
 
     fakePacket.storeUnacknowledgedTicket(db)
 
-    const defer = Defer()
+    const defer = new Defer()
 
     subscribeToAcknowledgements(libp2pSelf.subscribe, db, chainSelf as any, self, () => {
       defer.resolve()
@@ -163,7 +163,7 @@ describe('packet interaction', function () {
     const testMsg = new TextEncoder().encode('testMsg')
     const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any)
 
-    const msgDefer = Defer()
+    const msgDefer = new Defer()
 
     const senderInteraction = new PacketForwardInteraction(
       libp2pSender.subscribe,

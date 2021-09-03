@@ -31,5 +31,3 @@ jobs:
           INFURA_KEY: ${{ secrets.INFURA_KEY }}
           GITHUB_REF: ${{ github.ref }}
           BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
-
-

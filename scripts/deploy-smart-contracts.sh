@@ -19,7 +19,7 @@ fi
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
-cd "${mydir}/../packages/ethereum"
+cd "${mydir}/../"
 
 # deploy smart contracts
-yarn hardhat deploy --network "${NETWORK}"
+yarn workspace @hoprnet/hopr-ethereum hardhat deploy --network "${NETWORK}"
