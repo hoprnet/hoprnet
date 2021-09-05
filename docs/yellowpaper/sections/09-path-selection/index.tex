@@ -1,27 +1,27 @@
 \section{Path Selection}
 \label{sec:pathselection}
 
-In order to facilitate packets flowing through the HOPR network each node needs
-to decide which path a packet is sent on. That decision making, called
-\textbf{Path Selection}, needs to be performed for every packet. HOPR uses a
+To send packets through the HOPR network, each node must
+decide which path a packet is sent via. This decision, called
+\textbf{path selection}, must be performed for every packet. HOPR uses a
 random selection algorithm to determine the identities of nodes participating in
-the network relaying service generally and for a particular packet.
-The selection process is divided into two steps:
+the network relaying service, both generally and for each particular packet.
+\\~\\The selection process is divided into two steps:
 
 \begin{enumerate}
 
     \item \textbf{Pre-Selection:}
-          Initially, a subset $m<<n$ nodes will be selected based on these factors:
+          Initially, a subset $m<<n$ nodes will be selected based on the following factors:
           \begin{itemize}
-              \item Node Availability
-              \item Payment Channel Graph
-              \item Payment Channel Stake
+              \item Node availability
+              \item Payment channel graph
+              \item Payment channel stake
           \end{itemize}
           Each node receives a weight that is proportional to these factors.
 
     \item \textbf{Random Selection:} Each edge (from node $A$ to $B$) within the subset
       $m$ is assigned a random number $r_i$. Edges are then sorted by
-      $$r_i*weight(edge_i)$$. The path with the largest weight is expanded next
+      $$r_i*weight(edge_i).$$ The path with the largest weight is extended next,
       using a priority queue mechanism.
 
 \end{enumerate}
@@ -67,25 +67,24 @@ The selection process is divided into two steps:
 \subsection{Node Availability}
 \label{sec:nodeavailability}
 
-Availability of a node is estimated using a heartbeat protocol. Each node maintains a
-list of neighbor nodes in the HOPR network. A node will \textit{ping} neighbors and
-respond to \textit{pings} from other nodes in order to determine whether they are online or offline.
-A node is considered online if the ping response (“PONG”) comes back within a
-certain timeframe. Otherwise, the node is considered offline and its waiting
-time for the next PING attempt is doubled. Newly working pings will improve a
-neighbors availability gradually again.
+Node availability is estimated using a heartbeat protocol. Each node maintains a
+list of its neighbouring nodes within the network. A node will \textit{ping} neighbours and
+respond to \textit{pings} from other nodes to determine whether they are online or offline.
+A node is considered online if the ping response (``pong”) returns within a
+certain timeframe. Otherwise, the node is considered offline and the waiting
+time before the next ping attempt to that node is doubled. Newly working pings will gladually improve a
+neighbour's availability score.
 
 \subsection{Payment channel graph}
 
 Every node that intends to send messages needs to have a basic understanding
-about the topology of the network which means whether the channel is open and
-funded with enough HOPR tokens for the relaying service. In case no existing
-payment channel is open, the sender creates a new channel and funds it with
-enough HOPR tokens.
+about the topology of the network, meanings whether a payment channel to the node is open and
+funded with sufficient HOPR tokens for the relaying service. If no such
+payment channel exists, the sender creates a new channel and funds it with
+sufficient HOPR tokens.
 
 \subsection{Payment channel stake}
 
-The HOPR tokens are used to create payment channels with other nodes in the
-network and thereby staked in the HOPR network. The node will then use the HOPR
-token to cover transaction costs when interacting with the blockchain. The more
-stake a node locks the higher probability that it would be chosen as a relayer.
+As payment channels are opened with other nodes, HOPR tokes are staked in those channels and therefore the network as a whole. Nodes use these HOPR
+tokens to cover transaction costs when interacting with the blockchain. The higher
+the stake a node has locked, the higher probability that it will be chosen as a relayer.
