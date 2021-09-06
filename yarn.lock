@@ -177,6 +177,28 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@chainsafe/libp2p-noise@npm:^4.1.1":
+  version: 4.1.1
+  resolution: "@chainsafe/libp2p-noise@npm:4.1.1"
+  dependencies:
+    "@stablelib/chacha20poly1305": ^1.0.1
+    "@stablelib/hkdf": ^1.0.1
+    "@stablelib/sha256": ^1.0.1
+    "@stablelib/x25519": ^1.0.1
+    debug: ^4.3.1
+    it-buffer: ^0.1.3
+    it-length-prefixed: ^5.0.3
+    it-pair: ^1.0.0
+    it-pb-rpc: ^0.1.11
+    it-pipe: ^1.1.0
+    libp2p-crypto: ^0.19.7
+    peer-id: ^0.15.3
+    protobufjs: ^6.11.2
+    uint8arrays: ^3.0.0
+  checksum: 97f3d4fe97b460129149395851c09dbbf8d8be711f889b01725ba8330c45fddb7c31e0bc930b57284bb3c7299d07e2e5c2bdf82953266964b294e03bb5545196
+  languageName: node
+  linkType: hard
+
 "@cspotcode/source-map-consumer@npm:0.8.0":
   version: 0.8.0
   resolution: "@cspotcode/source-map-consumer@npm:0.8.0"
@@ -982,6 +1004,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-core@workspace:packages/core"
   dependencies:
+    "@chainsafe/libp2p-noise": ^4.1.1
     "@google-cloud/profiler": ^4.1.2
     "@hoprnet/hopr-connect": 0.2.41
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
@@ -998,10 +1021,9 @@ __metadata:
     leveldown: ~6.0.0
     levelup: ~5.0.0
     libp2p: 0.32.4
-    libp2p-kad-dht: 0.23.2
+    libp2p-kad-dht: 0.24.0
     libp2p-mplex: 0.10.4
-    libp2p-noise: ^4.0.0
-    libp2p-tcp: ^0.17.1
+    libp2p-tcp: ^0.17.2
     memdown: ^6.0.0
     mocha: ^9.0.2
     multiaddr: ^10.0.0
@@ -9446,7 +9468,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"it-buffer@npm:^0.1.1, it-buffer@npm:^0.1.2":
+"it-buffer@npm:^0.1.2, it-buffer@npm:^0.1.3":
   version: 0.1.3
   resolution: "it-buffer@npm:0.1.3"
   dependencies:
@@ -9498,7 +9520,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"it-length-prefixed@npm:^5.0.0, it-length-prefixed@npm:^5.0.2":
+"it-length-prefixed@npm:^5.0.0, it-length-prefixed@npm:^5.0.2, it-length-prefixed@npm:^5.0.3":
   version: 5.0.3
   resolution: "it-length-prefixed@npm:5.0.3"
   dependencies:
@@ -9506,6 +9528,13 @@ fsevents@~2.1.1:
     buffer: ^6.0.3
     varint: ^6.0.0
   checksum: 0d946828a898f0c2a09f8a4eea121819ea62f546e740bd5015ff50f514777137532a93e69d27761a53f099af6ed60853e4a0c8b0badd960818b5164ccb555ffc
+  languageName: node
+  linkType: hard
+
+"it-length@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "it-length@npm:1.0.3"
+  checksum: 74b5f974101c2a63de952984988f82824a788b0db052a63163fcfd6f719625fc1e119ffd0f9220d0dae06076101870733be8e8c711738da23b76f1af43c0bea0
   languageName: node
   linkType: hard
 
@@ -9534,7 +9563,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"it-pb-rpc@npm:^0.1.9":
+"it-pb-rpc@npm:^0.1.11":
   version: 0.1.11
   resolution: "it-pb-rpc@npm:0.1.11"
   dependencies:
@@ -10437,7 +10466,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p-crypto@npm:0.19.7, libp2p-crypto@npm:^0.19.0, libp2p-crypto@npm:^0.19.4, libp2p-crypto@npm:^0.19.5":
+"libp2p-crypto@npm:0.19.7, libp2p-crypto@npm:^0.19.0, libp2p-crypto@npm:^0.19.4, libp2p-crypto@npm:^0.19.5, libp2p-crypto@npm:^0.19.7":
   version: 0.19.7
   resolution: "libp2p-crypto@npm:0.19.7"
   dependencies:
@@ -10477,17 +10506,17 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p-kad-dht@npm:0.23.2":
-  version: 0.23.2
-  resolution: "libp2p-kad-dht@npm:0.23.2"
+"libp2p-kad-dht@npm:0.24.0":
+  version: 0.24.0
+  resolution: "libp2p-kad-dht@npm:0.24.0"
   dependencies:
-    abort-controller: ^3.0.0
     debug: ^4.3.1
     err-code: ^3.0.0
     hashlru: ^2.3.0
     heap: ~0.2.6
     interface-datastore: ^5.1.1
     it-first: ^1.0.4
+    it-length: ^1.0.3
     it-length-prefixed: ^5.0.2
     it-pipe: ^1.1.0
     k-bucket: ^5.1.0
@@ -10499,14 +10528,12 @@ fsevents@~2.1.1:
     p-map: ^4.0.0
     p-queue: ^6.6.2
     p-timeout: ^4.1.0
-    p-times: ^3.0.0
     peer-id: ^0.15.0
     protobufjs: ^6.10.2
     streaming-iterables: ^6.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-    xor-distance: ^2.0.0
-  checksum: 861839acfa3156a030a31dafa5e117543a509d484329245bd9b003463053c66e748919c331a1e13ff345154c3595115d24fb77e272d8a2e68080f3b5b1fdbc94
+  checksum: 0de8cf6e722392316317a8ab39738f53edd144a857ace990e0cac838644d0c02948793ee9313b9597dc41d578edbb983579b8000025c2ce897bda44192de27c7
   languageName: node
   linkType: hard
 
@@ -10526,28 +10553,6 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p-noise@npm:^4.0.0":
-  version: 4.0.0
-  resolution: "libp2p-noise@npm:4.0.0"
-  dependencies:
-    "@stablelib/chacha20poly1305": ^1.0.1
-    "@stablelib/hkdf": ^1.0.1
-    "@stablelib/sha256": ^1.0.1
-    "@stablelib/x25519": ^1.0.1
-    debug: ^4.3.1
-    it-buffer: ^0.1.1
-    it-length-prefixed: ^5.0.2
-    it-pair: ^1.0.0
-    it-pb-rpc: ^0.1.9
-    it-pipe: ^1.1.0
-    libp2p-crypto: ^0.19.0
-    peer-id: ^0.15.0
-    protobufjs: ^6.10.1
-    uint8arrays: ^2.0.5
-  checksum: e2731488616c3b56cbcc44a912f08995e26e8a4c28ff8fecb46a5911e3e530a04401d4c154133434c61c4e5402ff7d296c7d2cfb834b2550874d468aa6e3f631
-  languageName: node
-  linkType: hard
-
 "libp2p-record@npm:^0.10.4":
   version: 0.10.5
   resolution: "libp2p-record@npm:0.10.5"
@@ -10560,9 +10565,9 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p-tcp@npm:^0.17.1":
-  version: 0.17.1
-  resolution: "libp2p-tcp@npm:0.17.1"
+"libp2p-tcp@npm:^0.17.2":
+  version: 0.17.2
+  resolution: "libp2p-tcp@npm:0.17.2"
   dependencies:
     abortable-iterator: ^3.0.0
     class-is: ^1.1.0
@@ -10572,7 +10577,7 @@ fsevents@~2.1.1:
     mafmt: ^10.0.0
     multiaddr: ^10.0.0
     stream-to-it: ^0.2.2
-  checksum: 69951a3cd2a0444f635673b30df80e95e053e3e08cc585d473ca40533d4c5a3eb93fd241da0349f58cdda4270c4e202a0f53b59e147fcda826d65401153214fb
+  checksum: 97a0c3e4296831470023a97e2722bf87c29ca54e842fe9f71b2a50c33d23818f8fbada7eb2f27a9574bb6fa30ae889eac1e736e10cc42d18d80dae8cb312f858
   languageName: node
   linkType: hard
 
@@ -12876,15 +12881,6 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"p-times@npm:^3.0.0":
-  version: 3.0.0
-  resolution: "p-times@npm:3.0.0"
-  dependencies:
-    p-map: ^4.0.0
-  checksum: 8c2946267602adfe767a8e9e6373f4e9f72f70ea2eb8c2fe128faf19093fa2eec951d12de6b61dbcd848514d6cd1421cf5f9be42e206fd6eb3ac57b503dc1c26
-  languageName: node
-  linkType: hard
-
 "p-try@npm:^1.0.0":
   version: 1.0.0
   resolution: "p-try@npm:1.0.0"
@@ -13160,7 +13156,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"peer-id@npm:0, peer-id@npm:0.15.3, peer-id@npm:^0.15.0, peer-id@npm:^0.15.1, peer-id@npm:~0.15.2":
+"peer-id@npm:0, peer-id@npm:0.15.3, peer-id@npm:^0.15.0, peer-id@npm:^0.15.1, peer-id@npm:^0.15.3, peer-id@npm:~0.15.2":
   version: 0.15.3
   resolution: "peer-id@npm:0.15.3"
   dependencies:
@@ -13495,7 +13491,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"protobufjs@npm:^6.10.1, protobufjs@npm:^6.10.2, protobufjs@npm:^6.11.2, protobufjs@npm:~6.11.0":
+"protobufjs@npm:^6.10.2, protobufjs@npm:^6.11.2, protobufjs@npm:~6.11.0":
   version: 6.11.2
   resolution: "protobufjs@npm:6.11.2"
   dependencies:
@@ -17933,13 +17929,6 @@ resolve@1.17.0:
   version: 1.8.0
   resolution: "xmlhttprequest@npm:1.8.0"
   checksum: c891cf0d7884b4f5cce835aa01f1965727cd352cbd2d7a2e0605bf11ec99ae2198364cca54656ec8b2581a5704dee6c2bf9911922a0ff2a71b613455d32e81b7
-  languageName: node
-  linkType: hard
-
-"xor-distance@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "xor-distance@npm:2.0.0"
-  checksum: 4c5c629272317b14c215f503b5f21bf618166483f2c78cae6f680be6dd8799230817c883d7b2f9292cc91d1b555776af8fd4a8b04d01ade14e0b219a257aa82d
   languageName: node
   linkType: hard
 
