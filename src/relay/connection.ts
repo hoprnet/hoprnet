@@ -184,8 +184,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         }.call(this)
       )
   
-      console.log(`inside sink`)
-
       return deferred.promise
     }
 
