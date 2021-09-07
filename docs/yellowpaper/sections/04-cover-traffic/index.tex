@@ -2,7 +2,6 @@
 
 
 Cover Traffic, also known as chafing mechanism, generates and randomly injects packets in the network which increases its anonymity set and thus make fake and real traffic seem indistinguishable from one another. The reason why this is necessary is to make it more difficult for an attacker to deploy passive and active attacks to the network like traffic analysis attacks.
-
 Cover traffic also increases the anonymity level of the mix network by making it harder to identify whether a specific sender is communicating with any receiver, this is also known as the sender online unobservability which is explained in the security goals section.
 Another reason to why HOPR needs cover traffic from its early stage is to help provide sender-receiver unlinkability (explained in security goals section) which is a property of mixnets but since in the early stage of developement of HOPR project, only few packets will be travelling through the network, it very easy for a GPA to links the sender and receiver of that packet and thus breaks the unlinkability property.
 \\~\\ CT (Cover Traffic) nodes are HOPR nodes with a Cover Traffic service enabled, run by the HOPR Organization for the purpose of generating cover traffic. In the future, anyone in the HOPR network will be able to start a CT node when fulfilling the requirements needed to do so.
@@ -25,11 +24,13 @@ Where $\xi$ is the funds to be distributed, $$\sigma$$ the ticket amount, $P_w$ 
 \\~\\Nodes do not rely on node quality since they are likely to die or lose connectivity. Thus cover traffic distribution is independent from the CT node uptime and instead closes a channel if a mix node is found to be offline a new one is opened which gives a fair chance to nodes which are online more frequently than others. 
 
 \subsection{Path selection and payout}
-After opening channels, the CT node sends CT packets at a regular interval following the uniform distribution. The path selection algorithm used for cover traffic is the same one used to select nodes for real traffic (see path selection section for more details) where nodes are selected at random  but weighted in proportion to the importance of each node starting at the CT node. We use a weighted priority queue of potential paths to choose the next node, if queue is empty then it fails.
-Nodes get chosen only once in a path, if we take the following example:
+After opening channels, the CT node sends CT packets at a regular interval. The path selection algorithm used for cover traffic is the same one used to select nodes for real traffic (see path selection section for more details) where nodes are selected at random  but weighted in proportion to the importance of each node starting at the CT node.
+The first relay node is chosen with a probability proportional to the amount which the CT node funded so every node has equal chances of getting selected. For the next intermediate hops, nodes are selected with a probability weighted proportional to their importance. We use a weighted priority queue of potential paths to choose the next node, if queue is empty then it fails.
+\\Nodes get chosen only once in a path, if we take the following example:
 \\For a path $A\rightarrow B$, when looking for the third node in the path, if $A$ is found to be the only node with open channel with $B$ the search will fail and a new path is generated again.
 \\~\\ Rewards are distributed in HOPR tokens to all selected nodes in a path as tickets which they can redeem afterwards (see ticket section) here is a correlation between list importance and list 
 rewards and thus rewards are distributed fairly.
+
 
 \subsection{Closing CT channels:}
 Channels get closed and others get opened if the following factors is below its threshold:
@@ -42,4 +43,4 @@ Channels get closed and others get opened if the following factors is below its 
       \item \textbf{Number of failed packets} is higher than the message fail threshold:
       $$ $$
   \end{itemize}
-The channel creator calls \textit{initiateChannelClosure()} if the above verifies and emits two events \textit{ChannelUpdate} and \textit{ChannelClosureInitiated}
+The CT node calls \textit{initiateChannelClosure()} if the above verifies and emits two events \textit{ChannelUpdate} and \textit{ChannelClosureInitiated}
