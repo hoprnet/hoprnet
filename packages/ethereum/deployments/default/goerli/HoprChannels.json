@@ -1,5 +1,6 @@
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
   "address": "0x6fbfc1e839D52946a231a6Df8102d4048cC4b33c",
   "transactionHash": "0xb4dc27ca10a3bbdea30b1530debf202b74cb594f5ed540c874f3931910681adc",
   "blockNumber": 5467168,
@@ -8,6 +9,9 @@
   "transactionHash": "0x6a25e5e4057ac7335ea17069309e3bdf61c3c83617c98e8ebeb864ca2bb1afce",
   "blockNumber": 5376311,
 >>>>>>> ee30aeb89 (added protocol-config to npm (#2293))
+=======
+  "address": "0x9697a67237F87EEefFC4475EA90fB8ad8bF14d35",
+>>>>>>> 227affbf7 (remove hardcoded networks (#2311))
   "metadata": {
     "solcVersion": "0.8.3",
     "input": {

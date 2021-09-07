@@ -908,10 +908,17 @@
     }
   },
   "0.100.0": {
+<<<<<<< HEAD
     "hash": "/ipfs/QmSeD1P5SW58Cd8MLeGGk6zccyAnY9mHhg3UqaxC8Q62dY",
     "type": "manifest",
     "uploadedTo": {
       "http://80.208.229.228:5001": "Thu, 26 Aug 2021 10:08:27 GMT"
+=======
+    "hash": "/ipfs/QmRMDyreDKC3y4GG827J3pt4NkKM2JXQ86xpBD1M44Rqs7",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Wed, 01 Sep 2021 13:05:38 GMT"
+>>>>>>> 227affbf7 (remove hardcoded networks (#2311))
     }
   },
   "1.64.0": {
