@@ -531,6 +531,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             this.log(`RESTART received. Ending stream ...`)
             this.emit(`restart`)
 
+            // First switch, then call _onReconnect to make sure
+            // values are set, even if _onReconnect throws
             let switchedConnection = this.switch()
 
             this._onReconnect?.(switchedConnection, this._counterparty)
