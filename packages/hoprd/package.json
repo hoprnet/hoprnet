@@ -76,9 +76,7 @@
   },
   "hopr": {
     "description": "master",
-    "environment_id": "master",
-    "release_name": "whatever",
-    "version": "1.xx"
+    "environment_id": "master"
   },
   "publishConfig": {
     "access": "public"
