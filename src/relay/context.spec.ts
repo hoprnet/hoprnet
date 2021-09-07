@@ -261,7 +261,7 @@ describe('relay switch context - falsy streams', function () {
     })
 
     await waitForError.promise
-    // await new Promise(resolve => setTimeout(resolve))
+    await new Promise((resolve) => setTimeout(resolve))
   })
 
   it('falsy sink', async function () {
