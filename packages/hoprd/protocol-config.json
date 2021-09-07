@@ -15,8 +15,15 @@
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}"
     },
     {
-      "id": "master",
+      "id": "master-goerli",
       "network_id": "goerli",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
+      "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
+    },
+    {
+      "id": "master-xdai",
+      "network_id": "xdai",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
       "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
