@@ -181,7 +181,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           }
         }.call(this)
       )
-  
+
       return deferred.promise
     }
 
