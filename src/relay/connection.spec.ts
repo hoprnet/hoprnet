@@ -539,11 +539,6 @@ describe('relay connection - stream error propagation', function () {
       counterparty: Bob
     })
 
-    const aliceShaker = handshake({
-      source: alice.source,
-      sink: alice.sink
-    })
-
-    await assert.rejects(aliceShaker.read(), Error(errorInSource))
+    await assert.rejects(alice.source.next(), Error(errorInSource))
   })
 })
