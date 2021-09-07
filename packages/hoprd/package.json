@@ -75,8 +75,7 @@
     "require": "ts-node/register"
   },
   "hopr": {
-    "description": "master",
-    "environment_id": "master"
+    "description": "master"
   },
   "publishConfig": {
     "access": "public"
