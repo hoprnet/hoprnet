@@ -4,6 +4,7 @@
 import handshake from 'it-handshake'
 import Pair from 'it-pair'
 import { Multiaddr } from 'multiaddr'
+import Defer from 'p-defer'
 
 import { WebRTCConnection, MigrationStatus } from './connection'
 import { encodeWithLengthPrefix } from '../utils'
@@ -269,5 +270,107 @@ describe('test webrtc connection', function () {
         encodeWithLengthPrefix(Uint8Array.from([MigrationStatus.NOT_DONE, ...msgSentBackThroughWebRTC]))
       )
     )
+  })
+})
+
+describe('webrtc connection - stream error propagation', function () {
+  it('falsy sink', async function () {
+    const BobAlice = Pair<StreamType>()
+
+    const falsySinkError = 'falsy sink error'
+
+    const waitForSinkAttach = Defer<Uint8Array>()
+
+    const conn = new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: BobAlice.source,
+        sink: () => waitForSinkAttach.promise,
+        sendUpgraded: () => {}
+      } as any,
+      new EventEmitter() as any
+    )
+
+    await assert.rejects(
+      conn.sink(
+        (async function* () {
+          waitForSinkAttach.reject(Error(falsySinkError))
+          yield new Uint8Array()
+        })()
+      ),
+      Error(falsySinkError)
+    )
+  })
+
+  it('falsy sink before sink source attach', async function () {
+    const BobAlice = Pair<StreamType>()
+
+    const falsySinkError = 'falsy sink error'
+
+    const waitForError = Defer<void>()
+
+    new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: BobAlice.source,
+        sink: () => {
+          waitForError.resolve()
+          return Promise.reject(Error(falsySinkError))
+        },
+        sendUpgraded: () => {}
+      } as any,
+      new EventEmitter() as any
+    )
+
+    await waitForError.promise
+    await new Promise((resolve) => setTimeout(resolve))
+  })
+
+  it('falsy sink source', async function () {
+    const AliceBob = Pair<StreamType>()
+    const BobAlice = Pair<StreamType>()
+
+    const errorInSinkSource = 'error in sink source'
+    const conn = new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: BobAlice.source,
+        sink: AliceBob.sink,
+        sendUpgraded: () => {}
+      } as any,
+      new EventEmitter() as any
+    )
+
+    await assert.rejects(
+      conn.sink(
+        (async function* () {
+          throw Error(errorInSinkSource)
+        })()
+      ),
+      Error(errorInSinkSource)
+    )
+  })
+
+  it('falsy source', async function () {
+    const AliceBob = Pair<StreamType>()
+
+    const errorInSource = 'error in source'
+    const conn = new WebRTCConnection(
+      Bob,
+      { connections: new Map() } as any,
+      {
+        source: (async function* () {
+          throw Error(errorInSource)
+        })(),
+        sink: AliceBob.sink,
+        sendUpgraded: () => {}
+      } as any,
+      new EventEmitter() as any
+    )
+
+    await assert.rejects(conn.source.next(), Error(errorInSource))
   })
 })
