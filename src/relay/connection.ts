@@ -165,10 +165,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         await this._migrationDone.promise
       }
 
-  
       let deferred = Defer<void>()
       sinkCreator.catch(deferred.reject)
-
 
       this._sinkSourceAttached = true
       this._sinkSourceAttachedPromise.resolve(
@@ -183,7 +181,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           }
         }.call(this)
       )
-  
+
       console.log(`inside sink`)
 
       return deferred.promise
