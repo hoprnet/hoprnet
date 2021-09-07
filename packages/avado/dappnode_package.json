@@ -20,12 +20,17 @@
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "hash": "/ipfs/QmQoE2Wqb3qfd75aoEig4Q7tQPcLdaA9ykqnaySSYTX8Q6",
     "size": 60498772,
 =======
     "hash": "/ipfs/Qmag151F1M2TDfG4st1rznuyzstZKV2LeRgjp2MYxSmfhA",
     "size": 60513416,
 >>>>>>> 227affbf7 (remove hardcoded networks (#2311))
+=======
+    "hash": "/ipfs/Qma2BabYpNVGB9cTpf1JM4ndg4hPj3JrffwgyVQkL6ry5S",
+    "size": 60509692,
+>>>>>>> a0f2d389e (Avado CI: new release)
     "restart": "always"
   },
   "author": "HOPR",
