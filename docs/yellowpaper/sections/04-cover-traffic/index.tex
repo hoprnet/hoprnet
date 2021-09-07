@@ -5,7 +5,6 @@ Cover Traffic, also known as chafing mechanism, generates and randomly injects p
 
 Cover traffic also increases the anonymity level of the mix network by making it harder to identify whether a specific sender is communicating with any receiver, this is also known as the sender online unobservability which is explained in the security goals section.
 Another reason to why HOPR needs cover traffic from its early stage is to help provide sender-receiver unlinkability (explained in security goals section) which is a property of mixnets but since in the early stage of developement of HOPR project, only few packets will be travelling through the network, it very easy for a GPA to links the sender and receiver of that packet and thus breaks the unlinkability property.
-
 \\~\\ CT (Cover Traffic) nodes are HOPR nodes with a Cover Traffic service enabled, run by the HOPR Organization for the purpose of generating cover traffic. In the future, anyone in the HOPR network will be able to start a CT node when fulfilling the requirements needed to do so.
 \subsection{Opening CT channels:} 
 CT nodes must open and fund payment channels before they can send CT packets via that counterparty. The number of channels a CT node can open is predefined and cannot be exceeded. Whenever payment channels are closed, the CT node replaces them by opening new channels as long as it still has funds. 
