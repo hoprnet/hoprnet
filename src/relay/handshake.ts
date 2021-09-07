@@ -102,7 +102,13 @@ class RelayHandshake {
     try {
       chunk = await this.shaker.read()
     } catch (err) {
-      error(`Error while reading answer ${green(relay.toB58String())}. ${err instanceof Error ? err.message : err}`)
+      error(`Error while reading answer from ${green(relay.toB58String())}.`)
+      if (err instanceof Error) {
+        error(err.message)
+      } else {
+        console.trace()
+        error(`Non-error instance was thrown.`, err)
+      }
     }
 
     if (chunk == null || chunk.length == 0) {
@@ -304,7 +310,13 @@ class RelayHandshake {
     try {
       initiator = pubKeyToPeerId(chunk.slice())
     } catch (err) {
-      error(`Could not decode sender peerId. Error was: ${err instanceof Error ? err.message : err}`)
+      error(`Could not decode sender peerId.`)
+      if (err instanceof Error) {
+        error(err.message)
+      } else {
+        console.trace()
+        error(`Non-error instance was thrown.`, err)
+      }
     }
 
     if (initiator == null) {
