@@ -221,7 +221,6 @@ describe('relay switch context - falsy streams', function () {
 
     await assert.rejects(sinkPromise, Error(errorInSource))
 
-    console.log('here', sourcePromise)
     await sourcePromise
   })
 

@@ -470,6 +470,8 @@ describe('relay connection - stream error propagation', function () {
     const AliceRelay = Pair<StreamType>()
     const RelayAlice = Pair<StreamType>()
 
+    const errorInSource = 'error in source'
+
     const alice = new RelayConnection({
       stream: {
         sink: AliceRelay.sink,
@@ -480,14 +482,9 @@ describe('relay connection - stream error propagation', function () {
       counterparty: Bob
     })
 
-    const relayShaker = handshake({
-      sink: RelayAlice.sink,
-      source: AliceRelay.source
-    })
+    const sourcePromise = AliceRelay.source.next()
 
-    const errorInSource = 'error in source'
-
-    const rejectPromise = assert.rejects(
+    await assert.rejects(
       alice.sink(
         (async function* () {
           throw Error(errorInSource)
@@ -496,17 +493,13 @@ describe('relay connection - stream error propagation', function () {
       Error(errorInSource)
     )
 
-    // Start the pipeline
-    relayShaker.read()
-
-    await rejectPromise
+    await sourcePromise
   })
 
   it('correct sources in falsy sinks', async function () {
-    const AliceRelay = Pair<StreamType>()
+    // const AliceRelay = Pair<StreamType>()
     const RelayAlice = Pair<StreamType>()
 
-    const errorInSource = 'error in source'
     const errorInSinkFunction = 'error in sink function'
 
     const alice = new RelayConnection({
@@ -519,24 +512,14 @@ describe('relay connection - stream error propagation', function () {
       counterparty: Bob
     })
 
-    const relayShaker = handshake({
-      sink: RelayAlice.sink,
-      source: AliceRelay.source
-    })
-
-    const rejectPromise = assert.rejects(
+    await assert.rejects(
       alice.sink(
         (async function* () {
-          throw Error(errorInSource)
+          yield new Uint8Array()
         })()
       ),
       Error(errorInSinkFunction)
     )
-
-    // Start the pipeline
-    relayShaker.read()
-
-    await rejectPromise
   })
 
   it('falsy sources', async function () {

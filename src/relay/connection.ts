@@ -88,7 +88,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _destroyedPromise: DeferredPromise<void>
   private _statusMessagePromise: DeferredPromise<void>
   private _closePromise: DeferredPromise<void>
-  private _sinkSourcePromise: DeferredPromise<void>
 
   private _onReconnect: ((newStream: RelayConnection, counterparty: PeerId) => Promise<void>) | undefined
 
@@ -157,15 +156,42 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._statusMessagePromise = Defer<void>()
     this._sinkSwitchPromise = Defer<void>()
     this._sourceSwitchPromise = Defer<void>()
-    this._sinkSourcePromise = Defer<void>()
 
     this.source = this.createSource()
 
-    this._stream.sink(this.sinkFunction() as unknown as Stream['source']).catch((err) => {
-      this._sinkSourcePromise.reject(err)
-    })
+    let sinkCreator: Promise<void>
+    this.sink = async (source: Stream['source']) => {
+      if (this._migrationDone != undefined) {
+        await this._migrationDone.promise
+      }
 
-    this.sink = this.attachSinkSource.bind(this)
+  
+      let deferred = Defer<void>()
+      sinkCreator.catch(deferred.reject)
+
+
+      this._sinkSourceAttached = true
+      this._sinkSourceAttachedPromise.resolve(
+        async function* (this: RelayConnection) {
+          try {
+            yield* toU8aStream(source)
+            deferred.resolve()
+          } catch (err: any) {
+            console.log(`error caught`, err.message)
+            this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
+            deferred.reject(err)
+          }
+        }.call(this)
+      )
+  
+      console.log(`inside sink`)
+
+      return deferred.promise
+    }
+
+    sinkCreator = this._stream.sink(this.sinkFunction())
+
+    sinkCreator.catch((err) => this.error('sink error thrown before sink attach', err.message))
   }
 
   /**
@@ -260,34 +286,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._streamClosed = true
     this._closePromise.resolve()
     this.timeline.close = Date.now()
-  }
-
-  /**
-   * Attaches a source to the stream sink. Called once
-   * the stream is used to send messages
-   * @param source the source that is attached
-   */
-  private async attachSinkSource(source: Stream['source']): Promise<void> {
-    if (this._migrationDone != undefined) {
-      await this._migrationDone.promise
-    }
-
-    let deferred = Defer<void>()
-    this._sinkSourceAttached = true
-    this._sinkSourceAttachedPromise.resolve(
-      toU8aStream(
-        (async function* () {
-          try {
-            yield* source
-            deferred.resolve()
-          } catch (err) {
-            deferred.reject(err)
-          }
-        })()
-      )
-    )
-
-    return Promise.race([deferred.promise, this._sinkSourcePromise.promise])
   }
 
   /**
