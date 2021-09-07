@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- `Contract`
+- `BaseContract`
 
   ↳ **`HoprForwarder`**
 
@@ -34,13 +34,9 @@
 ### Methods
 
 - [ERC1820\_REGISTRY](HoprForwarder.md#erc1820_registry)
-- [ERC1820\_REGISTRY()](HoprForwarder.md#erc1820_registry())
 - [HOPR\_TOKEN](HoprForwarder.md#hopr_token)
-- [HOPR\_TOKEN()](HoprForwarder.md#hopr_token())
 - [MULTISIG](HoprForwarder.md#multisig)
-- [MULTISIG()](HoprForwarder.md#multisig())
 - [TOKENS\_RECIPIENT\_INTERFACE\_HASH](HoprForwarder.md#tokens_recipient_interface_hash)
-- [TOKENS\_RECIPIENT\_INTERFACE\_HASH()](HoprForwarder.md#tokens_recipient_interface_hash())
 - [\_checkRunningEvents](HoprForwarder.md#_checkrunningevents)
 - [\_deployed](HoprForwarder.md#_deployed)
 - [\_wrapEvent](HoprForwarder.md#_wrapevent)
@@ -56,11 +52,9 @@
 - [once](HoprForwarder.md#once)
 - [queryFilter](HoprForwarder.md#queryfilter)
 - [recoverTokens](HoprForwarder.md#recovertokens)
-- [recoverTokens(address)](HoprForwarder.md#recovertokens(address))
 - [removeAllListeners](HoprForwarder.md#removealllisteners)
 - [removeListener](HoprForwarder.md#removelistener)
 - [tokensReceived](HoprForwarder.md#tokensreceived)
-- [tokensReceived(address,address,address,uint256,bytes,bytes)](HoprForwarder.md#tokensreceived(address,address,address,uint256,bytes,bytes))
 - [getContractAddress](HoprForwarder.md#getcontractaddress)
 - [getInterface](HoprForwarder.md#getinterface)
 - [isIndexed](HoprForwarder.md#isindexed)
@@ -81,7 +75,7 @@
 
 #### Inherited from
 
-Contract.constructor
+BaseContract.constructor
 
 #### Defined in
 
@@ -95,7 +89,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:103
 
 #### Inherited from
 
-Contract.\_deployedPromise
+BaseContract.\_deployedPromise
 
 #### Defined in
 
@@ -113,7 +107,7 @@ ___
 
 #### Inherited from
 
-Contract.\_runningEvents
+BaseContract.\_runningEvents
 
 #### Defined in
 
@@ -131,7 +125,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrappedEmits
+BaseContract.\_wrappedEmits
 
 #### Defined in
 
@@ -145,7 +139,7 @@ ___
 
 #### Inherited from
 
-Contract.address
+BaseContract.address
 
 #### Defined in
 
@@ -162,25 +156,19 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `recoverTokens` | (`token`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
-Contract.callStatic
+BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:219
+packages/ethereum/types/HoprForwarder.d.ts:169
 
 ___
 
@@ -190,7 +178,7 @@ ___
 
 #### Inherited from
 
-Contract.deployTransaction
+BaseContract.deployTransaction
 
 #### Defined in
 
@@ -207,25 +195,19 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `recoverTokens` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
-Contract.estimateGas
+BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:268
+packages/ethereum/types/HoprForwarder.d.ts:193
 
 ___
 
@@ -235,11 +217,11 @@ ___
 
 #### Overrides
 
-Contract.filters
+BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:266
+packages/ethereum/types/HoprForwarder.d.ts:191
 
 ___
 
@@ -252,21 +234,15 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `recoverTokens` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
-Contract.functions
+BaseContract.functions
 
 #### Defined in
 
@@ -280,7 +256,7 @@ ___
 
 #### Overrides
 
-Contract.interface
+BaseContract.interface
 
 #### Defined in
 
@@ -297,25 +273,19 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `ERC1820_REGISTRY` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `ERC1820_REGISTRY()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `HOPR_TOKEN` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `HOPR_TOKEN()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `MULTISIG` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `MULTISIG()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `recoverTokens` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `recoverTokens(address)` | (`token`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
-Contract.populateTransaction
+BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:320
+packages/ethereum/types/HoprForwarder.d.ts:220
 
 ___
 
@@ -325,7 +295,7 @@ ___
 
 #### Inherited from
 
-Contract.provider
+BaseContract.provider
 
 #### Defined in
 
@@ -339,7 +309,7 @@ ___
 
 #### Inherited from
 
-Contract.resolvedAddress
+BaseContract.resolvedAddress
 
 #### Defined in
 
@@ -353,7 +323,7 @@ ___
 
 #### Inherited from
 
-Contract.signer
+BaseContract.signer
 
 #### Defined in
 
@@ -377,27 +347,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:171
-
-___
-
-### ERC1820\_REGISTRY()
-
-▸ **ERC1820_REGISTRY()**(`overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/HoprForwarder.d.ts:173
+packages/ethereum/types/HoprForwarder.d.ts:146
 
 ___
 
@@ -417,27 +367,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:175
-
-___
-
-### HOPR\_TOKEN()
-
-▸ **HOPR_TOKEN()**(`overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/HoprForwarder.d.ts:177
+packages/ethereum/types/HoprForwarder.d.ts:148
 
 ___
 
@@ -457,27 +387,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:179
-
-___
-
-### MULTISIG()
-
-▸ **MULTISIG()**(`overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/HoprForwarder.d.ts:181
+packages/ethereum/types/HoprForwarder.d.ts:150
 
 ___
 
@@ -497,27 +407,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:183
-
-___
-
-### TOKENS\_RECIPIENT\_INTERFACE\_HASH()
-
-▸ **TOKENS_RECIPIENT_INTERFACE_HASH()**(`overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/HoprForwarder.d.ts:185
+packages/ethereum/types/HoprForwarder.d.ts:152
 
 ___
 
@@ -537,7 +427,7 @@ ___
 
 #### Inherited from
 
-Contract.\_checkRunningEvents
+BaseContract.\_checkRunningEvents
 
 #### Defined in
 
@@ -561,7 +451,7 @@ ___
 
 #### Inherited from
 
-Contract.\_deployed
+BaseContract.\_deployed
 
 #### Defined in
 
@@ -587,7 +477,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrapEvent
+BaseContract.\_wrapEvent
 
 #### Defined in
 
@@ -611,7 +501,7 @@ ___
 
 #### Overrides
 
-Contract.attach
+BaseContract.attach
 
 #### Defined in
 
@@ -635,7 +525,7 @@ ___
 
 #### Overrides
 
-Contract.connect
+BaseContract.connect
 
 #### Defined in
 
@@ -653,7 +543,7 @@ ___
 
 #### Overrides
 
-Contract.deployed
+BaseContract.deployed
 
 #### Defined in
 
@@ -678,7 +568,7 @@ ___
 
 #### Inherited from
 
-Contract.emit
+BaseContract.emit
 
 #### Defined in
 
@@ -702,7 +592,7 @@ ___
 
 #### Inherited from
 
-Contract.fallback
+BaseContract.fallback
 
 #### Defined in
 
@@ -726,7 +616,7 @@ ___
 
 #### Inherited from
 
-Contract.listenerCount
+BaseContract.listenerCount
 
 #### Defined in
 
@@ -757,7 +647,7 @@ ___
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -777,7 +667,7 @@ packages/ethereum/types/HoprForwarder.d.ts:81
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -809,7 +699,7 @@ ___
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -830,7 +720,7 @@ packages/ethereum/types/HoprForwarder.d.ts:84
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -862,7 +752,7 @@ ___
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -883,7 +773,7 @@ packages/ethereum/types/HoprForwarder.d.ts:88
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -915,7 +805,7 @@ ___
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -936,7 +826,7 @@ packages/ethereum/types/HoprForwarder.d.ts:92
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -969,7 +859,7 @@ ___
 
 #### Overrides
 
-Contract.queryFilter
+BaseContract.queryFilter
 
 #### Defined in
 
@@ -994,28 +884,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:189
-
-___
-
-### recoverTokens(address)
-
-▸ **recoverTokens(address)**(`token`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `token` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/HoprForwarder.d.ts:194
+packages/ethereum/types/HoprForwarder.d.ts:154
 
 ___
 
@@ -1042,7 +911,7 @@ ___
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -1062,7 +931,7 @@ packages/ethereum/types/HoprForwarder.d.ts:100
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -1094,7 +963,7 @@ ___
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -1115,7 +984,7 @@ packages/ethereum/types/HoprForwarder.d.ts:96
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -1145,33 +1014,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:199
-
-___
-
-### tokensReceived(address,address,address,uint256,bytes,bytes)
-
-▸ **tokensReceived(address,address,address,uint256,bytes,bytes)**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `operator` | `string` |
-| `from` | `string` |
-| `to` | `string` |
-| `amount` | `BigNumberish` |
-| `userData` | `BytesLike` |
-| `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/HoprForwarder.d.ts:209
+packages/ethereum/types/HoprForwarder.d.ts:159
 
 ___
 
@@ -1193,7 +1036,7 @@ ___
 
 #### Inherited from
 
-Contract.getContractAddress
+BaseContract.getContractAddress
 
 #### Defined in
 
@@ -1217,7 +1060,7 @@ ___
 
 #### Inherited from
 
-Contract.getInterface
+BaseContract.getInterface
 
 #### Defined in
 
@@ -1241,7 +1084,7 @@ value is Indexed
 
 #### Inherited from
 
-Contract.isIndexed
+BaseContract.isIndexed
 
 #### Defined in
 
