@@ -2,7 +2,14 @@ import { deployments, ethers } from 'hardhat'
 import { Multiaddr } from 'multiaddr'
 import { expect } from 'chai'
 import BN from 'bn.js'
-import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory, HoprChannels, HoprToken } from '../types'
+import {
+  HoprToken__factory,
+  ChannelsMock__factory,
+  HoprChannels__factory,
+  HoprChannels,
+  HoprToken,
+  ChannelsMock
+} from '../types'
 import { increaseTime } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './constants'
 import {
@@ -761,7 +768,7 @@ describe('with a reopened channel', function () {
 })
 
 describe('test internals with mock', function () {
-  let channels: HoprChannels
+  let channels: ChannelsMock
 
   beforeEach(async function () {
     channels = (await useFixtures()).mockChannels
