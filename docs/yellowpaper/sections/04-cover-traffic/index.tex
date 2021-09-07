@@ -18,9 +18,12 @@ $$w(C) = \sqrt{(B(C) / st(Cs) * st(Cd))}$$
 \\
 Where $N$ is the node, $w$ is the channel's weight, $st$ is its stake $C$ is a payment channel between two nodes in the HOPR network. $Cs$ means the node that opens a payment channel and 
 $Cd$ is the destination node of that opened channel. $uT(N)$: The balance of unreleased tokens for a node $N$, $B$ is the channel's balance and $tB$ is the sum of the outgoingBalances of each channel from node $N$.
-\\~\\ According to the previous definition, the importance score of a node increases with increasing channel balances of that node towards other nodes with high total stake. This means that channel opening is proportional to a node’s stake and thus its importance. We compute the needed cover traffic $\Psi$ as such:
+\\~\\ According to the previous definition, the importance score of a node increases with increasing channel balances of that node towards other nodes with high total stake. This means that channel opening is proportional to a node’s stake. CT is allocated in proportion to node's importance and not to channel's stake as a way of protection against selfish node operators who seek to optimize their own profits.
+With such a mechanism, the node operator will need to re-allocate their stake to their downstream nodes in order to receive cover traffic. 
+The way importance and weight are calculated prevents nodes from opening a few minimally funded channels to large nodes (with huge total stake) and incentivizes nodes to stake in as many possible channels and thus avoids centralization.
+\\~\\ We compute the needed cover traffic $\Psi$ as such:
 $$\Psi= ( \xi/ (\sigma * P_w)) pk$$
-Where $\xi$ is the funds to be distributed, $$\sigma$$ the ticket amount, $P_w$ is the winning probability and $pk$ is the number of packets.
+Where $\xi$ is the funds to be distributed, $\sigma$ the ticket amount, $P_w$ is the winning probability and $pk$ is the number of packets.
 \\~\\Nodes do not rely on node quality since they are likely to die or lose connectivity. Thus cover traffic distribution is independent from the CT node uptime and instead closes a channel if a mix node is found to be offline a new one is opened which gives a fair chance to nodes which are online more frequently than others. 
 
 \subsection{Path selection and payout}
