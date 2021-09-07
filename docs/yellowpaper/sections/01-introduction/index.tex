@@ -60,6 +60,12 @@ Generally, the HOPR protocol aims to hide the fact that two parties are communic
         $\{S_1\rightarrow R_2, S_2\rightarrow R_1\}$ for any concurrently online
         honest senders $S_1$, $S_2$ and honest receivers $R_1$, $R_2$ of the
         adversary’s choice.
+      \item \textbf{Sender online unobservability}: The inability of an adversary to decide whether a specific sender $S$ is communicating with any receiver $R$ or not, for any concurrently online honest sender $S$ of the adversary’s choice.
+    \begin{center}
+    Sender online unobservability $\rightarrow$ sender anonymity 
+    \end{center} 
+    $\{S_1 \rightarrow R,S_2 /\rightarrow \;or\; S_1 /\rightarrow,S_2 \rightarrow R\}$ for any concurrently online honest senders $S_1$ and $S_2$ and any receiver of the adversary’s choice. 
+        
 
     \item \textbf{Resistance to active attacks}: Adversaries must not be able to conduct active attacks
         such as tagging and replay attacks, where the adversary modifies and
