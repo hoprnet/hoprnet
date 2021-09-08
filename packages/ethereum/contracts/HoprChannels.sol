@@ -422,6 +422,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
           if (channel.commitment != bytes32(0)) {
             channel.status = ChannelStatus.OPEN;
+            emit ChannelOpened(source, dest);
           } else {
             channel.status = ChannelStatus.WAITING_FOR_COMMITMENT;
           }
