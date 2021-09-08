@@ -71,7 +71,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   git push origin "${branch}" --tags
 
   # publish each workspace package to npm
-  if [ -n "${NODE_AUTH_TOKEN:-}"]; then
+  if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
     yarn config set npmAuthToken "${NODE_AUTH_TOKEN:-}"
   fi
   yarn workspaces foreach -piv --no-private --topological-dev npm publish --access public
