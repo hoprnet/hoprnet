@@ -20,11 +20,13 @@ the network relaying service, both generally and for each particular packet.
           Each node receives a weight that is proportional to these factors.
 
     \item \textbf{Random Selection:} Each edge (from node $A$ to $B$) within the subset
-      $m$ is assigned a random number $r_i$. Edges are then sorted by
-      $$r_i*weight(edge_i).$$ The path with the largest weight is extended next,
-      using a priority queue mechanism.
+          $m$ is assigned a random number $r_i$. Edges are then sorted by
+          $$r_i*weight(edge_i).$$ The path with the largest weight is extended next,
+          using a priority queue mechanism.
 
 \end{enumerate}
+
+An edge that is sorted first can either be originated from a high $r_i$ assigned to that node \textit{or} a high weight computed as aforementioned including \textbf{availability}, \textbf{payment channel graph} or \textbf{stake}. This makes sure that neither nodes with high $r_i$ nor nodes with higher score are first, hence the score rather depends equally on the rating based on \textit{availabilty}, the \textit{payment channel graph}, the nodes's \textit{stake} and on the assigned $r_i$.
 
 \begin{algorithm}[H]
     \SetAlgoNoLine
@@ -85,6 +87,6 @@ sufficient HOPR tokens.
 
 \subsection{Payment channel stake}
 
-As payment channels are opened with other nodes, HOPR tokes are staked in those channels and therefore the network as a whole. Nodes use these HOPR
+As payment channels are opened with other nodes, HOPR tokens are staked in those channels and therefore the network as a whole. Nodes use these HOPR
 tokens to cover transaction costs when interacting with the blockchain. The higher
 the stake a node has locked, the higher probability that it will be chosen as a relayer.
