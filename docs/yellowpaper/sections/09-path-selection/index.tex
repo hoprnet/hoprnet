@@ -1,72 +1,81 @@
 \section{Path Selection}
-\label{sec:pathselection}
+\label{sec:path-selection}
 
-To send packets through the HOPR network, each node must
-decide which path a packet is sent via. This decision, called
-\textbf{path selection}, must be performed for every packet. HOPR uses a
-random selection algorithm to determine the identities of nodes participating in
-the network relaying service, both generally and for each particular packet.
-\\~\\The selection process is divided into two steps:
+Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to the final destination. To achieve its pricacy properties, it is crucial for nodes in the network to keep the chosen path secret. As relay nodes differ in their ability to forward packets, path choices need to incorporate the nodes' resources and cannot be chosen entirely at random.
+
+Path selection is therefore done in multiple steps: first, there is a pre-selection based on the node resources which gives a subgraph of the network. Afterwards each node is assigned a randomly generated number. Aggretating both values, network quality and the random number, gives the edge weight that is used to sample a path.
 
 \begin{enumerate}
-
-    \item \textbf{Pre-Selection:}
-          Initially, a subset $m<<n$ nodes will be selected based on the following factors:
-          \begin{itemize}
-              \item Node availability
-              \item Payment channel graph
-              \item Payment channel stake
-          \end{itemize}
-          Each node receives a weight that is proportional to these factors.
-
-    \item \textbf{Random Selection:} Each edge (from node $A$ to $B$) within the subset
-          $m$ is assigned a random number $r_i$. Edges are then sorted by
-          $$r_i*weight(edge_i).$$ The path with the largest weight is extended next,
-          using a priority queue mechanism.
-
+    \item \textbf{Pre-select} nodes according to node quality yielding a subgraph of the network
+    \item \textbf{Randomize} the edge weights of the subgraph
+    \item \textbf{Find} a path in the subgraph using a graph traversal algorithm
 \end{enumerate}
 
-An edge that is sorted first can either be originated from a high $r_i$ assigned to that node \textit{or} a high weight computed as aforementioned including \textbf{availability}, \textbf{payment channel graph} or \textbf{stake}. This makes sure that neither nodes with high $r_i$ nor nodes with higher score are first, hence the score rather depends equally on the rating based on \textit{availabilty}, the \textit{payment channel graph}, the nodes's \textit{stake} and on the assigned $r_i$.
+\subsection{Pre-selection}
+\label{sec:pathselection:pre-selection}
+
+Nodes in the network suffer from various problems, including unclear availability due to transport problems as well as outdated information. Once a packet makes it into the receive buffer of the next hop, it needs to be processed which involves non-negligible computation and can lead to congestion on that node.
+
+As relay nodes in the network get compensated for their work, there need to an edge in the payment channel graph that has enough stake to cover the costs for the packets.
+
+Last but not least, nodes \textit{can} exclude certain nodes due to past bad behavior or other preferences.
+
+The outcome is a subgraph $G = (V, E)$ where $V$ is a subset of all nodes $V_{all}$ in the network and $E$ including all possible edges between the nodes as determined by the payment channel graph.
+
+\subsection{Randomization}
+\label{sec:pathselection:randomization}
+
+Since the previous step is entirely deterministic and potential adversaries can thus deduct the outcome from public information, each edge weight gets randomized by multplying it with a random number $r_{i,j}$.
+$$weight(e_{i,j}) := quality(e_{i,j}) * r_{i,j}$$.
+
+\subsection{Graph traversal}
+\label{sec:pathselection:graph-traversal}
+
+The HOPR network uses source-selected routing, hence each node needs to sample the entire path that the mixnet packet is going to take before sending it to the first relayer.
+
+To achieve the aforementioned privacy guarantees, paths should include a minimum number of intermediate node and to make all interactions look the same towards an adversary, \textit{most} of the paths should have the same length. Conversely, the maximum path length is fixed to $pathLength$ due to the usage of the SPHIX packet format, see section \ref{sec:sphinx}, and longer paths lead to larger packet headers which can be easily perceived by a potential adversary.
+
+As a result of the previous pre-selection, the final path sampling can run on disconnected subgraphs that do not lead to a sufficiently long path. Since the algorithm might take too long in these cases to terminate, the number of iterations is limitted by ${maxIteraions}$. Analogously, nodes that to often lead to dead ends are excluded from further node expansions.
 
 \begin{algorithm}[H]
     \SetAlgoNoLine
     \DontPrintSemicolon
-    $V := Nodes$\;
-    $M := MaxSelectionIterations$\;
-    $A := MinNodeAvailability$\;
-    $P := RequiredPathLength$\;
-    \;
-    $openChannels \leftarrow \{ (x, y) \in V \times V \ | \ x \ne y \land getChannel(x,y).state = OPEN \}$\;
-    $queue \leftarrow new \ PriorityQueue()$\;
-    $queue.addAll(\{ (x,y) \in openChannels \ | \ x = self \})$\;
+    $queue \leftarrow \mathbf{new} \ \mathsf{PriorityQueue}_{\textsf{pathWeight}}()$\;
+    $queue.addAll((x,y) \in E)$\;
     $deadEnds \leftarrow \emptyset$\;
     $iterations \leftarrow 0$\;
     \;
-    \While{$!queue.isEmpty() \land iterations < M$}{
-        $current \leftarrow queue.peek()$\;
-        \If{$|current| = P$}{
-            \Return{$current$}
-        }
-        \;
-        $currentNode \leftarrow lastNode(current)$\;
-        $open \leftarrow \{ (x, y) \in E \ | \ x = currentNode \land y \notin deadEnds \land y \ne currentNode \land availability(y) > A$ \}\;
-        $open \leftarrow open.sort(weight_fun)$\;
-        \;
-        \eIf{$open = \emptyset$} {
-            $queue.pop()$\;
-            $deadEnds \leftarrow deadEnds \cup currentNode$\;
-        } {
-            $newPath \leftarrow \{ (current_0, ..., current_{|current| - 1}, o) \ | \ o \in open \})$\;
-            $queue.push(newPath)$\;
-        }
-        \;
-        $iterations \leftarrow iterations + 1$\;
+    \While{$size(queue) > 0 \ \mathsf{and} \ iterations < maxIterations$}{
+    $path \leftarrow queue.peek()$\;
+    \If{$length(path) = pathLength$}{
+        \Return{$current$}
     }
-    \Return{$\bot$}
-    \caption{Path selection in HOPR}
+    \;
+    $current \leftarrow last(path)$\;
+
+    $open \leftarrow \mathbf{new} \ \mathsf{PriorityQueue}_{\mathsf{edgeWeight}}()$\;
+
+    \ForEach{$ (x,y) \in E$}{
+        \If{$x = current \ \mathbf{and} \ y \notin deadEnds$}{
+            $open.push(y)$\;
+        }
+    }
+    \;
+    \eIf{$size(open) = 0$} {
+        $queue.pop()$\;
+        $deadEnds \leftarrow deadEnds \cup current$\;
+    } {
+        \ForEach{$node \in open$)}{
+            $queue.push(\ (...path, node) \ )$\;
+        }
+    }
+    \;
+    $iterations \leftarrow iterations + 1$\;
+    }
+    \caption{Path selection}
 \end{algorithm}
 
-\subsection{Node Availability}
+\subsection{WIP: Node Availability}
 \label{sec:nodeavailability}
 
 Node availability is estimated using a heartbeat protocol. Each node maintains a
@@ -77,7 +86,7 @@ certain timeframe. Otherwise, the node is considered offline and the waiting
 time before the next ping attempt to that node is doubled. Newly working pings will gladually improve a
 neighbour's availability score.
 
-\subsection{Payment channel graph}
+\subsection{WIP: Payment channel graph}
 
 Every node that intends to send messages needs to have a basic understanding
 about the topology of the network, meanings whether a payment channel to the node is open and
@@ -85,7 +94,7 @@ funded with sufficient HOPR tokens for the relaying service. If no such
 payment channel exists, the sender creates a new channel and funds it with
 sufficient HOPR tokens.
 
-\subsection{Payment channel stake}
+\subsection{WIP: Payment channel stake}
 
 As payment channels are opened with other nodes, HOPR tokens are staked in those channels and therefore the network as a whole. Nodes use these HOPR
 tokens to cover transaction costs when interacting with the blockchain. The higher
