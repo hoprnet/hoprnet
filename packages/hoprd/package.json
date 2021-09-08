@@ -10,8 +10,7 @@
   "bin": "lib/index.js",
   "files": [
     "lib",
-    "hopr-admin/.next",
-    "hoprd-default.sh"
+    "hopr-admin/.next/**"
   ],
   "scripts": {
     "clean": "rimraf ./lib",
