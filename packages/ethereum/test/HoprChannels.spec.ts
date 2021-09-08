@@ -369,7 +369,6 @@ describe('funding a HoprChannel success', function () {
         )
     )
       .to.emit(channels, 'ChannelUpdate')
-      .and.to.emit(channels, 'ChannelFunded')
       .withArgs(
         ACCOUNT_B.address,
         ACCOUNT_A.address,
@@ -382,6 +381,8 @@ describe('funding a HoprChannel success', function () {
           })
         )
       )
+      .and.to.emit(channels, 'ChannelFunded')
+      .withArgs(accountB.address, ACCOUNT_B.address, ACCOUNT_A.address, '30')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: ChannelStatus.Closed + '',
       status: ChannelStatus.Closed + ''
