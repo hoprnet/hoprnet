@@ -281,10 +281,9 @@ describe('funding a HoprChannel success', function () {
   it('should multi fund and open channel A->B, no commitment', async function () {
     const { channels, accountA, fundAndApprove, token } = await useFixtures()
     await fundAndApprove(accountA, 100)
-    await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30'))
+      .to.emit(channels, 'ChannelUpdate')
+      .and.to.emit(channels, 'ChannelFunded')
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
     validateChannel(ab, { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
@@ -296,10 +295,9 @@ describe('funding a HoprChannel success', function () {
   it('should multi fund and open channel B->A, no commitment', async function () {
     const { channels, accountB, fundAndApprove } = await useFixtures()
     await fundAndApprove(accountB, 100)
-    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      .to.emit(channels, 'ChannelUpdate')
+      .and.to.emit(channels, 'ChannelFunded')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: '70',
       status: ChannelStatus.WaitingForCommitment + ''
@@ -313,10 +311,9 @@ describe('funding a HoprChannel success', function () {
   it('should multi fund and open channel B->A, commit afterwards', async function () {
     const { channels, accountA, accountB, fundAndApprove } = await useFixtures()
     await fundAndApprove(accountB, 100)
-    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      .to.emit(channels, 'ChannelUpdate')
+      .and.to.emit(channels, 'ChannelFunded')
     await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: '70',
@@ -329,10 +326,9 @@ describe('funding a HoprChannel success', function () {
     const { channels, accountA, accountB, fundAndApprove } = await useFixtures()
     await fundAndApprove(accountB, 100)
     await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
-    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      .to.emit(channels, 'ChannelUpdate')
+      .and.to.emit(channels, 'ChannelFunded')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: '70',
       status: ChannelStatus.WaitingForCommitment + ''
@@ -345,10 +341,9 @@ describe('funding a HoprChannel success', function () {
     await fundAndApprove(accountB, 100)
     await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     await channels.connect(accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      .to.emit(channels, 'ChannelUpdate')
+      .and.to.emit(channels, 'ChannelFunded')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
   })
