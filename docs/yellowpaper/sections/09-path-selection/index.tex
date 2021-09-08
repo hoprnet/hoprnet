@@ -5,7 +5,7 @@
 
 Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to the final destination. To achieve its privacy properties, it is crucial for nodes in the network to keep the chosen path secret. As relay nodes differ in their ability to forward packets, path choices need to incorporate the nodes' resources and cannot be chosen entirely at random.
 
-Path selection is therefore done in multiple steps: first, there is a preprocessing that assigns each node a score depending on their relative availability and their stake. The stake is then randomized by multiplying with random numbers yielding the final score of the node.
+Path selection is therefore done in multiple steps: first, there is a preprocessing that assigns each node a score depending on their relative availability and their stake. The score is then randomized by multiplying with random numbers yielding the final score of the node.
 
 \begin{enumerate}
     \item \textbf{Assign} each node a score depending on availability and stake
@@ -14,7 +14,7 @@ Path selection is therefore done in multiple steps: first, there is a preprocess
 \end{enumerate}
 
 \subsection{Node score assignment}
-\label{sec:path-selection:pre-selection}
+\label{sec:path-selection:node-score}
 
 The HOPR network is kept open and permissionless, hence it is not foreseen to have any gatekeeper that grants access to the network and maintains a list of active nodes. For that reason, it is necessary for participants of the network to maintain a solid understanding about the network topology to decide \textit{which} nodes they can use to relay their mixnet packets.
 
@@ -34,54 +34,51 @@ Incentives for relaying mixnet packages require the existence of an open payment
 
 Funding a payment channel with HOPR tokens means staking these tokens in the HOPR network. The more tokens a node stakes, the more likely it is chosen as a relayer by other nodes.
 
-\subsubsection{Network quality computation}
-
-Each node is given a score that includes network
-Availability measurement and payment channel stake lead to a
-
 \subsection{Randomization}
 \label{sec:path-selection:randomization}
 
 Since the previous step is entirely deterministic and potential adversaries can thus deduct the outcome from public information, each node score gets randomized by multplying it with a random number $r_i$.
-$$weight(e_i) := score(e_i) * r_i$$
+$$weight(n_i) := score(n_i) * r_i$$
 
-Note that the random numbers are assigned in the beginning and kept until a path is found.
+Note that the random numbers are assigned \textit{once} in the beginning and reassigned upon the selection of a subsequent packet.
 
 \subsection{Graph traversal}
 \label{sec:path-selection:graph-traversal}
 
 The HOPR network uses source-selected routing, hence each node needs to sample the entire path that the mixnet packet is going to take in advance before sending it to the first relayer.
 
-To achieve the aforementioned privacy guarantees, paths should include a minimum number of intermediate nodes and to make all interactions look the same towards an adversary, \textit{most} of the paths should have the same length. Conversely, longer paths lead due to the usage of the SPHINX packet format, see section \ref{sec:sphinx}, to longer packet headers and more computation, and can thus be easily distinguished by an adversary. As a balance between privacy and efficiency, the HOPR network uses a target $pathLength$ of \textit{three} hops.
+To achieve the aforementioned privacy guarantees, paths \textit{must} include at least one intermediate node. As longer paths increase due to the usage of the SPHINX packet format the size of the header as well as the computation needed to generate them, and can therefore easily distinguished by an adversary, \textit{all} nodes in the HOPR network use a $targetLength$ of \textit{three}. Packets with longer paths are dropped by relayers. Nevertheless it is possible but discouraged to use smaller path lengths such as \textit{one} or \textit{two} intermediate hops.
 
-As a result of the previous pre-selection, the final path sampling can run on disconnected subgraphs that do not lead to a sufficiently long path. Since the algorithm might take too long in these cases to terminate, the number of iterations is limited by ${maxIterations}$. Analogously, nodes that lead to dead ends are excluded from further node expansions.
+The algorithm terminates once a path with $targetLength$ is found. To prevent the algorithm from visitting too many nodes, the number of iterations is bound by $maxIterations$ and the longest known path is returned if no path of length $targetLength$ was found.
 
 \begin{algorithm}[H]
     \SetAlgoNoLine
     \DontPrintSemicolon
+    \KwIn{$\text{nodes} \ V, \text{edges} \ E$}
+    \;
     $queue \leftarrow \mathbf{new} \ \mathsf{PriorityQueue}_{\textsf{pathWeight}}()$\;
     $queue.addAll(\{ (x,y) \in E \ | \ x = self)$\;
-    $deadEnds \leftarrow \emptyset$\;
+    $closed \leftarrow \emptyset$\;
     $iterations \leftarrow 0$\;
     \;
     \While{$size(queue) > 0 \ \mathsf{and} \ iterations < maxIterations$}{
     $path \leftarrow queue.peek()$\;
-    \If{$length(path) = pathLength$}{
-        \Return{$current$}
+    \If{$length(path) = targetLength$}{
+        \Return{$path$}
     }
     \;
     $current \leftarrow last(path)$\;
-    $open \leftarrow \mathbf{new} \ \mathsf{PriorityQueue}_{\mathsf{edgeWeight}}()$\;
-
-    \ForEach{$ (x,y) \in E$}{
-        \If{$x = current \ \mathbf{and} \ y \notin deadEnds \ \mathbf{and} \ y \notin path$}{
+    $open \leftarrow \mathbf{new} \ \mathsf{PriorityQueue}_{\mathsf{nodeWeight}}()$\;
+    \;
+    \ForEach{$next \in \{ y \in V \ | \ (x,y) \in E \ \land \ x = current \}$}{
+        \If{$score(next) > threshold \ \mathbf{and} \ y \notin closed \ \mathbf{and} \ y \notin path$}{
             $open.push(y)$\;
         }
     }
     \;
     \uIf{$size(open) = 0$} {
         $queue.pop()$\;
-        $deadEnds \leftarrow deadEnds \cup current$\;
+        $closed.add(current)$\;
     }
     \Else{
         \ForEach{$node \in open$}{
@@ -91,5 +88,6 @@ As a result of the previous pre-selection, the final path sampling can run on di
     \;
     $iterations \leftarrow iterations + 1$\;
     }
+    \Return{$queue.peek()$}
     \caption{Path selection}
 \end{algorithm}
