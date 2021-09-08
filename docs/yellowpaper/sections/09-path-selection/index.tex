@@ -75,7 +75,7 @@ As a result of the previous pre-selection, the final path sampling can run on di
     \caption{Path selection}
 \end{algorithm}
 
-\subsection{WIP: Node Availability}
+\subsection{Node Availability}
 \label{sec:nodeavailability}
 
 Node availability is estimated using a heartbeat protocol. Each node maintains a
@@ -85,13 +85,13 @@ A node is considered online if the ping response (``pong”) returns within a
 certain timeframe. Otherwise, the node is considered offline and the waiting
 time before the next ping attempt to that node is doubled. Newly working pings will gladually improve a
 neighbour's availability score.
-\subsection{WIP: Payment channel graph}
+\subsection{Payment channel graph}
 Every node that intends to send messages needs to have a basic understanding
 about the topology of the network, meanings whether a payment channel to the node is open and
 funded with sufficient HOPR tokens for the relaying service. If no such
 payment channel exists, the sender creates a new channel and funds it with
 sufficient HOPR tokens.
-\subsection{WIP: Payment channel stake}
+\subsection{Payment channel stake}
 As payment channels are opened with other nodes, HOPR tokens are staked in those channels and therefore the network as a whole. Nodes use these HOPR
 tokens to cover transaction costs when interacting with the blockchain. The higher
 the stake a node has locked, the higher probability that it will be chosen as a relayer.
