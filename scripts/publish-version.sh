@@ -71,5 +71,5 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   git push origin "${branch}" --tags
 
   # publish each workspace package to npm
-  yarn workspaces foreach -piv --no-private --topological-dev exec -- npm publish --access public
+  yarn workspaces foreach -piv --no-private --topological-dev npm publish --access public
 fi
