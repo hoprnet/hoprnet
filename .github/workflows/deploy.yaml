@@ -81,7 +81,7 @@ jobs:
         if: ${{ !env.ACT }}
         run: ./scripts/commit-and-push-all-changes.sh
         env:
-          HOPR_GIT_MSG: "Update smart contract deployments"
+          HOPR_GIT_MSG: "chore(release): update smart contract deployments"
 
       - name: '[NPM] Publish prerelease version (On pushes to master and debug-deploy/*)'
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') }}
