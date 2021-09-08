@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- `Contract`
+- `BaseContract`
 
   ↳ **`BasicToken`**
 
@@ -38,7 +38,6 @@
 - [\_wrapEvent](BasicToken.md#_wrapevent)
 - [attach](BasicToken.md#attach)
 - [balanceOf](BasicToken.md#balanceof)
-- [balanceOf(address)](BasicToken.md#balanceof(address))
 - [connect](BasicToken.md#connect)
 - [deployed](BasicToken.md#deployed)
 - [emit](BasicToken.md#emit)
@@ -52,9 +51,7 @@
 - [removeAllListeners](BasicToken.md#removealllisteners)
 - [removeListener](BasicToken.md#removelistener)
 - [totalSupply](BasicToken.md#totalsupply)
-- [totalSupply()](BasicToken.md#totalsupply())
 - [transfer](BasicToken.md#transfer)
-- [transfer(address,uint256)](BasicToken.md#transfer(address,uint256))
 - [getContractAddress](BasicToken.md#getcontractaddress)
 - [getInterface](BasicToken.md#getinterface)
 - [isIndexed](BasicToken.md#isindexed)
@@ -75,7 +72,7 @@
 
 #### Inherited from
 
-Contract.constructor
+BaseContract.constructor
 
 #### Defined in
 
@@ -89,7 +86,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:103
 
 #### Inherited from
 
-Contract.\_deployedPromise
+BaseContract.\_deployedPromise
 
 #### Defined in
 
@@ -107,7 +104,7 @@ ___
 
 #### Inherited from
 
-Contract.\_runningEvents
+BaseContract.\_runningEvents
 
 #### Defined in
 
@@ -125,7 +122,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrappedEmits
+BaseContract.\_wrappedEmits
 
 #### Defined in
 
@@ -139,7 +136,7 @@ ___
 
 #### Inherited from
 
-Contract.address
+BaseContract.address
 
 #### Defined in
 
@@ -156,19 +153,16 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 
 #### Overrides
 
-Contract.callStatic
+BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:144
+packages/ethereum/types/BasicToken.d.ts:118
 
 ___
 
@@ -178,7 +172,7 @@ ___
 
 #### Inherited from
 
-Contract.deployTransaction
+BaseContract.deployTransaction
 
 #### Defined in
 
@@ -195,19 +189,16 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
-Contract.estimateGas
+BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:180
+packages/ethereum/types/BasicToken.d.ts:141
 
 ___
 
@@ -219,15 +210,15 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Transfer` | (`from`: `string`, `to`: `string`, `value`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
 
 #### Overrides
 
-Contract.filters
+BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:169
+packages/ethereum/types/BasicToken.d.ts:130
 
 ___
 
@@ -240,15 +231,12 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
-Contract.functions
+BaseContract.functions
 
 #### Defined in
 
@@ -262,7 +250,7 @@ ___
 
 #### Overrides
 
-Contract.interface
+BaseContract.interface
 
 #### Defined in
 
@@ -279,19 +267,16 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
-Contract.populateTransaction
+BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:205
+packages/ethereum/types/BasicToken.d.ts:153
 
 ___
 
@@ -301,7 +286,7 @@ ___
 
 #### Inherited from
 
-Contract.provider
+BaseContract.provider
 
 #### Defined in
 
@@ -315,7 +300,7 @@ ___
 
 #### Inherited from
 
-Contract.resolvedAddress
+BaseContract.resolvedAddress
 
 #### Defined in
 
@@ -329,7 +314,7 @@ ___
 
 #### Inherited from
 
-Contract.signer
+BaseContract.signer
 
 #### Defined in
 
@@ -353,7 +338,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Inherited from
 
-Contract.\_checkRunningEvents
+BaseContract.\_checkRunningEvents
 
 #### Defined in
 
@@ -377,7 +362,7 @@ ___
 
 #### Inherited from
 
-Contract.\_deployed
+BaseContract.\_deployed
 
 #### Defined in
 
@@ -403,7 +388,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrapEvent
+BaseContract.\_wrapEvent
 
 #### Defined in
 
@@ -427,7 +412,7 @@ ___
 
 #### Overrides
 
-Contract.attach
+BaseContract.attach
 
 #### Defined in
 
@@ -452,28 +437,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:125
-
-___
-
-### balanceOf(address)
-
-▸ **balanceOf(address)**(`_owner`, `overrides?`): `Promise`<`BigNumber`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_owner` | `string` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/types/BasicToken.d.ts:127
+packages/ethereum/types/BasicToken.d.ts:110
 
 ___
 
@@ -493,7 +457,7 @@ ___
 
 #### Overrides
 
-Contract.connect
+BaseContract.connect
 
 #### Defined in
 
@@ -511,7 +475,7 @@ ___
 
 #### Overrides
 
-Contract.deployed
+BaseContract.deployed
 
 #### Defined in
 
@@ -536,7 +500,7 @@ ___
 
 #### Inherited from
 
-Contract.emit
+BaseContract.emit
 
 #### Defined in
 
@@ -560,7 +524,7 @@ ___
 
 #### Inherited from
 
-Contract.fallback
+BaseContract.fallback
 
 #### Defined in
 
@@ -584,7 +548,7 @@ ___
 
 #### Inherited from
 
-Contract.listenerCount
+BaseContract.listenerCount
 
 #### Defined in
 
@@ -615,7 +579,7 @@ ___
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -635,7 +599,7 @@ packages/ethereum/types/BasicToken.d.ts:58
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -667,7 +631,7 @@ ___
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -688,7 +652,7 @@ packages/ethereum/types/BasicToken.d.ts:61
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -720,7 +684,7 @@ ___
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -741,7 +705,7 @@ packages/ethereum/types/BasicToken.d.ts:65
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -773,7 +737,7 @@ ___
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -794,7 +758,7 @@ packages/ethereum/types/BasicToken.d.ts:69
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -827,7 +791,7 @@ ___
 
 #### Overrides
 
-Contract.queryFilter
+BaseContract.queryFilter
 
 #### Defined in
 
@@ -858,7 +822,7 @@ ___
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -878,7 +842,7 @@ packages/ethereum/types/BasicToken.d.ts:77
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -910,7 +874,7 @@ ___
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -931,7 +895,7 @@ packages/ethereum/types/BasicToken.d.ts:73
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -955,27 +919,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:121
-
-___
-
-### totalSupply()
-
-▸ **totalSupply()**(`overrides?`): `Promise`<`BigNumber`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/types/BasicToken.d.ts:123
+packages/ethereum/types/BasicToken.d.ts:108
 
 ___
 
@@ -997,29 +941,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:132
-
-___
-
-### transfer(address,uint256)
-
-▸ **transfer(address,uint256)**(`_to`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_to` | `string` |
-| `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/BasicToken.d.ts:138
+packages/ethereum/types/BasicToken.d.ts:112
 
 ___
 
@@ -1041,7 +963,7 @@ ___
 
 #### Inherited from
 
-Contract.getContractAddress
+BaseContract.getContractAddress
 
 #### Defined in
 
@@ -1065,7 +987,7 @@ ___
 
 #### Inherited from
 
-Contract.getInterface
+BaseContract.getInterface
 
 #### Defined in
 
@@ -1089,7 +1011,7 @@ value is Indexed
 
 #### Inherited from
 
-Contract.isIndexed
+BaseContract.isIndexed
 
 #### Defined in
 

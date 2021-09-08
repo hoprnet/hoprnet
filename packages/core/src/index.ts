@@ -3,7 +3,7 @@ import type { Connection } from 'libp2p'
 
 const MPLEX = require('libp2p-mplex')
 import KadDHT from 'libp2p-kad-dht'
-import { NOISE } from 'libp2p-noise'
+import { NOISE } from '@chainsafe/libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
@@ -203,6 +203,8 @@ class Hopr extends EventEmitter {
         dht: KadDHT
       },
       config: {
+        // @ts-ignore
+        protocolPrefix: 'hopr',
         transport: {
           HoprConnect: {
             initialNodes,

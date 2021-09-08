@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- `Contract`
+- `BaseContract`
 
   ↳ **`LegacyERC20`**
 
@@ -50,9 +50,7 @@
 - [removeAllListeners](LegacyERC20.md#removealllisteners)
 - [removeListener](LegacyERC20.md#removelistener)
 - [transfer](LegacyERC20.md#transfer)
-- [transfer(address,uint256)](LegacyERC20.md#transfer(address,uint256))
 - [transferFrom](LegacyERC20.md#transferfrom)
-- [transferFrom(address,address,uint256)](LegacyERC20.md#transferfrom(address,address,uint256))
 - [getContractAddress](LegacyERC20.md#getcontractaddress)
 - [getInterface](LegacyERC20.md#getinterface)
 - [isIndexed](LegacyERC20.md#isindexed)
@@ -73,7 +71,7 @@
 
 #### Inherited from
 
-Contract.constructor
+BaseContract.constructor
 
 #### Defined in
 
@@ -87,7 +85,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:103
 
 #### Inherited from
 
-Contract.\_deployedPromise
+BaseContract.\_deployedPromise
 
 #### Defined in
 
@@ -105,7 +103,7 @@ ___
 
 #### Inherited from
 
-Contract.\_runningEvents
+BaseContract.\_runningEvents
 
 #### Defined in
 
@@ -123,7 +121,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrappedEmits
+BaseContract.\_wrappedEmits
 
 #### Defined in
 
@@ -137,7 +135,7 @@ ___
 
 #### Inherited from
 
-Contract.address
+BaseContract.address
 
 #### Defined in
 
@@ -154,17 +152,15 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
-Contract.callStatic
+BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:143
+packages/ethereum/types/LegacyERC20.d.ts:117
 
 ___
 
@@ -174,7 +170,7 @@ ___
 
 #### Inherited from
 
-Contract.deployTransaction
+BaseContract.deployTransaction
 
 #### Defined in
 
@@ -191,17 +187,15 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
-Contract.estimateGas
+BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:173
+packages/ethereum/types/LegacyERC20.d.ts:134
 
 ___
 
@@ -211,11 +205,11 @@ ___
 
 #### Overrides
 
-Contract.filters
+BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:171
+packages/ethereum/types/LegacyERC20.d.ts:132
 
 ___
 
@@ -228,13 +222,11 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
-Contract.functions
+BaseContract.functions
 
 #### Defined in
 
@@ -248,7 +240,7 @@ ___
 
 #### Overrides
 
-Contract.interface
+BaseContract.interface
 
 #### Defined in
 
@@ -265,17 +257,15 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `transfer` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `transfer(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `transferFrom` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `transferFrom(address,address,uint256)` | (`_owner`: `string`, `_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
-Contract.populateTransaction
+BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:201
+packages/ethereum/types/LegacyERC20.d.ts:149
 
 ___
 
@@ -285,7 +275,7 @@ ___
 
 #### Inherited from
 
-Contract.provider
+BaseContract.provider
 
 #### Defined in
 
@@ -299,7 +289,7 @@ ___
 
 #### Inherited from
 
-Contract.resolvedAddress
+BaseContract.resolvedAddress
 
 #### Defined in
 
@@ -313,7 +303,7 @@ ___
 
 #### Inherited from
 
-Contract.signer
+BaseContract.signer
 
 #### Defined in
 
@@ -337,7 +327,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Inherited from
 
-Contract.\_checkRunningEvents
+BaseContract.\_checkRunningEvents
 
 #### Defined in
 
@@ -361,7 +351,7 @@ ___
 
 #### Inherited from
 
-Contract.\_deployed
+BaseContract.\_deployed
 
 #### Defined in
 
@@ -387,7 +377,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrapEvent
+BaseContract.\_wrapEvent
 
 #### Defined in
 
@@ -411,7 +401,7 @@ ___
 
 #### Overrides
 
-Contract.attach
+BaseContract.attach
 
 #### Defined in
 
@@ -435,7 +425,7 @@ ___
 
 #### Overrides
 
-Contract.connect
+BaseContract.connect
 
 #### Defined in
 
@@ -453,7 +443,7 @@ ___
 
 #### Overrides
 
-Contract.deployed
+BaseContract.deployed
 
 #### Defined in
 
@@ -478,7 +468,7 @@ ___
 
 #### Inherited from
 
-Contract.emit
+BaseContract.emit
 
 #### Defined in
 
@@ -502,7 +492,7 @@ ___
 
 #### Inherited from
 
-Contract.fallback
+BaseContract.fallback
 
 #### Defined in
 
@@ -526,7 +516,7 @@ ___
 
 #### Inherited from
 
-Contract.listenerCount
+BaseContract.listenerCount
 
 #### Defined in
 
@@ -557,7 +547,7 @@ ___
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -577,7 +567,7 @@ packages/ethereum/types/LegacyERC20.d.ts:51
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -609,7 +599,7 @@ ___
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -630,7 +620,7 @@ packages/ethereum/types/LegacyERC20.d.ts:54
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -662,7 +652,7 @@ ___
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -683,7 +673,7 @@ packages/ethereum/types/LegacyERC20.d.ts:58
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -715,7 +705,7 @@ ___
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -736,7 +726,7 @@ packages/ethereum/types/LegacyERC20.d.ts:62
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -769,7 +759,7 @@ ___
 
 #### Overrides
 
-Contract.queryFilter
+BaseContract.queryFilter
 
 #### Defined in
 
@@ -800,7 +790,7 @@ ___
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -820,7 +810,7 @@ packages/ethereum/types/LegacyERC20.d.ts:70
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -852,7 +842,7 @@ ___
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -873,7 +863,7 @@ packages/ethereum/types/LegacyERC20.d.ts:66
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -899,29 +889,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:131
-
-___
-
-### transfer(address,uint256)
-
-▸ **transfer(address,uint256)**(`_spender`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_spender` | `string` |
-| `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/LegacyERC20.d.ts:137
+packages/ethereum/types/LegacyERC20.d.ts:111
 
 ___
 
@@ -944,30 +912,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:117
-
-___
-
-### transferFrom(address,address,uint256)
-
-▸ **transferFrom(address,address,uint256)**(`_owner`, `_spender`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_owner` | `string` |
-| `_spender` | `string` |
-| `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/LegacyERC20.d.ts:124
+packages/ethereum/types/LegacyERC20.d.ts:104
 
 ___
 
@@ -989,7 +934,7 @@ ___
 
 #### Inherited from
 
-Contract.getContractAddress
+BaseContract.getContractAddress
 
 #### Defined in
 
@@ -1013,7 +958,7 @@ ___
 
 #### Inherited from
 
-Contract.getInterface
+BaseContract.getInterface
 
 #### Defined in
 
@@ -1037,7 +982,7 @@ value is Indexed
 
 #### Inherited from
 
-Contract.isIndexed
+BaseContract.isIndexed
 
 #### Defined in
 

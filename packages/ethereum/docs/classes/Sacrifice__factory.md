@@ -19,6 +19,8 @@
 - [bytecode](Sacrifice__factory.md#bytecode)
 - [interface](Sacrifice__factory.md#interface)
 - [signer](Sacrifice__factory.md#signer)
+- [abi](Sacrifice__factory.md#abi)
+- [bytecode](Sacrifice__factory.md#bytecode)
 
 ### Methods
 
@@ -27,6 +29,7 @@
 - [deploy](Sacrifice__factory.md#deploy)
 - [getDeployTransaction](Sacrifice__factory.md#getdeploytransaction)
 - [connect](Sacrifice__factory.md#connect)
+- [createInterface](Sacrifice__factory.md#createinterface)
 - [fromSolidity](Sacrifice__factory.md#fromsolidity)
 - [getContract](Sacrifice__factory.md#getcontract)
 - [getContractAddress](Sacrifice__factory.md#getcontractaddress)
@@ -50,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:11
+packages/ethereum/types/factories/Sacrifice__factory.ts:33
 
 ## Properties
 
@@ -94,6 +97,26 @@ ContractFactory.signer
 
 node_modules/@ethersproject/contracts/lib/index.d.ts:136
 
+___
+
+### abi
+
+▪ `Static` `Readonly` **abi**: { `inputs`: { `name`: `string` = "\_recipient"; `type`: `string` = "address" }[] ; `payable`: `boolean` = true; `stateMutability`: `string` = "payable"; `type`: `string` = "constructor" }[]
+
+#### Defined in
+
+packages/ethereum/types/factories/Sacrifice__factory.ts:56
+
+___
+
+### bytecode
+
+▪ `Static` `Readonly` **bytecode**: ``"0x608060405260405160208060218339810160405251600160a060020a038116ff00"``
+
+#### Defined in
+
+packages/ethereum/types/factories/Sacrifice__factory.ts:55
+
 ## Methods
 
 ### attach
@@ -116,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:27
+packages/ethereum/types/factories/Sacrifice__factory.ts:49
 
 ___
 
@@ -140,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:30
+packages/ethereum/types/factories/Sacrifice__factory.ts:52
 
 ___
 
@@ -165,7 +188,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:15
+packages/ethereum/types/factories/Sacrifice__factory.ts:37
 
 ___
 
@@ -190,7 +213,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:21
+packages/ethereum/types/factories/Sacrifice__factory.ts:43
 
 ___
 
@@ -211,7 +234,21 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:33
+packages/ethereum/types/factories/Sacrifice__factory.ts:60
+
+___
+
+### createInterface
+
+▸ `Static` **createInterface**(): `SacrificeInterface`
+
+#### Returns
+
+`SacrificeInterface`
+
+#### Defined in
+
+packages/ethereum/types/factories/Sacrifice__factory.ts:57
 
 ___
 

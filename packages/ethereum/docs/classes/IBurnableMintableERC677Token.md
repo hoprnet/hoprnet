@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- `Contract`
+- `BaseContract`
 
   ↳ **`IBurnableMintableERC677Token`**
 
@@ -37,28 +37,20 @@
 - [\_deployed](IBurnableMintableERC677Token.md#_deployed)
 - [\_wrapEvent](IBurnableMintableERC677Token.md#_wrapevent)
 - [allowance](IBurnableMintableERC677Token.md#allowance)
-- [allowance(address,address)](IBurnableMintableERC677Token.md#allowance(address,address))
 - [approve](IBurnableMintableERC677Token.md#approve)
-- [approve(address,uint256)](IBurnableMintableERC677Token.md#approve(address,uint256))
 - [attach](IBurnableMintableERC677Token.md#attach)
 - [balanceOf](IBurnableMintableERC677Token.md#balanceof)
-- [balanceOf(address)](IBurnableMintableERC677Token.md#balanceof(address))
 - [burn](IBurnableMintableERC677Token.md#burn)
-- [burn(uint256)](IBurnableMintableERC677Token.md#burn(uint256))
 - [claimTokens](IBurnableMintableERC677Token.md#claimtokens)
-- [claimTokens(address,address)](IBurnableMintableERC677Token.md#claimtokens(address,address))
 - [connect](IBurnableMintableERC677Token.md#connect)
 - [decreaseAllowance](IBurnableMintableERC677Token.md#decreaseallowance)
-- [decreaseAllowance(address,uint256)](IBurnableMintableERC677Token.md#decreaseallowance(address,uint256))
 - [deployed](IBurnableMintableERC677Token.md#deployed)
 - [emit](IBurnableMintableERC677Token.md#emit)
 - [fallback](IBurnableMintableERC677Token.md#fallback)
 - [increaseAllowance](IBurnableMintableERC677Token.md#increaseallowance)
-- [increaseAllowance(address,uint256)](IBurnableMintableERC677Token.md#increaseallowance(address,uint256))
 - [listenerCount](IBurnableMintableERC677Token.md#listenercount)
 - [listeners](IBurnableMintableERC677Token.md#listeners)
 - [mint](IBurnableMintableERC677Token.md#mint)
-- [mint(address,uint256)](IBurnableMintableERC677Token.md#mint(address,uint256))
 - [off](IBurnableMintableERC677Token.md#off)
 - [on](IBurnableMintableERC677Token.md#on)
 - [once](IBurnableMintableERC677Token.md#once)
@@ -66,13 +58,9 @@
 - [removeAllListeners](IBurnableMintableERC677Token.md#removealllisteners)
 - [removeListener](IBurnableMintableERC677Token.md#removelistener)
 - [totalSupply](IBurnableMintableERC677Token.md#totalsupply)
-- [totalSupply()](IBurnableMintableERC677Token.md#totalsupply())
 - [transfer](IBurnableMintableERC677Token.md#transfer)
-- [transfer(address,uint256)](IBurnableMintableERC677Token.md#transfer(address,uint256))
 - [transferAndCall](IBurnableMintableERC677Token.md#transferandcall)
-- [transferAndCall(address,uint256,bytes)](IBurnableMintableERC677Token.md#transferandcall(address,uint256,bytes))
 - [transferFrom](IBurnableMintableERC677Token.md#transferfrom)
-- [transferFrom(address,address,uint256)](IBurnableMintableERC677Token.md#transferfrom(address,address,uint256))
 - [getContractAddress](IBurnableMintableERC677Token.md#getcontractaddress)
 - [getInterface](IBurnableMintableERC677Token.md#getinterface)
 - [isIndexed](IBurnableMintableERC677Token.md#isindexed)
@@ -93,7 +81,7 @@
 
 #### Inherited from
 
-Contract.constructor
+BaseContract.constructor
 
 #### Defined in
 
@@ -107,7 +95,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:103
 
 #### Inherited from
 
-Contract.\_deployedPromise
+BaseContract.\_deployedPromise
 
 #### Defined in
 
@@ -125,7 +113,7 @@ ___
 
 #### Inherited from
 
-Contract.\_runningEvents
+BaseContract.\_runningEvents
 
 #### Defined in
 
@@ -143,7 +131,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrappedEmits
+BaseContract.\_wrappedEmits
 
 #### Defined in
 
@@ -157,7 +145,7 @@ ___
 
 #### Inherited from
 
-Contract.address
+BaseContract.address
 
 #### Defined in
 
@@ -174,37 +162,25 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `approve` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `approve(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 | `balanceOf` | (`_who`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `balanceOf(address)` | (`_who`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `burn` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 | `increaseAllowance` | (`spender`: `string`, `addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `increaseAllowance(address,uint256)` | (`spender`: `string`, `addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 | `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 | `transferAndCall` | (`arg0`: `string`, `arg1`: `BigNumberish`, `arg2`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `transferAndCall(address,uint256,bytes)` | (`arg0`: `string`, `arg1`: `BigNumberish`, `arg2`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 | `transferFrom` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
-| `transferFrom(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`boolean`\> |
 
 #### Overrides
 
-Contract.callStatic
+BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:432
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:296
 
 ___
 
@@ -214,7 +190,7 @@ ___
 
 #### Inherited from
 
-Contract.deployTransaction
+BaseContract.deployTransaction
 
 #### Defined in
 
@@ -231,37 +207,25 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `approve` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `approve(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `balanceOf` | (`_who`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `balanceOf(address)` | (`_who`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `increaseAllowance` | (`spender`: `string`, `addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `increaseAllowance(address,uint256)` | (`spender`: `string`, `addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `transferAndCall` | (`arg0`: `string`, `arg1`: `BigNumberish`, `arg2`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `transferAndCall(address,uint256,bytes)` | (`arg0`: `string`, `arg1`: `BigNumberish`, `arg2`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `transferFrom` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `transferFrom(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
-Contract.estimateGas
+BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:585
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:381
 
 ___
 
@@ -273,16 +237,16 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Approval` | (`owner`: `string`, `spender`: `string`, `value`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer` | (`from`: `string`, `to`: `string`, `value`: ``null``, `data`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`], `Object`\> |
+| `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``, `data?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`], `Object`\> |
 
 #### Overrides
 
-Contract.filters
+BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:564
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:360
 
 ___
 
@@ -295,33 +259,21 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `approve` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `approve(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `balanceOf` | (`_who`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `balanceOf(address)` | (`_who`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `increaseAllowance` | (`spender`: `string`, `addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `increaseAllowance(address,uint256)` | (`spender`: `string`, `addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `transferAndCall` | (`arg0`: `string`, `arg1`: `BigNumberish`, `arg2`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `transferAndCall(address,uint256,bytes)` | (`arg0`: `string`, `arg1`: `BigNumberish`, `arg2`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `transferFrom` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `transferFrom(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
-Contract.functions
+BaseContract.functions
 
 #### Defined in
 
@@ -335,7 +287,7 @@ ___
 
 #### Overrides
 
-Contract.interface
+BaseContract.interface
 
 #### Defined in
 
@@ -352,37 +304,25 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `approve` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `approve(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `balanceOf` | (`_who`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `balanceOf(address)` | (`_who`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `burn` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `burn(uint256)` | (`_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `claimTokens` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `claimTokens(address,address)` | (`_token`: `string`, `_to`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `decreaseAllowance` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `decreaseAllowance(address,uint256)` | (`spender`: `string`, `subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `increaseAllowance` | (`spender`: `string`, `addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `increaseAllowance(address,uint256)` | (`spender`: `string`, `addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `mint` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `mint(address,uint256)` | (`_to`: `string`, `_amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `transferAndCall` | (`arg0`: `string`, `arg1`: `BigNumberish`, `arg2`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `transferAndCall(address,uint256,bytes)` | (`arg0`: `string`, `arg1`: `BigNumberish`, `arg2`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `transferFrom` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `transferFrom(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
-Contract.populateTransaction
+BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:720
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:448
 
 ___
 
@@ -392,7 +332,7 @@ ___
 
 #### Inherited from
 
-Contract.provider
+BaseContract.provider
 
 #### Defined in
 
@@ -406,7 +346,7 @@ ___
 
 #### Inherited from
 
-Contract.resolvedAddress
+BaseContract.resolvedAddress
 
 #### Defined in
 
@@ -420,7 +360,7 @@ ___
 
 #### Inherited from
 
-Contract.signer
+BaseContract.signer
 
 #### Defined in
 
@@ -444,7 +384,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Inherited from
 
-Contract.\_checkRunningEvents
+BaseContract.\_checkRunningEvents
 
 #### Defined in
 
@@ -468,7 +408,7 @@ ___
 
 #### Inherited from
 
-Contract.\_deployed
+BaseContract.\_deployed
 
 #### Defined in
 
@@ -494,7 +434,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrapEvent
+BaseContract.\_wrapEvent
 
 #### Defined in
 
@@ -520,29 +460,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:420
-
-___
-
-### allowance(address,address)
-
-▸ **allowance(address,address)**(`_owner`, `_spender`, `overrides?`): `Promise`<`BigNumber`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_owner` | `string` |
-| `_spender` | `string` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:426
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:290
 
 ___
 
@@ -564,29 +482,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:299
-
-___
-
-### approve(address,uint256)
-
-▸ **approve(address,uint256)**(`_spender`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_spender` | `string` |
-| `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:305
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:231
 
 ___
 
@@ -606,7 +502,7 @@ ___
 
 #### Overrides
 
-Contract.attach
+BaseContract.attach
 
 #### Defined in
 
@@ -631,28 +527,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:389
-
-___
-
-### balanceOf(address)
-
-▸ **balanceOf(address)**(`_who`, `overrides?`): `Promise`<`BigNumber`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_who` | `string` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:391
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:276
 
 ___
 
@@ -673,28 +548,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:367
-
-___
-
-### burn(uint256)
-
-▸ **burn(uint256)**(`_value`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:372
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:265
 
 ___
 
@@ -716,29 +570,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:377
-
-___
-
-### claimTokens(address,address)
-
-▸ **claimTokens(address,address)**(`_token`, `_to`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_token` | `string` |
-| `_to` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:383
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:270
 
 ___
 
@@ -758,7 +590,7 @@ ___
 
 #### Overrides
 
-Contract.connect
+BaseContract.connect
 
 #### Defined in
 
@@ -784,29 +616,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:396
-
-___
-
-### decreaseAllowance(address,uint256)
-
-▸ **decreaseAllowance(address,uint256)**(`spender`, `subtractedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `spender` | `string` |
-| `subtractedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:402
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:278
 
 ___
 
@@ -820,7 +630,7 @@ ___
 
 #### Overrides
 
-Contract.deployed
+BaseContract.deployed
 
 #### Defined in
 
@@ -845,7 +655,7 @@ ___
 
 #### Inherited from
 
-Contract.emit
+BaseContract.emit
 
 #### Defined in
 
@@ -869,7 +679,7 @@ ___
 
 #### Inherited from
 
-Contract.fallback
+BaseContract.fallback
 
 #### Defined in
 
@@ -895,29 +705,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:329
-
-___
-
-### increaseAllowance(address,uint256)
-
-▸ **increaseAllowance(address,uint256)**(`spender`, `addedValue`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `spender` | `string` |
-| `addedValue` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:335
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:246
 
 ___
 
@@ -937,7 +725,7 @@ ___
 
 #### Inherited from
 
-Contract.listenerCount
+BaseContract.listenerCount
 
 #### Defined in
 
@@ -968,7 +756,7 @@ ___
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -988,7 +776,7 @@ packages/ethereum/types/IBurnableMintableERC677Token.d.ts:126
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -1014,29 +802,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:355
-
-___
-
-### mint(address,uint256)
-
-▸ **mint(address,uint256)**(`_to`, `_amount`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_to` | `string` |
-| `_amount` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:361
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:259
 
 ___
 
@@ -1064,7 +830,7 @@ ___
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -1085,7 +851,7 @@ packages/ethereum/types/IBurnableMintableERC677Token.d.ts:129
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -1117,7 +883,7 @@ ___
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -1138,7 +904,7 @@ packages/ethereum/types/IBurnableMintableERC677Token.d.ts:133
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -1170,7 +936,7 @@ ___
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -1191,7 +957,7 @@ packages/ethereum/types/IBurnableMintableERC677Token.d.ts:137
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -1224,7 +990,7 @@ ___
 
 #### Overrides
 
-Contract.queryFilter
+BaseContract.queryFilter
 
 #### Defined in
 
@@ -1255,7 +1021,7 @@ ___
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -1275,7 +1041,7 @@ packages/ethereum/types/IBurnableMintableERC677Token.d.ts:145
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -1307,7 +1073,7 @@ ___
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -1328,7 +1094,7 @@ packages/ethereum/types/IBurnableMintableERC677Token.d.ts:141
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -1352,27 +1118,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:311
-
-___
-
-### totalSupply()
-
-▸ **totalSupply()**(`overrides?`): `Promise`<`BigNumber`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:313
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:237
 
 ___
 
@@ -1394,29 +1140,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:408
-
-___
-
-### transfer(address,uint256)
-
-▸ **transfer(address,uint256)**(`_to`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_to` | `string` |
-| `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:414
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:284
 
 ___
 
@@ -1439,30 +1163,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:341
-
-___
-
-### transferAndCall(address,uint256,bytes)
-
-▸ **transferAndCall(address,uint256,bytes)**(`arg0`, `arg1`, `arg2`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `arg0` | `string` |
-| `arg1` | `BigNumberish` |
-| `arg2` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:348
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:252
 
 ___
 
@@ -1485,30 +1186,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:315
-
-___
-
-### transferFrom(address,address,uint256)
-
-▸ **transferFrom(address,address,uint256)**(`_from`, `_to`, `_value`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_from` | `string` |
-| `_to` | `string` |
-| `_value` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:322
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:239
 
 ___
 
@@ -1530,7 +1208,7 @@ ___
 
 #### Inherited from
 
-Contract.getContractAddress
+BaseContract.getContractAddress
 
 #### Defined in
 
@@ -1554,7 +1232,7 @@ ___
 
 #### Inherited from
 
-Contract.getInterface
+BaseContract.getInterface
 
 #### Defined in
 
@@ -1578,7 +1256,7 @@ value is Indexed
 
 #### Inherited from
 
-Contract.isIndexed
+BaseContract.isIndexed
 
 #### Defined in
 

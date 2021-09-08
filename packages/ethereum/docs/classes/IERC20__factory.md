@@ -8,15 +8,30 @@
 
 - [constructor](IERC20__factory.md#constructor)
 
+### Properties
+
+- [abi](IERC20__factory.md#abi)
+
 ### Methods
 
 - [connect](IERC20__factory.md#connect)
+- [createInterface](IERC20__factory.md#createinterface)
 
 ## Constructors
 
 ### constructor
 
 • **new IERC20__factory**()
+
+## Properties
+
+### abi
+
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `boolean` = false; `inputs`: { `indexed`: `boolean` = true; `internalType`: `string` = "address"; `name`: `string` = "owner"; `type`: `string` = "address" }[] ; `name`: `string` = "Approval"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "owner"; `type`: `string` = "address" }[] ; `name`: `string` = "allowance"; `outputs`: { `internalType`: `string` = "uint256"; `name`: `string` = ""; `type`: `string` = "uint256" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" })[]
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC20__factory.ts:196
 
 ## Methods
 
@@ -37,4 +52,18 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC20__factory.ts:11
+packages/ethereum/types/factories/IERC20__factory.ts:200
+
+___
+
+### createInterface
+
+▸ `Static` **createInterface**(): `IERC20Interface`
+
+#### Returns
+
+`IERC20Interface`
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC20__factory.ts:197

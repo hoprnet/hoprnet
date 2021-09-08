@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- `Contract`
+- `BaseContract`
 
   ↳ **`IERC1820Implementer`**
 
@@ -38,7 +38,6 @@
 - [\_wrapEvent](IERC1820Implementer.md#_wrapevent)
 - [attach](IERC1820Implementer.md#attach)
 - [canImplementInterfaceForAddress](IERC1820Implementer.md#canimplementinterfaceforaddress)
-- [canImplementInterfaceForAddress(bytes32,address)](IERC1820Implementer.md#canimplementinterfaceforaddress(bytes32,address))
 - [connect](IERC1820Implementer.md#connect)
 - [deployed](IERC1820Implementer.md#deployed)
 - [emit](IERC1820Implementer.md#emit)
@@ -71,7 +70,7 @@
 
 #### Inherited from
 
-Contract.constructor
+BaseContract.constructor
 
 #### Defined in
 
@@ -85,7 +84,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:103
 
 #### Inherited from
 
-Contract.\_deployedPromise
+BaseContract.\_deployedPromise
 
 #### Defined in
 
@@ -103,7 +102,7 @@ ___
 
 #### Inherited from
 
-Contract.\_runningEvents
+BaseContract.\_runningEvents
 
 #### Defined in
 
@@ -121,7 +120,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrappedEmits
+BaseContract.\_wrappedEmits
 
 #### Defined in
 
@@ -135,7 +134,7 @@ ___
 
 #### Inherited from
 
-Contract.address
+BaseContract.address
 
 #### Defined in
 
@@ -152,15 +151,14 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 
 #### Overrides
 
-Contract.callStatic
+BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Implementer.d.ts:108
+packages/ethereum/types/IERC1820Implementer.d.ts:96
 
 ___
 
@@ -170,7 +168,7 @@ ___
 
 #### Inherited from
 
-Contract.deployTransaction
+BaseContract.deployTransaction
 
 #### Defined in
 
@@ -187,15 +185,14 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
-Contract.estimateGas
+BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Implementer.d.ts:124
+packages/ethereum/types/IERC1820Implementer.d.ts:106
 
 ___
 
@@ -205,11 +202,11 @@ ___
 
 #### Overrides
 
-Contract.filters
+BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Implementer.d.ts:122
+packages/ethereum/types/IERC1820Implementer.d.ts:104
 
 ___
 
@@ -222,11 +219,10 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 
 #### Overrides
 
-Contract.functions
+BaseContract.functions
 
 #### Defined in
 
@@ -240,7 +236,7 @@ ___
 
 #### Overrides
 
-Contract.interface
+BaseContract.interface
 
 #### Defined in
 
@@ -257,15 +253,14 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
-Contract.populateTransaction
+BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Implementer.d.ts:138
+packages/ethereum/types/IERC1820Implementer.d.ts:114
 
 ___
 
@@ -275,7 +270,7 @@ ___
 
 #### Inherited from
 
-Contract.provider
+BaseContract.provider
 
 #### Defined in
 
@@ -289,7 +284,7 @@ ___
 
 #### Inherited from
 
-Contract.resolvedAddress
+BaseContract.resolvedAddress
 
 #### Defined in
 
@@ -303,7 +298,7 @@ ___
 
 #### Inherited from
 
-Contract.signer
+BaseContract.signer
 
 #### Defined in
 
@@ -327,7 +322,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Inherited from
 
-Contract.\_checkRunningEvents
+BaseContract.\_checkRunningEvents
 
 #### Defined in
 
@@ -351,7 +346,7 @@ ___
 
 #### Inherited from
 
-Contract.\_deployed
+BaseContract.\_deployed
 
 #### Defined in
 
@@ -377,7 +372,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrapEvent
+BaseContract.\_wrapEvent
 
 #### Defined in
 
@@ -401,7 +396,7 @@ ___
 
 #### Overrides
 
-Contract.attach
+BaseContract.attach
 
 #### Defined in
 
@@ -427,29 +422,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Implementer.d.ts:96
-
-___
-
-### canImplementInterfaceForAddress(bytes32,address)
-
-▸ **canImplementInterfaceForAddress(bytes32,address)**(`interfaceHash`, `account`, `overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `interfaceHash` | `BytesLike` |
-| `account` | `string` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/IERC1820Implementer.d.ts:102
+packages/ethereum/types/IERC1820Implementer.d.ts:90
 
 ___
 
@@ -469,7 +442,7 @@ ___
 
 #### Overrides
 
-Contract.connect
+BaseContract.connect
 
 #### Defined in
 
@@ -487,7 +460,7 @@ ___
 
 #### Overrides
 
-Contract.deployed
+BaseContract.deployed
 
 #### Defined in
 
@@ -512,7 +485,7 @@ ___
 
 #### Inherited from
 
-Contract.emit
+BaseContract.emit
 
 #### Defined in
 
@@ -536,7 +509,7 @@ ___
 
 #### Inherited from
 
-Contract.fallback
+BaseContract.fallback
 
 #### Defined in
 
@@ -560,7 +533,7 @@ ___
 
 #### Inherited from
 
-Contract.listenerCount
+BaseContract.listenerCount
 
 #### Defined in
 
@@ -591,7 +564,7 @@ ___
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -611,7 +584,7 @@ packages/ethereum/types/IERC1820Implementer.d.ts:44
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
@@ -643,7 +616,7 @@ ___
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -664,7 +637,7 @@ packages/ethereum/types/IERC1820Implementer.d.ts:47
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
@@ -696,7 +669,7 @@ ___
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -717,7 +690,7 @@ packages/ethereum/types/IERC1820Implementer.d.ts:51
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
@@ -749,7 +722,7 @@ ___
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -770,7 +743,7 @@ packages/ethereum/types/IERC1820Implementer.d.ts:55
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
@@ -803,7 +776,7 @@ ___
 
 #### Overrides
 
-Contract.queryFilter
+BaseContract.queryFilter
 
 #### Defined in
 
@@ -834,7 +807,7 @@ ___
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -854,7 +827,7 @@ packages/ethereum/types/IERC1820Implementer.d.ts:63
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
@@ -886,7 +859,7 @@ ___
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -907,7 +880,7 @@ packages/ethereum/types/IERC1820Implementer.d.ts:59
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
@@ -933,7 +906,7 @@ ___
 
 #### Inherited from
 
-Contract.getContractAddress
+BaseContract.getContractAddress
 
 #### Defined in
 
@@ -957,7 +930,7 @@ ___
 
 #### Inherited from
 
-Contract.getInterface
+BaseContract.getInterface
 
 #### Defined in
 
@@ -981,7 +954,7 @@ value is Indexed
 
 #### Inherited from
 
-Contract.isIndexed
+BaseContract.isIndexed
 
 #### Defined in
 

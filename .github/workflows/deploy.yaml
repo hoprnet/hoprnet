@@ -85,7 +85,7 @@ jobs:
 
       - name: '[NPM] Publish prerelease version (On pushes to master)'
         if: ${{ github.ref == 'refs/heads/master' }}
-        run: ./scripts/publish-pre-release.sh
+        run: ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           HOPR_VERSION_MAJMIN: true
@@ -94,7 +94,7 @@ jobs:
       # accordance with semver.
       - name: '[NPM] Publish patch version (On pushes to release branches)'
         if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
-        run: ./scripts/publish-patch-release.sh
+        run: ./scripts/publish-version.sh patch
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

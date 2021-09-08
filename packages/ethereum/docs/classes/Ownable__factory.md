@@ -8,15 +8,30 @@
 
 - [constructor](Ownable__factory.md#constructor)
 
+### Properties
+
+- [abi](Ownable__factory.md#abi)
+
 ### Methods
 
 - [connect](Ownable__factory.md#connect)
+- [createInterface](Ownable__factory.md#createinterface)
 
 ## Constructors
 
 ### constructor
 
 • **new Ownable__factory**()
+
+## Properties
+
+### abi
+
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `boolean` = false; `inputs`: { `indexed`: `boolean` = true; `internalType`: `string` = "address"; `name`: `string` = "previousOwner"; `type`: `string` = "address" }[] ; `name`: `string` = "OwnershipTransferred"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: `any`[] = []; `name`: `string` = "owner"; `outputs`: { `internalType`: `string` = "address"; `name`: `string` = ""; `type`: `string` = "address" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "newOwner"; `type`: `string` = "address" }[] ; `name`: `string` = "transferOwnership"; `outputs`: `any`[] = []; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" })[]
+
+#### Defined in
+
+packages/ethereum/types/factories/Ownable__factory.ts:65
 
 ## Methods
 
@@ -37,4 +52,18 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/Ownable__factory.ts:11
+packages/ethereum/types/factories/Ownable__factory.ts:69
+
+___
+
+### createInterface
+
+▸ `Static` **createInterface**(): `OwnableInterface`
+
+#### Returns
+
+`OwnableInterface`
+
+#### Defined in
+
+packages/ethereum/types/factories/Ownable__factory.ts:66
