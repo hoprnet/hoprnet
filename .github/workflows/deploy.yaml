@@ -83,12 +83,11 @@ jobs:
         env:
           HOPR_GIT_MSG: "Update smart contract deployments"
 
-      - name: '[NPM] Publish prerelease version (On pushes to master)'
-        if: ${{ github.ref == 'refs/heads/master' }}
+      - name: '[NPM] Publish prerelease version (On pushes to master and debug-deploy/*)'
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') }}
         run: ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          HOPR_VERSION_MAJMIN: true
 
       # Pushing a PR to a release branch should increment the patch version in
       # accordance with semver.
@@ -99,7 +98,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: '[NPM] Wait for package to be accessible'
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: ./scripts/wait-for-npm-package.sh
 
       - name: '[FINISH] Send notification if anything failed on master or release branches'
