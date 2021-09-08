@@ -80,15 +80,38 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
      */
     uint32 public immutable secsClosure;
 
+    /**
+     * Emitted on every channel state change.
+     */
+    event ChannelUpdate(
+        address indexed source,
+        address indexed destination,
+        Channel newState
+    );
+
     event Announcement(
         address indexed account,
         bytes multiaddr
     );
 
-    event ChannelUpdate(
+    event ChannelFunded(
+        address indexed funder,
         address indexed source,
         address indexed destination,
-        Channel newState
+        uint256 amount
+    );
+
+    event ChannelOpened(
+        address indexed source,
+        address indexed destination
+    );
+
+    event ChannelBumped(
+        address indexed source,
+        address indexed destination,
+        bytes32 newCommitment,
+        uint256 ticketEpoch,
+        uint256 channelBalance
     );
 
     event ChannelClosureInitiated(
@@ -104,14 +127,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 channelBalance
     );
 
-    event ChannelBumped(
-        address indexed source,
-        address indexed destination,
-        bytes32 newCommitment,
-        uint256 ticketEpoch,
-        uint256 channelBalance
-    );
-
     event TicketRedeemed(
         address indexed source,
         address indexed destination,
@@ -122,14 +137,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 amount,
         uint256 winProb,
         bytes signature
-    );
-
-    event TokensReceived(
-        address indexed from,
-        address indexed account1,
-        address indexed account2,
-        uint256 amount1,
-        uint256 amount2
     );
 
     /**
@@ -178,13 +185,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 amount2
     ) external {
         require(amount1 + amount2 > 0, "amount must be greater than 0");
+
+        // fund channel in direction of: account1 -> account2
         if (amount1 > 0){
-          _fundChannel(account1, account2, amount1);
+          _fundChannel(msg.sender, account1, account2, amount1);
         }
+        // fund channel in direction of: account2 -> account1
         if (amount2 > 0){
-          _fundChannel(account2, account1, amount2);
+          _fundChannel(msg.sender, account2, account1, amount2);
         }
 
+        // pull tokens from funder
         token.transferFrom(msg.sender, address(this), amount1 + amount2);
     }
 
@@ -373,13 +384,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
             (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
             require(amount == amount1 + amount2, "amount sent must be equal to amount specified");
 
+            // fund channel in direction of: account1 -> account2
             if (amount1 > 0){
-                _fundChannel(account1, account2, amount1);
+                _fundChannel(from, account1, account2, amount1);
             }
+            // fund channel in direction of: account2 -> account1
             if (amount2 > 0){
-                _fundChannel(account2, account1, amount2);
+                _fundChannel(from, account2, account1, amount2);
             }
-            emit TokensReceived(from, account1, account2, amount1, amount2);
         }
     }
 
@@ -393,6 +405,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
      * @param amount amount to fund account1
      */
     function _fundChannel(
+        address funder,
         address source,
         address dest,
         uint256 amount
@@ -416,6 +429,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
         channel.balance = channel.balance + amount;
         emit ChannelUpdate(source, dest, channel);
+        emit ChannelFunded(funder, source, dest, amount);
     }
 
 
