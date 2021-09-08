@@ -96,7 +96,7 @@ export class PersistedState {
       }
     })
   }
-  
+
   /**
    * Retrieve the persisted state
    * @returns State network state
@@ -106,7 +106,7 @@ export class PersistedState {
   }
 
   /**
-   * Write a network state into the persisted state as a string, and execute the 
+   * Write a network state into the persisted state as a string, and execute the
    * update at the end of the writing.
    * @param s persisted network state
    */
@@ -169,7 +169,7 @@ export class PersistedState {
   /**
    * Update the list of all the non-closed cover traffic channels with the current
    * cover traffic node as `source`
-   * @param channels Channels opened with the cover traffic node as `source` 
+   * @param channels Channels opened with the cover traffic node as `source`
    */
   setCTChannels(channels: OpenChannels[]): void {
     const state = this.get()
@@ -232,10 +232,10 @@ export class PersistedState {
   }
 
   /**
-   * Randomly return a node in the network. The chance of being picked up is 
-   * in proportion to its weights, which is calculated through the formula of 
+   * Randomly return a node in the network. The chance of being picked up is
+   * in proportion to its weights, which is calculated through the formula of
    * `importance`.
-   * @returns a Public key of the node being randomed chosen based on its 
+   * @returns a Public key of the node being randomed chosen based on its
    * weight, throw an error otherwise.
    */
   weightedRandomChoice(): PublicKey {

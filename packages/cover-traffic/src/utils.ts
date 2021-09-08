@@ -21,7 +21,7 @@ export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
 /**
  * Get the total outgoing channel balance of a node, given the network state.
  * totalChannelBalance(n) = balance of each channel from node n
- * @param p Public key of the node 
+ * @param p Public key of the node
  * @param state State of the network
  * @returns Total channel balance in big number
  */
@@ -32,11 +32,11 @@ export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
 
 /**
  * Get the importance score of a node, given the network state.
- * Sum of the square root of all the outgoing channels 
+ * Sum of the square root of all the outgoing channels
  * importance(node) = sum(squareRoot((balance(node) * stake(node) * totalStake(node)))
  * where stake(n) = unreleasedTokens(n) + totalChannelBalance(n)
  * FIXME: Current version does not contain unreleased token balance.
- * @param p Public key of the node 
+ * @param p Public key of the node
  * @param state State of the network
  * @returns Total channel balance in big number
  */
@@ -59,7 +59,7 @@ export const randomWeightedImportance = (p: PublicKey, state: State): BN => {
 }
 
 /**
- * Find the channel entry that is between the provided source and destination, 
+ * Find the channel entry that is between the provided source and destination,
  * given the network state.
  * @param src Public key of the `source` of the channel
  * @param dest Public key of the `destination` of the channel
@@ -71,7 +71,7 @@ export const findChannel = (src: PublicKey, dest: PublicKey, state: State): Chan
     .find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
 
 /**
- * 
+ *
  * @param startNode Public key of the first-hop node
  * @param selfPub Public key of the cover-traffic node, which is also the recipient of the message.
  * @param sendMessage Method to send messages

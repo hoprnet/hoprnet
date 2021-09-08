@@ -25,7 +25,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
   tickInterval = 10000
 
   /**
-   * Go through network state and get arrays of channels to be opened/closed 
+   * Go through network state and get arrays of channels to be opened/closed
    * Called in `tickChannelStrategy` in `hopr-core`
    * @param balance HOPR token balance of the current node
    * @param currentChannels All the channels that have ever been opened with the current node as `source`
@@ -69,9 +69,11 @@ export class CoverTrafficStrategy extends SaneDefaults {
 
     // Network must have at least some channels to create a full cover-traffic loop.
     if (this.data.openChannelCount() > CT_INTERMEDIATE_HOPS + 1) {
-      for (let openChannel of state.ctChannels) { // all the non-closed channels from this cover-traffic node.
+      for (let openChannel of state.ctChannels) {
+        // all the non-closed channels from this cover-traffic node.
         const channel = this.data.findChannel(this.selfPub, openChannel.destination)
-        if (channel && channel.status == ChannelStatus.Open) {  // send messages for open channels
+        if (channel && channel.status == ChannelStatus.Open) {
+          // send messages for open channels
           const success = sendCTMessage(
             openChannel.destination,
             this.selfPub,
