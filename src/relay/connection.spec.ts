@@ -497,7 +497,6 @@ describe('relay connection - stream error propagation', function () {
   })
 
   it('correct sources in falsy sinks', async function () {
-    // const AliceRelay = Pair<StreamType>()
     const RelayAlice = Pair<StreamType>()
 
     const errorInSinkFunction = 'error in sink function'

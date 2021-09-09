@@ -175,7 +175,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             yield* toU8aStream(source)
             deferred.resolve()
           } catch (err: any) {
-            console.log(`error caught`, err.message)
             this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
             deferred.reject(err)
           }
