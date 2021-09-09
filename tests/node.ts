@@ -6,7 +6,7 @@ import type { Connection, HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 
-import { NOISE } from 'libp2p-noise'
+import { NOISE } from '@chainsafe/libp2p-noise'
 
 const MPLEX = require('libp2p-mplex')
 
