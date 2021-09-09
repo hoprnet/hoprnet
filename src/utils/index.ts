@@ -111,7 +111,7 @@ export async function dialHelper(
     return
   }
 
-  if ((err != null || struct == null) && libp2p._dht == undefined) {
+  if ((err != null || struct == null) && libp2p.peerRouting._routers.length == 0) {
     if (timeout != undefined) {
       clearTimeout(timeout)
     }
@@ -131,7 +131,7 @@ export async function dialHelper(
 
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
-    dhtResponse = await (libp2p._dht as any).findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
+    dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     error(
       `Querying the DHT for ${green(destination.toB58String())} failed. Known addresses:\n` +

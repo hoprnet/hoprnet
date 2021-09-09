@@ -116,7 +116,7 @@ class TCPConnection implements MultiaddrConnection {
         // If the source errored the socket will already have been destroyed by
         // toIterable.duplex(). If the socket errored it will already be
         // destroyed. There's nothing to do here except log the error & return.
-        error(err)
+        error(err.message)
       }
     }
   }
