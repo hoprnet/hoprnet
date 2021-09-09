@@ -41,8 +41,8 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   const pubkeys: any = {}
 
   const handleEvent = (ev) => {
-    if (ev.event == 'ChannelUpdate') {
-      const updateEvent = ev as Event<'ChannelUpdate'>
+    if (ev.event == 'ChannelUpdated') {
+      const updateEvent = ev as Event<'ChannelUpdated'>
 
       const eventChannelId = generateChannelId(
         Address.fromString(updateEvent.args.source),
@@ -66,7 +66,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
 
     async bumpChannel(_counterparty: string, _comm: string) {
       let newEvent = {
-        event: 'ChannelUpdate',
+        event: 'ChannelUpdated',
         transactionHash: '',
         blockNumber: 3,
         transactionIndex: 0,
@@ -84,7 +84,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
             closureTime: BigNumber.from('0')
           }
         } as any
-      } as Event<'ChannelUpdate'>
+      } as Event<'ChannelUpdated'>
       handleEvent(newEvent)
       this.emit('*', newEvent)
     }
@@ -358,7 +358,7 @@ describe('test indexer', function () {
 
     await indexer.start(chain, 0)
     const ev = {
-      event: 'ChannelUpdate',
+      event: 'ChannelUpdated',
       transactionHash: '',
       blockNumber: 2,
       transactionIndex: 0,
@@ -376,7 +376,7 @@ describe('test indexer', function () {
           closureTime: BigNumber.from('0')
         }
       } as any
-    } as Event<'ChannelUpdate'>
+    } as Event<'ChannelUpdated'>
     // We are ACCOUNT_A - if B opens a channel to us, we should automatically
     // commit.
     newEvent(ev)
@@ -392,7 +392,7 @@ describe('test indexer', function () {
     await commitmentSet.promise
 
     const evClose = {
-      event: 'ChannelUpdate',
+      event: 'ChannelUpdated',
       transactionHash: '',
       blockNumber: 5,
       transactionIndex: 0,
@@ -411,7 +411,7 @@ describe('test indexer', function () {
           closureByPartyA: true
         }
       } as any
-    } as Event<'ChannelUpdate'>
+    } as Event<'ChannelUpdated'>
     newEvent(evClose)
     newBlock()
     newBlock()
@@ -419,7 +419,7 @@ describe('test indexer', function () {
     await pendingIniated.promise
 
     const evClosed = {
-      event: 'ChannelUpdate',
+      event: 'ChannelUpdated',
       transactionHash: '',
       blockNumber: 7,
       transactionIndex: 0,
@@ -438,7 +438,7 @@ describe('test indexer', function () {
           closureByPartyA: false
         }
       } as any
-    } as Event<'ChannelUpdate'>
+    } as Event<'ChannelUpdated'>
 
     newEvent(evClosed)
     newBlock()

@@ -254,8 +254,8 @@ class Indexer extends EventEmitter {
       const eventName = event.event as EventNames
       if (eventName === ANNOUNCEMENT) {
         await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
-      } else if (eventName === 'ChannelUpdate') {
-        await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
+      } else if (eventName === 'ChannelUpdated') {
+        await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
       } else {
         log('skipping event: ', eventName, ' as it isnt recognized')
         //throw new Error('bad event name: ' + eventName)
@@ -301,7 +301,7 @@ class Indexer extends EventEmitter {
     }
   }
 
-  private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
+  private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
     let channel
     try {
       channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
