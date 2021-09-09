@@ -209,6 +209,8 @@ describe('check listening to sockets', function () {
   })
 
   it('should contact potential relays and expose relay addresses', async function () {
+    this.timeout(4e3)
+
     const relayContacted = Defer<void>()
 
     const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
