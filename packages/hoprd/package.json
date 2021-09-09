@@ -74,9 +74,6 @@
     "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
   },
-  "hopr": {
-    "description": "master"
-  },
   "publishConfig": {
     "access": "public"
   },
