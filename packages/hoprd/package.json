@@ -26,7 +26,7 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "dependencies": {
-    "@ceramicnetwork/http-client": "^1.2.0",
+    "@ceramicnetwork/http-client": "^1.2.1",
     "@ceramicnetwork/stream-tile": "^1.2.0",
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
