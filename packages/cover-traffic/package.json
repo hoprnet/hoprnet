@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/cover-traffic",
   "description": "Generate chaffing traffic",
-  "version": "1.77.0-next.8",
+  "version": "1.77.0-next.9",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
