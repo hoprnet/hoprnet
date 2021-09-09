@@ -1,4 +1,6 @@
 import { performance } from 'perf_hooks'
+import { validate } from 'jsonschema'
+import fs from 'fs'
 
 export function timer(fn: () => void): number {
   const start = performance.now()
@@ -20,4 +22,19 @@ export function expandVars(input: string, vars: { [key: string]: any }) {
     }
     return vars[varName]
   })
+}
+
+export function loadJson(file_path: string): any {
+  const content = fs.readFileSync(file_path, 'utf-8')
+  return JSON.parse(content)
+}
+
+export function validateData(data: any, schema: any) {
+  const res = validate(data, schema)
+  for (const err of res.errors) {
+    console.log(err.stack)
+  }
+  if (res.errors.length > 0) {
+    throw new Error(`validation failed`)
+  }
 }

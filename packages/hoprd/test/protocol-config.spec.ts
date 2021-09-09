@@ -1,21 +1,5 @@
-import { validate } from 'jsonschema'
-import fs from 'fs'
+import { loadJson, validateData } from '@hoprnet/hopr-utils'
 import type { Network, ProtocolConfig } from '@hoprnet/hopr-core'
-
-function loadJson(file_path: string): any {
-  const content = fs.readFileSync(file_path, 'utf-8')
-  return JSON.parse(content)
-}
-
-function validateData(data: ProtocolConfig, schema: any) {
-  const res = validate(data, schema)
-  for (const err of res.errors) {
-    console.log(err.stack)
-  }
-  if (res.errors.length > 0) {
-    throw new Error(`validation failed`)
-  }
-}
 
 describe('protocol config', async function () {
   it('should conform to schema', async function () {
