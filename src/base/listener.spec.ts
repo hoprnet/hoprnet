@@ -177,7 +177,7 @@ async function stopNode(socket: Socket | Listener) {
   return closePromise
 }
 
-describe('check listening to sockets', function () {
+describe.only('check listening to sockets', function () {
   it('recreate the socket and perform STUN request', async function () {
     let listener: Listener
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
@@ -208,7 +208,7 @@ describe('check listening to sockets', function () {
     await Promise.all(stunServers.map(stopNode))
   })
 
-  it('should contact potential relays and expose relay addresses', async function () {
+  it.only('should contact potential relays and expose relay addresses', async function () {
     const relayContacted = Defer<void>()
 
     const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
@@ -223,13 +223,19 @@ describe('check listening to sockets', function () {
 
     const eventPromise = once(node.listener.emitter, '_newNodeRegistered')
 
+    eventPromise.then(() => console.log(`newNodeEventTriggered`))
+
     node.publicNodesEmitter.emit(`addPublicNode`, {
       id: relay.peerId,
       multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)]
     })
 
+
+    relayContacted.promise.then(() => console.log(`relay got contacted`))
     // Checks that relay and STUN got contacted, otherwise timeout
     await Promise.all([relayContacted.promise, eventPromise])
+
+    console.log(`relay got contacted. promise done`)
 
     const addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())
 
@@ -237,6 +243,8 @@ describe('check listening to sockets', function () {
       addrs.includes(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`),
       `Listener must expose circuit address`
     )
+
+    console.log(`before stopping nodes`)
 
     await Promise.all([stopNode(node.listener), stopNode(relay.listener), stopNode(stunServer)])
   })
