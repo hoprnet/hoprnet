@@ -81,14 +81,13 @@ jobs:
         if: ${{ !env.ACT }}
         run: ./scripts/commit-and-push-all-changes.sh
         env:
-          HOPR_GIT_MSG: "Update smart contract deployments"
+          HOPR_GIT_MSG: "chore(release): update smart contract deployments"
 
-      - name: '[NPM] Publish prerelease version (On pushes to master)'
-        if: ${{ github.ref == 'refs/heads/master' }}
+      - name: '[NPM] Publish prerelease version (On pushes to master and debug-deploy/*)'
+        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') }}
         run: ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          HOPR_VERSION_MAJMIN: true
 
       # Pushing a PR to a release branch should increment the patch version in
       # accordance with semver.
@@ -99,7 +98,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: '[NPM] Wait for package to be accessible'
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: ./scripts/wait-for-npm-package.sh
 
       - name: '[FINISH] Send notification if anything failed on master or release branches'
@@ -238,7 +237,7 @@ jobs:
         run: |
           declare last_git_tag="$(git describe --tags --abbrev=0)"
           declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
-          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${commits_since_tag}"
+          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${tag}
         env:
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
@@ -362,7 +361,7 @@ jobs:
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
             declare last_git_tag="$(git describe --tags --abbrev=0)"
             declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
-            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${commits_since_tag}"
+            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
           fi
           echo "Pre-deploy env var RELEASE=${RELEASE}"
           ./scripts/deploy.sh
