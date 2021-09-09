@@ -237,7 +237,7 @@ jobs:
         run: |
           declare last_git_tag="$(git describe --tags --abbrev=0)"
           declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
-          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${commits_since_tag}"
+          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${tag}
         env:
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
@@ -361,7 +361,7 @@ jobs:
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
             declare last_git_tag="$(git describe --tags --abbrev=0)"
             declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
-            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${commits_since_tag}"
+            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
           fi
           echo "Pre-deploy env var RELEASE=${RELEASE}"
           ./scripts/deploy.sh
