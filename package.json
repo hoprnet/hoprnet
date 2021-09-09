@@ -51,7 +51,7 @@
     "@types/debug": "^4.1.7",
     "@types/mocha": "^9.0.0",
     "@types/node": "16",
-    "@types/simple-peer": "^9.11.1",
+    "@types/simple-peer": "^9.11.2",
     "@types/yargs": "^17.0.2",
     "chai": "^4.3.4",
     "chai-spies": "^1.0.0",
@@ -63,7 +63,7 @@
     "libp2p-mplex": "0.10.4",
     "libp2p-noise": "^4.0",
     "mocha": "^9.0.3",
-    "prettier": "~2.3.2",
+    "prettier": "~2.4.0",
     "ts-node": "^10.2.0",
     "typescript": "^4.3.5",
     "yargs": "^17.0.1"

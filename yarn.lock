@@ -430,7 +430,7 @@ __metadata:
     "@types/debug": ^4.1.7
     "@types/mocha": ^9.0.0
     "@types/node": 16
-    "@types/simple-peer": ^9.11.1
+    "@types/simple-peer": ^9.11.2
     "@types/yargs": ^17.0.2
     abort-controller: 3.0.0
     abortable-iterator: ^3.0.0
@@ -452,7 +452,7 @@ __metadata:
     multihashes: ^4.0.2
     p-defer: 3
     peer-id: ~0.15.2
-    prettier: ~2.3.2
+    prettier: ~2.4.0
     simple-peer: 9.11
     stream-to-it: ^0.2.4
     ts-node: ^10.2.0
@@ -858,12 +858,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/simple-peer@npm:^9.11.1":
-  version: 9.11.1
-  resolution: "@types/simple-peer@npm:9.11.1"
+"@types/simple-peer@npm:^9.11.2":
+  version: 9.11.2
+  resolution: "@types/simple-peer@npm:9.11.2"
   dependencies:
     "@types/node": "*"
-  checksum: 15738eb9e95e2fa98b012f519ed01dbd55219ff52ed531a95b6cb7861fc1a000930db7e165de8f414a3b1998813a7c6c26becaa1eb21918f8e65e7e03395cfe5
+  checksum: 4a0bb0294bdd5197e980a9039da921e46c2c85848a084da228fec2368438bccc5614810a99016d3132912079dc52865450ad77a722f51b33a7e6c6e178e29236
   languageName: node
   linkType: hard
 
@@ -3900,12 +3900,12 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"prettier@npm:~2.3.2":
-  version: 2.3.2
-  resolution: "prettier@npm:2.3.2"
+"prettier@npm:~2.4.0":
+  version: 2.4.0
+  resolution: "prettier@npm:2.4.0"
   bin:
     prettier: bin-prettier.js
-  checksum: 4fd89a7f6a12b13456d359fba2b1dd0fc0a17cf33f8f15953ab9f43b21ea9b09b5a2861d63b558ca0577274ce606d390e70628cf93e26d19d6cb7f19c9eebc31
+  checksum: b8409c92cf2e4e423b74e408f76b4786c2d8d5bc63c97aad256e9ca65c919a138e64717fdff4abeb9cb3b2048bb8320fc2e8fbca6f220b01dc08ad83c349cdc5
   languageName: node
   linkType: hard
 
