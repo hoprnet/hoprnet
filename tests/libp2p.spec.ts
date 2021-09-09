@@ -10,7 +10,7 @@ import type { MultiaddrConnection, Upgrader } from 'libp2p-interfaces/src/transp
 import type { HandlerProps } from 'libp2p'
 import libp2p from 'libp2p'
 
-import { NOISE } from 'libp2p-noise'
+import { NOISE } from '@chainsafe/libp2p-noise'
 const MPLEX = require('libp2p-mplex')
 import UpgraderClass from 'libp2p/src/upgrader'
 

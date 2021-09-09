@@ -59,7 +59,7 @@ Start a bootstrapServer
 ```ts
 const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
-import { NOISE } from 'libp2p-noise'
+import { NOISE } from '@chainsafe/libp2p-noise'
 const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
@@ -90,7 +90,7 @@ Start another client
 ```ts
 const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
-import { NOISE } from 'libp2p-noise'
+import { NOISE } from '@chainsafe/libp2p-noise'
 const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
