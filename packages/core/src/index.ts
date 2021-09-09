@@ -3,7 +3,7 @@ import type { Connection } from 'libp2p'
 
 const MPLEX = require('libp2p-mplex')
 import KadDHT from 'libp2p-kad-dht'
-import { NOISE } from 'libp2p-noise'
+import { NOISE } from '@chainsafe/libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
@@ -34,7 +34,8 @@ import {
   isSecp256k1PeerId,
   AcknowledgedTicket,
   ChannelStatus,
-  MIN_NATIVE_BALANCE
+  MIN_NATIVE_BALANCE,
+  u8aConcat
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -202,6 +203,8 @@ class Hopr extends EventEmitter {
         dht: KadDHT
       },
       config: {
+        // @ts-ignore
+        protocolPrefix: 'hopr',
         transport: {
           HoprConnect: {
             initialNodes,
@@ -244,6 +247,7 @@ class Hopr extends EventEmitter {
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
 
+    // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
     const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
       libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
     const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
@@ -347,6 +351,8 @@ class Hopr extends EventEmitter {
     }
   }
 
+  // On the strategy interval, poll the strategy to see what channel changes
+  // need to be made.
   private async tickChannelStrategy() {
     verbose('strategy tick', this.status)
     if (this.status != 'RUNNING') {
@@ -366,6 +372,14 @@ class Hopr extends EventEmitter {
       chain.getRandomOpenChannel.bind(chain)
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
+
+    for (let channel of currentChannels) {
+      if (channel.status == ChannelStatus.PendingToClose) {
+        // attempt to finalize closure
+        closeChannels.push(channel.destination)
+      }
+    }
+
     for (let toClose of closeChannels) {
       verbose(`closing ${toClose}`)
       try {
@@ -455,7 +469,7 @@ class Hopr extends EventEmitter {
    * @param peer peer to query for
    */
   public getObservedAddresses(peer: PeerId): Multiaddr[] {
-    return this.libp2p.peerStore.get(peer).addresses ?? []
+    return (this.libp2p.peerStore.get(peer).addresses ?? []).map((addr) => addr.multiaddr)
   }
 
   /**
@@ -856,6 +870,13 @@ class Hopr extends EventEmitter {
   public async getPublicKeyOf(addr: Address): Promise<PublicKey> {
     const ethereum = await this.startedPaymentChannels()
     return await ethereum.getPublicKeyOf(addr)
+  }
+
+  // NB: The prefix "HOPR Signed Message: " is added as a security precaution.
+  // Without it, the node could be convinced to sign a message like an Ethereum
+  // transaction draining it's connected wallet funds, since they share the key.
+  public async signMessage(message: Uint8Array) {
+    return await this.id.privKey.sign(u8aConcat(new TextEncoder().encode('HOPR Signed Message: '), message))
   }
 
   public async getEthereumAddress(): Promise<Address> {

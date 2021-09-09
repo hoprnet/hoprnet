@@ -8,15 +8,30 @@
 
 - [constructor](IERC777Sender__factory.md#constructor)
 
+### Properties
+
+- [abi](IERC777Sender__factory.md#abi)
+
 ### Methods
 
 - [connect](IERC777Sender__factory.md#connect)
+- [createInterface](IERC777Sender__factory.md#createinterface)
 
 ## Constructors
 
 ### constructor
 
 • **new IERC777Sender__factory**()
+
+## Properties
+
+### abi
+
+▪ `Static` `Readonly` **abi**: { `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "operator"; `type`: `string` = "address" }[] ; `name`: `string` = "tokensToSend"; `outputs`: `any`[] = []; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" }[]
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC777Sender__factory.ts:51
 
 ## Methods
 
@@ -37,4 +52,18 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC777Sender__factory.ts:11
+packages/ethereum/types/factories/IERC777Sender__factory.ts:55
+
+___
+
+### createInterface
+
+▸ `Static` **createInterface**(): `IERC777SenderInterface`
+
+#### Returns
+
+`IERC777SenderInterface`
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC777Sender__factory.ts:52

@@ -4,7 +4,7 @@ import fs from 'fs'
 import ws from 'ws'
 import path from 'path'
 import debug from 'debug'
-import { parse } from 'url'
+import { parse, URL } from 'url'
 import next from 'next'
 import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
@@ -36,6 +36,24 @@ export class AdminServer {
 
     if (req.headers.cookie == undefined) {
       return false
+    }
+
+    // Other clients different to `hoprd` might pass the `apiToken` via a
+    // query param since they won't be on the same domain the node is hosted,
+    // and thus, unable to set the `apiToken` via cookies. Using `req.url` we
+    // can detect these cases and provide the ability for any client that
+    // knows the `apiToken` to reach your HOPR node.
+    if (req.url) {
+      try {
+        // NB: We use a placeholder domain since req.url only passes query params
+        const url = new URL(`https://hoprnet.org${req.url}`)
+        const apiToken = (url.searchParams && url.searchParams.get('apiToken')) || ''
+        if (encodeURI(apiToken) == this.apiToken) {
+          return true
+        }
+      } catch (e) {
+        this.logs.error('invalid URL queried', e)
+      }
     }
 
     let cookies: ReturnType<typeof cookie.parse> | undefined

@@ -1,47 +1,51 @@
-\subsection{Proof Of Relay}
+\subsection{Proof of Relay}
 \label{sec:proofofrelay}
 
 HOPR incentivizes packet transformation and delivery using a mechanism called
-“Proof-Of-Relay”. This mechanism guarantees that nodes relay services are
+\textbf{proof of relay}. This mechanism guarantees that a node's relay services are
 verifiable.
 
 \paragraph{Construction}
+
 \begin{itemize}
-    \item Every packet is sent together with a ticket (check ticket section).
+    \item Every packet is sent together with a ticket.
     \item Each ticket contains a challenge.
-    \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket (check ticket section).
+    \item The validity of a ticket can only be checked on reception of the
+        packet but the on-chain logic enforces a solution to the challenge
+        stated in the ticket.
+
 \end{itemize}
 
 \subsubsection{Challenge}
 
-$(A)$ creates a shared group element $\alpha_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key that's generated from the master DH sphinx key and will be used to derive new keys $s_i^{(0)}$ and $s_{i}^{(1)}$. 
-The first key $s_i^{(0)}$ will be used as the node's \textit{own key share} and the second key $s_i^{(1)}$ will be used as the \textit{acknowledgement key} which will be embedded in the acknowledgement for a packet and thereby unlocks the incentive for the previous relayer for transforming and delivering the packet.
+$A$ creates a shared group element $\alpha_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key generated from the master DH Sphinx key and will be used to derive new keys $s_i^{(0)}$ and $s_{i}^{(1)}$. 
+The first key, $s_i^{(0)}$, will be used as the node's \textit{own key share} and the second key, $s_i^{(1)}$, will be used as the \textit{acknowledgement key}. The acknowledgement key will be embedded in the acknowledgement for a packet and thereby unlocks the reward for the previous relayer, earned for transforming and delivering the packet.
     \paragraph{Key derivation}
-    We first create a "session secret" $s_i$ then we use it as a seed to derive subkeys $s_i^{(0)},s_i^{(1)}$ for each node on the route. We do so using a HKDF (HMAC-based Key Derivation Function) which is a cryptographic hash function that derives one or more secret keys from a secret value using a pseudorandom function. The key derivation works as follows:
+    $A$ first creates a ``session secret", $s_i$, then uses it as a seed to derive subkeys $s_i^{(0)},s_i^{(1)}$ for each node on the route. This is done using an HKDF (HMAC-based Key Derivation Function), a cryptographic hash function that derives one or more secret keys from a secret value using a pseudorandom function. The key derivation works as follows:
     \begin{itemize}
-        \item Extract: Creates a pseudo-random key $s_i$   
+        \item \textbf{Extract}: Creates a pseudo-random key $s_i$   
         $$HKDF.extract(h_b, |h_b|, (\alpha_i* privKey) || pubKey)$$   
 
-        \item Expand: This step takes the output of the previous one $s_i$ as a seed and creates an output key material $s_i^{(0)},s_i^{(1)}$ which is expanded from hashes of $s_i$ and an optional info message (salt). The process goes as follows:
+        \item \textbf{Expand}: This step takes the output of the previous one, $s_i$, as a seed and creates output key material $s_i^{(0)},s_i^{(1)}$ which is expanded from hashes of $s_i$ and an optional info message (salt). The process occurs as follows:
         $$HKDF.expand(h_b, |h_b|,s_i, |s_i|, hashKey)$$
     \end{itemize}
-    where $||$ is concatenation and $*$ is scalar multiplication on the curve. $h_b$ is blake2s256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudo random key used as a seed and $|s_i|$ is its length, $hashKey$ is an identifier used to create a "virtual" hash function for each purpose, e.g. for the PRG, one for PRP, etc. and as well as for the PoR scheme. In case the result of HKDF does not lead to a field element, $hashKey$ is padded until that's the case.
-    \\~\\ The sender $(A)$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
-    The value “hint” or $H$ is computed as 
+    where $||$ is concatenation and $*$ is scalar multiplication on the curve. $h_b$ is the BLAKE2s 256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudo random key used as a seed and $|s_i|$ is its length. $hashKey$ is an identifier used to create a``virtual" hash function for each purpose, e.g., one for the PRG, one for PRP, etc. and also for the proof-of-relay scheme. If the result of HKDF does not lead to a field element, $hashKey$ is padded until it does.
+    \\~\\ $A$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
+    The hint value, $H$, is computed as 
     \begin{align}  
-        H_i&=s_{i+1}^{(1)}*G
+        H_i&=s_{i+1}^{(1)}*G,
          \end{align}
-    where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the sphinx section). 
+    where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the \ref{sec:sphinx} section). 
     \newline The hint for party $n_i$ is used to check whether the returned value $s_{i+1}'^{(1)}$ matches the promised value $s_{i+1}^{(1)}$ by checking whether $H_i$ equals $s_{i+1}'^{(1)}*G$. 
-   \\The sender $(A)$ also creates a challenge $T_{c_i}$ such that 
+   \\The sender $A$ also creates a challenge $T_{c_i}$, such that 
    \begin{align}  
     T_{c_i}&=(s_i^{(0)}+s_{i+1}^{(1)})*G
      \end{align}
-   Since “Proof-Of-Relay” is used to make the relay services of nodes verifiable, it is the duty of each node to check that given challenges are derivable from the given and the expected information.
-Packets with inappropriate challenges should be dropped as they might not lead to winning tickets.
-\\The values $H_i$ and $T_{c_i}$ are sent with the routing information $\beta_i$ as follows:
+   Since proof of relay is used to ensure the relay services of nodes are verifiable, it is the duty of each node to check that given challenges are derivable from the given and expected information.
+Packets with inappropriate challenges should be dropped, as they might not result in winning tickets with the expected probability.
+\\~\\The values $H_i$ and $T_{c_i}$ are sent with the routing information $\beta_i$ as follows:
 $$\beta_i=y_{i+1}\|H_i\|T_{c_i}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]}$$
-By decrypting $\beta_i$, each mix node $n_i$ will retrieve the public key of the next downstream node and both the hint and challenge which will be used in the Proof Of Relay to make sure relay services are verifiable.
+By decrypting $\beta_i$, each mix node $n_i$ will retrieve the public key of the next downstream node and both the hint and challenge required by proof of relay to ensure relay services are verifiable.
 
 \begin{comment}
  \begin{figure}[H]

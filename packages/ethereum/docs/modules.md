@@ -89,6 +89,9 @@
 - [ContractData](modules.md#contractdata)
 - [ContractNames](modules.md#contractnames)
 - [DeploymentTypes](modules.md#deploymenttypes)
+- [GetARGsTypeFromFactory](modules.md#getargstypefromfactory)
+- [GetContractTypeFromFactory](modules.md#getcontracttypefromfactory)
+- [MinEthersFactory](modules.md#minethersfactory)
 - [NetworkTag](modules.md#networktag)
 - [Networks](modules.md#networks)
 - [PublicNetworks](modules.md#publicnetworks)
@@ -139,6 +142,61 @@ ___
 #### Defined in
 
 [packages/ethereum/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L5)
+
+___
+
+### GetARGsTypeFromFactory
+
+Ƭ **GetARGsTypeFromFactory**<`F`\>: `F` extends [`MinEthersFactory`](modules.md#minethersfactory)<`any`, `any`\> ? `Parameters`<`F`[``"deploy"``]\> : `never`
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `F` |
+
+#### Defined in
+
+packages/ethereum/types/commons.ts:34
+
+___
+
+### GetContractTypeFromFactory
+
+Ƭ **GetContractTypeFromFactory**<`F`\>: `F` extends [`MinEthersFactory`](modules.md#minethersfactory)<infer C, `any`\> ? `C` : `never`
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `F` |
+
+#### Defined in
+
+packages/ethereum/types/commons.ts:28
+
+___
+
+### MinEthersFactory
+
+Ƭ **MinEthersFactory**<`C`, `ARGS`\>: `Object`
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `C` |
+| `ARGS` |
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `deploy` | (...`a`: `ARGS`[]) => `Promise`<`C`\> |
+
+#### Defined in
+
+packages/ethereum/types/commons.ts:25
 
 ___
 
@@ -215,14 +273,15 @@ packages/ethereum/types/commons.ts:15
 
 ### getContractData
 
-▸ `Const` **getContractData**(`network`, `contract`): [`ContractData`](modules.md#contractdata)
+▸ `Const` **getContractData**(`network`, `contract`, `environmentId?`): [`ContractData`](modules.md#contractdata)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `network` | [`Networks`](modules.md#networks) |
-| `contract` | [`ContractNames`](modules.md#contractnames) |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `network` | [`Networks`](modules.md#networks) | `undefined` |
+| `contract` | [`ContractNames`](modules.md#contractnames) | `undefined` |
+| `environmentId` | `string` | `'default'` |
 
 #### Returns
 

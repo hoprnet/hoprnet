@@ -2,8 +2,9 @@ name: build yellowpaper
 
 on:
   push:
+    branches: ['master', 'yellowpaper/**']
     paths:
-      'docs/yellowpaper/**/*.tex'
+      - 'docs/yellowpaper/**'
 
 jobs:
   build_latex:
@@ -21,19 +22,18 @@ jobs:
             tlmgr update --self
             tlmgr install preprint blindtext makecell multirow float comment
             tlmgr install algorithm2e ifoddpage relsize # add algorithm2e
-            cd docs/yellowpaper
-            latexmk -pdf
-            latexmk -c
-            mv main.pdf yellowpaper.pdf
+            make -C docs/yellowpaper/
 
-      - name: Commit generated .pdf file
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR LaTeX build robot"
-          git add docs/yellowpaper/yellowpaper.pdf
-          git commit -a -m "chore(build): update yellowpaper" || true
-          git pull origin ${{ github.ref }} --rebase
-          git push origin ${{ github.ref }}
+      - name: 'Configure Git info'
+        run: ./scripts/configure-git-info.sh
+
+      - name: Commit & Push changes
+        if: ${{ !env.ACT }}
+        env:
+          HOPR_GIT_MSG: "chore(build): update yellowpaper"
+          HOPR_GITHUB_REF: ${{ github.ref }}
+        run: ./scripts/commit-and-push-all-changes.sh
+
       # This should go into a release workflow
       # - name: Get the version
       #   id: get_version

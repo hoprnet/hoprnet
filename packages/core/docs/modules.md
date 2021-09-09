@@ -4,6 +4,10 @@
 
 ## Table of contents
 
+### Namespaces
+
+- [LibP2P](modules/LibP2P.md)
+
 ### Classes
 
 - [LibP2P](classes/LibP2P.md)
@@ -92,7 +96,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L73)
+[packages/core/src/index.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L74)
 
 ___
 
@@ -102,7 +106,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L95)
+[packages/core/src/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L96)
 
 ## Variables
 

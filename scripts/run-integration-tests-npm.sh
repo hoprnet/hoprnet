@@ -75,6 +75,7 @@ declare hardhat_rpc_log="${tmp}/hopr-npm-hardhat-rpc.log"
 function cleanup {
   local EXIT_CODE=$?
 
+  # at this point we don't want to fail hard anymore
   trap - SIGINT SIGTERM ERR EXIT
   set +Eeuo pipefail
 
@@ -159,9 +160,9 @@ function fund_node() {
     exit 1
   fi
 
-  log "Funding 1 ETH and 1 HOPR to ${eth_address}"
-  yarn hardhat faucet --config packages/ethereum/hardhat.config.ts \
-    --address "${eth_address}" --network localhost --ishopraddress true
+  log "Funding 1 ETH and 10 HOPR to ${eth_address}"
+  yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+    --address "${eth_address}" --network localhost --ishopraddress true --amount 10
 }
 
 # --- Log test info {{{
@@ -214,7 +215,7 @@ ensure_port_is_free 19096
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-DEVELOPMENT=true yarn hardhat node --config packages/ethereum/hardhat.config.ts \
+DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
@@ -261,7 +262,7 @@ ${mydir}/../test/integration-test.sh \
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
-grep -E "^HOPR Balance: +1 HOPR$" "${node6_log}"
+grep -E "^HOPR Balance: +10 HOPR$" "${node6_log}"
 grep -E "^ETH Balance: +1 xDAI$" "${node6_log}"
 grep -E "^Running on: localhost$" "${node6_log}"
 # }}}

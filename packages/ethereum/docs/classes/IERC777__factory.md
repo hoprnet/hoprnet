@@ -8,15 +8,30 @@
 
 - [constructor](IERC777__factory.md#constructor)
 
+### Properties
+
+- [abi](IERC777__factory.md#abi)
+
 ### Methods
 
 - [connect](IERC777__factory.md#connect)
+- [createInterface](IERC777__factory.md#createinterface)
 
 ## Constructors
 
 ### constructor
 
 • **new IERC777__factory**()
+
+## Properties
+
+### abi
+
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `boolean` = false; `inputs`: { `indexed`: `boolean` = true; `internalType`: `string` = "address"; `name`: `string` = "operator"; `type`: `string` = "address" }[] ; `name`: `string` = "AuthorizedOperator"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "owner"; `type`: `string` = "address" }[] ; `name`: `string` = "balanceOf"; `outputs`: { `internalType`: `string` = "uint256"; `name`: `string` = ""; `type`: `string` = "uint256" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" })[]
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC777__factory.ts:404
 
 ## Methods
 
@@ -37,4 +52,18 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC777__factory.ts:11
+packages/ethereum/types/factories/IERC777__factory.ts:408
+
+___
+
+### createInterface
+
+▸ `Static` **createInterface**(): `IERC777Interface`
+
+#### Returns
+
+`IERC777Interface`
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC777__factory.ts:405

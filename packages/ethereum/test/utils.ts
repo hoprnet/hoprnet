@@ -31,12 +31,12 @@ export const toSolPercent = (multiplier: number, percent: number): string => {
   return String(Math.floor(percent * multiplier))
 }
 
-export const advanceBlock = async (provider: providers.JsonRpcProvider) => {
+export const advanceBlock = async (provider: providers.StaticJsonRpcProvider) => {
   return provider.send('evm_mine', [])
 }
 
 // increases ganache time by the passed duration in seconds
-export const increaseTime = async (provider: providers.JsonRpcProvider, _duration: ethers.BigNumberish) => {
+export const increaseTime = async (provider: providers.StaticJsonRpcProvider, _duration: ethers.BigNumberish) => {
   const duration = ethers.BigNumber.from(_duration)
 
   if (duration.isNegative()) throw Error(`Cannot increase time by a negative amount (${duration})`)

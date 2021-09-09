@@ -14,11 +14,13 @@
     ],
     "ports": [
       "3000:3000/tcp",
-      "3001:3001/tcp"
+      "3001:3001/tcp",
+      "8080:8080/tcp",
+      "9091:9091/tcp"
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
-    "hash": "/ipfs/QmcjAW4176aRFT7sU64gDLeB88YNoaQaAbvEvP9bwEne3Y",
-    "size": 60521624,
+    "hash": "/ipfs/QmRzG8odoG9fGFixFw7TkB3Y9RQPDjUYSMdSCNPwCRFA7h",
+    "size": 60514740,
     "restart": "always"
   },
   "author": "HOPR",

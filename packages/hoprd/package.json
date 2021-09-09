@@ -1,15 +1,13 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.76.0-next.2",
+  "version": "1.77.0-next.0",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "main": "lib/index.js",
   "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
-  "bin": {
-    "hoprd": "lib/index.js"
-  },
+  "bin": "lib/index.js",
   "files": [
     "lib",
     "hopr-admin/.next",
@@ -28,43 +26,45 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "dependencies": {
-    "@ceramicnetwork/http-client": "^1.0.6",
-    "@ceramicnetwork/stream-tile": "^1.0.6",
-    "@hoprnet/hopr-core": "1.76.0-next.2",
-    "@hoprnet/hopr-utils": "1.76.0-next.0",
+    "@ceramicnetwork/http-client": "^1.2.0",
+    "@ceramicnetwork/stream-tile": "^1.2.0",
+    "@hoprnet/hopr-core": "workspace:packages/core",
+    "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "bn.js": "5.2.0",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
+    "chalk": "^4.1.1",
     "check-password-strength": "^2.0.3",
     "cookie": "^0.4.1",
-    "dids": "^2.1.0",
+    "debug": "^4.3.2",
+    "dids": "^2.4.0",
     "ethereumjs-wallet": "^1.0.1",
     "jazzicon": "^1.5.0",
     "js-cookie": "^3.0.0",
     "key-did-provider-ed25519": "^1.1.0",
     "key-did-resolver": "^1.2.1",
-    "next": "^11.0.0",
+    "next": "11.1.2",
     "peer-id": "0",
+    "prop-types": "^15.7.2",
     "react": "17.0.2",
     "react-dom": "17.0.2",
     "restana": "^4.8.0",
     "rlp": "^2.2.6",
     "run-queue": "^2.0.1",
-    "strip-ansi": "6.0.0",
+    "strip-ansi": "6",
     "tiny-hashes": "^1.0.1",
-    "yargs": "^17.0.0"
+    "ws": "^8.2.1",
+    "yargs": "17.1.1"
   },
   "devDependencies": {
-    "@types/bs58": "^4.0.1",
-    "@types/debug": "^4.1.5",
-    "@types/mocha": "^9.0.0",
-    "@types/node": "16.4.1",
-    "@types/yargs": "^17.0.0",
+    "@types/yargs": "^17.0.2",
     "mocha": "^9.0.0",
     "rimraf": "^3.0.2",
+    "sinon": "^11.1.1",
     "ts-node": "^10.1.0",
-    "typedoc": "0.21.5",
+    "typedoc": "0.21.9",
     "typedoc-plugin-markdown": "3.10.4",
-    "typescript": "4.3.5"
+    "typescript": "4.4.2"
   },
   "mocha": {
     "extension": [
@@ -73,7 +73,12 @@
     "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
   },
+  "hopr": {
+    "description": "master",
+    "environment_id": "master"
+  },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "stableVersion": "1.76.0-next.31"
 }

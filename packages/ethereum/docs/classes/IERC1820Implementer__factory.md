@@ -8,15 +8,30 @@
 
 - [constructor](IERC1820Implementer__factory.md#constructor)
 
+### Properties
+
+- [abi](IERC1820Implementer__factory.md#abi)
+
 ### Methods
 
 - [connect](IERC1820Implementer__factory.md#connect)
+- [createInterface](IERC1820Implementer__factory.md#createinterface)
 
 ## Constructors
 
 ### constructor
 
 • **new IERC1820Implementer__factory**()
+
+## Properties
+
+### abi
+
+▪ `Static` `Readonly` **abi**: { `inputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = "interfaceHash"; `type`: `string` = "bytes32" }[] ; `name`: `string` = "canImplementInterfaceForAddress"; `outputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = ""; `type`: `string` = "bytes32" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" }[]
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC1820Implementer__factory.ts:40
 
 ## Methods
 
@@ -37,4 +52,18 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC1820Implementer__factory.ts:11
+packages/ethereum/types/factories/IERC1820Implementer__factory.ts:44
+
+___
+
+### createInterface
+
+▸ `Static` **createInterface**(): `IERC1820ImplementerInterface`
+
+#### Returns
+
+`IERC1820ImplementerInterface`
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC1820Implementer__factory.ts:41

@@ -1,4 +1,4 @@
-import type { SolcUserConfig } from 'hardhat/types'
+import type { HardhatRuntimeEnvironment, HardhatConfig, SolcUserConfig } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
 // load hardhat plugins
@@ -10,15 +10,26 @@ import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
 // rest
-import { HardhatUserConfig, task, types } from 'hardhat/config'
-import { ethers } from 'ethers'
+import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
 import { networks, NetworkTag } from './constants'
 
-const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, INFURA_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
+const {
+  DEPLOYER_WALLET_PRIVATE_KEY,
+  ETHERSCAN_KEY,
+  INFURA_KEY,
+  QUIKNODE_KEY,
+  DEVELOPMENT = false,
+  ENVIRONMENT_ID = 'default'
+} = process.env
 const GAS_MULTIPLIER = 1.1
 
-// set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
-process.env.ETHERSCAN_API_KEY = ETHERSCAN_KEY
+extendConfig((config: HardhatConfig) => {
+  config.etherscan.apiKey = ETHERSCAN_KEY
+})
+
+extendEnvironment((hre: HardhatRuntimeEnvironment) => {
+  hre.environment = ENVIRONMENT_ID
+})
 
 const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
@@ -57,14 +68,14 @@ const hardhatConfig: HardhatUserConfig = {
     mumbai: {
       ...networks.mumbai,
       live: false,
-      tags: ['testing'] as NetworkTag[],
+      tags: ['development'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     },
     polygon: {
       ...networks.polygon,
-      live: false,
+      live: true,
       tags: ['testing'] as NetworkTag[],
       url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
@@ -89,7 +100,7 @@ const hardhatConfig: HardhatUserConfig = {
     tests: './test',
     cache: './hardhat/cache',
     artifacts: './hardhat/artifacts',
-    deployments: './deployments'
+    deployments: `./deployments/${ENVIRONMENT_ID}`
   },
   typechain: {
     outDir: './types',
@@ -105,7 +116,7 @@ task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR 
   return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
 })
   .addParam<string>('address', 'HoprToken address', undefined, types.string)
-  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', ethers.utils.parseEther('1').toString(), types.string)
+  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', '1', types.string)
   .addOptionalParam<boolean>(
     'ishopraddress',
     'Whether the address passed is a HOPR address or not',

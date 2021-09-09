@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- `Contract`
+- `BaseContract`
 
   ↳ **`Ownable`**
 
@@ -47,14 +47,11 @@
 - [on](Ownable.md#on)
 - [once](Ownable.md#once)
 - [owner](Ownable.md#owner)
-- [owner()](Ownable.md#owner())
 - [queryFilter](Ownable.md#queryfilter)
 - [removeAllListeners](Ownable.md#removealllisteners)
 - [removeListener](Ownable.md#removelistener)
 - [renounceOwnership](Ownable.md#renounceownership)
-- [renounceOwnership()](Ownable.md#renounceownership())
 - [transferOwnership](Ownable.md#transferownership)
-- [transferOwnership(address)](Ownable.md#transferownership(address))
 - [getContractAddress](Ownable.md#getcontractaddress)
 - [getInterface](Ownable.md#getinterface)
 - [isIndexed](Ownable.md#isindexed)
@@ -75,7 +72,7 @@
 
 #### Inherited from
 
-Contract.constructor
+BaseContract.constructor
 
 #### Defined in
 
@@ -89,7 +86,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:103
 
 #### Inherited from
 
-Contract.\_deployedPromise
+BaseContract.\_deployedPromise
 
 #### Defined in
 
@@ -107,7 +104,7 @@ ___
 
 #### Inherited from
 
-Contract.\_runningEvents
+BaseContract.\_runningEvents
 
 #### Defined in
 
@@ -125,7 +122,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrappedEmits
+BaseContract.\_wrappedEmits
 
 #### Defined in
 
@@ -139,7 +136,7 @@ ___
 
 #### Inherited from
 
-Contract.address
+BaseContract.address
 
 #### Defined in
 
@@ -156,19 +153,16 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `renounceOwnership` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `renounceOwnership()` | (`overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
+| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
-Contract.callStatic
+BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:147
+packages/ethereum/types/Ownable.d.ts:123
 
 ___
 
@@ -178,7 +172,7 @@ ___
 
 #### Inherited from
 
-Contract.deployTransaction
+BaseContract.deployTransaction
 
 #### Defined in
 
@@ -195,19 +189,16 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
+| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
-Contract.estimateGas
+BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:181
+packages/ethereum/types/Ownable.d.ts:144
 
 ___
 
@@ -219,16 +210,15 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `OwnershipRenounced` | (`previousOwner`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`], `Object`\> |
-| `OwnershipTransferred` | (`previousOwner`: `string`, `newOwner`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `OwnershipTransferred` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
 
 #### Overrides
 
-Contract.filters
+BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:167
+packages/ethereum/types/Ownable.d.ts:134
 
 ___
 
@@ -241,19 +231,16 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
+| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
-Contract.functions
+BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:101
+packages/ethereum/types/Ownable.d.ts:99
 
 ___
 
@@ -263,11 +250,11 @@ ___
 
 #### Overrides
 
-Contract.interface
+BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:99
+packages/ethereum/types/Ownable.d.ts:97
 
 ___
 
@@ -280,19 +267,16 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `owner` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `owner()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `renounceOwnership` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `renounceOwnership()` | (`overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `transferOwnership` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `transferOwnership(address)` | (`_newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
+| `transferOwnership` | (`newOwner`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
-Contract.populateTransaction
+BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:205
+packages/ethereum/types/Ownable.d.ts:157
 
 ___
 
@@ -302,7 +286,7 @@ ___
 
 #### Inherited from
 
-Contract.provider
+BaseContract.provider
 
 #### Defined in
 
@@ -316,7 +300,7 @@ ___
 
 #### Inherited from
 
-Contract.resolvedAddress
+BaseContract.resolvedAddress
 
 #### Defined in
 
@@ -330,7 +314,7 @@ ___
 
 #### Inherited from
 
-Contract.signer
+BaseContract.signer
 
 #### Defined in
 
@@ -354,7 +338,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Inherited from
 
-Contract.\_checkRunningEvents
+BaseContract.\_checkRunningEvents
 
 #### Defined in
 
@@ -378,7 +362,7 @@ ___
 
 #### Inherited from
 
-Contract.\_deployed
+BaseContract.\_deployed
 
 #### Defined in
 
@@ -404,7 +388,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrapEvent
+BaseContract.\_wrapEvent
 
 #### Defined in
 
@@ -428,11 +412,11 @@ ___
 
 #### Overrides
 
-Contract.attach
+BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:60
+packages/ethereum/types/Ownable.d.ts:58
 
 ___
 
@@ -452,11 +436,11 @@ ___
 
 #### Overrides
 
-Contract.connect
+BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:59
+packages/ethereum/types/Ownable.d.ts:57
 
 ___
 
@@ -470,11 +454,11 @@ ___
 
 #### Overrides
 
-Contract.deployed
+BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:61
+packages/ethereum/types/Ownable.d.ts:59
 
 ___
 
@@ -495,7 +479,7 @@ ___
 
 #### Inherited from
 
-Contract.emit
+BaseContract.emit
 
 #### Defined in
 
@@ -519,7 +503,7 @@ ___
 
 #### Inherited from
 
-Contract.fallback
+BaseContract.fallback
 
 #### Defined in
 
@@ -543,7 +527,7 @@ ___
 
 #### Inherited from
 
-Contract.listenerCount
+BaseContract.listenerCount
 
 #### Defined in
 
@@ -574,11 +558,11 @@ ___
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:63
+packages/ethereum/types/Ownable.d.ts:61
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -594,11 +578,11 @@ packages/ethereum/types/Ownable.d.ts:63
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:86
+packages/ethereum/types/Ownable.d.ts:84
 
 ___
 
@@ -626,11 +610,11 @@ ___
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:66
+packages/ethereum/types/Ownable.d.ts:64
 
 ▸ **off**(`eventName`, `listener`): [`Ownable`](Ownable.md)
 
@@ -647,11 +631,11 @@ packages/ethereum/types/Ownable.d.ts:66
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:87
+packages/ethereum/types/Ownable.d.ts:85
 
 ___
 
@@ -679,11 +663,11 @@ ___
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:70
+packages/ethereum/types/Ownable.d.ts:68
 
 ▸ **on**(`eventName`, `listener`): [`Ownable`](Ownable.md)
 
@@ -700,11 +684,11 @@ packages/ethereum/types/Ownable.d.ts:70
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:88
+packages/ethereum/types/Ownable.d.ts:86
 
 ___
 
@@ -732,11 +716,11 @@ ___
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:74
+packages/ethereum/types/Ownable.d.ts:72
 
 ▸ **once**(`eventName`, `listener`): [`Ownable`](Ownable.md)
 
@@ -753,11 +737,11 @@ packages/ethereum/types/Ownable.d.ts:74
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:89
+packages/ethereum/types/Ownable.d.ts:87
 
 ___
 
@@ -777,27 +761,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:133
-
-___
-
-### owner()
-
-▸ **owner()**(`overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/Ownable.d.ts:135
+packages/ethereum/types/Ownable.d.ts:112
 
 ___
 
@@ -826,11 +790,11 @@ ___
 
 #### Overrides
 
-Contract.queryFilter
+BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:93
+packages/ethereum/types/Ownable.d.ts:91
 
 ___
 
@@ -857,11 +821,11 @@ ___
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:82
+packages/ethereum/types/Ownable.d.ts:80
 
 ▸ **removeAllListeners**(`eventName?`): [`Ownable`](Ownable.md)
 
@@ -877,11 +841,11 @@ packages/ethereum/types/Ownable.d.ts:82
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:91
+packages/ethereum/types/Ownable.d.ts:89
 
 ___
 
@@ -909,11 +873,11 @@ ___
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:78
+packages/ethereum/types/Ownable.d.ts:76
 
 ▸ **removeListener**(`eventName`, `listener`): [`Ownable`](Ownable.md)
 
@@ -930,11 +894,11 @@ packages/ethereum/types/Ownable.d.ts:78
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:90
+packages/ethereum/types/Ownable.d.ts:88
 
 ___
 
@@ -954,39 +918,19 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:125
-
-___
-
-### renounceOwnership()
-
-▸ **renounceOwnership()**(`overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/Ownable.d.ts:129
+packages/ethereum/types/Ownable.d.ts:114
 
 ___
 
 ### transferOwnership
 
-▸ **transferOwnership**(`_newOwner`, `overrides?`): `Promise`<`ContractTransaction`\>
+▸ **transferOwnership**(`newOwner`, `overrides?`): `Promise`<`ContractTransaction`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_newOwner` | `string` |
+| `newOwner` | `string` |
 | `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
 
 #### Returns
@@ -995,28 +939,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:137
-
-___
-
-### transferOwnership(address)
-
-▸ **transferOwnership(address)**(`_newOwner`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `_newOwner` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/Ownable.d.ts:142
+packages/ethereum/types/Ownable.d.ts:118
 
 ___
 
@@ -1038,7 +961,7 @@ ___
 
 #### Inherited from
 
-Contract.getContractAddress
+BaseContract.getContractAddress
 
 #### Defined in
 
@@ -1062,7 +985,7 @@ ___
 
 #### Inherited from
 
-Contract.getInterface
+BaseContract.getInterface
 
 #### Defined in
 
@@ -1086,7 +1009,7 @@ value is Indexed
 
 #### Inherited from
 
-Contract.isIndexed
+BaseContract.isIndexed
 
 #### Defined in
 

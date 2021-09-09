@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs ? import <nixpkgs> {}, ... }:
 let
   linuxPkgs = with pkgs; lib.optional stdenv.isLinux (
     inotifyTools
@@ -29,6 +29,7 @@ mkShell {
 
     # testing utilities
     websocat
+    jq
 
     # custom pkg groups
     macosPkgs
