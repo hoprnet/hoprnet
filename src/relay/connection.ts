@@ -161,6 +161,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this.source = this.createSource()
 
+    // Auto-start sink stream and declare variable in advance
+    // to make sure we can attach an error handler to it
     let sinkCreator: Promise<void>
     this.sink = async (source: Stream['source']) => {
       if (this._migrationDone != undefined) {
@@ -168,6 +170,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       }
 
       let deferred = Defer<void>()
+      // forward errors
       sinkCreator.catch(deferred.reject)
 
       this._sinkSourceAttached = true
@@ -188,6 +191,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     sinkCreator = this._stream.sink(this.sinkFunction())
 
+    // catch errors that occur before attaching a sink source stream
     sinkCreator.catch((err) => this.error('sink error thrown before sink attach', err.message))
   }
 

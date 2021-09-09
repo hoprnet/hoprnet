@@ -61,9 +61,12 @@ class RelayContext extends EventEmitter {
 
     this.source = this.createSource()
 
+    // Auto-start sink stream and declare variable in advance
+    // to make sure we can attach an error handler to it
     let sinkCreator: Promise<void>
     this.sink = (source: Stream['source']): Promise<void> => {
       let deferred = Defer<void>()
+      // forward sink stream errors
       sinkCreator.catch(deferred.reject)
       this._sinkSourceAttached = true
       this._sinkSourceAttachedPromise.resolve(
@@ -84,7 +87,7 @@ class RelayContext extends EventEmitter {
 
     sinkCreator = this.createSink()
 
-    // Make sure that we catch all errors
+    // Make sure that we catch all errors, even before a sink source has been attached
     sinkCreator.catch((err) => this.error(`Sink has thrown error before attaching source`, err.message))
   }
 

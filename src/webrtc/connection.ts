@@ -220,10 +220,15 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this.verbose(`FLOW: webrtc sink 1`)
 
-    // First: use relayed connection
+    // handle sink stream of relay connection until it
+    // either ends or webrtc becomes available
     await new Promise<void>((resolve, reject) =>
       this.relayConn
         .sink(
+          // start sinking status messages even if no source got
+          // attached yet
+          // this is important for sending webrtc signalling messages
+          // even before payload messages are ready to send
           eagerIterator(
             async function* (this: WebRTCConnection): Stream['source'] {
               let webRTCFinished = false
@@ -320,11 +325,13 @@ class WebRTCConnection implements MultiaddrConnection {
             }.call(this)
           )
         )
+        // catch stream errors and forward error
         .catch(reject)
     )
-    // Either stream is finished or WebRTC is available
 
+    // Either stream is finished or WebRTC is available
     if (this._webRTCAvailable) {
+      // WebRTC is available, let's attach sink source to it
       this.verbose(`FLOW: sending UPGRADED to relay`)
       this.relayConn.sendUpgraded()
 
