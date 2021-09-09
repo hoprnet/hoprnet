@@ -15,9 +15,11 @@ import Debug from 'debug'
 import { EventEmitter } from 'events'
 import { toU8aStream, eagerIterator } from '../utils'
 
-const _log = Debug('hopr-connect')
-const _verbose = Debug('hopr-connect:verbose')
-const _error = Debug('hopr-connect:error')
+const DEBUG_PREFIX = 'hopr-connect'
+
+const _log = Debug(DEBUG_PREFIX)
+const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
+const _error = Debug(`${DEBUG_PREFIX}:error`)
 
 type WebRTC = {
   channel: SimplePeer

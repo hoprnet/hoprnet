@@ -18,8 +18,8 @@ import type { Stream, StreamResult, DialOptions } from '../types'
 const DEBUG_PREFIX = `hopr-connect`
 
 const _log = Debug(DEBUG_PREFIX)
-const _verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
-const _error = Debug(DEBUG_PREFIX.concat(`:error`))
+const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
+const _error = Debug(`${DEBUG_PREFIX}:error`)
 
 export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(3)
 

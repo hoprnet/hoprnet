@@ -10,9 +10,10 @@ import type { Stream, StreamResult } from '../types'
 import Debug from 'debug'
 
 const DEBUG_PREFIX = `hopr-connect`
+
 const _log = Debug(DEBUG_PREFIX)
-const _verbose = Debug(DEBUG_PREFIX.concat(`:verbose`))
-const _error = Debug(DEBUG_PREFIX.concat(`:error`))
+const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
+const _error = Debug(`${DEBUG_PREFIX}:error`)
 
 import { RelayPrefix, StatusMessages, ConnectionStatusMessages, isValidPrefix } from '../constants'
 import { eagerIterator } from '../utils'
