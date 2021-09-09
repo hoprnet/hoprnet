@@ -230,7 +230,6 @@ describe.only('check listening to sockets', function () {
       multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)]
     })
 
-
     relayContacted.promise.then(() => console.log(`relay got contacted`))
     // Checks that relay and STUN got contacted, otherwise timeout
     await Promise.all([relayContacted.promise, eventPromise])
