@@ -1,5 +1,6 @@
 /// <reference path="../@types/it-handshake.ts" />
 /// <reference path="../@types/it-pair.ts" />
+/// <reference path="../@types/stream-to-it.ts" />
 
 import handshake from 'it-handshake'
 import Pair from 'it-pair'
@@ -27,6 +28,12 @@ describe('test webrtc connection', function () {
     const AliceBob = Pair<StreamType>()
     const BobAlice = Pair<StreamType>()
 
+    const fakedWebRTCInstance = new EventEmitter() as any
+
+    Object.assign(fakedWebRTCInstance, {
+      destroy: () => {}
+    })
+
     const conn = new WebRTCConnection(
       Bob,
       { connections: new Map() } as any,
@@ -35,7 +42,7 @@ describe('test webrtc connection', function () {
         sink: AliceBob.sink,
         sendUpgraded: () => {}
       } as any,
-      new EventEmitter() as any
+      fakedWebRTCInstance
     )
 
     const AliceShaker = handshake(conn)
@@ -281,6 +288,12 @@ describe('webrtc connection - stream error propagation', function () {
 
     const waitForSinkAttach = Defer<Uint8Array>()
 
+    const fakedWebRTCInstance = new EventEmitter() as any
+
+    Object.assign(fakedWebRTCInstance, {
+      destroy: () => {}
+    })
+
     const conn = new WebRTCConnection(
       Bob,
       { connections: new Map() } as any,
@@ -289,7 +302,7 @@ describe('webrtc connection - stream error propagation', function () {
         sink: () => waitForSinkAttach.promise,
         sendUpgraded: () => {}
       } as any,
-      new EventEmitter() as any
+      fakedWebRTCInstance
     )
 
     await assert.rejects(
@@ -310,6 +323,12 @@ describe('webrtc connection - stream error propagation', function () {
 
     const waitForError = Defer<void>()
 
+    const fakedWebRTCInstance = new EventEmitter() as any
+
+    Object.assign(fakedWebRTCInstance, {
+      destroy: () => {}
+    })
+
     new WebRTCConnection(
       Bob,
       { connections: new Map() } as any,
@@ -321,7 +340,7 @@ describe('webrtc connection - stream error propagation', function () {
         },
         sendUpgraded: () => {}
       } as any,
-      new EventEmitter() as any
+      fakedWebRTCInstance
     )
 
     await waitForError.promise
@@ -332,6 +351,12 @@ describe('webrtc connection - stream error propagation', function () {
     const AliceBob = Pair<StreamType>()
     const BobAlice = Pair<StreamType>()
 
+    const fakedWebRTCInstance = new EventEmitter() as any
+
+    Object.assign(fakedWebRTCInstance, {
+      destroy: () => {}
+    })
+
     const errorInSinkSource = 'error in sink source'
     const conn = new WebRTCConnection(
       Bob,
@@ -341,7 +366,7 @@ describe('webrtc connection - stream error propagation', function () {
         sink: AliceBob.sink,
         sendUpgraded: () => {}
       } as any,
-      new EventEmitter() as any
+      fakedWebRTCInstance
     )
 
     await assert.rejects(
@@ -357,6 +382,12 @@ describe('webrtc connection - stream error propagation', function () {
   it('falsy source', async function () {
     const AliceBob = Pair<StreamType>()
 
+    const fakedWebRTCInstance = new EventEmitter() as any
+
+    Object.assign(fakedWebRTCInstance, {
+      destroy: () => {}
+    })
+
     const errorInSource = 'error in source'
     const conn = new WebRTCConnection(
       Bob,
@@ -368,7 +399,7 @@ describe('webrtc connection - stream error propagation', function () {
         sink: AliceBob.sink,
         sendUpgraded: () => {}
       } as any,
-      new EventEmitter() as any
+      fakedWebRTCInstance
     )
 
     await assert.rejects(conn.source.next(), Error(errorInSource))

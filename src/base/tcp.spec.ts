@@ -1,3 +1,5 @@
+/// <reference path="../@types/stream-to-it.ts" />
+
 import { createServer, Socket } from 'net'
 import type { AddressInfo } from 'net'
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'

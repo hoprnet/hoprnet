@@ -1,3 +1,5 @@
+/// <reference path="../@types/stream-to-it.ts" />
+
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 
 import type ConnectionManager from 'libp2p/src/connection-manager'

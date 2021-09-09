@@ -1,4 +1,6 @@
 /// <reference path="../@types/it-pair.ts" />
+/// <reference path="../@types/it-handshake.ts" />
+
 
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { u8aEquals } from '@hoprnet/hopr-utils'
