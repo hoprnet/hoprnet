@@ -177,7 +177,7 @@ async function stopNode(socket: Socket | Listener) {
   return closePromise
 }
 
-describe.only('check listening to sockets', function () {
+describe('check listening to sockets', function () {
   it('recreate the socket and perform STUN request', async function () {
     let listener: Listener
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
@@ -208,7 +208,7 @@ describe.only('check listening to sockets', function () {
     await Promise.all(stunServers.map(stopNode))
   })
 
-  it.only('should contact potential relays and expose relay addresses', async function () {
+  it('should contact potential relays and expose relay addresses', async function () {
     const relayContacted = Defer<void>()
 
     const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
