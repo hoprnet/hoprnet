@@ -32,13 +32,13 @@ Let `n=#G`= number of elements in G. Then
 **Definition:** A group `G` is said to be cyclic, with generator `g`, if every element of `G` is of the form `g^x` for some integer `x`.
 
 A finite group `G`  of `n` elements is cyclic, if there exist an element (or elements) 
-<img src="https://render.githubusercontent.com/render/math?math=g\in G"> with <img src="https://render.githubusercontent.com/render/math?math=\{g,g^2,g^3,...............g^n=e\}=G"> and `g` is a generator of `G`.
+<img src="https://render.githubusercontent.com/render/math?math=g\in G"> with <img src="https://render.githubusercontent.com/render/math?math=\{g,g^2,g^3,\dots g^n=e\}=G"> and `g` is a generator of `G`.
 
 ### Cyclic Groups & Cryptographic Applications
 
 The security of many cryptographic techniques depends on the intractability of the discrete logarithm problem which has no efficient solution.
 
-**Discrete logarithm problem:** If `G` is a cyclic group and `g` is a generator of `G`, then the discrete logarithm of <img src="https://render.githubusercontent.com/render/math?math=a\in G">  with basis `g`, denoted <img src="https://render.githubusercontent.com/render/math?math=log_ga">, is the unique number <img src="https://render.githubusercontent.com/render/math?math=i\in \{0,........|G|-1\}"> such that <img src="https://render.githubusercontent.com/render/math?math=a=g^i"> and `|G|` is the order of the group `G` (number of elements in the group).
+**Discrete logarithm problem:** If `G` is a cyclic group and `g` is a generator of `G`, then the discrete logarithm of <img src="https://render.githubusercontent.com/render/math?math=a\in G">  with basis `g`, denoted <img src="https://render.githubusercontent.com/render/math?math=log_ga">, is the unique number <img src="https://render.githubusercontent.com/render/math?math=i\in \{0,\dots |G|-1\}"> such that <img src="https://render.githubusercontent.com/render/math?math=a=g^i"> and `|G|` is the order of the group `G` (number of elements in the group).
 Fixing `G` and `g`, the discrete logarithm (DLOG) problem is, given a random <img src="https://render.githubusercontent.com/render/math?math=a\in G"> , find <img src="https://render.githubusercontent.com/render/math?math=log_ga">. We say that the problem is hard for if for every <img src="https://render.githubusercontent.com/render/math?math=poly A, \epsilon Pr_{a\leftarrow R}G[ \, A(G,g,a)=log_ga] \, < \epsilon">. 
 
 
@@ -61,15 +61,15 @@ The purpose of this section is to introduce elliptic curves as they are used in 
 To understand elliptic curve groups in cryptography, the reader should be familiar with the basics of finite fields `F_q`
 This is because, more generally, elliptic curves are groups which are defined on top of (over) fields
 Even though elliptic curve groups permit only one binary operation (the so-called group law), the operation itself is computed within the underlying field, which by definition permits two operations (and their inverses).
-Finite fields satisfy a few properties, see Wikipedia, and have a finite amount of elements, e.g. <img src="https://render.githubusercontent.com/render/math?math=(0, 1, ..., p-1)">  where `p` is the field order. We denote that field as `F_p`. A point `P` is therefore given as <img src="https://render.githubusercontent.com/render/math?math=P = (x,y)\in F_p\times F_p"> .
+Finite fields satisfy a few properties, see Wikipedia, and have a finite amount of elements, e.g. <img src="https://render.githubusercontent.com/render/math?math=(0, 1, \dots, p-1)">  where `p` is the field order. We denote that field as `F_p`. A point `P` is therefore given as <img src="https://render.githubusercontent.com/render/math?math=P = (x,y)\in F_p\times F_p"> .
 
 
 **Definition:** An Elliptic Curve is a curve given by an equation of the form: 
-<img src="https://render.githubusercontent.com/render/math?math=y^2=x^3+Ax+B"> (the short Weierstrass equation)
+<img src="https://render.githubusercontent.com/render/math?math=y^2=x^3%2BAx%2BB"> (the short Weierstrass equation)
 
 
 The elliptic curve points over <img src="https://render.githubusercontent.com/render/math?math=F_pF_p"> form a field, so we can use addition, meaning `Q=P+R` where <img src="https://render.githubusercontent.com/render/math?math=P, Q, R\in F_p\times F_p"> and `M=c*P` where 
- <img src="https://render.githubusercontent.com/render/math?math=M,P\in F_p\times F_p"> and <img src="https://render.githubusercontent.com/render/math?math=c\in F_p">. Note that <img src="https://render.githubusercontent.com/render/math?math=cP=P+(c-1)P=P+P+(c-2)P"> which means that multiplication is done by repeated addition of elliptic curve points. This can be optimized by using fast exponentiation. Exponentiation can be seen here as a synonym of multiplication.
+ <img src="https://render.githubusercontent.com/render/math?math=M,P\in F_p\times F_p"> and <img src="https://render.githubusercontent.com/render/math?math=c\in F_p">. Note that <img src="https://render.githubusercontent.com/render/math?math=cP=P%2B(c-1)P=P%2BP%2B(c-2)P"> which means that multiplication is done by repeated addition of elliptic curve points. This can be optimized by using fast exponentiation. Exponentiation can be seen here as a synonym of multiplication.
 
 The wording exponentiation and discrete logarithms comes from the time when asymmetric cryptography used finite fields like `F_p` where `p` is a very big prime number, e.g. **4096 bits**. Note that in groups like <img src="https://render.githubusercontent.com/render/math?math=F_p^* "> inverting an exponentiation which is also known as computing a discrete logarithm is computationally infeasible whereas for exponentiation we know efficient algorithms.
 
