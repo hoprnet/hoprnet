@@ -72,8 +72,7 @@ describe('relay connection', function () {
       },
       self: Alice,
       relay: Relay,
-      counterparty: Bob,
-      onReconnect: async () => {}
+      counterparty: Bob
     })
 
     const relayShaker = handshake({
@@ -111,8 +110,7 @@ describe('relay connection', function () {
       },
       self: Alice,
       relay: Relay,
-      counterparty: Bob,
-      onReconnect: async () => {}
+      counterparty: Bob
     })
 
     const relayShaker = handshake({
@@ -151,8 +149,7 @@ describe('relay connection', function () {
       },
       self: Alice,
       relay: Relay,
-      counterparty: Bob,
-      onReconnect: async () => {}
+      counterparty: Bob
     })
 
     const relayShaker = handshake({
@@ -341,7 +338,6 @@ describe('relay connection', function () {
       self: Alice,
       relay: Relay,
       counterparty: Bob,
-      onReconnect: async () => {},
       webRTC: {
         channel: webRTC as any,
         upgradeInbound: (): any => {}
@@ -399,7 +395,6 @@ describe('relay connection', function () {
       self: Alice,
       relay: Relay,
       counterparty: Bob,
-      onReconnect: async () => {},
       webRTC: {
         channel: webRTC as any,
         upgradeInbound: (): any => {
@@ -461,5 +456,88 @@ describe('relay connection', function () {
           correctWebRTCResponseAfterReconnect
       )
     }
+  })
+})
+
+describe('relay connection - stream error propagation', function () {
+  let Alice: PeerId, Relay: PeerId, Bob: PeerId
+
+  before(async function () {
+    ;[Alice, Relay, Bob] = await Promise.all(Array.from({ length: 3 }, (_) => PeerId.create({ keyType: 'secp256k1' })))
+  })
+
+  it('falsy sources in sinks', async function () {
+    const AliceRelay = Pair<StreamType>()
+    const RelayAlice = Pair<StreamType>()
+
+    const errorInSource = 'error in source'
+
+    const alice = new RelayConnection({
+      stream: {
+        sink: AliceRelay.sink,
+        source: RelayAlice.source
+      },
+      self: Alice,
+      relay: Relay,
+      counterparty: Bob
+    })
+
+    const sourcePromise = AliceRelay.source.next()
+
+    await assert.rejects(
+      alice.sink(
+        (async function* () {
+          throw Error(errorInSource)
+        })()
+      ),
+      Error(errorInSource)
+    )
+
+    await sourcePromise
+  })
+
+  it('correct sources in falsy sinks', async function () {
+    const RelayAlice = Pair<StreamType>()
+
+    const errorInSinkFunction = 'error in sink function'
+
+    const alice = new RelayConnection({
+      stream: {
+        sink: () => Promise.reject(Error(errorInSinkFunction)),
+        source: RelayAlice.source
+      },
+      self: Alice,
+      relay: Relay,
+      counterparty: Bob
+    })
+
+    await assert.rejects(
+      alice.sink(
+        (async function* () {
+          yield new Uint8Array()
+        })()
+      ),
+      Error(errorInSinkFunction)
+    )
+  })
+
+  it('falsy sources', async function () {
+    const AliceRelay = Pair<StreamType>()
+
+    const errorInSource = 'error in source'
+
+    const alice = new RelayConnection({
+      stream: {
+        sink: AliceRelay.sink,
+        source: (async function* () {
+          throw Error(errorInSource)
+        })()
+      },
+      self: Alice,
+      relay: Relay,
+      counterparty: Bob
+    })
+
+    await assert.rejects(alice.source.next(), Error(errorInSource))
   })
 })

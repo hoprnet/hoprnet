@@ -111,7 +111,7 @@ export async function dialHelper(
     return
   }
 
-  if ((err != null || struct == null) && libp2p._dht == undefined) {
+  if ((err != null || struct == null) && libp2p.peerRouting._routers.length == 0) {
     if (timeout != undefined) {
       clearTimeout(timeout)
     }
@@ -131,14 +131,19 @@ export async function dialHelper(
 
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
-    dhtResponse = await (libp2p._dht as any).findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
+    dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     error(
-      // prettier-ignore
       `Querying the DHT for ${green(destination.toB58String())} failed. Known addresses:\n` +
-      `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n` +
-      `${err.message}`
+        `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n`
     )
+
+    if (err instanceof Error) {
+      error(err.message)
+    } else {
+      console.trace()
+      error(`Non-error message was thrown`, err)
+    }
   }
 
   const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
@@ -160,11 +165,19 @@ export async function dialHelper(
     verbose(`Dial after DHT request successful`)
   } catch (err) {
     error(
-      // prettier-ignore
-      `Cannot connect to ${green(destination.toB58String())}. New addresses after DHT request did not lead to a connection. Used addresses:\n` +
-      `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}\n` +
-      `${err.message}`
+      `Cannot connect to ${green(
+        destination.toB58String()
+      )}. New addresses after DHT request did not lead to a connection. Used addresses:\n` +
+        `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}\n`
     )
+
+    if (err instanceof Error) {
+      error(err.message)
+    } else {
+      console.trace()
+      error(`Non-error instance was thrown`, err)
+    }
+
     return
   }
 

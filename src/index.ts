@@ -142,12 +142,6 @@ class HoprConnect implements Transport<DialOptions, any> {
   }
 
   /**
-   * Removes a relay from the list of usable relays
-   * @TODO to be implemented
-   */
-  removeRelay() {}
-
-  /**
    * Tries to establish a connection to the given destination
    * @param ma destination
    * @param options optional dial options

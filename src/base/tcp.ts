@@ -110,13 +110,13 @@ class TCPConnection implements MultiaddrConnection {
       await this._stream.sink(
         this._signal != undefined ? (abortable(u8aStream, this._signal) as Stream['source']) : u8aStream
       )
-    } catch (err) {
+    } catch (err: any) {
       // If aborted we can safely ignore
       if (err.type !== 'aborted') {
         // If the source errored the socket will already have been destroyed by
         // toIterable.duplex(). If the socket errored it will already be
         // destroyed. There's nothing to do here except log the error & return.
-        error(err)
+        error(err.message)
       }
     }
   }
@@ -153,10 +153,7 @@ class TCPConnection implements MultiaddrConnection {
 
       const onTimeout = () => {
         log('connnection timeout %s:%s', cOpts.host, cOpts.port)
-        const err = new Error(`connection timeout after ${Date.now() - start}ms`)
-        // Note: this will result in onError() being called
-        rawSocket.emit('error', err)
-        done()
+        done(new Error(`connection timeout after ${Date.now() - start}ms`))
       }
 
       const onConnect = () => {

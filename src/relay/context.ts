@@ -10,9 +10,10 @@ import type { Stream, StreamResult } from '../types'
 import Debug from 'debug'
 
 const DEBUG_PREFIX = `hopr-connect`
+
 const _log = Debug(DEBUG_PREFIX)
-const _verbose = Debug(DEBUG_PREFIX.concat(`:verbose`))
-const _error = Debug(DEBUG_PREFIX.concat(`:error`))
+const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
+const _error = Debug(`${DEBUG_PREFIX}:error`)
 
 import { RelayPrefix, StatusMessages, ConnectionStatusMessages, isValidPrefix } from '../constants'
 import { eagerIterator } from '../utils'
@@ -60,14 +61,34 @@ class RelayContext extends EventEmitter {
 
     this.source = this.createSource()
 
+    // Auto-start sink stream and declare variable in advance
+    // to make sure we can attach an error handler to it
+    let sinkCreator: Promise<void>
     this.sink = (source: Stream['source']): Promise<void> => {
+      let deferred = Defer<void>()
+      // forward sink stream errors
+      sinkCreator.catch(deferred.reject)
       this._sinkSourceAttached = true
-      this._sinkSourceAttachedPromise.resolve(source)
+      this._sinkSourceAttachedPromise.resolve(
+        async function* (this: RelayContext) {
+          try {
+            yield* source
+            deferred.resolve()
+          } catch (err) {
+            // Close stream
+            this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
+            deferred.reject(err)
+          }
+        }.call(this)
+      )
 
-      return Promise.resolve()
+      return deferred.promise
     }
 
-    this.createSink()
+    sinkCreator = this.createSink()
+
+    // Make sure that we catch all errors, even before a sink source has been attached
+    sinkCreator.catch((err) => this.error(`Sink has thrown error before attaching source`, err.message))
   }
 
   /**
@@ -92,7 +113,7 @@ class RelayContext extends EventEmitter {
       timeoutPromise.resolve()
     }, ms)
 
-    this.queueStatusMessage(StatusMessages.PING)
+    this.queueStatusMessage(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING))
 
     await Promise.race([
       // prettier-ignore
@@ -242,7 +263,7 @@ class RelayContext extends EventEmitter {
         if (PREFIX[0] == RelayPrefix.STATUS_MESSAGE) {
           if (SUFFIX[0] == StatusMessages.PING) {
             this.verbose(`PING received`)
-            this.queueStatusMessage(StatusMessages.PONG)
+            this.queueStatusMessage(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
             // Don't forward ping
           } else if (SUFFIX[0] == StatusMessages.PONG) {
             this.verbose(`PONG received`)
@@ -309,12 +330,7 @@ class RelayContext extends EventEmitter {
 
     let currentSource: Stream['source'] | undefined
 
-    let iteration = 0
-
-    async function* drain(this: RelayContext): Stream['source'] {
-      // deep-clone number
-      // @TODO make sure that the compiler does not notice
-      const drainIteration = parseInt(iteration.toString())
+    async function* drain(this: RelayContext, end: DeferredPromise<void>): Stream['source'] {
       type SinkResult = Stream['source'] | StreamResult | void
 
       let result: SinkResult
@@ -322,11 +338,16 @@ class RelayContext extends EventEmitter {
       const next = () => {
         result = undefined
 
-        sourcePromise = currentSource?.next()
+        sourcePromise = (currentSource as Stream['source']).next()
       }
 
+      let ended = false
+      const endPromise = end.promise.then(() => {
+        ended = true
+      })
+
       this.verbose(`FLOW: relay_outgoing: loop started`)
-      while (iteration == drainIteration) {
+      while (true) {
         this.verbose(`FLOW: relay_outgoing: new loop iteration`)
 
         const promises: Promise<SinkResult>[] = []
@@ -341,6 +362,8 @@ class RelayContext extends EventEmitter {
             })
           )
         }
+
+        pushPromise(endPromise, 'ended')
 
         if (currentSource == undefined) {
           pushPromise(this._sinkSourceAttachedPromise.promise, 'sinkSourceAttacked')
@@ -360,11 +383,12 @@ class RelayContext extends EventEmitter {
         // 3. Handle payload messages
         this.verbose(`FLOW: relay_outgoing: awaiting promises`)
         result = await Promise.race(promises)
+
         this.verbose(`FLOW: relay_outgoing: promise ${resolvedPromiseName} resolved`)
 
         // Don't handle incoming messages after migration
-        if (iteration != drainIteration) {
-          this.verbose(`FLOW: relay_outgoing: iteration != drainIteration, break`)
+        if (ended) {
+          this.verbose(`FLOW: relay_outgoing: ended, break`)
           break
         }
 
@@ -420,11 +444,24 @@ class RelayContext extends EventEmitter {
     }
 
     while (true) {
-      currentSink(drain.call(this))
+      const endPromise = Defer<void>()
 
-      currentSink = await this._streamSinkSwitchPromise.promise
-      iteration++
-      this._streamSinkSwitchPromise = Defer<Stream['sink']>()
+      let err: any
+
+      const sinkPromise = currentSink(drain.call(this, endPromise)).catch((_err) => {
+        err = _err
+      })
+
+      await Promise.race([sinkPromise, this._streamSinkSwitchPromise.promise])
+
+      if (err) {
+        this.error(`Sink threw error`, err.message)
+        throw err
+      } else {
+        currentSink = await this._streamSinkSwitchPromise.promise
+        this._streamSinkSwitchPromise = Defer<Stream['sink']>()
+        endPromise.resolve()
+      }
     }
   }
 
@@ -432,8 +469,8 @@ class RelayContext extends EventEmitter {
    * Add status and control messages to queue
    * @param msg msg to add
    */
-  private queueStatusMessage(msg: StatusMessages) {
-    this._statusMessages.push(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, msg))
+  private queueStatusMessage(msg: Uint8Array) {
+    this._statusMessages.push(msg)
 
     this._statusMessagePromise.resolve()
   }

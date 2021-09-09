@@ -15,9 +15,11 @@ import Debug from 'debug'
 import { EventEmitter } from 'events'
 import { toU8aStream, eagerIterator } from '../utils'
 
-const _log = Debug('hopr-connect')
-const _verbose = Debug('hopr-connect:verbose')
-const _error = Debug('hopr-connect:error')
+const DEBUG_PREFIX = 'hopr-connect'
+
+const _log = Debug(DEBUG_PREFIX)
+const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
+const _error = Debug(`${DEBUG_PREFIX}:error`)
 
 type WebRTC = {
   channel: SimplePeer
@@ -89,7 +91,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _statusMessagePromise: DeferredPromise<void>
   private _closePromise: DeferredPromise<void>
 
-  private _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
+  private _onReconnect: ((newStream: RelayConnection, counterparty: PeerId) => Promise<void>) | undefined
 
   public destroyed: boolean
 
@@ -113,7 +115,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     self: PeerId
     relay: PeerId
     counterparty: PeerId
-    onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
+    onReconnect?: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
     webRTC?: WebRTC
   }) {
     super()
@@ -159,9 +161,38 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this.source = this.createSource()
 
-    this._stream.sink(this.sinkFunction())
+    // Auto-start sink stream and declare variable in advance
+    // to make sure we can attach an error handler to it
+    let sinkCreator: Promise<void>
+    this.sink = async (source: Stream['source']) => {
+      if (this._migrationDone != undefined) {
+        await this._migrationDone.promise
+      }
 
-    this.sink = this.attachSinkSource.bind(this)
+      let deferred = Defer<void>()
+      // forward errors
+      sinkCreator.catch(deferred.reject)
+
+      this._sinkSourceAttached = true
+      this._sinkSourceAttachedPromise.resolve(
+        async function* (this: RelayConnection) {
+          try {
+            yield* toU8aStream(source)
+            deferred.resolve()
+          } catch (err: any) {
+            this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
+            deferred.reject(err)
+          }
+        }.call(this)
+      )
+
+      return deferred.promise
+    }
+
+    sinkCreator = this._stream.sink(this.sinkFunction())
+
+    // catch errors that occur before attaching a sink source stream
+    sinkCreator.catch((err) => this.error('sink error thrown before sink attach', err.message))
   }
 
   /**
@@ -195,7 +226,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   /**
    * Send UPGRADED status msg to the relay, so it can free the slot
    */
-  sendUpgraded() {
+  public sendUpgraded() {
     this.verbose(`FLOW: sending UPGRADED`)
     this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.UPGRADED))
   }
@@ -256,20 +287,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._streamClosed = true
     this._closePromise.resolve()
     this.timeline.close = Date.now()
-  }
-
-  /**
-   * Attaches a source to the stream sink. Called once
-   * the stream is used to send messages
-   * @param source the source that is attached
-   */
-  private async attachSinkSource(source: Stream['source']): Promise<void> {
-    if (this._migrationDone != undefined) {
-      await this._migrationDone.promise
-    }
-
-    this._sinkSourceAttached = true
-    this._sinkSourceAttachedPromise.resolve(toU8aStream(source))
   }
 
   /**
@@ -513,7 +530,11 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
             this.log(`RESTART received. Ending stream ...`)
             this.emit(`restart`)
 
-            this._onReconnect(this.switch(), this._counterparty)
+            // First switch, then call _onReconnect to make sure
+            // values are set, even if _onReconnect throws
+            let switchedConnection = this.switch()
+
+            this._onReconnect?.(switchedConnection, this._counterparty)
 
             continue
           }
