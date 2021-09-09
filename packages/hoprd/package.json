@@ -12,7 +12,8 @@
     "lib",
     "hopr-admin/.next/**",
     "hoprd-default.sh",
-    "protocol-config.json"
+    "protocol-config.json",
+    "releases.json"
   ],
   "scripts": {
     "clean": "rimraf ./lib",
