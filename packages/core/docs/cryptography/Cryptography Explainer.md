@@ -76,7 +76,3 @@ The wording exponentiation and discrete logarithms comes from the time when asym
 For elliptic curves, we have multiplication which is efficient to compute whereas division is believed to be infeasible to compute.
 
 Note that there exists as well multiplication of two elliptic curve points, namely <img src="https://render.githubusercontent.com/render/math?math=S=T\times U "> where <img src="https://render.githubusercontent.com/render/math?math=T,U\in E_0"> and <img src="https://render.githubusercontent.com/render/math?math=S\in E_1">  where `E_0`, `E_1` are two potentially different elliptic curves. This operation is called **pairing** and we still don’t know an efficient way to compute it.
-
-
-
-
