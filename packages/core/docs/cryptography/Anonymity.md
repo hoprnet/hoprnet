@@ -61,7 +61,3 @@ Check following papers:
 - [Anonymity, Unobservability, and Pseudonymity](https://www.researchgate.net/publication/221331797_Anonymity_Unobservability_and_Pseudonymity_-_A_Proposal_for_Terminology)
 - [Measuring Relationship Anonymity in Mix Networks](https://www.cs.cornell.edu/~shmat/shmat_wpes06.pdf)
 - [Towards an information theoretic metric for anonymity](http://www0.cs.ucl.ac.uk/staff/G.Danezis/papers/set.pdf)
-
-
-## Definition of done:
-This ticket should be closed when we find the different metrics needed to measure the anonymity of a mixnet and the way to measure that anonymity. The result of this issue will be used later on to create an algorithm to measure anonymity for current CT simulator ([issue #2344](https://github.com/hoprnet/hoprnet/issues/2344))
