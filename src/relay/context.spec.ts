@@ -6,6 +6,7 @@ import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../consta
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
 import handshake from 'it-handshake'
+import Defer from 'p-defer'
 
 import type { StreamType } from '../types'
 import assert from 'assert'
@@ -196,5 +197,84 @@ describe('relay swtich context', function () {
         )
       )
     }
+  })
+})
+
+describe('relay switch context - falsy streams', function () {
+  it('falsy sink source', async function () {
+    const nodeToRelay = Pair<StreamType>()
+    const relayToNode = Pair<StreamType>()
+
+    const errorInSource = 'error in source'
+    const ctx = new RelayContext({
+      source: nodeToRelay.source,
+      sink: relayToNode.sink
+    })
+
+    const sinkPromise = ctx.sink(
+      (async function* () {
+        throw Error(errorInSource)
+      })()
+    )
+
+    const sourcePromise = relayToNode.source.next()
+
+    await assert.rejects(sinkPromise, Error(errorInSource))
+
+    await sourcePromise
+  })
+
+  it('falsy sink', async function () {
+    const nodeToRelay = Pair<StreamType>()
+
+    const falsySinkError = 'falsy sink error'
+
+    const ctx = new RelayContext({
+      source: nodeToRelay.source,
+      sink: () => Promise.reject(Error(falsySinkError))
+    })
+
+    await assert.rejects(
+      ctx.sink(
+        (async function* () {
+          yield new Uint8Array()
+        })()
+      ),
+      Error(falsySinkError)
+    )
+  })
+
+  it('falsy sink before attaching source', async function () {
+    const nodeToRelay = Pair<StreamType>()
+
+    const falsySinkError = 'falsy sink error'
+
+    const waitForError = Defer<void>()
+
+    new RelayContext({
+      source: nodeToRelay.source,
+      sink: () => {
+        waitForError.resolve()
+        return Promise.reject(Error(falsySinkError))
+      }
+    })
+
+    await waitForError.promise
+    await new Promise((resolve) => setTimeout(resolve))
+  })
+
+  it('falsy sink', async function () {
+    const relayToNode = Pair<StreamType>()
+
+    const falsySourceError = 'falsy source error'
+
+    const ctx = new RelayContext({
+      source: (async function* () {
+        throw new Error(falsySourceError)
+      })(),
+      sink: relayToNode.sink
+    })
+
+    await assert.rejects(ctx.source.next(), Error(falsySourceError))
   })
 })

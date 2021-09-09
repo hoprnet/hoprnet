@@ -18,8 +18,8 @@ import type { Stream, StreamResult, DialOptions } from '../types'
 const DEBUG_PREFIX = `hopr-connect`
 
 const _log = Debug(DEBUG_PREFIX)
-const _verbose = Debug('hopr-connect:verbose')
-const _error = Debug(DEBUG_PREFIX.concat(`error`))
+const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
+const _error = Debug(`${DEBUG_PREFIX}:error`)
 
 export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(3)
 
@@ -114,9 +114,33 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this.source = getAbortableSource(this.createSource(), this.options?.signal)
 
-    this.sink = this._sink.bind(this)
+    let sinkCreator: Promise<void>
+    this.sink = (source: Stream['source']) => {
+      let deferred = Defer<void>()
+      sinkCreator.catch(deferred.reject)
+      this._sinkSourceAttached = true
+      this._sinkSourceAttachedPromise.resolve(
+        async function* (this: WebRTCConnection) {
+          try {
+            yield* getAbortableSource(toU8aStream(source), this.options?.signal)
+            deferred.resolve()
+          } catch (err: any) {
+            if (err.type === 'aborted') {
+              deferred.resolve()
+            } else {
+              this.error(`sink error thrown`, err.message)
+              deferred.reject(err)
+            }
+          }
+        }.call(this)
+      )
 
-    this.sinkFunction()
+      return deferred.promise
+    }
+
+    sinkCreator = this.sinkFunction()
+
+    sinkCreator.catch((err) => this.error('sink error thrown before sink attach', err.message))
     this.verbose(`!!! sinkFunction`)
 
     this.webRTCHandshakeTimeout = setTimeout(this.afterWebRTCUpgrade.bind(this), WEBRTC_UPGRADE_TIMEOUT)
@@ -182,15 +206,6 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   /**
-   * Called once source is available and attaches source to sink
-   * @param source source to attach
-   */
-  private async _sink(source: Stream['source']): Promise<void> {
-    this._sinkSourceAttached = true
-    this._sinkSourceAttachedPromise.resolve(getAbortableSource(toU8aStream(source), this.options?.signal))
-  }
-
-  /**
    * Starts the communication with the counterparty through the
    * relayed connection. Passes messages through relayed connection
    * until WebRTC connection is available.
@@ -205,109 +220,118 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this.verbose(`FLOW: webrtc sink 1`)
 
-    // First: use relayed connection
-    await new Promise<void>((resolve) =>
-      this.relayConn.sink(
-        eagerIterator(
-          async function* (this: WebRTCConnection): Stream['source'] {
-            let webRTCFinished = false
+    // handle sink stream of relay connection until it
+    // either ends or webrtc becomes available
+    await new Promise<void>((resolve, reject) =>
+      this.relayConn
+        .sink(
+          // start sinking status messages even if no source got
+          // attached yet
+          // this is important for sending webrtc signalling messages
+          // even before payload messages are ready to send
+          eagerIterator(
+            async function* (this: WebRTCConnection): Stream['source'] {
+              let webRTCFinished = false
 
-            let result: SinkType
+              let result: SinkType
 
-            const next = () => {
-              sourcePromise = (source as Stream['source']).next()
-              result = undefined
-            }
-
-            this.verbose(`FLOW: webrtc sink: loop started`)
-
-            while (true) {
-              this.verbose(`FLOW: webrtc sink: loop iteration`)
-              const promises: Promise<SinkType>[] = []
-
-              let resolvedPromiseName
-
-              const pushPromise = (promise: Promise<SinkType>, name: string) => {
-                promises.push(
-                  promise.then((res: any) => {
-                    resolvedPromiseName = name
-                    return res
-                  })
-                )
+              const next = () => {
+                sourcePromise = (source as Stream['source']).next()
+                result = undefined
               }
 
-              // No source available, need to wait for it
-              if (!sourceAttached) {
-                pushPromise(this._sinkSourceAttachedPromise.promise, 'sourceAttached')
-              }
+              this.verbose(`FLOW: webrtc sink: loop started`)
 
-              // WebRTC handshake is not completed yet
-              if (!webRTCFinished) {
-                pushPromise(this._switchPromise.promise, 'switch')
-              }
+              while (true) {
+                this.verbose(`FLOW: webrtc sink: loop iteration`)
+                const promises: Promise<SinkType>[] = []
 
-              // Source already attached, wait for incoming messages
-              if (sourceAttached) {
-                sourcePromise ??= (source as Stream['source']).next()
-                pushPromise(sourcePromise, 'source')
-              }
+                let resolvedPromiseName
 
-              // (0.) Handle stream source attach
-              // 1. Handle stream handover
-              // 2. Handle stream messages
-              this.verbose(`FLOW: webrtc sink: awaiting promises`)
-              result = await Promise.race(promises)
-              this.verbose(`FLOW: webrtc sink: promise resolved ${resolvedPromiseName}`)
+                const pushPromise = (promise: Promise<SinkType>, name: string) => {
+                  promises.push(
+                    promise.then((res: any) => {
+                      resolvedPromiseName = name
+                      return res
+                    })
+                  )
+                }
 
-              // Source got attached
-              if (!sourceAttached && this._sinkSourceAttached) {
-                sourceAttached = true
-                source = result as Stream['source']
-                this.verbose(`FLOW: webrtc sink: source attached, continue`)
-                continue
-              }
+                // No source available, need to wait for it
+                if (!sourceAttached) {
+                  pushPromise(this._sinkSourceAttachedPromise.promise, 'sourceAttached')
+                }
 
-              // WebRTC is finished, now handle result
-              if (!webRTCFinished && this._webRTCHandshakeFinished) {
-                webRTCFinished = true
+                // WebRTC handshake is not completed yet
+                if (!webRTCFinished) {
+                  pushPromise(this._switchPromise.promise, 'switch')
+                }
 
-                if (this._webRTCAvailable) {
-                  // Send DONE and migrate to direct WebRTC connection
-                  this.verbose(`FLOW: webrtc sink: webrtc finished, handle`)
-                  // this.verbose(`FLOW: switched to webrtc, will try to close relayed connection`)
+                // Source already attached, wait for incoming messages
+                if (sourceAttached) {
+                  sourcePromise ??= (source as Stream['source']).next()
+                  pushPromise(sourcePromise, 'source')
+                }
 
-                  yield Uint8Array.of(MigrationStatus.DONE)
-                  break
-                } else {
-                  // WebRTC upgrade finished but no connection
-                  // possible
-                  this.verbose(`FLOW: webrtc sink: WebRTC upgrade finished but no connection, continue`)
+                // (0.) Handle stream source attach
+                // 1. Handle stream handover
+                // 2. Handle stream messages
+                this.verbose(`FLOW: webrtc sink: awaiting promises`)
+                result = await Promise.race(promises)
+                this.verbose(`FLOW: webrtc sink: promise resolved ${resolvedPromiseName}`)
+
+                // Source got attached
+                if (!sourceAttached && this._sinkSourceAttached) {
+                  sourceAttached = true
+                  source = result as Stream['source']
+                  this.verbose(`FLOW: webrtc sink: source attached, continue`)
                   continue
                 }
+
+                // WebRTC is finished, now handle result
+                if (!webRTCFinished && this._webRTCHandshakeFinished) {
+                  webRTCFinished = true
+
+                  if (this._webRTCAvailable) {
+                    // Send DONE and migrate to direct WebRTC connection
+                    this.verbose(`FLOW: webrtc sink: webrtc finished, handle`)
+                    // this.verbose(`FLOW: switched to webrtc, will try to close relayed connection`)
+
+                    yield Uint8Array.of(MigrationStatus.DONE)
+                    break
+                  } else {
+                    // WebRTC upgrade finished but no connection
+                    // possible
+                    this.verbose(`FLOW: webrtc sink: WebRTC upgrade finished but no connection, continue`)
+                    continue
+                  }
+                }
+
+                const received = result as StreamResult
+
+                if (received.done) {
+                  this.verbose(`FLOW: webrtc sink: received.done, break`)
+                  break
+                }
+
+                next()
+
+                this.log(`sinking ${received.value.slice().length} bytes into relayed connection`)
+                this.verbose(`FLOW: webrtc sink: loop iteration ended`)
+                yield Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.slice()])
               }
-
-              const received = result as StreamResult
-
-              if (received.done) {
-                this.verbose(`FLOW: webrtc sink: received.done, break`)
-                break
-              }
-
-              next()
-
-              this.log(`sinking ${received.value.slice().length} bytes into relayed connection`)
-              this.verbose(`FLOW: webrtc sink: loop iteration ended`)
-              yield Uint8Array.from([MigrationStatus.NOT_DONE, ...received.value.slice()])
-            }
-            this.verbose(`FLOW: webrtc sink: loop ended`)
-            resolve()
-          }.call(this)
+              this.verbose(`FLOW: webrtc sink: loop ended`)
+              resolve()
+            }.call(this)
+          )
         )
-      )
+        // catch stream errors and forward error
+        .catch(reject)
     )
-    // Either stream is finished or WebRTC is available
 
+    // Either stream is finished or WebRTC is available
     if (this._webRTCAvailable) {
+      // WebRTC is available, let's attach sink source to it
       this.verbose(`FLOW: sending UPGRADED to relay`)
       this.relayConn.sendUpgraded()
 
