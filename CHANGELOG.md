@@ -1,3 +1,14 @@
+<a name="0.2.42"></a>
+
+## [0.2.42](https://github.com/hoprnet/hopr-connect/compare/v0.2.41...v0.2.42) (2021-09-10)
+
+Changes:
+
+- remove type hacks (#308)
+- handle stream pipeline errors (#300)
+- fix infinite loop error (#295)
+- package upgrades
+
 <a name="0.2.41"></a>
 
 ## [0.2.41](https://github.com/hoprnet/hopr-connect/compare/v0.2.40...v0.2.41) (2021-08-13)
