@@ -1,20 +1,18 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { utils } from 'ethers'
 import { convertPubKeyFromB58String } from '@hoprnet/hopr-utils'
 import { HoprToken__factory } from '../types'
 import { getContractData, Networks } from '..'
 
 const send = (signer, txparams) =>
-  signer.sendTransaction(txparams, (error, transactionHash) => {
+  signer.sendTransaction(txparams, (error, transactionHash: string) => {
     if (error) {
       console.log(`Error: ${error}`)
     }
     console.log(`transactionHash: ${transactionHash}`)
   })
 
-const nativeAddress = async (hoprAddress) => {
-  const nodePeerPubkey = await convertPubKeyFromB58String(hoprAddress)
-  return utils.computeAddress(nodePeerPubkey.marshal())
+const nativeAddress = (hoprAddress: string): string => {
+  return convertPubKeyFromB58String(hoprAddress).toAddress().toHex()
 }
 
 /**
@@ -41,7 +39,7 @@ async function main(
 
   const etherAmount = '1.0'
   const signer = ethers.provider.getSigner()
-  const nodeAddress = ishopraddress ? await nativeAddress(address) : address
+  const nodeAddress = ishopraddress ? nativeAddress(address) : address
   const tx = {
     to: nodeAddress,
     value: ethers.utils.parseEther(etherAmount)

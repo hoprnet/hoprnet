@@ -2,8 +2,7 @@
  * Add a more usable API on top of LibP2P
  */
 import PeerId from 'peer-id'
-import { keys, PublicKey } from 'libp2p-crypto'
-import multihashes from 'multihashes'
+import { keys } from 'libp2p-crypto'
 import { green } from 'chalk'
 import type { PeerRoutingModule, Connection, MuxedStream } from 'libp2p'
 import type LibP2P from 'libp2p'
@@ -12,6 +11,7 @@ import AbortController from 'abort-controller'
 import Debug from 'debug'
 import pipe from 'it-pipe'
 import type { PromiseValue } from '../typescript'
+import { PublicKey } from '..'
 
 export * from './privKeyToPeerId'
 export * from './pubKeyToPeerId'
@@ -30,8 +30,8 @@ export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
  *
  * @param peerId the PeerId used to generate a public key
  */
-export async function convertPubKeyFromPeerId(peerId: PeerId): Promise<PublicKey> {
-  return keys.unmarshalPublicKey(multihashes.decode(peerId.toBytes()).digest)
+export function convertPubKeyFromPeerId(peerId: PeerId): PublicKey {
+  return PublicKey.fromPeerId(peerId)
 }
 
 /**
@@ -40,8 +40,8 @@ export async function convertPubKeyFromPeerId(peerId: PeerId): Promise<PublicKey
  *
  * @param string the B58String used to represent the PeerId
  */
-export async function convertPubKeyFromB58String(b58string: string): Promise<PublicKey> {
-  return await convertPubKeyFromPeerId(PeerId.createFromB58String(b58string))
+export function convertPubKeyFromB58String(b58string: string): PublicKey {
+  return convertPubKeyFromPeerId(PeerId.createFromB58String(b58string))
 }
 
 /**
