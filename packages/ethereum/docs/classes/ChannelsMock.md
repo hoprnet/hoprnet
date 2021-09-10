@@ -194,7 +194,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:519
+packages/ethereum/types/ChannelsMock.d.ts:521
 
 ___
 
@@ -246,7 +246,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:784
+packages/ethereum/types/ChannelsMock.d.ts:787
 
 ___
 
@@ -262,9 +262,10 @@ ___
 | `ChannelBumped` | (`source?`: `string`, `destination?`: `string`, `newCommitment?`: ``null``, `ticketEpoch?`: ``null``, `channelBalance?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
 | `ChannelClosureFinalized` | (`source?`: `string`, `destination?`: `string`, `closureFinalizationTime?`: ``null``, `channelBalance?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`, `BigNumber`], `Object`\> |
 | `ChannelClosureInitiated` | (`source?`: `string`, `destination?`: `string`, `closureInitiationTime?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`], `Object`\> |
-| `ChannelUpdate` | (`source?`: `string`, `destination?`: `string`, `newState?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, [`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }], `Object`\> |
+| `ChannelFunded` | (`funder?`: `string`, `source?`: `string`, `destination?`: `string`, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`], `Object`\> |
+| `ChannelOpened` | (`source?`: `string`, `destination?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `ChannelUpdated` | (`source?`: `string`, `destination?`: `string`, `newState?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, [`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }], `Object`\> |
 | `TicketRedeemed` | (`source?`: `string`, `destination?`: `string`, `nextCommitment?`: ``null``, `ticketEpoch?`: ``null``, `ticketIndex?`: ``null``, `proofOfRelaySecret?`: ``null``, `amount?`: ``null``, `winProb?`: ``null``, `signature?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`, `string`, `BigNumber`, `BigNumber`, `string`], `Object`\> |
-| `TokensReceived` | (`from?`: `string`, `account1?`: `string`, `account2?`: `string`, `amount1?`: ``null``, `amount2?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
 
 #### Overrides
 
@@ -272,7 +273,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:640
+packages/ethereum/types/ChannelsMock.d.ts:642
 
 ___
 
@@ -310,7 +311,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:265
+packages/ethereum/types/ChannelsMock.d.ts:267
 
 ___
 
@@ -324,7 +325,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:263
+packages/ethereum/types/ChannelsMock.d.ts:265
 
 ___
 
@@ -362,7 +363,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:900
+packages/ethereum/types/ChannelsMock.d.ts:903
 
 ___
 
@@ -424,7 +425,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:394
+packages/ethereum/types/ChannelsMock.d.ts:396
 
 ___
 
@@ -444,7 +445,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:396
+packages/ethereum/types/ChannelsMock.d.ts:398
 
 ___
 
@@ -539,7 +540,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:398
+packages/ethereum/types/ChannelsMock.d.ts:400
 
 ___
 
@@ -563,7 +564,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:224
+packages/ethereum/types/ChannelsMock.d.ts:226
 
 ___
 
@@ -585,7 +586,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:403
+packages/ethereum/types/ChannelsMock.d.ts:405
 
 ___
 
@@ -607,7 +608,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:409
+packages/ethereum/types/ChannelsMock.d.ts:411
 
 ___
 
@@ -628,7 +629,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:415
+packages/ethereum/types/ChannelsMock.d.ts:417
 
 ___
 
@@ -649,7 +650,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:430
+packages/ethereum/types/ChannelsMock.d.ts:432
 
 ___
 
@@ -673,7 +674,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:223
+packages/ethereum/types/ChannelsMock.d.ts:225
 
 ___
 
@@ -691,7 +692,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:225
+packages/ethereum/types/ChannelsMock.d.ts:227
 
 ___
 
@@ -761,7 +762,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:435
+packages/ethereum/types/ChannelsMock.d.ts:437
 
 ___
 
@@ -785,7 +786,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:440
+packages/ethereum/types/ChannelsMock.d.ts:442
 
 ___
 
@@ -807,7 +808,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:448
+packages/ethereum/types/ChannelsMock.d.ts:450
 
 ___
 
@@ -834,7 +835,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:454
+packages/ethereum/types/ChannelsMock.d.ts:456
 
 ___
 
@@ -861,7 +862,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:465
+packages/ethereum/types/ChannelsMock.d.ts:467
 
 ___
 
@@ -884,7 +885,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:476
+packages/ethereum/types/ChannelsMock.d.ts:478
 
 ___
 
@@ -905,7 +906,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:483
+packages/ethereum/types/ChannelsMock.d.ts:485
 
 ___
 
@@ -960,7 +961,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:227
+packages/ethereum/types/ChannelsMock.d.ts:229
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -980,7 +981,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:250
+packages/ethereum/types/ChannelsMock.d.ts:252
 
 ___
 
@@ -1001,7 +1002,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:488
+packages/ethereum/types/ChannelsMock.d.ts:490
 
 ___
 
@@ -1033,7 +1034,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:230
+packages/ethereum/types/ChannelsMock.d.ts:232
 
 ▸ **off**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1054,7 +1055,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:251
+packages/ethereum/types/ChannelsMock.d.ts:253
 
 ___
 
@@ -1086,7 +1087,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:234
+packages/ethereum/types/ChannelsMock.d.ts:236
 
 ▸ **on**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1107,7 +1108,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:252
+packages/ethereum/types/ChannelsMock.d.ts:254
 
 ___
 
@@ -1139,7 +1140,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:238
+packages/ethereum/types/ChannelsMock.d.ts:240
 
 ▸ **once**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1160,7 +1161,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:253
+packages/ethereum/types/ChannelsMock.d.ts:255
 
 ___
 
@@ -1193,7 +1194,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:257
+packages/ethereum/types/ChannelsMock.d.ts:259
 
 ___
 
@@ -1221,7 +1222,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:493
+packages/ethereum/types/ChannelsMock.d.ts:495
 
 ___
 
@@ -1252,7 +1253,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:246
+packages/ethereum/types/ChannelsMock.d.ts:248
 
 ▸ **removeAllListeners**(`eventName?`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1272,7 +1273,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:255
+packages/ethereum/types/ChannelsMock.d.ts:257
 
 ___
 
@@ -1304,7 +1305,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:242
+packages/ethereum/types/ChannelsMock.d.ts:244
 
 ▸ **removeListener**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1325,7 +1326,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:254
+packages/ethereum/types/ChannelsMock.d.ts:256
 
 ___
 
@@ -1345,7 +1346,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:505
+packages/ethereum/types/ChannelsMock.d.ts:507
 
 ___
 
@@ -1365,7 +1366,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:507
+packages/ethereum/types/ChannelsMock.d.ts:509
 
 ___
 
@@ -1391,7 +1392,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:509
+packages/ethereum/types/ChannelsMock.d.ts:511
 
 ___
 

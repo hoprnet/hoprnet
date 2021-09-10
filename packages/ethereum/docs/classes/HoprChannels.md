@@ -184,7 +184,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:378
+packages/ethereum/types/HoprChannels.d.ts:380
 
 ___
 
@@ -231,7 +231,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:603
+packages/ethereum/types/HoprChannels.d.ts:606
 
 ___
 
@@ -247,9 +247,10 @@ ___
 | `ChannelBumped` | (`source?`: `string`, `destination?`: `string`, `newCommitment?`: ``null``, `ticketEpoch?`: ``null``, `channelBalance?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
 | `ChannelClosureFinalized` | (`source?`: `string`, `destination?`: `string`, `closureFinalizationTime?`: ``null``, `channelBalance?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`, `BigNumber`], `Object`\> |
 | `ChannelClosureInitiated` | (`source?`: `string`, `destination?`: `string`, `closureInitiationTime?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`], `Object`\> |
-| `ChannelUpdate` | (`source?`: `string`, `destination?`: `string`, `newState?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, [`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }], `Object`\> |
+| `ChannelFunded` | (`funder?`: `string`, `source?`: `string`, `destination?`: `string`, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`], `Object`\> |
+| `ChannelOpened` | (`source?`: `string`, `destination?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `ChannelUpdated` | (`source?`: `string`, `destination?`: `string`, `newState?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, [`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }], `Object`\> |
 | `TicketRedeemed` | (`source?`: `string`, `destination?`: `string`, `nextCommitment?`: ``null``, `ticketEpoch?`: ``null``, `ticketIndex?`: ``null``, `proofOfRelaySecret?`: ``null``, `amount?`: ``null``, `winProb?`: ``null``, `signature?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`, `string`, `BigNumber`, `BigNumber`, `string`], `Object`\> |
-| `TokensReceived` | (`from?`: `string`, `account1?`: `string`, `account2?`: `string`, `amount1?`: ``null``, `amount2?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
 
 #### Overrides
 
@@ -257,7 +258,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:459
+packages/ethereum/types/HoprChannels.d.ts:461
 
 ___
 
@@ -290,7 +291,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:204
+packages/ethereum/types/HoprChannels.d.ts:206
 
 ___
 
@@ -304,7 +305,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:202
+packages/ethereum/types/HoprChannels.d.ts:204
 
 ___
 
@@ -337,7 +338,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:679
+packages/ethereum/types/HoprChannels.d.ts:682
 
 ___
 
@@ -399,7 +400,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:293
+packages/ethereum/types/HoprChannels.d.ts:295
 
 ___
 
@@ -419,7 +420,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:295
+packages/ethereum/types/HoprChannels.d.ts:297
 
 ___
 
@@ -514,7 +515,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:297
+packages/ethereum/types/HoprChannels.d.ts:299
 
 ___
 
@@ -538,7 +539,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:163
+packages/ethereum/types/HoprChannels.d.ts:165
 
 ___
 
@@ -560,7 +561,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:302
+packages/ethereum/types/HoprChannels.d.ts:304
 
 ___
 
@@ -582,7 +583,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:308
+packages/ethereum/types/HoprChannels.d.ts:310
 
 ___
 
@@ -603,7 +604,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:314
+packages/ethereum/types/HoprChannels.d.ts:316
 
 ___
 
@@ -627,7 +628,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:162
+packages/ethereum/types/HoprChannels.d.ts:164
 
 ___
 
@@ -645,7 +646,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:164
+packages/ethereum/types/HoprChannels.d.ts:166
 
 ___
 
@@ -715,7 +716,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:329
+packages/ethereum/types/HoprChannels.d.ts:331
 
 ___
 
@@ -739,7 +740,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:334
+packages/ethereum/types/HoprChannels.d.ts:336
 
 ___
 
@@ -760,7 +761,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:342
+packages/ethereum/types/HoprChannels.d.ts:344
 
 ___
 
@@ -815,7 +816,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:166
+packages/ethereum/types/HoprChannels.d.ts:168
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -835,7 +836,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:189
+packages/ethereum/types/HoprChannels.d.ts:191
 
 ___
 
@@ -856,7 +857,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:347
+packages/ethereum/types/HoprChannels.d.ts:349
 
 ___
 
@@ -888,7 +889,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:169
+packages/ethereum/types/HoprChannels.d.ts:171
 
 ▸ **off**(`eventName`, `listener`): [`HoprChannels`](HoprChannels.md)
 
@@ -909,7 +910,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:190
+packages/ethereum/types/HoprChannels.d.ts:192
 
 ___
 
@@ -941,7 +942,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:173
+packages/ethereum/types/HoprChannels.d.ts:175
 
 ▸ **on**(`eventName`, `listener`): [`HoprChannels`](HoprChannels.md)
 
@@ -962,7 +963,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:191
+packages/ethereum/types/HoprChannels.d.ts:193
 
 ___
 
@@ -994,7 +995,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:177
+packages/ethereum/types/HoprChannels.d.ts:179
 
 ▸ **once**(`eventName`, `listener`): [`HoprChannels`](HoprChannels.md)
 
@@ -1015,7 +1016,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:192
+packages/ethereum/types/HoprChannels.d.ts:194
 
 ___
 
@@ -1048,7 +1049,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:196
+packages/ethereum/types/HoprChannels.d.ts:198
 
 ___
 
@@ -1076,7 +1077,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:352
+packages/ethereum/types/HoprChannels.d.ts:354
 
 ___
 
@@ -1107,7 +1108,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:185
+packages/ethereum/types/HoprChannels.d.ts:187
 
 ▸ **removeAllListeners**(`eventName?`): [`HoprChannels`](HoprChannels.md)
 
@@ -1127,7 +1128,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:194
+packages/ethereum/types/HoprChannels.d.ts:196
 
 ___
 
@@ -1159,7 +1160,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:181
+packages/ethereum/types/HoprChannels.d.ts:183
 
 ▸ **removeListener**(`eventName`, `listener`): [`HoprChannels`](HoprChannels.md)
 
@@ -1180,7 +1181,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:193
+packages/ethereum/types/HoprChannels.d.ts:195
 
 ___
 
@@ -1200,7 +1201,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:364
+packages/ethereum/types/HoprChannels.d.ts:366
 
 ___
 
@@ -1220,7 +1221,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:366
+packages/ethereum/types/HoprChannels.d.ts:368
 
 ___
 
@@ -1246,7 +1247,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprChannels.d.ts:368
+packages/ethereum/types/HoprChannels.d.ts:370
 
 ___
 
