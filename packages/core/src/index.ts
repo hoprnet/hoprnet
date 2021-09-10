@@ -187,8 +187,11 @@ class Hopr extends EventEmitter {
    */
   public async start() {
     this.status = 'INITIALIZING'
-    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
-      throw new Error('Cannot start node without a funded wallet')
+    console.log(this.options, !this.options.disablePersistence)
+    if (!this.options.disablePersistence) {
+      if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
+        throw new Error('Cannot start node without a funded wallet')
+      }
     }
 
     const chain = await this.startedPaymentChannels()
@@ -273,7 +276,10 @@ class Hopr extends EventEmitter {
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
-    await this.announce(this.options.announce)
+    if (!this.options.disablePersistence) {
+      await this.announce(this.options.announce)
+    }
+
     log('announcing done, starting heartbeat')
 
     this.heartbeat.start()
