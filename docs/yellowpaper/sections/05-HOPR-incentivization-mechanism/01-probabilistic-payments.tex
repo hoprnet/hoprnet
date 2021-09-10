@@ -68,12 +68,7 @@ the payment channels contract \textit{HoprChannels} and including the following
 $$[A: address, B: address, \lambda: uint8, \mu: uint8], \mu = 0,$$
 
 where $\lambda$ is the amount to be staked by $A$. This call will trigger an on-chain event \textit{ChannelFunded}
-and open a unidirectional payment channel from $A$ to $B$. The payment channel will start
-<<<<<<< Updated upstream
-in state \textit{Waiting for commitment}. The destination address of the
-=======
-in state \textit{Waiting\_for\_commitment}. The destination address of the
->>>>>>> Stashed changes
+and open a unidirectional payment channel from $A$ to $B$. The payment channel will start in state \textit{Waiting for commitment}. The destination address of the
 payment channel must now set an on-chain commitment in order for the payment
 channel between both parties to become \textit{Open}. This is done by $B$
 calling the \textit{bumpChannel()} function to make a new set of commitments
