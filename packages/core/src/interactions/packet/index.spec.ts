@@ -165,8 +165,11 @@ describe('packet interaction', function () {
 
     const msgDefer = new Defer()
 
+    const fakeUnhandle = () => {}
+
     const senderInteraction = new PacketForwardInteraction(
       libp2pSender.subscribe,
+      fakeUnhandle,
       libp2pSender.send,
       sender,
       chainSender as any,
@@ -175,11 +178,36 @@ describe('packet interaction', function () {
     )
 
     // TODO: improve
-    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, chainRelay0 as any, console.log, db)
-    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, chainRelay1 as any, console.log, db)
-    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, chainRelay2 as any, console.log, db)
+    new PacketForwardInteraction(
+      libp2pRelay0.subscribe,
+      fakeUnhandle,
+      libp2pRelay0.send,
+      relay0,
+      chainRelay0 as any,
+      console.log,
+      db
+    )
+    new PacketForwardInteraction(
+      libp2pRelay1.subscribe,
+      fakeUnhandle,
+      libp2pRelay1.send,
+      relay1,
+      chainRelay1 as any,
+      console.log,
+      db
+    )
+    new PacketForwardInteraction(
+      libp2pRelay2.subscribe,
+      fakeUnhandle,
+      libp2pRelay2.send,
+      relay2,
+      chainRelay2 as any,
+      console.log,
+      db
+    )
     new PacketForwardInteraction(
       libp2pReceiver.subscribe,
+      fakeUnhandle,
       libp2pReceiver.send,
       receiver,
       chainReceiver as any,

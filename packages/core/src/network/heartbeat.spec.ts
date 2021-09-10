@@ -10,6 +10,8 @@ import { Hash } from '@hoprnet/hopr-utils'
 describe('unit test heartbeat', async () => {
   let heartbeat: Heartbeat
   let hangUp = sinon.fake.resolves(undefined)
+  let unhandle = sinon.fake.resolves(undefined)
+
   let peers: NetworkPeerStore
   let clock: any
 
@@ -19,7 +21,7 @@ describe('unit test heartbeat', async () => {
   beforeEach(async () => {
     clock = sinon.useFakeTimers(Date.now())
     peers = new NetworkPeerStore([], [await PeerId.create({ keyType: 'secp256k1' })])
-    heartbeat = new Heartbeat(peers, subscribe, send, hangUp)
+    heartbeat = new Heartbeat(peers, subscribe, send, hangUp, unhandle)
   })
 
   afterEach(() => {
@@ -51,7 +53,7 @@ describe('unit test heartbeat', async () => {
     let generateMock = (i: string | number) => {
       let id = fakePeerId(i)
       let peers = new NetworkPeerStore([], [id])
-      let heartbeat = new Heartbeat(peers, subscribe, send, hangUp)
+      let heartbeat = new Heartbeat(peers, subscribe, send, hangUp, unhandle)
       return { peers, id, heartbeat }
     }
 

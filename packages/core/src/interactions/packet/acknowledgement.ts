@@ -50,3 +50,7 @@ export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMes
     })
   })
 }
+
+export function unsubscribeFromAcknowledgements(unhandle: (protocol: string) => void) {
+  unhandle(PROTOCOL_ACKNOWLEDGEMENT)
+}

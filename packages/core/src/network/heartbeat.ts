@@ -21,7 +21,8 @@ export default class Heartbeat {
       msg: Uint8Array,
       opts: DialOpts
     ) => Promise<Uint8Array[]>,
-    private hangUp: (addr: PeerId) => Promise<void>
+    private hangUp: (addr: PeerId) => Promise<void>,
+    private unhandle: (protocol: string) => void
   ) {
     subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true)
   }
@@ -85,6 +86,7 @@ export default class Heartbeat {
 
   public stop() {
     clearTimeout(this.timeout)
+    this.unhandle(PROTOCOL_HEARTBEAT)
     log(`Heartbeat stopped`)
   }
 

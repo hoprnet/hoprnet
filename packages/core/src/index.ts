@@ -53,7 +53,7 @@ import {
 } from './channel-strategy'
 import Debug from 'debug'
 
-import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
+import { subscribeToAcknowledgements, unsubscribeFromAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
@@ -266,8 +266,9 @@ class Hopr extends EventEmitter {
     const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
       libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
+    const unhandle = this.libp2p.unhandle.bind(this.libp2p)
 
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup, unhandle)
 
     const ethereum = await this.startedPaymentChannels()
 
@@ -276,7 +277,15 @@ class Hopr extends EventEmitter {
     )
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
+    this.forward = new PacketForwardInteraction(
+      subscribe,
+      unhandle,
+      sendMessage,
+      this.getId(),
+      ethereum,
+      onMessage,
+      this.db
+    )
 
     if (!this.options.disablePersistence) {
       await this.announce(this.options.announce)
@@ -435,9 +444,17 @@ class Hopr extends EventEmitter {
   public async stop(): Promise<void> {
     this.status = 'DESTROYED'
     clearTimeout(this.checkTimeout)
-    await Promise.all([this.heartbeat.stop(), (await this.startedPaymentChannels()).stop()])
+    await Promise.all([
+      this.heartbeat.stop(),
+      this.forward.close(),
+      unsubscribeFromAcknowledgements(this.libp2p.unhandle.bind(this.libp2p)),
+      (await this.startedPaymentChannels()).stop()
+    ])
 
-    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
+    await Promise.all([
+      this.db?.close().then(() => log(`Database closed.`)),
+      this.libp2p.stop().then(() => log(`libp2p stopped`))
+    ])
 
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))

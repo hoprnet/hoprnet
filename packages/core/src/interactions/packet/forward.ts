@@ -12,7 +12,8 @@ export class PacketForwardInteraction {
   private mixer: Mixer
 
   constructor(
-    private subscribe: any,
+    private subscribe: (protocol: string, handler: (msg: Uint8Array, remotePeer: PeerId) => Promise<void>) => void,
+    private unhandle: (protocol: string) => void,
     private sendMessage: any,
     private privKey: PeerId,
     private chain: HoprCoreEthereum,
@@ -48,5 +49,9 @@ export class PacketForwardInteraction {
     }
 
     sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
+  }
+
+  close() {
+    this.unhandle(PROTOCOL_STRING)
   }
 }
