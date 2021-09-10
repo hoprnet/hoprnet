@@ -1,4 +1,4 @@
-#!/usr/bin/env -S yarn --silent ts-node
+#!/usr/bin/env -S yarn ts-node --transpile-only
 
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
@@ -24,8 +24,10 @@ async function main() {
 
   await node.start()
 
-  node.getAnnouncingNodes()
+  console.log(await node.getAnnouncingNodes())
 
+  console.log(`before stop`)
+  await node.stop()
   // @TODO print nodes
 }
 
