@@ -20,14 +20,17 @@ where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path
 length, $F$ is the relay fee, and $P_w$ is the ticket's winning probability.
 \\~\\$A$ issues a ticket for the next downstream node.
 The challenge is given together with the routing information by the packet.
-\\$A$ does not know whether the ticket is a winner or not.
-    \\~\\$A$ sets the content of the ticket to: $$t=(R,\sigma,P_w,\alpha,I,T_c,\zeta)$$, where $t$ has the following components, in addition to those already defined above:
-    \\~\\\textbf{Recipient's Ethereum adress $R$:} a unique identifier derived from the ticket recipient's public key.
-    \\\textbf{Ticket epoch $\alpha$:} used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha$ whenever a node resets a commitment, which helps keep track of updates to the on-chain commitments and invalidates tickets from earlier epochs.
-    \\\textbf{Ticket index $I$:} set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops any packets where this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with an unchanged index.
-    \\\textbf{Ticket challenge $T_c$:}  set by the ticket issuer and used to check whether a ticket is redeemable before the packet is been relayed. If it is not redeemable, the packet is dropped.
-    \\\textbf{Channel epoch $\zeta$:} used to give each incarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel become invalid once a channel is reopened ($\alpha$'s count restarts again). This is due to the fact that $\zeta$ increments whenever a closed channel is (re)opened.
-\\~\\$A$ then signs the ticket with its private key and sends $T = (t, Sig_I(t))$ to the recipient together with a mixnet packet.
+\\~\\$A$ does not know whether the ticket is a winner or not.
+    \\~\\$A$ sets the content of the ticket to: $$t=(R,\sigma,P_w,\alpha,I,T_c,\zeta),$$ where $t$ has the following components, in addition to those already defined above:
+\begin{itemize}
+\item \textbf{Recipient's Ethereum address $R$}: a unique identifier derived from the ticket recipient's public key.
+\item \textbf{Ticket epoch $\alpha$}: used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha$ whenever a node resets a commitment, which helps keep track of updates to the on-chain commitments and invalidates tickets from earlier epochs.
+\item \textbf{Ticket index $I$}: set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops any packets where this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with an unchanged index.
+\item \textbf{Ticket challenge $T_c$}: set by the ticket issuer and used to check whether a ticket is redeemable before the packet is been relayed. If it is not redeemable, the packet is dropped.
+\item \textbf{Channel epoch $\zeta$}: used to give each incarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel become invalid once a channel is reopened ($\alpha$'s count restarts again). This is due to the fact that $\zeta$ increments whenever a closed channel is (re)opened.
+\end{itemize}
+
+$A$ then signs the ticket with its private key and sends $T = (t, Sig_I(t))$ to the recipient together with a mixnet packet.
     \begin{comment}
 
 
@@ -66,9 +69,9 @@ The challenge is given together with the routing information by the packet.
 \subsection{Ticket Validation}
 
 Tickets are received together with packets. To this end, the recipient and the next downstream node share a secret, $s$, whose key shares $s_i$ and $s_{i+1}$ are derivable by those nodes. Ticket validation requires the following steps:
-\\~\\ \textbf{Validate response:} Once $A$ receives $s_{i+1}^{(1)}$ from $B$ via secret sharing, it can compute $$r_i=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
+\\~\\ \textbf{Validate response} Once $A$ receives $s_{i+1}^{(1)}$ from $B$ via secret sharing, it can compute $$r_i=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
 $$r_i*G=T_{c_i}$$
-\\\textbf{Validate hint:} Once the recipient transforms the packet, it can compute $s_i$. The recipient can now also extract the routing information from the packet.
+\\\textbf{Validate hint} Once the recipient transforms the packet, it can compute $s_i$. The recipient can now also extract the routing information from the packet.
 This includes a hint to the value $s_{i+1}$, given as $$H_i=s_{i+1}^{(1)}*G,$$ which is stored in the Sphinx packet header.
 \\~\\The unacknowledged ticket is stored in the database under the hint to the promised value to ensure the acknowledgement can be later linked to the unacknowledged ticket.
 \\~\\Together with $s_i^{(0)}$, the node can verify that $$T_{c_i}=s_i^{(0)}*G+H_i$$ with $$s_i^{(0)}*G+H_i=s_i^{(0)}*G+s_{i+1}^{(1)}*G=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
@@ -86,10 +89,10 @@ In order to unlock a ticket, the recipient node stores the ticket within its dat
 The node then replies with an acknowledgement which includes a response to the challenge. If this is not the case, the node should drop the packet.
 \end{itemize}
 
-Both the node and the smart contract perform the following checks: 
+Both the node and the smart contract then perform the following checks: 
 
 \begin{itemize}
-\item \textbf{Channel existence} The node checks that the appropriate channel \textbf{exists} and is \textbf{open} or \textbf{pending to close}. If these checks do not pass, the node should drops the packet and the smart contract check will revert. To prevent metadata leakage, the check happens locally rather than on-chain using the blockchain indexer. If the node has no record of the channel or considers the channel to be in a state different from \textbf{open} or \textbf{pending to close}, the ticket is dropped and receipt of the accompanying packet is rejected.
+\item \textbf{Channel existence} The node checks that the appropriate channel \textbf{exists} and is \textbf{open} or \textbf{pending to close}. If these checks do not pass, the node should drop the packet and the smart contract check will revert. To prevent metadata leakage, the check happens locally rather than on-chain using the blockchain indexer. If the node has no record of the channel or considers the channel to be in a state different from \textbf{open} or \textbf{pending to close}, the ticket is dropped and receipt of the accompanying packet is rejected.
 \item \textbf{Commitment value check} Additionally, the node and the smart contract retrieve the next commitment value, $comm_{i-1}$. They then check that this value is not empty and that the commitment is the opening of the next commitment as follows:
 $$ comm_{i-1} != 0 \; and \; comm_{i}=h(comm_{i-1})$$
 \item \textbf{Commitment verification} The node then verifies that $r_i$ and $comm_{i-1}$ lead to a winning ticket.
@@ -98,7 +101,7 @@ This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the tic
 The final recipient of the packet does not receive a ticket because packet reception is not incentivized by the HOPR protocol.
 \item \textbf{Issuer identity} The ticket signer must be same as the ticket issuer. Both node and smart contract verify if the public key associated to the private key used to sign $$T= (t, Sig_I(t))$$ is the issuer's public key. The packet is dropped if this test fails.
 \item \textbf{Prior redemption} The ticket must not have been already redeemed and the ticket index must be strictly greater than the current value in the smart contract (replay protection).
-     $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ the ticket index.
+     $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ is the ticket index.
 \item \textbf{Valid ticket amount} The amount of ticket must be greater than 0: $$\sigma>0$$ where $\sigma$ is the ticket amount.
 \item \textbf{Liquidity check} The channel must have enough funds to cover the value transfer for the ticket: $$ C_b>\sigma$$ where $C_b$ is the channel balance.
 \end{itemize}

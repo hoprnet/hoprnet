@@ -28,12 +28,12 @@ commitment $comm_i$ such that for every $i \in \mathbb{N}_0$ and $i > 0$ it
 holds that $$ \mathsf{Open}(comm_{i}, comm_{i-1}) = \top,$$ which means opening
 $comm_{i}$ with $comm_{i-1}$ holds true.
 The iterated commitment is computed as $$comm_n = h^n(comm_0),$$ where $h$ is a
-preimage-resistant hash function (we use the keccak256 hash function, which is also used
+pre-image resistant hash function (we use the keccak256 hash function, which is also used
 in Ethereum) and $comm_0$ is derived as $$ comm_0 = \mathsf{h}(privKey,chainId,
 contractAddr, channelId, channelEpoch)$$
 This will be implemented in the future after further research
 determines whether such a design leaks information about the
-private key or not. \\~\\The master key should be pseudo-random, such that
+private key or not. \\~\\The master key should be pseudorandom, such that
 all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \le
 n$ are indistinguishable for the ticket issuer from random numbers of the same
 length. This is necessary to ensure that the ticket issuer is unable to
