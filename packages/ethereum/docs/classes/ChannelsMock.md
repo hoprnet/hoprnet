@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- `Contract`
+- `BaseContract`
 
   ↳ **`ChannelsMock`**
 
@@ -34,59 +34,40 @@
 ### Methods
 
 - [FUND\_CHANNEL\_MULTI\_SIZE](ChannelsMock.md#fund_channel_multi_size)
-- [FUND\_CHANNEL\_MULTI\_SIZE()](ChannelsMock.md#fund_channel_multi_size())
 - [TOKENS\_RECIPIENT\_INTERFACE\_HASH](ChannelsMock.md#tokens_recipient_interface_hash)
-- [TOKENS\_RECIPIENT\_INTERFACE\_HASH()](ChannelsMock.md#tokens_recipient_interface_hash())
 - [\_checkRunningEvents](ChannelsMock.md#_checkrunningevents)
 - [\_deployed](ChannelsMock.md#_deployed)
 - [\_wrapEvent](ChannelsMock.md#_wrapevent)
 - [announce](ChannelsMock.md#announce)
-- [announce(bytes)](ChannelsMock.md#announce(bytes))
 - [attach](ChannelsMock.md#attach)
 - [bumpChannel](ChannelsMock.md#bumpchannel)
-- [bumpChannel(address,bytes32)](ChannelsMock.md#bumpchannel(address,bytes32))
 - [canImplementInterfaceForAddress](ChannelsMock.md#canimplementinterfaceforaddress)
-- [canImplementInterfaceForAddress(bytes32,address)](ChannelsMock.md#canimplementinterfaceforaddress(bytes32,address))
 - [channels](ChannelsMock.md#channels)
-- [channels(bytes32)](ChannelsMock.md#channels(bytes32))
 - [computeChallengeInternal](ChannelsMock.md#computechallengeinternal)
-- [computeChallengeInternal(bytes32)](ChannelsMock.md#computechallengeinternal(bytes32))
 - [connect](ChannelsMock.md#connect)
 - [deployed](ChannelsMock.md#deployed)
 - [emit](ChannelsMock.md#emit)
 - [fallback](ChannelsMock.md#fallback)
 - [finalizeChannelClosure](ChannelsMock.md#finalizechannelclosure)
-- [finalizeChannelClosure(address)](ChannelsMock.md#finalizechannelclosure(address))
 - [fundChannelMulti](ChannelsMock.md#fundchannelmulti)
-- [fundChannelMulti(address,address,uint256,uint256)](ChannelsMock.md#fundchannelmulti(address,address,uint256,uint256))
 - [getChannelIdInternal](ChannelsMock.md#getchannelidinternal)
-- [getChannelIdInternal(address,address)](ChannelsMock.md#getchannelidinternal(address,address))
 - [getEncodedTicketInternal](ChannelsMock.md#getencodedticketinternal)
-- [getEncodedTicketInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)](ChannelsMock.md#getencodedticketinternal(address,uint256,bytes32,uint256,uint256,uint256,uint256))
 - [getTicketHashInternal](ChannelsMock.md#gettickethashinternal)
-- [getTicketHashInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)](ChannelsMock.md#gettickethashinternal(address,uint256,bytes32,uint256,uint256,uint256,uint256))
 - [getTicketLuckInternal](ChannelsMock.md#getticketluckinternal)
-- [getTicketLuckInternal(bytes32,bytes32,bytes32)](ChannelsMock.md#getticketluckinternal(bytes32,bytes32,bytes32))
 - [initiateChannelClosure](ChannelsMock.md#initiatechannelclosure)
-- [initiateChannelClosure(address)](ChannelsMock.md#initiatechannelclosure(address))
 - [listenerCount](ChannelsMock.md#listenercount)
 - [listeners](ChannelsMock.md#listeners)
 - [multicall](ChannelsMock.md#multicall)
-- [multicall(bytes[])](ChannelsMock.md#multicall(bytes[]))
 - [off](ChannelsMock.md#off)
 - [on](ChannelsMock.md#on)
 - [once](ChannelsMock.md#once)
 - [queryFilter](ChannelsMock.md#queryfilter)
 - [redeemTicket](ChannelsMock.md#redeemticket)
-- [redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)](ChannelsMock.md#redeemticket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes))
 - [removeAllListeners](ChannelsMock.md#removealllisteners)
 - [removeListener](ChannelsMock.md#removelistener)
 - [secsClosure](ChannelsMock.md#secsclosure)
-- [secsClosure()](ChannelsMock.md#secsclosure())
 - [token](ChannelsMock.md#token)
-- [token()](ChannelsMock.md#token())
 - [tokensReceived](ChannelsMock.md#tokensreceived)
-- [tokensReceived(address,address,address,uint256,bytes,bytes)](ChannelsMock.md#tokensreceived(address,address,address,uint256,bytes,bytes))
 - [getContractAddress](ChannelsMock.md#getcontractaddress)
 - [getInterface](ChannelsMock.md#getinterface)
 - [isIndexed](ChannelsMock.md#isindexed)
@@ -107,7 +88,7 @@
 
 #### Inherited from
 
-Contract.constructor
+BaseContract.constructor
 
 #### Defined in
 
@@ -121,7 +102,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:103
 
 #### Inherited from
 
-Contract.\_deployedPromise
+BaseContract.\_deployedPromise
 
 #### Defined in
 
@@ -139,7 +120,7 @@ ___
 
 #### Inherited from
 
-Contract.\_runningEvents
+BaseContract.\_runningEvents
 
 #### Defined in
 
@@ -157,7 +138,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrappedEmits
+BaseContract.\_wrappedEmits
 
 #### Defined in
 
@@ -171,7 +152,7 @@ ___
 
 #### Inherited from
 
-Contract.address
+BaseContract.address
 
 #### Defined in
 
@@ -188,51 +169,32 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `FUND_CHANNEL_MULTI_SIZE` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `FUND_CHANNEL_MULTI_SIZE()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `announce` | (`multiaddr`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `announce(bytes)` | (`multiaddr`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `bumpChannel` | (`source`: `string`, `newCommitment`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `bumpChannel(address,bytes32)` | (`source`: `string`, `newCommitment`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `channels` | (`arg0`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }\> |
-| `channels(bytes32)` | (`arg0`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }\> |
 | `computeChallengeInternal` | (`response`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `computeChallengeInternal(bytes32)` | (`response`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `finalizeChannelClosure` | (`destination`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `finalizeChannelClosure(address)` | (`destination`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `fundChannelMulti` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `fundChannelMulti(address,address,uint256,uint256)` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `getChannelIdInternal` | (`partyA`: `string`, `partyB`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `getChannelIdInternal(address,address)` | (`partyA`: `string`, `partyB`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `getEncodedTicketInternal` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `getEncodedTicketInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `getTicketHashInternal` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `getTicketHashInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `getTicketLuckInternal` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `getTicketLuckInternal(bytes32,bytes32,bytes32)` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `multicall` | (`data`: `BytesLike`[], `overrides?`: `CallOverrides`) => `Promise`<`string`[]\> |
-| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `CallOverrides`) => `Promise`<`string`[]\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<`number`\> |
-| `secsClosure()` | (`overrides?`: `CallOverrides`) => `Promise`<`number`\> |
 | `token` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
-| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<`string`\> |
 | `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`void`\> |
 
 #### Overrides
 
-Contract.callStatic
+BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:775
+packages/ethereum/types/ChannelsMock.d.ts:521
 
 ___
 
@@ -242,7 +204,7 @@ ___
 
 #### Inherited from
 
-Contract.deployTransaction
+BaseContract.deployTransaction
 
 #### Defined in
 
@@ -259,51 +221,32 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `FUND_CHANNEL_MULTI_SIZE` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `FUND_CHANNEL_MULTI_SIZE()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `announce` | (`multiaddr`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `announce(bytes)` | (`multiaddr`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `bumpChannel` | (`source`: `string`, `newCommitment`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `bumpChannel(address,bytes32)` | (`source`: `string`, `newCommitment`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `channels` | (`arg0`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `channels(bytes32)` | (`arg0`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `computeChallengeInternal` | (`response`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `computeChallengeInternal(bytes32)` | (`response`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `finalizeChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `finalizeChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `fundChannelMulti` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `fundChannelMulti(address,address,uint256,uint256)` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `getChannelIdInternal` | (`partyA`: `string`, `partyB`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `getChannelIdInternal(address,address)` | (`partyA`: `string`, `partyB`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `getEncodedTicketInternal` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `getEncodedTicketInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `getTicketHashInternal` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `getTicketHashInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `getTicketLuckInternal` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `getTicketLuckInternal(bytes32,bytes32,bytes32)` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `multicall` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `secsClosure()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `token` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
-| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<`BigNumber`\> |
 | `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`BigNumber`\> |
 
 #### Overrides
 
-Contract.estimateGas
+BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:1167
+packages/ethereum/types/ChannelsMock.d.ts:787
 
 ___
 
@@ -315,21 +258,22 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Announcement` | (`account`: `string`, `multiaddr`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `ChannelBumped` | (`source`: `string`, `destination`: `string`, `newCommitment`: ``null``, `ticketEpoch`: ``null``, `channelBalance`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
-| `ChannelClosureFinalized` | (`source`: `string`, `destination`: `string`, `closureFinalizationTime`: ``null``, `channelBalance`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`, `BigNumber`], `Object`\> |
-| `ChannelClosureInitiated` | (`source`: `string`, `destination`: `string`, `closureInitiationTime`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`], `Object`\> |
-| `ChannelUpdate` | (`source`: `string`, `destination`: `string`, `newState`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, [`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }], `Object`\> |
-| `TicketRedeemed` | (`source`: `string`, `destination`: `string`, `nextCommitment`: ``null``, `ticketEpoch`: ``null``, `ticketIndex`: ``null``, `proofOfRelaySecret`: ``null``, `amount`: ``null``, `winProb`: ``null``, `signature`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`, `string`, `BigNumber`, `BigNumber`, `string`], `Object`\> |
-| `TokensReceived` | (`from`: `string`, `account1`: `string`, `account2`: `string`, `amount1`: ``null``, `amount2`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
+| `Announcement` | (`account?`: `string`, `multiaddr?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `ChannelBumped` | (`source?`: `string`, `destination?`: `string`, `newCommitment?`: ``null``, `ticketEpoch?`: ``null``, `channelBalance?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
+| `ChannelClosureFinalized` | (`source?`: `string`, `destination?`: `string`, `closureFinalizationTime?`: ``null``, `channelBalance?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`, `BigNumber`], `Object`\> |
+| `ChannelClosureInitiated` | (`source?`: `string`, `destination?`: `string`, `closureInitiationTime?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `number`], `Object`\> |
+| `ChannelFunded` | (`funder?`: `string`, `source?`: `string`, `destination?`: `string`, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`], `Object`\> |
+| `ChannelOpened` | (`source?`: `string`, `destination?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `ChannelUpdated` | (`source?`: `string`, `destination?`: `string`, `newState?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, [`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }], `Object`\> |
+| `TicketRedeemed` | (`source?`: `string`, `destination?`: `string`, `nextCommitment?`: ``null``, `ticketEpoch?`: ``null``, `ticketIndex?`: ``null``, `proofOfRelaySecret?`: ``null``, `amount?`: ``null``, `winProb?`: ``null``, `signature?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `BigNumber`, `string`, `BigNumber`, `BigNumber`, `string`], `Object`\> |
 
 #### Overrides
 
-Contract.filters
+BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:1023
+packages/ethereum/types/ChannelsMock.d.ts:642
 
 ___
 
@@ -342,51 +286,32 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `FUND_CHANNEL_MULTI_SIZE` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `FUND_CHANNEL_MULTI_SIZE()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `announce` | (`multiaddr`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `announce(bytes)` | (`multiaddr`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `bumpChannel` | (`source`: `string`, `newCommitment`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `bumpChannel(address,bytes32)` | (`source`: `string`, `newCommitment`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `channels` | (`arg0`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }\> |
-| `channels(bytes32)` | (`arg0`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }\> |
 | `computeChallengeInternal` | (`response`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `computeChallengeInternal(bytes32)` | (`response`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `finalizeChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `finalizeChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `fundChannelMulti` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `fundChannelMulti(address,address,uint256,uint256)` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `getChannelIdInternal` | (`partyA`: `string`, `partyB`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `getChannelIdInternal(address,address)` | (`partyA`: `string`, `partyB`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `getEncodedTicketInternal` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `getEncodedTicketInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `getTicketHashInternal` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `getTicketHashInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `getTicketLuckInternal` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
-| `getTicketLuckInternal(bytes32,bytes32,bytes32)` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `multicall` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<[`number`]\> |
-| `secsClosure()` | (`overrides?`: `CallOverrides`) => `Promise`<[`number`]\> |
 | `token` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
-| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
 | `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`ContractTransaction`\> |
 
 #### Overrides
 
-Contract.functions
+BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:265
+packages/ethereum/types/ChannelsMock.d.ts:267
 
 ___
 
@@ -396,11 +321,11 @@ ___
 
 #### Overrides
 
-Contract.interface
+BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:263
+packages/ethereum/types/ChannelsMock.d.ts:265
 
 ___
 
@@ -413,51 +338,32 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `FUND_CHANNEL_MULTI_SIZE` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `FUND_CHANNEL_MULTI_SIZE()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `TOKENS_RECIPIENT_INTERFACE_HASH` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `announce` | (`multiaddr`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `announce(bytes)` | (`multiaddr`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `bumpChannel` | (`source`: `string`, `newCommitment`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `bumpChannel(address,bytes32)` | (`source`: `string`, `newCommitment`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `channels` | (`arg0`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `channels(bytes32)` | (`arg0`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `computeChallengeInternal` | (`response`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `computeChallengeInternal(bytes32)` | (`response`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `finalizeChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `finalizeChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `fundChannelMulti` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `fundChannelMulti(address,address,uint256,uint256)` | (`account1`: `string`, `account2`: `string`, `amount1`: `BigNumberish`, `amount2`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `getChannelIdInternal` | (`partyA`: `string`, `partyB`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `getChannelIdInternal(address,address)` | (`partyA`: `string`, `partyB`: `string`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `getEncodedTicketInternal` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `getEncodedTicketInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `getTicketHashInternal` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `getTicketHashInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)` | (`recipient`: `string`, `recipientCounter`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `channelIteration`: `BigNumberish`, `amount`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `winProb`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `getTicketLuckInternal` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `getTicketLuckInternal(bytes32,bytes32,bytes32)` | (`ticketHash`: `BytesLike`, `secretPreImage`: `BytesLike`, `proofOfRelaySecret`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `initiateChannelClosure` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `initiateChannelClosure(address)` | (`destination`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `multicall` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `multicall(bytes[])` | (`data`: `BytesLike`[], `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `redeemTicket` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | (`source`: `string`, `nextCommitment`: `BytesLike`, `ticketEpoch`: `BigNumberish`, `ticketIndex`: `BigNumberish`, `proofOfRelaySecret`: `BytesLike`, `amount`: `BigNumberish`, `winProb`: `BigNumberish`, `signature`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 | `secsClosure` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `secsClosure()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `token` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
-| `token()` | (`overrides?`: `CallOverrides`) => `Promise`<`PopulatedTransaction`\> |
 | `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  }) => `Promise`<`PopulatedTransaction`\> |
 
 #### Overrides
 
-Contract.populateTransaction
+BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:1400
+packages/ethereum/types/ChannelsMock.d.ts:903
 
 ___
 
@@ -467,7 +373,7 @@ ___
 
 #### Inherited from
 
-Contract.provider
+BaseContract.provider
 
 #### Defined in
 
@@ -481,7 +387,7 @@ ___
 
 #### Inherited from
 
-Contract.resolvedAddress
+BaseContract.resolvedAddress
 
 #### Defined in
 
@@ -495,7 +401,7 @@ ___
 
 #### Inherited from
 
-Contract.signer
+BaseContract.signer
 
 #### Defined in
 
@@ -519,27 +425,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:523
-
-___
-
-### FUND\_CHANNEL\_MULTI\_SIZE()
-
-▸ **FUND_CHANNEL_MULTI_SIZE()**(`overrides?`): `Promise`<`BigNumber`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:525
+packages/ethereum/types/ChannelsMock.d.ts:396
 
 ___
 
@@ -559,27 +445,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:527
-
-___
-
-### TOKENS\_RECIPIENT\_INTERFACE\_HASH()
-
-▸ **TOKENS_RECIPIENT_INTERFACE_HASH()**(`overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:529
+packages/ethereum/types/ChannelsMock.d.ts:398
 
 ___
 
@@ -599,7 +465,7 @@ ___
 
 #### Inherited from
 
-Contract.\_checkRunningEvents
+BaseContract.\_checkRunningEvents
 
 #### Defined in
 
@@ -623,7 +489,7 @@ ___
 
 #### Inherited from
 
-Contract.\_deployed
+BaseContract.\_deployed
 
 #### Defined in
 
@@ -649,7 +515,7 @@ ___
 
 #### Inherited from
 
-Contract.\_wrapEvent
+BaseContract.\_wrapEvent
 
 #### Defined in
 
@@ -674,28 +540,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:533
-
-___
-
-### announce(bytes)
-
-▸ **announce(bytes)**(`multiaddr`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `multiaddr` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:538
+packages/ethereum/types/ChannelsMock.d.ts:400
 
 ___
 
@@ -715,11 +560,11 @@ ___
 
 #### Overrides
 
-Contract.attach
+BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:224
+packages/ethereum/types/ChannelsMock.d.ts:226
 
 ___
 
@@ -741,29 +586,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:543
-
-___
-
-### bumpChannel(address,bytes32)
-
-▸ **bumpChannel(address,bytes32)**(`source`, `newCommitment`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `source` | `string` |
-| `newCommitment` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:549
+packages/ethereum/types/ChannelsMock.d.ts:405
 
 ___
 
@@ -785,29 +608,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:555
-
-___
-
-### canImplementInterfaceForAddress(bytes32,address)
-
-▸ **canImplementInterfaceForAddress(bytes32,address)**(`interfaceHash`, `account`, `overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `interfaceHash` | `BytesLike` |
-| `account` | `string` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:561
+packages/ethereum/types/ChannelsMock.d.ts:411
 
 ___
 
@@ -828,28 +629,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:567
-
-___
-
-### channels(bytes32)
-
-▸ **channels(bytes32)**(`arg0`, `overrides?`): `Promise`<[`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `arg0` | `BytesLike` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<[`BigNumber`, `string`, `BigNumber`, `BigNumber`, `number`, `BigNumber`, `number`] & { `balance`: `BigNumber` ; `channelEpoch`: `BigNumber` ; `closureTime`: `number` ; `commitment`: `string` ; `status`: `number` ; `ticketEpoch`: `BigNumber` ; `ticketIndex`: `BigNumber`  }\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:582
+packages/ethereum/types/ChannelsMock.d.ts:417
 
 ___
 
@@ -870,28 +650,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:597
-
-___
-
-### computeChallengeInternal(bytes32)
-
-▸ **computeChallengeInternal(bytes32)**(`response`, `overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `response` | `BytesLike` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:602
+packages/ethereum/types/ChannelsMock.d.ts:432
 
 ___
 
@@ -911,11 +670,11 @@ ___
 
 #### Overrides
 
-Contract.connect
+BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:223
+packages/ethereum/types/ChannelsMock.d.ts:225
 
 ___
 
@@ -929,11 +688,11 @@ ___
 
 #### Overrides
 
-Contract.deployed
+BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:225
+packages/ethereum/types/ChannelsMock.d.ts:227
 
 ___
 
@@ -954,7 +713,7 @@ ___
 
 #### Inherited from
 
-Contract.emit
+BaseContract.emit
 
 #### Defined in
 
@@ -978,7 +737,7 @@ ___
 
 #### Inherited from
 
-Contract.fallback
+BaseContract.fallback
 
 #### Defined in
 
@@ -1003,28 +762,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:607
-
-___
-
-### finalizeChannelClosure(address)
-
-▸ **finalizeChannelClosure(address)**(`destination`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `destination` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:612
+packages/ethereum/types/ChannelsMock.d.ts:437
 
 ___
 
@@ -1048,31 +786,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:617
-
-___
-
-### fundChannelMulti(address,address,uint256,uint256)
-
-▸ **fundChannelMulti(address,address,uint256,uint256)**(`account1`, `account2`, `amount1`, `amount2`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `account1` | `string` |
-| `account2` | `string` |
-| `amount1` | `BigNumberish` |
-| `amount2` | `BigNumberish` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:625
+packages/ethereum/types/ChannelsMock.d.ts:442
 
 ___
 
@@ -1094,29 +808,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:633
-
-___
-
-### getChannelIdInternal(address,address)
-
-▸ **getChannelIdInternal(address,address)**(`partyA`, `partyB`, `overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `partyA` | `string` |
-| `partyB` | `string` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:639
+packages/ethereum/types/ChannelsMock.d.ts:450
 
 ___
 
@@ -1143,34 +835,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:645
-
-___
-
-### getEncodedTicketInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)
-
-▸ **getEncodedTicketInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)**(`recipient`, `recipientCounter`, `proofOfRelaySecret`, `channelIteration`, `amount`, `ticketIndex`, `winProb`, `overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `recipient` | `string` |
-| `recipientCounter` | `BigNumberish` |
-| `proofOfRelaySecret` | `BytesLike` |
-| `channelIteration` | `BigNumberish` |
-| `amount` | `BigNumberish` |
-| `ticketIndex` | `BigNumberish` |
-| `winProb` | `BigNumberish` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:656
+packages/ethereum/types/ChannelsMock.d.ts:456
 
 ___
 
@@ -1197,34 +862,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:667
-
-___
-
-### getTicketHashInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)
-
-▸ **getTicketHashInternal(address,uint256,bytes32,uint256,uint256,uint256,uint256)**(`recipient`, `recipientCounter`, `proofOfRelaySecret`, `channelIteration`, `amount`, `ticketIndex`, `winProb`, `overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `recipient` | `string` |
-| `recipientCounter` | `BigNumberish` |
-| `proofOfRelaySecret` | `BytesLike` |
-| `channelIteration` | `BigNumberish` |
-| `amount` | `BigNumberish` |
-| `ticketIndex` | `BigNumberish` |
-| `winProb` | `BigNumberish` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:678
+packages/ethereum/types/ChannelsMock.d.ts:467
 
 ___
 
@@ -1247,30 +885,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:689
-
-___
-
-### getTicketLuckInternal(bytes32,bytes32,bytes32)
-
-▸ **getTicketLuckInternal(bytes32,bytes32,bytes32)**(`ticketHash`, `secretPreImage`, `proofOfRelaySecret`, `overrides?`): `Promise`<`BigNumber`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `ticketHash` | `BytesLike` |
-| `secretPreImage` | `BytesLike` |
-| `proofOfRelaySecret` | `BytesLike` |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`BigNumber`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:696
+packages/ethereum/types/ChannelsMock.d.ts:478
 
 ___
 
@@ -1291,28 +906,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:703
-
-___
-
-### initiateChannelClosure(address)
-
-▸ **initiateChannelClosure(address)**(`destination`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `destination` | `string` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:708
+packages/ethereum/types/ChannelsMock.d.ts:485
 
 ___
 
@@ -1332,7 +926,7 @@ ___
 
 #### Inherited from
 
-Contract.listenerCount
+BaseContract.listenerCount
 
 #### Defined in
 
@@ -1363,11 +957,11 @@ ___
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:227
+packages/ethereum/types/ChannelsMock.d.ts:229
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -1383,11 +977,11 @@ packages/ethereum/types/ChannelsMock.d.ts:227
 
 #### Overrides
 
-Contract.listeners
+BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:250
+packages/ethereum/types/ChannelsMock.d.ts:252
 
 ___
 
@@ -1408,28 +1002,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:713
-
-___
-
-### multicall(bytes[])
-
-▸ **multicall(bytes[])**(`data`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `data` | `BytesLike`[] |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:718
+packages/ethereum/types/ChannelsMock.d.ts:490
 
 ___
 
@@ -1457,11 +1030,11 @@ ___
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:230
+packages/ethereum/types/ChannelsMock.d.ts:232
 
 ▸ **off**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1478,11 +1051,11 @@ packages/ethereum/types/ChannelsMock.d.ts:230
 
 #### Overrides
 
-Contract.off
+BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:251
+packages/ethereum/types/ChannelsMock.d.ts:253
 
 ___
 
@@ -1510,11 +1083,11 @@ ___
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:234
+packages/ethereum/types/ChannelsMock.d.ts:236
 
 ▸ **on**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1531,11 +1104,11 @@ packages/ethereum/types/ChannelsMock.d.ts:234
 
 #### Overrides
 
-Contract.on
+BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:252
+packages/ethereum/types/ChannelsMock.d.ts:254
 
 ___
 
@@ -1563,11 +1136,11 @@ ___
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:238
+packages/ethereum/types/ChannelsMock.d.ts:240
 
 ▸ **once**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1584,11 +1157,11 @@ packages/ethereum/types/ChannelsMock.d.ts:238
 
 #### Overrides
 
-Contract.once
+BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:253
+packages/ethereum/types/ChannelsMock.d.ts:255
 
 ___
 
@@ -1617,11 +1190,11 @@ ___
 
 #### Overrides
 
-Contract.queryFilter
+BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:257
+packages/ethereum/types/ChannelsMock.d.ts:259
 
 ___
 
@@ -1649,35 +1222,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:723
-
-___
-
-### redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)
-
-▸ **redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)**(`source`, `nextCommitment`, `ticketEpoch`, `ticketIndex`, `proofOfRelaySecret`, `amount`, `winProb`, `signature`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `source` | `string` |
-| `nextCommitment` | `BytesLike` |
-| `ticketEpoch` | `BigNumberish` |
-| `ticketIndex` | `BigNumberish` |
-| `proofOfRelaySecret` | `BytesLike` |
-| `amount` | `BigNumberish` |
-| `winProb` | `BigNumberish` |
-| `signature` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:735
+packages/ethereum/types/ChannelsMock.d.ts:495
 
 ___
 
@@ -1704,11 +1249,11 @@ ___
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:246
+packages/ethereum/types/ChannelsMock.d.ts:248
 
 ▸ **removeAllListeners**(`eventName?`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1724,11 +1269,11 @@ packages/ethereum/types/ChannelsMock.d.ts:246
 
 #### Overrides
 
-Contract.removeAllListeners
+BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:255
+packages/ethereum/types/ChannelsMock.d.ts:257
 
 ___
 
@@ -1756,11 +1301,11 @@ ___
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:242
+packages/ethereum/types/ChannelsMock.d.ts:244
 
 ▸ **removeListener**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1777,11 +1322,11 @@ packages/ethereum/types/ChannelsMock.d.ts:242
 
 #### Overrides
 
-Contract.removeListener
+BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:254
+packages/ethereum/types/ChannelsMock.d.ts:256
 
 ___
 
@@ -1801,27 +1346,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:747
-
-___
-
-### secsClosure()
-
-▸ **secsClosure()**(`overrides?`): `Promise`<`number`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`number`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:749
+packages/ethereum/types/ChannelsMock.d.ts:507
 
 ___
 
@@ -1841,27 +1366,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:751
-
-___
-
-### token()
-
-▸ **token()**(`overrides?`): `Promise`<`string`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `overrides?` | `CallOverrides` |
-
-#### Returns
-
-`Promise`<`string`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:753
+packages/ethereum/types/ChannelsMock.d.ts:509
 
 ___
 
@@ -1887,33 +1392,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:755
-
-___
-
-### tokensReceived(address,address,address,uint256,bytes,bytes)
-
-▸ **tokensReceived(address,address,address,uint256,bytes,bytes)**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<`ContractTransaction`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `operator` | `string` |
-| `from` | `string` |
-| `to` | `string` |
-| `amount` | `BigNumberish` |
-| `userData` | `BytesLike` |
-| `operatorData` | `BytesLike` |
-| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<`string`\>  } |
-
-#### Returns
-
-`Promise`<`ContractTransaction`\>
-
-#### Defined in
-
-packages/ethereum/types/ChannelsMock.d.ts:765
+packages/ethereum/types/ChannelsMock.d.ts:511
 
 ___
 
@@ -1935,7 +1414,7 @@ ___
 
 #### Inherited from
 
-Contract.getContractAddress
+BaseContract.getContractAddress
 
 #### Defined in
 
@@ -1959,7 +1438,7 @@ ___
 
 #### Inherited from
 
-Contract.getInterface
+BaseContract.getInterface
 
 #### Defined in
 
@@ -1983,7 +1462,7 @@ value is Indexed
 
 #### Inherited from
 
-Contract.isIndexed
+BaseContract.isIndexed
 
 #### Defined in
 

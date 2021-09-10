@@ -1,0 +1,14 @@
+# Exclude node.js stuff
+node_modules
+
+# Exclude OSX files
+**/.DS_Store
+
+# Exclude built Typescript files
+lib
+
+# Exclude built npm packages
+*.tgz
+
+# CT database
+ct.json

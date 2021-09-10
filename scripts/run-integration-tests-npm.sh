@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# prevent souring of this script, only allow execution
+# prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -32,10 +32,13 @@ declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
 
 # we rely on Git tags so need to fetch the tags in case they are not present
 git fetch --unshallow --tags || :
-npm_package_version=${1:-$(git describe --abbrev=0)}
+npm_package_version=${1:-$(git describe --tags --abbrev=0)}
+# remove prefix 'v' if it exists
+npm_package_version=${npm_package_version#v}
 
 declare wait_delay=2
 declare wait_max_wait=1000
+declare cwd=`pwd`
 
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   wait_delay=10
@@ -119,10 +122,13 @@ function setup_node() {
     log "Additional args: \"${additional_args}\""
   fi
 
+  # move into work dir before we proceed to use yarn
   mkdir -p "${npm_install_dir}"
-  yarn --cwd "${npm_install_dir}" add @hoprnet/hoprd@${version}
+  cd "${npm_install_dir}"
 
-  DEBUG="hopr*" yarn --cwd "${npm_install_dir}" hoprd \
+  yarn add @hoprnet/hoprd@${version}
+
+  DEBUG="hopr*" yarn hoprd \
     --admin \
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \
@@ -141,6 +147,9 @@ function setup_node() {
     --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
+
+  # back to our original directory
+  cd "${cwd}"
 
   wait_for_http_port "${rest_port}" "127.0.0.1" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
@@ -166,6 +175,7 @@ function fund_node() {
 }
 
 # --- Log test info {{{
+log "Using NPM package version: ${npm_package_version}"
 log "Test files and directories"
 log "\thardhat"
 log "\t\tlog: ${hardhat_rpc_log}"

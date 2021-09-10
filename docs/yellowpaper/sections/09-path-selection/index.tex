@@ -1,91 +1,93 @@
-\section{Path Selection}
-\label{sec:pathselection}
+\setlength{\parindent}{0pt}
 
-In order to facilitate packets flowing through the HOPR network each node needs
-to decide which path a packet is sent on. That decision making, called
-\textbf{Path Selection}, needs to be performed for every packet. HOPR uses a
-random selection algorithm to determine the identities of nodes participating in
-the network relaying service generally and for a particular packet.
-The selection process is divided into two steps:
+\section{Path Selection}
+\label{sec:path-selection}
+
+Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to the final destination. To achieve its privacy properties, it is crucial for nodes in the network to keep the chosen path secret. As relay nodes differ in their ability to forward packets, path choices need to incorporate the nodes' resources and cannot be chosen entirely at random.
+
+Path selection is therefore done in multiple steps: first, there is a preprocessing that assigns each node a score depending on their relative availability and their stake. The score is then randomized by multiplying with random numbers yielding the final score of the node.
 
 \begin{enumerate}
-
-    \item \textbf{Pre-Selection:}
-          Initially, a subset $m<<n$ nodes will be selected based on these factors:
-          \begin{itemize}
-              \item Node Availability
-              \item Payment Channel Graph
-              \item Payment Channel Stake
-          \end{itemize}
-          Each node receives a weight that is proportional to these factors.
-
-    \item \textbf{Random Selection:} Each edge (from node $A$ to $B$) within the subset
-      $m$ is assigned a random number $r_i$. Edges are then sorted by
-      $$r_i*weight(edge_i)$$. The path with the largest weight is expanded next
-      using a priority queue mechanism.
-
+    \item \textbf{Assign} each node a score depending on availability and stake
+    \item \textbf{Randomize} the edge weights of the subgraph
+    \item \textbf{Find} a path in the subgraph using a graph traversal algorithm
 \end{enumerate}
+
+\subsection{Node score assignment}
+\label{sec:path-selection:node-score}
+
+The HOPR network is kept open and permissionless, hence it is not foreseen to have any gatekeeper that grants access to the network and maintains a list of active nodes. For that reason, it is necessary for participants of the network to maintain a solid understanding about the network topology to decide \textit{which} nodes they can use to relay their mixnet packets.
+
+The network topology includes two layers: the payment channel graph and the ability of nodes to establish a network connection to each other. Whilst the former one is easily achieved by observing and indexing on-chain interactions, the latter one needs active communication with other nodes to check their availability. Since the network status can change abruptly e.g. due to lack of electricity or unstable network links, the measuring need to be done frequently.
+
+\subsubsection{Node availabilty}
+
+The availability of nodes in the network is estimated by regularly pinging other nodes in the network and listening to ping attempts from other nodes. Receiving a \textit{ping} request or a \textit{pong} response from another node means that a node is available and gladually increases their network score.
+
+If a node does not respond to \textit{ping} attempts, it is considered \textit{temporary} offline and the waiting time to the next \textit{ping} attempt is doubled until it reaches an upper bound and the node is considered dead.
+
+\subsubsection{Payment channel graph}
+
+Incentives for relaying mixnet packages require the existence of an open payment channel that is funded towards the relay node. Hence, it is necessary to be in sync with the latest on-chain state.
+
+\subsubsection{The importance of stake}
+
+Funding a payment channel with HOPR tokens means staking these tokens in the HOPR network. The more tokens a node stakes, the more likely it is chosen as a relayer by other nodes.
+
+\subsection{Randomization}
+\label{sec:path-selection:randomization}
+
+Since the previous step is entirely deterministic and potential adversaries can thus deduct the outcome from public information, each node score gets randomized by multplying it with a random number $r_i$.
+$$weight(n_i) := score(n_i) * r_i$$
+
+Note that the random numbers are assigned \textit{once} in the beginning and reassigned upon the selection of a subsequent packet.
+
+\subsection{Graph traversal}
+\label{sec:path-selection:graph-traversal}
+
+The HOPR network uses source-selected routing, hence each node needs to sample the entire path that the mixnet packet is going to take in advance before sending it to the first relayer.
+
+To achieve the aforementioned privacy guarantees, paths \textit{must} include at least one intermediate node. As longer paths increase due to the usage of the SPHINX packet format the size of the header as well as the computation needed to generate them, and can therefore easily distinguished by an adversary, \textit{all} nodes in the HOPR network use a $targetLength$ of \textit{three}. Packets with longer paths are dropped by relayers. Nevertheless it is possible but discouraged to use smaller path lengths such as \textit{one} or \textit{two} intermediate hops.
+
+The algorithm terminates once a path with $targetLength$ is found. To prevent the algorithm from visitting too many nodes, the number of iterations is bound by $maxIterations$ and the longest known path is returned if no path of length $targetLength$ was found.
 
 \begin{algorithm}[H]
     \SetAlgoNoLine
     \DontPrintSemicolon
-    $V := Nodes$\;
-    $M := MaxSelectionIterations$\;
-    $A := MinNodeAvailability$\;
-    $P := RequiredPathLength$\;
+    \KwIn{$\text{nodes} \ V, \text{edges} \ E$}
     \;
-    $openChannels \leftarrow \{ (x, y) \in V \times V \ | \ x \ne y \land getChannel(x,y).state = OPEN \}$\;
-    $queue \leftarrow new \ PriorityQueue()$\;
-    $queue.addAll(\{ (x,y) \in openChannels \ | \ x = self \})$\;
-    $deadEnds \leftarrow \emptyset$\;
+    $queue \leftarrow \mathbf{new} \ \mathsf{PriorityQueue}_{\textsf{pathWeight}}()$\;
+    $queue.addAll(\{ (x,y) \in E \ | \ x = self)$\;
+    $closed \leftarrow \emptyset$\;
     $iterations \leftarrow 0$\;
     \;
-    \While{$!queue.isEmpty() \land iterations < M$}{
-        $current \leftarrow queue.peek()$\;
-        \If{$|current| = P$}{
-            \Return{$current$}
-        }
-        \;
-        $currentNode \leftarrow lastNode(current)$\;
-        $open \leftarrow \{ (x, y) \in E \ | \ x = currentNode \land y \notin deadEnds \land y \ne currentNode \land availability(y) > A$ \}\;
-        $open \leftarrow open.sort(weight_fun)$\;
-        \;
-        \eIf{$open = \emptyset$} {
-            $queue.pop()$\;
-            $deadEnds \leftarrow deadEnds \cup currentNode$\;
-        } {
-            $newPath \leftarrow \{ (current_0, ..., current_{|current| - 1}, o) \ | \ o \in open \})$\;
-            $queue.push(newPath)$\;
-        }
-        \;
-        $iterations \leftarrow iterations + 1$\;
+    \While{$size(queue) > 0 \ \mathsf{and} \ iterations < maxIterations$}{
+    $path \leftarrow queue.peek()$\;
+    \If{$length(path) = targetLength$}{
+        \Return{$path$}
     }
-    \Return{$\bot$}
-    \caption{Path selection in HOPR}
+    \;
+    $current \leftarrow last(path)$\;
+    $open \leftarrow \mathbf{new} \ \mathsf{PriorityQueue}_{\mathsf{nodeWeight}}()$\;
+    \;
+    \ForEach{$next \in \{ y \in V \ | \ (x,y) \in E \ \land \ x = current \}$}{
+        \If{$score(next) > threshold \ \mathbf{and} \ y \notin closed \ \mathbf{and} \ y \notin path$}{
+            $open.push(y)$\;
+        }
+    }
+    \;
+    \uIf{$size(open) = 0$} {
+        $queue.pop()$\;
+        $closed.add(current)$\;
+    }
+    \Else{
+        \ForEach{$node \in open$}{
+            $queue.push(\ (...path, node) \ )$\;
+        }
+    }
+    \;
+    $iterations \leftarrow iterations + 1$\;
+    }
+    \Return{$queue.peek()$}
+    \caption{Path selection}
 \end{algorithm}
-
-\subsection{Node Availability}
-\label{sec:nodeavailability}
-
-Availability of a node is estimated using a heartbeat protocol. Each node maintains a
-list of neighbor nodes in the HOPR network. A node will \textit{ping} neighbors and
-respond to \textit{pings} from other nodes in order to determine whether they are online or offline.
-A node is considered online if the ping response (“PONG”) comes back within a
-certain timeframe. Otherwise, the node is considered offline and its waiting
-time for the next PING attempt is doubled. Newly working pings will improve a
-neighbors availability gradually again.
-
-\subsection{Payment channel graph}
-
-Every node that intends to send messages needs to have a basic understanding
-about the topology of the network which means whether the channel is open and
-funded with enough HOPR tokens for the relaying service. In case no existing
-payment channel is open, the sender creates a new channel and funds it with
-enough HOPR tokens.
-
-\subsection{Payment channel stake}
-
-The HOPR tokens are used to create payment channels with other nodes in the
-network and thereby staked in the HOPR network. The node will then use the HOPR
-token to cover transaction costs when interacting with the blockchain. The more
-stake a node locks the higher probability that it would be chosen as a relayer.

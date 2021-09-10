@@ -39,7 +39,7 @@ export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>
 
 export async function createChainWrapper(providerURI: string, privateKey: Uint8Array) {
   const provider = providerURI.startsWith('http')
-    ? new providers.JsonRpcProvider(providerURI)
+    ? new providers.StaticJsonRpcProvider(providerURI)
     : new providers.WebSocketProvider(providerURI)
   const wallet = new Wallet(privateKey).connect(provider)
   const address = Address.fromString(wallet.address)

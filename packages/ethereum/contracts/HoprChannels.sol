@@ -80,30 +80,44 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
      */
     uint32 public immutable secsClosure;
 
-    event Announcement(
-        address indexed account,
-        bytes multiaddr
-    );
-
-    event ChannelUpdate(
+    /**
+     * Emitted on every channel state change.
+     */
+    event ChannelUpdated(
         address indexed source,
         address indexed destination,
         Channel newState
     );
 
-    event ChannelClosureInitiated(
-        address indexed source,
-        address indexed destination,
-        uint32 closureInitiationTime
+    /**
+     * Emitted once an account announces.
+     */
+    event Announcement(
+        address indexed account,
+        bytes multiaddr
     );
 
-    event ChannelClosureFinalized(
+    /**
+     * Emitted once a channel if funded.
+     */
+    event ChannelFunded(
+        address indexed funder,
         address indexed source,
         address indexed destination,
-        uint32 closureFinalizationTime,
-        uint256 channelBalance
+        uint256 amount
     );
 
+    /**
+     * Emitted once a channel is opened.
+     */
+    event ChannelOpened(
+        address indexed source,
+        address indexed destination
+    );
+
+    /**
+     * Emitted once bumpChannel is called.
+     */
     event ChannelBumped(
         address indexed source,
         address indexed destination,
@@ -112,6 +126,28 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 channelBalance
     );
 
+    /**
+     * Emitted once a channel closure is initialized.
+     */
+    event ChannelClosureInitiated(
+        address indexed source,
+        address indexed destination,
+        uint32 closureInitiationTime
+    );
+
+    /**
+     * Emitted once a channel closure is finalized.
+     */
+    event ChannelClosureFinalized(
+        address indexed source,
+        address indexed destination,
+        uint32 closureFinalizationTime,
+        uint256 channelBalance
+    );
+
+    /**
+     * Emitted once a ticket is redeemed.
+     */
     event TicketRedeemed(
         address indexed source,
         address indexed destination,
@@ -122,14 +158,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 amount,
         uint256 winProb,
         bytes signature
-    );
-
-    event TokensReceived(
-        address indexed from,
-        address indexed account1,
-        address indexed account2,
-        uint256 amount1,
-        uint256 amount2
     );
 
     /**
@@ -165,7 +193,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
     /**
      * @dev Funds channels, in both directions, between 2 parties.
-     * then emits {ChannelUpdate} event, for each channel.
+     * then emits {ChannelUpdated} event, for each channel.
      * @param account1 the address of account1
      * @param account2 the address of account2
      * @param amount1 amount to fund account1
@@ -178,13 +206,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         uint256 amount2
     ) external {
         require(amount1 + amount2 > 0, "amount must be greater than 0");
+
+        // fund channel in direction of: account1 -> account2
         if (amount1 > 0){
-          _fundChannel(account1, account2, amount1);
+          _fundChannel(msg.sender, account1, account2, amount1);
         }
+        // fund channel in direction of: account2 -> account1
         if (amount2 > 0){
-          _fundChannel(account2, account1, amount2);
+          _fundChannel(msg.sender, account2, account1, amount2);
         }
 
+        // pull tokens from funder
         token.transferFrom(msg.sender, address(this), amount1 + amount2);
     }
 
@@ -252,12 +284,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
               source
           );
 
-          emit ChannelUpdate(source, msg.sender, spendingChannel);
+          emit ChannelUpdated(source, msg.sender, spendingChannel);
           emit TicketRedeemed(source, msg.sender, nextCommitment, ticketEpoch, ticketIndex, proofOfRelaySecret, amount, winProb, signature);
 
           if (earningChannel.status == ChannelStatus.OPEN) {
             earningChannel.balance = earningChannel.balance + amount;
-            emit ChannelUpdate(msg.sender, source, earningChannel);
+            emit ChannelUpdated(msg.sender, source, earningChannel);
           } else {
             token.transfer(msg.sender, amount);
           }
@@ -272,7 +304,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
      * before-hand. This notice period is called the 'cool-off' period.
      * The channel 'destination' should be monitoring blockchain events, thus
      * they should be aware that the closure has been triggered, as this
-     * method triggers a {ChannelUpdate} and an {ChannelClosureInitiated} event.
+     * method triggers a {ChannelUpdated} and an {ChannelClosureInitiated} event.
      * After the cool-off period expires, the 'source' can call
      * 'finalizeChannelClosure' which withdraws the stake.
      * @param destination the address of the destination
@@ -284,14 +316,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         require(channel.status == ChannelStatus.OPEN || channel.status == ChannelStatus.WAITING_FOR_COMMITMENT, "channel must be open or waiting for commitment");
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
         channel.status = ChannelStatus.PENDING_TO_CLOSE;
-        emit ChannelUpdate(msg.sender, destination, channel);
+        emit ChannelUpdated(msg.sender, destination, channel);
         emit ChannelClosureInitiated(msg.sender, destination, _currentBlockTimestamp());
     }
 
     /**
      * @dev Finalize the channel closure, if cool-off period
      * is over it will close the channel and transfer funds
-     * to the sender. Then emits {ChannelUpdate} and the
+     * to the sender. Then emits {ChannelUpdated} and the
      * {ChannelClosureFinalized} event.
      * @param destination the address of the counterparty
      */
@@ -306,7 +338,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         delete channel.balance;
         delete channel.closureTime;
         channel.status = ChannelStatus.CLOSED;
-        emit ChannelUpdate(msg.sender, destination, channel);
+        emit ChannelUpdated(msg.sender, destination, channel);
 
         if (amountToTransfer > 0) {
           token.transfer(msg.sender, amountToTransfer);
@@ -336,7 +368,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         if (channel.status == ChannelStatus.WAITING_FOR_COMMITMENT){
           channel.status = ChannelStatus.OPEN;
         }
-        emit ChannelUpdate(source, msg.sender, channel);
+        emit ChannelUpdated(source, msg.sender, channel);
         emit ChannelBumped(source, msg.sender, newCommitment, channel.ticketEpoch, channel.balance);
     }
 
@@ -373,13 +405,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
             (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
             require(amount == amount1 + amount2, "amount sent must be equal to amount specified");
 
+            // fund channel in direction of: account1 -> account2
             if (amount1 > 0){
-                _fundChannel(account1, account2, amount1);
+                _fundChannel(from, account1, account2, amount1);
             }
+            // fund channel in direction of: account2 -> account1
             if (amount2 > 0){
-                _fundChannel(account2, account1, amount2);
+                _fundChannel(from, account2, account1, amount2);
             }
-            emit TokensReceived(from, account1, account2, amount1, amount2);
         }
     }
 
@@ -387,12 +420,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
     /**
      * @dev Funds a channel, then emits
-     * {ChannelUpdate} event.
+     * {ChannelUpdated} event.
      * @param source the address of the channel source
      * @param dest the address of the channel destination
      * @param amount amount to fund account1
      */
     function _fundChannel(
+        address funder,
         address source,
         address dest,
         uint256 amount
@@ -409,13 +443,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
           if (channel.commitment != bytes32(0)) {
             channel.status = ChannelStatus.OPEN;
+            emit ChannelOpened(source, dest);
           } else {
             channel.status = ChannelStatus.WAITING_FOR_COMMITMENT;
           }
         }
 
         channel.balance = channel.balance + amount;
-        emit ChannelUpdate(source, dest, channel);
+        emit ChannelUpdated(source, dest, channel);
+        emit ChannelFunded(funder, source, dest, amount);
     }
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.76.7",
+  "version": "1.77.0-next.10",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -10,8 +10,7 @@
   "bin": "lib/index.js",
   "files": [
     "lib",
-    "hopr-admin/.next",
-    "hoprd-default.sh"
+    "hopr-admin/.next/**"
   ],
   "scripts": {
     "clean": "rimraf ./lib",
@@ -26,8 +25,8 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "dependencies": {
-    "@ceramicnetwork/http-client": "^1.0.6",
-    "@ceramicnetwork/stream-tile": "^1.0.6",
+    "@ceramicnetwork/http-client": "^1.2.0",
+    "@ceramicnetwork/stream-tile": "^1.2.0",
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "bn.js": "5.2.0",
@@ -37,13 +36,13 @@
     "check-password-strength": "^2.0.3",
     "cookie": "^0.4.1",
     "debug": "^4.3.2",
-    "dids": "^2.1.0",
+    "dids": "^2.4.0",
     "ethereumjs-wallet": "^1.0.1",
     "jazzicon": "^1.5.0",
     "js-cookie": "^3.0.0",
     "key-did-provider-ed25519": "^1.1.0",
     "key-did-resolver": "^1.2.1",
-    "next": "^11.0.0",
+    "next": "11.1.2",
     "peer-id": "0",
     "prop-types": "^15.7.2",
     "react": "17.0.2",
@@ -51,10 +50,10 @@
     "restana": "^4.8.0",
     "rlp": "^2.2.6",
     "run-queue": "^2.0.1",
-    "strip-ansi": "6.0.0",
+    "strip-ansi": "6",
     "tiny-hashes": "^1.0.1",
-    "ws": "^7.5.2",
-    "yargs": "17.0.1"
+    "ws": "^8.2.1",
+    "yargs": "17.1.1"
   },
   "devDependencies": {
     "@types/yargs": "^17.0.2",

@@ -8,15 +8,30 @@
 
 - [constructor](ReentrancyGuard__factory.md#constructor)
 
+### Properties
+
+- [abi](ReentrancyGuard__factory.md#abi)
+
 ### Methods
 
 - [connect](ReentrancyGuard__factory.md#connect)
+- [createInterface](ReentrancyGuard__factory.md#createinterface)
 
 ## Constructors
 
 ### constructor
 
 • **new ReentrancyGuard__factory**()
+
+## Properties
+
+### abi
+
+▪ `Static` `Readonly` **abi**: { `inputs`: `any`[] = []; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" }[]
+
+#### Defined in
+
+packages/ethereum/types/factories/ReentrancyGuard__factory.ts:21
 
 ## Methods
 
@@ -37,4 +52,18 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/ReentrancyGuard__factory.ts:11
+packages/ethereum/types/factories/ReentrancyGuard__factory.ts:25
+
+___
+
+### createInterface
+
+▸ `Static` **createInterface**(): `ReentrancyGuardInterface`
+
+#### Returns
+
+`ReentrancyGuardInterface`
+
+#### Defined in
+
+packages/ethereum/types/factories/ReentrancyGuard__factory.ts:22
