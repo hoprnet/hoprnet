@@ -281,10 +281,10 @@ describe('funding a HoprChannel success', function () {
   it('should multi fund and open channel A->B, no commitment', async function () {
     const { channels, accountA, fundAndApprove, token } = await useFixtures()
     await fundAndApprove(accountA, 100)
-    await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30'))
+      .to.emit(channels, 'ChannelUpdated')
+      .and.to.emit(channels, 'ChannelFunded')
+      .and.not.to.emit(channels, 'ChannelOpened')
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
     validateChannel(ab, { balance: '70', status: ChannelStatus.WaitingForCommitment + '' })
@@ -296,10 +296,10 @@ describe('funding a HoprChannel success', function () {
   it('should multi fund and open channel B->A, no commitment', async function () {
     const { channels, accountB, fundAndApprove } = await useFixtures()
     await fundAndApprove(accountB, 100)
-    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      .to.emit(channels, 'ChannelUpdated')
+      .and.to.emit(channels, 'ChannelFunded')
+      .and.not.to.emit(channels, 'ChannelOpened')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: '70',
       status: ChannelStatus.WaitingForCommitment + ''
@@ -313,10 +313,10 @@ describe('funding a HoprChannel success', function () {
   it('should multi fund and open channel B->A, commit afterwards', async function () {
     const { channels, accountA, accountB, fundAndApprove } = await useFixtures()
     await fundAndApprove(accountB, 100)
-    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      .to.emit(channels, 'ChannelUpdated')
+      .and.to.emit(channels, 'ChannelFunded')
+      .and.not.to.emit(channels, 'ChannelOpened')
     await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: '70',
@@ -329,10 +329,10 @@ describe('funding a HoprChannel success', function () {
     const { channels, accountA, accountB, fundAndApprove } = await useFixtures()
     await fundAndApprove(accountB, 100)
     await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
-    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      .to.emit(channels, 'ChannelUpdated')
+      .and.to.emit(channels, 'ChannelFunded')
+      .and.to.emit(channels, 'ChannelOpened')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: '70',
       status: ChannelStatus.WaitingForCommitment + ''
@@ -345,10 +345,10 @@ describe('funding a HoprChannel success', function () {
     await fundAndApprove(accountB, 100)
     await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     await channels.connect(accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70'))
+      .to.emit(channels, 'ChannelUpdated')
+      .and.to.emit(channels, 'ChannelFunded')
+      .and.to.emit(channels, 'ChannelOpened')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.Open + '' })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
   })
@@ -368,7 +368,7 @@ describe('funding a HoprChannel success', function () {
           )
         )
     )
-      .to.emit(channels, 'ChannelUpdate')
+      .to.emit(channels, 'ChannelUpdated')
       .withArgs(
         ACCOUNT_B.address,
         ACCOUNT_A.address,
@@ -381,6 +381,8 @@ describe('funding a HoprChannel success', function () {
           })
         )
       )
+      .and.to.emit(channels, 'ChannelFunded')
+      .withArgs(accountB.address, ACCOUNT_B.address, ACCOUNT_A.address, '30')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       balance: ChannelStatus.Closed + '',
       status: ChannelStatus.Closed + ''
@@ -452,7 +454,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
 
     await expect(await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN.ticket)))
-      .to.emit(channels, 'ChannelUpdate')
+      .to.emit(channels, 'ChannelUpdated')
       .and.to.emit(channels, 'TicketRedeemed')
 
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '80', status: ChannelStatus.Open + '' })
@@ -545,7 +547,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
 
   it('A can initialize channel closure', async function () {
     await expect(channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address))
-      .to.emit(channels, 'ChannelUpdate')
+      .to.emit(channels, 'ChannelUpdated')
       .withArgs(
         fixtures.accountA.address,
         ACCOUNT_B.address,
@@ -571,7 +573,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
 
   it('B can initialize channel closure', async function () {
     await expect(channels.connect(fixtures.accountB).initiateChannelClosure(ACCOUNT_A.address))
-      .to.emit(channels, 'ChannelUpdate')
+      .to.emit(channels, 'ChannelUpdated')
       .withArgs(
         fixtures.accountB.address,
         ACCOUNT_A.address,
@@ -636,7 +638,7 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
     await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address))
-      .to.emit(channels, 'ChannelUpdate')
+      .to.emit(channels, 'ChannelUpdated')
       .withArgs(
         fixtures.accountA.address,
         fixtures.accountB.address,

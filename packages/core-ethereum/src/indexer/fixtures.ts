@@ -55,7 +55,7 @@ export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A.toAddress(),
 export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B.toAddress(), PARTY_B_MULTIADDR, new BN(1))
 
 export const OPENED_EVENT = {
-  event: 'ChannelUpdate',
+  event: 'ChannelUpdated',
   transactionHash: '',
   blockNumber: 2,
   transactionIndex: 0,
@@ -73,4 +73,4 @@ export const OPENED_EVENT = {
       closureTime: BigNumber.from('0')
     }
   } as any
-} as Event<'ChannelUpdate'>
+} as Event<'ChannelUpdated'>
