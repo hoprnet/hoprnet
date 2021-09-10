@@ -24,7 +24,7 @@
     "spawn-test-node": "ts-node tests/node.ts",
     "clean": "rm -Rf ./lib",
     "build": "yarn clean && tsc -p .",
-    "test": "yarn node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --full-trace --exit --parallel",
+    "test": "yarn node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --parallel --full-trace",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
@@ -69,9 +69,6 @@
     "yargs": "^17.1.1"
   },
   "mocha": {
-    "extension": [
-      "ts"
-    ],
     "spec": [
       "src/**/*.spec.ts"
     ],

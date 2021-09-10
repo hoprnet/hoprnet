@@ -1,7 +1,3 @@
-/// <reference path="../@types/it-handshake.ts" />
-/// <reference path="../@types/it-pair.ts" />
-/// <reference path="../@types/stream-to-it.ts" />
-
 import handshake from 'it-handshake'
 import Pair from 'it-pair'
 import { Multiaddr } from 'multiaddr'
