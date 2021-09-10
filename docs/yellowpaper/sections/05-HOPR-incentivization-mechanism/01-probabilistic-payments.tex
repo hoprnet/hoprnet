@@ -67,15 +67,15 @@ the payment channels contract \textit{HoprChannels} and including the following
 
 $$[A: address, B: address, \lambda: uint8, \mu: uint8], \mu = 0,$$
 
-where $\lambda$ is the amount to be staked by $A$. This will open a
-unidirectional payment channel from $A$ to $B$. The payment channel will start
+where $\lambda$ is the amount to be staked by $A$. This call will trigger an on-chain event \textit{ChannelFunded}
+and open a unidirectional payment channel from $A$ to $B$. The payment channel will start
 in state \textit{Waiting for commitment}. The destination address of the
 payment channel must now set an on-chain commitment in order for the payment
 channel between both parties to become \textit{Open}. This is done by $B$
 calling the \textit{bumpChannel()} function to make a new set of commitments
 towards this payment channel. This call will trigger an on-chain event
-\textit{ChannelIsOpened} and bumps the ticket epoch to ensure tickets with the
-previous epochs are invalidated.
+\textit{ChannelOpened} and bumps the ticket epoch to ensure tickets with the
+previous epochs are invalidated. Every time the channel changes its state, an on-chain event \textit{ChannelUpdated} is emitted.
 
 \paragraph{Redeeming tickets}
 As long as the channel remains open, nodes can claim their incentives for
