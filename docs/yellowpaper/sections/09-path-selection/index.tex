@@ -1,11 +1,10 @@
 \setlength{\parindent}{0pt}
 
-\section{Path Selection}
+\section{Paths and Path Selection}
 \label{sec:path-selection}
 
-Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to the final destination. To achieve its privacy properties, it is crucial for nodes in the network to keep the chosen path secret. As relay nodes differ in their ability to forward packets, path choices need to incorporate the nodes' resources and cannot be chosen entirely at random.
-
-Path selection is therefore done in multiple steps: first, there is a preprocessing that assigns each node a score depending on their relative availability and their stake. The score is then randomized by multiplying with random numbers yielding the final score of the node.
+Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to their final destination. To meet HOPR's stated security goals, it is crucial for nodes in the network to keep the chosen path secret. As relay nodes differ in their ability to forward packets, path choices need to consider the nodes' resources and cannot be chosen entirely at random.
+\\~\\Path selection is therefore done in multiple steps: first, there is a preprocessing step to assign each node a score depending on their relative availability and their \textbf{stake} (the number of HOPR tokens locked in payment channels to and from the node, explained in the \nameref{sec:incentiviationmechanism} section). The score is then multiplied by a random number to yield the node's final score. This randomization helps reduce linkability, which is a risk is a purely deterministic selection process. Finally, a path is chosen to the destination based on these scores.
 
 \begin{enumerate}
     \item \textbf{Assign} each node a score depending on availability and stake
@@ -16,15 +15,13 @@ Path selection is therefore done in multiple steps: first, there is a preprocess
 \subsection{Node score assignment}
 \label{sec:path-selection:node-score}
 
-The HOPR network is kept open and permissionless, hence it is not foreseen to have any gatekeeper that grants access to the network and maintains a list of active nodes. For that reason, it is necessary for participants of the network to maintain a solid understanding about the network topology to decide \textit{which} nodes they can use to relay their mixnet packets.
-
-The network topology includes two layers: the payment channel graph and the ability of nodes to establish a network connection to each other. Whilst the former one is easily achieved by observing and indexing on-chain interactions, the latter one needs active communication with other nodes to check their availability. Since the network status can change abruptly e.g. due to lack of electricity or unstable network links, the measuring need to be done frequently.
+The HOPR network is kept open and permissionless, hence there is no gatekeeper which grants access to the network and maintains a full list of active nodes. For this reason, it is necessary for network participants to maintain a solid understanding of the network topology to decide which nodes they can use to relay their mixnet packets.
+\\~\\The network topology includes two layers: the payment channel graph and the ability of nodes to establish a network connection to each other. Whilst the former is easily constructed by observing and indexing on-chain interactions, the latter needs active communication with other nodes to check their availability. Since the network status can change abruptly, e.g., due to electricity outages or unstable network links, availability needs to be measured frequently on an ongoing basis.
 
 \subsubsection{Node availabilty}
 
-The availability of nodes in the network is estimated by regularly pinging other nodes in the network and listening to ping attempts from other nodes. Receiving a \textit{ping} request or a \textit{pong} response from another node means that a node is available and gladually increases their network score.
-
-If a node does not respond to \textit{ping} attempts, it is considered \textit{temporary} offline and the waiting time to the next \textit{ping} attempt is doubled until it reaches an upper bound and the node is considered dead.
+The availability of nodes in the network is estimated by regularly pinging other nodes in the network and listening to ping attempts from other nodes. Receiving a \textit{ping} request or a \textit{pong} response from another node means that a node is available and gradually increases their network score.
+\\~\\If a node does not respond to \textit{ping} attempts, it is considered temporarily offline and the waiting time to the next \textit{ping} attempt is doubled. This doubling occurs until an upper bound is reached, at which point the node is considered dead.
 
 \subsubsection{Payment channel graph}
 
@@ -37,19 +34,16 @@ Funding a payment channel with HOPR tokens means staking these tokens in the HOP
 \subsection{Randomization}
 \label{sec:path-selection:randomization}
 
-Since the previous step is entirely deterministic and potential adversaries can thus deduct the outcome from public information, each node score gets randomized by multplying it with a random number $r_i$.
+Since the previous step is entirely deterministic and potential adversaries could thus deduce the outcome from public information, each node score is randomized by multiplying it with a random number, $r_i$.
 $$weight(n_i) := score(n_i) * r_i$$
-
-Note that the random numbers are assigned \textit{once} in the beginning and reassigned upon the selection of a subsequent packet.
+\\~\\Note that the random numbers are assigned once at the beginning of the process and reassigned upon the selection of a subsequent packet.
 
 \subsection{Graph traversal}
 \label{sec:path-selection:graph-traversal}
 
-The HOPR network uses source-selected routing, hence each node needs to sample the entire path that the mixnet packet is going to take in advance before sending it to the first relayer.
-
-To achieve the aforementioned privacy guarantees, paths \textit{must} include at least one intermediate node. As longer paths increase due to the usage of the SPHINX packet format the size of the header as well as the computation needed to generate them, and can therefore easily distinguished by an adversary, \textit{all} nodes in the HOPR network use a $targetLength$ of \textit{three}. Packets with longer paths are dropped by relayers. Nevertheless it is possible but discouraged to use smaller path lengths such as \textit{one} or \textit{two} intermediate hops.
-
-The algorithm terminates once a path with $targetLength$ is found. To prevent the algorithm from visitting too many nodes, the number of iterations is bound by $maxIterations$ and the longest known path is returned if no path of length $targetLength$ was found.
+The HOPR network uses source-selected routing. This means a node must sample the entire path the mixnet packet will take before sending it to the first relayer.
+\\~\\To achieve the aforementioned privacy guarantees, paths must include at least one intermediate node. However, using the Sphinx packet format (see the \nameref{sec:sphinx} section) increases both the size of the header and the computation needed to generate it, which makes it possible for adversaries to distinguish packets on longer paths. Therefore, all nodes in the HOPR network are strongly encouraged to use a $targetLength$ of three. Packets with longer paths are dropped by relayers. It is possible but discouraged for nodes to use paths of one or two hops.
+\\~\\The algorithm terminates once a path with $targetLength$ is found. To prevent the algorithm from visiting too many nodes, the number of iterations is bound by $maxIterations$ and the longest known path is returned if no path of length $targetLength$ was found.
 
 \begin{algorithm}[H]
     \SetAlgoNoLine

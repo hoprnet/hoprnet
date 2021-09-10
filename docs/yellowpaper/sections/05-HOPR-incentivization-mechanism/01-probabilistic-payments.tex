@@ -8,8 +8,8 @@ send and receive transactions within the same payment channel. The HOPR protocol
 unidirectional payment channels to implement bidirectional payment channel behavior, where one
 payment channel is created from $A$ to $B$ and another from $B$ to $A$. The payment channel creator is
 the sole owner of funds in the payment channel and the only one able to create
-\textbf{tickets}, encapsulated funds which are described in detail in
-\nameref{sec:tickets}. A payment channel created from party $A$ to party $B$ is
+\textbf{tickets}, encapsulated funds which are described in detail in the
+\nameref{sec:tickets} section. A payment channel created from party $A$ to party $B$ is
 different from a payment channel created from party $B$ to party $A$.
 
 $$A\rightarrow B \neq B\rightarrow A$$
@@ -32,7 +32,7 @@ where $n$ is the total number of mixnet packets transformed.
 $packet_{n-1}$. At this point $B$ would have no incentive to process
 $packet_{n-1}$ rather than $packet_{n}$. To avoid such false incentives, the HOPR
 protocol utilizes probabilistic payments. A \textit{ticket} can be either a win
-or a loss, determined based on some winning probability lower than 100 percent. This means
+or a loss, determined based on some winning probability lower than 1. This means
 nodes are incentivized to continue relaying packets, as they do not know which
 tickets will result in a payout. From a node's perspective, each ticket has the same
 value until it is claimed; therefore, the HOPR protocol encourages nodes to
@@ -68,8 +68,7 @@ the payment channels contract \textit{HoprChannels} and including the following
 $$[A: address, B: address, \lambda: uint8, \mu: uint8], \mu = 0,$$
 
 where $\lambda$ is the amount to be staked by $A$. This call will trigger an on-chain event \textit{ChannelFunded}
-and open a unidirectional payment channel from $A$ to $B$. The payment channel will start
-in state \textit{Waiting for commitment}. The destination address of the
+and open a unidirectional payment channel from $A$ to $B$. The payment channel will start in state \textit{Waiting for commitment}. The destination address of the
 payment channel must now set an on-chain commitment in order for the payment
 channel between both parties to become \textit{Open}. This is done by $B$
 calling the \textit{bumpChannel()} function to make a new set of commitments
