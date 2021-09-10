@@ -1,4 +1,7 @@
 {
+  "ts-node": {
+    "files": true
+  },
   "compilerOptions": {
     "lib": ["es2021", "dom"],
     "module": "commonjs",
@@ -11,9 +14,7 @@
     "noImplicitReturns": true,
     "strict": true,
     "outDir": "lib",
-    "forceConsistentCasingInFileNames": true,
-    "typeRoots": ["node_modules/@types", "src/@types"]
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts"]
+  "include": ["src/**/*.ts"]
 }
