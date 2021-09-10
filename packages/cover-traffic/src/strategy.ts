@@ -21,7 +21,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
     super()
   }
 
-  // Interval of the `periodicCheck` in hopr=core
+  // Interval of the `periodicCheck` in hopr-core
   tickInterval = 10000
 
   /**
