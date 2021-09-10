@@ -187,7 +187,6 @@ class Hopr extends EventEmitter {
    */
   public async start() {
     this.status = 'INITIALIZING'
-    console.log(this.options, !this.options.disablePersistence)
     if (!this.options.disablePersistence) {
       if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
         throw new Error('Cannot start node without a funded wallet')
@@ -246,6 +245,8 @@ class Hopr extends EventEmitter {
     chain.indexer.off('peer', pushToRecentlyAnnouncedNodes)
 
     recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
+
+    initialNodes.forEach(this.onPeerAnnouncement.bind(this))
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
