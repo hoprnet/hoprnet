@@ -2,6 +2,7 @@
 
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
+import type { AccountEntry } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 
 import yargs from 'yargs/yargs'
@@ -24,11 +25,26 @@ async function main() {
 
   await node.start()
 
-  console.log(await node.getAnnouncingNodes())
+  const announcedNodes = (await node.getAnnouncingNodes()).filter((entry: AccountEntry) => entry.hasAnnounced())
 
-  console.log(`before stop`)
+  const results: { [key: string]: number } = {}
+
+  await Promise.all(
+    announcedNodes.map(async (entry: AccountEntry) => {
+      const id = entry.getPeerId()
+      const pingResult = await node.ping(entry.getPeerId())
+
+      Object.assign(results, {
+        [id.toB58String()]: pingResult.latency
+      })
+    })
+  )
+
+  console.log(results)
+
   await node.stop()
-  // @TODO print nodes
+
+  process.exit()
 }
 
 main().catch(console.log)
