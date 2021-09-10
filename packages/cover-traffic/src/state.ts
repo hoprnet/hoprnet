@@ -8,7 +8,7 @@ export type ChannelData = {
   channel: ChannelEntry
   // number of attempts of a node to send out packets.
   sendAttempts: number
-  // number of attempst of a node to forward packets.
+  // number of attempts of a node to forward packets.
   forwardAttempts: number
 }
 
