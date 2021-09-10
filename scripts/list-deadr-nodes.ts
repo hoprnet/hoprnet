@@ -1,5 +1,7 @@
 #!/usr/bin/env -S yarn ts-node --transpile-only
 
+// Example usage:
+// ./scripts/list-deadr-nodes.ts --provider ws://localhost:8545
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type { AccountEntry } from '@hoprnet/hopr-utils'
@@ -44,6 +46,7 @@ async function main() {
 
   await node.stop()
 
+  // hack: node process hangs
   process.exit()
 }
 
