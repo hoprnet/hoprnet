@@ -447,6 +447,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": ^4.1.1
     "@hoprnet/hopr-utils": 1.75.0-next.19
+    "@types/bl": ^5.0.1
     "@types/bn.js": ^5.1.0
     "@types/chai": ^4.2.21
     "@types/chai-spies": ^1.0.3
@@ -781,6 +782,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/bl@npm:^5.0.1":
+  version: 5.0.1
+  resolution: "@types/bl@npm:5.0.1"
+  dependencies:
+    "@types/node": "*"
+    "@types/readable-stream": "*"
+  checksum: 2c54f1d4f2df1c9a66d53ae241fed267b90ed28bd37cfa538175c4c0a14dcab253fbb8c993ea4cfee3049c61b308f82f99b635c18c4fa28c25e4de69ffda5c99
+  languageName: node
+  linkType: hard
+
 "@types/bn.js@npm:^5.1.0":
   version: 5.1.0
   resolution: "@types/bn.js@npm:5.1.0"
@@ -854,6 +865,16 @@ __metadata:
   version: 15.0.2
   resolution: "@types/node@npm:15.0.2"
   checksum: 273565e1da341b248e08bec105667f0ab8ef89e347a47bbd6e18e35c0946788a53d581e0e3d8b8e3b3b5809db3237fcbf1bbb2251cf1506e5f81622739cb9ff1
+  languageName: node
+  linkType: hard
+
+"@types/readable-stream@npm:*":
+  version: 2.3.11
+  resolution: "@types/readable-stream@npm:2.3.11"
+  dependencies:
+    "@types/node": "*"
+    safe-buffer: "*"
+  checksum: 24b6930af48e719c59e534217def105df444ff1b2bf3957de942077a97215f8a501bed7edc3e0bc1f816e52fea89f7d513e3ab9df4db1eff9ce633ca78eb1c9e
   languageName: node
   linkType: hard
 
@@ -4241,7 +4262,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"safe-buffer@npm:^5.0.1, safe-buffer@npm:^5.1.0, safe-buffer@npm:^5.1.2, safe-buffer@npm:~5.2.0":
+"safe-buffer@npm:*, safe-buffer@npm:^5.0.1, safe-buffer@npm:^5.1.0, safe-buffer@npm:^5.1.2, safe-buffer@npm:~5.2.0":
   version: 5.2.1
   resolution: "safe-buffer@npm:5.2.1"
   checksum: b99c4b41fdd67a6aaf280fcd05e9ffb0813654894223afb78a31f14a19ad220bba8aba1cb14eddce1fcfb037155fe6de4e861784eb434f7d11ed58d1e70dd491
