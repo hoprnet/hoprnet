@@ -946,9 +946,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-connect@npm:0.2.41":
-  version: 0.2.41
-  resolution: "@hoprnet/hopr-connect@npm:0.2.41"
+"@hoprnet/hopr-connect@npm:0.2.42":
+  version: 0.2.42
+  resolution: "@hoprnet/hopr-connect@npm:0.2.42"
   dependencies:
     "@hoprnet/hopr-utils": 1.75.0-next.19
     abort-controller: 3.0.0
@@ -960,12 +960,12 @@ __metadata:
     multiaddr: ^10.0.0
     multihashes: ^4.0.2
     p-defer: 3
-    peer-id: ~0.15.2
+    peer-id: ^0.15.3
     simple-peer: 9.11
     stream-to-it: ^0.2.4
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
-  checksum: ee712559a4575ae3674ee1e6f6a0b394f08b37f7ce673d4cc6d21c83a4b15bb074761d4774d25c202b15374392ac49a5fce27b40606503c226a125399434d1a4
+  checksum: 2979b0d57f2abea82dad9e6e3a826d95641046a8626d6f3169a92d05373755563e1e19900438ea235bb87b0a6742a77a7f58f16ac92672f49f9ba5e41e2cdbee
   languageName: node
   linkType: hard
 
@@ -1006,7 +1006,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": ^4.1.1
     "@google-cloud/profiler": ^4.1.2
-    "@hoprnet/hopr-connect": 0.2.41
+    "@hoprnet/hopr-connect": 0.2.42
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
@@ -13181,7 +13181,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"peer-id@npm:0, peer-id@npm:0.15.3, peer-id@npm:^0.15.0, peer-id@npm:^0.15.1, peer-id@npm:^0.15.3, peer-id@npm:~0.15.2":
+"peer-id@npm:0, peer-id@npm:0.15.3, peer-id@npm:^0.15.0, peer-id@npm:^0.15.1, peer-id@npm:^0.15.3":
   version: 0.15.3
   resolution: "peer-id@npm:0.15.3"
   dependencies:
