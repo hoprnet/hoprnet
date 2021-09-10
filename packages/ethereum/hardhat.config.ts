@@ -115,14 +115,10 @@ const hardhatConfig: HardhatUserConfig = {
 task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) => {
   return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
 })
-  .addParam<string>('address', 'HoprToken address', undefined, types.string)
+  .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', '1', types.string)
-  .addOptionalParam<boolean>(
-    'ishopraddress',
-    'Whether the address passed is a HOPR address or not',
-    false,
-    types.boolean
-  )
+  .addFlag('ishopraddress', 'Whether the address passed is a HOPR address or not')
+  .addFlag('uselocalidentities', 'Fund all identities stored in /tmp')
 
 task('accounts', 'View unlocked accounts', async (...args: any[]) => {
   return (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])

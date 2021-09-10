@@ -1056,6 +1056,7 @@ __metadata:
     chai: ^4.3.4
     dotenv: ^10.0.0
     ethereum-waffle: ^3.3.0
+    ethereumjs-wallet: ^1.0.1
     ethers: 5.4.6
     hardhat: ^2.6.2
     hardhat-deploy: ^0.9.0
