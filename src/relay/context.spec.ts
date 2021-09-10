@@ -1,6 +1,3 @@
-/// <reference path="../@types/it-handshake.ts" />
-/// <reference path="../@types/it-pair.ts" />
-
 import { RelayContext, DEFAULT_PING_TIMEOUT } from './context'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
 import { u8aEquals } from '@hoprnet/hopr-utils'

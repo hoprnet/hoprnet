@@ -1,6 +1,3 @@
-/// <reference path="../@types/it-pair.ts" />
-/// <reference path="../@types/it-handshake.ts" />
-
 import { Relay } from './index'
 import PeerId from 'peer-id'
 import { HandlerProps } from 'libp2p'

@@ -1,6 +1,3 @@
-/// <reference path="../src/@types/stream-to-it.ts" />
-/// <reference path="../src/@types/it-handshake.ts" />
-
 import libp2p from 'libp2p'
 import type { Connection, HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
