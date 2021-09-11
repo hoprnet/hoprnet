@@ -3,12 +3,12 @@
 
 Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to their final destination. To meet HOPR's stated security goals, it is crucial for nodes in the network to keep the chosen path secret. As relay nodes differ in their ability to forward packets, path choices need to consider the nodes' resources and cannot be chosen entirely at random.
 
-Path selection is therefore done in multiple steps: first, there is a preprocessing step to assign each node a score depending on their relative availability and their \textbf{stake} (the number of HOPR tokens locked in payment channels to and from the node, explained in the \nameref{sec:incentiviationmechanism} section). The score is then multiplied by a random number to yield the node's final score. This randomization helps reduce linkability, which is a risk is a purely deterministic selection process. Finally, a path is chosen to the destination based on these scores.
+Path selection is therefore done in multiple steps: first, there is a preprocessing step to assign each payment channel a score, which by default equals to their balance (the number of HOPR tokens locked in a payment channel). The score is then multiplied by a random number to yield the channel's final weight. This randomization helps reduce linkability, which is a risk is a purely deterministic selection process. Finally, a path is chosen to the destination based on these scores while considering the relative availability of intermediate hops.
 
 \begin{enumerate}
-    \item \textbf{Assign} each node a score depending on availability and stake
+    \item \textbf{Assign} each channel a score depending on their balance
     \item \textbf{Randomize} the edge weights of the subgraph
-    \item \textbf{Find} a path in the subgraph using a graph traversal algorithm
+    \item \textbf{Find} a path in the subgraph with channel weights and node availability using a graph traversal algorithm
 \end{enumerate}
 
 \subsection{Node score assignment}
