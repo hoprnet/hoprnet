@@ -6,6 +6,7 @@
 *.bbl
 *.blg
 *.synctex.gz
+*.synctex(busy)
 *.xdv
 
 # Built PDF files
