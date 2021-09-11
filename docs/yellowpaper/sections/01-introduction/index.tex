@@ -5,8 +5,10 @@
 Internet privacy, commonly referred to as online privacy, is a subset of data privacy and a fundamental human right as defined by the UN \cite{un2018}.
 In order to retain and exercise this right to privacy, each internet user must have full control of the transmission, storage, use, and disclosure of their
 personally identifiable information. However, the infrastructure and economics of our increasingly technologically driven world put great pressure on privacy, due to the various advantages (economic and otherwise) which knowledge of users' private information provides. 
-\\~\\To combat this trend, multiple solutions are being developed to restore internet users' control of their private information. These solutions generally centre on providing truly anonymous communication, such that neither the content of the communication nor information about the communicators can be discovered by anyone, including the communicating parties.
-\\~\\HOPR is a decentralized incentivized mixnet that employs privacy-by-design protocols. HOPR aims to protect users' metadata privacy, giving them the
+
+To combat this trend, multiple solutions are being developed to restore internet users' control of their private information. These solutions generally centre on providing truly anonymous communication, such that neither the content of the communication nor information about the communicators can be discovered by anyone, including the communicating parties.
+
+HOPR is a decentralized incentivized mixnet that employs privacy-by-design protocols. HOPR aims to protect users' metadata privacy, giving them the
 freedom to use online services safely and privately. HOPR leverages existing mechanisms such as the Sphinx packet format
 \cite{sphinxpaper} and packet mixing to achieve its privacy goals, but adds an innovative incentive framework to promote network growth and reliability. HOPR uses the
 Ethereum blockchain \cite{ethereum} to facilitate this incentive framework, specifically to perform probabilistic payments via payment channels. 
@@ -28,12 +30,17 @@ HOPR is built with the following principles in mind: that privacy must be an int
     \item \textbf{Decentralization} The internet is not private by design, although it is decentralized by design. In the early days of the internet, this decentralization provided a certain measure of privacy, by placing control in the hands of individual users. 
         However, internet users must increasingly interact with services provided by central
         authorities. These central authorities control the privacy of individual users, often without their full informed consent. 
-        \\~\\In particular, interactions with third-party service providers regularly entail a loss of transport-layer privacy. Links can often be drawn between the user and the service provider, either by the service provider themselves, or by a third party who can observe public metadata revealed during the interaction or pressure the service provider to divulge stored data. With a sufficient number of such links, a profile can be constructed of a user's online activity. 
-        \\~\\This runs contrary to the requirements of privacy as a fundamental human right, since often the only truly private option is to abstain from using such services entirely. To provide privacy as a fundamental feature on top of the internet, a decentralized infrastructure is required.
-        \\~\\The HOPR protocol runs on nodes within a decentralized network, therefore ensuring that the network is independent. No single entity can influence its development or manipulate its performance to their advantage. It also makes the network resilient, able to keep running even if a majority of nodes are damaged or compromised and very difficult, if not impossible, to shut down.
+        
+        In particular, interactions with third-party service providers regularly entail a loss of transport-layer privacy. Links can often be drawn between the user and the service provider, either by the service provider themselves, or by a third party who can observe public metadata revealed during the interaction or pressure the service provider to divulge stored data. With a sufficient number of such links, a profile can be constructed of a user's online activity. 
+        
+        This runs contrary to the requirements of privacy as a fundamental human right, since often the only truly private option is to abstain from using such services entirely. To provide privacy as a fundamental feature on top of the internet, a decentralized infrastructure is required.
+        
+        The HOPR protocol runs on nodes within a decentralized network, therefore ensuring that the network is independent. No single entity can influence its development or manipulate its performance to their advantage. It also makes the network resilient, able to keep running even if a majority of nodes are damaged or compromised and very difficult, if not impossible, to shut down.
 
-    \item \textbf{Incentivization} Although users are incentivized to use privacy technologies by the privacy they provide, most privacy technologies have no baked-in incentive framework for infrastructure providers: rewards either flow to a centralized service provider (and thus the service is not truly private, since the service provider will gather transport-level information on user activity) or the providers in a decentralized network receive no direct rewards. This constrains the growth of the network and limits its scope. In systems which leverage privacy through obscurity, this reduced scale compromises the privacy of the entire network, since fewer users means less data to confound observers. Although blockchains provide a way, for the first time, to incentivize a decentralized network without introducing a centralized entity responsible for payment provision, it is challenging to leverage blockchain technology without compromising either the privacy of network members or the reliability of the network. In brief, if node runners can rely on the anonymity of the technology they are providing, they can potentially use it to claim rewards without properly fulfilling their duties as a node runner. On the other hand, if node runners are required to interact with a blockchain to prove their service provision and claim their reward, the resultant on-chain data is liable to provide a permanent and growing source of metadata which can be used to erode node runners' privacy.  
-    \\~\\HOPR's proof-of-relay mechanism threads this needle, and is the major innovation of the HOPR protocol. Every HOPR node can receive payment for each packet they process and forward, but only once their data payload arrives at the next node. Payments are probabilistic, which ensures nodes do not
+    \item \textbf{Incentivization}
+        Although users are incentivized to use privacy technologies by the privacy they provide, most privacy technologies have no baked-in incentive framework for infrastructure providers: rewards either flow to a centralized service provider (and thus the service is not truly private, since the service provider will gather transport-level information on user activity) or the providers in a decentralized network receive no direct rewards. This constrains the growth of the network and limits its scope. In systems which leverage privacy through obscurity, this reduced scale compromises the privacy of the entire network, since fewer users means less data to confound observers. Although blockchains provide a way, for the first time, to incentivize a decentralized network without introducing a centralized entity responsible for payment provision, it is challenging to leverage blockchain technology without compromising either the privacy of network members or the reliability of the network. In brief, if node runners can rely on the anonymity of the technology they are providing, they can potentially use it to claim rewards without properly fulfilling their duties as a node runner. On the other hand, if node runners are required to interact with a blockchain to prove their service provision and claim their reward, the resultant on-chain data is liable to provide a permanent and growing source of metadata which can be used to erode node runners' privacy.
+        
+        HOPR's proof-of-relay mechanism threads this needle, and is the major innovation of the HOPR protocol. Every HOPR node can receive payment for each packet they process and forward, but only once their data payload arrives at the next node. Payments are probabilistic, which ensures nodes do not
         (de-)prioritize other nodes and/or packets. To maximize received incentives, node operators must ensure good network connectivity, node availability, computational capacity, and committed funds (to reward other nodes). These combined incentives promote a broad, robust, and reliable network. At the same time, the probabilistic nature of payments obscures links between on-chain data and node runners.
 
 \end{itemize}
@@ -42,7 +49,8 @@ HOPR is built with the following principles in mind: that privacy must be an int
 \label{sec:securitygoals}
 
 Generally, the HOPR protocol aims to hide the fact that two parties are communicating with each other, as well as the contents of the communication. This information should be hidden from any party external to the network, all intermediaries involved in transferring the data between the communicating parties, and even the communicating parties themselves, if one or both of them desires it.
-\\~\\Specifically, the HOPR protocol aims to build a network with the following features:
+
+Specifically, the HOPR protocol aims to build a network with the following features:
 
 \begin{itemize}
 
@@ -73,7 +81,9 @@ in the \nameref{sec:sphinx} section.
 Although we assume that nodes in the HOPR network can communicate reliably, the
 network must still be protected from malicious actors and node failures. We assume a
 threat model with byzantine nodes with the ability to either observe all network
-traffic and launch network attacks or to inject, drop, or delay messages. \\~\\In particular, to provide reliable privacy and data transmission the HOPR network needs to be resistant to both Sybil and eclipse attacks:
+traffic and launch network attacks or to inject, drop, or delay messages.
+
+In particular, to provide reliable privacy and data transmission the HOPR network needs to be resistant to both Sybil and eclipse attacks:
 
 \begin{itemize}
     \item \textbf{Sybil attacks} In a Sybil attack, an attacker forges
@@ -87,7 +97,8 @@ traffic and launch network attacks or to inject, drop, or delay messages. \\~\\I
 \end{itemize}
 However, security cannot come at the expense of usability. To be appealing to users and node runners alike, it is important for HOPR to find a satisfactory compromise to what is known as the ``anonymity trilemma" \cite{AnonymityTrilemma}, which states that a privacy network can provide at most two of the following properties: low-latency
 communication, low bandwidth overhead, and strong anonymity.
-\\~\\The rest of this paper will outline the current state of the art among anonymous communication protocols and layer-2 scalability protocols, describe how the HOPR network is built, and explain how HOPR provides a satisfactory resolution to the anonymity trilemma. 
+
+The rest of this paper will outline the current state of the art among anonymous communication protocols and layer-2 scalability protocols, describe how the HOPR network is built, and explain how HOPR provides a satisfactory resolution to the anonymity trilemma. 
 
 \subsection{State of the Art}
 \label{sec:stateoftheart}
@@ -109,15 +120,19 @@ communication metadata, since they control all communication going through it. I
 endpoints are often a single point of failure, since they are provided as
 centralized services. Both factors are major weaknesses when
 considering VPNs for privacy-preserving communication.
-\\~\\These privacy concerns have motivated the creation of a new model for VPNs,
+
+These privacy concerns have motivated the creation of a new model for VPNs,
 \textbf{Decentralized Virtual Private Networks} (\textit{dVPN}s). dVPNs leverage blockchain technology to remove reliance on a central authority. Users act as bandwidth providers, allowing other users to access internet services via their node, in exchange for rewards. 
-\\~\\Examples of dVPN projects include Orchid \cite{orchid}, Sentinel \cite{sentinel}, and Mysterium \cite{mysterium}. However, these projects still lack privacy, performance, and reliability guarantees, since bandwidth providers can potentially inspect, log, and share any of their traffic. This harms honest bandwidth providers as well as users: since bandwidth providers can theoretically monitor traffic, nodes whose bandwidth are used to enable illicit activity can potentially be held liable for those activities by government authorities. Indeed, there have been incidents where unaware dVPN users have been (ab)used as exit nodes through which DDoS attacks
+
+Examples of dVPN projects include Orchid \cite{orchid}, Sentinel \cite{sentinel}, and Mysterium \cite{mysterium}. However, these projects still lack privacy, performance, and reliability guarantees, since bandwidth providers can potentially inspect, log, and share any of their traffic. This harms honest bandwidth providers as well as users: since bandwidth providers can theoretically monitor traffic, nodes whose bandwidth are used to enable illicit activity can potentially be held liable for those activities by government authorities. Indeed, there have been incidents where unaware dVPN users have been (ab)used as exit nodes through which DDoS attacks
 were performed. 
-\\~\\A research project called VPN$^0$ \cite{vpn0} aims to provide better privacy guarantees. VPN$^0$ leverages zero-knowledge proofs to hide traffic content to relay nodes with traffic accounting and traffic blaming capabilities as a way to combat the weaknesses of other dVPN solutions.
+
+A research project called VPN$^0$ \cite{vpn0} aims to provide better privacy guarantees. VPN$^0$ leverages zero-knowledge proofs to hide traffic content to relay nodes with traffic accounting and traffic blaming capabilities as a way to combat the weaknesses of other dVPN solutions.
 
 \paragraph{Onion Routing} is another approach to network privacy, implemented by projects such as Tor \cite{tor}. Tor encapsulates messages in layers of
 encryption and transmits them through a series of network nodes called \textit{onion routers}. However, Tor is susceptible to end-to-end correlation attacks from adversaries who can eavesdrop on the communication channels. These attacks reveal a wide range of information, including the identity of the communicating peers.
-\\~\\The Invisible Internet Project (\textit{I2P}) is an implementation of onion-routing with notably different characteristics than Tor \cite{i2p}:
+
+The Invisible Internet Project (\textit{I2P}) is an implementation of onion-routing with notably different characteristics than Tor \cite{i2p}:
 
 \begin{itemize}
 
@@ -158,11 +173,13 @@ traffic is designed to hide communication messages among random noise. An
 external adversary able to observe the message flow should not be able to
 distinguish communication messages from these cover traffic messages, increasing
 privacy.
-\\~\\The application of cover traffic provides metadata protection from global network adversaries, a considerable improvement on projects such as Tor and I2P.
+
+The application of cover traffic provides metadata protection from global network adversaries, a considerable improvement on projects such as Tor and I2P.
 However, because mixnets add extra latency to network traffic, they are better suited to
 applications that are not as sensitive to increased latency, such as messaging
 or email applications. For applications such as real-time video streaming, Tor may be more suitable, provided the user feels the latency improvements outweigh the increased privacy risks.
-\\~\\Loopix \cite{loopix} is another research project which uses cover traffic to
+
+Loopix \cite{loopix} is another research project which uses cover traffic to
 resist traffic analysis while still achieving low latency. To achieve this, Loopix
 employs a mixing strategy called \textit{Poisson mix}. Poisson mix nodes
 independently delay messages, making packets unlinkable via timing analysis.
@@ -172,11 +189,15 @@ independently delay messages, making packets unlinkable via timing analysis.
 \label{sec:l2protocols}
 
 Blockchain technology (mostly public blockchains like Bitcoin and Ethereum) suffers from a major scalability issue: every node in the network needs to process every transaction, validate them, and store a copy of the entire chain state. Thus the number of transactions cannot exceed that of a single node. For Ethereum, this is currently around 30 transactions per second.
-\\~\\Multiple solutions have been proposed to resolve the scalability issue, including sharding and off-chain computation. Both approaches intend to create a second layer of computation to reduce the load on the blockchain mainnet.
-\\~\\Off-chain solutions such as Plasma \cite{plasma}, Truebit \cite{truebit}, and state channels process transactions outside the blockchain while still guaranteeing a sufficient level of security and finality. State channels are better known as ``payment channels". In models like the Lightning Network \cite{lightningnetwork}, a payment channel is opened between two parties by committing a funding transaction. Those parties may then make any number of signed transactions that update the channel's funds without broadcasting those to the blockchain. The channel is eventually closed by broadcasting the final version of the settlement transaction.
-The channel balance is updated by creating a new set of commitment transactions, followed by trade revocation keys which render the previous set of commitment transactions unusable. Both parties always have the option to ``cash out" by submitting the latest commitment transaction to the blockchain. If one party tries to cheat by submitting an outdated commitment transaction, the other party can use the corresponding revocation key to take all the funds in the channel.
-\\~\\As soon as closure is initiated, the channel can no longer be used to route payments. There are different channel closure transactions depending on whether both parties agree on closing the channel. If both agree, they provide a digital signature that authorizes this cooperative settlement transaction. In the case where they disagree or only one party is online, a unilateral closure is initiated without the cooperation of the other party. This is done by broadcasting a ``commitment transaction". Both parties will receive their portion of the money in the channel, but the party that initiates the closure must wait for a certain delay to receive their money. This delay time is negotiated by the nodes before the channel is opened, for the protection of both parties.
-\\~\\The Raiden network \cite{raiden} is a layer-2 payment solution for the Ethereum blockchain. The project employs the same technological innovations pioneered by the Bitcoin Lightning Network by facilitating transactions off-chain, but provides support for all ERC-20 compliant tokens. Raiden differs in operation from its main chain because it does not require global consensus. However, to preserve the integrity of transactions, Raiden powers token transfers using digital signatures and hash-locks. Known as \textbf{balance proofs}, this type of token exchange uses payment channels. Raiden also introduces ``mediated transfers", which allow nodes to send payments to another node without opening a direct channel to it. These payment channels are updated with absolute amounts, whereas HOPR employs relative amounts (more details in the \nameref{sec:tickets} section).
+
+Multiple solutions have been proposed to resolve the scalability issue, including sharding and off-chain computation. Both approaches intend to create a second layer of computation to reduce the load on the blockchain mainnet.
+
+Off-chain solutions such as Plasma \cite{plasma}, Truebit \cite{truebit}, and state channels process transactions outside the blockchain while still guaranteeing a sufficient level of security and finality. State channels are better known as "payment channels". In models like the Lightning Network \cite{lightningnetwork}, a payment channel is opened between two parties by committing a funding transaction. Those parties may then make any number of signed transactions that update the channel's funds without broadcasting those to the blockchain. The channel is eventually closed by broadcasting the final version of the settlement transaction.
+The channel balance is updated by creating a new set of commitment transactions, followed by trade revocation keys which render the previous set of commitment transactions unusable. Both parties always have the option to "cash out" by submitting the latest commitment transaction to the blockchain. If one party tries to cheat by submitting an outdated commitment transaction, the other party can use the corresponding revocation key to take all the funds in the channel.
+
+As soon as closure is initiated, the channel can no longer be used to route payments. There are different channel closure transactions depending on whether both parties agree on closing the channel. If both agree, they provide a digital signature that authorizes this cooperative settlement transaction. In the case where they disagree or only one party is online, a unilateral closure is initiated without the cooperation of the other party. This is done by broadcasting a ``commitment transaction". Both parties will receive their portion of the money in the channel, but the party that initiates the closure must wait for a certain delay to receive their money. This delay time is negotiated by the nodes before the channel is opened, for the protection of both parties.
+
+The Raiden network \cite{raiden} is a layer-2 payment solution for the Ethereum blockchain. The project employs the same technological innovations pioneered by the Bitcoin Lightning Network by facilitating transactions off-chain, but provides support for all ERC-20 compliant tokens. Raiden differs in operation from its main chain because it does not require global consensus. However, to preserve the integrity of transactions, Raiden powers token transfers using digital signatures and hash-locks. Known as \textbf{balance proofs}, this type of token exchange uses payment channels. Raiden also introduces ``mediated transfers", which allow nodes to send payments to another node without opening a direct channel to it. These payment channels are updated with absolute amounts, whereas HOPR employs relative amounts (more details in the \nameref{sec:tickets} section).
 
 \begin{comment}
 We present in the following a comparison table (from the Loopix paper) between different anonymous communication systems.
@@ -196,9 +217,13 @@ Although there are numerous projects attempting to solve the problem of online p
 \paragraph{Decentralization} Most projects presented above have decentralization as a core goal, with the exception of VPNs, where the service is provided by a centralized entity, at the expense of user privacy. However, many projects lack the impetus to scale, which prevents them from leveraging many of the advantages which come with a decentralized network, such as privacy through obscurity, while retaining all of the challenges, such as coordination and consensus issues. It is our opinion that the only way to solve the scalability problem is with the introduction of a robust incentivization scheme for node runners.
 
 \paragraph{Incentivization} Many projects referenced in this section lack incentivization of any kind. VPNs incentivize the service provider, but since this is a centralized entity this fails the privacy condition. 
-\\~\\Bandwidth providers in dVPNs share their resources and are granted tokens accordingly as payment for their
+
+Bandwidth providers in dVPNs share their resources and are granted tokens accordingly as payment for their
 services. For example, Mysterium \cite{mysterium}, an open-source dVPN built on top of a P2P architecture, uses a smart contract on top of Ethereum to ensure
 that the VPN service is adequately funded. However, the resultant liability risk for dVPNs means these incentives are likely to be insufficient. 
-\\~\\Tor and I2P rely on donations and government funding, which only covers the cost of running a node, not any additional reward. This has discouraged volunteers from joining these networks and the number of relayers in both networks has stayed mostly static in recent years, even as usage and the demand for privacy has risen sharply.
-\\~\\Mixnet designs are generally unconcerned with the problem of incentivization, and most existing implementations rely on a group of volunteer agents who lack incentives to participate. However, it is possible to add incentivization on top of a mixnet design, which is what HOPR does. Some mixnets have proposed adding digital coins to messages, such that each volunteer can extract only the digital coin designated as a payment for them. However, here the anonymity provided by the mixnet acts as a double-edged sword: since there is no verification for whether a message arrives at its final destination, and node identities are kept secret by the mixnet, selfish nodes can extract payment without performing their relaying task. Thus a naive implementation of this approach does not actually provide an incentive at all.
-\\~\\It is in this last area that HOPR provides its main innovation: HOPR's proof-of-relay mechanism ensures that node runners are only paid if they complete their relaying duties. The challenge is to enforce this without publicizing data which would allow an adversary to break the anonymity of the network, and to provide both incentivization and anonymity without introducing unacceptable latency and bandwidth costs. The remainder of this paper will explain how this is achieved. 
+
+Tor and I2P rely on donations and government funding, which only covers the cost of running a node, not any additional reward. This has discouraged volunteers from joining these networks and the number of relayers in both networks has stayed mostly static in recent years, even as usage and the demand for privacy has risen sharply.
+
+Mixnet designs are generally unconcerned with the problem of incentivization, and most existing implementations rely on a group of volunteer agents who lack incentives to participate. However, it is possible to add incentivization on top of a mixnet design, which is what HOPR does. Some mixnets have proposed adding digital coins to messages, such that each volunteer can extract only the digital coin designated as a payment for them. However, here the anonymity provided by the mixnet acts as a double-edged sword: since there is no verification for whether a message arrives at its final destination, and node identities are kept secret by the mixnet, selfish nodes can extract payment without performing their relaying task. Thus a naive implementation of this approach does not actually provide an incentive at all.
+
+It is in this last area that HOPR provides its main innovation: HOPR's proof-of-relay mechanism ensures that node runners are only paid if they complete their relaying duties. The challenge is to enforce this without publicizing data which would allow an adversary to break the anonymity of the network, and to provide both incentivization and anonymity without introducing unacceptable latency and bandwidth costs. The remainder of this paper will explain how this is achieved. 

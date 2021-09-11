@@ -13,15 +13,19 @@ a winner or not when an attempt is made to redeem it.
 
 A ticket can be issued when two nodes have established a payment channel with
 each other. By definition this means at least one of them has staked HOPR tokens.
-\\~\\The ticket issuer $A$ (who could also be the packet creator) selects the
+
+The ticket issuer $A$ (who could also be the packet creator) selects the
 winning probability of the ticket and the relay fee to use and sets the amount to:
 $$\sigma=\dfrac{L\times F}{P_w}$$
 where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path
 length, $F$ is the relay fee, and $P_w$ is the ticket's winning probability.
-\\~\\$A$ issues a ticket for the next downstream node.
+
+$A$ issues a ticket for the next downstream node.
 The challenge is given together with the routing information by the packet.
-\\~\\$A$ does not know whether the ticket is a winner or not.
-    \\~\\$A$ sets the content of the ticket to: $$t=(R,\sigma,P_w,\alpha,I,T_c,\zeta),$$ where $t$ has the following components, in addition to those already defined above:
+
+$A$ does not know whether the ticket is a winner or not.
+    
+$A$ sets the content of the ticket to: $$t=(R,\sigma,P_w,\alpha,I,T_c,\zeta),$$ where $t$ has the following components, in addition to those already defined above:
 \begin{itemize}
 \item \textbf{Recipient's Ethereum address $R$}: a unique identifier derived from the ticket recipient's public key.
 \item \textbf{Ticket epoch $\alpha$}: used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha$ whenever a node resets a commitment, which helps keep track of updates to the on-chain commitments and invalidates tickets from earlier epochs.
@@ -69,22 +73,27 @@ $A$ then signs the ticket with its private key and sends $T = (t, Sig_I(t))$ to 
 \subsection{Ticket Validation}
 
 Tickets are received together with packets. To this end, the recipient and the next downstream node share a secret, $s$, whose key shares $s_i$ and $s_{i+1}$ are derivable by those nodes. Ticket validation requires the following steps:
-\\~\\ \textbf{Validate response} Once $A$ receives $s_{i+1}^{(1)}$ from $B$ via secret sharing, it can compute $$r_i=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
+
+ \textbf{Validate response} Once $A$ receives $s_{i+1}^{(1)}$ from $B$ via secret sharing, it can compute $$r_i=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
 $$r_i*G=T_{c_i}$$
 \\\textbf{Validate hint} Once the recipient transforms the packet, it can compute $s_i$. The recipient can now also extract the routing information from the packet.
 This includes a hint to the value $s_{i+1}$, given as $$H_i=s_{i+1}^{(1)}*G,$$ which is stored in the Sphinx packet header.
-\\~\\The unacknowledged ticket is stored in the database under the hint to the promised value to ensure the acknowledgement can be later linked to the unacknowledged ticket.
-\\~\\Together with $s_i^{(0)}$, the node can verify that $$T_{c_i}=s_i^{(0)}*G+H_i$$ with $$s_i^{(0)}*G+H_i=s_i^{(0)}*G+s_{i+1}^{(1)}*G=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
+
+The unacknowledged ticket is stored in the database under the hint to the promised value to ensure the acknowledgement can be later linked to the unacknowledged ticket.
+
+Together with $s_i^{(0)}$, the node can verify that $$T_{c_i}=s_i^{(0)}*G+H_i$$ with $$s_i^{(0)}*G+H_i=s_i^{(0)}*G+s_{i+1}^{(1)}*G=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
 This allows the recipient to verify that the promised value $s_{i+1}^{(1)}$ indeed leads to a solution of the challenge given in the ticket. If this is not the case, the node should drop the packet. Without this check, the sender could intentionally create false challenges which lead to unredeemable tickets.
 
 
 \subsection{Ticket Redemption}
 
 In order to unlock a ticket, the recipient node stores the ticket within its database until it receives an acknowledgement containing $s_{i+1}$ from the next downstream node. HOPR uses acknowledgements to prove the correct transformation of mixnet packets as well as their delivery to the next downstream node.
-\\~\\The challenge can be computed from the acknowledgement as $T_{c_i}=Ack_i*G$. The node checks the following in order to redeem its ticket:
+
+The challenge can be computed from the acknowledgement as $T_{c_i}=Ack_i*G$. The node checks the following in order to redeem its ticket:
 \begin{itemize}
 \item \textbf{Stored ticket} Once the node receives an acknowledgement, it checks whether it is storing an unacknowledged ticket corresponding to the received acknowledgement. If it does not, the node should drop the acknowledgement.
-\\~\\ The node then computes the response to the challenge (also referred to as the \textit{proof of relay secret}) given in the ticket as $$r_i=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
+
+ The node then computes the response to the challenge (also referred to as the \textit{proof of relay secret}) given in the ticket as $$r_i=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
 \item  \textbf{Sufficient challenge information} The node checks whether the information gained from the packet transformation is sufficient to fulfil the challenge sent along with the ticket, $$r_i*G=T_{c_i}$$
 The node then replies with an acknowledgement which includes a response to the challenge. If this is not the case, the node should drop the packet.
 \end{itemize}
@@ -97,7 +106,8 @@ Both the node and the smart contract then perform the following checks:
 $$ comm_{i-1} != 0 \; and \; comm_{i}=h(comm_{i-1})$$
 \item \textbf{Commitment verification} The node then verifies that $r_i$ and $comm_{i-1}$ lead to a winning ticket.
 This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the ticket hash. The values are first ABI encoded, then hashed using keccak256 and last but not least converted to uint256.
-\\~\\If the check is not valid, the node should drop the packet.
+
+If the check is not valid, the node should drop the packet.
 The final recipient of the packet does not receive a ticket because packet reception is not incentivized by the HOPR protocol.
 \item \textbf{Issuer identity} The ticket signer must be same as the ticket issuer. Both node and smart contract verify if the public key associated to the private key used to sign $$T= (t, Sig_I(t))$$ is the issuer's public key. The packet is dropped if this test fails.
 \item \textbf{Prior redemption} The ticket must not have been already redeemed and the ticket index must be strictly greater than the current value in the smart contract (replay protection).
