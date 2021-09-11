@@ -45,10 +45,7 @@ Specifically, the HOPR protocol aims to build a network with the following featu
 \begin{itemize}
 
     \item \textbf{Sender-receiver unlinkability}
-          An adversary should be unable to distinguish whether $\{S_1\rightarrow R_1, S_2\rightarrow R_2\}$ or
-          $\{S_1\rightarrow R_2, S_2\rightarrow R_1\}$ for any concurrently online
-          honest senders $S_1$, $S_2$ and honest receivers $R_1$, $R_2$ of the
-          adversary’s choice.
+          An adversary should be unable to distinguish whether $\{S_1\rightarrow R_1, S_2\rightarrow R_2\}$ or $\{S_1\rightarrow R_2, S_2\rightarrow R_1\}$ for any concurrently online honest senders $S_1$, $S_2$ and honest receivers $R_1$, $R_2$ of the adversary’s choice.
     \item \textbf{Sender online unobservability}
           An adversary should be unable to determine whether or not a specific sender $S$ is communicating with any receiver $R$, for any concurrently online honest sender $S$ of the adversary’s choice.
           \begin{center}
@@ -58,8 +55,7 @@ Specifically, the HOPR protocol aims to build a network with the following featu
 
 
     \item \textbf{Resistance to active attacks}
-          An adversary must not be able to conduct active attacks such as tagging and replay attacks, where the adversary modifies and
-          re-injects messages to extract information about their destinations or
+          An adversary must not be able to conduct active attacks such as tagging and replay attacks, where the adversary modifies and re-injects messages to extract information about their destinations or
           content.
 
 \end{itemize}
@@ -119,8 +115,8 @@ The Invisible Internet Project (\textit{I2P}) is an implementation of onion-rout
 
     \item \textbf{Peer profiles instead of directory authorities}
           I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
-
 \end{itemize}
+
 Despite these improvements, I2P is vulnerable to eclipse attacks since no I2P router has a full view of the global network (similar to other peer-to-peer networks). Like Tor, I2P only provides protection against local adversaries, making it vulnerable to timing, intersection, and traffic analysis attacks. I2P has also been shown to be vulnerable to Sybil and predecessor attacks, in spite of various countermeasures implemented to thwart these.
 
 \paragraph{Mixnets} are overlay networks of so-called \textit{mix nodes} which route messages anonymously, similarly to Tor \cite{mixnets}. Mixnets originally used a cascade topology where each node would receive a batch of encrypted messages, decrypt them, randomly permute packets, and transfer them in parallel. Cascade topology makes it easy to prove the anonymity properties of a given mixnet design for a particular mix. However, it does not scale well with respect to increasing mixnet traffic and is susceptible to traffic and active attacks. Since then, research has evolved to provide solutions with low latency while still providing high anonymity by using a method called \textit{cover traffic}. Cover traffic is designed to hide communication messages among random noise. An external adversary able to observe the message flow should not be able to
@@ -129,7 +125,6 @@ distinguish communication messages from these cover traffic messages, increasing
 The application of cover traffic provides metadata protection from global network adversaries, a considerable improvement on projects such as Tor and I2P. However, because mixnets add extra latency to network traffic, they are better suited to applications that are not as sensitive to increased latency, such as messaging or email applications. For applications such as real-time video streaming, Tor may be more suitable, provided the user feels the latency improvements outweigh the increased privacy risks.
 
 Loopix \cite{loopix} is another research project which uses cover traffic to resist traffic analysis while still achieving low latency. To achieve this, Loopix employs a mixing strategy called \textit{Poisson mix}. Poisson mix nodes independently delay messages, making packets unlinkable via timing analysis.
-
 
 \subsubsection{Layer-2 Scalability Protocols}
 \label{sec:l2protocols}
