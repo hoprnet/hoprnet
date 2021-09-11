@@ -15,7 +15,7 @@ Contains the source code for the [yellowpaper](./yellowpaper.pdf) of [hoprnet.or
 
 ```sh
 apt install -y git
-apt install -y texlive texlive-latex-extra
+apt install -y texlive texlive-science
 ```
 
 - "LaTeX Workshop" in VSCode
