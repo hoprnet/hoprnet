@@ -16,15 +16,11 @@ HOPR is built with the following principles in mind: that privacy must be an int
 
 \begin{itemize}
 
-    \item \textbf{Privacy by design} Privacy by design is an approach to systems engineering which
-          considers privacy throughout the entire engineering process, not merely as an afterthought. The internet is a public good –
-          a digital commons that should be safe and secure to use for all users.
-          However, it's impossible to provide such privacy using current
-          internet infrastructure, which attaches little or no importance to metadata privacy, and indeed in many cases relies on copious amounts of metadata to be made public in order to function. Therefore, new infrastructure with a focus on privacy must be created on top of the existing internet. HOPR provides an essential part of that infrastructure, and has been built with privacy as its foremost goal.
+    \item \textbf{Privacy by design}
+          Privacy by design is an approach to systems engineering which considers privacy throughout the entire engineering process, not merely as an afterthought. The internet is a public good – a digital commons that should be safe and secure to use for all users. However, it's impossible to provide such privacy using current internet infrastructure, which attaches little or no importance to metadata privacy, and indeed in many cases relies on copious amounts of metadata to be made public in order to function. Therefore, new infrastructure with a focus on privacy must be created on top of the existing internet. HOPR provides an essential part of that infrastructure, and has been built with privacy as its foremost goal.
 
-    \item \textbf{Decentralization} The internet is not private by design, although it is decentralized by design. In the early days of the internet, this decentralization provided a certain measure of privacy, by placing control in the hands of individual users.
-          However, internet users must increasingly interact with services provided by central
-          authorities. These central authorities control the privacy of individual users, often without their full informed consent.
+    \item \textbf{Decentralization}
+          The internet is not private by design, although it is decentralized by design. In the early days of the internet, this decentralization provided a certain measure of privacy, by placing control in the hands of individual users. However, internet users must increasingly interact with services provided by central authorities. These central authorities control the privacy of individual users, often without their full informed consent.
 
           In particular, interactions with third-party service providers regularly entail a loss of transport-layer privacy. Links can often be drawn between the user and the service provider, either by the service provider themselves, or by a third party who can observe public metadata revealed during the interaction or pressure the service provider to divulge stored data. With a sufficient number of such links, a profile can be constructed of a user's online activity.
 
@@ -37,7 +33,6 @@ HOPR is built with the following principles in mind: that privacy must be an int
 
           HOPR's proof-of-relay mechanism threads this needle, and is the major innovation of the HOPR protocol. Every HOPR node can receive payment for each packet they process and forward, but only once their data payload arrives at the next node. Payments are probabilistic, which ensures nodes do not
           (de-)prioritize other nodes and/or packets. To maximize received incentives, node operators must ensure good network connectivity, node availability, computational capacity, and committed funds (to reward other nodes). These combined incentives promote a broad, robust, and reliable network. At the same time, the probabilistic nature of payments obscures links between on-chain data and node runners.
-
 \end{itemize}
 
 \subsection{Security Goals}
@@ -49,20 +44,21 @@ Specifically, the HOPR protocol aims to build a network with the following featu
 
 \begin{itemize}
 
-    \item \textbf{Sender-receiver unlinkability} An adversary should be unable
-          to distinguish whether $\{S_1\rightarrow R_1, S_2\rightarrow R_2\}$ or
+    \item \textbf{Sender-receiver unlinkability}
+          An adversary should be unable to distinguish whether $\{S_1\rightarrow R_1, S_2\rightarrow R_2\}$ or
           $\{S_1\rightarrow R_2, S_2\rightarrow R_1\}$ for any concurrently online
           honest senders $S_1$, $S_2$ and honest receivers $R_1$, $R_2$ of the
           adversary’s choice.
-    \item \textbf{Sender online unobservability} An adversary should be unable to determine whether or not a specific sender $S$ is communicating with any receiver $R$, for any concurrently online honest sender $S$ of the adversary’s choice.
+    \item \textbf{Sender online unobservability}
+          An adversary should be unable to determine whether or not a specific sender $S$ is communicating with any receiver $R$, for any concurrently online honest sender $S$ of the adversary’s choice.
           \begin{center}
               Sender online unobservability $\rightarrow$ sender anonymity
           \end{center}
           $\{S_1 \rightarrow R,S_2 /\rightarrow \;or\; S_1 /\rightarrow,S_2 \rightarrow R\}$ for any concurrently online honest senders $S_1$ and $S_2$ and any receiver of the adversary’s choice.
 
 
-    \item \textbf{Resistance to active attacks} An adversary must not be able to conduct active attacks
-          such as tagging and replay attacks, where the adversary modifies and
+    \item \textbf{Resistance to active attacks}
+          An adversary must not be able to conduct active attacks such as tagging and replay attacks, where the adversary modifies and
           re-injects messages to extract information about their destinations or
           content.
 
@@ -77,17 +73,18 @@ Although we assume that nodes in the HOPR network can communicate reliably, the 
 In particular, to provide reliable privacy and data transmission the HOPR network needs to be resistant to both Sybil and eclipse attacks:
 
 \begin{itemize}
-    \item \textbf{Sybil attacks} In a Sybil attack, an attacker forges
+    \item \textbf{Sybil attacks}
+          In a Sybil attack, an attacker forges
           multiple identities in the network, thereby introducing network redundancy and
           reducing system security. The attacker can potentially de-anonymize packet traffic and thus link the sender and receiver's identities. HOPR mitigates Sybil attacks via the trust assumption of the Sphinx packet format: only a single honest relayer is needed to ensure integrity of the entire transmission chain, and since the traffic is source routed, users can choose routes themselves to ensure this minimal requirement of one honest relayer is met.
-    \item \textbf{Eclipse attacks} In an eclipse attack, the attacker seeks to isolate and attack or
+    \item \textbf{Eclipse attacks}
+          In an eclipse attack, the attacker seeks to isolate and attack or
           manipulate a specific user in the network. This is a common
           attack in peer-to-peer networks since nodes do not have a global view of the entire network, making it difficult to identify
           malicious nodes. HOPR mitigates this by employing a smart contract known as DEADR (Decentralized Entry Advertisement and Distributed Relaying). This smart contact employs a distributed hash table (DHT) to advertise honest entry nodes to the network.
 
 \end{itemize}
-However, security cannot come at the expense of usability. To be appealing to users and node runners alike, it is important for HOPR to find a satisfactory compromise to what is known as the ``anonymity trilemma" \cite{AnonymityTrilemma}, which states that a privacy network can provide at most two of the following properties: low-latency
-communication, low bandwidth overhead, and strong anonymity.
+However, security cannot come at the expense of usability. To be appealing to users and node runners alike, it is important for HOPR to find a satisfactory compromise to what is known as the ``anonymity trilemma" \cite{AnonymityTrilemma}, which states that a privacy network can provide at most two of the following properties: low-latency communication, low bandwidth overhead, and strong anonymity.
 
 The rest of this paper will outline the current state of the art among anonymous communication protocols and layer-2 scalability protocols, describe how the HOPR network is built, and explain how HOPR provides a satisfactory resolution to the anonymity trilemma.
 
@@ -114,21 +111,14 @@ The Invisible Internet Project (\textit{I2P}) is an implementation of onion-rout
 
 \begin{itemize}
 
-    \item \textbf{Packet switched instead of circuit switched} Tor allocates connection
-          to long-lived circuits; this allocation does not change until either the
-          connection or the circuit closes. In contrast, routers in I2P maintain
-          multiple tunnels per destination. This significantly increases
-          scalability and failure resistance since packets are used in
-          parallel.
+    \item \textbf{Packet switched instead of circuit switched}
+          Tor allocates connection to long-lived circuits; this allocation does not change until either the connection or the circuit closes. In contrast, routers in I2P maintain multiple tunnels per destination. This significantly increases scalability and failure resistance since packets are used in parallel.
 
-    \item \textbf{Unidirectional tunnels} Employing unidirectional rather than bidirectional tunnels makes
-          deanonymization harder, because tunnel participants see half as much data
-          and need two sets of peers to be profiled.
+    \item \textbf{Unidirectional tunnels}
+          Employing unidirectional rather than bidirectional tunnels makes deanonymization harder, because tunnel participants see half as much data and need two sets of peers to be profiled.
 
-    \item \textbf{Peer profiles instead of directory authorities} I2P’s network
-          information is stored in a DHT (information in the DHT is inherently
-          untrusted) while Tor’s relay network is managed by a set of nine
-          Directory Authorities.
+    \item \textbf{Peer profiles instead of directory authorities}
+          I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
 
 \end{itemize}
 Despite these improvements, I2P is vulnerable to eclipse attacks since no I2P router has a full view of the global network (similar to other peer-to-peer networks). Like Tor, I2P only provides protection against local adversaries, making it vulnerable to timing, intersection, and traffic analysis attacks. I2P has also been shown to be vulnerable to Sybil and predecessor attacks, in spite of various countermeasures implemented to thwart these.
