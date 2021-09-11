@@ -70,14 +70,11 @@ In particular, to provide reliable privacy and data transmission the HOPR networ
 
 \begin{itemize}
     \item \textbf{Sybil attacks}
-          In a Sybil attack, an attacker forges
-          multiple identities in the network, thereby introducing network redundancy and
-          reducing system security. The attacker can potentially de-anonymize packet traffic and thus link the sender and receiver's identities. HOPR mitigates Sybil attacks via the trust assumption of the Sphinx packet format: only a single honest relayer is needed to ensure integrity of the entire transmission chain, and since the traffic is source routed, users can choose routes themselves to ensure this minimal requirement of one honest relayer is met.
+          In a Sybil attack, an attacker forges multiple identities in the network, thereby introducing network redundancy and reducing system security. The attacker can potentially de-anonymize packet traffic and thus link the sender and receiver's identities. HOPR mitigates Sybil attacks via the trust assumption of the Sphinx packet format: only a single honest relayer is needed to ensure integrity of the entire transmission chain, and since the traffic is source routed, users can choose routes themselves to ensure this minimal requirement of one honest relayer is met.
     \item \textbf{Eclipse attacks}
-          In an eclipse attack, the attacker seeks to isolate and attack or
-          manipulate a specific user in the network. This is a common
-          attack in peer-to-peer networks since nodes do not have a global view of the entire network, making it difficult to identify
-          malicious nodes. HOPR mitigates this by employing a smart contract known as DEADR (Decentralized Entry Advertisement and Distributed Relaying). This smart contact employs a distributed hash table (DHT) to advertise honest entry nodes to the network.
+          Nodes in a decentralized network suffer from the general unavailability of a general understanding of its topology, hence they cannot determine whether the respective local view is complete or accurate. As an attacker it might be attractive to flood a victim with inappropriate information about collaborating node whilst withholding the information about honest nodes.
+
+          HOPR mitigates this issue by using a different medium to announce entry nodes to the network. This is done using a smart contract on a blockchain and known within HOPR as DEADR (Decentralized Entry Advertisement and Distributed Relaying). Running a successful eclipse attack therefore also includes forging a public blockchain which is assumed to hard since their stakeholders, such as holders of their native token, also have strong interest that none of the previous state changes, i.e. token transfers, are dropped.Hence it is assumed that an attacker can announce \textit{more} addresses but not \textit{less}.
 
 \end{itemize}
 However, security cannot come at the expense of usability. To be appealing to users and node runners alike, it is important for HOPR to find a satisfactory compromise to what is known as the ``anonymity trilemma" \cite{AnonymityTrilemma}, which states that a privacy network can provide at most two of the following properties: low-latency communication, low bandwidth overhead, and strong anonymity.
