@@ -1,5 +1,6 @@
 import { performance } from 'perf_hooks'
 import { validate } from 'jsonschema'
+import Hjson from 'hjson'
 import fs from 'fs'
 
 export function timer(fn: () => void): number {
@@ -32,7 +33,7 @@ export function expandVars(input: string, vars: { [key: string]: any }) {
  */
 export function loadJson(file_path: string): any {
   const content = fs.readFileSync(file_path, 'utf-8')
-  return JSON.parse(content)
+  return Hjson.parse(content)
 }
 
 /**

@@ -1,9 +1,11 @@
 [
     {
-        "id": "master-goerli",
-        "git_ref": "refs/heads/master",
-        "environment_id": "master-goerli",
-        "deprecated": false
+        "id": "master-goerli", // the release id used for VM naming
+        "git_ref": "refs/heads/master", // every time this git ref is updated, the release is deployed
+        "environment_id": "master-goerli", // the environment id to run release nodes in, see protocol-config.json
+        "deprecated": false, // if true, this release is kept for historical purposes and not re-deployed
+        "version_major": 0, // optional: major semver for the release
+        "version_minor": 0, // optional: minor semver for the release 
     },
     {
         "id": "master-xdai",

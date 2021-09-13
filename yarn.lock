@@ -1113,6 +1113,7 @@ __metadata:
     debug: ^4.3.2
     ethers: ^5.4.6
     futoin-hkdf: ~1.4.1
+    hjson: ^3.2.2
     it-pipe: ^1.1.0
     leveldown: ^6.0.1
     levelup: ^5.0.1
@@ -8434,6 +8435,15 @@ fsevents@~2.1.1:
   version: 0.0.2
   resolution: "here@npm:0.0.2"
   checksum: 73531438cfe6919a12d350fdaa356d18b8ed6479a4bdeaa05d7fb91dafd9ff52d0c4bd41eb28c92bf27631da1f52f7c7c7a75263600686983f2c4b9d06833d60
+  languageName: node
+  linkType: hard
+
+"hjson@npm:^3.2.2":
+  version: 3.2.2
+  resolution: "hjson@npm:3.2.2"
+  bin:
+    hjson: bin/hjson
+  checksum: 556086424f719c82fc8ae880d388e617e88f38213f69a6c380704fa6808790c68f9233ef480cdb22d6f24549b2edfc19aea67ab2c40013b231001f8168d56e33
   languageName: node
   linkType: hard
 
