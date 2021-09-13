@@ -41,7 +41,7 @@ export function loadJson(file_path: string): any {
  * prints errors to the console and throws in case of non-conforming
  * @param data parsed JSON data
  * @param schema parsed JSON schema for the data
- * @throws 
+ * @throws
  */
 export function validateData(data: any, schema: any) {
   const res = validate(data, schema)

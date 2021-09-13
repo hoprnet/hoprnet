@@ -1,32 +1,32 @@
 [
-    {
-        "id": "master-goerli", // the release id used for VM naming
-        "git_ref": "refs/heads/master", // every time this git ref is updated, the release is deployed
-        "environment_id": "master-goerli", // the environment id to run release nodes in, see protocol-config.json
-        "deprecated": false, // if true, this release is kept for historical purposes and not re-deployed
-        "version_major": 0, // optional: major semver for the release
-        "version_minor": 0, // optional: minor semver for the release 
-    },
-    {
-        "id": "master-xdai",
-        "git_ref": "refs/heads/master",
-        "environment_id": "master-xdai",
-        "deprecated": false
-    },
-    {
-        "id": "wildhorn",
-        "version_major": 1,
-        "version_minor": 76,
-        "git_ref": "refs/heads/release/wildhorn",
-        "environment_id": "wildhorn-matic-polygon",
-        "deprecated": false
-    },
-    {
-        "id": "constantine",
-        "version_major": 1,
-        "version_minor": 75,
-        "git_ref": "refs/heads/release/constantine",
-        "environment_id": "constantine-xdai",
-        "deprecated": true
-    }
+  {
+    "id": "master-goerli", // the release id used for VM naming
+    "git_ref": "refs/heads/master", // every time this git ref is updated, the release is deployed
+    "environment_id": "master-goerli", // the environment id to run release nodes in, see protocol-config.json
+    "deprecated": false, // if true, this release is kept for historical purposes and not re-deployed
+    "version_major": 0, // optional: major semver for the release
+    "version_minor": 0 // optional: minor semver for the release
+  },
+  {
+    "id": "master-xdai",
+    "git_ref": "refs/heads/master",
+    "environment_id": "master-xdai",
+    "deprecated": false
+  },
+  {
+    "id": "wildhorn",
+    "version_major": 1,
+    "version_minor": 76,
+    "git_ref": "refs/heads/release/wildhorn",
+    "environment_id": "wildhorn-matic-polygon",
+    "deprecated": false
+  },
+  {
+    "id": "constantine",
+    "version_major": 1,
+    "version_minor": 75,
+    "git_ref": "refs/heads/release/constantine",
+    "environment_id": "constantine-xdai",
+    "deprecated": true
+  }
 ]

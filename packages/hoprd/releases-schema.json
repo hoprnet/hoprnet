@@ -1,33 +1,28 @@
 {
-    "type": "array",
-    "items": {
-        "type": "object",
-        "properties": {
-            "id": {
-                "type": "string"
-            },
-            "version_major": {
-                "type": "integer"
-            },
-            "version_minor": {
-                "type": "integer"
-            },
-            "git_ref": {
-                "type": "string"
-            },
-            "environment_id": {
-                "type": "string"
-            },
-            "deprecated": {
-                "type": "boolean"
-            }
-        },
-        "required": [
-            "id",
-            "git_ref",
-            "environment_id",
-            "deprecated"
-        ],
-        "additionalProperties": false
-    }
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "version_major": {
+        "type": "integer"
+      },
+      "version_minor": {
+        "type": "integer"
+      },
+      "git_ref": {
+        "type": "string"
+      },
+      "environment_id": {
+        "type": "string"
+      },
+      "deprecated": {
+        "type": "boolean"
+      }
+    },
+    "required": ["id", "git_ref", "environment_id", "deprecated"],
+    "additionalProperties": false
+  }
 }
