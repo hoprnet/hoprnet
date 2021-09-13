@@ -13,6 +13,7 @@ import { getIdentity } from './identity'
 import path from 'path'
 import { passwordStrength } from 'check-password-strength'
 import type { ProtocolConfig } from '@hoprnet/hopr-core'
+import { ResolvedEnvironment } from '@hoprnet/hopr-core/lib/environment'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -160,30 +161,14 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-async function generateNodeOptions(): Promise<HoprOptions> {
-  let options: HoprOptions = {
-    createDbIfNotExist: argv.init,
-    announce: argv.announce,
-    hosts: parseHosts(),
-    announceLocalAddresses: argv.testAnnounceLocalAddresses,
-    preferLocalAddresses: argv.testPreferLocalAddresses,
-    environment: undefined
-  }
 
-  if (argv.password !== undefined) {
-    options.password = argv.password as string
-  }
-
-  if (argv.data && argv.data !== '') {
-    options.dbPath = argv.data
-  }
-
+export function resolveEnvironment(environment_id: string): ResolvedEnvironment {
   const protocolConfig = require('../protocol-config.json') as ProtocolConfig
   for (const environment of protocolConfig.environments) {
-    if (environment.id === argv.environment) {
+    if (environment.id === environment_id) {
       for (const network of protocolConfig.networks) {
         if (network.id === environment.network_id) {
-          options.environment = {
+          return {
             id: environment.id,
             network,
             channel_contract_deploy_block: environment.channel_contract_deploy_block,
@@ -194,14 +179,29 @@ async function generateNodeOptions(): Promise<HoprOptions> {
       }
     }
   }
+  const supportedEnvs: string = protocolConfig.environments.map((env) => env.id).join(', ')
+  throw new Error(
+    `failed to find environment with id '${argv.environment}' in the supported protocol configuration, supported environments: ${supportedEnvs}`
+  )
+}
 
-  if (!options.environment) {
-    const supportedEnvs: string = protocolConfig.environments.map((env) => env.id).join(', ')
-    throw new Error(
-      `failed to find environment with id '${argv.environment}' in the supported protocol configuration, supported environments: ${supportedEnvs}`
-    )
+async function generateNodeOptions(): Promise<HoprOptions> {
+  let options: HoprOptions = {
+    createDbIfNotExist: argv.init,
+    announce: argv.announce,
+    hosts: parseHosts(),
+    announceLocalAddresses: argv.testAnnounceLocalAddresses,
+    preferLocalAddresses: argv.testPreferLocalAddresses,
+    environment: resolveEnvironment(argv.environment)
   }
 
+  if (argv.password !== undefined) {
+    options.password = argv.password as string
+  }
+
+  if (argv.data && argv.data !== '') {
+    options.dbPath = argv.data
+  }
   return options
 }
 
