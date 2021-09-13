@@ -7,3 +7,4 @@ export const CT_INTERMEDIATE_HOPS = 2 // 3  // NB. min is 2
 export const MESSAGE_FAIL_THRESHOLD = 1000 // Failed sends to channel before we autoclose
 export const CT_PATH_RANDOMNESS = 0.2
 export const CT_NETWORK_QUALITY_THRESHOLD = 0.15
+export const CT_CHANNEL_STALL_TIMEOUT = 600000 // 10 min

@@ -35,6 +35,10 @@ export const findChannel = (src: PublicKey, dest: PublicKey, state: State): Chan
     .map((c: ChannelData): ChannelEntry => c.channel)
     .find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
 
+export const findCtChannelOpenTime = (dest: PublicKey, state: State): number => {
+  return state.ctChannels.find(ctChannel => ctChannel.destination === dest).openFrom ?? Date.now();
+}
+
 export const sendCTMessage = async (
   startNode: PublicKey,
   selfPub: PublicKey,
