@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { resolveEnvironment } from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { decode } from 'rlp'
@@ -12,8 +12,6 @@ import setupAPI from './api'
 import { getIdentity } from './identity'
 import path from 'path'
 import { passwordStrength } from 'check-password-strength'
-import type { ProtocolConfig } from '@hoprnet/hopr-core'
-import { ResolvedEnvironment } from '@hoprnet/hopr-core/lib/environment'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -159,30 +157,6 @@ function parseHosts(): HoprOptions['hosts'] {
     }
   }
   return hosts
-}
-
-
-export function resolveEnvironment(environment_id: string): ResolvedEnvironment {
-  const protocolConfig = require('../protocol-config.json') as ProtocolConfig
-  for (const environment of protocolConfig.environments) {
-    if (environment.id === environment_id) {
-      for (const network of protocolConfig.networks) {
-        if (network.id === environment.network_id) {
-          return {
-            id: environment.id,
-            network,
-            channel_contract_deploy_block: environment.channel_contract_deploy_block,
-            token_contract_address: environment.token_contract_address,
-            channels_contract_address: environment.channels_contract_address
-          }
-        }
-      }
-    }
-  }
-  const supportedEnvs: string = protocolConfig.environments.map((env) => env.id).join(', ')
-  throw new Error(
-    `failed to find environment with id '${argv.environment}' in the supported protocol configuration, supported environments: ${supportedEnvs}`
-  )
 }
 
 async function generateNodeOptions(): Promise<HoprOptions> {

@@ -31,3 +31,26 @@ export type ResolvedEnvironment = {
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address
 }
+
+export function resolveEnvironment(environment_id: string): ResolvedEnvironment {
+  const protocolConfig = require('../protocol-config.json') as ProtocolConfig
+  for (const environment of protocolConfig.environments) {
+    if (environment.id === environment_id) {
+      for (const network of protocolConfig.networks) {
+        if (network.id === environment.network_id) {
+          return {
+            id: environment.id,
+            network,
+            channel_contract_deploy_block: environment.channel_contract_deploy_block,
+            token_contract_address: environment.token_contract_address,
+            channels_contract_address: environment.channels_contract_address
+          }
+        }
+      }
+    }
+  }
+  const supportedEnvs: string = protocolConfig.environments.map((env) => env.id).join(', ')
+  throw new Error(
+    `failed to find environment with id '${environment_id}' in the supported protocol configuration, supported environments: ${supportedEnvs}`
+  )
+}
