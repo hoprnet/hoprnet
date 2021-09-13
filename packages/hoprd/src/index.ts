@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Hopr, { resolveEnvironment } from '@hoprnet/hopr-core'
+import Hopr, { resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { decode } from 'rlp'
@@ -15,13 +15,10 @@ import { passwordStrength } from 'check-password-strength'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
-const pkg = require('../package.json')
-
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
-    array: true,
+    string: true,
     describe: 'Environment id, one of the ids defined in protocol-config.json',
-    default: pkg.hopr.environment_id
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -136,9 +133,6 @@ const argv = yargs(process.argv.slice(2))
     describe: 'no remote authentication for easier testing',
     default: false
   })
-  .coerce({
-    environment: (env) => env[env.length - 1]
-  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -230,6 +224,10 @@ async function main() {
     if (length < 8) {
       throw new Error(`API token must be at least 8 characters long`)
     }
+  }
+
+  if (!argv.environment) {
+    throw new Error(`please specify --environment <environment id>, support environments: \n` + supportedEnvironments().join('\n'))
   }
 
   if (argv.admin) {
