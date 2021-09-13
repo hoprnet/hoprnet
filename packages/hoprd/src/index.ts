@@ -18,7 +18,7 @@ const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
     array: true,
-    describe: 'Environment id, one of the ids defined in protocol-config.json',
+    describe: 'Environment id, one of the ids defined in protocol-config.json'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -227,7 +227,9 @@ async function main() {
   }
 
   if (!argv.environment) {
-    throw new Error(`please specify --environment <environment id>, support environments: \n` + supportedEnvironments().join('\n'))
+    throw new Error(
+      `please specify --environment <environment id>, support environments: \n` + supportedEnvironments().join('\n')
+    )
   }
 
   if (argv.admin) {
