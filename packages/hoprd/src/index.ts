@@ -17,7 +17,7 @@ const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
-    string: true,
+    array: true,
     describe: 'Environment id, one of the ids defined in protocol-config.json',
   })
   .option('host', {
@@ -160,7 +160,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     hosts: parseHosts(),
     announceLocalAddresses: argv.testAnnounceLocalAddresses,
     preferLocalAddresses: argv.testPreferLocalAddresses,
-    environment: resolveEnvironment(argv.environment)
+    environment: resolveEnvironment(argv.environment[argv.environment.length - 1] as string)
   }
 
   if (argv.password !== undefined) {
