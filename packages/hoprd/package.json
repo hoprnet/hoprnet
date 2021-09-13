@@ -12,7 +12,8 @@
     "lib",
     "hopr-admin/.next/**",
     "hoprd-default.sh",
-    "protocol-config.json"
+    "protocol-config.json",
+    "releases.json"
   ],
   "scripts": {
     "clean": "rimraf ./lib",
@@ -73,10 +74,6 @@
     ],
     "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
-  },
-  "hopr": {
-    "description": "master",
-    "environment_id": "master"
   },
   "publishConfig": {
     "access": "public"

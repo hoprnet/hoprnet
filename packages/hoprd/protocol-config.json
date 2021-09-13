@@ -15,8 +15,22 @@
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}"
     },
     {
-      "id": "master",
+      "id": "master-goerli",
       "network_id": "goerli",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
+      "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
+    },
+    {
+      "id": "master-xdai",
+      "network_id": "xdai",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
+      "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
+    },
+    {
+      "id": "constantine-xdai",
+      "network_id": "xdai",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
       "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
@@ -36,6 +50,13 @@
       "token_contract_address": "0x566a5c774bb8abe1a88b4f187e24d4cd55c207a5"
     },
     {
+      "id": "wildhorn-matic-polygon",
+      "network_id": "polygon",
+      "channel_contract_deploy_block": 0,
+      "channels_contract_address": "0xd8f4e1867bbff6647b80bc624d22bd552eb81eef",
+      "token_contract_address": "0x6f80d1a3ab9006548c2fbb180879b87364d63bf7"
+    },
+    {
       "id": "matic-polygon",
       "network_id": "polygon",
       "channel_contract_deploy_block": 0,
@@ -53,9 +74,7 @@
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
       "hopr_token_name": "wxHOPR",
-      "tags": [
-        "development"
-      ]
+      "tags": ["development"]
     },
     {
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
@@ -67,9 +86,7 @@
       "default_provider": "https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/",
       "native_token_name": "xDAI",
       "hopr_token_name": "wxHOPR",
-      "tags": [
-        "production"
-      ]
+      "tags": ["production"]
     },
     {
       "id": "goerli",
@@ -81,9 +98,7 @@
       "default_provider": "https://goerli.infura.io/v3/${INFURA_KEY}",
       "native_token_name": "gETH",
       "hopr_token_name": "wxHOPR",
-      "tags": [
-        "staging"
-      ]
+      "tags": ["staging"]
     },
     {
       "id": "mumbai",
@@ -95,22 +110,19 @@
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
       "hopr_token_name": "mHOPR",
-      "tags": [
-        "testing"
-      ]
+      "tags": ["testing"]
     },
     {
       "id": "polygon",
       "description": "Polygon, previously known as MATIC network, is an interchain scalability solution that gives an infrastructure for creating blockchain networks that can interface with each other",
       "chain_id": 137,
+      "live": true,
       "default_provider": "https://polygon-mainnet.infura.io/v3/${INFURA_KEY}",
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
       "hopr_token_name": "mHOPR",
-      "tags": [
-        "testing"
-      ]
+      "tags": ["testing"]
     }
   ]
 }

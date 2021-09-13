@@ -35,6 +35,7 @@
     "debug": "^4.3.2",
     "ethers": "^5.4.6",
     "futoin-hkdf": "~1.4.1",
+    "hjson": "^3.2.2",
     "it-pipe": "^1.1.0",
     "leveldown": "^6.0.1",
     "levelup": "^5.0.1",

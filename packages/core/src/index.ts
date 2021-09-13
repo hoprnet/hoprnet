@@ -157,6 +157,8 @@ class Hopr extends EventEmitter {
       log('Addresses are sorted by default')
     }
     this.indexer = this.paymentChannels.indexer // TODO temporary
+
+    log(`using environment: ${this.environment.id}`)
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
