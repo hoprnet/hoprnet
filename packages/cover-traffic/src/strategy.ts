@@ -40,7 +40,11 @@ export class CoverTrafficStrategy extends SaneDefaults {
         continue
       }
       const q = await peers.qualityOf(c.destination)
-      ctChannels.push({ destination: c.destination, latestQualityOf: q, openFrom: findCtChannelOpenTime(c.destination, state)})
+      ctChannels.push({
+        destination: c.destination,
+        latestQualityOf: q,
+        openFrom: findCtChannelOpenTime(c.destination, state)
+      })
       if (q < CT_NETWORK_QUALITY_THRESHOLD) {
         toClose.push(c.destination)
       }
@@ -70,12 +74,12 @@ export class CoverTrafficStrategy extends SaneDefaults {
             this.data.incrementMessageFails(openChannel.destination)
           }
         } else if (
-          channel && 
-          channel.status == ChannelStatus.WaitingForCommitment && 
+          channel &&
+          channel.status == ChannelStatus.WaitingForCommitment &&
           Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT
         ) {
           // handle waiting for commitment stalls
-          toClose.push(openChannel.destination);
+          toClose.push(openChannel.destination)
         }
       }
     } else {

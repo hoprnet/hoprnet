@@ -13,7 +13,7 @@ export type ChannelData = {
 export type OpenChannels = {
   destination: PublicKey
   latestQualityOf: number
-  openFrom: number  // timestamp (in milliseconds) when the CT channel is opened
+  openFrom: number // timestamp (in milliseconds) when the CT channel is opened
 }
 
 export type State = {
