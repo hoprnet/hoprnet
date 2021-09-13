@@ -147,8 +147,8 @@ The encrypted payload $\delta$ is where the actual message is hidden. This is co
 $\delta$ is repeatedly encrypted via keys derived from the DH key exchange between the packet’s group element $\alpha_i$ and the public key of each node in the path $y_i$.
 
 \subparagraph{Notation}
-Let $j$ be the block size in bits, which will typically be large. Let $H_k$ be a keyed hash function with the key $k$ for the payload. $k$ consists of four independent keys, $k_1$, $k_2$, $k_3$, and $k_4$, which $A$ derives from the master keys $s_0$, $s_1$, $s_2$, and $s_3$. Of the four keys, $k_1$ and $k_3$ will be used to key the stream cipher, while $k_2$ and $k_4$ are used to key the hash function. Sphinx uses the LIONESS wide block cipher scheme for encryption and decryption purposes.
-Let $S_k$ be a pseudorandom function (stream cipher) which given the input $m$ will generate an output of arbitrary length. We add an authentication tag $\tau$ to $m$ before encryption and a 0-padding string as follows:
+Let $j$ be the block size in bits, which will typically be large. Let $H_u$ be a keyed hash function with the key $u$ for the payload. $u$ consists of four independent keys, $u_1$, $u_2$, $u_3$, and $u_4$, which $A$ derives from the master keys $s_0$, $s_1$, $s_2$, and $s_3$. Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $u_2$ and $u_4$ are used to key the hash function. Sphinx uses the LIONESS wide block cipher scheme for encryption and decryption purposes.
+Let $S_u$ be a pseudorandom function (stream cipher) which given the input $m$ will generate an output of arbitrary length. We add an authentication tag $\tau$ to $m$ before encryption and a 0-padding string as follows:
 \begin{align}
    m &\leftarrow 0_{l} \|\tau\|m
     \end{align}
@@ -158,10 +158,10 @@ $0 <= l <= |m| - 4$.
 $m$ is divided into two blocks, left ($m_l$) and right ($m_r$), whose sizes are $|m_l|=w$ and $|m_r|=j-w$. We thus get $m=m_r\|m_l$.
 \subparagraph{Encryption}
 The blocks $m_l$ and $m_r$ are transformed using a four-round Feistel structure:
-$$m_r\leftarrow m_r \oplus S_{k1}(m_l), m_l\leftarrow m_l \oplus H_{k2}(m_r), m_r\leftarrow m_r\oplus S_{k3}(m_l), m_l\leftarrow m_l\oplus H_{k4}(m_r)$$
+$$m_r\leftarrow m_r \oplus S_{u1}(m_l), m_l\leftarrow m_l \oplus H_{u2}(m_r), m_r\leftarrow m_r\oplus S_{u3}(m_l), m_l\leftarrow m_l\oplus H_{u4}(m_r)$$
 The updated $m_l\|m_r$ constitutes the ciphertext $\delta$.
 \subparagraph{Decryption} Decryption happens as follows:
-$$m_l\leftarrow m_l\oplus H_{k4}(m_r), m_r\leftarrow S_{k3}(m_l), m_l\leftarrow m_l\oplus H_{k2}(m_r), m_r\leftarrow m_r\oplus S_{k1}(m_l)$$
+$$m_l\leftarrow m_l\oplus H_{u4}(m_r), m_r\leftarrow S_{u3}(m_l), m_l\leftarrow m_l\oplus H_{u2}(m_r), m_r\leftarrow m_r\oplus S_{u1}(m_l)$$
 \subparagraph{Integrity}
 The payload is encrypted using a bidirectional error propagating block cipher
 and protected with an integrity check for the receiver, but not
