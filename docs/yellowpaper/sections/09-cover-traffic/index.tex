@@ -37,9 +37,7 @@ After opening channels, the CT node sends cover traffic packets at regular inter
 
 The first relay node is chosen with a probability proportional to the amount funded by the CT node, so every node has an equal chance of getting selected. For subsequent hops, nodes are selected with a probability weighted proportional to their importance. We use a weighted priority queue of potential paths to choose the next node. If the queue is empty then it fails.
 
-Nodes can only be chosen once per path. For example, when choosing the third node in the path $A\rightarrow B$, if $A$ is found to be the only node with an open channel to $B$, the search will fail and a new path will be generated.
-
- As with real traffic, rewards are distributed to all selected nodes in a path as tickets which can be redeemed for HOPR tokens with a certain probability (see the \nameref{sec:tickets} section). Thus there is a direct correlation between a node's importance and the cover traffic rewards it receives, ensuring that rewards are distributed fairly.
+As with real traffic, rewards are distributed to all selected nodes in a path as tickets which can be redeemed for HOPR tokens with a certain probability (see the \nameref{sec:tickets} section). Thus there is a direct correlation between a node's importance and the cover traffic rewards it receives, ensuring that rewards are distributed fairly.
 
 
 \subsection{Closing cover traffic channels}
