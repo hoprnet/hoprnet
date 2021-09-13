@@ -13,10 +13,7 @@ import { utils } from 'ethers'
 
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
-import { networks, NetworkTag } from './constants'
-import { ethers } from 'ethers'
 export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'production'
-export type NetworkTag = DeploymentTypes | 'etherscan'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, ENVIRONMENT_ID = 'default' } = process.env
 import { expandVars } from '@hoprnet/hopr-utils'
