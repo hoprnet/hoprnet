@@ -22,7 +22,11 @@ The network topology includes two layers: the payment channel graph and the abil
 
 The availability of nodes in the network is estimated by regularly pinging other nodes in the network and listening to ping attempts from other nodes. Receiving a \textit{ping} request or a \textit{pong} response from another node means that a node is available and gradually increases their network score.
 
-If a node does not respond to \textit{ping} attempts, it is considered temporarily offline and the waiting time to the next \textit{ping} attempt is doubled. This doubling occurs until an upper bound is reached, at which point the node is considered dead.
+If a node does not respond to \textit{ping} attempts, their network score decreases and the waiting time to the next \textit{ping} attempt increases exponentially. This exponential backoff occurs until an upper bound is reached. A successful response to \textit{ping} resets the backoff timer.
+$$t_{bo} = \exp (t_{base}, {\exp (f_{bo}, n_{fail})})$$
+where $t_{bo}$ is the backoff time, $t_{base}$ is the initial backoff time, $f_{bo}$ is the backoff factor, and $ n_{fail}$ is the number of failed attempts since the last sucessful attempt or the network start.
+
+When the network score is below the network quality threshold, the node is considered offline.
 
 \subsubsection{Payment channel graph}
 
