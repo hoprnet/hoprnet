@@ -66,5 +66,5 @@ export function fakeAddress(id: PeerId): Multiaddr {
 }
 
 export function showBackoff(networkPeers: PeerStore): number {
-  return parseFloat(networkPeers.debugLog().match(/(?<=\(backoff\s)(.*)(?=\,)/g));
+  return parseFloat(networkPeers.debugLog().match(/(?<=\(backoff\s)(.*)(?=\,)/g))
 }
