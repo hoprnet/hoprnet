@@ -61,7 +61,15 @@ describe('test pathfinder with some simple topologies', function () {
     stakes: (i: PublicKey) => Balance
   ): (p: PublicKey) => Promise<any[]> {
     return (a: PublicKey) =>
-      Promise.resolve((edges.get(a) || []).map((b) => ({ source: a, destination: b, balance: stakes(b) as any })))
+      Promise.resolve(
+        (edges.get(a) || []).map((b) => ({
+          sourcePubKey: a,
+          source: a.toAddress(),
+          destinationPubKey: b,
+          destination: b.toAddress(),
+          balance: stakes(b) as any
+        }))
+      )
   }
 
   it('should find a path through a reliable star', async function () {
