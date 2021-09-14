@@ -143,11 +143,18 @@ The new mix header is now ready to be sent to $C$, defined as the node with publ
 $$M_1=(\alpha_1,\beta_1,\gamma_1)$$
 where $\alpha$, $\beta$ and $\gamma$ are defined in equations $\ref{eq:1}$, $\ref{eq:2}$ and $\ref{eq:6}$
 \subsection{Encrypt and decrypt}
-The encrypted payload $\delta$ is where the actual message is hidden. This is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing.
+The encrypted payload $\delta$ is where the actual message is hidden. This is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing which is basically a pseudo-random permutation process (PRP).
 $\delta$ is repeatedly encrypted via keys derived from the DH key exchange between the packet’s group element $\alpha_i$ and the public key of each node in the path $y_i$.
 
 \paragraph{Notation}
-Let $j$ be the block size in bits, which will typically be large. Let $H_u$ be a keyed hash function with the key $u$ for the payload. $u$ consists of four independent keys, $u_1$, $u_2$, $u_3$, and $u_4$, which $A$ derives from the master keys $\varphi_0$, $\varphi_1$, $\varphi_2$, and $\varphi_3$. Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $u_2$ and $u_4$ are used to key the hash function. Sphinx uses the LIONESS wide block cipher scheme for encryption and decryption purposes.
+Let $j$ be the block size in bits, which will typically be large. Let $H_u$ be a keyed hash function with the key $u$ for the payload. $u$ consists of four independent keys, $u_1$, $u_2$, $u_3$, and $u_4$, which $A$ derives from the master keys $\varphi_0$, $\varphi_1$, $\varphi_2$, and $\varphi_3$ using the HKDF key derivation function explained in Proof of Relay section. The derivation is as follow:
+
+        $$HKDF.expand(h_b, |h_b|,\varphi_0, |\varphi_i + PRP_IV_LENGTH|, hash\_Key\_PRP)$$
+     
+ 
+\textbf{Expand} This step takes $\varphi_i$, as a seed and creates output key material $u_i$ for all $1\le i < 4 $ which is expanded from hashes of $\varphi_i$ and an optional info message (salt). The process occurs as follows:
+
+Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $u_2$ and $u_4$ are used to key the hash function. Sphinx uses the LIONESS wide block cipher scheme for encryption and decryption purposes.
 Let $S_u$ be a pseudorandom function (stream cipher) which given the input $m$ will generate an output of arbitrary length. We add a padding tag $\tau$ to $m$ before encryption and a 0-padding string as follows:
 \begin{align}
    m &\leftarrow 0_{l} \|\tau\|m
