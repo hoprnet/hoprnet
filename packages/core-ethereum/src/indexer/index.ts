@@ -403,7 +403,7 @@ class Indexer extends EventEmitter {
   }
 
   public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
-    return (await this.db.getAccounts((account: AccountEntry) => !!account.multiAddr)).map(
+    return (await this.db.getAccounts((account: AccountEntry) => account.hasAnnounced())).map(
       (account: AccountEntry) => account.multiAddr
     )
   }
