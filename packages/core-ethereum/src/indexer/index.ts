@@ -306,11 +306,7 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
-<<<<<<< HEAD
     let channel: ChannelEntry
-=======
-    let channel
->>>>>>> master
     try {
       channel = await ChannelEntry.fromSCEvent(event)
     } catch (e) {
