@@ -27,35 +27,35 @@ echo "Looking for releases to deploy (GITHUB_REF == ${GITHUB_REF})"
 
 # iterate through releases with git_ref == $GITHUB_REF
 for row in $(cat packages/hoprd/releases.json | ./node_modules/.bin/strip-json-comments | jq -r ".[] | select(.git_ref==\"${GITHUB_REF}\") | @base64"); do
-  declare RELEASE_ID=$(_jq "${row}" ".id")
-  declare DEPRECATED=$(_jq "${row}" ".deprecated")
-  declare ENVIRONMENT_ID=$(_jq "${row}" ".environment_id")
-  declare VERSION_MAJOR=$(_jq "${row}" ".version_major")
-  declare VERSION_MINOR=$(_jq "${row}" ".version_minor")
-  declare DOCKER_IMAGE=$(_jq "${row}" ".docker_image")
+  declare release_id=$(_jq "${row}" ".id")
+  declare deprecated=$(_jq "${row}" ".deprecated")
+  declare environment_id=$(_jq "${row}" ".environment_id")
+  declare version_major=$(_jq "${row}" ".version_major")
+  declare version_minor=$(_jq "${row}" ".version_minor")
+  declare docker_image=$(_jq "${row}" ".docker_image")
 
-  if [ "${DEPRECATED}" == "true" ]; then
-    echo "${RELEASE_ID} deprecated, skipping"
+  if [ "${deprecated}" == "true" ]; then
+    echo "${release_id} deprecated, skipping"
     continue
   fi
 
-  declare VERSION_MAJ_MIN
-  if [ "${VERSION_MAJOR}" != "null" ] && [ "${VERSION_MINOR}" != "null" ]; then
-    VERSION_MAJ_MIN="${VERSION_MAJOR}.${VERSION_MINOR}"
+  declare version_maj_min
+  if [ "${version_major}" != "null" ] && [ "${version_minor}" != "null" ]; then
+    version_maj_min="${version_major}.${version_minor}"
   else
-    VERSION_MAJ_MIN="unversioned"
+    version_maj_min="unversioned"
   fi
-  declare TESTNET_NAME="$RELEASE_ID-$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
-  declare TESTNET_SIZE=3
+  declare testnet_name="$release_id-$(echo "$version_maj_min" | sed 's/\./-/g')"
+  declare testnet_size=3
 
-  echo "Deploying release ${RELEASE_ID}"
-  echo " version: ${VERSION_MAJ_MIN}" 
-  echo " environment ${ENVIRONMENT_ID}"
-  echo " docker image: ${DOCKER_IMAGE}"
-  echo " testnet name: ${TESTNET_NAME}"
+  echo "Deploying release ${release_id}"
+  echo " version: ${version_maj_min}" 
+  echo " environment ${environment_id}"
+  echo " docker image: ${docker_image}"
+  echo " testnet name: ${testnet_name}"
 
   echo "Cleaning up testnet"
-  cleanup_instance "${TESTNET_NAME}"
+  cleanup_instance "${testnet_name}"
   echo "Starting testnet"
-  start_testnet $TESTNET_NAME $TESTNET_SIZE $DOCKER_IMAGE $ENVIRONMENT_ID
+  start_testnet $testnet_name $testnet_size $docker_image $environment_id
 done
