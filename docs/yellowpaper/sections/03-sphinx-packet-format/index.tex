@@ -54,13 +54,13 @@ $$\alpha_0=g^x,\varphi_0=y^x_B,b_0=h_b(a_0,\varphi_0)$$
 and
 \begin{equation}
     \begin{cases}
-        \alpha_i=g^{x\Pi_{i=1}^{i=r-1}b_i}\\
-        \varphi_i=y^{x\Pi_{i=1}^{i=r-1}b_i}_i \\
+        \alpha_i=g^{x\Pj_{j=0}^{i=r-2}b_j}\\
+        \varphi_i=y^{x\Pi_{j=0}^{j=r-2}b_j} \\
         b_i=h_b(a_i,\varphi_i)
     \end{cases}\,.
     \label{eq:1}
 \end{equation}
-for $0\le i < r-1$, where $y_0,y_1, y_2, y_3$, and $y_4$ are the public keys of the nodes $B$, $C$, $D$, and $Z$, which we assume to be available to $A$ .
+for $1\le i < r-1$, where $y_0,y_1, y_2, y_3$, and $y_4$ are the public keys of the nodes $B$, $C$, $D$, and $Z$, which we assume to be available to $A$ .
 
 \subsection{Routing information}
 Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final receiver of the message. 
@@ -147,12 +147,12 @@ $\delta$ is repeatedly encrypted via keys derived from the DH key exchange betwe
 
 \paragraph{Notation}
 Let $j$ be the block size in bits, which will typically be large. Let $H_u$ be a keyed hash function with the key $u$ for the payload. $u$ consists of four independent keys, $u_1$, $u_2$, $u_3$, and $u_4$, which $A$ derives from the master keys $\varphi_0$, $\varphi_1$, $\varphi_2$, and $\varphi_3$. Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $u_2$ and $u_4$ are used to key the hash function. Sphinx uses the LIONESS wide block cipher scheme for encryption and decryption purposes.
-Let $S_u$ be a pseudorandom function (stream cipher) which given the input $m$ will generate an output of arbitrary length. We add an authentication tag $\tau$ to $m$ before encryption and a 0-padding string as follows:
+Let $S_u$ be a pseudorandom function (stream cipher) which given the input $m$ will generate an output of arbitrary length. We add a padding tag $\tau$ to $m$ before encryption and a 0-padding string as follows:
 \begin{align}
    m &\leftarrow 0_{l} \|\tau\|m
     \end{align}
 where $\tau$ is generated arbitrarily and $|\tau|=4$ is its length ($\tau=``HOPR "$ in ASCII). $l$ is the $0$ padding length where
-$0 <= l <= |m| - 4$.
+$0 <= l <= |m| - 4$. The payloads that do not include the correct padding are considered invalid.
 
 $m$ is divided into two blocks, left ($m_l$) and right ($m_r$), whose sizes are $|m_l|=w$ and $|m_r|=j-w$. We thus get $m=m_r\|m_l$.
 \subparagraph{Encryption}
