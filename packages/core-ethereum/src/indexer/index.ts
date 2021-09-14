@@ -306,13 +306,7 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
-    let channel: ChannelEntry
-    try {
-      channel = await ChannelEntry.fromSCEvent(event)
-    } catch (e) {
-      log('could not process channel event, skipping it', e)
-      return
-    }
+    const channel = await ChannelEntry.fromSCEvent(event)
 
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
