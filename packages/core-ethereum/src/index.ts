@@ -102,12 +102,12 @@ export default class HoprEthereum extends EventEmitter {
     return this.indexer.getOpenChannelsFrom(p)
   }
 
-  public getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
-    return this.indexer.getChannelsFrom(addr)
+  public getChannelsFrom(addr: Address, onlyWithPubKeys: boolean = false): Promise<ChannelEntry[]> {
+    return this.indexer.getChannelsFrom(addr, onlyWithPubKeys)
   }
 
-  public getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
-    return this.indexer.getChannelsTo(addr)
+  public getChannelsTo(addr: Address, onlyWithPubKeys: boolean = false): Promise<ChannelEntry[]> {
+    return this.indexer.getChannelsTo(addr, onlyWithPubKeys)
   }
 
   public async getAccount(addr: Address) {

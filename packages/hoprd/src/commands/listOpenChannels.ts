@@ -41,9 +41,10 @@ export default class ListOpenChannels extends AbstractCommand {
       }
       // find counterpartys' peerIds
       for (const channel of channelsFrom) {
+        // prettier-ignore
         log(`
 Outgoing Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-To:                     ${styleValue(channel.destination.toPeerId().toB58String(), 'peerId')}
+To:                     ${styleValue(channel.destination.toHex(), 'address')} ${channel.destinationPubKey ? `(${channel.destinationPubKey.toPeerId().toB58String()})` : '(not announced)'}
 Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)
@@ -57,9 +58,10 @@ Balance:                ${styleValue(channel.balance.toFormattedString(), 'numbe
       }
       // find counterpartys' peerIds
       for (const channel of channelsTo) {
+        // prettier-ignore
         log(`
 Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
-From:                   ${styleValue(channel.source.toPeerId().toB58String(), 'peerId')}
+To:                     ${styleValue(channel.source.toHex(), 'address')} ${channel.sourcePubKey ? `(${channel.sourcePubKey.toPeerId().toB58String()})` : '(not announced)'}
 Status:                 ${styleValue(channelStatusToString(channel.status), 'highlight')}
 Balance:                ${styleValue(channel.balance.toFormattedString(), 'number')}
 `)

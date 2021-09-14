@@ -46,8 +46,8 @@ export class CoverTrafficStrategy extends SaneDefaults {
       if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
         toClose.push(c.destination)
       }
-      if (this.data.messageFails(c.destination) > MESSAGE_FAIL_THRESHOLD) {
-        this.data.resetMessageFails(c.destination)
+      if (this.data.messageFails(c.destinationPubKey) > MESSAGE_FAIL_THRESHOLD) {
+        this.data.resetMessageFails(c.destinationPubKey)
         toClose.push(c.destination)
       }
     }
@@ -86,7 +86,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       const q = await peers.qualityOf(c)
 
       if (
-        currentChannels.filter((x) => x.status !== ChannelStatus.Closed).find((x) => x.destination.eq(c)) ||
+        currentChannels.filter((x) => x.status !== ChannelStatus.Closed).find((x) => x.destinationPubKey.eq(c)) ||
         c.eq(this.selfPub) ||
         toOpen.find((x) => x[1].eq(c))
       ) {

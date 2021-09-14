@@ -11,7 +11,7 @@ export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRo
 export const findChannelsFrom = (p: PublicKey, state: State): ChannelEntry[] =>
   Object.values(state.channels)
     .map((c) => c.channel)
-    .filter((c: ChannelEntry) => c.source.eq(p))
+    .filter((c: ChannelEntry) => c.sourcePubKey.eq(p))
 
 export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
   findChannelsFrom(p, state)
@@ -21,7 +21,9 @@ export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
 export const importance = (p: PublicKey, state: State): BN =>
   findChannelsFrom(p, state)
     .map((c: ChannelEntry) =>
-      sqrtBN(totalChannelBalanceFor(p, state).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination, state)))
+      sqrtBN(
+        totalChannelBalanceFor(p, state).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destinationPubKey, state))
+      )
     )
     .reduce(addBN, new BN('0'))
 
@@ -33,7 +35,7 @@ export const randomWeightedImportance = (p: PublicKey, state: State): BN => {
 export const findChannel = (src: PublicKey, dest: PublicKey, state: State): ChannelEntry =>
   Object.values(state.channels)
     .map((c: ChannelData): ChannelEntry => c.channel)
-    .find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
+    .find((c: ChannelEntry) => c.sourcePubKey.eq(src) && c.destinationPubKey.eq(dest))
 
 export const sendCTMessage = async (
   startNode: PublicKey,
@@ -41,7 +43,7 @@ export const sendCTMessage = async (
   sendMessage: (path: PublicKey[]) => Promise<void>,
   data: PersistedState
 ): Promise<boolean> => {
-  const weight = async (edge: ChannelEntry): Promise<BN> => randomWeightedImportance(edge.destination, data.get())
+  const weight = async (edge: ChannelEntry): Promise<BN> => randomWeightedImportance(edge.destinationPubKey, data.get())
   let path: PublicKey[]
   try {
     path = await findPath(

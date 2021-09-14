@@ -50,8 +50,8 @@ export async function main(update: (State: State) => void, peerId: PeerId) {
   data.log('starting node ...')
   await node.start()
   data.log('node is running')
-  const channels = await node.getChannelsFrom(selfAddr)
-  data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0 })))
+  const channels = await node.getChannelsFrom(selfAddr, true)
+  data.setCTChannels(channels.map((c) => ({ destination: c.destinationPubKey, latestQualityOf: 0 })))
   node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))
 }
 

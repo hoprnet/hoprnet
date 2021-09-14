@@ -40,8 +40,8 @@ function channelStatusToU8a(c: ChannelStatus): Uint8Array {
 
 // TODO, find a better way to do this.
 const components = [
-  PublicKey,
-  PublicKey,
+  Address,
+  Address,
   Balance,
   Hash,
   UINT256,
@@ -52,9 +52,12 @@ const components = [
 ]
 
 export class ChannelEntry {
+  public sourcePubKey?: PublicKey
+  public destinationPubKey?: PublicKey
+
   constructor(
-    public readonly source: PublicKey,
-    public readonly destination: PublicKey,
+    public readonly source: Address,
+    public readonly destination: Address,
     public readonly balance: Balance,
     public readonly commitment: Hash,
     public readonly ticketEpoch: UINT256,
@@ -79,12 +82,11 @@ export class ChannelEntry {
     return new ChannelEntry(...params)
   }
 
-  static async fromSCEvent(event: any, keyFor: (a: Address) => Promise<PublicKey>): Promise<ChannelEntry> {
-    // TODO type
+  static async fromSCEvent(event: any): Promise<ChannelEntry> {
     const { source, destination, newState } = event.args
     return new ChannelEntry(
-      await keyFor(Address.fromString(source)),
-      await keyFor(Address.fromString(destination)),
+      Address.fromString(source),
+      Address.fromString(destination),
       new Balance(new BN(newState.balance.toString())),
       new Hash(stringToU8a(newState.commitment)),
       new UINT256(new BN(newState.ticketEpoch.toString())),
@@ -97,8 +99,8 @@ export class ChannelEntry {
 
   public serialize(): Uint8Array {
     return serializeToU8a([
-      [this.source.serialize(), PublicKey.SIZE],
-      [this.destination.serialize(), PublicKey.SIZE],
+      [this.source.serialize(), Address.SIZE],
+      [this.destination.serialize(), Address.SIZE],
       [this.balance.serialize(), Balance.SIZE],
       [this.commitment.serialize(), Hash.SIZE],
       [this.ticketEpoch.serialize(), UINT256.SIZE],
@@ -126,14 +128,40 @@ export class ChannelEntry {
   }
 
   public getId() {
-    return generateChannelId(this.source.toAddress(), this.destination.toAddress())
+    return generateChannelId(this.source, this.destination)
+  }
+
+  public async findPublicKeys(getPublicKeyOf: (addr: Address) => Promise<PublicKey>): Promise<{
+    sourcePubKey?: PublicKey
+    destinationPubKey?: PublicKey
+  }> {
+    if (!this.sourcePubKey) {
+      try {
+        this.sourcePubKey = await getPublicKeyOf(this.source)
+      } catch {}
+    }
+    if (!this.destinationPubKey) {
+      try {
+        this.destinationPubKey = await getPublicKeyOf(this.destination)
+      } catch {}
+    }
+
+    return {
+      sourcePubKey: this.sourcePubKey,
+      destinationPubKey: this.destinationPubKey
+    }
+  }
+
+  public async hasPublicKeys(getPublicKeyOf: (addr: Address) => Promise<PublicKey>): Promise<boolean> {
+    const { sourcePubKey, destinationPubKey } = await this.findPublicKeys(getPublicKeyOf)
+    return !!sourcePubKey && !!destinationPubKey
   }
 
   public static createMock(): ChannelEntry {
-    const pub = PublicKey.createMock()
+    const addr = PublicKey.createMock().toAddress()
     return new ChannelEntry(
-      pub,
-      pub,
+      addr,
+      addr,
       new Balance(new BN(1)),
       Hash.create(),
       new UINT256(new BN(1)),

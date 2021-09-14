@@ -86,17 +86,17 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
     let toOpen: ChannelsToOpen[] = []
 
     let i = 0
-    let toClose = currentChannels
+    let toClose: PublicKey[] = currentChannels
       .filter((x: ChannelEntry) => {
         return (
-          peers.qualityOf(x.destination.toPeerId()) < 0.1 ||
+          peers.qualityOf(x.destinationPubKey.toPeerId()) < 0.1 ||
           // Lets append channels with less balance than a full hop messageto toClose.
           // NB: This is based on channel balance, not expected balance so may not be
           // aggressive enough.
           x.balance.toBN().lte(PRICE_PER_PACKET.muln(INTERMEDIATE_HOPS))
         )
       })
-      .map((x) => x.destination)
+      .map((x) => x.destinationPubKey)
 
     // First let's open channels to any interesting peers we have
     peers.all().forEach((peerId) => {
@@ -104,7 +104,7 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
         balance.gtn(0) &&
         currentChannels.length + toOpen.length < MAX_AUTO_CHANNELS &&
         !toOpen.find((x) => x[0].eq(PublicKey.fromPeerId(peerId))) &&
-        !currentChannels.find((x) => x.destination.toPeerId().equals(peerId)) &&
+        !currentChannels.find((x) => x.destinationPubKey.toPeerId().equals(peerId)) &&
         peers.qualityOf(peerId) > NETWORK_QUALITY_THRESHOLD
       ) {
         toOpen.push([PublicKey.fromPeerId(peerId), MINIMUM_REASONABLE_CHANNEL_STAKE])
@@ -124,13 +124,13 @@ export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy
         break
       }
       log('evaluating', randomChannel.source.toString())
-      peers.register(randomChannel.source.toPeerId())
+      peers.register(randomChannel.sourcePubKey.toPeerId())
       if (
-        !toOpen.find((x) => x[0].eq(randomChannel.source)) &&
-        !currentChannels.find((x) => x.destination.eq(randomChannel.source)) &&
-        peers.qualityOf(randomChannel.source.toPeerId()) > NETWORK_QUALITY_THRESHOLD
+        !toOpen.find((x) => x[0].eq(randomChannel.sourcePubKey)) &&
+        !currentChannels.find((x) => x.destinationPubKey.eq(randomChannel.sourcePubKey)) &&
+        peers.qualityOf(randomChannel.sourcePubKey.toPeerId()) > NETWORK_QUALITY_THRESHOLD
       ) {
-        toOpen.push([randomChannel.source, MINIMUM_REASONABLE_CHANNEL_STAKE])
+        toOpen.push([randomChannel.sourcePubKey, MINIMUM_REASONABLE_CHANNEL_STAKE])
         balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
       }
     }

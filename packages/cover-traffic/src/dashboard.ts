@@ -67,7 +67,7 @@ function setupDashboard(selfPub: PublicKey) {
         findChannelsFrom(node.pub, _lastState).forEach((c, i) => {
           data.push([
             'ch.' + i,
-            c.destination.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status
+            c.destinationPubKey.toPeerId().toB58String() + ' ' + c.balance.toFormattedString() + ' - ' + c.status
           ])
         })
         inspect.setData({ headers: ['', ''], data })

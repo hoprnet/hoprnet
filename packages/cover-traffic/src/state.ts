@@ -141,7 +141,7 @@ export class PersistedState {
 
   findChannelsFrom(p: PublicKey): ChannelEntry[] {
     return Object.values(this.get().channels)
-      .filter((c: ChannelData) => c.channel.source.eq(p))
+      .filter((c: ChannelData) => c.channel.sourcePubKey.eq(p))
       .map((c) => c.channel)
   }
 

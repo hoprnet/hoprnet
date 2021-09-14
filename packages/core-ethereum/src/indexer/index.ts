@@ -252,13 +252,17 @@ class Indexer extends EventEmitter {
 
     for (const event of confirmedEvents) {
       const eventName = event.event as EventNames
-      if (eventName === ANNOUNCEMENT) {
-        await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
-      } else if (eventName === 'ChannelUpdated') {
-        await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
-      } else {
-        log('skipping event: ', eventName, ' as it isnt recognized')
-        //throw new Error('bad event name: ' + eventName)
+
+      try {
+        if (eventName === ANNOUNCEMENT) {
+          await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
+        } else if (eventName === 'ChannelUpdated') {
+          await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
+        } else {
+          log('skipping event: ', eventName, ' as it isnt recognized')
+        }
+      } catch (err) {
+        log('error processing event:', event, err)
       }
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
@@ -302,9 +306,9 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
-    let channel
+    let channel: ChannelEntry
     try {
-      channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
+      channel = await ChannelEntry.fromSCEvent(event)
     } catch (e) {
       log('could not process channel event, skipping it', e)
       return
@@ -314,10 +318,10 @@ class Indexer extends EventEmitter {
     await this.db.updateChannel(channel.getId(), channel)
     this.emit('channel-update', channel)
 
-    if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
+    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
-      if (channel.destination.toAddress().eq(this.address)) {
+      if (channel.destination.eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           await this.onOwnUnsetCommitment(channel)
@@ -329,13 +333,13 @@ class Indexer extends EventEmitter {
   }
 
   private onOwnUnsetCommitment(channel: ChannelEntry) {
-    if (!channel.destination.toAddress().eq(this.address)) {
+    if (!channel.destination.eq(this.address)) {
       throw new Error('shouldnt be called unless we are the destination')
     }
     log(`Found channel ${chalk.yellow(channel.getId().toHex())} to us with unset commitment. Setting commitment`)
 
     return new Commitment(
-      (comm: Hash) => this.chain.setCommitment(channel.source.toAddress(), comm),
+      (comm: Hash) => this.chain.setCommitment(channel.source, comm),
       async () => (await this.getChannel(channel.getId())).commitment,
       this.db,
       channel.getId(),
@@ -363,26 +367,6 @@ class Indexer extends EventEmitter {
     return this.db.getAccount(address)
   }
 
-  public async getChannel(channelId: Hash) {
-    return this.db.getChannel(channelId)
-  }
-
-  public async getChannels(filter?: (channel: ChannelEntry) => boolean) {
-    return this.db.getChannels(filter)
-  }
-
-  public async getChannelsFrom(address: Address) {
-    return this.db.getChannels((channel) => {
-      return address.eq(channel.source.toAddress())
-    })
-  }
-
-  public async getChannelsTo(address: Address) {
-    return this.db.getChannels((channel) => {
-      return address.eq(channel.destination.toAddress())
-    })
-  }
-
   public async getPublicKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.db.getAccount(address)
     if (account) {
@@ -391,8 +375,43 @@ class Indexer extends EventEmitter {
     throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
   }
 
+  public async getChannel(channelId: Hash) {
+    return this.db.getChannel(channelId)
+  }
+
+  public async getChannels(filter?: (channel: ChannelEntry) => boolean, onlyWithPubKeys?: boolean) {
+    const allChannels = await this.db.getChannels(filter)
+    if (!onlyWithPubKeys) return allChannels
+
+    return Promise.all(
+      allChannels.map(async (channel) => ({
+        channel,
+        hasPublicKeys: await channel.hasPublicKeys(this.getPublicKeyOf)
+      }))
+    ).then((results) => {
+      return results.reduce<ChannelEntry[]>((channels, { channel, hasPublicKeys }) => {
+        if (hasPublicKeys) channels.push(channel)
+        return channels
+      }, [])
+    })
+  }
+
+  public async getChannelsFrom(address: Address, onlyWithPubKeys?: boolean) {
+    return this.getChannels((channel: ChannelEntry) => {
+      return address.eq(channel.source)
+    }, onlyWithPubKeys)
+  }
+
+  public async getChannelsTo(address: Address, onlyWithPubKeys?: boolean) {
+    return this.getChannels((channel: ChannelEntry) => {
+      return address.eq(channel.destination)
+    }, onlyWithPubKeys)
+  }
+
   public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
-    return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
+    return (await this.db.getAccounts((account: AccountEntry) => !!account.multiAddr)).map(
+      (account: AccountEntry) => account.multiAddr
+    )
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
@@ -405,15 +424,15 @@ class Indexer extends EventEmitter {
   }
 
   /**
-   * Returns a random open channel.
+   * Returns a random open channel which both parties have announced.
    * NOTE: channels with status 'PENDING_TO_CLOSE' are not included
    * @returns an open channel
    */
   public async getRandomOpenChannel(): Promise<ChannelEntry> {
-    const channels = await this.getChannels((channel) => channel.status === ChannelStatus.Open)
+    const channels = await this.getChannels((channel: ChannelEntry) => channel.status === ChannelStatus.Open, true)
 
     if (channels.length === 0) {
-      log('no open channels exist in indexer')
+      log('no open channels with announced parties exist in indexer')
       return undefined
     }
 
@@ -421,14 +440,14 @@ class Indexer extends EventEmitter {
   }
 
   /**
-   * Returns peer's open channels.
+   * Returns peer's open channels which both parties have announced.
    * NOTE: channels with status 'PENDING_TO_CLOSE' are not included
    * @param source peer
    * @returns peer's open channels
    */
   public async getOpenChannelsFrom(source: PublicKey): Promise<ChannelEntry[]> {
-    return await this.getChannelsFrom(source.toAddress()).then((channels) =>
-      channels.filter((channel) => channel.status === ChannelStatus.Open)
+    return this.getChannelsFrom(source.toAddress(), true).then((channels) =>
+      channels.filter((channel: ChannelEntry) => channel.status === ChannelStatus.Open)
     )
   }
 }

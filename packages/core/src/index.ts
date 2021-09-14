@@ -361,7 +361,7 @@ class Hopr extends EventEmitter {
 
     const currentChannels = await this.getAllChannels()
     for (const channel of currentChannels) {
-      this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
+      this.networkPeers.register(channel.destinationPubKey.toPeerId()) // Make sure current channels are 'interesting'
     }
     const balance = await this.getBalance()
     const chain = await this.startedPaymentChannels()
@@ -376,7 +376,7 @@ class Hopr extends EventEmitter {
     for (let channel of currentChannels) {
       if (channel.status == ChannelStatus.PendingToClose) {
         // attempt to finalize closure
-        closeChannels.push(channel.destination)
+        closeChannels.push(channel.destinationPubKey)
       }
     }
 
@@ -405,7 +405,7 @@ class Hopr extends EventEmitter {
   }
 
   private async getAllChannels(): Promise<ChannelEntry[]> {
-    return (await this.startedPaymentChannels()).getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress())
+    return (await this.startedPaymentChannels()).getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress(), true)
   }
 
   /**
@@ -857,14 +857,14 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
+  public async getChannelsFrom(addr: Address, onlyWithPubKeys: boolean = false): Promise<ChannelEntry[]> {
     const ethereum = await this.startedPaymentChannels()
-    return await ethereum.getChannelsFrom(addr)
+    return await ethereum.getChannelsFrom(addr, onlyWithPubKeys)
   }
 
-  public async getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
+  public async getChannelsTo(addr: Address, onlyWithPubKeys: boolean = false): Promise<ChannelEntry[]> {
     const ethereum = await this.startedPaymentChannels()
-    return await ethereum.getChannelsTo(addr)
+    return await ethereum.getChannelsTo(addr, onlyWithPubKeys)
   }
 
   public async getPublicKeyOf(addr: Address): Promise<PublicKey> {

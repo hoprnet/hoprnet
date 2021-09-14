@@ -50,8 +50,8 @@ const createMockTicket = ({
 const mockChannelEntry = (isChannelOpen: boolean, balance: Balance, ticketEpoch: UINT256, ticketIndex: UINT256) =>
   Promise.resolve(
     new ChannelEntry(
-      TARGET_PUBKEY,
-      TARGET_PUBKEY,
+      TARGET_PUBKEY.toAddress(),
+      TARGET_PUBKEY.toAddress(),
       balance,
       null,
       ticketEpoch,

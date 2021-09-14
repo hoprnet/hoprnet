@@ -1,8 +1,8 @@
 import { stringToU8a } from '../u8a'
-import { ChannelEntry, PublicKey } from '.'
+import { ChannelEntry, PublicKey, Address } from '.'
 import assert from 'assert'
 
-const EMPTY_ADDRESS = new PublicKey(new Uint8Array({ length: PublicKey.SIZE }))
+const EMPTY_ADDRESS = new Address(new Uint8Array({ length: Address.SIZE }))
 
 export const PARTY_A = PublicKey.fromPrivKey(
   stringToU8a('0x0f1b0de97ef1e907d8152bdfdaa39b4bb5879d5d48d152a84421bd2f9ccb3877')

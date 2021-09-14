@@ -11,8 +11,8 @@ export type Path = PublicKey[]
 type ChannelPath = { weight: BN; path: ChannelEntry[] }
 
 const sum = (a: BN, b: BN) => a.add(b)
-const pathFrom = (c: ChannelPath): Path => c.path.map((ce) => ce.destination) // Doesn't include ourself [0]
-const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.eq(c.destination))
+const pathFrom = (c: ChannelPath): Path => c.path.map((ce) => ce.destinationPubKey) // Doesn't include ourself [0]
+const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.eq(c.destinationPubKey))
 const rand = () => Math.random() // TODO - swap for something crypto safe
 const debugPath = (p: ChannelPath) =>
   pathFrom(p)
@@ -65,11 +65,11 @@ export async function findPath(
       return pathFrom(currentPath)
     }
 
-    const lastPeer = currentPath.path[currentPath.path.length - 1].destination
+    const lastPeer = currentPath.path[currentPath.path.length - 1].destinationPubKey
     const newChannels = (await getOpenChannelsFromPeer(lastPeer)).filter((c: ChannelEntry) => {
       return (
-        !destination.eq(c.destination) &&
-        networkQualityOf(c.destination) > NETWORK_QUALITY_THRESHOLD &&
+        !destination.eq(c.destinationPubKey) &&
+        networkQualityOf(c.destinationPubKey) > NETWORK_QUALITY_THRESHOLD &&
         filterCycles(c, currentPath) &&
         !deadEnds.has(c.destination.toHex())
       )
