@@ -20,9 +20,12 @@
       },
       "deprecated": {
         "type": "boolean"
+      },
+      "docker_image": {
+        "type": "string"
       }
     },
-    "required": ["id", "git_ref", "environment_id", "deprecated"],
+    "required": ["id", "git_ref", "environment_id", "deprecated", "docker_image"],
     "additionalProperties": false
   }
 }

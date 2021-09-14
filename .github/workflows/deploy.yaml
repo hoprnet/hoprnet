@@ -372,7 +372,8 @@ jobs:
           BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
           RPC_NETWORK: ${{ steps.set-rpc-network.outputs.network }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-
+          QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
+          
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
         run: |
