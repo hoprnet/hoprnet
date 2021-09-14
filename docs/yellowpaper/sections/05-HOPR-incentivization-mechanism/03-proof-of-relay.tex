@@ -29,7 +29,20 @@ The first key, $s_i^{(0)}$, will be used as the node's \textit{own key share} an
         \item \textbf{Expand} This step takes the output of the previous one, $s_i$, as a seed and creates output key material $s_i^{(0)},s_i^{(1)}$ which is expanded from hashes of $s_i$ and an optional info message (salt). The process occurs as follows:
         $$HKDF.expand(h_b, |h_b|,s_i, |s_i|, hashKey)$$
     \end{itemize}
-    where $||$ is concatenation and $*$ is scalar multiplication on the curve. $h_b$ is the BLAKE2s 256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudorandom key used as a seed and $|s_i|$ is its length. $hashKey$ is an identifier used to create a``virtual" hash function for each purpose, e.g., one for the PRG, one for PRP, etc. and also for the proof-of-relay scheme. If the result of HKDF does not lead to a field element, $hashKey$ is padded until it does.
+    where $||$ is concatenation and $*$ is scalar multiplication on the curve. $h_b$ is the BLAKE2s 256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudorandom key used as a seed and $|s_i|$ is its length. $hashKey$ is an identifier used to create a``virtual" hash function for each purpose, e.g., one for the PRG, one for PRP, etc. and also for the proof-of-relay scheme. We use the same hash function under the hood but we "virtually" create 
+$$h_i: x -> hash(hashKey_i || x)$$ where: 
+\begin{center}
+\begin{tabular}{c|c|} 
+      \textbf{hashKey} & \textbf{Value}\\
+       Blinding& $"HASH\_KEY\_BLINDING"$ \\
+      \hline
+      PRG & "HASH\_KEY\_PRG" \\
+      PRP & "HASH\_KEY\_PRP" \\
+      Packet tag & "HASH\_KEY\_PACKET\_TAG" \\
+    \end{tabular}
+\end{center}
+    
+If the result of HKDF does not lead to a field element, $hashKey$ is padded until it does. 
     
 $A$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
     The hint value, $H$, is computed as 

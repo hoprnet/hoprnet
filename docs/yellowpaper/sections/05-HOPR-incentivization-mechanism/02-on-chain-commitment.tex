@@ -25,18 +25,14 @@ HOPR uses a computationally hiding and binding commitment scheme:
 
 \subsubsection{Commitment phase}
 
-Once a node is the destination of a HOPR unidirectional channel, it derives a
-master key $comm_0$ from its private key and uses it to create an iterated
+Once a node is the destination of a HOPR unidirectional channel, it generates a master key $comm_0$ randomly and uses it to create an iterated
 commitment $comm_i$ such that for every $i \in \mathbb{N}_0$ and $i > 0$ it
 holds that $$ \mathsf{Open}(comm_{i}, comm_{i-1}) = \top,$$ which means opening
 $comm_{i}$ with $comm_{i-1}$ holds true.
+
 The iterated commitment is computed as $$comm_n = h^n(comm_0),$$ where $h$ is a
 pre-image resistant hash function (we use the keccak256 hash function, which is also used
-in Ethereum) and $comm_0$ is derived as $$ comm_0 = \mathsf{h}(privKey,chainId,
-contractAddr, channelId, channelEpoch)$$
-This will be implemented in the future after further research
-determines whether such a design leaks information about the
-private key or not. 
+in Ethereum).
 The master key should be pseudorandom, such that
 all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \le
 n$ are indistinguishable for the ticket issuer from random numbers of the same

@@ -79,5 +79,11 @@ Trust is represented by a triplet (trust, distrust, uncertainty) where:
         of the trustor’s negative experience.
 
     \item Uncertainty = 1 - trust - distrust.
+ 
+ \subsubsection*{Commitment derivation}
+  In the future $comm_0$ will be derived from the private key of the node as $$ comm_0 = \mathsf{h}(privKey,chainId,
+contractAddr, channelId, channelEpoch)$$
+And there will be further research to determine whether such a design leaks information about the
+private key or not. 
 
 \end{itemize}

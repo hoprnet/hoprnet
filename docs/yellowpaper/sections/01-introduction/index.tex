@@ -64,7 +64,11 @@ To provide these features, the HOPR protocol builds on top of the Sphinx packet 
 
 \subsubsection{Threat Model}
 
-Although we assume that nodes in the HOPR network can communicate reliably, the network must still be protected from malicious actors and node failures. We assume a threat model with byzantine nodes with the ability to either observe all network traffic and launch network attacks or to inject, drop, or delay messages.
+Although we assume that nodes in the HOPR network can communicate reliably, the network must still be protected from malicious actors and node failures. We assume a threat model with byzantine nodes with the ability to either observe all network traffic and launch network attacks or to inject, drop, or delay messages as follows:
+
+\paragraph{A global passive adversary (GPA)} is able to observe all network traffic between users and providers and between mix servers. This adversary is able to observe the entire network infrastructure, launch network attacks such as BGP rerouting  or conduct indirect observations such as load monitoring and off-path attacks. Thus, the GPA is an abstraction that represents many different classes of adversaries able to observe some or all information between network nodes.
+\paragraph{Active adversary:}The adversary has the ability to observe all of the internal state of some corrupted or malicious mix relays. The adversary may inject, drop, or delay messages. She also has access to, and operates, using the secrets of those compromised parties. Furthermore, such corrupted nodes may deviate from the protocol, or inject malformed messages. A variation of this ability is where the mix relay is also the provider node meaning that the adversary additionally knows the mapping between clients and their mailboxes. We say that the provider is corrupt, but is restricted to being honest but curious.
+
 
 In particular, to provide reliable privacy and data transmission the HOPR network needs to be resistant to both Sybil and eclipse attacks:
 
