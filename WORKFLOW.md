@@ -9,8 +9,8 @@ Sprints are finite timeframes which have defined task priorities which the
 team tries to adhere to as much as possible. Outside of emergency requests
 the priorities stay the same within a sprint's timeframe.
 
-*Length:* 2 weeks
-*Start:*  first day of the week, mostly Monday
+_Length:_ 2 weeks
+_Start:_ first day of the week, mostly Monday
 
 The start and end of a sprint is defined by a set of activities in which
 mostly the whole team is involved in:
@@ -31,15 +31,15 @@ tasks and PRs on Github. This includes but is not limited to:
 - updating and/or closing PRs to ensure only in-progress PRs are active
 - moving tasks on task boards to correct columns
 
-*Who:*  all team members individually
-*When:* first day of the sprint
+_Who:_ all team members individually
+_When:_ first day of the sprint
 
 ## Retrospective
 
 TODO
 
-*Who:*  all team members within a meeting
-*When:* first day of the sprint
+_Who:_ all team members within a meeting
+_When:_ first day of the sprint
 
 ## Prioritization
 
@@ -62,8 +62,8 @@ directly.
 The `Done` column contains epics which were accepted. The column is cleaned up
 as part of the `Task Grooming` phase.
 
-*Who:*  3 team members which were selected by consensus, currently @nionis @tolbrino @SCBuergel
-*When*: first day of a sprint
+_Who:_ 3 team members which were selected by consensus, currently @nionis @tolbrino @SCBuergel
+_When_: first day of a sprint
 
 ## Task Planning
 
@@ -73,8 +73,8 @@ have clear definitions of work and done. Each sprint has its own taskboard, e.g.
 [Sprint 36-37](https://github.com/orgs/hoprnet/projects/11). Ideally each team
 member has only one task assigned which is `in progress`.
 
-*Who:*  all team members within a meeting
-*When:* first day of the sprint
+_Who:_ all team members within a meeting
+_When:_ first day of the sprint
 
 ## Principles
 
