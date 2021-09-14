@@ -29,7 +29,7 @@
     "git_ref": "refs/heads/release/wildhorn",
     "environment_id": "wildhorn-matic-polygon",
     "deprecated": false,
-    "docker_image": "gcr.io/hoprassociation/hoprd:wildhorn"
+    "docker_image": "gcr.io/hoprassociation/hoprd:latest-wildhorn"
   },
   {
     "id": "constantine",
@@ -38,6 +38,6 @@
     "git_ref": "refs/heads/release/constantine",
     "environment_id": "constantine-xdai",
     "deprecated": true,
-    "docker_image": "gcr.io/hoprassociation/hoprd:constantine"
+    "docker_image": "gcr.io/hoprassociation/hoprd:latest-constantine"
   }
 ]
