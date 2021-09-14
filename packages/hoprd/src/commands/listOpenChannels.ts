@@ -41,6 +41,8 @@ export default class ListOpenChannels extends AbstractCommand {
       }
       // find counterpartys' peerIds
       for (const channel of channelsFrom) {
+        await channel.findPublicKeys(this.node.getPublicKeyOf.bind(this.node))
+
         // prettier-ignore
         log(`
 Outgoing Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
@@ -58,6 +60,8 @@ Balance:                ${styleValue(channel.balance.toFormattedString(), 'numbe
       }
       // find counterpartys' peerIds
       for (const channel of channelsTo) {
+        await channel.findPublicKeys(this.node.getPublicKeyOf.bind(this.node))
+
         // prettier-ignore
         log(`
 Incoming Channel:       ${styleValue(channel.getId().toHex(), 'hash')}
