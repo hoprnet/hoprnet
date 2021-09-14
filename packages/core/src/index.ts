@@ -236,6 +236,8 @@ class Hopr extends EventEmitter {
 
     recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
 
+    initialNodes.forEach(this.onPeerAnnouncement.bind(this))
+
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
       this.networkPeers.register(conn.remotePeer)

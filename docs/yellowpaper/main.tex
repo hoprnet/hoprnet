@@ -1,53 +1,10 @@
-\documentclass{article}
-
-\usepackage{authblk}
-\usepackage[utf8]{inputenc}
-\usepackage{xcolor}
-\usepackage[colorlinks = true,
-            linkcolor = blue,
-            urlcolor  = blue,
-            citecolor = blue,
-            anchorcolor = blue]{hyperref}
-\usepackage{array}
-\usepackage{makecell}
-\usepackage{multirow}
-\usepackage{amssymb}
-\usepackage{amsfonts}
-\usepackage{amsmath}
-\usepackage{amsthm}
-\usepackage{graphicx}
-\usepackage{float}
-\usepackage[ruled,vlined]{algorithm2e}
-\usepackage{pgf}
-\usepackage{comment}
-\usepackage{setspace,calc}
-\usepackage{tikz}
-
-
-
-\usetikzlibrary{snakes,shapes,arrows,topaths}
-
-%\usepackage{fancyhdr}
-%\renewcommand{\footrulewidth}{1pt}
-%\pagestyle{fancy}
-%\fancyhf{}
-
-\renewcommand{\today}{\ifcase \month \or January\or February\or March\or %
-April\or May \or June\or July\or August\or September\or October\or November\or %
-December\fi \ \number \year}
-
-\newcommand{\MYhref}[3][blue]{\href{#2}{\color{#1}{#3}}}%
-
-\newtheorem{defnsub}{Definition}[subsection]
+\documentclass[11pt,a4paper]{article}
+\usepackage{hopr}
 
 \title{HOPR - a Decentralized and Metadata-Private Messaging Protocol with Incentives}
-\author{Amira Bouguera, Robert Kiel, Dr. Sebastian B\"urgel}
+\author{Amira Bouguera, Robert Kiel, Dr. Sebastian B\"urgel, Qianchen Yu}
 \date{\today, v2.0}
 
 \begin{document}
-\sloppy
-\bibliographystyle{apalike}
-\maketitle
 \input{sections/index}
-
 \end{document}

@@ -772,7 +772,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | `Event`<``"ChannelUpdate"``\> |
+| `event` | `Event`<``"ChannelUpdated"``\> |
 
 #### Returns
 

@@ -6,6 +6,7 @@
 *.bbl
 *.blg
 *.synctex.gz
+*.synctex(busy)
 *.xdv
 
 # Built PDF files
@@ -14,3 +15,5 @@
 
 # temp latex files
 **/__latexindent_temp.tex
+*.bcf
+*.xml

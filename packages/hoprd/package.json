@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.77.0-next.0",
+  "version": "1.77.0-next.11",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -10,8 +10,7 @@
   "bin": "lib/index.js",
   "files": [
     "lib",
-    "hopr-admin/.next",
-    "hoprd-default.sh"
+    "hopr-admin/.next/**"
   ],
   "scripts": {
     "clean": "rimraf ./lib",

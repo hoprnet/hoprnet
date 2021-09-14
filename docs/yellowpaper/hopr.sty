@@ -1,0 +1,76 @@
+\usepackage{authblk}
+\usepackage[utf8]{inputenc}
+
+%%% layout
+\usepackage{geometry}
+\geometry{a4paper, margin=1.5in}
+
+%%% define colors 
+\usepackage{xcolor}
+\definecolor{hopr-blue}{HTML}{0000b4}
+
+%%% bibliograph and reference
+\usepackage{hyperref}
+\hypersetup{colorlinks = true,
+            linkcolor = hopr-blue,
+            urlcolor  = hopr-blue,
+            citecolor = hopr-blue,
+            anchorcolor = hopr-blue
+}
+\bibliographystyle{apalike}
+% overfull box due to citation
+% https://tex.stackexchange.com/questions/2773/how-do-i-make-latex-push-long-citations-to-a-new-line
+\usepackage{breakcites}
+% underfull box in bibliography
+% https://tex.stackexchange.com/questions/10924/underfull-hbox-in-bibliography/10928#10928
+\usepackage{etoolbox}
+\apptocmd{\thebibliography}{\raggedright}{}{}
+
+%%% graphs and tables
+\usepackage{array}
+\usepackage{makecell}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{pgf}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,topaths}
+
+%%% math/symbol/algorithm
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage[ruled,vlined]{algorithm2e}
+
+%%% comments
+\usepackage{comment}
+
+%%% computation
+\usepackage{setspace,calc}
+
+
+%\usepackage{fancyhdr}
+%\renewcommand{\footrulewidth}{1pt}
+%\pagestyle{fancy}
+%\fancyhf{}
+
+\renewcommand{\today}{\ifcase \month \or January\or February\or March\or %
+April\or May \or June\or July\or August\or September\or October\or November\or %
+December\fi \ \number \year}
+
+\newcommand{\MYhref}[3][blue]{\href{#2}{\color{#1}{#3}}}%
+
+\newtheorem{defnsub}{Definition}[subsection]
+
+%%% formatting document layout
+% Beginning of the document
+\AtBeginDocument{
+\sloppy
+\maketitle
+} 
+% end \AtBeginDocument
+%%%
+
+\setlength{\parindent}{0em} % no indentation in paragraph
+\setlength{\parskip}{1em}   % spacing between paragraphs
