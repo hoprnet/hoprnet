@@ -332,7 +332,7 @@ jobs:
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
       
-      - name: Run start script
+      - name: Run deploy script
         if: ${{ !env.ACT }}
         run: |
           # get latest version
