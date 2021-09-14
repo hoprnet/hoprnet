@@ -1,9 +1,80 @@
-# Development workflow
+# Development Workflow
 
-## Introduction
+The HOPR Association core team members have agreed on the following planning
+an development processes to streamline the implementation of the HOPR protocol.
 
-The HOPR Association team members have agreed on the following development
-workflow to streamline the process we use to implement the HOPR protocol.
+## Sprints
+
+Sprints are finite timeframes which have defined task priorities which the
+team tries to adhere to as much as possible. Outside of emergency requests
+the priorities stay the same within a sprint's timeframe.
+
+*Length:* 2 weeks
+*Start:*  first day of the week, mostly Monday
+
+The start and end of a sprint is defined by a set of activities in which
+mostly the whole team is involved in:
+
+1. Task Grooming
+2. Retrospective
+3. Prioritization
+4. Planning
+
+## Task Grooming
+
+On the last day of a sprint all team members shall spend time cleaning up
+tasks and PRs on Github. This includes but is not limited to:
+
+- responding to bug reports
+- updating progress on tasks
+- closing tasks which are actually done
+- updating and/or closing PRs to ensure only in-progress PRs are active
+- moving tasks on task boards to correct columns
+
+*Who:*  all team members individually
+*When:* first day of the sprint
+
+## Retrospective
+
+TODO
+
+*Who:*  all team members within a meeting
+*When:* first day of the sprint
+
+## Prioritization
+
+The target of prioritization are issues marked as
+[epic](https://github.com/hoprnet/hoprnet/issues?q=is%3Aissue+is%3Aopen+label%3Aepic).
+Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/projects/9) which only contains epic issues.
+
+The `Icebox` contains epics which require further specification or are specifically paused.
+The `Backlog` contains epics which are well specified but haven't been given any
+priority to be worked on during the current sprint.
+The `Next` column contains epics which are given priority to be worked on during
+the current sprint. The priorities are descending from top to bottom. Priorites
+with hard deadlines must be marked with the label
+[deadline](https://github.com/hoprnet/hoprnet/labels/deadline) with more
+information on the deadline being available within the issue's description.
+The `Acceptance` column contains epics which were completed but require
+acceptance testing from an additional team member or outside person. When moving
+issues into `Acceptance` the person who's input is required must be pinged
+directly.
+The `Done` column contains epics which were accepted. The column is cleaned up
+as part of the `Task Grooming` phase.
+
+*Who:*  3 team members which were selected by consensus, currently @nionis @tolbrino @SCBuergel
+*When*: first day of a sprint
+
+## Task Planning
+
+The task planning follows the `Prioritization` and takes the priorities into
+account as much as possible. Epic issues are further refined into tasks which
+have clear definitions of work and done. Each sprint has its own taskboard, e.g.
+[Sprint 36-37](https://github.com/orgs/hoprnet/projects/11). Ideally each team
+member has only one task assigned which is `in progress`.
+
+*Who:*  all team members within a meeting
+*When:* first day of the sprint
 
 ## Principles
 
