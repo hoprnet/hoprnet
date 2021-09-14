@@ -35,11 +35,10 @@ for row in $(cat packages/hoprd/releases.json | ./node_modules/.bin/strip-json-c
   declare ENVIRONMENT_ID=$(_jq "${row}" ".environment_id")
   declare VERSION_MAJOR=$(_jq "${row}" ".version_major")
   declare VERSION_MINOR=$(_jq "${row}" ".version_minor")
+  declare DOCKER_IMAGE=$(_jq "${row}" ".docker_image")
 
-  echo "Matching release id: ${RELEASE_ID}"
-  
   if [ "${DEPRECATED}" == "true" ]; then
-    echo "deprecated, skipping"
+    echo "${RELEASE_ID} deprecated, skipping"
     continue
   fi
 
@@ -49,13 +48,17 @@ for row in $(cat packages/hoprd/releases.json | ./node_modules/.bin/strip-json-c
   else
     VERSION_MAJ_MIN="unversioned"
   fi
-
-  echo "Deploying release ${RELEASE_ID} ${VERSION_MAJ_MIN} to environment ${ENVIRONMENT_ID}"
   declare TESTNET_NAME="$RELEASE_ID-$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
   declare TESTNET_SIZE=3
 
-  echo "Testnet name: ${TESTNET_NAME}"
+  echo "Deploying release ${RELEASE_ID}"
+  echo " version: ${VERSION_MAJ_MIN}" 
+  echo " environment ${ENVIRONMENT_ID}"
+  echo " docker image: ${DOCKER_IMAGE}"
+  echo " testnet name: ${TESTNET_NAME}"
+
+  echo "Cleaning up testnet"
   cleanup_instance "${TESTNET_NAME}"
-  echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes and image hoprd:$RELEASE, environment id: $ENVIRONMENT_ID"
-  start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" $ENVIRONMENT_ID
+  echo "Starting testnet"
+  start_testnet $TESTNET_NAME $TESTNET_SIZE $DOCKER_IMAGE $ENVIRONMENT_ID
 done
