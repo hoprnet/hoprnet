@@ -32,10 +32,7 @@ $comm_{i}$ with $comm_{i-1}$ holds true.
 
 The iterated commitment is computed as $$comm_n = h^n(comm_0),$$ where $h$ is a
 pre-image resistant hash function (we use the keccak256 hash function, which is also used
-in Ethereum). In the future $comm_0$ will be derived from the private key of the node as $$ comm_0 = \mathsf{h}(privKey,chainId,
-contractAddr, channelId, channelEpoch)$$
-And there will be further research to determine whether such a design leaks information about the
-private key or not. 
+in Ethereum).
 The master key should be pseudorandom, such that
 all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \le
 n$ are indistinguishable for the ticket issuer from random numbers of the same
