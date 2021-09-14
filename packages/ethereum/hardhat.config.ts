@@ -26,7 +26,7 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
   hre.environment = ENVIRONMENT_ID
 })
 
-const PROTOCOL_CONFIG = require('../hoprd/protocol-config.json')
+const PROTOCOL_CONFIG = require('../core/protocol-config.json')
 
 function networkToHardhatNetwork(input: any): any {
   let res: any = {

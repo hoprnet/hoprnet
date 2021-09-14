@@ -1,7 +1,7 @@
 import { PersistedState } from './state'
 import type { PeerData, State } from './state'
 import type { HoprOptions } from '@hoprnet/hopr-core'
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { resolveEnvironment } from '@hoprnet/hopr-core'
 import { CoverTrafficStrategy } from './strategy'
 import { ChannelEntry, privKeyToPeerId, PublicKey } from '@hoprnet/hopr-utils'
 import type PeerId from 'peer-id'
@@ -13,16 +13,6 @@ const peerId = privKeyToPeerId(priv)
 function stopGracefully(signal: number) {
   console.log(`Process exiting with signal ${signal}`)
   process.exit()
-}
-
-const options: HoprOptions = {
-  //provider: 'wss://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
-  // provider: 'https://eth-goerli.gateway.pokt.network/v1/6021a2b6928ff9002e6c7f2f',
-  provider: 'wss://goerli.infura.io/ws/v3/51d4d972f30c4d92b61f2b3898fccaf6',
-  createDbIfNotExist: true,
-  password: '',
-  forceCreateDB: true,
-  announce: false
 }
 
 export async function main(update: (State: State) => void, peerId: PeerId) {
@@ -39,6 +29,15 @@ export async function main(update: (State: State) => void, peerId: PeerId) {
   }
 
   data.log('creating a node...')
+
+  const options: HoprOptions = {
+    createDbIfNotExist: true,
+    password: '',
+    forceCreateDB: true,
+    announce: false,
+    environment: resolveEnvironment('master-goerli')
+  }
+
   const node = new Hopr(peerId, options)
   data.log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)

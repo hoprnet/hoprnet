@@ -25,6 +25,7 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "files": [
+    "protocol-config.json",
     "lib",
     "!**/*.spec.ts",
     "!**/*.spec.d.ts",

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { decode } from 'rlp'
@@ -12,17 +12,13 @@ import setupAPI from './api'
 import { getIdentity } from './identity'
 import path from 'path'
 import { passwordStrength } from 'check-password-strength'
-import type { ProtocolConfig } from '@hoprnet/hopr-core'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
-
-const pkg = require('../package.json')
 
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
     array: true,
-    describe: 'Environment id, one of the ids defined in protocol-config.json',
-    default: pkg.hopr.environment_id
+    describe: 'Environment id, one of the ids defined in protocol-config.json'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -137,9 +133,6 @@ const argv = yargs(process.argv.slice(2))
     describe: 'no remote authentication for easier testing',
     default: false
   })
-  .coerce({
-    environment: (env) => env[env.length - 1]
-  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -167,7 +160,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     hosts: parseHosts(),
     announceLocalAddresses: argv.testAnnounceLocalAddresses,
     preferLocalAddresses: argv.testPreferLocalAddresses,
-    environment: undefined
+    environment: resolveEnvironment(argv.environment[argv.environment.length - 1] as string)
   }
 
   if (argv.password !== undefined) {
@@ -177,31 +170,6 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   if (argv.data && argv.data !== '') {
     options.dbPath = argv.data
   }
-
-  const protocolConfig = require('../protocol-config.json') as ProtocolConfig
-  for (const environment of protocolConfig.environments) {
-    if (environment.id === argv.environment) {
-      for (const network of protocolConfig.networks) {
-        if (network.id === environment.network_id) {
-          options.environment = {
-            id: environment.id,
-            network,
-            channel_contract_deploy_block: environment.channel_contract_deploy_block,
-            token_contract_address: environment.token_contract_address,
-            channels_contract_address: environment.channels_contract_address
-          }
-        }
-      }
-    }
-  }
-
-  if (!options.environment) {
-    const supportedEnvs: string = protocolConfig.environments.map((env) => env.id).join(', ')
-    throw new Error(
-      `failed to find environment with id '${argv.environment}' in the supported protocol configuration, supported environments: ${supportedEnvs}`
-    )
-  }
-
   return options
 }
 
@@ -256,6 +224,12 @@ async function main() {
     if (length < 8) {
       throw new Error(`API token must be at least 8 characters long`)
     }
+  }
+
+  if (!argv.environment) {
+    throw new Error(
+      `please specify --environment <environment id>, support environments: \n` + supportedEnvironments().join('\n')
+    )
   }
 
   if (argv.admin) {
