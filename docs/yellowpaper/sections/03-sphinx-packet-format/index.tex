@@ -24,6 +24,7 @@ HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route d
     \caption{Sphinx packet format}
 \end{figure}
 
+\subsection{Construction}
 
 The following explains the steps a Sphinx packet goes through before arriving at its final destination. We start with key derivation to extract shared keys for the relay nodes chosen by the sender. These shared keys will be used to unblind the routing information and find the public key of the next relay node. 
 
@@ -42,7 +43,7 @@ Each node $i$ has a private key $x_{i}\in \mathbb{Z}^*_q$ and a public key $y_{i
 $\alpha_i$ is the group elements which, when combined with the nodes’ public keys, allow a shared key to be computed for each via Diffie-Hellman (DH) key exchange. This ensures that each node in the user-chosen route can forward the packet to the next, and only the receiving mix node can decrypt it.
 $\varphi_i$ are the DH shared secrets, $b_i$ are the blinding factors.
 
-\subsection{Key derivation}
+\subsubsection{Key derivation}
 The sender $A$ picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new keys for every packet.
 
 $A$ randomly picks a path consisting of intermediate nodes $B$, $C$, $D$, and the packet's final destination, $Z$.
@@ -62,7 +63,7 @@ and
 \end{equation}
 for $1\le i < r-1$, where $y_0,y_1, y_2, y_3$, and $y_4$ are the public keys of the nodes $B$, $C$, $D$, and $Z$, which we assume to be available to $A$ .
 
-\subsection{Routing information}
+\subsubsection{Routing information}
 Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final receiver of the message. 
 The $END$ message is a distinguished prefix byte which is added to the final receiver's compressed public key.
 For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$. 
@@ -117,7 +118,7 @@ $B$ computes the keyed hash of the encrypted routing information $\beta_0$ as
     $$\gamma_0=HMAC(s_0,\beta_0)$$
 and compares with the integrity tag $\gamma_0$ attached in the packet header. If the integrity check fails, it is assumed the header has been tampered with and the packet is dropped. Otherwise, the mix node proceeds to the unblinding step.
 
-\subsection{Unblinding}
+\subsubsection{Unblinding}
 The unblinding works as follows: $B$ decrypts the attached $\beta_0$ in order to extract the routing instructions. First, $B$ appends a zero-byte padding at the end of $\beta_0$ and decrypts the padded block of routing information $\beta$ by XORing it with $PRG(s_{0})$ as follows:
 \begin{align}
     (\beta_0\|0_{2\kappa})&\oplus \rho(h_{\rho}(s_{0}))
