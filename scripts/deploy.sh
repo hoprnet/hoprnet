@@ -10,17 +10,12 @@ source scripts/cleanup.sh
 
 # ---- On Deployment -----
 #
-# This is run on pushes to master, or release/**
+# This finds matching entries in packages/hoprd/releases.json and deploys accordingly
 #
 # ENV Variables:
 # - GITHUB_REF: ie. `/refs/heads/mybranch`
 # - FUNDING_PRIV_KEY: funding private key, raw
 # - BS_PASSWORD: database password
-
-# Get version from package.json if not already set
-if [ -z "${RELEASE:-}" ]; then
-  RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
-fi
 
 _jq() {
   echo "$1" | base64 --decode | jq -r "$2"
