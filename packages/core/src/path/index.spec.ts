@@ -30,7 +30,8 @@ export function fakePublicKey(i: number | string): PublicKey {
     eq: (x: PublicKey) => x.id == i,
     toB58String: () => i,
     toPeerId: () => {},
-    toHex: () => '' + i
+    toHex: () => '' + i,
+    toAddress: () => 'addr' + i
   } as unknown as PublicKey
 }
 
