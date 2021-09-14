@@ -71,7 +71,7 @@ export async function findPath(
         !destination.eq(c.destinationPubKey) &&
         networkQualityOf(c.destinationPubKey) > NETWORK_QUALITY_THRESHOLD &&
         filterCycles(c, currentPath) &&
-        !deadEnds.has(c.destination.toHex())
+        !deadEnds.has(c.destinationPubKey.toHex())
       )
     })
 
