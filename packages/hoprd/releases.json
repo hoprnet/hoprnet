@@ -16,6 +16,13 @@
     "docker_image": "gcr.io/hoprassociation/hoprd:master"
   },
   {
+    "id": "integration-test",
+    "git_ref": "refs/heads/integration/release-environment",
+    "environment_id": "master-xdai",
+    "deprecated": false,
+    "docker_image": "gcr.io/hoprassociation/hoprd:master"
+  },
+  {
     "id": "wildhorn",
     "version_major": 1,
     "version_minor": 76,
