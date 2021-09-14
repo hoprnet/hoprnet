@@ -33,7 +33,7 @@ The integrity of this routing information is checked before sending. At each hop
 
 Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination.
 
-$G$ is a prime order cyclic group satisfying the decisional Diffie-Hellman assumption \cite{Boneh_1998}. We use the secp256k1 elliptic curve \cite{sec2}. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx2^{\kappa}$.
+$G$ is a prime order cyclic group satisfying the decisional Diffie-Hellman assumption \cite{Boneh_1998}. We use the secp256k1 elliptic curve \cite{sec2}. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx2^{2*\kappa}$.
 
 $G^*$ is the set of non-identity elements of G. $h_b$ is a pre-image resistant hash function used to compute blinding factors and modelled as a random oracle such that
 $h_b:G^*\times G^*\rightarrow\mathbb{Z}^*_q$, where $\mathbb{Z}^*_q$ is the field of non-identity elements of $\mathbb{Z}_q$ (field of integers). We use the BLAKE2s hash function \cite{blake2}.
