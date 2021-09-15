@@ -927,25 +927,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@hoprnet/cover-traffic@workspace:packages/cover-traffic":
-  version: 0.0.0-use.local
-  resolution: "@hoprnet/cover-traffic@workspace:packages/cover-traffic"
-  dependencies:
-    "@hoprnet/hopr-core": "workspace:packages/core"
-    "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@types/blessed": 0.1.19
-    bignumber.js: 9.0.1
-    blessed: ^0.1.81
-    blessed-contrib: ^4.10.0
-    bn.js: 5.2.0
-    mocha: 9.1.1
-    peer-id: 0.15.3
-    typedoc: 0.21.9
-    typedoc-plugin-markdown: 3.10.4
-    typescript: 4.4.2
-  languageName: unknown
-  linkType: soft
-
 "@hoprnet/hopr-connect@npm:0.2.42":
   version: 0.2.42
   resolution: "@hoprnet/hopr-connect@npm:0.2.42"
@@ -1035,6 +1016,29 @@ __metadata:
     typedoc: 0.21.9
     typedoc-plugin-markdown: 3.10.4
     typescript: 4.4.2
+  languageName: unknown
+  linkType: soft
+
+"@hoprnet/hopr-cover-traffic-daemon@workspace:packages/cover-traffic":
+  version: 0.0.0-use.local
+  resolution: "@hoprnet/hopr-cover-traffic-daemon@workspace:packages/cover-traffic"
+  dependencies:
+    "@hoprnet/hopr-core": "workspace:packages/core"
+    "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@types/blessed": 0.1.19
+    "@types/rimraf": ^3
+    "@types/yargs": ^17
+    bignumber.js: 9.0.1
+    blessed: ^0.1.81
+    blessed-contrib: ^4.10.0
+    bn.js: 5.2.0
+    mocha: 9.1.1
+    peer-id: 0.15.3
+    rimraf: ^3.0.2
+    typedoc: 0.21.9
+    typedoc-plugin-markdown: 3.10.4
+    typescript: 4.4.2
+    yargs: ^17.1.1
   languageName: unknown
   linkType: soft
 
@@ -2085,7 +2089,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/glob@npm:^7.1.1":
+"@types/glob@npm:*, @types/glob@npm:^7.1.1":
   version: 7.1.4
   resolution: "@types/glob@npm:7.1.4"
   dependencies:
@@ -2245,6 +2249,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/rimraf@npm:^3":
+  version: 3.0.2
+  resolution: "@types/rimraf@npm:3.0.2"
+  dependencies:
+    "@types/glob": "*"
+    "@types/node": "*"
+  checksum: b47fa302f46434cba704d20465861ad250df79467d3d289f9d6490d3aeeb41e8cb32dd80bd1a8fd833d1e185ac719fbf9be12e05ad9ce9be094d8ee8f1405347
+  languageName: node
+  linkType: hard
+
 "@types/secp256k1@npm:^4.0.1":
   version: 4.0.3
   resolution: "@types/secp256k1@npm:4.0.3"
@@ -2304,7 +2318,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/yargs@npm:^17.0.2":
+"@types/yargs@npm:^17, @types/yargs@npm:^17.0.2":
   version: 17.0.2
   resolution: "@types/yargs@npm:17.0.2"
   dependencies:
