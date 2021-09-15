@@ -1,6 +1,6 @@
-[@hoprnet/cover-traffic](README.md) / Exports
+[@hoprnet/hopr-cover-traffic-daemon](README.md) / Exports
 
-# @hoprnet/cover-traffic
+# @hoprnet/hopr-cover-traffic-daemon
 
 ## Table of contents
 
@@ -12,14 +12,14 @@
 
 ### main
 
-▸ **main**(`update`, `peerId`): `Promise`<`void`\>
+▸ **main**(`update`, `peerId?`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `update` | (`State`: `State`) => `void` |
-| `peerId` | `PeerId` |
+| `peerId?` | `PeerId` |
 
 #### Returns
 
@@ -27,4 +27,4 @@
 
 #### Defined in
 
-[index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic/src/index.ts#L28)
+[index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic/src/index.ts#L43)
