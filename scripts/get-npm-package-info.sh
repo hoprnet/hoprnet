@@ -26,7 +26,7 @@ usage() {
 ([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
 # verify and set parameters
-declare pkg pkg_vsn pkg_name
+declare pkg pkg_vsn pkg_name pkg_path
 
 pkg=${1:-hoprd}
 pkg_vsn=${2:-$("${mydir}/get-package-version.sh" ${pkg})}
