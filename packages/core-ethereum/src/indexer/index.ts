@@ -258,6 +258,8 @@ class Indexer extends EventEmitter {
           await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
         } else if (eventName === 'ChannelUpdated') {
           await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
+        } else {
+          log(`ignoring event '${eventName}'`)
         }
       } catch (err) {
         log('error processing event:', event, err)
