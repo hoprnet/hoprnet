@@ -109,7 +109,6 @@ describe('Commands', () => {
     await assertMatch(cmds, 'close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7', /5 minutes/)
   })
 
-
   it('info', async () => {
     let mockNode: any = sinon.fake()
     mockNode.getAnnouncedAddresses = async () => []
