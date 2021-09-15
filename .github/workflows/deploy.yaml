@@ -303,7 +303,7 @@ jobs:
           echo "::set-output name=tag::${tag}"
 
       - name: Building Docker image using Google Cloud Build
-        working-directory: packages/cover-traffic
+        working-directory: packages/cover-traffic-daemon
         run: |
           gcloud builds submit --config cloudbuild.yaml \
             --substitutions=_PACKAGE_VERSION=${PACKAGE_VERSION},_IMAGE_VERSION=${IMAGE_VERSION}
