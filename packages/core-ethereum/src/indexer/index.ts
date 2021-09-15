@@ -252,13 +252,17 @@ class Indexer extends EventEmitter {
 
     for (const event of confirmedEvents) {
       const eventName = event.event as EventNames
-      if (eventName === ANNOUNCEMENT) {
-        await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
-      } else if (eventName === 'ChannelUpdated') {
-        await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
-      } else {
-        log('skipping event: ', eventName, ' as it isnt recognized')
-        //throw new Error('bad event name: ' + eventName)
+
+      try {
+        if (eventName === ANNOUNCEMENT) {
+          await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
+        } else if (eventName === 'ChannelUpdated') {
+          await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
+        } else {
+          log(`ignoring event '${eventName}'`)
+        }
+      } catch (err) {
+        log('error processing event:', event, err)
       }
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
