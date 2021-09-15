@@ -107,7 +107,6 @@ export const sendCTMessage = async (
     )
 
     path.forEach((p) => data.incrementForwards(p))
-    path.push(selfPub) // destination is always self.
     data.log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
