@@ -20,7 +20,6 @@ import Settings from './settings'
 import Withdraw from './withdraw'
 import { Alias } from './alias'
 import { Info } from './info'
-import { CoverTraffic } from './cover-traffic'
 import Addresses from './addresses'
 
 export class Commands {
@@ -38,7 +37,6 @@ export class Commands {
       new Addresses(node),
       new Alias(node),
       new CloseChannel(node),
-      new CoverTraffic(node),
       new Info(node),
       new ListConnectedPeers(node),
       new ListCommands(() => this.commands),
