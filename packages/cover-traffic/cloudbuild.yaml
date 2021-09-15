@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '.'
+      - '--tag=gcr.io/$PROJECT_ID/hopr-cover-traffic-daemon:$_IMAGE_VERSION'
+      - '--build-arg=PACKAGE_VERSION=$_PACKAGE_VERSION'
+options:
+  logStreamingOption: STREAM_ON
+images:
+  - 'gcr.io/$PROJECT_ID/hopr-cover-traffic-daemon'

@@ -3,6 +3,8 @@ import contrib from 'blessed-contrib'
 import type { State, OpenChannels } from './state'
 import { findChannel, totalChannelBalanceFor, findChannelsFrom, importance } from './utils'
 import { main } from '.'
+import yargs from 'yargs/yargs'
+import { terminalWidth } from 'yargs'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'bignumber.js'
@@ -127,9 +129,17 @@ function setupDashboard(selfPub: PublicKey) {
   return update
 }
 
+const argv = yargs(process.argv.slice(2))
+  .option('privateKey', {
+    describe: 'A private key to be used for the node',
+    string: true,
+    demandOption: true
+  })
+  .wrap(Math.min(120, terminalWidth()))
+  .parseSync()
+
 if (require.main === module) {
-  const priv = process.argv[2]
-  const peerId = privKeyToPeerId(priv)
+  const peerId = privKeyToPeerId(argv.privateKey)
   const selfPub = PublicKey.fromPeerId(peerId)
   const update = setupDashboard(selfPub)
   main(update, peerId)

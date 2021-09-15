@@ -1,5 +1,5 @@
 {
-  "name": "@hoprnet/cover-traffic",
+  "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
   "version": "1.77.0-next.11",
   "repository": "https://github.com/hoprnet/hoprnet.git",
@@ -29,11 +29,15 @@
     "blessed": "^0.1.81",
     "blessed-contrib": "^4.10.0",
     "bn.js": "5.2.0",
-    "peer-id": "0.15.3"
+    "peer-id": "0.15.3",
+    "yargs": "^17.1.1"
   },
   "devDependencies": {
     "@types/blessed": "0.1.19",
+    "@types/rimraf": "^3",
+    "@types/yargs": "^17",
     "mocha": "9.1.1",
+    "rimraf": "^3.0.2",
     "typedoc": "0.21.9",
     "typedoc-plugin-markdown": "3.10.4",
     "typescript": "4.4.2"
