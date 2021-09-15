@@ -30,12 +30,12 @@ const argv = yargs(process.argv.slice(2))
 
 async function generateNodeOptions(): Promise<HoprOptions> {
   const options: HoprOptions = {
-  provider: argv.provider,
-  createDbIfNotExist: true,
-  password: '',
-  forceCreateDB: true,
-  announce: false
-}
+    provider: argv.provider,
+    createDbIfNotExist: true,
+    password: '',
+    forceCreateDB: true,
+    announce: false
+  }
 
   return options
 }
