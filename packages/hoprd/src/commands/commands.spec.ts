@@ -109,30 +109,6 @@ describe('Commands', () => {
     await assertMatch(cmds, 'close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7', /5 minutes/)
   })
 
-  it('cover traffic', async () => {
-    var clock = sinon.useFakeTimers(Date.now())
-    let mockNode: any = sinon.fake()
-    let receive
-    mockNode.on = (ev, f) => {
-      assert(ev == 'hopr:message')
-      receive = f
-    }
-    mockNode.getId = () => 'node'
-    mockNode.sendMessage = (m, id) => {
-      assert(m, 'send message takes message')
-      assert(id == mockNode.getId(), 'sends to self')
-      setTimeout(() => receive(m), 300)
-      return Promise.resolve()
-    }
-    let cmds = new mod.Commands(mockNode)
-    await assertMatch(cmds, 'covertraffic start', /started/)
-    await clock.tickAsync(30_000)
-    await assertMatch(cmds, 'covertraffic stop', /stopped/)
-    await assertMatch(cmds, 'covertraffic stats', /messages sent/)
-    await assertMatch(cmds, 'covertraffic stats', /reliability/)
-
-    clock.restore()
-  })
 
   it('info', async () => {
     let mockNode: any = sinon.fake()
