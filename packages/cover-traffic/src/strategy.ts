@@ -104,9 +104,10 @@ export class CoverTrafficStrategy extends SaneDefaults {
       const q = await peers.qualityOf(c)
       // Ignore the randomly chosen node, if it's the cover traffic node itself, or a non-closed channel exists
       if (
-        currentChannels.filter((x) => x.status !== ChannelStatus.Closed).find((x) => x.destination.eq(c)) ||
+        ctChannels.find((x) => x.destination.eq(c)) ||
         c.eq(this.selfPub) ||
-        toOpen.find((x) => x[1].eq(c))
+        toOpen.find((x) => x[0].eq(c)) || 
+        toClose.find(x => x.eq(c))
       ) {
         console.error('skipping node', c.toB58String())
         continue
