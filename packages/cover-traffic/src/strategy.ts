@@ -106,8 +106,8 @@ export class CoverTrafficStrategy extends SaneDefaults {
       if (
         ctChannels.find((x) => x.destination.eq(c)) ||
         c.eq(this.selfPub) ||
-        toOpen.find((x) => x[0].eq(c)) || 
-        toClose.find(x => x.eq(c))
+        toOpen.find((x) => x[0].eq(c)) ||
+        toClose.find((x) => x.eq(c))
       ) {
         console.error('skipping node', c.toB58String())
         continue
