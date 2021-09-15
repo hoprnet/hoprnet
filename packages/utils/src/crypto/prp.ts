@@ -1,8 +1,10 @@
+// LIONESS implementation for packet payload based on the ChaCha stream cipher and the BLAKE2 hash algorithm
+
 import { createCipheriv, createHmac } from 'crypto'
 import { u8aXOR } from '../u8a'
 
-const HASH_ALGORITHM = 'blake2s256'
-const CIPHER_ALGORITHM = 'chacha20'
+const HASH_ALGORITHM = 'blake2s256'   
+const CIPHER_ALGORITHM = 'chacha20'  
 
 const INTERMEDIATE_KEY_LENGTH = 32
 const INTERMEDIATE_IV_LENGTH = 16
@@ -13,11 +15,12 @@ export const PRP_KEY_LENGTH = 4 * INTERMEDIATE_KEY_LENGTH
 export const PRP_IV_LENGTH = 4 * INTERMEDIATE_IV_LENGTH
 export const PRP_MIN_LENGTH = HASH_LENGTH
 
+// PRP-- Pseudo Random Permutation (stream cipher)
 export type PRPParameters = {
-  key: Uint8Array
-  iv: Uint8Array
-}
-
+  key: Uint8Array // key for the payload
+  iv: Uint8Array // iv The initialization vector
+  
+// k1,k2,k3,k4 are Round keys
 export class PRP {
   private readonly k1: Uint8Array
   private readonly k2: Uint8Array
@@ -67,7 +70,8 @@ export class PRP {
     }
 
     const data = plaintext
-
+    
+  // k1 and k3 will be used to key the stream cipher, while k2 and k4 are used to key the hash function.
     encrypt(data, this.k1, this.iv1)
     hash(data, this.k2, this.iv2)
     encrypt(data, this.k3, this.iv3)
