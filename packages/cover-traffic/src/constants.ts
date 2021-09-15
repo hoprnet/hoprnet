@@ -8,3 +8,4 @@ export const MESSAGE_FAIL_THRESHOLD = 1000 // Failed sends to channel before we 
 export const CT_PATH_RANDOMNESS = 0.2
 export const CT_NETWORK_QUALITY_THRESHOLD = 0.15 // Minimum channel quality to keep a channel open.
 export const CT_OPEN_CHANNEL_QUALITY_THRESHOLD = 0.6 // Minimum channel quality to open a new channel.
+export const CT_CHANNEL_STALL_TIMEOUT = 600000 // 10 min. Timeout to close WAIT_FOR_COMMITMENT cover traffic channels.

@@ -15,6 +15,7 @@ export type ChannelData = {
 export type OpenChannels = {
   destination: PublicKey
   latestQualityOf: number
+  openFrom: number // timestamp (in milliseconds) when the CT channel is opened
 }
 
 export type State = {
@@ -73,8 +74,9 @@ export class PersistedState {
       channels: {},
       log: ['loaded data'],
       ctChannels: json.ctChannels.map((p) => ({
-        destination: PublicKey.fromPeerId(PeerId.createFromB58String(p)),
-        latestQualityOf: 0
+        destination: PublicKey.fromPeerId(PeerId.createFromB58String(p.destination)),
+        latestQualityOf: 0,
+        openFrom: p.openFrom
       })),
       messageFails: {},
       block: new BN(json.block)
@@ -124,7 +126,10 @@ export class PersistedState {
           forwardAttempts: c.forwardAttempts,
           sendAttempts: c.sendAttempts
         })),
-        ctChannels: s.ctChannels.map((o: OpenChannels) => o.destination.toB58String()),
+        ctChannels: s.ctChannels.map((o: OpenChannels) => ({
+          destination: o.destination.toB58String(),
+          openFrom: o.openFrom
+        })),
         block: s.block.toString()
       }),
       'utf8'

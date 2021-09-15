@@ -3,7 +3,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import type BN from 'bn.js'
 import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import type { PersistedState } from './state'
-import { sendCTMessage } from './utils'
+import { findCtChannelOpenTime, sendCTMessage } from './utils'
 import {
   CT_INTERMEDIATE_HOPS,
   MESSAGE_FAIL_THRESHOLD,
@@ -11,6 +11,7 @@ import {
   CHANNELS_PER_COVER_TRAFFIC_NODE,
   CHANNEL_STAKE,
   CT_NETWORK_QUALITY_THRESHOLD,
+  CT_CHANNEL_STALL_TIMEOUT,
   CT_OPEN_CHANNEL_QUALITY_THRESHOLD
 } from './constants'
 
@@ -50,7 +51,12 @@ export class CoverTrafficStrategy extends SaneDefaults {
         continue
       }
       const q = await peers.qualityOf(c.destination)
-      ctChannels.push({ destination: c.destination, latestQualityOf: q })
+      ctChannels.push({
+        destination: c.destination,
+        latestQualityOf: q,
+        openFrom: findCtChannelOpenTime(c.destination, state)
+      })
+
       // Cover traffic channels with quality below this threshold will be closed
       if (q < CT_NETWORK_QUALITY_THRESHOLD) {
         toClose.push(c.destination)
@@ -85,8 +91,14 @@ export class CoverTrafficStrategy extends SaneDefaults {
           if (!success) {
             this.data.incrementMessageFails(openChannel.destination)
           }
+        } else if (
+          channel &&
+          channel.status == ChannelStatus.WaitingForCommitment &&
+          Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT
+        ) {
+          // handle waiting for commitment stalls
+          toClose.push(openChannel.destination)
         }
-        // TODO: handle waiting for commitment stalls
       }
     } else {
       this.data.log('aborting send messages - less channels in network than hops required')
