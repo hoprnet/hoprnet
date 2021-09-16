@@ -5,7 +5,7 @@
   "workspaces": [
     "packages/core",
     "packages/core-ethereum",
-    "packages/cover-traffic",
+    "packages/cover-traffic-daemon",
     "packages/ethereum",
     "packages/utils",
     "packages/hoprd"
