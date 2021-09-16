@@ -5,6 +5,8 @@ on:
     branches: ['master', 'yellowpaper/**']
     paths:
       - 'docs/yellowpaper/**'
+    paths-ignore:
+      - 'docs/yellowpaper/yellowpaper.pdf'
 
 jobs:
   build_latex:
@@ -15,13 +17,9 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Compile LaTeX document
-        uses: xu-cheng/texlive-action/small@v1
         with:
           run: |
-            apk add make
-            tlmgr update --self
-            tlmgr install preprint blindtext makecell multirow float comment
-            tlmgr install algorithm2e ifoddpage relsize # add algorithm2e
+            apt install texlive texlive-science texlive-bibtex-extra
             make -C docs/yellowpaper/
 
       - name: 'Configure Git info'
