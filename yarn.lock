@@ -1049,6 +1049,9 @@ __metadata:
     typedoc-plugin-markdown: 3.10.4
     typescript: 4.4.2
     yargs: ^17.1.1
+  bin:
+    hopr-cover-traffic-daemon: lib/index.js
+    hopr-cover-traffic-daemon-dashboard: lib/dashboard.js
   languageName: unknown
   linkType: soft
 
@@ -4677,12 +4680,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cli-table@npm:^0.3.1":
-  version: 0.3.6
-  resolution: "cli-table@npm:0.3.6"
+"cli-table3@npm:^0.6.0":
+  version: 0.6.0
+  resolution: "cli-table3@npm:0.6.0"
   dependencies:
-    colors: 1.0.3
-  checksum: b0cd08578c810240920438cc2b3ffb4b4f5106b29f3362707f1d8cfc0c0440ad2afb70b96e30ce37f72f0ffe1e844ae7341dde4df17d51ad345eb186a5903af2
+    colors: ^1.1.2
+    object-assign: ^4.1.0
+    string-width: ^4.2.0
+  dependenciesMeta:
+    colors:
+      optional: true
+  checksum: 98682a2d3eef5ad07d34a08f90398d0640004e28ecf8eb59006436f11ed7b4d453db09f46c2ea880618fbd61fee66321b3b3ee1b20276bc708b6baf6f9663d75
   languageName: node
   linkType: hard
 
@@ -4822,13 +4830,6 @@ __metadata:
   version: 1.4.0
   resolution: "colorette@npm:1.4.0"
   checksum: 01c3c16058b182a4ab4c126a65a75faa4d38a20fa7c845090b25453acec6c371bb2c5dceb0a2338511f17902b9d1a9af0cadd8509c9403894b79311032c256c3
-  languageName: node
-  linkType: hard
-
-"colors@npm:1.0.3":
-  version: 1.0.3
-  resolution: "colors@npm:1.0.3"
-  checksum: 234e8d3ab7e4003851cdd6a1f02eaa16dabc502ee5f4dc576ad7959c64b7477b15bd21177bab4055a4c0a66aa3d919753958030445f87c39a253d73b7a3637f5
   languageName: node
   linkType: hard
 
@@ -5826,9 +5827,9 @@ __metadata:
   linkType: hard
 
 "electron-to-chromium@npm:^1.3.47, electron-to-chromium@npm:^1.3.723":
-  version: 1.3.839
-  resolution: "electron-to-chromium@npm:1.3.839"
-  checksum: f1bd5abb709dd6d6e9e8bacc0efd519019d0c78408c3b6c928070123f57f4ea386c1de8306dbce1d621b850310259a9a57c06710f84f52e2776e926de1d3f646
+  version: 1.3.840
+  resolution: "electron-to-chromium@npm:1.3.840"
+  checksum: 3b4d872b5a862d6a176121a0b7d803a428e156bff0a55de6026e355f025f1c17cccfd6407f7c1755d024663af577e8ea41e93b271830df4477bffb01253dbf18
   languageName: node
   linkType: hard
 
@@ -11107,18 +11108,18 @@ fsevents@~2.1.1:
   linkType: hard
 
 "marked-terminal@npm:^4.1.1":
-  version: 4.1.1
-  resolution: "marked-terminal@npm:4.1.1"
+  version: 4.2.0
+  resolution: "marked-terminal@npm:4.2.0"
   dependencies:
     ansi-escapes: ^4.3.1
     cardinal: ^2.1.1
     chalk: ^4.1.0
-    cli-table: ^0.3.1
+    cli-table3: ^0.6.0
     node-emoji: ^1.10.0
     supports-hyperlinks: ^2.1.0
   peerDependencies:
     marked: ^1.0.0 || ^2.0.0
-  checksum: daa02e9174689dfd04ef827fe7afa7de1f1a600af171ad6ab712da391d65620d5f4d255f82185ae8fd6f72b8dcab9e8c9f31195baaff839abe2aeda91661b36f
+  checksum: a68a4cfd22b42f990a82e3234c68006ab4d1285a4a9bdd162f597740d9a55275c10c78ca21fa3927a76b2197589fe382e33af9baa2ccb2153812986c15aa73b8
   languageName: node
   linkType: hard
 
@@ -13432,11 +13433,11 @@ fsevents@~2.1.1:
   linkType: hard
 
 "prettier@npm:^2.1.2":
-  version: 2.4.0
-  resolution: "prettier@npm:2.4.0"
+  version: 2.4.1
+  resolution: "prettier@npm:2.4.1"
   bin:
     prettier: bin-prettier.js
-  checksum: ac1bf07566dad5f58469e6d8a954bd5c0f833935597deb00330e9f673e14e4cf81e07dee7eff5776c0edebe11358d199f332d9940be40c8b455516034e553ce0
+  checksum: cc6830588b401b0d742862fe9c46bc9118204fb307c3abe0e49e95b35ed23629573807ffdf9cdd65289c252a0bb51fc0171437f6626ee36378dea80f0ee80b91
   languageName: node
   linkType: hard
 
@@ -14975,9 +14976,9 @@ resolve@1.17.0:
   linkType: hard
 
 "signal-exit@npm:^3.0.0, signal-exit@npm:^3.0.2, signal-exit@npm:^3.0.3":
-  version: 3.0.3
-  resolution: "signal-exit@npm:3.0.3"
-  checksum: f0169d3f1263d06df32ca072b0bf33b34c6f8f0341a7a1621558a2444dfbe8f5fec76b35537fcc6f0bc4944bdb5336fe0bdcf41a5422c4e45a1dba3f45475e6c
+  version: 3.0.4
+  resolution: "signal-exit@npm:3.0.4"
+  checksum: e72633b05df8d65035a0b31718b1a587f55b25953a8e7b959f6c3a963cc0abcb70a0d78a7e0792bc104c874525efdc619e823095d382a775641e3867b1b68c54
   languageName: node
   linkType: hard
 
