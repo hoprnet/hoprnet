@@ -1,3 +1,5 @@
+import type { Wallet } from '@ethersproject/wallet'
+import type { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { deployments, ethers } from 'hardhat'
 import { Multiaddr } from 'multiaddr'
 import { expect } from 'chai'
@@ -30,7 +32,6 @@ import {
   ChannelStatus,
   PromiseValue
 } from '@hoprnet/hopr-utils'
-import type { Wallet } from '@ethersproject/wallet'
 import { BigNumber } from 'ethers'
 
 type TicketValues = {
@@ -230,13 +231,24 @@ const useFixtures = deployments.createFixture(async () => {
   }
 })
 
-describe('announce user', function () {
+describe.only('announce user', function () {
+  // recover the public key from the signer passed by ethers
+  // could not find a way to get the public key through the API
+  const recoverPublicKey = async (deployer: SignerWithAddress): Promise<PublicKey> => {
+    const msg = 'hello'
+    const sig = await deployer.signMessage(msg)
+    const msgHash = ethers.utils.hashMessage(msg)
+    const msgHashBytes = ethers.utils.arrayify(msgHash)
+    return PublicKey.fromUncompressedPubKey(ethers.utils.arrayify(ethers.utils.recoverPublicKey(msgHashBytes, sig)))
+  }
+
   it('should announce user', async function () {
     const { channels, deployer } = await useFixtures()
+    const deployerPublicKey = await recoverPublicKey(deployer)
 
-    await expect(channels.connect(deployer).announce(MULTI_ADDR))
+    await expect(channels.connect(deployer).announce(deployerPublicKey.toUncompressedPubKeyHex(), MULTI_ADDR))
       .to.emit(channels, 'Announcement')
-      .withArgs(deployer.address, MULTI_ADDR)
+      .withArgs(deployer.address, deployerPublicKey.toUncompressedPubKeyHex(), MULTI_ADDR)
   })
 })
 

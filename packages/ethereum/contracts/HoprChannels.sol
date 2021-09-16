@@ -65,6 +65,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
 
     /**
+     * @dev Stored publicKeys keyed by their address
+     */
+    mapping(address => bytes) public publicKeys;
+
+    /**
      * @dev Stored channels keyed by their channel ids
      */
     mapping(bytes32 => Channel) public channels;
@@ -94,6 +99,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
      */
     event Announcement(
         address indexed account,
+        bytes publicKey,
         bytes multiaddr
     );
 
@@ -183,12 +189,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
 
     /**
-     * @dev Announces msg.sender's multiaddress.
-     * Confirmation should be done off-chain.
+     * @dev Announces msg.sender's publicKey and multiaddress.
+     * Multiaddress confirmation should be done off-chain.
+     * @param publicKey the msg.sender's public key
      * @param multiaddr the multiaddress
      */
-    function announce(bytes calldata multiaddr) external {
-        emit Announcement(msg.sender, multiaddr);
+    function announce(bytes calldata publicKey, bytes calldata multiaddr) external {
+        require(address(uint160(uint256(keccak256(publicKey)))) == msg.sender, "publicKey's address does not match senders");
+        publicKeys[msg.sender] = publicKey;
+        emit Announcement(msg.sender, publicKey, multiaddr);
     }
 
     /**
