@@ -7,6 +7,10 @@
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
+  "bin": {
+    "hopr-cover-traffic-daemon": "lib/index.js",
+    "hopr-cover-traffic-daemon-dashboard": "lib/dashboard.js"
+  },
   "scripts": {
     "clean": "rimraf ./lib",
     "test": "mocha --parallel",
