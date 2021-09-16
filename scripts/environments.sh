@@ -26,6 +26,11 @@ get_environment() {
   case "$BRANCH" in release/*)
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE)
 
+    if [ "$VERSION_MAJ_MIN" == '1.77' ]; then
+      RELEASE_NAME='rio'
+      return
+    fi
+
     if [ "$VERSION_MAJ_MIN" == '1.76' ]; then
       RELEASE_NAME='wildhorn'
       return
