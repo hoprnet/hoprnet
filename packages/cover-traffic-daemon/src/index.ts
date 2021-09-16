@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { PersistedState } from './state'
 import type { PeerData, State } from './state'
 import type { HoprOptions } from '@hoprnet/hopr-core'

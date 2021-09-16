@@ -208,7 +208,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:510
+packages/ethereum/types/ERC677BridgeToken.d.ts:549
 
 ___
 
@@ -267,7 +267,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:672
+packages/ethereum/types/ERC677BridgeToken.d.ts:756
 
 ___
 
@@ -280,12 +280,19 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
 | `Burn` | (`burner?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
+| `Burn(address,uint256)` | (`burner?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
 | `Mint` | (`to?`: `string`, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
+| `Mint(address,uint256)` | (`to?`: `string`, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
 | `MintFinished` | () => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[], `Object`\> |
+| `MintFinished()` | () => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[], `Object`\> |
 | `OwnershipRenounced` | (`previousOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`], `Object`\> |
+| `OwnershipRenounced(address)` | (`previousOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`], `Object`\> |
 | `OwnershipTransferred` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``, `data?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`], `Object`\> |
+| `OwnershipTransferred(address,address)` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Transfer(address,address,uint256,bytes)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``, `data?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`], `Object`\> |
 
 #### Overrides
 
@@ -293,7 +300,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:624
+packages/ethereum/types/ERC677BridgeToken.d.ts:663
 
 ___
 
@@ -338,7 +345,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:270
+packages/ethereum/types/ERC677BridgeToken.d.ts:309
 
 ___
 
@@ -352,7 +359,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:268
+packages/ethereum/types/ERC677BridgeToken.d.ts:307
 
 ___
 
@@ -397,7 +404,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:785
+packages/ethereum/types/ERC677BridgeToken.d.ts:869
 
 ___
 
@@ -535,7 +542,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:499
+packages/ethereum/types/ERC677BridgeToken.d.ts:538
 
 ___
 
@@ -557,7 +564,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:395
+packages/ethereum/types/ERC677BridgeToken.d.ts:434
 
 ___
 
@@ -581,7 +588,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:229
+packages/ethereum/types/ERC677BridgeToken.d.ts:268
 
 ___
 
@@ -602,7 +609,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:453
+packages/ethereum/types/ERC677BridgeToken.d.ts:492
 
 ___
 
@@ -622,7 +629,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:491
+packages/ethereum/types/ERC677BridgeToken.d.ts:530
 
 ___
 
@@ -643,7 +650,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:436
+packages/ethereum/types/ERC677BridgeToken.d.ts:475
 
 ___
 
@@ -665,7 +672,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:447
+packages/ethereum/types/ERC677BridgeToken.d.ts:486
 
 ___
 
@@ -689,7 +696,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:228
+packages/ethereum/types/ERC677BridgeToken.d.ts:267
 
 ___
 
@@ -709,7 +716,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:415
+packages/ethereum/types/ERC677BridgeToken.d.ts:454
 
 ___
 
@@ -731,7 +738,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:479
+packages/ethereum/types/ERC677BridgeToken.d.ts:518
 
 ___
 
@@ -753,7 +760,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:441
+packages/ethereum/types/ERC677BridgeToken.d.ts:480
 
 ___
 
@@ -771,7 +778,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:230
+packages/ethereum/types/ERC677BridgeToken.d.ts:269
 
 ___
 
@@ -840,7 +847,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:461
+packages/ethereum/types/ERC677BridgeToken.d.ts:500
 
 ___
 
@@ -860,7 +867,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:465
+packages/ethereum/types/ERC677BridgeToken.d.ts:504
 
 ___
 
@@ -882,7 +889,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:417
+packages/ethereum/types/ERC677BridgeToken.d.ts:456
 
 ___
 
@@ -904,7 +911,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:493
+packages/ethereum/types/ERC677BridgeToken.d.ts:532
 
 ___
 
@@ -925,7 +932,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:459
+packages/ethereum/types/ERC677BridgeToken.d.ts:498
 
 ___
 
@@ -980,7 +987,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:232
+packages/ethereum/types/ERC677BridgeToken.d.ts:271
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -1000,7 +1007,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:255
+packages/ethereum/types/ERC677BridgeToken.d.ts:294
 
 ___
 
@@ -1022,7 +1029,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:430
+packages/ethereum/types/ERC677BridgeToken.d.ts:469
 
 ___
 
@@ -1042,7 +1049,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:391
+packages/ethereum/types/ERC677BridgeToken.d.ts:430
 
 ___
 
@@ -1062,7 +1069,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:393
+packages/ethereum/types/ERC677BridgeToken.d.ts:432
 
 ___
 
@@ -1094,7 +1101,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:235
+packages/ethereum/types/ERC677BridgeToken.d.ts:274
 
 ▸ **off**(`eventName`, `listener`): [`ERC677BridgeToken`](ERC677BridgeToken.md)
 
@@ -1115,7 +1122,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:256
+packages/ethereum/types/ERC677BridgeToken.d.ts:295
 
 ___
 
@@ -1147,7 +1154,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:239
+packages/ethereum/types/ERC677BridgeToken.d.ts:278
 
 ▸ **on**(`eventName`, `listener`): [`ERC677BridgeToken`](ERC677BridgeToken.md)
 
@@ -1168,7 +1175,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:257
+packages/ethereum/types/ERC677BridgeToken.d.ts:296
 
 ___
 
@@ -1200,7 +1207,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:243
+packages/ethereum/types/ERC677BridgeToken.d.ts:282
 
 ▸ **once**(`eventName`, `listener`): [`ERC677BridgeToken`](ERC677BridgeToken.md)
 
@@ -1221,7 +1228,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:258
+packages/ethereum/types/ERC677BridgeToken.d.ts:297
 
 ___
 
@@ -1241,7 +1248,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:475
+packages/ethereum/types/ERC677BridgeToken.d.ts:514
 
 ___
 
@@ -1274,7 +1281,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:262
+packages/ethereum/types/ERC677BridgeToken.d.ts:301
 
 ___
 
@@ -1305,7 +1312,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:251
+packages/ethereum/types/ERC677BridgeToken.d.ts:290
 
 ▸ **removeAllListeners**(`eventName?`): [`ERC677BridgeToken`](ERC677BridgeToken.md)
 
@@ -1325,7 +1332,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:260
+packages/ethereum/types/ERC677BridgeToken.d.ts:299
 
 ___
 
@@ -1357,7 +1364,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:247
+packages/ethereum/types/ERC677BridgeToken.d.ts:286
 
 ▸ **removeListener**(`eventName`, `listener`): [`ERC677BridgeToken`](ERC677BridgeToken.md)
 
@@ -1378,7 +1385,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:259
+packages/ethereum/types/ERC677BridgeToken.d.ts:298
 
 ___
 
@@ -1398,7 +1405,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:455
+packages/ethereum/types/ERC677BridgeToken.d.ts:494
 
 ___
 
@@ -1419,7 +1426,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:401
+packages/ethereum/types/ERC677BridgeToken.d.ts:440
 
 ___
 
@@ -1439,7 +1446,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:477
+packages/ethereum/types/ERC677BridgeToken.d.ts:516
 
 ___
 
@@ -1459,7 +1466,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:406
+packages/ethereum/types/ERC677BridgeToken.d.ts:445
 
 ___
 
@@ -1481,7 +1488,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:485
+packages/ethereum/types/ERC677BridgeToken.d.ts:524
 
 ___
 
@@ -1504,7 +1511,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:423
+packages/ethereum/types/ERC677BridgeToken.d.ts:462
 
 ___
 
@@ -1527,7 +1534,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:408
+packages/ethereum/types/ERC677BridgeToken.d.ts:447
 
 ___
 
@@ -1548,7 +1555,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC677BridgeToken.d.ts:505
+packages/ethereum/types/ERC677BridgeToken.d.ts:544
 
 ___
 

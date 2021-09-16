@@ -1,12 +1,11 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.77.0-next.13",
+  "version": "1.77.0-next.19",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "main": "lib/index.js",
-  "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
   "bin": "lib/index.js",
   "files": [
     "lib",

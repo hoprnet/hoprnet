@@ -210,7 +210,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:575
+packages/ethereum/types/ERC777SnapshotMock.d.ts:626
 
 ___
 
@@ -270,7 +270,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:810
+packages/ethereum/types/ERC777SnapshotMock.d.ts:948
 
 ___
 
@@ -283,12 +283,19 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
 | `AuthorizedOperator` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `AuthorizedOperator(address,address)` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
 | `Burned` | (`operator?`: `string`, `from?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `Burned(address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `from?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
 | `Minted` | (`operator?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `Minted(address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
 | `RevokedOperator` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `RevokedOperator(address,address)` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
 | `Sent` | (`operator?`: `string`, `from?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `Sent(address,address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `from?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
 | `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
 
 #### Overrides
 
@@ -296,7 +303,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:721
+packages/ethereum/types/ERC777SnapshotMock.d.ts:772
 
 ___
 
@@ -342,7 +349,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:282
+packages/ethereum/types/ERC777SnapshotMock.d.ts:333
 
 ___
 
@@ -356,7 +363,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:280
+packages/ethereum/types/ERC777SnapshotMock.d.ts:331
 
 ___
 
@@ -402,7 +409,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:955
+packages/ethereum/types/ERC777SnapshotMock.d.ts:1093
 
 ___
 
@@ -540,7 +547,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:431
+packages/ethereum/types/ERC777SnapshotMock.d.ts:482
 
 ___
 
@@ -562,7 +569,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:439
+packages/ethereum/types/ERC777SnapshotMock.d.ts:490
 
 ___
 
@@ -584,7 +591,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:445
+packages/ethereum/types/ERC777SnapshotMock.d.ts:496
 
 ___
 
@@ -608,7 +615,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:241
+packages/ethereum/types/ERC777SnapshotMock.d.ts:292
 
 ___
 
@@ -629,7 +636,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:451
+packages/ethereum/types/ERC777SnapshotMock.d.ts:502
 
 ___
 
@@ -650,7 +657,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:456
+packages/ethereum/types/ERC777SnapshotMock.d.ts:507
 
 ___
 
@@ -672,7 +679,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:458
+packages/ethereum/types/ERC777SnapshotMock.d.ts:509
 
 ___
 
@@ -696,7 +703,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:464
+packages/ethereum/types/ERC777SnapshotMock.d.ts:515
 
 ___
 
@@ -718,7 +725,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:472
+packages/ethereum/types/ERC777SnapshotMock.d.ts:523
 
 ___
 
@@ -742,7 +749,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:240
+packages/ethereum/types/ERC777SnapshotMock.d.ts:291
 
 ___
 
@@ -762,7 +769,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:478
+packages/ethereum/types/ERC777SnapshotMock.d.ts:529
 
 ___
 
@@ -782,7 +789,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:480
+packages/ethereum/types/ERC777SnapshotMock.d.ts:531
 
 ___
 
@@ -800,7 +807,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:242
+packages/ethereum/types/ERC777SnapshotMock.d.ts:293
 
 ___
 
@@ -871,7 +878,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:482
+packages/ethereum/types/ERC777SnapshotMock.d.ts:533
 
 ___
 
@@ -892,7 +899,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:488
+packages/ethereum/types/ERC777SnapshotMock.d.ts:539
 
 ___
 
@@ -912,7 +919,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:493
+packages/ethereum/types/ERC777SnapshotMock.d.ts:544
 
 ___
 
@@ -934,7 +941,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:495
+packages/ethereum/types/ERC777SnapshotMock.d.ts:546
 
 ___
 
@@ -989,7 +996,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:244
+packages/ethereum/types/ERC777SnapshotMock.d.ts:295
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -1009,7 +1016,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:267
+packages/ethereum/types/ERC777SnapshotMock.d.ts:318
 
 ___
 
@@ -1033,7 +1040,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:501
+packages/ethereum/types/ERC777SnapshotMock.d.ts:552
 
 ___
 
@@ -1053,7 +1060,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:509
+packages/ethereum/types/ERC777SnapshotMock.d.ts:560
 
 ___
 
@@ -1085,7 +1092,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:247
+packages/ethereum/types/ERC777SnapshotMock.d.ts:298
 
 ▸ **off**(`eventName`, `listener`): [`ERC777SnapshotMock`](ERC777SnapshotMock.md)
 
@@ -1106,7 +1113,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:268
+packages/ethereum/types/ERC777SnapshotMock.d.ts:319
 
 ___
 
@@ -1138,7 +1145,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:251
+packages/ethereum/types/ERC777SnapshotMock.d.ts:302
 
 ▸ **on**(`eventName`, `listener`): [`ERC777SnapshotMock`](ERC777SnapshotMock.md)
 
@@ -1159,7 +1166,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:269
+packages/ethereum/types/ERC777SnapshotMock.d.ts:320
 
 ___
 
@@ -1191,7 +1198,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:255
+packages/ethereum/types/ERC777SnapshotMock.d.ts:306
 
 ▸ **once**(`eventName`, `listener`): [`ERC777SnapshotMock`](ERC777SnapshotMock.md)
 
@@ -1212,7 +1219,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:270
+packages/ethereum/types/ERC777SnapshotMock.d.ts:321
 
 ___
 
@@ -1236,7 +1243,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:511
+packages/ethereum/types/ERC777SnapshotMock.d.ts:562
 
 ___
 
@@ -1261,7 +1268,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:519
+packages/ethereum/types/ERC777SnapshotMock.d.ts:570
 
 ___
 
@@ -1294,7 +1301,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:274
+packages/ethereum/types/ERC777SnapshotMock.d.ts:325
 
 ___
 
@@ -1325,7 +1332,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:263
+packages/ethereum/types/ERC777SnapshotMock.d.ts:314
 
 ▸ **removeAllListeners**(`eventName?`): [`ERC777SnapshotMock`](ERC777SnapshotMock.md)
 
@@ -1345,7 +1352,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:272
+packages/ethereum/types/ERC777SnapshotMock.d.ts:323
 
 ___
 
@@ -1377,7 +1384,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:259
+packages/ethereum/types/ERC777SnapshotMock.d.ts:310
 
 ▸ **removeListener**(`eventName`, `listener`): [`ERC777SnapshotMock`](ERC777SnapshotMock.md)
 
@@ -1398,7 +1405,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:271
+packages/ethereum/types/ERC777SnapshotMock.d.ts:322
 
 ___
 
@@ -1419,7 +1426,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:528
+packages/ethereum/types/ERC777SnapshotMock.d.ts:579
 
 ___
 
@@ -1442,7 +1449,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:533
+packages/ethereum/types/ERC777SnapshotMock.d.ts:584
 
 ___
 
@@ -1462,7 +1469,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:540
+packages/ethereum/types/ERC777SnapshotMock.d.ts:591
 
 ___
 
@@ -1482,7 +1489,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:542
+packages/ethereum/types/ERC777SnapshotMock.d.ts:593
 
 ___
 
@@ -1503,7 +1510,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:544
+packages/ethereum/types/ERC777SnapshotMock.d.ts:595
 
 ___
 
@@ -1524,7 +1531,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:549
+packages/ethereum/types/ERC777SnapshotMock.d.ts:600
 
 ___
 
@@ -1546,7 +1553,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:556
+packages/ethereum/types/ERC777SnapshotMock.d.ts:607
 
 ___
 
@@ -1569,7 +1576,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:562
+packages/ethereum/types/ERC777SnapshotMock.d.ts:613
 
 ___
 
@@ -1591,7 +1598,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SnapshotMock.d.ts:569
+packages/ethereum/types/ERC777SnapshotMock.d.ts:620
 
 ___
 
