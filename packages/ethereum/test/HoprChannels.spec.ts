@@ -231,7 +231,7 @@ const useFixtures = deployments.createFixture(async () => {
   }
 })
 
-describe.only('announce user', function () {
+describe('announce user', function () {
   // recover the public key from the signer passed by ethers
   // could not find a way to get the public key through the API
   const recoverPublicKey = async (deployer: SignerWithAddress): Promise<PublicKey> => {
@@ -249,6 +249,19 @@ describe.only('announce user', function () {
     await expect(channels.connect(deployer).announce(deployerPublicKey.toUncompressedPubKeyHex(), MULTI_ADDR))
       .to.emit(channels, 'Announcement')
       .withArgs(deployer.address, deployerPublicKey.toUncompressedPubKeyHex(), MULTI_ADDR)
+  })
+
+  it('should fail to announce user', async function () {
+    const { channels, deployer, accountA } = await useFixtures()
+
+    await expect(
+      channels
+        .connect(deployer)
+        .announce(
+          PublicKey.fromPrivKey(ethers.utils.arrayify(accountA.privateKey)).toUncompressedPubKeyHex(),
+          MULTI_ADDR
+        )
+    ).to.be.revertedWith("publicKey's address does not match senders")
   })
 })
 
