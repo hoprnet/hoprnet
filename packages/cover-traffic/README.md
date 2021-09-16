@@ -14,4 +14,3 @@ Example
 ```sh
 DEBUG="hopr*" node ./lib/index.js --privateKey 0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332
 ```
-
