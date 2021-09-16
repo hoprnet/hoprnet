@@ -282,37 +282,27 @@ class Indexer extends EventEmitter {
   }
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
-    try {
-      //TODO types
-      const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
-      const address = Address.fromString(event.args.account)
-      const account = new AccountEntry(address, multiaddr, blockNumber)
-      if (!account.getPublicKey().toAddress().eq(address)) {
-        throw Error("Multiaddr in announcement does not match sender's address")
-      }
-      if (!account.getPeerId() || !PeerId.isPeerId(account.getPeerId())) {
-        throw Error('Peer ID in multiaddr is null')
-      }
-      log('New node announced', account.address.toHex(), account.multiAddr.toString())
-      this.emit('peer', {
-        id: account.getPeerId(),
-        multiaddrs: [account.multiAddr]
-      })
-      await this.db.updateAccount(account)
-    } catch (e) {
-      // Issue with the multiaddress or invalid public key, no worries, we ignore this announcement.
-      log('Error with announced peer', e, event)
+    // publicKey given by the SC always matches the address
+    // const publicKey = PublicKey.fromUncompressedPubKey(stringToU8a(event.args.publicKey))
+    const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
+    const address = Address.fromString(event.args.account)
+    const account = new AccountEntry(address, multiaddr, blockNumber)
+    if (!account.getPublicKey().toAddress().eq(address)) {
+      throw Error("Multiaddr in announcement does not match sender's address")
     }
+    if (!account.getPeerId() || !PeerId.isPeerId(account.getPeerId())) {
+      throw Error('Peer ID in multiaddr is null')
+    }
+    log('New node announced', account.address.toHex(), account.multiAddr.toString())
+    this.emit('peer', {
+      id: account.getPeerId(),
+      multiaddrs: [account.multiAddr]
+    })
+    await this.db.updateAccount(account)
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
-    let channel
-    try {
-      channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
-    } catch (e) {
-      log('could not process channel event, skipping it', e)
-      return
-    }
+    const channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
 
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
