@@ -16,10 +16,9 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Compile LaTeX document
-        with:
-          run: |
-            apt install texlive texlive-science texlive-bibtex-extra
-            make -C docs/yellowpaper/
+        run: |
+          apt install texlive texlive-science texlive-bibtex-extra
+          make -C docs/yellowpaper/
 
       - name: 'Configure Git info'
         run: ./scripts/configure-git-info.sh
