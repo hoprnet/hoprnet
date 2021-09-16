@@ -182,7 +182,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:297
+packages/ethereum/types/IERC777.d.ts:336
 
 ___
 
@@ -228,7 +228,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:425
+packages/ethereum/types/IERC777.d.ts:533
 
 ___
 
@@ -241,10 +241,15 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `AuthorizedOperator` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `AuthorizedOperator(address,address)` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
 | `Burned` | (`operator?`: `string`, `from?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `Burned(address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `from?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
 | `Minted` | (`operator?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `Minted(address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
 | `RevokedOperator` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `RevokedOperator(address,address)` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
 | `Sent` | (`operator?`: `string`, `from?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `Sent(address,address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `from?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
 
 #### Overrides
 
@@ -252,7 +257,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:354
+packages/ethereum/types/IERC777.d.ts:393
 
 ___
 
@@ -284,7 +289,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:179
+packages/ethereum/types/IERC777.d.ts:218
 
 ___
 
@@ -298,7 +303,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:177
+packages/ethereum/types/IERC777.d.ts:216
 
 ___
 
@@ -330,7 +335,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:485
+packages/ethereum/types/IERC777.d.ts:593
 
 ___
 
@@ -470,7 +475,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:138
+packages/ethereum/types/IERC777.d.ts:177
 
 ___
 
@@ -491,7 +496,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:239
+packages/ethereum/types/IERC777.d.ts:278
 
 ___
 
@@ -512,7 +517,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:244
+packages/ethereum/types/IERC777.d.ts:283
 
 ___
 
@@ -534,7 +539,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:246
+packages/ethereum/types/IERC777.d.ts:285
 
 ___
 
@@ -558,7 +563,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:137
+packages/ethereum/types/IERC777.d.ts:176
 
 ___
 
@@ -578,7 +583,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:252
+packages/ethereum/types/IERC777.d.ts:291
 
 ___
 
@@ -596,7 +601,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:139
+packages/ethereum/types/IERC777.d.ts:178
 
 ___
 
@@ -665,7 +670,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:254
+packages/ethereum/types/IERC777.d.ts:293
 
 ___
 
@@ -687,7 +692,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:256
+packages/ethereum/types/IERC777.d.ts:295
 
 ___
 
@@ -742,7 +747,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:141
+packages/ethereum/types/IERC777.d.ts:180
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -762,7 +767,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:164
+packages/ethereum/types/IERC777.d.ts:203
 
 ___
 
@@ -782,7 +787,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:262
+packages/ethereum/types/IERC777.d.ts:301
 
 ___
 
@@ -814,7 +819,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:144
+packages/ethereum/types/IERC777.d.ts:183
 
 ▸ **off**(`eventName`, `listener`): [`IERC777`](IERC777.md)
 
@@ -835,7 +840,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:165
+packages/ethereum/types/IERC777.d.ts:204
 
 ___
 
@@ -867,7 +872,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:148
+packages/ethereum/types/IERC777.d.ts:187
 
 ▸ **on**(`eventName`, `listener`): [`IERC777`](IERC777.md)
 
@@ -888,7 +893,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:166
+packages/ethereum/types/IERC777.d.ts:205
 
 ___
 
@@ -920,7 +925,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:152
+packages/ethereum/types/IERC777.d.ts:191
 
 ▸ **once**(`eventName`, `listener`): [`IERC777`](IERC777.md)
 
@@ -941,7 +946,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:167
+packages/ethereum/types/IERC777.d.ts:206
 
 ___
 
@@ -965,7 +970,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:264
+packages/ethereum/types/IERC777.d.ts:303
 
 ___
 
@@ -990,7 +995,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:272
+packages/ethereum/types/IERC777.d.ts:311
 
 ___
 
@@ -1023,7 +1028,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:171
+packages/ethereum/types/IERC777.d.ts:210
 
 ___
 
@@ -1054,7 +1059,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:160
+packages/ethereum/types/IERC777.d.ts:199
 
 ▸ **removeAllListeners**(`eventName?`): [`IERC777`](IERC777.md)
 
@@ -1074,7 +1079,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:169
+packages/ethereum/types/IERC777.d.ts:208
 
 ___
 
@@ -1106,7 +1111,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:156
+packages/ethereum/types/IERC777.d.ts:195
 
 ▸ **removeListener**(`eventName`, `listener`): [`IERC777`](IERC777.md)
 
@@ -1127,7 +1132,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:168
+packages/ethereum/types/IERC777.d.ts:207
 
 ___
 
@@ -1148,7 +1153,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:281
+packages/ethereum/types/IERC777.d.ts:320
 
 ___
 
@@ -1171,7 +1176,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:286
+packages/ethereum/types/IERC777.d.ts:325
 
 ___
 
@@ -1191,7 +1196,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:293
+packages/ethereum/types/IERC777.d.ts:332
 
 ___
 
@@ -1211,7 +1216,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:295
+packages/ethereum/types/IERC777.d.ts:334
 
 ___
 
