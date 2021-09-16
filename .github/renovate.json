@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "prCreation": "not-pending",
+  "extends": [
+    "config:base",
+    ":pinAllExceptPeerDependencies"
+  ],
+  "docker": {
+    "enabled": true,
+    "pinDigests": true
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true
+  },
+  "semanticCommits": "enabled"
+}
