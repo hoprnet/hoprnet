@@ -5,8 +5,7 @@ on:
     branches: ['master', 'yellowpaper/**']
     paths:
       - 'docs/yellowpaper/**'
-    paths-ignore:
-      - 'docs/yellowpaper/yellowpaper.pdf'
+      - '!docs/yellowpaper/yellowpaper.pdf'
 
 jobs:
   build_latex:
