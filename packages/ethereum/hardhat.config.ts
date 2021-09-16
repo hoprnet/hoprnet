@@ -44,16 +44,16 @@ const hardhatConfig: HardhatUserConfig = {
       saveDeployments: true,
       mining: DEVELOPMENT
         ? {
-            auto: true, // every transaction will trigger a new block (without this deployments fail)
-            interval: [1000, 3000] // mine new block every 1 - 3s
-          }
+          auto: true, // every transaction will trigger a new block (without this deployments fail)
+          interval: [1000, 3000] // mine new block every 1 - 3s
+        }
         : undefined
     },
     goerli: {
       ...networks.goerli,
       live: true,
       tags: ['staging'] as NetworkTag[],
-      gasMultiplier: GAS_MULTIPLIER,
+      gasMultiplier: GAS_MULTIPLIER + 0.3, // Görli has been failing lately with underpriced txs
       url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     },
