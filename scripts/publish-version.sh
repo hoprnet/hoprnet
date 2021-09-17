@@ -67,17 +67,23 @@ new_version=$(${mydir}/get-package-version.sh)
 # commit changes and create Git tag
 git add packages/*/package.json
 git commit -m "chore(release): publish ${new_version}"
+
+# in the meantime new changes might have come in which we need to rebase on before pushing
+git pull origin "${branch}" --rebase --tags
+
+# now tag and proceed
 git tag v${new_version}
 
 # only make remote changes if running in CI
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
+  # we push changes back onto origin
+  git push origin "${branch}"
+  # we only push the tag if we succeeded to push the changes onto master
+  git push origin tag "v${new_version}"
+
   # publish each workspace package to npm
   if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
     yarn config set npmAuthToken "${NODE_AUTH_TOKEN:-}"
   fi
   yarn workspaces foreach -piv --no-private --topological-dev npm publish --access public
-
-  # we push changes back onto origin only if the npm publish step worked
-  git push origin "${branch}"
-  git push origin tag "v${new_version}"
 fi
