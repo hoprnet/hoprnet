@@ -235,5 +235,5 @@ done
 
 for i in `seq 1 10`; do
   log "Node 1 send message to node 5"
-  run_command "${api1}" "send ${addr5} 'hello, world'" "Message sent" 600
+  run_command "${api1}" "send ,${addr5} 'hello, world'" "Message sent" 600
 done
