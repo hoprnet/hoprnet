@@ -282,9 +282,13 @@ class Indexer extends EventEmitter {
   }
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
-    // publicKey given by the SC always matches the address
-    // const publicKey = PublicKey.fromUncompressedPubKey(stringToU8a(event.args.publicKey))
+    // publicKey given by the SC is verified
+    const publicKey = PublicKey.fromUncompressedPubKey(stringToU8a(event.args.publicKey))
     const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
+      // remove "p2p" and corresponding peerID
+      .decapsulateCode(421)
+      // add new peerID
+      .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
     const address = Address.fromString(event.args.account)
     const account = new AccountEntry(address, multiaddr, blockNumber)
     if (!account.getPublicKey().toAddress().eq(address)) {
