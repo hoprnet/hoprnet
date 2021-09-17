@@ -62,6 +62,14 @@ jobs:
           ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
           NETWORK: goerli
 
+      - name: '[SMART-CONTRACTS] Deploy on Polygon'
+        if: ${{ !env.ACT }}
+        run: ./scripts/deploy-smart-contracts.sh
+        env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
+          NETWORK: polygon
+
       - name: '[SMART-CONTRACTS] Deploy on xDai'
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh

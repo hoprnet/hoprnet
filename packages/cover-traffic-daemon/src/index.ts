@@ -18,7 +18,7 @@ function stopGracefully(signal: number) {
 const argv = yargs(process.argv.slice(2))
   .option('provider', {
     describe: 'A provider url for the network this node shall operate on',
-    default: 'https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/',
+    default: 'https://provider-proxy.hoprnet.workers.dev/matic_rio',
     string: true
   })
   .option('privateKey', {
