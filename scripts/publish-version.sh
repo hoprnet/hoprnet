@@ -38,7 +38,7 @@ fi
 
 # ensure local copy is up-to-date with origin
 branch=$(git rev-parse --abbrev-ref HEAD)
-git pull origin "${branch}" --rebase
+git pull origin "${branch}" --rebase --tags
 
 # get package info
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
@@ -71,12 +71,13 @@ git tag v${new_version}
 
 # only make remote changes if running in CI
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
-  # push changes back onto origin including new tag
-  git push origin "${branch}" --tags
-
   # publish each workspace package to npm
   if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
     yarn config set npmAuthToken "${NODE_AUTH_TOKEN:-}"
   fi
   yarn workspaces foreach -piv --no-private --topological-dev npm publish --access public
+
+  # we push changes back onto origin only if the npm publish step worked
+  git push origin "${branch}"
+  git push origin tag "v${new_version}"
 fi
