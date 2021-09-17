@@ -141,7 +141,7 @@ describe('test Balance primitive', function () {
   })
 
   it('should format Balance', function () {
-    assert.strictEqual(new Balance(balance).toFormattedString(), '0.000000000000000001 mHOPR')
+    assert.strictEqual(new Balance(balance).toFormattedString(), '0.000000000000000001 HOPR')
   })
 })
 

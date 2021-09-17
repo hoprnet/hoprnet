@@ -1,6 +1,6 @@
 {
-  "address": "0xd827162C35941a053031df832c773b8A887B6a45",
-  "transactionHash": "0x1f3257803dfd5b50c8c04c2761209c2e2b693cd378cfab71e14a4be7f3cb0e6d",
+  "address": "0x9a8114412E1d1eb4644c7a6212D9A28A79269aA7",
+  "transactionHash": "0x2bd144942996e8aaac29622793d93227c3e57cba447e0c294ec13df99e9e744f",
   "blockNumber": 9,
   "metadata": {
     "solcVersion": "0.8.3",
@@ -214,6 +214,56 @@
         {
           "indexed": true,
           "internalType": "address",
+          "name": "funder",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "source",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "destination",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "ChannelFunded",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "source",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "destination",
+          "type": "address"
+        }
+      ],
+      "name": "ChannelOpened",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "source",
           "type": "address"
         },
@@ -267,7 +317,7 @@
           "type": "tuple"
         }
       ],
-      "name": "ChannelUpdate",
+      "name": "ChannelUpdated",
       "type": "event"
     },
     {
@@ -329,43 +379,6 @@
         }
       ],
       "name": "TicketRedeemed",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "account1",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "account2",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount1",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount2",
-          "type": "uint256"
-        }
-      ],
-      "name": "TokensReceived",
       "type": "event"
     },
     {
