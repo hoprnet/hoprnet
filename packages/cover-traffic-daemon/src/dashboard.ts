@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import blessed from 'blessed'
 import contrib from 'blessed-contrib'
 import type { State, OpenChannels } from './state'
