@@ -93,7 +93,7 @@ In the original Sphinx paper, $Z$ is concatenated with an identifier $I$
     and $0$ padding sequence, where $I$ is used for SURBs (single-use reply
     blocks) such that $I \in \{0, 1\}^\kappa$. We do not use $I$ since HOPR does not
     currently employ SURBs. We do, however, include $hint$ and $challenge$ values in
-    $\beta$, defined in the \nameref{sec:proofofrelay} section. These values are not included in the original Sphinx paper but are needed for the HOPR protocol.
+    $\beta$, defined in Section \ref{sec:proofofrelay}. These values are not included in the original Sphinx paper but are needed for the HOPR protocol.
     Since $A$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them.
     Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC),
 which is encoded in the header.
