@@ -14,10 +14,10 @@ WORKDIR /app
 # enable to pass the version to Docker using either --build-arg or an
 # environment variable
 # if its not given, yarn will install the latest version of the package
-ARG TARGET_VERSION
-RUN echo "ARG TARGET_VERSION=${TARGET_VERSION}"
-ENV TARGET_VERSION=${TARGET_VERSION:-}
-RUN echo "ENV TARGET_VERSION=${TARGET_VERSION}"
+ARG PACKAGE_VERSION
+RUN echo "ARG PACKAGE_VERSION=${PACKAGE_VERSION}"
+ENV PACKAGE_VERSION=${PACKAGE_VERSION:-}
+RUN echo "ENV PACKAGE_VERSION=${PACKAGE_VERSION}"
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
@@ -25,7 +25,7 @@ ENV NODE_OPTIONS=--max_old_space_size=4096
 ENV npm_config_build_from_source false
 
 # install hoprd as a local module
-RUN yarn add @hoprnet/hopr-cover-traffic-daemon@${TARGET_VERSION}
+RUN yarn add @hoprnet/hopr-cover-traffic-daemon@${PACKAGE_VERSION}
 
 # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-buster-slim@sha256:ddb4d0ea63591c5a4ef6a9778e3913c3bfcc70328240bb4f97d31d4843587f9b as runtime

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.77.0-next.13",
+  "version": "1.77.0-next.20",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -34,7 +34,7 @@
     "bn.js": "5.2.0",
     "chalk": "^4.1.0",
     "debug": "^4.3.1",
-    "ethers": "^5.4.6",
+    "ethers": "5.4.7",
     "heap-js": "^2.1.2",
     "multiaddr": "^10.0.0",
     "peer-id": "0.15.3",
@@ -53,7 +53,7 @@
     "ts-node": "^10.1.0",
     "typedoc": "0.21.9",
     "typedoc-plugin-markdown": "3.10.4",
-    "typescript": "4.4.2"
+    "typescript": "4.4.3"
   },
   "mocha": {
     "extension": [

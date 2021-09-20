@@ -135,16 +135,43 @@ gcloud_cleanup_docker_images() {
 # $1 - template name
 # $2 - container image
 # $3 - rpc endpoint
-# $4 - api token
-# $5 - password
+# $4 - optional: api token
+# $5 - optional: password
+# $6 - optional: private key
+# $7 - optional: no args
 gcloud_create_or_update_instance_template() {
-  local name mount_path image rpc api_token password host_path
+  local args name mount_path image rpc api_token password host_path extra_args
+  local no_args private_key
 
   name="${1}"
   image="${2}"
   rpc="${3}"
-  api_token="${4}"
-  password="${5}"
+
+  # these parameters are only used by hoprd nodes
+  api_token="${4:-}"
+  password="${5:-}"
+
+  # this parameter is mostly used on by CT nodes, although hoprd nodes also
+  # support it
+  private_key="${6:-}"
+
+  # if set no additional arguments are used to start the container
+  no_args="${7:-}"
+
+  args="--container-arg=\"--provider\" --container-arg=\"${rpc}\""
+
+  if [ -n "${api_token}" ]; then
+    extra_args="${extra_args} --container-arg=\"--apiToken\" --container-arg=\"${api_token}\""
+  fi
+
+  if [ -n "${password}" ]; then
+    extra_args="${extra_args} --container-arg=\"--password\" --container-arg=\"${password}\""
+  fi
+
+  if [ -n "${private_key}" ]; then
+    extra_args="${extra_args} --container-arg=\"--privateKey\" --container-arg=\"${private_key}\""
+  fi
+
   mount_path="/app/db"
   host_path="/var/hoprd"
 
@@ -155,32 +182,48 @@ gcloud_create_or_update_instance_template() {
   fi
 
   log "creating instance template ${name}"
-  gcloud compute instance-templates create-with-container "${name}" \
-    --machine-type=e2-medium \
-    --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
-    --maintenance-policy=MIGRATE \
-    --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
-    --boot-disk-size=20GB \
-    --boot-disk-type=pd-balanced \
-    --image-family=cos-stable \
-    --image-project=cos-cloud \
-    --container-image="${image}" \
-    --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
-    --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
-    --container-arg="--admin" \
-    --container-arg="--adminHost" --container-arg="0.0.0.0" \
-    --container-arg="--announce" \
-    --container-arg="--apiToken" --container-arg="${api_token}" \
-    --container-arg="--healthCheck" \
-    --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-    --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
-    --container-arg="--init" \
-    --container-arg="--password" --container-arg="${password}" \
-    --container-arg="--provider" --container-arg="${rpc}" \
-    --container-arg="--rest" \
-    --container-arg="--restHost" --container-arg="0.0.0.0" \
-    --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
-    --container-restart-policy=always
+
+  if [ "${no_args}" = "true" ]; then
+    gcloud compute instance-templates create-with-container "${name}" \
+      --machine-type=e2-medium \
+      --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
+      --maintenance-policy=MIGRATE \
+      --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
+      --boot-disk-size=20GB \
+      --boot-disk-type=pd-balanced \
+      --image-family=cos-stable \
+      --image-project=cos-cloud \
+      --container-image="${image}" \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
+      --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
+      --container-restart-policy=always \
+      ${extra_args}
+  else
+    gcloud compute instance-templates create-with-container "${name}" \
+      --machine-type=e2-medium \
+      --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
+      --maintenance-policy=MIGRATE \
+      --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
+      --boot-disk-size=20GB \
+      --boot-disk-type=pd-balanced \
+      --image-family=cos-stable \
+      --image-project=cos-cloud \
+      --container-image="${image}" \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
+      --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
+      --container-restart-policy=always \
+      ${extra_args} \
+      --container-arg="--admin" \
+      --container-arg="--adminHost" --container-arg="0.0.0.0" \
+      --container-arg="--announce" \
+      --container-arg="--healthCheck" \
+      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
+      --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
+      --container-arg="--init" \
+      --container-arg="--rest" \
+      --container-arg="--restHost" --container-arg="0.0.0.0" \
+      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\""
+  fi
 }
 
 # $1 - template name

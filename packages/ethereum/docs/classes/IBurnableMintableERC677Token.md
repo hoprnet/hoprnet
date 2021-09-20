@@ -180,7 +180,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:296
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:317
 
 ___
 
@@ -225,7 +225,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:381
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:420
 
 ___
 
@@ -238,7 +238,9 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``, `data?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`], `Object`\> |
+| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Transfer(address,address,uint256,bytes)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``, `data?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`], `Object`\> |
 
 #### Overrides
 
@@ -246,7 +248,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:360
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:381
 
 ___
 
@@ -277,7 +279,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:164
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:185
 
 ___
 
@@ -291,7 +293,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:162
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:183
 
 ___
 
@@ -322,7 +324,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:448
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:487
 
 ___
 
@@ -460,7 +462,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:290
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:311
 
 ___
 
@@ -482,7 +484,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:231
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:252
 
 ___
 
@@ -506,7 +508,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:123
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:144
 
 ___
 
@@ -527,7 +529,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:276
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:297
 
 ___
 
@@ -548,7 +550,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:265
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:286
 
 ___
 
@@ -570,7 +572,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:270
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:291
 
 ___
 
@@ -594,7 +596,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:122
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:143
 
 ___
 
@@ -616,7 +618,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:278
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:299
 
 ___
 
@@ -634,7 +636,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:124
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:145
 
 ___
 
@@ -705,7 +707,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:246
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:267
 
 ___
 
@@ -760,7 +762,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:126
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:147
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -780,7 +782,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:149
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:170
 
 ___
 
@@ -802,7 +804,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:259
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:280
 
 ___
 
@@ -834,7 +836,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:129
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:150
 
 ▸ **off**(`eventName`, `listener`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -855,7 +857,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:150
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:171
 
 ___
 
@@ -887,7 +889,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:133
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:154
 
 ▸ **on**(`eventName`, `listener`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -908,7 +910,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:151
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:172
 
 ___
 
@@ -940,7 +942,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:137
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:158
 
 ▸ **once**(`eventName`, `listener`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -961,7 +963,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:152
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:173
 
 ___
 
@@ -994,7 +996,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:156
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:177
 
 ___
 
@@ -1025,7 +1027,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:145
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:166
 
 ▸ **removeAllListeners**(`eventName?`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -1045,7 +1047,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:154
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:175
 
 ___
 
@@ -1077,7 +1079,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:141
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:162
 
 ▸ **removeListener**(`eventName`, `listener`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -1098,7 +1100,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:153
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:174
 
 ___
 
@@ -1118,7 +1120,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:237
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:258
 
 ___
 
@@ -1140,7 +1142,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:284
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:305
 
 ___
 
@@ -1163,7 +1165,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:252
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:273
 
 ___
 
@@ -1186,7 +1188,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:239
+packages/ethereum/types/IBurnableMintableERC677Token.d.ts:260
 
 ___
 
