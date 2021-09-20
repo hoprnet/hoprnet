@@ -1,4 +1,4 @@
-FROM gitpod/workspace-full@sha256:d191ad0b17210682d692eeae42daab4b5d29f146c25288f47843073eb4d45113
+FROM gitpod/workspace-full@sha256:3ba16dad787233abc63227ff0f0effa9db584c6aaee15a7dae023f8fe002cb9d
 
 # Install & use custom Node.js version
 ENV NODE_VERSION=16
