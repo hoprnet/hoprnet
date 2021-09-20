@@ -1023,7 +1023,7 @@ __metadata:
     leveldown: ~6.0.1
     levelup: ~5.0.1
     libp2p: 0.32.4
-    libp2p-kad-dht: 0.24.0
+    libp2p-kad-dht: 0.24.2
     libp2p-mplex: 0.10.4
     libp2p-tcp: ^0.17.2
     memdown: ^6.0.0
@@ -10592,9 +10592,9 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p-kad-dht@npm:0.24.0":
-  version: 0.24.0
-  resolution: "libp2p-kad-dht@npm:0.24.0"
+"libp2p-kad-dht@npm:0.24.2":
+  version: 0.24.2
+  resolution: "libp2p-kad-dht@npm:0.24.2"
   dependencies:
     debug: ^4.3.1
     err-code: ^3.0.0
@@ -10619,7 +10619,7 @@ fsevents@~2.1.1:
     streaming-iterables: ^6.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: 0de8cf6e722392316317a8ab39738f53edd144a857ace990e0cac838644d0c02948793ee9313b9597dc41d578edbb983579b8000025c2ce897bda44192de27c7
+  checksum: 429271b868bfb6991b80619bae61925c4b84535798ece5cbfb4a766010f99d842c5da5a05e0373631ed25f7ac34db0409703c619d13540a1c2a2d603e3596e90
   languageName: node
   linkType: hard
 
