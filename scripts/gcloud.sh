@@ -169,7 +169,7 @@ gcloud_create_or_update_instance_template() {
   fi
 
   if [ -n "${private_key}" ]; then
-    extra_args="${extra_args} --container-arg=\"--privateKey\" --container-arg=\"${private_key}\""
+    extra_args="${extra_args} --container-arg=--privateKey --container-arg=\"${private_key}\""
   fi
 
   mount_path="/app/db"

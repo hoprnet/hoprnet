@@ -77,9 +77,6 @@ function cleanup {
 
 if [ "${perform_cleanup}" = "1" ] || [ "${perform_cleanup}" = "true" ]; then
   cleanup
-
-  # exit right away
-  exit
 fi
 
 # --- Log test info {{{
