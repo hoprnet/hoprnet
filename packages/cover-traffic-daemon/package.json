@@ -37,7 +37,7 @@
   "devDependencies": {
     "@types/blessed": "0.1.19",
     "@types/rimraf": "^3",
-    "@types/yargs": "^17",
+    "@types/yargs": "17.0.3",
     "mocha": "9.1.1",
     "rimraf": "^3.0.2",
     "typedoc": "0.21.9",
