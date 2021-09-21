@@ -5,6 +5,9 @@ import type PeerId from 'peer-id'
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
+import debug from 'debug'
+
+const log = debug('hopr-core:packet:forward')
 
 const FORWARD_TIMEOUT = durations.seconds(6)
 
@@ -42,9 +45,15 @@ export class PacketForwardInteraction {
       this.emitMessage(packet.plaintext)
     } else {
       await packet.storeUnacknowledgedTicket(this.db)
-      await packet.forwardTransform(this.privKey, this.chain)
-
-      await this.interact(pubKeyToPeerId(packet.nextHop), packet)
+      try { 
+        await packet.forwardTransform(this.privKey, this.chain)
+        await this.interact(pubKeyToPeerId(packet.nextHop), packet)
+      } catch (e) {
+        // Errors include:
+        // - not knowing about the channel in our db, because the
+        //   indexer is not caught up yet.
+        log('error while transforming packet, packet is dropped', e)
+      }
     }
 
     sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
