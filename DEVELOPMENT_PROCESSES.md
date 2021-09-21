@@ -97,6 +97,7 @@ _Where:_ In element channel `tech - eod`
 ### Absence
 
 Every Team Member is responsible for letting the rest of the team know about illness/absence/vacation.
+_TODO: extend_
 
 ## Sprints
 
@@ -344,3 +345,10 @@ daily workflow as it was before.
   marked with a **PUBLIC RELEASE**, we cut a `release/**`
   branch, using an internal name to identify the release. Official milestones
   use a specific name with the codename of a mountain in Switzerland.
+
+<!--
+TODO:
+
+- fix various TODOs in document
+- emailing process
+-->
