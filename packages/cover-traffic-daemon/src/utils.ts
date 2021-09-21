@@ -4,6 +4,9 @@ import { BigNumber } from 'bignumber.js'
 import { PublicKey, ChannelEntry } from '@hoprnet/hopr-utils'
 import type { State, ChannelData, PersistedState } from './state'
 import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
+import debug from 'debug'
+
+const log = debug('cover-traffic')
 
 export const addBN = (a: BN, b: BN): BN => a.add(b)
 export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().integerValue().toFixed(), 10)
@@ -107,10 +110,10 @@ export const sendCTMessage = async (
     )
 
     path.forEach((p) => data.incrementForwards(p))
-    data.log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
+    log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
-    data.log(`Could not find path: ${startNode.toB58String()} -> ${selfPub.toPeerId()} (${e})`)
+    log(`Could not find path: ${startNode.toB58String()} -> ${selfPub.toPeerId()} (${e})`)
     return false
   }
   try {
@@ -119,7 +122,7 @@ export const sendCTMessage = async (
     return true
   } catch (e) {
     //console.log(e)
-    data.log('error sending to' + startNode.toPeerId().toB58String())
+    log('error sending to' + startNode.toPeerId().toB58String())
     return false
   }
 }

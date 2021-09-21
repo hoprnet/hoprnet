@@ -9,6 +9,9 @@ import { CoverTrafficStrategy } from './strategy'
 import { ChannelEntry, privKeyToPeerId, PublicKey } from '@hoprnet/hopr-utils'
 import type PeerId from 'peer-id'
 import BN from 'bn.js'
+import debug from 'debug'
+
+const log = debug('cover-traffic')
 
 function stopGracefully(signal: number) {
   console.log(`Process exiting with signal ${signal}`)
@@ -58,18 +61,18 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     data.setNode(peer)
   }
 
-  data.log('creating a node...')
+  log('creating a node...')
   const node = new Hopr(peerId, options)
-  data.log('setting up indexer')
+  log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
   node.indexer.on('block', (blockNumber) => data.setBlock(new BN(blockNumber.toString())))
 
-  data.log('waiting for node to be funded')
+  log('waiting for node to be funded')
   await node.waitForFunds()
-  data.log('starting node ...')
+  log('starting node ...')
   await node.start()
-  data.log('node is running')
+  log('node is running')
   const channels = await node.getChannelsFrom(selfAddr)
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))
   node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))

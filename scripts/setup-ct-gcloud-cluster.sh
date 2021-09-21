@@ -33,6 +33,7 @@ usage() {
   msg "------------------------------"
   msg
   msg "CT_PRIV_KEY\t\t\tsets the account which is used to run the nodes"
+  msg "HOPRD_INFURA_KEY\t\t\tfor the provider"
   msg
   msg "Optional environment variables"
   msg "------------------------------"
@@ -76,9 +77,6 @@ function cleanup {
 
 if [ "${perform_cleanup}" = "1" ] || [ "${perform_cleanup}" = "true" ]; then
   cleanup
-
-  # exit right away
-  exit
 fi
 
 # --- Log test info {{{

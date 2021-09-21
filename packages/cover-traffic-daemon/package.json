@@ -30,8 +30,6 @@
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "bignumber.js": "9.0.1",
-    "blessed": "^0.1.81",
-    "blessed-contrib": "^4.10.0",
     "bn.js": "5.2.0",
     "peer-id": "0.15.3",
     "yargs": "^17.1.1"

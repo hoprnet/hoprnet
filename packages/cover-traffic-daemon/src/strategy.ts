@@ -14,6 +14,9 @@ import {
   CT_CHANNEL_STALL_TIMEOUT,
   CT_OPEN_CHANNEL_QUALITY_THRESHOLD
 } from './constants'
+import debug from 'debug'
+
+const log = debug('cover-traffic')
 
 export class CoverTrafficStrategy extends SaneDefaults {
   name = 'covertraffic'
@@ -101,7 +104,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
         }
       }
     } else {
-      this.data.log('aborting send messages - less channels in network than hops required')
+      log('aborting send messages - less channels in network than hops required')
     }
 
     let attempts = 0
@@ -133,7 +136,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       toOpen.push([c, CHANNEL_STAKE])
     }
 
-    this.data.log(
+    log(
       `strategy tick: ${Date.now()} balance:${balance.toString()} open:${toOpen
         .map((p) => p[0].toPeerId().toB58String())
         .join(',')} close: ${toClose.map((p) => p.toPeerId().toB58String()).join(',')}`.replace('\n', ', ')
