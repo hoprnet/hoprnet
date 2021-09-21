@@ -1,9 +1,8 @@
-# Development Workflow
+# Development Processes
 
-The HOPR Association tech team members have agreed on the following planning
-an development processes to streamline the implementation of the HOPR protocol.
+The HOPR Association _tech_ members have agreed on the following development processes to streamline the implementation of the HOPR protocol.
 
-- [Development Workflow](#development-workflow)
+- [Development Processes](#development-processes)
   - [Legend](#legend)
     - [Ambassadors](#ambassadors)
     - [Trifecta](#trifecta)
@@ -12,6 +11,7 @@ an development processes to streamline the implementation of the HOPR protocol.
       - [Text Update](#text-update)
       - [Video call](#video-call)
     - [End of working day](#end-of-working-day)
+    - [Absence](#absence)
   - [Sprints](#sprints)
     - [Task Grooming](#task-grooming)
       - [External issues](#external-issues)
@@ -19,6 +19,7 @@ an development processes to streamline the implementation of the HOPR protocol.
     - [Epic Prioritization](#epic-prioritization)
       - [The Roadmap columns](#the-roadmap-columns)
     - [Sprint Planning](#sprint-planning)
+    - [Fire alarm](#fire-alarm)
   - [Development](#development)
     - [Principles](#principles)
     - [Rules](#rules)
@@ -34,19 +35,18 @@ an development processes to streamline the implementation of the HOPR protocol.
 
 ## Legend
 
-| Name        | Description                                                                        |
-| ----------- | ---------------------------------------------------------------------------------- |
-| Ambassadors | Two tech team members elected to be the bridge between tech team and Project Owner |
-| Trifecta    | Ambassadors + Project Owner                                                        |
+| Name          | Description                                                                   |
+| ------------- | ----------------------------------------------------------------------------- |
+| Project Owner | _TODO_                                                                        |
+| Ambassadors   | Two tech members elected to be the bridge between tech team and Project Owner |
+| Trifecta      | Ambassadors + Project Owner                                                   |
+| Issue tracker | The sole issue tracker is [GitHub](https://github.com/hoprnet)                |
 
 ### Ambassadors
 
 Elected ambassadors are rotated every `2 months`.
 
-<!-- TODO: Bi-weekly priorities check done by Trifecta of two “Ambassadors” elected and Sebbi responsible for Backlog grooming.
-Escalation issues decided by Ambassadors
-Ticket Duration Estimation is done by Trifecta BEFORE Sprint Planning and is part of Backlog Grooming
--->
+- bridge between tech team and Project Owner
 
 _Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nionis)
 _Expiry:_ 5/11/21
@@ -54,6 +54,9 @@ _Expiry:_ 5/11/21
 ### Trifecta
 
 Trifecta is made up by the Project Owner and the ambassadors.
+
+- bi-weekly [epic priorities](#epic-prioritization) check
+- task duration estimation done before [Sprint Planning](#sprint-planning)
 
 _Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nionis), [Sebastian](https://github.com/SCBuergel)
 
@@ -63,35 +66,37 @@ _Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nioni
 
 #### Text Update
 
-For every working day, all team members are required to write an update on what they will be working on throughout the day. Ideally, the list should be accompanied by github issues or PRs.
+For every working day, all members are required to write an update on what they will be working on throughout the day. Ideally, the list should be accompanied by github issues or PRs.
 
 _Required:_ `True`
+
 _When:_ Every working day, at start of work
+
 _Where:_ In element channel `tech - daily`
 
 #### Video call
 
-For every working day except Mondays, all team members are required to join the video call with camera. The call is an opportunity for everybody to catch up, call out on things that are blocking them and any other unexpected issues.
+For every working day except Mondays, all members are required to join the video call with camera. The call is an opportunity for everybody to catch up, call out on things that are blocking them and any other unexpected issues.
 
 _Required:_ `True`
+
 _When:_ Every working day except Mondays, time determined by google meet invite
+
 _Where:_ Google meet
 
 ### End of working day
 
-At the end of every working day, team members may write an update on what they have accomplished during the day.
+At the end of every working day, members may write an update on what they have accomplished during the day.
 
 _Required:_ `False`
+
 _When:_ Every day, at end of work
+
 _Where:_ In element channel `tech - eod`
 
-<!-- ### Vacation
+### Absence
 
-Every Team Member is responsible for letting the rest of the team know about planned absence/vacation in advance (TODO: how much).
-
-### Sick
-
-- Every Team Member is responsible for letting the rest of the team know about illness/absence/vacation and giving EOD-Updates -->
+Every Team Member is responsible for letting the rest of the team know about illness/absence/vacation.
 
 ## Sprints
 
@@ -100,6 +105,7 @@ team tries to adhere to as much as possible. Outside of emergency requests
 the priorities stay the same within a sprint's timeframe.
 
 _Length:_ 2 weeks
+
 _Start:_ first day of the week, mostly Monday
 
 The start and end of a sprint is defined by a set of activities in which
@@ -110,11 +116,11 @@ mostly the whole team is involved in:
 3. Epic Prioritization
 4. Task Planning
 
-<!-- TODO: define a small guide how the meeting is carried out -->
+_TODO: define a small guide how the meetings are carried out_
 
 ### Task Grooming
 
-On the last day of a sprint all team members shall spend time cleaning up
+On the last day of a sprint all members shall spend time cleaning up
 tasks and PRs on Github. This includes but is not limited to:
 
 - updating progress on tasks
@@ -123,7 +129,8 @@ tasks and PRs on Github. This includes but is not limited to:
 - moving tasks on sprint boards to correct columns
 - [responding to issues created by externals](#external-issues)
 
-_Who:_ all team members individually
+_Who:_ all members individually
+
 _When:_ first day of the sprint or before a vacation
 
 #### External issues
@@ -141,7 +148,8 @@ In `Retrospective` we aim to summurize the results of the last spring, in order 
 - what went worse than expected
 - lessons learned
 
-_Who:_ all team members within a meeting
+_Who:_ all members within a meeting
+
 _When:_ first day of the sprint
 
 ### Epic Prioritization
@@ -152,7 +160,7 @@ Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/project
 
 - closed epics are moved to `Acceptance`
 - epics within `Acceptance` column are accepted by [Trifecta](#trifecta) prior to the meeting
-- ensure newly created epics are well created (TODO: define criteria)
+- ensure newly created epics are well created _TODO: define_
 - adapt epic priorities
 - create new [Sprint](#sprint-planning) project
 
@@ -174,6 +182,7 @@ Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/project
   as part of the `Task Grooming` phase.
 
 _Who:_ [Trifecta](#trifecta)
+
 _When_: first day of a sprint
 
 ### Sprint Planning
@@ -184,10 +193,20 @@ account as much as possible.
 - Each sprint has its own taskboard, e.g. [Sprint 36-37](https://github.com/orgs/hoprnet/projects/11).
 - Epic issues are further refined into tasks which have clear definitions of work and done.
 - Ideally each team member has only one task assigned which is `in progress`.
-- Team members which are coming back from vacation should already have tasks assigned to them. _(TODO: whos job?)_
+- members which are coming back from vacation should already have tasks assigned to them. _TODO: whos job?_
 
-_Who:_ all team members within a meeting
+_Who:_ all members within a meeting
+
 _When:_ first day of the sprint
+
+### Fire alarm
+
+It's possible that throughout the planned sprint, we encounter a bag of issues that need to be resolved ASAP.
+
+1. As soon issue is detected, an [ambassador](#ambassadors) needs to take up the task of coordinating how the issue is tackled
+2. Member appointed then is responsible for finding the right member within the tech team that has the most knowledge on the current issue, let's say that's Alice
+3. Alice investigates issue and may ask other members for help
+4. Alice patches issue
 
 ## Development
 
@@ -201,7 +220,7 @@ _When:_ first day of the sprint
 
 ### Rules
 
-- All PR‘s **have to be approved** by at least two team members.
+- All PR‘s **have to be approved** by at least two members.
 - Respect our CI pipeline. If you break it, you fix it.
 - All PR‘s must pass all status checks/tests before merging.
 - Releases can be merged back to `master`, but not always necessary.
@@ -249,7 +268,7 @@ particular branch to deploy on every change.
    run the tests on every single push.
 
 3. When the code is ready, mark the pull-request as ready to review, and request
-   a code-review from a maintainer. In the case of team members, the approval of an
+   a code-review from a maintainer. In the case of members, the approval of an
    additional team member is required. Externals require **two** maintainers to
    approve the change.
 
@@ -288,7 +307,7 @@ particular branch to deploy on every change.
    in the file `scripts/environment.sh` as well as `packages/avado/Dockerfile` and add an entry to `CHANGELOG.md`.
 
 2. The information about the release, how to test and what commands to run, are
-   then shared within our #release channel. On the #testing channel, team members are expected
+   then shared within our #release channel. On the #testing channel, members are expected
    to run their own nodes (either AVADO or via their workstation) to participate in the release.
 3. Patches to the release are created via `hotfix/**` branches. Each of these merges will trigger
    a new release version, and re-build our infrastructure for that version. Upon successfullly
