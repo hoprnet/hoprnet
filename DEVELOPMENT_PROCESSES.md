@@ -97,7 +97,10 @@ _Where:_ In element channel `tech - eod`
 ### Absence
 
 Every Team Member is responsible for letting the rest of the team know about illness/absence/vacation.
-_TODO: extend_
+
+- unexpected absence needs to be reported ASAP through email
+
+_TODO: add info about planned absences_
 
 ## Sprints
 
