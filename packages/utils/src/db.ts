@@ -325,7 +325,7 @@ export class HoprDB {
     await this.put(LATEST_BLOCK_NUMBER_KEY, blockNumber.toBuffer())
   }
 
-  async getLatestConfirmedSnapshot(): Promise<Snapshot | undefined> {
+  async getLatestConfirmedSnapshotOrUndefined(): Promise<Snapshot | undefined> {
     return await this.getCoercedOrDefault(LATEST_CONFIRMED_SNAPSHOT_KEY, Snapshot.deserialize, undefined)
   }
 
