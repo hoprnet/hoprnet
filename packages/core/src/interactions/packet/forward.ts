@@ -45,7 +45,7 @@ export class PacketForwardInteraction {
       this.emitMessage(packet.plaintext)
     } else {
       await packet.storeUnacknowledgedTicket(this.db)
-      try { 
+      try {
         await packet.forwardTransform(this.privKey, this.chain)
         await this.interact(pubKeyToPeerId(packet.nextHop), packet)
       } catch (e) {
