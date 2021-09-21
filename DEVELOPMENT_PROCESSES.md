@@ -22,6 +22,7 @@ The HOPR Association _tech_ members have agreed on the following development pro
     - [Fire alarm](#fire-alarm)
   - [Development](#development)
     - [Principles](#principles)
+    - [Issue creation](#issue-creation)
     - [Rules](#rules)
     - [Releases](#releases)
     - [Workflow](#workflow)
@@ -32,6 +33,7 @@ The HOPR Association _tech_ members have agreed on the following development pro
       - [Release Version Bump (`master` -> `release/**` = `x.y.z-0.next.*` -> `x.y.0`)](#release-version-bump-master---release--xyz-0next---xy0)
       - [Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)](#minor-version-bump-release---master--xy---xy10-next0)
     - [Branches](#branches)
+    - [Labels](#labels)
 
 ## Legend
 
@@ -222,6 +224,10 @@ It's possible that throughout the planned sprint, we encounter a bag of issues t
 - Automation-first. Whenever possible, rely on automation.
 - Test early, test often. They prevent bad deployments and API regressions.
 
+### Issue creation
+
+_TODO: epics, other_
+
 ### Rules
 
 - All PR‘s **have to be approved** by at least two members.
@@ -355,3 +361,15 @@ TODO:
 - fix various TODOs in document
 - emailing process
 -->
+
+### Labels
+
+All hopr repositories need to support these labels.
+
+| Name    | Description                           | Color                                           |
+| ------- | ------------------------------------- | ----------------------------------------------- |
+| epic    | An issue which tracks multiple issues | <span style="background:#2473b7">#2473b7</span> |
+| bug     | Something isn't working               | <span style="background:#d73a4a">#d73a4a</span> |
+| feature | New feature or request                | <span style="background:#d73a4a">#a2eeef</span> |
+
+_TODO: extend_
