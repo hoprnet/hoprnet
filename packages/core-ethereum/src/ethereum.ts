@@ -216,7 +216,13 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     )
 
     try {
-      const confirmation = await sendTransaction(true, populatedTx, channels.announce, publicKey.toUncompressedPubKeyHex(), multiaddr.bytes)
+      const confirmation = await sendTransaction(
+        true,
+        populatedTx,
+        channels.announce,
+        publicKey.toUncompressedPubKeyHex(),
+        multiaddr.bytes
+      )
       return confirmation.hash
     } catch {
       throw new Error('Fatal error, announce transaction failed')

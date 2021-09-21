@@ -39,7 +39,6 @@ class Channel {
     private readonly privateKey: Uint8Array,
     private readonly events: EventEmitter
   ) {
-
     const setCommitment = (commitment: Hash): Promise<string> => {
       try {
         return this.chain.setCommitment(counterparty.toAddress(), commitment)
