@@ -214,9 +214,13 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       publicKey.toUncompressedPubKeyHex(),
       multiaddr.bytes
     )
-    return (
-      await sendTransaction(true, populatedTx, channels.announce, publicKey.toUncompressedPubKeyHex(), multiaddr.bytes)
-    ).hash
+
+    try {
+      const confirmation = await sendTransaction(true, populatedTx, channels.announce, publicKey.toUncompressedPubKeyHex(), multiaddr.bytes)
+      return confirmation.hash
+    } catch {
+      throw new Error('Fatal error, announce transaction failed')
+    }
   }
 
   async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
