@@ -44,7 +44,7 @@
     "heap-js": "^2.1.6",
     "leveldown": "~6.0.1",
     "levelup": "~5.0.1",
-    "libp2p": "0.32.4",
+    "libp2p": "0.32.5",
     "libp2p-kad-dht": "0.24.2",
     "libp2p-mplex": "0.10.4",
     "multiaddr": "^10.0.0",
