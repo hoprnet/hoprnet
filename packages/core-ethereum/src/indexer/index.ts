@@ -336,8 +336,17 @@ class Indexer extends EventEmitter {
     }
     log(`Found channel ${chalk.yellow(channel.getId().toHex())} to us with unset commitment. Setting commitment`)
 
+    const setCommitment = (commitment: Hash): Promise<string> => {
+      try {
+        return this.chain.setCommitment(channel.source.toAddress(), commitment)
+      } catch (e) {
+        log('Error setting commitment', e)
+        // TODO: defer to channel strategy for this, and allow for retries.
+      }
+    }
+
     return new Commitment(
-      (comm: Hash) => this.chain.setCommitment(channel.source.toAddress(), comm),
+      setCommitment,
       async () => (await this.getChannel(channel.getId())).commitment,
       this.db,
       channel.getId(),
