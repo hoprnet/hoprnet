@@ -44,8 +44,8 @@
     "heap-js": "^2.1.6",
     "leveldown": "~6.0.1",
     "levelup": "~5.0.1",
-    "libp2p": "0.32.4",
-    "libp2p-kad-dht": "0.24.0",
+    "libp2p": "0.32.5",
+    "libp2p-kad-dht": "0.24.2",
     "libp2p-mplex": "0.10.4",
     "multiaddr": "^10.0.0",
     "peer-id": "^0.15.1",
@@ -64,7 +64,7 @@
     "ts-node": "^10.1.0",
     "typedoc": "0.21.9",
     "typedoc-plugin-markdown": "3.10.4",
-    "typescript": "4.4.2"
+    "typescript": "4.4.3"
   },
   "mocha": {
     "extension": [

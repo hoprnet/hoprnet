@@ -117,6 +117,11 @@ export class HoprDB {
     }
   }
 
+  private async getCoerced<T>(key: Uint8Array, coerce: (u: Uint8Array) => T) {
+    let u8a = await this.get(key)
+    return coerce(u8a)
+  }
+
   private async getCoercedOrDefault<T>(key: Uint8Array, coerce: (u: Uint8Array) => T, defaultVal: T) {
     let u8a = await this.maybeGet(key)
     if (u8a === undefined) {
@@ -320,7 +325,7 @@ export class HoprDB {
     await this.put(LATEST_BLOCK_NUMBER_KEY, blockNumber.toBuffer())
   }
 
-  async getLatestConfirmedSnapshot(): Promise<Snapshot | undefined> {
+  async getLatestConfirmedSnapshotOrUndefined(): Promise<Snapshot | undefined> {
     return await this.getCoercedOrDefault(LATEST_CONFIRMED_SNAPSHOT_KEY, Snapshot.deserialize, undefined)
   }
 
@@ -328,8 +333,8 @@ export class HoprDB {
     await this.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
   }
 
-  async getChannel(channelId: Hash): Promise<ChannelEntry | undefined> {
-    return await this.getCoercedOrDefault(createChannelKey(channelId), ChannelEntry.deserialize, undefined)
+  async getChannel(channelId: Hash): Promise<ChannelEntry> {
+    return await this.getCoerced(createChannelKey(channelId), ChannelEntry.deserialize)
   }
 
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {

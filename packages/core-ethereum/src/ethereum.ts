@@ -42,7 +42,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     ? new providers.StaticJsonRpcProvider(providerURI)
     : new providers.WebSocketProvider(providerURI)
   const wallet = new Wallet(privateKey).connect(provider)
-  const address = Address.fromString(wallet.address)
+  const publicKey = PublicKey.fromPrivKey(privateKey)
+  const address = publicKey.toAddress()
   const chainId = await provider.getNetwork().then((res) => res.chainId)
   const networkInfo = knownNetworks.find((info) => info.chainId === chainId)
   // get network's name by looking into our known networks
@@ -209,8 +210,23 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   async function announce(multiaddr: Multiaddr): Promise<string> {
-    const populatedTx = await channels.populateTransaction.announce(multiaddr.bytes)
-    return (await sendTransaction(true, populatedTx, channels.announce, multiaddr.bytes)).hash
+    const populatedTx = await channels.populateTransaction.announce(
+      publicKey.toUncompressedPubKeyHex(),
+      multiaddr.bytes
+    )
+
+    try {
+      const confirmation = await sendTransaction(
+        true,
+        populatedTx,
+        channels.announce,
+        publicKey.toUncompressedPubKeyHex(),
+        multiaddr.bytes
+      )
+      return confirmation.hash
+    } catch {
+      throw new Error('Fatal error, announce transaction failed')
+    }
   }
 
   async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {

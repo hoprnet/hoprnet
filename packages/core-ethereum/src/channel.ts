@@ -39,8 +39,17 @@ class Channel {
     private readonly privateKey: Uint8Array,
     private readonly events: EventEmitter
   ) {
+    const setCommitment = (commitment: Hash): Promise<string> => {
+      try {
+        return this.chain.setCommitment(counterparty.toAddress(), commitment)
+      } catch (e) {
+        log('Error setting commitment', e)
+        // TODO: defer to channel strategy for this, and allow for retries.
+      }
+    }
+
     this.commitment = new Commitment(
-      (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
+      setCommitment,
       () => this.getChainCommitment(),
       this.db,
       generateChannelId(counterparty.toAddress(), self.toAddress()), // Counterparty to us
