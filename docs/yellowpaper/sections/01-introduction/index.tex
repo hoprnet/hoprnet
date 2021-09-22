@@ -40,31 +40,30 @@ HOPR is built with the following principles in mind: that privacy must be an int
 
 Generally, the HOPR protocol aims to hide the fact that two parties are communicating with each other, as well as the contents of the communication. This information should be hidden from any party external to the network, all intermediaries involved in transferring the data between the communicating parties, and even the communicating parties themselves, if one or both of them desires it.
 
-Specifically, the HOPR protocol aims to build a network with the following features:
+Specifically, the HOPR protocol aims to build a network with the following features (definitions based on \cite{AnoA} and \cite{sphinxpaper}:
 
 \begin{itemize}
-
-    \item \textbf{Sender-receiver unlinkability}
-
-
     \item \textbf{Sender online unobservability}
-
-
+        For any sender, $A$, it should be impossible for an adversary to determine whether they are communicating with any receiver, $Z$ (denoted as $A \rightarrow Z$).
+    \item \textbf{Sender anonymity}
+        $\{S_1 \rightarrow R,S_2 /\rightarrow \;or\; S_1 /\rightarrow,S_2 \rightarrow R\}$ for any concurrently online honest senders $S_1$ and $S_2$ and any receiver of the adversary’s choice.
+    \item \textbf{Sender-receiver unlinkability}
+    	For any pair of senders, $A_1 and A_2$, communicating with any pair of receivers, $Z_1 and Z_2$, an adversary must be unable to determine whether $\{A_1\rightarrow Z_1, A_2\rightarrow Z_2\}$ or $\{A_1\rightarrow Z_2, A_2\rightarrow Z_1\}$.
     \item \textbf{Resistance to active attacks}
-
+          An adversary must not be able to successfully conduct active attacks, whereby an adversary in control of a corrupted node injects false data into the network to extract information or significantly disrupt the normal operation of the network for honest users.
 \end{itemize}
-To provide these features, the HOPR protocol builds on top of the Sphinx packet format \cite{sphinxpaper}, the specifics of which are explained in the \nameref{sec:sphinx} section.
+These properties assume senders and receivers are honest, but they should hold for any honest senders and receivers of the adversary's choice.
 
+To provide these features, the HOPR protocol builds on top of the Sphinx packet format \cite{sphinxpaper}, the specifics of which are explained in Section \ref{sec:sphinx}.
 
 \subsubsection{Threat Model}
 
-Although we assume that nodes in the HOPR network can communicate reliably, the network must still be protected from malicious actors and node failures. We assume a threat model with byzantine nodes with the ability to either observe all network traffic and launch network attacks or to inject, drop, or delay messages as follows:
+Although we assume that nodes in the HOPR network can communicate reliably, the network must still be protected from malicious actors and node failures. We assume a threat model with Byzantine nodes with the ability to either observe all network traffic and launch network attacks or to inject, drop, or delay messages as follows:
 
-\paragraph{Global Passive Adversary (GPA)}
+\paragraph{Global passive adversaries (GPAs)} A global passive adversary (GPA) is a theoretical attacker who can observe the entirety of network traffic passing between users. A GPA is considered passive because their attacks are based on observation alone. A GPA is arbitrarily powerful, and the full abilities of a GPA are unlikely to be manifest in any real-world attacker. Nonetheless, building a network which is GPA-resistant introduced extra security through redundancy and future-proofing.
+\paragraph{Active adversary} In contrast to a GPA, an active adversary controls one or more corrupted nodes within the network and can thus observe the contents of packets passing through these nodes. As an active adversary, these corrupted nodes can be used to inject new packets, delay implementation of the mixing and transmission protocol, or drop packets entirely.
 
-\paragraph{Active adversary}
-
-To provide reliable privacy and data transmission the HOPR network needs to be resistant to both Sybil and eclipse attacks:
+Thanks to the properties of Sphinx (see Section \ref{sec:sphinx}) and proof of relay (see Section \ref{sec:proofofrelay}), HOPR is able to defend against both classes of attacker. Nonetheless, it is worth mention some specific attacks that mixnets are particular vulnerable to by virture of their decentralized and anonymous nature:
 
 \paragraph{Sybil attacks}
 In a Sybil attack, an attacker forges multiple identities in the network, thereby introducing network redundancy and reducing system security. The attacker can potentially de-anonymize packet traffic and thus link the sender and receiver's identities. HOPR mitigates Sybil attacks via the trust assumption of the Sphinx packet format: only a single honest relayer is needed to ensure integrity of the entire transmission chain, and since the traffic is source routed, users can choose routes themselves to ensure this minimal requirement of one honest relayer is met.
@@ -132,7 +131,7 @@ Off-chain solutions such as Plasma \cite{plasma}, Truebit \cite{truebit}, and st
 
 As soon as closure is initiated, the channel can no longer be used to route payments. There are different channel closure transactions depending on whether both parties agree on closing the channel. If both agree, they provide a digital signature that authorizes this cooperative settlement transaction. In the case where they disagree or only one party is online, a unilateral closure is initiated without the cooperation of the other party. This is done by broadcasting a ``commitment transaction". Both parties will receive their portion of the money in the channel, but the party that initiates the closure must wait for a certain delay to receive their money. This delay time is negotiated by the nodes before the channel is opened, for the protection of both parties.
 
-The Raiden network \cite{raiden} is a layer-2 payment solution for the Ethereum blockchain. The project employs the same technological innovations pioneered by the Bitcoin Lightning Network by facilitating transactions off-chain, but provides support for all ERC-20 compliant tokens. Raiden differs in operation from its main chain because it does not require global consensus. However, to preserve the integrity of transactions, Raiden powers token transfers using digital signatures and hash-locks. Known as \textbf{balance proofs}, this type of token exchange uses payment channels. Raiden also introduces ``mediated transfers", which allow nodes to send payments to another node without opening a direct channel to it. These payment channels are updated with absolute amounts, whereas HOPR employs relative amounts (more details in the \nameref{sec:tickets} section).
+The Raiden network \cite{raiden} is a layer-2 payment solution for the Ethereum blockchain. The project employs the same technological innovations pioneered by the Bitcoin Lightning Network by facilitating transactions off-chain, but provides support for all ERC-20 compliant tokens. Raiden differs in operation from its main chain because it does not require global consensus. However, to preserve the integrity of transactions, Raiden powers token transfers using digital signatures and hash-locks. Known as \textbf{balance proofs}, this type of token exchange uses payment channels. Raiden also introduces ``mediated transfers", which allow nodes to send payments to another node without opening a direct channel to it. These payment channels are updated with absolute amounts, whereas HOPR employs relative amounts (more details in Section \ref{sec:tickets}).
 
 \begin{comment}
 We present in the following a comparison table (from the Loopix paper) between different anonymous communication systems.
@@ -147,7 +146,7 @@ We present in the following a comparison table (from the Loopix paper) between d
 
 \subsection{Assessment}
 
-Although there are numerous projects attempting to solve the problem of online privacy, most fail to satisfy our \nameref{sec:vision} and \nameref{sec:securitygoals} mentioned above.
+Although there are numerous projects attempting to solve the problem of online privacy, most fail to satisfy the design principles and security goals outlined in Section \ref{sec:securitygoals}.
 
 \paragraph{Privacy} The metadata privacy properties that a mixnet like HOPR provides are significantly beyond what VPNs, dVPNs or even Tor can deliver. VPNs and dVPNs have single points of trust and failure. Tor and I2P have been shown to be subject to a large variety of de-anonymizing attacks, which a mixnet like HOPR is resilient against. The HOPR mixnet unlinks sender and recipient even facing powerful global passive adversaries (GPAs) which can monitor every packet in the network. This is achieved by packet transformation, mixing and introducing delays before forwarding a packet as well as bandwidth overhead in form of Cover Traffic and packet padding.
 
