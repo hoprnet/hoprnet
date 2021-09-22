@@ -71,9 +71,8 @@ In a Sybil attack, an attacker forges multiple identities in the network, thereb
 \paragraph{Eclipse attacks}
 Nodes in a decentralized network suffer from the general unavailability of a general understanding of its topology, hence they cannot determine whether the respective local view is complete or accurate. As an attacker it might be attractive to flood a victim with inappropriate information about collaborating node whilst withholding the information about honest nodes.
 
-          HOPR mitigates this issue by using a different medium to announce entry nodes to the network. This is done using a smart contract on a blockchain and known within HOPR as DEADR (Decentralized Entry Advertisement and Distributed Relaying). Running a successful eclipse attack therefore also includes forging a public blockchain which we assume is impossible and out of scope of this work.
+HOPR mitigates this issue by using a different medium to announce entry nodes to the network. This is done using a smart contract on a blockchain and known within HOPR as DEADR (Decentralized Entry Advertisement and Distributed Relaying). Running a successful eclipse attack therefore also includes forging a public blockchain which we assume is impossible and out of scope of this work.
 
-\end{itemize}
 However, security cannot come at the expense of usability. To be appealing to users and node runners alike, it is important for HOPR to find a satisfactory compromise to what is known as the ``anonymity trilemma" \cite{AnonymityTrilemma}, which states that a privacy network can provide at most two of the following properties: low-latency communication, low bandwidth overhead, and strong anonymity.
 
 The rest of this paper will outline the current state of the art among anonymous communication protocols and layer-2 scalability protocols, describe how the HOPR network is built, and explain how HOPR provides a satisfactory resolution to the anonymity trilemma.
