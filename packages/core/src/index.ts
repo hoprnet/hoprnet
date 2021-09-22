@@ -365,7 +365,14 @@ class Hopr extends EventEmitter {
     for (const channel of currentChannels) {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
-    const balance = await this.getBalance()
+
+    let balance
+    try {
+      balance = await this.getBalance()
+    } catch (e) {
+      log('failed to getBalance, aborting tick')
+      return
+    }
     const chain = await this.startedPaymentChannels()
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance.toBN(),
