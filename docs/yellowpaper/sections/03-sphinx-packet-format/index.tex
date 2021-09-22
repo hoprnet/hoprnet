@@ -89,14 +89,11 @@ where $\phi_0=\epsilon$ is an empty string. $\phi_i$ is generated using the shar
 
 $\beta_i$ is computed as the concatenation of $Z$ and a sequence of padding which is then encrypted by XORing with the output of a PRG seeded with shared key $\varphi_{v-1}$ of node $v-1$. The result is finally concatenated with $\phi$ to ensure the header packets remain constant in size.
 
-In the original Sphinx paper, $Z$ is concatenated with an identifier $I$
-and $0$ padding sequence, where $I$ is used for SURBs (single-use reply
-blocks) such that $I \in \{0, 1\}^\kappa$. We do not use $I$ since HOPR does not
-currently employ SURBs. We do, however, include $hint$ and $challenge$ values in
-$\beta$, defined in the \nameref{sec:proofofrelay} section. These values are not included in the original Sphinx paper but are needed for the HOPR protocol.
+In the original Sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence, where $I$ is used for SURBs (single-use reply
+blocks) such that $I \in \{0, 1\}^\kappa$. We do not use $I$ since HOPR does not currently employ SURBs. We do, however, include $hint$ and $challenge$ values in
+$\beta$, defined in Section \ref{sec:proofofrelay}. These values are not included in the original Sphinx paper but are needed for the HOPR protocol.
 Since $A$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them.
-Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC),
-which is encoded in the header.
+Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC), which is encoded in the header.
 
 Padding is added at each mix stage in order to keep the length of the message invariant at each hop.
 

@@ -33,11 +33,11 @@ where $\xi$ is the funds to be distributed, $\sigma$ the ticket amount, $P_w$ is
 Since distributing cover traffic comes at a cost to network bandwidth, it is important to try and minimise wasted transmission. Therefore, CT nodes distribute cover traffic based on node importance rather than node uptime. This is because individual nodes are liable to suddenly lose connectivity. Of course, this distribution method will still result in sending cover traffic to offline nodes. If a mix node is found to be offline, the channel to that node is closed and new one to a different node is opened. The offline node will have to wait until the CT node is ready to open a new channel to stand a chance of being reselected.
 
 \subsection{Path selection and payout}
-After opening channels, the CT node sends cover traffic packets at regular intervals. The path selection algorithm used for cover traffic is the same one used to select nodes for real traffic (see the \nameref{sec:path-selection} section for more details) where nodes are selected at random but weighted by importance, starting at the CT node.
+After opening channels, the CT node sends cover traffic packets at regular intervals. The path selection algorithm used for cover traffic is the same one used to select nodes for real traffic (see Section \ref{sec:path-selection} for more details) where nodes are selected at random but weighted by importance, starting at the CT node.
 
 The first relay node is chosen with a probability proportional to the amount funded by the CT node, so every node has an equal chance of getting selected. For subsequent hops, nodes are selected with a probability weighted proportional to their importance. We use a weighted priority queue of potential paths to choose the next node. If the queue is empty then it fails.
 
-As with real traffic, rewards are distributed to all selected nodes in a path as tickets which can be redeemed for HOPR tokens with a certain probability (see the \nameref{sec:tickets} section). Thus there is a direct correlation between a node's importance and the cover traffic rewards it receives, ensuring that rewards are distributed fairly.
+As with real traffic, rewards are distributed to all selected nodes in a path as tickets which can be redeemed for HOPR tokens with a certain probability (see Section \ref{sec:tickets}). Thus there is a direct correlation between a node's importance and the cover traffic rewards it receives, ensuring that rewards are distributed fairly.
 
 
 \subsection{Closing cover traffic channels}

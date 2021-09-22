@@ -58,7 +58,7 @@ The sender $A$ also creates a challenge $T_{c_i}$, such that
     T_{c_i}&=(s_i^{(0)}+s_{i+1}^{(1)})*G
      \end{align}
    Since proof of relay is used to ensure the relay services of nodes are verifiable, it is the duty of each node to check that given challenges are derivable from the given and expected information.
-Packets with inappropriate challenges should be dropped, as they might not result in winning tickets with the expected probability (see \nameref{sec:tickets} section).
+Packets with inappropriate challenges should be dropped, as they might not result in winning tickets with the expected probability (see Section \ref{sec:tickets}).
 
 The values $H_i$ and $T_{c_i}$ are sent with the routing information $\beta_i$ as follows:
 $$\beta_i=y_{i+1}\|H_i\|T_{c_i}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]}$$

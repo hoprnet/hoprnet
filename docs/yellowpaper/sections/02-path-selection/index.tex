@@ -49,7 +49,7 @@ Note that the random numbers are assigned once at the beginning of the process a
 
 The HOPR network uses source-selected routing. This means a node must sample the entire path the mixnet packet will take before sending it to the first relayer.
 
-To achieve the aforementioned privacy guarantees, paths must include at least one intermediate node. However, using the Sphinx packet format (see the \nameref{sec:sphinx} section) increases both the size of the header and the computation needed to generate it, which makes it possible for adversaries to distinguish packets on longer paths. Therefore, all nodes in the HOPR network are strongly encouraged to use a $targetLength$ of three. Packets with longer paths are dropped by relayers. It is possible but discouraged for nodes to use paths of one or two hops.
+To achieve the aforementioned privacy guarantees, paths must include at least one intermediate node. However, using the Sphinx packet format (see Section \ref{sec:sphinx}) increases both the size of the header and the computation needed to generate it, which makes it possible for adversaries to distinguish packets on longer paths. Therefore, all nodes in the HOPR network are strongly encouraged to use a $targetLength$ of three. Packets with longer paths are dropped by relayers. It is possible but discouraged for nodes to use paths of one or two hops.
 
 Nodes can only be chosen once per path. For example, when choosing the third node in the path $A\rightarrow B$, if $A$ is found to be the only node with an open channel to $B$, the search will fail and a new path will be generated.
 
