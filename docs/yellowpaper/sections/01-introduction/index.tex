@@ -6,10 +6,10 @@ Internet privacy, commonly referred to as online privacy, is a subset of data pr
 
 To combat this trend, multiple solutions are being developed to restore internet users' control of their private information. These solutions generally centre on providing truly anonymous communication, such that neither the content of the communication nor information about the communicators can be discovered by anyone, including the communicating parties.
 
-HOPR is a decentralized incentivized mixnet that employs privacy-by-design protocols. HOPR aims to protect users' metadata privacy, giving them the freedom to use online services safely and privately. HOPR leverages existing mechanisms such as the Sphinx packet format \cite{sphinxpaper} and packet mixing to achieve its privacy goals, but adds an innovative incentive framework to promote network growth and reliability. HOPR uses the Ethereum blockchain \cite{ethereum} to facilitate this incentive framework, specifically to perform probabilistic payments via payment channels.
+HOPR is a decentralized incentivized mixnet that employs privacy-by-design protocols. HOPR aims to protect users' transport-level metadata privacy, giving them the freedom to use online services safely and privately. HOPR leverages existing mechanisms such as the Sphinx packet format \cite{sphinxpaper} and packet mixing to achieve its privacy goals, but adds an innovative incentive framework to promote network growth and reliability. HOPR uses the Ethereum blockchain \cite{ethereum} to facilitate this incentive framework, specifically to perform probabilistic payments via payment channels.
 
 
-\subsection{The HOPR Design Ethos}
+\subsection{HOPR Design Ethos}
 \label{sec:vision}
 
 HOPR is built with the following principles in mind: that privacy must be an integral part of the design process (privacy by design); that privacy cannot be reliably achieved in centralized systems; and that decentralized systems must be properly incentivized to provide privacy at a sufficient scale and level of reliability. The following section explains these three principles in more detail, as well as how HOPR meets them.
@@ -17,7 +17,7 @@ HOPR is built with the following principles in mind: that privacy must be an int
 \begin{itemize}
 
     \item \textbf{Privacy by design}
-          Privacy by design is an approach to systems engineering which considers privacy throughout the entire engineering process, not merely as an afterthought. The internet is a public good – a digital commons that should be safe and secure to use for all users. However, it's impossible to provide such privacy using current internet infrastructure, which attaches little or no importance to metadata privacy, and indeed in many cases relies on copious amounts of metadata to be made public in order to function. Therefore, new infrastructure with a focus on privacy must be created on top of the existing internet. HOPR provides an essential part of that infrastructure, and has been built with privacy as its foremost goal.
+          Privacy by design is an approach to systems engineering which considers privacy throughout the entire engineering process, not merely as an afterthought. The internet is a public good – a digital commons that should be safe and secure to use for all users. However, it is impossible to provide such privacy using current internet infrastructure, which attaches little or no importance to metadata privacy, and indeed in many cases relies on copious amounts of metadata to be made public in order to function. Therefore, new infrastructure with a focus on privacy must be created on top of the existing internet. HOPR provides an essential part of that infrastructure, and has been built with privacy as its foremost goal.
 
     \item \textbf{Decentralization}
           The internet is not private by design, although it is decentralized by design. In the early days of the internet, this decentralization provided a certain measure of privacy, by placing control in the hands of individual users. However, internet users must increasingly interact with services provided by central authorities. These central authorities control the privacy of individual users, often without their full informed consent.
@@ -65,13 +65,13 @@ Although we assume that nodes in the HOPR network can communicate reliably, the 
 
 Thanks to the properties of Sphinx (see Section \ref{sec:sphinx}) and proof of relay (see Section \ref{sec:proofofrelay}), HOPR is able to defend against both classes of attacker. Nonetheless, it is worth mention some specific attacks that mixnets are particular vulnerable to by virture of their decentralized and anonymous nature:
 
-\begin{itemize}
-    \item \textbf{Sybil attacks}
-          In a Sybil attack, an attacker forges multiple identities in the network, thereby introducing network redundancy and reducing system security. The attacker can potentially de-anonymize packet traffic and thus link the sender and receiver's identities. HOPR mitigates Sybil attacks via the trust assumption of the Sphinx packet format: only a single honest relayer is needed to ensure integrity of the entire transmission chain, and since the traffic is source routed, users can choose routes themselves to ensure this minimal requirement of one honest relayer is met.
-    \item \textbf{Eclipse attacks}
-          Nodes in a decentralized network suffer from the general unavailability of a general understanding of its topology, hence they cannot determine whether the respective local view is complete or accurate. As an attacker it might be attractive to flood a victim with inappropriate information about collaborating node whilst withholding the information about honest nodes.
+\paragraph{Sybil attacks}
+In a Sybil attack, an attacker forges multiple identities in the network, thereby introducing network redundancy and reducing system security. The attacker can potentially de-anonymize packet traffic and thus link the sender and receiver's identities. HOPR mitigates Sybil attacks via the trust assumption of the Sphinx packet format: only a single honest relayer is needed to ensure integrity of the entire transmission chain, and since the traffic is source routed, users can choose routes themselves to ensure this minimal requirement of one honest relayer is met.
 
-          HOPR mitigates this issue by using a different medium to announce entry nodes to the network. This is done using a smart contract on a blockchain and known within HOPR as DEADR (Decentralized Entry Advertisement and Distributed Relaying). Running a successful eclipse attack therefore also includes forging a public blockchain which is assumed to hard since their stakeholders, such as holders of their native token, also have strong interest that none of the previous state changes, i.e. token transfers, are dropped and the append-only logic of blockchains makes modifications of past blocks observable. Hence it is assumed that an attacker can announce \textit{more} addresses but not \textit{less}.
+\paragraph{Eclipse attacks}
+Nodes in a decentralized network suffer from the general unavailability of a general understanding of its topology, hence they cannot determine whether the respective local view is complete or accurate. As an attacker it might be attractive to flood a victim with inappropriate information about collaborating node whilst withholding the information about honest nodes.
+
+          HOPR mitigates this issue by using a different medium to announce entry nodes to the network. This is done using a smart contract on a blockchain and known within HOPR as DEADR (Decentralized Entry Advertisement and Distributed Relaying). Running a successful eclipse attack therefore also includes forging a public blockchain which we assume is impossible and out of scope of this work.
 
 \end{itemize}
 However, security cannot come at the expense of usability. To be appealing to users and node runners alike, it is important for HOPR to find a satisfactory compromise to what is known as the ``anonymity trilemma" \cite{AnonymityTrilemma}, which states that a privacy network can provide at most two of the following properties: low-latency communication, low bandwidth overhead, and strong anonymity.
@@ -81,7 +81,7 @@ The rest of this paper will outline the current state of the art among anonymous
 \subsection{State of the Art}
 \label{sec:stateoftheart}
 
-HOPR has been built on top of, or as a reaction to, various technologies and research projects which try to meet some or all of the design ethos and security goals outlined above. These technologies and research projects can be broadly divided into two groups: (1) \nameref{sec:privacyprotocols} which attempt to hide user information; (2) \nameref{sec:l2protocols}which allow systems to perform micro-payments via the Ethereum blockchain.
+HOPR has been built on top of, or as a reaction to, various technologies and research projects which try to meet some or all of the design ethos and security goals outlined above. These technologies and research projects can be broadly divided into two groups for which we separately present the state of the art in the following sections: (1) \nameref{sec:privacyprotocols} which attempt to hide user information; (2) \nameref{sec:l2protocols} which allow systems to perform micro-payments via the Ethereum blockchain.
 
 \subsubsection{Anonymous Communication Protocols}
 \label{sec:privacyprotocols}
@@ -147,6 +147,8 @@ We present in the following a comparison table (from the Loopix paper) between d
 \subsection{Assessment}
 
 Although there are numerous projects attempting to solve the problem of online privacy, most fail to satisfy the design principles and security goals outlined in Section \ref{sec:securitygoals}.
+
+\paragraph{Privacy} The metadata privacy properties that a mixnet like HOPR provides are significantly beyond what VPNs, dVPNs or even Tor can deliver. VPNs and dVPNs have single points of trust and failure. Tor and I2P have been shown to be subject to a large variety of de-anonymizing attacks, which a mixnet like HOPR is resilient against. The HOPR mixnet unlinks sender and recipient even facing powerful global passive adversaries (GPAs) which can monitor every packet in the network. This is achieved by packet transformation, mixing and introducing delays before forwarding a packet as well as bandwidth overhead in form of Cover Traffic and packet padding.
 
 \paragraph{Decentralization} Most projects presented above have decentralization as a core goal, with the exception of VPNs, where the service is provided by a centralized entity, at the expense of user privacy. However, many projects lack the impetus to scale, which prevents them from leveraging many of the advantages which come with a decentralized network, such as privacy through obscurity, while retaining all of the challenges, such as coordination and consensus issues. It is our opinion that the only way to solve the scalability problem is with the introduction of a robust incentivization scheme for node runners.
 

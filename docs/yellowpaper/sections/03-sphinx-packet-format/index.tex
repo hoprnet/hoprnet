@@ -55,8 +55,8 @@ $$\alpha_0=g^x,\varphi_0=y^x_B,b_0=h_b(a_0,\varphi_0)$$
 and
 \begin{equation}
     \begin{cases}
-        \alpha_i = g^{x\Pi_{j=0}^{i=r-2}b_j} \\
-        \varphi_i=y^{x\Pi_{j=0}^{j=r-2}b_j}  \\
+        \alpha_i=g^{x\Pi_{j=0}^{i=r-2}b_j}\\
+        \varphi_i=y^{x\Pi_{j=0}^{j=r-2}b_j} \\
         b_i=h_b(a_i,\varphi_i)
     \end{cases}\,.
     \label{eq:1}
@@ -64,9 +64,7 @@ and
 for $1\le i < r-1$, where $y_0,y_1, y_2, y_3$, and $y_4$ are the public keys of the nodes $B$, $C$, $D$, and $Z$, which we assume to be available to $A$ .
 
 \subsubsection{Routing information}
-Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final receiver of the message.
-The $END$ message is a distinguished prefix byte which is added to the final receiver's compressed public key.
-For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$.
+Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final receiver of the message.  The $END$ message is a distinguished prefix byte which is added to the final receiver's compressed public key. For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$. 
 
 The $y$ coordinate is extracted from $x$ by resolving the elliptic curve equation $Y^2=X^3+aX+b$, using the given parameters $a$ and $b$. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is $0\times02$ or $0\times03$, depending on that bit).
 
@@ -89,11 +87,7 @@ where $\phi_0=\epsilon$ is an empty string. $\phi_i$ is generated using the shar
 
 $\beta_i$ is computed as the concatenation of $Z$ and a sequence of padding which is then encrypted by XORing with the output of a PRG seeded with shared key $\varphi_{v-1}$ of node $v-1$. The result is finally concatenated with $\phi$ to ensure the header packets remain constant in size.
 
-In the original Sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence, where $I$ is used for SURBs (single-use reply
-blocks) such that $I \in \{0, 1\}^\kappa$. We do not use $I$ since HOPR does not currently employ SURBs. We do, however, include $hint$ and $challenge$ values in
-$\beta$, defined in Section \ref{sec:proofofrelay}. These values are not included in the original Sphinx paper but are needed for the HOPR protocol.
-Since $A$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them.
-Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC), which is encoded in the header.
+In the original Sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence, where $I$ is used for SURBs (single-use reply blocks) such that $I \in \{0, 1\}^\kappa$. We do not use $I$ since HOPR does not currently employ SURBs. We do, however, include $hint$ and $challenge$ values in $\beta$, defined in the \nameref{sec:proofofrelay} section. These values are not included in the original Sphinx paper but are needed for the HOPR protocol. Since $A$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them. Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC), which is encoded in the header.
 
 Padding is added at each mix stage in order to keep the length of the message invariant at each hop.
 
@@ -102,7 +96,10 @@ The mix header is constructed as follows:
     M_i & =(\alpha_i,\beta_i,\gamma_i)
 \end{align}
 
-$A$ sends the mix header $M_0$ to $B$. Once $B$ receives the packet, it derives the shared key $\varphi_0$ by computing $$\varphi_0=(\alpha_0)^b=(g^x)^b=(g^b)^x=y^x_B$$
+$A$ sends the mix header $M_0$ to $B$. Once $B$ receives the packet, it derives the shared key $\varphi_0$ by computing
+
+$$\varphi_0=(\alpha_0)^b=(g^x)^b=(g^b)^x=y^x_B$$
+
 and removes its blindings. This allows $B$ to unblind the routing info that tells $B$ the public key of the next downstream node, $C$.
 
 \subsubsection{Integrity check}
@@ -139,12 +136,13 @@ After $B$ extracts the public key of $C$, it deletes the routing information fro
 The first $\kappa$ bits of $\beta_0$ will be $n_{1}$ itself, the next $\kappa$ bits will be $\gamma_{1}$, and the remaining $(2r-1)\kappa$ bits of $\beta_0$ are shifted left to form the leftmost $(2r-1)\kappa$ bits of $\beta_{1}$; the rightmost $2\kappa$ bits of $\beta_{1}$ are simply a substring of an output of the PRG function.
 
 The new mix header is now ready to be sent to $C$, defined as the node with public key $y_1$:
+
 $$M_1=(\alpha_1,\beta_1,\gamma_1)$$
+
 where $\alpha$, $\beta$ and $\gamma$ are defined in equations $\ref{eq:1}$, $\ref{eq:2}$ and $\ref{eq:6}$
 
 \subsubsection{Encrypt and decrypt}
-The encrypted payload $\delta$ is where the actual message is hidden. This is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing which is basically a pseudo-random permutation process (PRP).
-$\delta$ is repeatedly encrypted via keys derived from the DH key exchange between the packet’s group element $\alpha_i$ and the public key of each node in the path $y_i$.
+The encrypted payload $\delta$ is where the actual message is hidden. This is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing which is basically a pseudo-random permutation process (PRP). $\delta$ is repeatedly encrypted via keys derived from the DH key exchange between the packet’s group element $\alpha_i$ and the public key of each node in the path $y_i$.
 
 \paragraph{Notation}
 Let $j$ be the block size in bits, which will typically be large. Let $H_u$ be a keyed hash function with the key $u$ for the payload. $u$ consists of four independent keys, $u_1$, $u_2$, $u_3$, and $u_4$, which $A$ derives from the master keys $\varphi_0$, $\varphi_1$, $\varphi_2$, and $\varphi_3$ using the HKDF key derivation function explained in Proof of Relay section. The derivation is as follow:
@@ -154,10 +152,9 @@ $$HKDF.expand(h_b, |h_b|,\varphi_0, |\varphi_i + PRP_IV_LENGTH|, hash\_Key\_PRP)
 
 \textbf{Expand} This step takes $\varphi_i$, as a seed and creates output key material $u_i$ for all $1\le i < 4 $ which is expanded from hashes of $\varphi_i$ and an optional info message (salt). The process occurs as follows:
 
-Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $u_2$ and $u_4$ are used to key the hash function. Sphinx uses the LIONESS wide block cipher scheme for encryption and decryption purposes.
-Let $S_u$ be a pseudorandom function (stream cipher) which given the input $m$ will generate an output of arbitrary length. We add a padding tag $\tau$ to $m$ before encryption and a 0-padding string as follows:
+Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $u_2$ and $u_4$ are used to key the hash function. Sphinx uses the LIONESS wide block cipher scheme for encryption and decryption purposes. Let $S_u$ be a pseudorandom function (stream cipher) which given the input $m$ will generate an output of arbitrary length. We add a padding tag $\tau$ to $m$ before encryption and a 0-padding string as follows:
 \begin{align}
-    m & \leftarrow 0_{l} \|\tau\|m
+   m &\leftarrow 0_{l} \|\tau\|m
 \end{align}
 where $\tau$ is generated arbitrarily and $|\tau|=4$ is its length ($\tau=``HOPR "$ in ASCII). $l$ is the $0$ padding length where
 $0 <= l <= |m| - 4$. The payloads that do not include the correct padding are considered invalid.
@@ -165,15 +162,18 @@ $0 <= l <= |m| - 4$. The payloads that do not include the correct padding are co
 $m$ is divided into two blocks, left ($m_l$) and right ($m_r$), whose sizes are $|m_l|=w$ and $|m_r|=j-w$. We thus get $m=m_r\|m_l$.
 \subparagraph{Encryption}
 The blocks $m_l$ and $m_r$ are transformed using a four-round Feistel structure:
+
 $$m_r\leftarrow m_r \oplus S_{u1}(m_l), m_l\leftarrow m_l \oplus H_{u2}(m_r), m_r\leftarrow m_r\oplus S_{u3}(m_l), m_l\leftarrow m_l\oplus H_{u4}(m_r)$$
+
 The updated $m_l\|m_r$ constitutes the ciphertext $\delta$.
-\subparagraph{Decryption} Decryption happens as follows:
+
+\subparagraph{Decryption}
+Decryption happens as follows:
+
 $$m_l\leftarrow m_l\oplus H_{u4}(m_r), m_r\leftarrow S_{u3}(m_l), m_l\leftarrow m_l\oplus H_{u2}(m_r), m_r\leftarrow m_r\oplus S_{u1}(m_l)$$
 
 \subsubsection{Integrity}
-The payload is encrypted using a bidirectional error propagating block cipher
-and protected with an integrity check for the receiver, but not
-for processing relays. Packet integrity is authenticated by prepending a tag set so that any alteration to the encrypted payload as it traverses the network will result in an irrecoverably corrupted plaintext when the payload is decrypted by the recipient.
+The payload is encrypted using a bidirectional error propagating block cipher and protected with an integrity check for the receiver, but not for processing relays. Packet integrity is authenticated by prepending a tag set so that any alteration to the encrypted payload as it traverses the network will result in an irrecoverably corrupted plaintext when the payload is decrypted by the recipient.
 
 \begin{figure}[H]
     \centering
@@ -190,25 +190,12 @@ HOPR employs the following cryptographic primitives:
 \begin{itemize}
     \item \textbf{Cyclic group} HOPR's Sphinx implementation uses an elliptic curve group on the secp256k1 curve. Operations are therefore performed on the elliptic curve.
 
-    \item \textbf{Hash function} HOPR uses the BLAKE2s hash function, a cryptographic
-          hash function faster than SHA-2 and SHA-3, yet at least as secure as
-          SHA-3. It produces digests of 32 bytes.
+    \item \textbf{Hash function} HOPR uses the BLAKE2s hash function, a cryptographic hash function faster than SHA-2 and SHA-3, yet at least as secure as SHA-3. It produces digests of 32 bytes.
 
     \item \textbf{MAC} HOPR uses HMAC based on the BLAKE2s hash function.
 
-    \item \textbf{Encryption scheme} HOPR uses the LIONESS \cite{lionesspaper}
-          implementation, using BLAKE2s as a hash function and ChaCha20 as a
-          stream cipher.
+    \item \textbf{Encryption scheme} HOPR uses the LIONESS \cite{lionesspaper} implementation, using BLAKE2s as a hash function and ChaCha20 as a stream cipher.
 
-    \item \textbf{Padding} The original Sphinx paper uses a sequence of 0s
-          for padding. However, this allows the last mix node in the path to infer
-          information about the length of the path and the last destination, hence
-          breaking one of the security properties promised by Sphinx. In order to
-          prevent this attack, HOPR replaces the 0-padding with randomized padding
-          for the last exit-mix node when $v<r$. This ensures the exit node cannot
-          identify where the padding starts and thus will not be able to determine the
-          path length. In the case where $v=r$ there is
-          no need to add padding as the length of the path is the maximum length,
-          and thus no additional information is being revealed.
+    \item \textbf{Padding} The original Sphinx paper uses a sequence of 0s for padding. However, this allows the last mix node in the path to infer information about the length of the path and the last destination, hence breaking one of the security properties promised by Sphinx. In order to prevent this attack, HOPR replaces the 0-padding with randomized padding for the last exit-mix node when $v<r$. This ensures the exit node cannot identify where the padding starts and thus will not be able to determine the path length. In the case where $v=r$ there is no need to add padding as the length of the path is the maximum length, and thus no additional information is being revealed.
 
 \end{itemize}
