@@ -209,8 +209,7 @@ describe('test indexer', function () {
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const channel = await indexer.getChannel(OPENED_CHANNEL.getId())
-    assert.strictEqual(typeof channel, 'undefined')
+    assert.rejects(() => indexer.getChannel(OPENED_CHANNEL.getId()))
   })
 
   it('should process all past events', async function () {

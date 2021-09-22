@@ -210,7 +210,7 @@ class Indexer extends EventEmitter {
       this.latestBlock = blockNumber
     }
 
-    let lastSnapshot = await this.db.getLatestConfirmedSnapshot()
+    let lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
     const confirmedEvents = []
 
     // check unconfirmed events and process them if found
