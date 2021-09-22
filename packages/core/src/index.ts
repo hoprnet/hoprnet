@@ -934,12 +934,16 @@ class Hopr extends EventEmitter {
       return backoff(
         () => {
           return new Promise<void>(async (resolve, reject) => {
-            const nativeBalance = await this.getNativeBalance()
-
-            if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
-              resolve()
-            } else {
-              log('still unfunded, trying again soon')
+            try {
+              const nativeBalance = await this.getNativeBalance()
+              if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
+                resolve()
+              } else {
+                log('still unfunded, trying again soon')
+                reject()
+              }
+            } catch (e) {
+              log('error with native balance call, trying again soon')
               reject()
             }
           })
