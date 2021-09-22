@@ -320,11 +320,9 @@ class Hopr extends EventEmitter {
     if (isOutOfFunds === 'NATIVE') {
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
-      await this.getNativeBalance()
     } else if (isOutOfFunds === 'HOPR') {
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
-      await this.getBalance()
     }
   }
 
