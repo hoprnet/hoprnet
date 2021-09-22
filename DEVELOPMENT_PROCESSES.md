@@ -1,6 +1,6 @@
 # Development Processes
 
-The HOPR Association _tech_ members have agreed on the following development processes to streamline the implementation of the HOPR protocol.
+The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on the following development processes to streamline the implementation of the HOPR protocol.
 
 - [Development Processes](#development-processes)
   - [Legend](#legend)
@@ -23,6 +23,7 @@ The HOPR Association _tech_ members have agreed on the following development pro
   - [Development](#development)
     - [Principles](#principles)
     - [Issue creation](#issue-creation)
+    - [Labels](#labels)
     - [Rules](#rules)
     - [Releases](#releases)
     - [Workflow](#workflow)
@@ -33,34 +34,38 @@ The HOPR Association _tech_ members have agreed on the following development pro
       - [Release Version Bump (`master` -> `release/**` = `x.y.z-0.next.*` -> `x.y.0`)](#release-version-bump-master---release--xyz-0next---xy0)
       - [Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)](#minor-version-bump-release---master--xy---xy10-next0)
     - [Branches](#branches)
-    - [Labels](#labels)
 
 ## Legend
 
-| Name          | Description                                                                   |
-| ------------- | ----------------------------------------------------------------------------- |
-| Project Owner | _TODO_                                                                        |
-| Ambassadors   | Two tech members elected to be the bridge between tech team and Project Owner |
-| Trifecta      | Ambassadors + Project Owner                                                   |
-| Issue tracker | The sole issue tracker is [GitHub](https://github.com/hoprnet)                |
+| Name          | Description                                                                                                |
+| ------------- | ---------------------------------------------------------------------------------------------------------- |
+| Project Owner | A HOPR member which ensures epics prioritized are in line with both the short and long term vision of HOPR |
+| Ambassadors   | Two tech members elected to be the bridge between tech team and Project Owner                              |
+| Trifecta      | Ambassadors + Project Owner                                                                                |
+| Issue tracker | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
 ### Ambassadors
 
 Elected ambassadors are rotated every `2 months`.
 
-- bridge between tech team and Project Owner
+Responsibilities:
+
+- to be the bridge between tech team and Project Owner
 
 _Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nionis)
+
 _Expiry:_ 5/11/21
 
 ### Trifecta
 
-Trifecta is made up by the Project Owner and the ambassadors.
+Trifecta is made up by the [Ambassadors](#ambassadors) and Project Owner.
+
+Responsibilities:
 
 - bi-weekly [epic priorities](#epic-prioritization) check
 - task duration estimation done before [Sprint Planning](#sprint-planning)
 
-_Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nionis), [Sebastian](https://github.com/SCBuergel)
+_Current:_ [Ambassadors](#ambassadors), [Sebastian](https://github.com/SCBuergel)
 
 ## Daily updates
 
@@ -101,8 +106,7 @@ _Where:_ In element channel `tech - eod`
 Every Team Member is responsible for letting the rest of the team know about illness/absence/vacation.
 
 - unexpected absence needs to be reported ASAP through email
-
-_TODO: add info about planned absences_
+- planned absence of +3 days needs to be reported 3 months in advance through email
 
 ## Sprints
 
@@ -121,8 +125,6 @@ mostly the whole team is involved in:
 2. Sprint Retrospective
 3. Epic Prioritization
 4. Task Planning
-
-_TODO: define a small guide how the meetings are carried out_
 
 ### Task Grooming
 
@@ -166,7 +168,7 @@ Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/project
 
 - closed epics are moved to `Acceptance`
 - epics within `Acceptance` column are accepted by [Trifecta](#trifecta) prior to the meeting
-- ensure newly created epics are well created _TODO: define_
+- ensure newly created [epics](#issue-creation) are well created
 - adapt epic priorities
 - create new [Sprint](#sprint-planning) project
 
@@ -199,7 +201,7 @@ account as much as possible.
 - Each sprint has its own taskboard, e.g. [Sprint 36-37](https://github.com/orgs/hoprnet/projects/11).
 - Epic issues are further refined into tasks which have clear definitions of work and done.
 - Ideally each team member has only one task assigned which is `in progress`.
-- members which are coming back from vacation should already have tasks assigned to them. _TODO: whos job?_
+- members which are coming back from vacation should already have tasks assigned to them.
 
 _Who:_ all members within a meeting
 
@@ -223,10 +225,30 @@ It's possible that throughout the planned sprint, we encounter a bag of issues t
 - Code for maintainability, not perfection.
 - Automation-first. Whenever possible, rely on automation.
 - Test early, test often. They prevent bad deployments and API regressions.
+- All PRs must include the relevant tests required to ensure updated code works as expected.
+- All PRs must include the documentation changes which will reflect the updated codebase.
 
 ### Issue creation
 
-_TODO: epics, other_
+All HOPR repositories must support at most these issue templates, more templates may be added which make sense for each specific repository.
+
+- [Epic Template](./.github/ISSUE_TEMPLATE/epic.md)
+- [Bug Template](./.github/ISSUE_TEMPLATE/bug.md)
+- [Feature Template](./.github/ISSUE_TEMPLATE/feature.md)
+- [Custom Template](./.github/ISSUE_TEMPLATE/custom.md)
+
+### Labels
+
+All HOPR repositories must support at most these labels, more labels may be added which make sense for each specific repository.
+Since PRs should link to an issue, it's not necessary to label PRs. However, some automation tools like `dependabot` doesn't create issues, in cases like this, it will label it's PRs.
+
+| Name         | Description                                             | Color                                           |
+| ------------ | ------------------------------------------------------- | ----------------------------------------------- |
+| epic         | An issue which tracks multiple issues                   | <span style="background:#2473b7">#2473b7</span> |
+| bug          | Something isn't working                                 | <span style="background:#d73a4a">#d73a4a</span> |
+| feature      | New feature request                                     | <span style="background:#a2eeef">#a2eeef</span> |
+| new issue    | **Automatic**, this is a new issue                      | <span style="background:#000000">#000000</span> |
+| dependencies | **Automatic** for **PRs**, this PR updates a dependancy | <span style="background:#0366d6">#0366d6</span> |
 
 ### Rules
 
@@ -354,22 +376,3 @@ daily workflow as it was before.
   marked with a **PUBLIC RELEASE**, we cut a `release/**`
   branch, using an internal name to identify the release. Official milestones
   use a specific name with the codename of a mountain in Switzerland.
-
-<!--
-TODO:
-
-- fix various TODOs in document
-- emailing process
--->
-
-### Labels
-
-All hopr repositories need to support these labels.
-
-| Name    | Description                           | Color                                           |
-| ------- | ------------------------------------- | ----------------------------------------------- |
-| epic    | An issue which tracks multiple issues | <span style="background:#2473b7">#2473b7</span> |
-| bug     | Something isn't working               | <span style="background:#d73a4a">#d73a4a</span> |
-| feature | New feature or request                | <span style="background:#d73a4a">#a2eeef</span> |
-
-_TODO: extend_

@@ -1,12 +1,12 @@
 ---
-name: Feature Request
-about: Request a new feature, or change to an existing one
+name: Feature Template
+about: Create a feature request
 title: ''
-labels: 'feature, s:new issue'
+labels: 'feature, new issue'
 assignees: ''
 ---
 
-<!--- Please DO NOT remove the automatically added 's:new issue' label -->
+<!--- Please DO NOT remove the automatically added 'new issue' label -->
 <!--- Provide a general summary of the issue in the Title above -->
 
 ### Is your feature related to a problem?
