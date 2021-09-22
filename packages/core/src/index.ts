@@ -320,11 +320,9 @@ class Hopr extends EventEmitter {
     if (isOutOfFunds === 'NATIVE') {
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
-      await this.getNativeBalance()
     } else if (isOutOfFunds === 'HOPR') {
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
-      await this.getBalance()
     }
   }
 
@@ -365,7 +363,14 @@ class Hopr extends EventEmitter {
     for (const channel of currentChannels) {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
-    const balance = await this.getBalance()
+
+    let balance
+    try {
+      balance = await this.getBalance()
+    } catch (e) {
+      log('failed to getBalance, aborting tick')
+      return
+    }
     const chain = await this.startedPaymentChannels()
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance.toBN(),
@@ -927,12 +932,16 @@ class Hopr extends EventEmitter {
       return backoff(
         () => {
           return new Promise<void>(async (resolve, reject) => {
-            const nativeBalance = await this.getNativeBalance()
-
-            if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
-              resolve()
-            } else {
-              log('still unfunded, trying again soon')
+            try {
+              const nativeBalance = await this.getNativeBalance()
+              if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
+                resolve()
+              } else {
+                log('still unfunded, trying again soon')
+                reject()
+              }
+            } catch (e) {
+              log('error with native balance call, trying again soon')
               reject()
             }
           })
