@@ -143,7 +143,7 @@ _When:_ first day of the sprint or before a vacation
 
 #### External issues
 
-Newly created issues may not all have been replied to, the [Ambassadors](#ambassadors) may reply or assign a tech member to follow up on the issue.
+Newly created issues ([labelled as](#labels): `new issue`) may not all have been replied to, the [Ambassadors](#ambassadors) may reply or assign a tech member to follow up on the issue.
 
 - closing duplicates
 - issues are properly labelled
