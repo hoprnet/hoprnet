@@ -38,7 +38,7 @@
     "it-pipe": "^1.1.0",
     "leveldown": "^6.0.1",
     "levelup": "^5.0.1",
-    "libp2p": "0.32.4",
+    "libp2p": "0.32.5",
     "libp2p-crypto": "0.19.7",
     "memdown": "^6.0.0",
     "multiaddr": "^10.0.0",
