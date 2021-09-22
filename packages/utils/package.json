@@ -33,12 +33,12 @@
     "bs58": "^4.0.1",
     "chalk": "^4.1.1",
     "debug": "^4.3.2",
-    "ethers": "^5.4.6",
+    "ethers": "5.4.7",
     "futoin-hkdf": "~1.4.1",
     "it-pipe": "^1.1.0",
     "leveldown": "^6.0.1",
     "levelup": "^5.0.1",
-    "libp2p": "0.32.4",
+    "libp2p": "0.32.5",
     "libp2p-crypto": "0.19.7",
     "memdown": "^6.0.0",
     "multiaddr": "^10.0.0",
@@ -58,7 +58,7 @@
     "ts-node": "^10.1.0",
     "typedoc": "0.21.9",
     "typedoc-plugin-markdown": "3.10.4",
-    "typescript": "4.4.2"
+    "typescript": "4.4.3"
   },
   "mocha": {
     "extension": [

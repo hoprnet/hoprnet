@@ -220,7 +220,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:715
+packages/ethereum/types/HoprToken.d.ts:725
 
 ___
 
@@ -285,7 +285,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:1089
+packages/ethereum/types/HoprToken.d.ts:1117
 
 ___
 
@@ -307,6 +307,8 @@ ___
 | `Minted(address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
 | `RevokedOperator` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
 | `RevokedOperator(address,address)` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `RoleAdminChanged` | (`role?`: `BytesLike`, `previousAdminRole?`: `BytesLike`, `newAdminRole?`: `BytesLike`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
+| `RoleAdminChanged(bytes32,bytes32,bytes32)` | (`role?`: `BytesLike`, `previousAdminRole?`: `BytesLike`, `newAdminRole?`: `BytesLike`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
 | `RoleGranted` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
 | `RoleGranted(bytes32,address,address)` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
 | `RoleRevoked` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
@@ -322,7 +324,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:877
+packages/ethereum/types/HoprToken.d.ts:887
 
 ___
 
@@ -373,7 +375,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:390
+packages/ethereum/types/HoprToken.d.ts:400
 
 ___
 
@@ -387,7 +389,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:388
+packages/ethereum/types/HoprToken.d.ts:398
 
 ___
 
@@ -438,7 +440,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:1253
+packages/ethereum/types/HoprToken.d.ts:1281
 
 ___
 
@@ -500,7 +502,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:555
+packages/ethereum/types/HoprToken.d.ts:565
 
 ___
 
@@ -520,7 +522,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:557
+packages/ethereum/types/HoprToken.d.ts:567
 
 ___
 
@@ -616,7 +618,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:559
+packages/ethereum/types/HoprToken.d.ts:569
 
 ___
 
@@ -638,7 +640,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:567
+packages/ethereum/types/HoprToken.d.ts:577
 
 ___
 
@@ -660,7 +662,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:573
+packages/ethereum/types/HoprToken.d.ts:583
 
 ___
 
@@ -684,7 +686,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:349
+packages/ethereum/types/HoprToken.d.ts:359
 
 ___
 
@@ -705,7 +707,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:579
+packages/ethereum/types/HoprToken.d.ts:589
 
 ___
 
@@ -726,7 +728,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:584
+packages/ethereum/types/HoprToken.d.ts:594
 
 ___
 
@@ -748,7 +750,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:586
+packages/ethereum/types/HoprToken.d.ts:596
 
 ___
 
@@ -770,7 +772,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:592
+packages/ethereum/types/HoprToken.d.ts:602
 
 ___
 
@@ -794,7 +796,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:348
+packages/ethereum/types/HoprToken.d.ts:358
 
 ___
 
@@ -814,7 +816,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:598
+packages/ethereum/types/HoprToken.d.ts:608
 
 ___
 
@@ -834,7 +836,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:600
+packages/ethereum/types/HoprToken.d.ts:610
 
 ___
 
@@ -852,7 +854,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:350
+packages/ethereum/types/HoprToken.d.ts:360
 
 ___
 
@@ -922,7 +924,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:602
+packages/ethereum/types/HoprToken.d.ts:612
 
 ___
 
@@ -944,7 +946,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:604
+packages/ethereum/types/HoprToken.d.ts:614
 
 ___
 
@@ -965,7 +967,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:610
+packages/ethereum/types/HoprToken.d.ts:620
 
 ___
 
@@ -987,7 +989,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:615
+packages/ethereum/types/HoprToken.d.ts:625
 
 ___
 
@@ -1007,7 +1009,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:621
+packages/ethereum/types/HoprToken.d.ts:631
 
 ___
 
@@ -1029,7 +1031,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:623
+packages/ethereum/types/HoprToken.d.ts:633
 
 ___
 
@@ -1051,7 +1053,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:629
+packages/ethereum/types/HoprToken.d.ts:639
 
 ___
 
@@ -1106,7 +1108,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:352
+packages/ethereum/types/HoprToken.d.ts:362
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -1126,7 +1128,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:375
+packages/ethereum/types/HoprToken.d.ts:385
 
 ___
 
@@ -1150,7 +1152,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:635
+packages/ethereum/types/HoprToken.d.ts:645
 
 ___
 
@@ -1170,7 +1172,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:643
+packages/ethereum/types/HoprToken.d.ts:653
 
 ___
 
@@ -1202,7 +1204,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:355
+packages/ethereum/types/HoprToken.d.ts:365
 
 ▸ **off**(`eventName`, `listener`): [`HoprToken`](HoprToken.md)
 
@@ -1223,7 +1225,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:376
+packages/ethereum/types/HoprToken.d.ts:386
 
 ___
 
@@ -1255,7 +1257,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:359
+packages/ethereum/types/HoprToken.d.ts:369
 
 ▸ **on**(`eventName`, `listener`): [`HoprToken`](HoprToken.md)
 
@@ -1276,7 +1278,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:377
+packages/ethereum/types/HoprToken.d.ts:387
 
 ___
 
@@ -1308,7 +1310,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:363
+packages/ethereum/types/HoprToken.d.ts:373
 
 ▸ **once**(`eventName`, `listener`): [`HoprToken`](HoprToken.md)
 
@@ -1329,7 +1331,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:378
+packages/ethereum/types/HoprToken.d.ts:388
 
 ___
 
@@ -1353,7 +1355,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:645
+packages/ethereum/types/HoprToken.d.ts:655
 
 ___
 
@@ -1378,7 +1380,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:653
+packages/ethereum/types/HoprToken.d.ts:663
 
 ___
 
@@ -1411,7 +1413,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:382
+packages/ethereum/types/HoprToken.d.ts:392
 
 ___
 
@@ -1442,7 +1444,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:371
+packages/ethereum/types/HoprToken.d.ts:381
 
 ▸ **removeAllListeners**(`eventName?`): [`HoprToken`](HoprToken.md)
 
@@ -1462,7 +1464,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:380
+packages/ethereum/types/HoprToken.d.ts:390
 
 ___
 
@@ -1494,7 +1496,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:367
+packages/ethereum/types/HoprToken.d.ts:377
 
 ▸ **removeListener**(`eventName`, `listener`): [`HoprToken`](HoprToken.md)
 
@@ -1515,7 +1517,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:379
+packages/ethereum/types/HoprToken.d.ts:389
 
 ___
 
@@ -1537,7 +1539,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:662
+packages/ethereum/types/HoprToken.d.ts:672
 
 ___
 
@@ -1558,7 +1560,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:668
+packages/ethereum/types/HoprToken.d.ts:678
 
 ___
 
@@ -1580,7 +1582,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:673
+packages/ethereum/types/HoprToken.d.ts:683
 
 ___
 
@@ -1603,7 +1605,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:679
+packages/ethereum/types/HoprToken.d.ts:689
 
 ___
 
@@ -1623,7 +1625,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:686
+packages/ethereum/types/HoprToken.d.ts:696
 
 ___
 
@@ -1643,7 +1645,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:688
+packages/ethereum/types/HoprToken.d.ts:698
 
 ___
 
@@ -1664,7 +1666,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:690
+packages/ethereum/types/HoprToken.d.ts:700
 
 ___
 
@@ -1685,7 +1687,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:695
+packages/ethereum/types/HoprToken.d.ts:705
 
 ___
 
@@ -1707,7 +1709,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:702
+packages/ethereum/types/HoprToken.d.ts:712
 
 ___
 
@@ -1730,7 +1732,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:708
+packages/ethereum/types/HoprToken.d.ts:718
 
 ___
 

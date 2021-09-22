@@ -1,5 +1,6 @@
+import type { Wallet } from '@ethersproject/wallet'
+import type { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { deployments, ethers } from 'hardhat'
-import { Multiaddr } from 'multiaddr'
 import { expect } from 'chai'
 import BN from 'bn.js'
 import {
@@ -30,7 +31,6 @@ import {
   ChannelStatus,
   PromiseValue
 } from '@hoprnet/hopr-utils'
-import type { Wallet } from '@ethersproject/wallet'
 import { BigNumber } from 'ethers'
 
 type TicketValues = {
@@ -166,77 +166,140 @@ export const SECRET_2 = ethers.utils.solidityKeccak256(['bytes32'], [SECRET_1])
 export const WIN_PROB_100 = percentToUint256(100)
 export const WIN_PROB_0 = percentToUint256(0)
 const ENOUGH_TIME_FOR_CLOSURE = 100
-const MULTI_ADDR = ethers.utils.hexlify(
-  new Multiaddr('/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg').bytes
-)
+const MULTI_ADDR = []
+
+// recover the public key from the signer passed by ethers
+// could not find a way to get the public key through the API
+const recoverPublicKeyFromSigner = async (deployer: SignerWithAddress): Promise<PublicKey> => {
+  const msg = 'hello'
+  const sig = await deployer.signMessage(msg)
+  const msgHash = ethers.utils.hashMessage(msg)
+  const msgHashBytes = ethers.utils.arrayify(msgHash)
+  return PublicKey.fromUncompressedPubKey(ethers.utils.arrayify(ethers.utils.recoverPublicKey(msgHashBytes, sig)))
+}
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
-const useFixtures = deployments.createFixture(async () => {
-  const [deployer] = await ethers.getSigners()
-  const accountA = new ethers.Wallet(ACCOUNT_A.privateKey).connect(ethers.provider)
-  const accountB = new ethers.Wallet(ACCOUNT_B.privateKey).connect(ethers.provider)
+const useFixtures = deployments.createFixture(
+  async (_, ops: { skipAnnounceForAccountA: boolean; skipAnnounceForAccountB: boolean }) => {
+    const [deployer] = await ethers.getSigners()
+    const deployerPubKey = await recoverPublicKeyFromSigner(deployer)
+    const accountA = new ethers.Wallet(ACCOUNT_A.privateKey).connect(ethers.provider)
+    const accountAPubKey = PublicKey.fromPrivKey(ethers.utils.arrayify(accountA.privateKey))
+    const accountB = new ethers.Wallet(ACCOUNT_B.privateKey).connect(ethers.provider)
+    const accountBPubKey = PublicKey.fromPrivKey(ethers.utils.arrayify(accountB.privateKey))
 
-  // run migrations
-  const contracts = await deployments.fixture()
-  const token = HoprToken__factory.connect(contracts['HoprToken'].address, ethers.provider)
-  const channels = HoprChannels__factory.connect(contracts['HoprChannels'].address, ethers.provider)
-  const mockChannels = await new ChannelsMock__factory(deployer).deploy(token.address, 0)
+    // run migrations
+    const contracts = await deployments.fixture()
+    const token = HoprToken__factory.connect(contracts['HoprToken'].address, ethers.provider)
+    const channels = HoprChannels__factory.connect(contracts['HoprChannels'].address, ethers.provider)
+    const mockChannels = await new ChannelsMock__factory(deployer).deploy(token.address, 0)
 
-  // create deployer the minter
-  const minterRole = await token.MINTER_ROLE()
-  await token.connect(deployer).grantRole(minterRole, deployer.address)
+    // create deployer the minter
+    const minterRole = await token.MINTER_ROLE()
+    await token.connect(deployer).grantRole(minterRole, deployer.address)
 
-  const fundEther = async (addr, amount) => await deployer.sendTransaction({ to: addr, value: amount })
+    const fundEther = async (addr, amount) => await deployer.sendTransaction({ to: addr, value: amount })
 
-  const fund = async (addr, amount) =>
-    await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
+    const fund = async (addr, amount) =>
+      await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
 
-  const approve = async (account, amount) => await token.connect(account).approve(channels.address, amount)
+    const approve = async (account, amount) => await token.connect(account).approve(channels.address, amount)
 
-  const fundAndApprove = async (account, amount) => {
-    await fund(account.address, amount)
-    await approve(account, amount)
+    const fundAndApprove = async (account, amount) => {
+      await fund(account.address, amount)
+      await approve(account, amount)
+    }
+
+    const TICKET_AB_WIN = await createTicket(
+      {
+        recipient: ACCOUNT_B.address,
+        proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
+        ticketEpoch: '0',
+        ticketIndex: '1',
+        amount: '10',
+        winProb: WIN_PROB_100.toString(),
+        channelEpoch: '1'
+      },
+      ACCOUNT_A,
+      SECRET_1
+    )
+
+    await fundEther(accountA.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
+    await fundEther(accountB.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
+
+    // announce
+    if (!ops?.skipAnnounceForAccountA) {
+      await channels.connect(accountA).announce(ethers.utils.arrayify(accountAPubKey.toUncompressedPubKeyHex()), [])
+    }
+    if (!ops?.skipAnnounceForAccountB) {
+      await channels.connect(accountB).announce(ethers.utils.arrayify(accountBPubKey.toUncompressedPubKeyHex()), [])
+    }
+
+    return {
+      token,
+      channels,
+      deployer,
+      deployerPubKey,
+      accountA,
+      accountAPubKey,
+      accountB,
+      accountBPubKey,
+      fund,
+      approve,
+      mockChannels,
+      fundAndApprove,
+      TICKET_AB_WIN
+    }
   }
-
-  const TICKET_AB_WIN = await createTicket(
-    {
-      recipient: ACCOUNT_B.address,
-      proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-      ticketEpoch: '0',
-      ticketIndex: '1',
-      amount: '10',
-      winProb: WIN_PROB_100.toString(),
-      channelEpoch: '1'
-    },
-    ACCOUNT_A,
-    SECRET_1
-  )
-
-  await fundEther(accountA.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
-  await fundEther(accountB.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
-
-  return {
-    token,
-    channels,
-    deployer,
-    accountA,
-    accountB,
-    fund,
-    approve,
-    mockChannels,
-    fundAndApprove,
-    TICKET_AB_WIN
-  }
-})
+)
 
 describe('announce user', function () {
   it('should announce user', async function () {
-    const { channels, deployer } = await useFixtures()
+    const { channels, deployer, deployerPubKey } = await useFixtures()
 
-    await expect(channels.connect(deployer).announce(MULTI_ADDR))
+    await expect(channels.connect(deployer).announce(deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR))
       .to.emit(channels, 'Announcement')
-      .withArgs(deployer.address, MULTI_ADDR)
+      .withArgs(deployer.address, deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR)
+  })
+
+  it('should fail to announce user', async function () {
+    const { channels, deployer, accountA } = await useFixtures()
+
+    await expect(
+      channels
+        .connect(deployer)
+        .announce(
+          PublicKey.fromPrivKey(ethers.utils.arrayify(accountA.privateKey)).toUncompressedPubKeyHex(),
+          MULTI_ADDR
+        )
+    ).to.be.revertedWith("publicKey's address does not match senders")
+  })
+})
+
+describe('funding HoprChannel without announcements', function () {
+  it('should fail to fund without accountA announcement', async function () {
+    const { accountA, channels, fundAndApprove } = await useFixtures({
+      skipAnnounceForAccountA: true,
+      skipAnnounceForAccountB: false
+    })
+
+    await fundAndApprove(accountA, 100)
+    await expect(
+      channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    ).to.be.revertedWith('source has not announced')
+  })
+
+  it('should fail to fund without accountB announcement', async function () {
+    const { accountA, channels, fundAndApprove } = await useFixtures({
+      skipAnnounceForAccountA: false,
+      skipAnnounceForAccountB: true
+    })
+
+    await fundAndApprove(accountA, 100)
+    await expect(
+      channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    ).to.be.revertedWith('destination has not announced')
   })
 })
 

@@ -16,7 +16,8 @@ import {
   AccountEntry,
   Hash,
   PublicKey,
-  Snapshot
+  Snapshot,
+  u8aConcat
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
@@ -209,7 +210,7 @@ class Indexer extends EventEmitter {
       this.latestBlock = blockNumber
     }
 
-    let lastSnapshot = await this.db.getLatestConfirmedSnapshot()
+    let lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
     const confirmedEvents = []
 
     // check unconfirmed events and process them if found
@@ -282,37 +283,34 @@ class Indexer extends EventEmitter {
   }
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
-    try {
-      //TODO types
-      const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
-      const address = Address.fromString(event.args.account)
-      const account = new AccountEntry(address, multiaddr, blockNumber)
-      if (!account.getPublicKey().toAddress().eq(address)) {
-        throw Error("Multiaddr in announcement does not match sender's address")
-      }
-      if (!account.getPeerId() || !PeerId.isPeerId(account.getPeerId())) {
-        throw Error('Peer ID in multiaddr is null')
-      }
-      log('New node announced', account.address.toHex(), account.multiAddr.toString())
-      this.emit('peer', {
-        id: account.getPeerId(),
-        multiaddrs: [account.multiAddr]
-      })
-      await this.db.updateAccount(account)
-    } catch (e) {
-      // Issue with the multiaddress or invalid public key, no worries, we ignore this announcement.
-      log('Error with announced peer', e, event)
+    // publicKey given by the SC is verified
+    const publicKey = PublicKey.fromUncompressedPubKey(
+      // add uncompressed key identifier
+      u8aConcat(new Uint8Array([4]), stringToU8a(event.args.publicKey))
+    )
+    const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
+      // remove "p2p" and corresponding peerID
+      .decapsulateCode(421)
+      // add new peerID
+      .encapsulate(`/p2p/${publicKey.toPeerId().toB58String()}`)
+    const address = Address.fromString(event.args.account)
+    const account = new AccountEntry(address, multiaddr, blockNumber)
+    if (!account.getPublicKey().toAddress().eq(address)) {
+      throw Error("Multiaddr in announcement does not match sender's address")
     }
+    if (!account.getPeerId() || !PeerId.isPeerId(account.getPeerId())) {
+      throw Error('Peer ID in multiaddr is null')
+    }
+    log('New node announced', account.address.toHex(), account.multiAddr.toString())
+    this.emit('peer', {
+      id: account.getPeerId(),
+      multiaddrs: [account.multiAddr]
+    })
+    await this.db.updateAccount(account)
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
-    let channel
-    try {
-      channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
-    } catch (e) {
-      log('could not process channel event, skipping it', e)
-      return
-    }
+    const channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
 
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
@@ -338,8 +336,17 @@ class Indexer extends EventEmitter {
     }
     log(`Found channel ${chalk.yellow(channel.getId().toHex())} to us with unset commitment. Setting commitment`)
 
+    const setCommitment = (commitment: Hash): Promise<string> => {
+      try {
+        return this.chain.setCommitment(channel.source.toAddress(), commitment)
+      } catch (e) {
+        log('Error setting commitment', e)
+        // TODO: defer to channel strategy for this, and allow for retries.
+      }
+    }
+
     return new Commitment(
-      (comm: Hash) => this.chain.setCommitment(channel.source.toAddress(), comm),
+      setCommitment,
       async () => (await this.getChannel(channel.getId())).commitment,
       this.db,
       channel.getId(),
