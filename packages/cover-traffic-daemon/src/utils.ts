@@ -4,6 +4,9 @@ import { BigNumber } from 'bignumber.js'
 import { PublicKey, ChannelEntry } from '@hoprnet/hopr-utils'
 import type { State, ChannelData, PersistedState } from './state'
 import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
+import debug from 'debug'
+
+const log = debug('cover-traffic')
 
 export const addBN = (a: BN, b: BN): BN => a.add(b)
 export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().integerValue().toFixed(), 10)
@@ -70,6 +73,15 @@ export const findChannel = (src: PublicKey, dest: PublicKey, state: State): Chan
     .map((c: ChannelData): ChannelEntry => c.channel)
     .find((c: ChannelEntry) => c.source.eq(src) && c.destination.eq(dest))
 
+/*
+ * Find the timestamp at which a CT channel is opened.
+ * @param dest Public key of the `destination` of the channel
+ * @param state State of the network
+ */
+export const findCtChannelOpenTime = (dest: PublicKey, state: State): number => {
+  return state.ctChannels.find((ctChannel) => ctChannel.destination === dest).openFrom ?? Date.now()
+}
+
 /**
  *
  * @param startNode Public key of the first-hop node
@@ -98,11 +110,10 @@ export const sendCTMessage = async (
     )
 
     path.forEach((p) => data.incrementForwards(p))
-    path.push(selfPub) // destination is always self.
-    data.log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
+    log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
-    data.log(`Could not find path: ${startNode.toB58String()} -> ${selfPub.toPeerId()} (${e})`)
+    log(`Could not find path: ${startNode.toB58String()} -> ${selfPub.toPeerId()} (${e})`)
     return false
   }
   try {
@@ -111,7 +122,7 @@ export const sendCTMessage = async (
     return true
   } catch (e) {
     //console.log(e)
-    data.log('error sending to' + startNode.toPeerId().toB58String())
+    log('error sending to' + startNode.toPeerId().toB58String())
     return false
   }
 }

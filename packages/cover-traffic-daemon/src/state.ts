@@ -15,13 +15,13 @@ export type ChannelData = {
 export type OpenChannels = {
   destination: PublicKey
   latestQualityOf: number
+  openFrom: number // timestamp (in milliseconds) when the CT channel is opened
 }
 
 export type State = {
   nodes: Record<string, PeerData>
   // channels indexed by its channelId
   channels: Record<string, ChannelData>
-  log: string[]
   // currently non-closed cover traffic channels
   ctChannels: OpenChannels[]
   block: BN
@@ -55,7 +55,6 @@ export class PersistedState {
       this._data = {
         nodes: {},
         channels: {},
-        log: [],
         ctChannels: [],
         messageFails: {},
         block: new BN('0')
@@ -71,10 +70,10 @@ export class PersistedState {
     this._data = {
       nodes: {},
       channels: {},
-      log: ['loaded data'],
       ctChannels: json.ctChannels.map((p) => ({
-        destination: PublicKey.fromPeerId(PeerId.createFromB58String(p)),
-        latestQualityOf: 0
+        destination: PublicKey.fromPeerId(PeerId.createFromB58String(p.destination)),
+        latestQualityOf: 0,
+        openFrom: p.openFrom
       })),
       messageFails: {},
       block: new BN(json.block)
@@ -124,7 +123,10 @@ export class PersistedState {
           forwardAttempts: c.forwardAttempts,
           sendAttempts: c.sendAttempts
         })),
-        ctChannels: s.ctChannels.map((o: OpenChannels) => o.destination.toB58String()),
+        ctChannels: s.ctChannels.map((o: OpenChannels) => ({
+          destination: o.destination.toB58String(),
+          openFrom: o.openFrom
+        })),
         block: s.block.toString()
       }),
       'utf8'
@@ -186,16 +188,6 @@ export class PersistedState {
     return Object.values(this.get().channels)
       .filter((c: ChannelData) => c.channel.source.eq(p))
       .map((c) => c.channel)
-  }
-
-  /**
-   * Update the log in the persisted state.
-   * @param args An array of strings to be written to the state
-   */
-  log(...args: String[]): void {
-    const s = this.get()
-    s.log.push(args.join(' '))
-    this.set(s)
   }
 
   /**

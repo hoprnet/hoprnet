@@ -3,7 +3,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import type BN from 'bn.js'
 import { PublicKey, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import type { PersistedState } from './state'
-import { sendCTMessage } from './utils'
+import { findCtChannelOpenTime, sendCTMessage } from './utils'
 import {
   CT_INTERMEDIATE_HOPS,
   MESSAGE_FAIL_THRESHOLD,
@@ -11,8 +11,12 @@ import {
   CHANNELS_PER_COVER_TRAFFIC_NODE,
   CHANNEL_STAKE,
   CT_NETWORK_QUALITY_THRESHOLD,
+  CT_CHANNEL_STALL_TIMEOUT,
   CT_OPEN_CHANNEL_QUALITY_THRESHOLD
 } from './constants'
+import debug from 'debug'
+
+const log = debug('cover-traffic')
 
 export class CoverTrafficStrategy extends SaneDefaults {
   name = 'covertraffic'
@@ -50,7 +54,12 @@ export class CoverTrafficStrategy extends SaneDefaults {
         continue
       }
       const q = await peers.qualityOf(c.destination)
-      ctChannels.push({ destination: c.destination, latestQualityOf: q })
+      ctChannels.push({
+        destination: c.destination,
+        latestQualityOf: q,
+        openFrom: findCtChannelOpenTime(c.destination, state)
+      })
+
       // Cover traffic channels with quality below this threshold will be closed
       if (q < CT_NETWORK_QUALITY_THRESHOLD) {
         toClose.push(c.destination)
@@ -85,11 +94,17 @@ export class CoverTrafficStrategy extends SaneDefaults {
           if (!success) {
             this.data.incrementMessageFails(openChannel.destination)
           }
+        } else if (
+          channel &&
+          channel.status == ChannelStatus.WaitingForCommitment &&
+          Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT
+        ) {
+          // handle waiting for commitment stalls
+          toClose.push(openChannel.destination)
         }
-        // TODO: handle waiting for commitment stalls
       }
     } else {
-      this.data.log('aborting send messages - less channels in network than hops required')
+      log('aborting send messages - less channels in network than hops required')
     }
 
     let attempts = 0
@@ -104,9 +119,10 @@ export class CoverTrafficStrategy extends SaneDefaults {
       const q = await peers.qualityOf(c)
       // Ignore the randomly chosen node, if it's the cover traffic node itself, or a non-closed channel exists
       if (
-        currentChannels.filter((x) => x.status !== ChannelStatus.Closed).find((x) => x.destination.eq(c)) ||
+        ctChannels.find((x) => x.destination.eq(c)) ||
         c.eq(this.selfPub) ||
-        toOpen.find((x) => x[1].eq(c))
+        toOpen.find((x) => x[0].eq(c)) ||
+        toClose.find((x) => x.eq(c))
       ) {
         console.error('skipping node', c.toB58String())
         continue
@@ -120,7 +136,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       toOpen.push([c, CHANNEL_STAKE])
     }
 
-    this.data.log(
+    log(
       `strategy tick: ${Date.now()} balance:${balance.toString()} open:${toOpen
         .map((p) => p[0].toPeerId().toB58String())
         .join(',')} close: ${toClose.map((p) => p.toPeerId().toB58String()).join(',')}`.replace('\n', ', ')

@@ -26,11 +26,12 @@ usage() {
 ([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
 # verify and set parameters
-declare pkg pkg_vsn pkg_name
+declare pkg pkg_vsn pkg_name pkg_path
 
 pkg=${1:-hoprd}
 pkg_vsn=${2:-$("${mydir}/get-package-version.sh" ${pkg})}
-pkg_name="@hoprnet/${pkg}"
+pkg_path="${mydir}/../packages/${pkg}/package.json"
+pkg_name=$(node -p -e "require('${pkg_path}').name")
 
 log "Get npm package info for ${pkg_name}@${pkg_vsn}"
 npm view "${pkg_name}@${pkg_vsn}" --json

@@ -58,14 +58,15 @@ ___
 
 ### createChainWrapper
 
-▸ **createChainWrapper**(`providerURI`, `privateKey`): `Promise`<`Object`\>
+▸ **createChainWrapper**(`providerURI`, `privateKey`, `checkDuplicate?`): `Promise`<`Object`\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `providerURI` | `string` |
-| `privateKey` | `Uint8Array` |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `providerURI` | `string` | `undefined` |
+| `privateKey` | `Uint8Array` | `undefined` |
+| `checkDuplicate` | `Boolean` | `true` |
 
 #### Returns
 

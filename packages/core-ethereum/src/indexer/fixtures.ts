@@ -34,6 +34,7 @@ export const PARTY_A_INITIALIZED_EVENT = {
   logIndex: 0,
   args: {
     account: PARTY_A.toAddress().toHex(),
+    publicKey: PARTY_A.toUncompressedPubKeyHex(),
     multiaddr: u8aToHex(PARTY_A_MULTIADDR.bytes)
   }
 } as Event<'Announcement'>
@@ -46,6 +47,7 @@ export const PARTY_B_INITIALIZED_EVENT = {
   logIndex: 0,
   args: {
     account: PARTY_B.toAddress().toHex(),
+    publicKey: PARTY_B.toUncompressedPubKeyHex(),
     multiaddr: u8aToHex(PARTY_B_MULTIADDR.bytes)
   }
 } as Event<'Announcement'>

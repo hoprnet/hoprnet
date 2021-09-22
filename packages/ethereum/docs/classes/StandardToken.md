@@ -172,7 +172,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:221
+packages/ethereum/types/StandardToken.d.ts:233
 
 ___
 
@@ -213,7 +213,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:284
+packages/ethereum/types/StandardToken.d.ts:314
 
 ___
 
@@ -226,7 +226,9 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
 | `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
 
 #### Overrides
 
@@ -234,7 +236,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:264
+packages/ethereum/types/StandardToken.d.ts:276
 
 ___
 
@@ -261,7 +263,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:137
+packages/ethereum/types/StandardToken.d.ts:149
 
 ___
 
@@ -275,7 +277,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:135
+packages/ethereum/types/StandardToken.d.ts:147
 
 ___
 
@@ -302,7 +304,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:327
+packages/ethereum/types/StandardToken.d.ts:357
 
 ___
 
@@ -440,7 +442,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:215
+packages/ethereum/types/StandardToken.d.ts:227
 
 ___
 
@@ -462,7 +464,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:180
+packages/ethereum/types/StandardToken.d.ts:192
 
 ___
 
@@ -486,7 +488,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:96
+packages/ethereum/types/StandardToken.d.ts:108
 
 ___
 
@@ -507,7 +509,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:201
+packages/ethereum/types/StandardToken.d.ts:213
 
 ___
 
@@ -531,7 +533,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:95
+packages/ethereum/types/StandardToken.d.ts:107
 
 ___
 
@@ -553,7 +555,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:195
+packages/ethereum/types/StandardToken.d.ts:207
 
 ___
 
@@ -571,7 +573,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:97
+packages/ethereum/types/StandardToken.d.ts:109
 
 ___
 
@@ -642,7 +644,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:209
+packages/ethereum/types/StandardToken.d.ts:221
 
 ___
 
@@ -697,7 +699,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:99
+packages/ethereum/types/StandardToken.d.ts:111
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -717,7 +719,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:122
+packages/ethereum/types/StandardToken.d.ts:134
 
 ___
 
@@ -749,7 +751,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:102
+packages/ethereum/types/StandardToken.d.ts:114
 
 ▸ **off**(`eventName`, `listener`): [`StandardToken`](StandardToken.md)
 
@@ -770,7 +772,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:123
+packages/ethereum/types/StandardToken.d.ts:135
 
 ___
 
@@ -802,7 +804,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:106
+packages/ethereum/types/StandardToken.d.ts:118
 
 ▸ **on**(`eventName`, `listener`): [`StandardToken`](StandardToken.md)
 
@@ -823,7 +825,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:124
+packages/ethereum/types/StandardToken.d.ts:136
 
 ___
 
@@ -855,7 +857,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:110
+packages/ethereum/types/StandardToken.d.ts:122
 
 ▸ **once**(`eventName`, `listener`): [`StandardToken`](StandardToken.md)
 
@@ -876,7 +878,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:125
+packages/ethereum/types/StandardToken.d.ts:137
 
 ___
 
@@ -909,7 +911,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:129
+packages/ethereum/types/StandardToken.d.ts:141
 
 ___
 
@@ -940,7 +942,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:118
+packages/ethereum/types/StandardToken.d.ts:130
 
 ▸ **removeAllListeners**(`eventName?`): [`StandardToken`](StandardToken.md)
 
@@ -960,7 +962,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:127
+packages/ethereum/types/StandardToken.d.ts:139
 
 ___
 
@@ -992,7 +994,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:114
+packages/ethereum/types/StandardToken.d.ts:126
 
 ▸ **removeListener**(`eventName`, `listener`): [`StandardToken`](StandardToken.md)
 
@@ -1013,7 +1015,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:126
+packages/ethereum/types/StandardToken.d.ts:138
 
 ___
 
@@ -1033,7 +1035,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:186
+packages/ethereum/types/StandardToken.d.ts:198
 
 ___
 
@@ -1055,7 +1057,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:203
+packages/ethereum/types/StandardToken.d.ts:215
 
 ___
 
@@ -1078,7 +1080,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/StandardToken.d.ts:188
+packages/ethereum/types/StandardToken.d.ts:200
 
 ___
 
