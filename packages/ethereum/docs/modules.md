@@ -14,8 +14,6 @@
 - [BurnableToken\_\_factory](classes/BurnableToken__factory.md)
 - [ChannelsMock](classes/ChannelsMock.md)
 - [ChannelsMock\_\_factory](classes/ChannelsMock__factory.md)
-- [Context](classes/Context.md)
-- [Context\_\_factory](classes/Context__factory.md)
 - [DetailedERC20](classes/DetailedERC20.md)
 - [DetailedERC20\_\_factory](classes/DetailedERC20__factory.md)
 - [ERC1820Implementer](classes/ERC1820Implementer.md)
