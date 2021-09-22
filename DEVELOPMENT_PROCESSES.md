@@ -106,7 +106,6 @@ _Where:_ In element channel `tech - eod`
 Every Team Member is responsible for letting the rest of the team know about illness/absence/vacation.
 
 - unexpected absence needs to be reported ASAP through email
-- planned absence of +3 days needs to be reported 3 months in advance through email
 
 ## Sprints
 
