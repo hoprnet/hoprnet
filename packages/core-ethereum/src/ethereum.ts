@@ -111,7 +111,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     populatedTx: UnsignedTransaction,
     method: T,
     ...rest: Parameters<T>
-  ): Promise<ContractTransaction | {hash: string;}> {
+  ): Promise<ContractTransaction | { hash: string }> {
     const gasLimit = 300e3
     const gasPrice = networkInfo?.gas ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
@@ -133,16 +133,11 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
     try {
       if (checkDuplicate) {
-        const [checkedDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice);
+        const [checkedDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
         // check duplicated pending/mined transaction against transaction manager
         // if transaction manager has a transaction with the same payload that is mined or is pending but with
         // a higher or equal nonce, halt.
-        log(
-          'checkDuplicate %s %s with hash %s',
-          checkDuplicate,
-          checkedDuplicate,
-          hash
-        )
+        log('checkDuplicate %s %s with hash %s', checkDuplicate, checkedDuplicate, hash)
 
         if (checkedDuplicate) {
           return {

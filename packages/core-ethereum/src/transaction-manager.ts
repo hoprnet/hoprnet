@@ -44,7 +44,10 @@ class TranscationManager {
    * @param payload object
    * @param gasPrice gas price associated with the payload
    */
-  public existInMinedOrPendingWithHigherFee(payload: TransactionPayload, gasPrice: number | BigNumber): [Boolean, string] {
+  public existInMinedOrPendingWithHigherFee(
+    payload: TransactionPayload,
+    gasPrice: number | BigNumber
+  ): [Boolean, string] {
     // Using isDeepStrictEqual to compare TransactionPayload objects, see
     // https://nodejs.org/api/util.html#util_util_isdeepstrictequal_val1_val2
     const index = Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload))
