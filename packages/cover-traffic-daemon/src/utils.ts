@@ -79,7 +79,7 @@ export const findChannel = (src: PublicKey, dest: PublicKey, state: State): Chan
  * @param state State of the network
  */
 export const findCtChannelOpenTime = (dest: PublicKey, state: State): number => {
-  const ctChannel = state.ctChannels.find((ctChannel) => ctChannel.destination === dest);
+  const ctChannel = state.ctChannels.find((ctChannel) => ctChannel.destination === dest)
   return !ctChannel ? Date.now() : ctChannel.openFrom ?? Date.now()
 }
 
