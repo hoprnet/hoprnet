@@ -382,5 +382,5 @@ daily workflow as it was before.
 
 All members may suggest changes to our development processes.
 
-1. For questions, reach out to one of the [Ambassadors](#ambassadors) through email, element, or simply asking the question in element channel `tech -pm`.
+1. For questions, reach out to one of the [Ambassadors](#ambassadors) through email, element, or simply asking the question in element channel `tech - pm`.
 2. For changes, make a PR modifying this file, the PR will have to be reviewed by the [Trifecta](#trifecta), the [Process Facilitator](#legend), and generally be accepted by the _tech_ team.
