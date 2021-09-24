@@ -1,15 +1,16 @@
 \section{Paths and Path Selection}
 \label{sec:path-selection}
+HOPR currently utilizes free-route sender-selected paths which are known to provide better privacy as well as better packet delivery in the event of partial network failure than other topologies \cite{Dingledine2004SynchronousBF}. HOPR makes it easy to customize various different routing strategies. In this section, we present the free-routing strategy that HOPR nodes are currently following. Another strategy is later introduced in the \nameref{sec:CT} section.
 
-Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to their final destination. To meet HOPR's stated security goals, it is crucial for nodes in the network to keep the chosen path secret. As relay nodes differ in their ability to forward packets, path choices need to consider the nodes' resources and cannot be chosen entirely at random.
+Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to their final destination. To meet HOPR's stated \nameref{sec:securitygoals}, it is crucial for nodes in the network to keep the chosen path secret.
 
-Path selection is therefore done in multiple steps: first, there is a preprocessing step to assign each payment channel a score, which by default equals to their balance (the number of HOPR tokens locked in a payment channel). The score is then multiplied by a random number to yield the channel's final weight. This randomization helps reduce linkability, which is a risk is a purely deterministic selection process. Finally, a path is chosen to the destination based on these scores while considering the relative availability of intermediate hops.
+As relay nodes differ in their ability to forward packets, path choices need to consider the nodes' resources and cannot be chosen entirely at random.
 
-\begin{enumerate}
-    \item \textbf{Assign} each channel a score depending on their balance
-    \item \textbf{Randomize} the edge weights of the subgraph
-    \item \textbf{Find} a path in the subgraph with channel weights and node availability using a graph traversal algorithm
-\end{enumerate}
+Path selection is therefore done in multiple steps: first, there is a preprocessing step to assign each payment channel a score, which by default equals to its balance (the number of HOPR tokens locked in a payment channel). Here we use the balance that a node has staked in a particular payment channel as a signal for how much traffic the node is willing to relay in a fashion that aligns its incentives with the rest of the network.
+
+The score is then multiplied by a random number to yield the channel's final weight. This randomization helps reduce linkability, which is a risk is a purely deterministic selection process. Finally, a path is chosen to the destination based on these scores while considering the relative availability of intermediate hops in a depth-first greedy search.
+
+This chapter details in \nameref{sec:path-selection:node-score} based on a nodes payment channel balances, \nameref{sec:path-selection:randomization} of the edge weights of the graph and \ref{sec:path-selection:graph-traversal} to find a path in HOPR network relative to randomized channel weights and node availability.
 
 \subsection{Node score assignment}
 \label{sec:path-selection:node-score}
@@ -26,25 +27,23 @@ If a node does not respond to \textit{ping} attempts, their network score decrea
 $$t_{bo} = \exp (t_{base}, {\exp (f_{bo}, n_{fail})})$$
 where $t_{bo}$ is the backoff time, $t_{base}$ is the initial backoff time, $f_{bo}$ is the backoff factor, and $ n_{fail}$ is the number of failed attempts since the last sucessful attempt or the network start.
 
-When the network score is below the network quality threshold, the node is considered offline.
+When the network score is below the network quality threshold, the node is considered offline. All incoming and outgoing channels of this node are ignored and the node will not be utilized in the path selection process.
 
-\subsubsection{Payment channel graph}
+\subsubsection{Payment channel graph and stake}
 
 Incentives for relaying mixnet packages require the existence of an open payment channel that is funded towards the relay node. Hence, it is necessary to be in sync with the latest on-chain state.
-
-\subsubsection{The importance of stake}
 
 Funding a payment channel with HOPR tokens means staking these tokens in the HOPR network. The more tokens a node stakes to an outgoing payment channel, the more likely the payment channel is selected as a path, hence the more likely the node is chosen as a relayer by other nodes.
 
 \subsection{Randomization}
 \label{sec:path-selection:randomization}
 
-Since the previous step is entirely deterministic and potential adversaries could thus deduce the outcome from public information, each node score is randomized by multiplying it with a random number, $r_i$.
+Since the previous step is entirely deterministic and potential adversaries could thus deduce the path of an individual packet from public information, each node score is randomized by multiplying it with a random number, $r_i$. Over long time scales, the expectation value of the weight is still proportional to the node's score and thus predictable.
 $$weight(n_i) := score(n_i) * r_i$$
 
 Note that the random numbers are assigned once at the beginning of the process and reassigned upon the selection of a subsequent packet.
 
-\subsection{Graph traversal}
+\subsection{Path selection}
 \label{sec:path-selection:graph-traversal}
 
 The HOPR network uses source-selected routing. This means a node must sample the entire path the mixnet packet will take before sending it to the first relayer.
@@ -72,7 +71,7 @@ The algorithm terminates once a path with $targetLength$ is found. To prevent th
     }
     \;
     $current \leftarrow last(path)$\;
-    $open \leftarrow \mathbf{new} \ \mathsf{PriorityQueue}_{\mathsf{nodeWeight}}()$\;
+    $open \leftarrow \emptyset$\;
     \;
     \ForEach{$next \in \{ y \in V \ | \ (x,y) \in E \ \land \ x = current \}$}{
         \If{$score(next) > threshold \ \mathbf{and} \ y \notin closed \ \mathbf{and} \ y \notin path$}{

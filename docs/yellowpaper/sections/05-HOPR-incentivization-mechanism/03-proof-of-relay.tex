@@ -1,9 +1,7 @@
 \subsection{Proof of Relay}
 \label{sec:proofofrelay}
 
-HOPR incentivizes packet transformation and delivery using a mechanism called
-\textbf{proof of relay}. This mechanism guarantees that a node's relay services are
-verifiable.
+HOPR incentivizes packet transformation and delivery using a mechanism called \textbf{proof of relay}. This mechanism guarantees that a node's relay services are verifiable.
 
 \paragraph{Construction}
 
@@ -18,8 +16,7 @@ verifiable.
 
 \subsubsection{Challenge}
 
-$A$ creates a shared group element $\alpha_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key generated from the master DH Sphinx key and will be used to derive new keys $s_i^{(0)}$ and $s_{i}^{(1)}$. 
-The first key, $s_i^{(0)}$, will be used as the node's \textit{own key share} and the second key, $s_i^{(1)}$, will be used as the \textit{acknowledgement key}. The acknowledgement key will be embedded in the acknowledgement for a packet and thereby unlocks the reward for the previous relayer, earned for transforming and delivering the packet.
+$A$ creates a shared group element $\alpha_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange as introduced in section \nameref{sec:sphinx:keyderivation}. This shared key is a session key generated from the master DH Sphinx key and will be used to derive new keys $s_i^{(0)}$ and $s_{i}^{(1)}$.  The first key, $s_i^{(0)}$, will be used as the node's \textit{own key share} and the second key, $s_i^{(1)}$, will be used as the \textit{acknowledgement key}. The acknowledgement key will be embedded in the acknowledgement for a packet and thereby unlocks the reward for the previous relayer, earned for transforming and delivering the packet.
     \paragraph{Key derivation}
     $A$ first creates a ``session secret", $s_i$, then uses it as a seed to derive subkeys $s_i^{(0)},s_i^{(1)}$ for each node on the route. This is done using an HKDF (HMAC-based key derivation function), a cryptographic hash function that derives one or more secret keys from a secret value using a pseudorandom function. The key derivation works as follows:
     \begin{itemize}
@@ -57,8 +54,7 @@ The sender $A$ also creates a challenge $T_{c_i}$, such that
    \begin{align}  
     T_{c_i}&=(s_i^{(0)}+s_{i+1}^{(1)})*G
      \end{align}
-   Since proof of relay is used to ensure the relay services of nodes are verifiable, it is the duty of each node to check that given challenges are derivable from the given and expected information.
-Packets with inappropriate challenges should be dropped, as they might not result in winning tickets with the expected probability (see Section \ref{sec:tickets}).
+   Since proof of relay is used to ensure the relay services of nodes are verifiable, it is the duty of each node to check that given challenges are derivable from the given and expected information. Packets with inappropriate challenges should be dropped, as they might not result in winning tickets with the expected probability (see Section \ref{sec:tickets}).
 
 The values $H_i$ and $T_{c_i}$ are sent with the routing information $\beta_i$ as follows:
 $$\beta_i=y_{i+1}\|H_i\|T_{c_i}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]}$$

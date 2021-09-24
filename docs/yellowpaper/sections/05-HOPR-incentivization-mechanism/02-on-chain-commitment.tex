@@ -1,14 +1,8 @@
 \subsection{On-chain Commitment}
 \label{sec:onchaincommitment}
 
-HOPR uses a commitment scheme to deposit values on-chain and reveal them once a
-node redeems an incentive for relaying packets. This comes with the benefit that
-the redeeming party must disclose a secret that is unknown to the issuer of the
-incentive until it is claimed on-chain. The $\textbf{opening}$ $\mathsf{Open}$
-and the $\textbf{response}$ $r$ to the proof-of-relay challenge (called \textit{nextCommitment} and \textit{proofOfRelaySecret} in the smart contract) are then
-used to prove to the smart contract that the node has a legitimate claim to the
-funds. 
-HOPR uses a computationally hiding and binding commitment scheme:
+HOPR uses a commitment scheme to deposit values on-chain and reveal them once a node redeems an incentive for relaying packets. This comes with the benefit that the redeeming party must disclose a secret that is unknown to the issuer of the incentive until it is claimed on-chain. The $\textbf{opening}$ $\mathsf{Open}$ and the $\textbf{response}$ $r$ to the proof-of-relay challenge (called \textit{nextCommitment} and \textit{proofOfRelaySecret} in the smart contract) are then used to prove to the smart contract that the node has a legitimate claim to the
+funds. HOPR uses a computationally hiding and binding commitment scheme:
 
 \begin{defnsub}
     % Currently leaving out further details such as unconditionally/computationally binding / hiding
@@ -25,50 +19,12 @@ HOPR uses a computationally hiding and binding commitment scheme:
 
 \subsubsection{Commitment phase}
 
-Once a node is the destination of a HOPR unidirectional channel, it generates a master key $comm_0$ randomly and uses it to create an iterated
-commitment $comm_i$ such that for every $i \in \mathbb{N}_0$ and $i > 0$ it
-holds that $$ \mathsf{Open}(comm_{i}, comm_{i-1}) = \top,$$ which means opening
-$comm_{i}$ with $comm_{i-1}$ holds true.
+Once a node is the destination of a HOPR unidirectional channel, it generates a master key $comm_0$ randomly and uses it to create an iterated commitment $comm_i$ such that for every $i \in \mathbb{N}_0$ and $i > 0$ it holds that $$ \mathsf{Open}(comm_{i}, comm_{i-1}) = \top,$$ which means opening $comm_{i}$ with $comm_{i-1}$ holds true.
 
-The iterated commitment is computed as $$comm_n = h^n(comm_0),$$ where $h$ is a
-pre-image resistant hash function (we use the keccak256 hash function, which is also used
-in Ethereum).
-The master key should be pseudorandom, such that
-all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \le
-n$ are indistinguishable for the ticket issuer from random numbers of the same
-length. This is necessary to ensure that the ticket issuer is unable to
-determine whether a ticket is a winner or not when issuing the ticket. This makes
-it infeasible for the ticket issuer to tweak the challenge to such that it
-cannot be a winner.
+The iterated commitment is computed as $$comm_n = h^n(comm_0),$$ where $h$ is a pre-image resistant hash function (we use the keccak256 hash function, which is also used in Ethereum). The master key should be pseudorandom, such that all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \l en$ are indistinguishable for the ticket issuer from random numbers of the same length. This is necessary to ensure that the ticket issuer is unable to determine whether a ticket is a winner or not when issuing the ticket. This makes it infeasible for the ticket issuer to tweak the challenge to such that it cannot be a winner.
 
-When dispatching a transaction that opens the payment channel, the
-commitment $comm_n$ is stored in the channel structure in the smart contract and
-the smart contract will force the ticket recipient to reveal $comm_{n-1}$ when
-redeeming a ticket issued in this channel. The number of iterations $n$ can be
-chosen as a constant and should reflect the number of tickets a node intends to
-redeem within a channel.
+When dispatching a transaction that opens the payment channel, the commitment $comm_n$ is stored in the channel structure in the smart contract and the smart contract will force the ticket recipient to reveal $comm_{n-1}$ when redeeming a ticket issued in this channel. The number of iterations $n$ can be chosen as a constant and should reflect the number of tickets a node intends to redeem within a channel.
 
 \subsubsection{Opening phase}
 
-In order to redeem a ticket, a node must reveal the opening to the current
-commitment $comm_i$ that is stored in the smart contract for the channel. Since
-the opening $comm_{i-1}$ allows the ticket issuer to determine whether a ticket
-is going to be a winner, the ticket recipient should keep $comm_{i-1}$ until it is
-used to redeem a ticket. Tickets lead to a win if: $$\mathsf{h}( t_h, r_i,
-comm_{i-1} ) < P_w,$$ where $P_w$ is the ticket's winning probability and
-$$t_h=\mathsf{h}(t) \;and\; \mathsf{Open}(comm_i, comm_{i-1}) = \top.$$ Since
-$comm_{0}$ is known to the ticket recipient, the ticket recipient can compute
-the opening as $comm_{n-1} = \mathsf{h}^{n-1}(comm_0)$. On redeeming a ticket,
-the smart contract verifies that $$\mathsf{Open}(comm_i, comm_{i-1}) = \top$$
-and sets $channel.comm[redeemer] \leftarrow comm_{i-1}$. Thus the next time the
-node redeems a ticket, it must reveal $comm_{i-2}$. In addition, each node is
-granted the right to reset the commitment to a new value. This is particularly necessary
-once a node reveals $comm_0$ and therefore is with high probability
-unable to compute a value $r$ such that $$\mathsf{Open}(comm_0,r) \neq \bot,$$
-where $\bot$ represents the truth value ``false". 
-Since this mechanism can
-be abused by the ticket recipient to tweak the entropy used to determine
-whether a ticket is a winner or not, the smart contract keeps track of resets of
-the on-chain commitment and sets $$channel[redeemer].ticketEpoch \leftarrow
-channel[redeemer].ticketEpoch +1 ,$$ thereby invalidating all previously
-unredeemed tickets.
+In order to redeem a ticket, a node must reveal the opening to the current commitment $comm_i$ that is stored in the smart contract for the channel. Since the opening $comm_{i-1}$ allows the ticket issuer to determine whether a ticket is going to be a winner, the ticket recipient should keep $comm_{i-1}$ until it is used to redeem a ticket. Tickets lead to a win if: $$\mathsf{h}( t_h, r_i, comm_{i-1} ) < P_w,$$ where $P_w$ is the ticket's winning probability and $$t_h=\mathsf{h}(t) \;and\; \mathsf{Open}(comm_i, comm_{i-1}) = \top.$$ Since $comm_{0}$ is known to the ticket recipient, the ticket recipient can compute the opening as $comm_{n-1} = \mathsf{h}^{n-1}(comm_0)$. On redeeming a ticket, the smart contract verifies that $$\mathsf{Open}(comm_i, comm_{i-1}) = \top$$ and sets $channel.comm[redeemer] \leftarrow comm_{i-1}$. Thus the next time the node redeems a ticket, it must reveal $comm_{i-2}$. In addition, each node is granted the right to reset the commitment to a new value. This is particularly necessary once a node reveals $comm_0$ and therefore is with high probability unable to compute a value $r$ such that $$\mathsf{Open}(comm_0,r) \neq \bot,$$ where $\bot$ represents the truth value ``false". Since this mechanism can be abused by the ticket recipient to tweak the entropy used to determine whether a ticket is a winner or not, the smart contract keeps track of resets of the on-chain commitment and sets $$channel[redeemer].ticketEpoch \leftarrow channel[redeemer].ticketEpoch +1 ,$$ thereby invalidating all previously unredeemed tickets.
