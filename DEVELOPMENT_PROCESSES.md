@@ -34,15 +34,17 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
       - [Release Version Bump (`master` -> `release/**` = `x.y.z-0.next.*` -> `x.y.0`)](#release-version-bump-master---release--xyz-0next---xy0)
       - [Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)](#minor-version-bump-release---master--xy---xy10-next0)
     - [Branches](#branches)
+  - [Processes](#processes)
 
 ## Legend
 
-| Name          | Description                                                                                                |
-| ------------- | ---------------------------------------------------------------------------------------------------------- |
-| Project Owner | A HOPR member which ensures epics prioritized are in line with both the short and long term vision of HOPR |
-| Ambassadors   | Two tech members elected to be the bridge between tech team and Project Owner                              |
-| Trifecta      | Ambassadors + Project Owner                                                                                |
-| Issue tracker | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
+| Name                | Description                                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Project Owner       | A HOPR member which ensures epics prioritized are in line with both the short and long term vision of HOPR |
+| Process Facilitator | A HOPR member which ensures agreed processes are followed                                                  |
+| Ambassadors         | Two tech members elected to be the bridge between tech team and Project Owner                              |
+| Trifecta            | Ambassadors + Project Owner                                                                                |
+| Issue tracker       | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
 ### Ambassadors
 
@@ -375,3 +377,10 @@ daily workflow as it was before.
   marked with a **PUBLIC RELEASE**, we cut a `release/**`
   branch, using an internal name to identify the release. Official milestones
   use a specific name with the codename of a mountain in Switzerland.
+
+## Processes
+
+All members may suggest changes to our development processes.
+
+1. For questions, reach out to one of the [Ambassadors](#ambassadors) through email, element, or simply asking the question in element channel `tech -pm`.
+2. For changes, make a PR modifying this file, the PR will have to be reviewed by the [Trifecta](#trifecta), the [Process Facilitator](#legend), and generally be accepted by the _tech_ team.
