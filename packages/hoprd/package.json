@@ -52,7 +52,7 @@
     "strip-ansi": "6",
     "tiny-hashes": "^1.0.1",
     "ws": "^8.2.1",
-    "yargs": "17.1.1"
+    "yargs": "17.2.1"
   },
   "devDependencies": {
     "@types/yargs": "17.0.3",
