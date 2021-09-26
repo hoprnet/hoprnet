@@ -1,12 +1,12 @@
 ---
-name: Bug report
-about: Create a report to help us improve
+name: Bug Template
+about: Create a bug report to help us improve
 title: ''
-labels: 'bug, s:new issue'
+labels: 'bug, new issue'
 assignees: ''
 ---
 
-<!--- Please DO NOT remove the automatically added 's:new issue' label -->
+<!--- Please DO NOT remove the automatically added 'new issue' label -->
 <!--- Provide a general summary of the issue in the Title above -->
 
 ## Expected Behavior
