@@ -1,7 +1,7 @@
 \section{Sphinx Packet Format}
 \label{sec:sphinx}
 
-HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route data packets in order to ensure sender and receiver unlinkability. The Sphinx packet format determines how mixnet packets are created and transformed before relaying them to the next downstream node in a way that does not leak path information to relayers or other parties. Each Sphinx packet consists of two parts, a header and an onion-encrypted payload:
+HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route data packets in order to ensure sender and recipient unlinkability. The Sphinx packet format determines how mixnet packets are created and transformed before relaying them to the next downstream node in a way that does not leak path information to relayers or other parties. Each Sphinx packet consists of two parts, a header and an onion-encrypted payload:
 
 \begin{figure}[H]
     \centering
@@ -34,7 +34,7 @@ The integrity of this routing information is checked before sending. At each hop
 
 Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination.
 
-$G$ is a prime order cyclic group satisfying the decisional Diffie-Hellman assumption \cite{Boneh_1998}. We use the secp256k1 elliptic curve \cite{sec2}. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx2^{2*\kappa}$.
+$G$ is a prime order cyclic group satisfying the decisional Diffie-Hellman assumption \cite{Boneh_1998}. We use the secp256k1 elliptic curve \cite{secp}. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx2^{2*\kappa}$.
 
 $G^*$ is the set of non-identity elements of G. $h_b$ is a pre-image resistant hash function used to compute blinding factors and modelled as a random oracle such that
 $h_b:G^*\times G^*\rightarrow\mathbb{Z}^*_q$, where $\mathbb{Z}^*_q$ is the field of non-identity elements of $\mathbb{Z}_q$ (field of integers). We use the BLAKE2s hash function \cite{blake2}.
@@ -65,7 +65,7 @@ and
 for $1\le i < r-1$, where $y_0,y_1, y_2, y_3$, and $y_4$ are the public keys of the nodes $B$, $C$, $D$, and $Z$, which we assume to be available to $A$ .
 
 \subsubsection{Routing information}
-Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final receiver of the message.  The $END$ message is a distinguished prefix byte which is added to the final receiver's compressed public key. For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$. 
+Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message.  The $END$ message is a distinguished prefix byte which is added to the final recipient's compressed public key. For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$. 
 
 The $y$ coordinate is extracted from $x$ by resolving the secp256k1 elliptic curve equation $Y^2=X^3+7$ \cite{secp}. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is $0\times02$ or $0\times03$, depending on that bit).
 
@@ -174,7 +174,7 @@ Decryption happens as follows:
 $$m_l\leftarrow m_l\oplus H_{u4}(m_r), m_r\leftarrow S_{u3}(m_l), m_l\leftarrow m_l\oplus H_{u2}(m_r), m_r\leftarrow m_r\oplus S_{u1}(m_l)$$
 
 \subsubsection{Integrity}
-The payload is encrypted using a bidirectional error propagating block cipher and protected with an integrity check for the receiver, but not for processing relays. Packet integrity is authenticated by prepending a tag set so that any alteration to the encrypted payload as it traverses the network will result in an irrecoverably corrupted plaintext when the payload is decrypted by the recipient.
+The payload is encrypted using a bidirectional error propagating block cipher and protected with an integrity check for the recipient, but not for processing relays. Packet integrity is authenticated by prepending a tag set so that any alteration to the encrypted payload as it traverses the network will result in an irrecoverably corrupted plaintext when the payload is decrypted by the recipient.
 
 \begin{figure}[H]
     \centering
