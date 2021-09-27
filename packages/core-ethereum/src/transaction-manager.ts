@@ -43,7 +43,7 @@ class TranscationManager {
    * Return pending and mined transactions
    * @returns Array of transaction hashes
    */
-   public getAllUnconfirmedTxs(): Transaction[] {
+  public getAllUnconfirmedTxs(): Transaction[] {
     return Array.from(this.pending.values()).concat(Array.from(this.mined.values()))
   }
 
