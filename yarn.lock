@@ -1084,7 +1084,7 @@ __metadata:
     ethereum-waffle: ^3.3.0
     ethers: 5.4.7
     hardhat: ^2.6.2
-    hardhat-deploy: ^0.9.0
+    hardhat-deploy: 0.9.2
     hardhat-gas-reporter: ^1.0.4
     multiaddr: ^10.0.0
     rimraf: ^3.0.2
@@ -8105,9 +8105,9 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"hardhat-deploy@npm:^0.9.0":
-  version: 0.9.1
-  resolution: "hardhat-deploy@npm:0.9.1"
+"hardhat-deploy@npm:0.9.2":
+  version: 0.9.2
+  resolution: "hardhat-deploy@npm:0.9.2"
   dependencies:
     "@ethersproject/abi": ^5.4.0
     "@ethersproject/abstract-signer": ^5.4.1
@@ -8133,7 +8133,7 @@ fsevents@~2.1.1:
   peerDependencies:
     "@ethersproject/hardware-wallets": ^5.0.14
     hardhat: ^2.0.0
-  checksum: e6a954419fa920293028a860c7a2b7cf282d9091a094d8449863f349917b7612b2a828bd801468cd79ee8340eef208b2cf83ff8a5d7e852bdd15098da395d492
+  checksum: 4230f192893859eee56c219cd8ca1d9fa3f15ffcf09b480652dcae6d18e3de3230376144dcfc7b9a28acab829589a73a7792452a04348d4606bc916376e1f417
   languageName: node
   linkType: hard
 
