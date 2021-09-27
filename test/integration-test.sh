@@ -110,7 +110,7 @@ validate_node_balance_gt0() {
   local balance eth_balance hopr_balance
 
   balance="$(run_command ${1} "balance")"
-  eth_balance="$(echo -e "$balance" | grep -c " xDAI" || true)"
+  eth_balance="$(echo -e "$balance" | grep -c " MATIC" || true)"
   hopr_balance="$(echo -e "$balance" | grep -c " HOPR" || true)"
 
   if [[ "$eth_balance" != "0" && "$hopr_balance" != "Hopr Balance: 0 HOPR" ]]; then
@@ -235,5 +235,5 @@ done
 
 for i in `seq 1 10`; do
   log "Node 1 send message to node 5"
-  run_command "${api1}" "send ${addr5} 'hello, world'" "Message sent" 600
+  run_command "${api1}" "send ,${addr5} 'hello, world'" "Message sent" 600
 done

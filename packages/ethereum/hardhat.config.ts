@@ -53,7 +53,7 @@ const hardhatConfig: HardhatUserConfig = {
       ...networks.goerli,
       live: true,
       tags: ['staging'] as NetworkTag[],
-      gasMultiplier: GAS_MULTIPLIER,
+      gasMultiplier: GAS_MULTIPLIER + 0.3, // Görli has been failing lately with underpriced txs
       url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     },

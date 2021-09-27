@@ -168,7 +168,7 @@ describe('test NativeBalance primitive', function () {
   })
 
   it('should format NativeBalance', function () {
-    assert.strictEqual(new NativeBalance(balance).toFormattedString(), '0.000000000000000001 xDAI')
+    assert.strictEqual(new NativeBalance(balance).toFormattedString(), '0.000000000000000001 MATIC')
   })
 })
 

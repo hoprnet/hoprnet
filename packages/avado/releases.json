@@ -1312,5 +1312,26 @@
     "uploadedTo": {
       "http://80.208.229.228:5001": "Mon, 30 Aug 2021 09:58:09 GMT"
     }
+  },
+  "1.77.0": {
+    "hash": "/ipfs/QmYFLjFZXLp9S3X2Pnrc13AtzpGo1MQqobRfXgvz1q9yj4",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Mon, 20 Sep 2021 13:44:40 GMT"
+    }
+  },
+  "1.78.0": {
+    "hash": "/ipfs/QmV6jHYpLcKkSPdqcDpNtMSTU32d7HD5kujJqyGz36dvhB",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Thu, 23 Sep 2021 13:40:04 GMT"
+    }
+  },
+  "1.79.0": {
+    "hash": "/ipfs/QmeJLm7axxJLPBWZsM3CKBwMMPdbiU59nkzLDkDNKctMrN",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Fri, 24 Sep 2021 14:59:12 GMT"
+    }
   }
 }
