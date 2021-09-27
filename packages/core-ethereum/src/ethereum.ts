@@ -62,8 +62,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     {
       getLatestBlockNumber: async () => provider.getBlockNumber(),
       getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
-      getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values()),
-      getPendingTransactions: (_addr) => Array.from(transactions.pending.values())
+      getPendingTransactions: (_addr) => Array.from(transactions.pending.values()),
+      getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values())
     },
     durations.minutes(15)
   )
