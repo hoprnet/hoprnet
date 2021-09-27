@@ -171,7 +171,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         30e3,
         (nonce: number, hash: string) => {
           log('Transaction with nonce %d and hash %s mined', nonce, hash)
-          transactions.moveToMined(hash)
+          transactions.moveFromPendingToMined(hash)
         }
       )
     } catch (error) {
@@ -184,7 +184,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
 
         // this transaction failed but was confirmed as reverted
-        transactions.moveToConfirmed(transaction.hash)
+        transactions.moveFromMinedToConfirmed(transaction.hash)
       } else {
         log('Transaction with nonce %d failed to sent: %s', nonce, error)
 
@@ -401,7 +401,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       token.on('error', cb)
     },
     subscribeChannelEvents: (cb) => channels.on('*', cb),
-    subscribeTokenEvents: (cb) => token.on('*', cb),
+    subscribeTokenEvents: (cb) => token.on(token.filters.Transfer(wallet.address), cb), // subscribe all the Transfer events from current nodes in HoprToken
     unsubscribe: () => {
       provider.removeAllListeners()
       channels.removeAllListeners()
@@ -415,7 +415,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       hoprTokenAddress: hoprTokenDeployment.address,
       hoprChannelsAddress: hoprChannelsDeployment.address,
       channelClosureSecs
-    })
+    }),
+    updateConfirmedTransaction: (hash: string) => transactions.moveToConfirmed(hash)
   }
 
   return api
