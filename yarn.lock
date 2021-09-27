@@ -988,7 +988,7 @@ __metadata:
     it-pipe: ^1.1.0
     levelup: ^5.0.1
     memdown: ^6.0.0
-    mocha: ^9.0.0
+    mocha: 9.1.2
     multiaddr: ^10.0.0
     peer-id: 0.15.3
     rimraf: ^3.0.2
@@ -1027,7 +1027,7 @@ __metadata:
     libp2p-mplex: 0.10.4
     libp2p-tcp: ^0.17.2
     memdown: ^6.0.0
-    mocha: ^9.0.2
+    mocha: 9.1.2
     multiaddr: ^10.0.0
     peer-id: ^0.15.1
     rimraf: ^3.0.2
@@ -1051,7 +1051,7 @@ __metadata:
     "@types/yargs": 17.0.3
     bignumber.js: 9.0.1
     bn.js: 5.2.0
-    mocha: 9.1.1
+    mocha: 9.1.2
     peer-id: 0.15.3
     rimraf: ^3.0.2
     typedoc: 0.21.9
@@ -1145,7 +1145,7 @@ __metadata:
     libp2p: 0.32.5
     libp2p-crypto: 0.19.7
     memdown: ^6.0.0
-    mocha: ^9.0.0
+    mocha: 9.1.2
     multiaddr: ^10.0.0
     multihashes: ~4.0.1
     peer-id: 0.15.3
@@ -1183,7 +1183,7 @@ __metadata:
     js-cookie: ^3.0.0
     key-did-provider-ed25519: ^1.1.0
     key-did-resolver: ^1.2.1
-    mocha: ^9.0.0
+    mocha: 9.1.2
     next: 11.1.2
     peer-id: 0
     prop-types: ^15.7.2
@@ -5224,7 +5224,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"debug@npm:4, debug@npm:^4.0.1, debug@npm:^4.1.0, debug@npm:^4.1.1, debug@npm:^4.3.0, debug@npm:^4.3.1, debug@npm:^4.3.2":
+"debug@npm:4, debug@npm:4.3.2, debug@npm:^4.0.1, debug@npm:^4.1.0, debug@npm:^4.1.1, debug@npm:^4.3.0, debug@npm:^4.3.1, debug@npm:^4.3.2":
   version: 4.3.2
   resolution: "debug@npm:4.3.2"
   dependencies:
@@ -5233,18 +5233,6 @@ __metadata:
     supports-color:
       optional: true
   checksum: 820ea160e267e23c953c9ed87e7ad93494d8cda2f7349af5e7e3bb236d23707ee3022f477d5a7d2ee86ef2bf7d60aa9ab22d1f58080d7deb9dccd073585e1e43
-  languageName: node
-  linkType: hard
-
-"debug@npm:4.3.1":
-  version: 4.3.1
-  resolution: "debug@npm:4.3.1"
-  dependencies:
-    ms: 2.1.2
-  peerDependenciesMeta:
-    supports-color:
-      optional: true
-  checksum: 2c3352e37d5c46b0d203317cd45ea0e26b2c99f2d9dfec8b128e6ceba90dfb65425f5331bf3020fe9929d7da8c16758e737f4f3bfc0fce6b8b3d503bae03298b
   languageName: node
   linkType: hard
 
@@ -11484,15 +11472,15 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"mocha@npm:9.1.1, mocha@npm:^9.0.0, mocha@npm:^9.0.2":
-  version: 9.1.1
-  resolution: "mocha@npm:9.1.1"
+"mocha@npm:9.1.2":
+  version: 9.1.2
+  resolution: "mocha@npm:9.1.2"
   dependencies:
     "@ungap/promise-all-settled": 1.1.2
     ansi-colors: 4.1.1
     browser-stdout: 1.3.1
     chokidar: 3.5.2
-    debug: 4.3.1
+    debug: 4.3.2
     diff: 5.0.0
     escape-string-regexp: 4.0.0
     find-up: 5.0.0
@@ -11503,12 +11491,11 @@ fsevents@~2.1.1:
     log-symbols: 4.1.0
     minimatch: 3.0.4
     ms: 2.1.3
-    nanoid: 3.1.23
+    nanoid: 3.1.25
     serialize-javascript: 6.0.0
     strip-json-comments: 3.1.1
     supports-color: 8.1.1
     which: 2.0.2
-    wide-align: 1.1.3
     workerpool: 6.1.5
     yargs: 16.2.0
     yargs-parser: 20.2.4
@@ -11516,7 +11503,7 @@ fsevents@~2.1.1:
   bin:
     _mocha: bin/_mocha
     mocha: bin/mocha
-  checksum: b45b6aabe9012a4074cd21a5f11726fd26b7e33081961ce364819169ceacd654fa89fb7f07b7f1395ea46bb2613a59e37af5e3249ce366a8be8ef6ed890e72f1
+  checksum: 6e8ecd836db41d0c529592f8437ddcfed10a992f064ba56a6790e3539b0de8435be38b8d7d8f76a74260c942db72fc3594784fc755cbe3ed59edc5e454142c3b
   languageName: node
   linkType: hard
 
@@ -11771,16 +11758,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"nanoid@npm:3.1.23":
-  version: 3.1.23
-  resolution: "nanoid@npm:3.1.23"
-  bin:
-    nanoid: bin/nanoid.cjs
-  checksum: 8fa8dc3283a4fa159700a36cb22f61197547c8155831cb74f1b9c51fbc29ea80c136fd91001468d147a31d3a77f884958aec6c1beabac903c89780acacca9327
-  languageName: node
-  linkType: hard
-
-"nanoid@npm:^3.0.2, nanoid@npm:^3.1.20, nanoid@npm:^3.1.21, nanoid@npm:^3.1.23":
+"nanoid@npm:3.1.25, nanoid@npm:^3.0.2, nanoid@npm:^3.1.20, nanoid@npm:^3.1.21, nanoid@npm:^3.1.23":
   version: 3.1.25
   resolution: "nanoid@npm:3.1.25"
   bin:

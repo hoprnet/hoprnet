@@ -46,7 +46,7 @@
     "it-pipe": "^1.1.0",
     "levelup": "^5.0.1",
     "memdown": "^6.0.0",
-    "mocha": "^9.0.0",
+    "mocha": "9.1.2",
     "rimraf": "^3.0.2",
     "sinon": "^11.0.0",
     "ts-generator": "^0.1.1",
