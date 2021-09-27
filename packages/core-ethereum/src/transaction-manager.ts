@@ -15,7 +15,7 @@ export type Transaction = {
 }
 
 /**
- * Keep track of pending and confirmed transactions,
+ * Keep track of pending, mined and confirmed transactions,
  * and allows for pruning unnecessary data.
  * This class is mainly used by nonce-tracker which relies
  * on transcation-manager to keep an update to date view
@@ -38,6 +38,22 @@ class TranscationManager {
    * confirmed transactions
    */
   public readonly confirmed = new Map<string, Transaction>()
+
+  /**
+   * Return pending and mined transactions
+   * @returns Array of transaction hashes
+   */
+  public getAllUnconfirmedTxs(): Transaction[] {
+    return Array.from(this.pending.values()).concat(Array.from(this.mined.values()))
+  }
+
+  /**
+   * Return pending and mined transactions
+   * @returns Array of transaction hashes
+   */
+  public getAllUnconfirmedHash(): string[] {
+    return Array.from(this.pending.keys()).concat(Array.from(this.mined.keys()))
+  }
 
   /**
    * If a transaction payload exists in mined or pending with a higher/equal gas price
@@ -92,7 +108,7 @@ class TranscationManager {
   }
 
   /**
-   * Moves transcation from pending to confirmed. Delete payload
+   * Moves transcation from mined to confirmed. Delete payload
    * @param hash transaction hash
    */
   public moveToConfirmed(hash: string): void {
