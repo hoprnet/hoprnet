@@ -1194,7 +1194,7 @@ __metadata:
     rlp: ^2.2.6
     run-queue: ^2.0.1
     sinon: ^11.1.1
-    strip-ansi: 6
+    strip-ansi: 6.0.1
     tiny-hashes: ^1.0.1
     ts-node: ^10.1.0
     typedoc: 0.21.9
@@ -2659,7 +2659,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ansi-regex@npm:^5.0.0":
+"ansi-regex@npm:^5.0.0, ansi-regex@npm:^5.0.1":
   version: 5.0.1
   resolution: "ansi-regex@npm:5.0.1"
   checksum: 2aa4bb54caf2d622f1afdad09441695af2a83aa3fe8b8afa581d205e57ed4261c183c4d3877cee25794443fde5876417d859c108078ab788d6af7e4fe52eb66b
@@ -15509,12 +15509,21 @@ resolve@1.17.0:
   languageName: node
   linkType: hard
 
-"strip-ansi@npm:6, strip-ansi@npm:6.0.0, strip-ansi@npm:^6.0.0":
+"strip-ansi@npm:6.0.0, strip-ansi@npm:^6.0.0":
   version: 6.0.0
   resolution: "strip-ansi@npm:6.0.0"
   dependencies:
     ansi-regex: ^5.0.0
   checksum: 04c3239ede44c4d195b0e66c0ad58b932f08bec7d05290416d361ff908ad282ecdaf5d9731e322c84f151d427436bde01f05b7422c3ec26dd927586736b0e5d0
+  languageName: node
+  linkType: hard
+
+"strip-ansi@npm:6.0.1":
+  version: 6.0.1
+  resolution: "strip-ansi@npm:6.0.1"
+  dependencies:
+    ansi-regex: ^5.0.1
+  checksum: f3cd25890aef3ba6e1a74e20896c21a46f482e93df4a06567cebf2b57edabb15133f1f94e57434e0a958d61186087b1008e89c94875d019910a213181a14fc8c
   languageName: node
   linkType: hard
 
