@@ -1,5 +1,4 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { utils } from 'ethers'
 import { convertPubKeyFromB58String } from '@hoprnet/hopr-utils'
 import { HoprToken__factory } from '../types'
 import { getContractData, Networks } from '..'
@@ -12,10 +11,7 @@ const send = (signer, txparams) =>
     console.log(`transactionHash: ${transactionHash}`)
   })
 
-const nativeAddress = async (hoprAddress) => {
-  const nodePeerPubkey = await convertPubKeyFromB58String(hoprAddress)
-  return utils.computeAddress(nodePeerPubkey.marshal())
-}
+const nativeAddress = async (hoprAddress: string) => convertPubKeyFromB58String(hoprAddress).toAddress().toHex()
 
 /**
  * Faucets HOPR and ETH tokens to a local account with HOPR
