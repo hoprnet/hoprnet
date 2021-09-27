@@ -43,16 +43,16 @@ class TranscationManager {
    * Return pending and mined transactions
    * @returns Array of transaction hashes
    */
-  public getAllUnconfirmedTxs (): Transaction[] {
-    return Array.from(this.pending.values()).concat(Array.from(this.mined.values()));
+  public getAllUnconfirmedTxs(): Transaction[] {
+    return Array.from(this.pending.values()).concat(Array.from(this.mined.values()))
   }
 
   /**
    * Return pending and mined transactions
    * @returns Array of transaction hashes
    */
-  public getAllUnconfirmedHash (): string[] {
-    return Array.from(this.pending.keys()).concat(Array.from(this.mined.keys()));
+  public getAllUnconfirmedHash(): string[] {
+    return Array.from(this.pending.keys()).concat(Array.from(this.mined.keys()))
   }
 
   /**
