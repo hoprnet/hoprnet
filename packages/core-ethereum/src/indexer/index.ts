@@ -382,10 +382,6 @@ class Indexer extends EventEmitter {
     this.pendingCommitments.get(channelId.toHex())?.resolve()
   }
 
-  private async getNativeTokenTransaction(blockNumber: number): Promise<string> {
-
-  }
-
   public async getAccount(address: Address) {
     return this.db.getAccount(address)
   }
