@@ -98,17 +98,28 @@ class Channel {
     return (await this.themToUs()).commitment
   }
 
+  getUsToThemId(): Hash {
+    return generateChannelId(this.self.toAddress(), this.counterparty.toAddress())
+  }
+
   async usToThem(): Promise<ChannelEntry> {
-    return await this.indexer.getChannel(generateChannelId(this.self.toAddress(), this.counterparty.toAddress()))
+    try {
+      return await this.indexer.getChannel(this.getUsToThemId())
+    } catch {
+      throw Error(`Channel from ${this.self.toHex()} to ${this.counterparty.toHex()} not found`)
+    }
+  }
+
+  getThemToUsId(): Hash {
+    return generateChannelId(this.counterparty.toAddress(), this.self.toAddress())
   }
 
   async themToUs(): Promise<ChannelEntry> {
-    return await this.indexer.getChannel(generateChannelId(this.counterparty.toAddress(), this.self.toAddress()))
-  }
-
-  // TODO kill
-  async getBalances() {
-    return [await this.usToThem(), await this.themToUs()].map((x) => x.balance)
+    try {
+      return await this.indexer.getChannel(this.getThemToUsId())
+    } catch {
+      throw Error(`Channel from ${this.counterparty.toHex()} to ${this.self.toHex()} not found`)
+    }
   }
 
   async fund(myFund: Balance, counterpartyFund: Balance) {
