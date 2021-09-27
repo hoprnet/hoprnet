@@ -1023,7 +1023,7 @@ __metadata:
     leveldown: ~6.0.1
     levelup: ~5.0.1
     libp2p: 0.33.0
-    libp2p-kad-dht: 0.24.2
+    libp2p-kad-dht: 0.25.0
     libp2p-mplex: 0.10.4
     libp2p-tcp: ^0.17.2
     memdown: ^6.0.0
@@ -5196,6 +5196,25 @@ __metadata:
   version: 3.0.1
   resolution: "data-uri-to-buffer@npm:3.0.1"
   checksum: c59c3009686a78c071806b72f4810856ec28222f0f4e252aa495ec027ed9732298ceea99c50328cf59b151dd34cbc3ad6150bbb43e41fc56fa19f48c99e9fc30
+  languageName: node
+  linkType: hard
+
+"datastore-core@npm:^6.0.7":
+  version: 6.0.7
+  resolution: "datastore-core@npm:6.0.7"
+  dependencies:
+    debug: ^4.1.1
+    err-code: ^3.0.1
+    interface-datastore: ^6.0.2
+    it-drain: ^1.0.4
+    it-filter: ^1.0.2
+    it-map: ^1.0.5
+    it-merge: ^1.0.1
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
+    it-take: ^1.0.1
+    uint8arrays: ^3.0.0
+  checksum: 565c37e3f0a5500bb9e96f27be68f14bb5250d2885f536b1adc69f0dfa21dc7795fc98ad029219b425bcc1979535ac48f9925079cee493a6dc708e75df931e4a
   languageName: node
   linkType: hard
 
@@ -9455,7 +9474,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"it-drain@npm:^1.0.1, it-drain@npm:^1.0.3":
+"it-drain@npm:^1.0.1, it-drain@npm:^1.0.3, it-drain@npm:^1.0.4":
   version: 1.0.4
   resolution: "it-drain@npm:1.0.4"
   checksum: fdb8bd0ec401f40fff07831c1313635025ae0648565e863e1b47927be16528ff66aea096a1ba29da41581af8d49a6b30eec61fd9d5779904e50633e5572a2b12
@@ -9515,14 +9534,14 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"it-map@npm:^1.0.4":
+"it-map@npm:^1.0.4, it-map@npm:^1.0.5":
   version: 1.0.5
   resolution: "it-map@npm:1.0.5"
   checksum: 4e6be042207055902becdcb2a0375594f68452175ab924a7c2176da19324a3a42074539fb8fefaf5c31ccdea2f459504d300a218ac400a3274c604168576ebf7
   languageName: node
   linkType: hard
 
-"it-merge@npm:^1.0.0":
+"it-merge@npm:^1.0.0, it-merge@npm:^1.0.1":
   version: 1.0.3
   resolution: "it-merge@npm:1.0.3"
   dependencies:
@@ -10466,15 +10485,16 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p-kad-dht@npm:0.24.2":
-  version: 0.24.2
-  resolution: "libp2p-kad-dht@npm:0.24.2"
+"libp2p-kad-dht@npm:0.25.0":
+  version: 0.25.0
+  resolution: "libp2p-kad-dht@npm:0.25.0"
   dependencies:
+    datastore-core: ^6.0.7
     debug: ^4.3.1
     err-code: ^3.0.0
     hashlru: ^2.3.0
     heap: ~0.2.6
-    interface-datastore: ^5.1.1
+    interface-datastore: ^6.0.2
     it-first: ^1.0.4
     it-length: ^1.0.3
     it-length-prefixed: ^5.0.2
@@ -10493,7 +10513,7 @@ fsevents@~2.1.1:
     streaming-iterables: ^6.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: 429271b868bfb6991b80619bae61925c4b84535798ece5cbfb4a766010f99d842c5da5a05e0373631ed25f7ac34db0409703c619d13540a1c2a2d603e3596e90
+  checksum: 2ccccdf2cb41b8010d7aa61e3f54b635b5533c406619657bf0d85953eef076b80347500c001f52334b22cfec5f350af430df09402f5f99616bf0feb71476cf4b
   languageName: node
   linkType: hard
 
