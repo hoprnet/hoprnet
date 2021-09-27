@@ -398,11 +398,14 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     subscribeError: (cb) => {
       provider.on('error', cb)
       channels.on('error', cb)
+      token.on('error', cb)
     },
     subscribeChannelEvents: (cb) => channels.on('*', cb),
+    subscribeTokenEvents: (cb) => token.on('*', cb),
     unsubscribe: () => {
       provider.removeAllListeners()
       channels.removeAllListeners()
+      token.removeAllListeners()
     },
     getChannels: () => channels,
     getPrivateKey: () => utils.arrayify(wallet.privateKey),
