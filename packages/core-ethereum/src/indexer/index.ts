@@ -215,6 +215,10 @@ class Indexer extends EventEmitter {
 
     let lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
+    // TODO: This new block markes a previous block 
+    // (blockNumber - this.maxConfirmations) is final.
+    // Confirm native token transactions in that previous block. 
+
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
