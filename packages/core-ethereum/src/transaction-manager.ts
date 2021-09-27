@@ -15,7 +15,7 @@ export type Transaction = {
 }
 
 /**
- * Keep track of pending and confirmed transactions,
+ * Keep track of pending, mined and confirmed transactions,
  * and allows for pruning unnecessary data.
  * This class is mainly used by nonce-tracker which relies
  * on transcation-manager to keep an update to date view
@@ -40,23 +40,42 @@ class TranscationManager {
   public readonly confirmed = new Map<string, Transaction>()
 
   /**
+   * Return pending and mined transactions
+   * @returns Array of transaction hashes
+   */
+   public getAllUnconfirmedTxs(): Transaction[] {
+    return Array.from(this.pending.values()).concat(Array.from(this.mined.values()))
+  }
+
+  /**
+   * Return pending and mined transactions
+   * @returns Array of transaction hashes
+   */
+  public getAllUnconfirmedHash(): string[] {
+    return Array.from(this.pending.keys()).concat(Array.from(this.mined.keys()))
+  }
+
+  /**
    * If a transaction payload exists in mined or pending with a higher/equal gas price
    * @param payload object
    * @param gasPrice gas price associated with the payload
    */
-  public existInMinedOrPendingWithHigherFee(payload: TransactionPayload, gasPrice: number | BigNumber): Boolean {
+  public existInMinedOrPendingWithHigherFee(
+    payload: TransactionPayload,
+    gasPrice: number | BigNumber
+  ): [Boolean, string] {
     // Using isDeepStrictEqual to compare TransactionPayload objects, see
     // https://nodejs.org/api/util.html#util_util_isdeepstrictequal_val1_val2
     const index = Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload))
     if (index < 0) {
-      return false
+      return [false, '']
     }
 
     const hash = Array.from(this.payloads.keys())[index]
     if (!this.mined.get(hash) && BigNumber.from(this.pending.get(hash).gasPrice).lt(BigNumber.from(gasPrice))) {
-      return false
+      return [false, hash]
     }
-    return true
+    return [true, hash]
   }
 
   /**
@@ -103,7 +122,7 @@ class TranscationManager {
   }
 
   /**
-   * Moves transcation from pending to confirmed. Delete payload
+   * Moves transcation from mined to confirmed. Delete payload
    * @param hash transaction hash
    */
   public moveFromMinedToConfirmed(hash: string): void {
