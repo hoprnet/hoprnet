@@ -57,6 +57,8 @@ if [[ "${version_type}" = "prerelease" ]]; then
   fi
 fi
 
+echo "Creating new version ${current_version} + ${version_type}"
+
 # create new version in each package
 yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version ${version_type} --preid=next
 declare new_version
