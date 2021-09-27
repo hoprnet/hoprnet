@@ -15,7 +15,7 @@ export type Transaction = {
 }
 
 /**
- * Keep track of pending and confirmed transactions,
+ * Keep track of pending, mined and confirmed transactions,
  * and allows for pruning unnecessary data.
  * This class is mainly used by nonce-tracker which relies
  * on transcation-manager to keep an update to date view
@@ -92,7 +92,7 @@ class TranscationManager {
   }
 
   /**
-   * Moves transcation from pending to confirmed. Delete payload
+   * Moves transcation from mined to confirmed. Delete payload
    * @param hash transaction hash
    */
   public moveToConfirmed(hash: string): void {
