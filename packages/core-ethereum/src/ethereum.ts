@@ -374,11 +374,18 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     return transaction.hash
   }
 
+  async function getNativeTokenTransactionInBlock(blockNumber: number, isOutgoing: boolean = true): Promise<Array<string>> {
+    const blockWithTx = await provider.getBlockWithTransactions(blockNumber);
+    const txs = blockWithTx.transactions.filter(tx => tx.value.gt(BigNumber.from(0)) && ((isOutgoing ? tx.from : tx.to) === wallet.address))
+    return txs.length === 0 ? [] : txs.map(tx => tx.hash);
+  }
+
   const api = {
     getBalance: (address: Address) =>
       token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
     getNativeBalance: (address: Address) =>
       provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
+    getNativeTokenTransactionInBlock: (blockNumber: number, isOutgoing: boolean = true) => getNativeTokenTransactionInBlock(blockNumber, isOutgoing),
     announce,
     withdraw: (currency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => withdraw(currency, recipient, amount),
     fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance) =>
