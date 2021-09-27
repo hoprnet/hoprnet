@@ -47,12 +47,14 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 yarn
 yarn build
 
-# turn prerelease into preminor if the current version is not a prerelease
-# already, thus update from a patch version to a new minor prerelease
-declare current_version
-current_version=$(${mydir}/get-package-version.sh)
-if [[ "${current_version}" != *"-next."* ]]; then
-  version_type="preminor"
+if [[ "${version_type}" = "prerelease" ]]; then
+  # turn prerelease into preminor if the current version is not a prerelease
+  # already, thus update from a patch version to a new minor prerelease
+  declare current_version
+  current_version=$(${mydir}/get-package-version.sh)
+  if [[ "${current_version}" != *"-next."* ]]; then
+    version_type="preminor"
+  fi
 fi
 
 # create new version in each package
