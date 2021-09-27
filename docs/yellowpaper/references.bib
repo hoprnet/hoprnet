@@ -1,3 +1,26 @@
+@article{secp,
+  author     = {Standards for Efficient Cryptography Group},
+  title      = {Recommended Elliptic Curve Domain Parameters},
+  journal    = {SEC 2},
+  year       = {2010},
+  url        = {https://www.secg.org/sec2-v2.pdf}
+}
+@inproceedings{Dingledine2004SynchronousBF,
+  author="Dingledine, Roger
+  and Shmatikov, Vitaly
+  and Syverson, Paul",
+  editor="Martin, David
+  and Serjantov, Andrei",
+  title="Synchronous Batching: From Cascades to Free Routes",
+  booktitle="Privacy Enhancing Technologies",
+  year="2005",
+  publisher="Springer Berlin Heidelberg",
+  address="Berlin, Heidelberg",
+  pages="186--206",
+  abstract="The variety of possible anonymity network topologies has spurred much debate in recent years. In a synchronous batching design, each batch of messages enters the mix network together, and the messages proceed in lockstep through the network. We show that a synchronous batching strategy can be used in various topologies, including a free-route network, in which senders choose paths freely, and a cascade network, in which senders choose from a set of fixed paths. We show that free-route topologies can provide better anonymity as well as better message reliability in the event of partial network failure.",
+  isbn="978-3-540-31960-3"
+}
+
 @inproceedings{lionesspaper,
   author    = {Ross J. Anderson and
                Eli Biham},
@@ -31,7 +54,7 @@
   biburl    = {https://dblp.org/rec/conf/sp/DanezisG09.bib},
   bibsource = {dblp computer science bibliography, https://dblp.org}
 }
-@inproceedings{mixnets,
+@article{mixnets,
   author    = {David Chaum},
   title     = {Untraceable Electronic Mail, Return Addresses, and Digital Pseudonyms},
   journal   = {Commun. {ACM}},
@@ -45,7 +68,7 @@
   biburl    = {https://dblp.org/rec/journals/cacm/Chaum81.bib},
   bibsource = {dblp computer science bibliography, https://dblp.org}
 }
-@inproceedings{loopix,
+@article{loopix,
   author        = {Ania M. Piotrowska and
                Jamie Hayes and
                Tariq Elahi and
@@ -63,29 +86,41 @@
   bibsource     = {dblp computer science bibliography, https://dblp.org}
 }
 @inproceedings{AnonymityTrilemma,
-  author = {Debajyoti Das and Sebastian Meiser and Esfandiar Mohammadi and Aniket Kate},
-  title  = {Anonymity Trilemma: Strong Anonymity, Low
-Bandwidth Overhead, Low Latency—Choose Two},
-  year   = {2017},
-  note   = {\url{https://eprint.iacr.org/2017/954.pdf}}
+  author    = {Debajyoti Das and
+               Sebastian Meiser and
+               Esfandiar Mohammadi and
+               Aniket Kate},
+  title     = {Anonymity Trilemma: Strong Anonymity, Low Bandwidth Overhead, Low
+               Latency - Choose Two},
+  booktitle = {2018 {IEEE} Symposium on Security and Privacy, {SP} 2018, Proceedings,
+               21-23 May 2018, San Francisco, California, {USA}},
+  pages     = {108--126},
+  publisher = {{IEEE} Computer Society},
+  year      = {2018},
+  url       = {https://doi.org/10.1109/SP.2018.00011},
+  doi       = {10.1109/SP.2018.00011},
+  timestamp = {Wed, 16 Oct 2019 14:14:51 +0200},
+  biburl    = {https://dblp.org/rec/conf/sp/Das0MK18.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
 }
-@inproceedings{truebit,
-  author        = {Jason Teutsch and
+@article{truebit,
+  author     = {Jason Teutsch and
                Christian Reitwie{\ss}ner},
-  title         = {A scalable verification solution for blockchains},
-  journal       = {CoRR},
-  volume        = {abs/1908.04756},
-  year          = {2019},
-  note          = {\url{http://arxiv.org/abs/1908.04756}},
-  archiveprefix = {arXiv},
-  eprint        = {1908.04756},
-  timestamp     = {Mon, 19 Aug 2019 13:21:03 +0200},
-  biburl        = {https://dblp.org/rec/journals/corr/abs-1908-04756.bib},
-  bibsource     = {dblp computer science bibliography, https://dblp.org}
+  title      = {A scalable verification solution for blockchains},
+  journal    = {CoRR},
+  volume     = {abs/1908.04756},
+  year       = {2019},
+  url        = {http://arxiv.org/abs/1908.04756},
+  eprinttype = {arXiv},
+  eprint     = {1908.04756},
+  timestamp  = {Mon, 19 Aug 2019 13:21:03 +0200},
+  biburl     = {https://dblp.org/rec/journals/corr/abs-1908-04756.bib},
+  bibsource  = {dblp computer science bibliography, https://dblp.org}
 }
 @inproceedings{plasma,
   author        = {J. Poon and V. Buterin},
   title         = {Plasma: Scalable Autonomous Smart Contracts},
+  booktitle     = {},
   journal       = {},
   volume        = {},
   year          = {2017},
@@ -101,6 +136,7 @@ Bandwidth Overhead, Low Latency—Choose Two},
   author        = {J. Poon and Thaddeus Dryja},
   title         = {The Bitcoin Lightning Network:
                Scalable Off-Chain Instant Payments},
+  booktitle     = {},
   journal       = {},
   volume        = {},
   year          = {2016},
@@ -111,7 +147,7 @@ Bandwidth Overhead, Low Latency—Choose Two},
   biburl        = {},
   bibsource     = {}
 }
-@inproceedings{vpn0,
+@article{vpn0,
   author        = {Matteo Varvello and
                I{\~{n}}igo Querejeta{-}Azurmendi and
                Antonio Nappa and
@@ -132,6 +168,7 @@ Bandwidth Overhead, Low Latency—Choose Two},
 @inproceedings{sentinel,
   author        = {Sentinel},
   title         = {Sentinel: A blockchain framework for building decentralized VPN applications},
+  booktitle     = {},
   journal       = {},
   volume        = {},
   year          = {2021},
@@ -146,6 +183,7 @@ Bandwidth Overhead, Low Latency—Choose Two},
 @inproceedings{mysterium,
   author        = {Mysterium},
   title         = {Mysterium Network Project},
+  booktitle     = {},
   journal       = {},
   volume        = {},
   year          = {2017},
@@ -176,22 +214,23 @@ Steven Waterhouse},
                Samuel Neves and
                Zooko Wilcox{-}O'Hearn and
                Christian Winnerlein},
-  title     = {{BLAKE2:} simpler, smaller, fast as {MD5}},
-  journal   = {{IACR} Cryptol. ePrint Arch.},
-  volume    = {2013},
-  pages     = {322},
+  editor    = {Michael J. Jacobson Jr. and
+               Michael E. Locasto and
+               Payman Mohassel and
+               Reihaneh Safavi{-}Naini},
+  title     = {{BLAKE2:} Simpler, Smaller, Fast as {MD5}},
+  booktitle = {Applied Cryptography and Network Security - 11th International Conference,
+               {ACNS} 2013, Banff, AB, Canada, June 25-28, 2013. Proceedings},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {7954},
+  pages     = {119--135},
+  publisher = {Springer},
   year      = {2013},
-  note      = {\url{http://eprint.iacr.org/2013/322}},
-  timestamp = {Mon, 11 May 2020 15:56:43 +0200},
-  biburl    = {https://dblp.org/rec/journals/iacr/AumassonNWW13.bib},
+  url       = {https://doi.org/10.1007/978-3-642-38980-1\_8},
+  doi       = {10.1007/978-3-642-38980-1\_8},
+  timestamp = {Tue, 20 Aug 2019 15:27:31 +0200},
+  biburl    = {https://dblp.org/rec/conf/acns/AumassonNWW13.bib},
   bibsource = {dblp computer science bibliography, https://dblp.org}
-}
-
-@inproceedings{sec2,
-  author = {Daniel R. L. Brown},
-  title  = {SEC 2. Standards for Efficient Cryptography Group: Recommended Elliptic Curve Domain Parameters},
-  year   = {Version 2.0, 2010},
-  note   = {\url{https://www.secg.org/sec2-v2.pdf}}
 }
 @inproceedings{tor,
   author    = {Roger Dingledine and
@@ -204,28 +243,43 @@ Steven Waterhouse},
   pages     = {303--320},
   publisher = {{USENIX}},
   year      = {2004},
-  note      = {\url{http://www.usenix.org/publications/library/proceedings/sec04/tech/dingledine.html}},
+  url       = {http://www.usenix.org/publications/library/proceedings/sec04/tech/dingledine.html},
   timestamp = {Mon, 01 Feb 2021 08:43:04 +0100},
   biburl    = {https://dblp.org/rec/conf/uss/DingledineMS04.bib},
   bibsource = {dblp computer science bibliography, https://dblp.org}
 }
-@inproceedings{i2p,
-  author = {I2P-Team},
-  title = {I2P: The Invisible Internet Project},
-  year   = {2003},
-  note  = {\url{https://geti2p.net/en/about/intro}}
+@techreport{i2p,
+  title       = {I2P - The Invisible Internet Project},
+  author      = {Astolfi, Felipe and Kroese, Jelger and {Van Oorschot}, Jeroen},
+  institution = {Media Technology, Leiden University},
+  year        = {2015},
+  type        = {Web Technology Report},
+  www_section = {Anonymous communication},
+  www_pdf_url = {https://staas.home.xs4all.nl/t/swtr/documents/wt2015_i2p.pdf}
 }
-@inproceedings{un2018,
-  author = {UN},
-  title  = {The right to privacy in the digital age: report},
-  year   = {2018},
-  note   = {\url{https://www.ohchr.org/EN/Issues/DigitalAge/Pages/ReportDigitalAge.aspx}}
+@article{un2018,
+  note    = {Submitted pursuant to Human Rights Council resolution  34/7.},
+  url     = {http://digitallibrary.un.org/record/1640588},
+  title   = {The right to privacy in the digital age : report of the United Nations High Commissioner for Human Rights},
+  journal = {},
+  author  = {UN},
+  recid   = {1640588},
+  pages   = {17 p.},
+  address = {Geneva :. 2018-08-03},
+  year    = {2018},
+  month   = {Aug}
 }
 @inproceedings{ethereum,
   author = {Gavin Wood},
   title  = {Ethereum: A secure decentralised generalised transaction ledger (Istanbul version)},
   year   = {2021},
   note   = {\url{https://ethereum.github.io/yellowpaper/paper.pdf}}
+}
+@inproceedings{raiden,
+  author = {{Raiden Team}},
+  title  = {Raiden Network - High-speed asset transfers for Ethereum},
+  year   = {2016},
+  note   = {\url{https://raiden.network}}
 }
 @article{hobbs_roberts_2018,
   title     = {How Sudden Censorship Can Increase Access to Information},
@@ -250,3 +304,38 @@ Steven Waterhouse},
   doi     = {10.1109/45.913204},
   note    = {\url{https://ieeexplore.ieee.org/document/913204}}
 }
+@inproceedings{Boneh_1998,
+  author    = {Dan Boneh},
+  editor    = {Joe Buhler},
+  title     = {The Decision Diffie-Hellman Problem},
+  booktitle = {Algorithmic Number Theory, Third International Symposium, ANTS-III,
+               Portland, Oregon, USA, June 21-25, 1998, Proceedings},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {1423},
+  pages     = {48--63},
+  publisher = {Springer},
+  year      = {1998},
+  url       = {https://doi.org/10.1007/BFb0054851},
+  doi       = {10.1007/BFb0054851},
+  timestamp = {Tue, 14 May 2019 10:00:53 +0200},
+  biburl    = {https://dblp.org/rec/conf/ants/Boneh98.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+@article{Wang_2003,
+  author  = {Wang, Y. and Vassileva, J.},
+  journal = {Peer-to-Peer Computing},
+  title   = {Trust and reputation model in peer-to-peer networks},
+  year    = {2003},
+  note    = {\url{https://ieeexplore.ieee.org/document/913204}}
+}
+@article{AnoA,
+  author  = {Backes, M. and Kate A. and Manoharan, P. and
+Meiser, S. and Mohammadi, E.},
+  journal = {Computer Security Foundations Symposium},
+  title   = {AnoA: A Framework for Analyzing Anonymous Communication Protocols},
+  year    = {2013},
+  pages   = {163-178},
+  note    = {\url{https://eprint.iacr.org/2014/087.pdf}}
+}}
+
+

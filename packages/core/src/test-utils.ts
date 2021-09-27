@@ -4,6 +4,7 @@ import PeerId from 'peer-id'
 import TCP from 'libp2p-tcp'
 const MPLEX = require('libp2p-mplex')
 import { NOISE } from '@chainsafe/libp2p-noise'
+import { PeerStore } from 'libp2p-kad-dht'
 
 /**
  * Informs each node about the others existence.
@@ -62,4 +63,8 @@ export function fakeAddress(id: PeerId): Multiaddr {
   return {
     getPeerId: () => id.toB58String()
   } as Multiaddr
+}
+
+export function showBackoff(networkPeers: PeerStore): number {
+  return parseFloat(networkPeers.debugLog().match(/(?<=\(backoff\s)(.*)(?=\,)/g))
 }

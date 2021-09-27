@@ -17,7 +17,7 @@ The nodes then publish the update independently to the DHT and allow HOPR end us
     \caption{Event propagation}
     \label{fig:Event propagation}
 \end{figure}
-\hspace{-5mm}HOPR is a privacy preserving protocol that guarantees sender-receiver unlinkability while still providing high availability.
+\hspace{-5mm}HOPR is a privacy preserving protocol that guarantees sender-recipient unlinkability while still providing high availability.
 \\~In order to achieve the aforementioned properties, nodes use DHT to place information in the network and ask selected other nodes to replicate it and update that list every 5 minutes. Since the indexer retrieves on-chain information, there is no leakage about HOPR nodes' knowledge of the network. 
 \\~Event logs are set to: $$log_i:=h( log_{i-1}|| Open) \quad or \quad log_i:=h( log_{i-1}|| Close )$$ where $log_0:=h(0)$.
 \\~When a node receives $log_i$ from another node, the validity can be checked by recreating the hash and comparing the value with the on-chain value.

@@ -1,12 +1,11 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.77.0-next.10",
+  "version": "1.80.0-next.2",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "main": "lib/index.js",
-  "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
   "bin": "lib/index.js",
   "files": [
     "lib",
@@ -50,20 +49,20 @@
     "restana": "^4.8.0",
     "rlp": "^2.2.6",
     "run-queue": "^2.0.1",
-    "strip-ansi": "6",
+    "strip-ansi": "6.0.1",
     "tiny-hashes": "^1.0.1",
     "ws": "^8.2.1",
-    "yargs": "17.1.1"
+    "yargs": "17.2.1"
   },
   "devDependencies": {
-    "@types/yargs": "^17.0.2",
-    "mocha": "^9.0.0",
+    "@types/yargs": "17.0.3",
+    "mocha": "9.1.2",
     "rimraf": "^3.0.2",
     "sinon": "^11.1.1",
     "ts-node": "^10.1.0",
     "typedoc": "0.21.9",
     "typedoc-plugin-markdown": "3.10.4",
-    "typescript": "4.4.2"
+    "typescript": "4.4.3"
   },
   "mocha": {
     "extension": [

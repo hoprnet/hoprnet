@@ -162,7 +162,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:123
+packages/ethereum/types/Ownable.d.ts:127
 
 ___
 
@@ -198,7 +198,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:144
+packages/ethereum/types/Ownable.d.ts:156
 
 ___
 
@@ -211,6 +211,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `OwnershipTransferred` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `OwnershipTransferred(address,address)` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
 
 #### Overrides
 
@@ -218,7 +219,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:134
+packages/ethereum/types/Ownable.d.ts:138
 
 ___
 
@@ -240,7 +241,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:99
+packages/ethereum/types/Ownable.d.ts:103
 
 ___
 
@@ -254,7 +255,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:97
+packages/ethereum/types/Ownable.d.ts:101
 
 ___
 
@@ -276,7 +277,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:157
+packages/ethereum/types/Ownable.d.ts:169
 
 ___
 
@@ -416,7 +417,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:58
+packages/ethereum/types/Ownable.d.ts:62
 
 ___
 
@@ -440,7 +441,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:57
+packages/ethereum/types/Ownable.d.ts:61
 
 ___
 
@@ -458,7 +459,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:59
+packages/ethereum/types/Ownable.d.ts:63
 
 ___
 
@@ -562,7 +563,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:61
+packages/ethereum/types/Ownable.d.ts:65
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -582,7 +583,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:84
+packages/ethereum/types/Ownable.d.ts:88
 
 ___
 
@@ -614,7 +615,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:64
+packages/ethereum/types/Ownable.d.ts:68
 
 ▸ **off**(`eventName`, `listener`): [`Ownable`](Ownable.md)
 
@@ -635,7 +636,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:85
+packages/ethereum/types/Ownable.d.ts:89
 
 ___
 
@@ -667,7 +668,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:68
+packages/ethereum/types/Ownable.d.ts:72
 
 ▸ **on**(`eventName`, `listener`): [`Ownable`](Ownable.md)
 
@@ -688,7 +689,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:86
+packages/ethereum/types/Ownable.d.ts:90
 
 ___
 
@@ -720,7 +721,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:72
+packages/ethereum/types/Ownable.d.ts:76
 
 ▸ **once**(`eventName`, `listener`): [`Ownable`](Ownable.md)
 
@@ -741,7 +742,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:87
+packages/ethereum/types/Ownable.d.ts:91
 
 ___
 
@@ -761,7 +762,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:112
+packages/ethereum/types/Ownable.d.ts:116
 
 ___
 
@@ -794,7 +795,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:91
+packages/ethereum/types/Ownable.d.ts:95
 
 ___
 
@@ -825,7 +826,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:80
+packages/ethereum/types/Ownable.d.ts:84
 
 ▸ **removeAllListeners**(`eventName?`): [`Ownable`](Ownable.md)
 
@@ -845,7 +846,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:89
+packages/ethereum/types/Ownable.d.ts:93
 
 ___
 
@@ -877,7 +878,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:76
+packages/ethereum/types/Ownable.d.ts:80
 
 ▸ **removeListener**(`eventName`, `listener`): [`Ownable`](Ownable.md)
 
@@ -898,7 +899,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:88
+packages/ethereum/types/Ownable.d.ts:92
 
 ___
 
@@ -918,7 +919,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:114
+packages/ethereum/types/Ownable.d.ts:118
 
 ___
 
@@ -939,7 +940,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/Ownable.d.ts:118
+packages/ethereum/types/Ownable.d.ts:122
 
 ___
 

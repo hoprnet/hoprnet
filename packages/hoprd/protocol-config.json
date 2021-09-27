@@ -58,7 +58,7 @@
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
-      "hopr_token_name": "mHOPR"
+      "hopr_token_name": "HOPR"
     },
     {
       "id": "polygon",
@@ -68,7 +68,7 @@
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
       "native_token_name": "MATIC",
-      "hopr_token_name": "mHOPR"
+      "hopr_token_name": "HOPR"
     }
   ]
 }

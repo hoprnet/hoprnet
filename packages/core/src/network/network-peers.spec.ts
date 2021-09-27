@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { NETWORK_QUALITY_THRESHOLD, NETWORK_QUALITY_THRESHOLD as Q } from '../constants'
-import { fakePeerId } from '../test-utils'
-import PeerStore from './network-peers'
+import { fakePeerId, showBackoff } from '../test-utils'
+import PeerStore, { MAX_BACKOFF } from './network-peers'
 
 describe('test PeerStore', async function () {
   const IDS = [fakePeerId(1), fakePeerId(2), fakePeerId(3), fakePeerId(4)]
@@ -61,6 +61,7 @@ describe('test PeerStore', async function () {
 
     const id = fakePeerId(5)
     networkPeers.register(id)
+    console.log('at start', networkPeers.debugLog())
 
     while (networkPeers.qualityOf(id) <= NETWORK_QUALITY_THRESHOLD) {
       await networkPeers.ping(id, () => Promise.resolve(true))
@@ -72,6 +73,8 @@ describe('test PeerStore', async function () {
       await networkPeers.ping(id, () => Promise.resolve(false))
     }
 
+    console.log('at end', networkPeers.debugLog())
     assert(peerConsideredOffline, 'peer should be considered offline since quality fell below threshold')
+    assert(showBackoff(networkPeers) < MAX_BACKOFF, 'even offline, backoff does not reach max')
   })
 })

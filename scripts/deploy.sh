@@ -24,7 +24,7 @@ if [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "goerli" ]; then
 elif [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "xdai" ]; then
   RPC="https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"
 elif [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "polygon" ]; then
-  RPC="https://still-patient-hill.matic.quiknode.pro/b4ecf45eb108716acdc775404e5b6bb9a46c18d8/"
+  RPC="https://provider-proxy.hoprnet.workers.dev/matic_rio"
 elif [ "${RPC_NETWORK:-}" != "xdai" ] && [ "${RPC_NETWORK:-}" != "goerli" ]; then
   echo "Missing supported RPC_NETWORK"
   exit 1

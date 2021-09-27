@@ -1,9 +1,10 @@
 \section{Conclusion}
 
-\subsection{Privacy, Reliability and Scalability}
+\subsection{Privacy, Reliability, and Scalability}
 
-This paper explains how the HOPR protocol, particularly its proof-of-relay mechanism, provides a first solution to building a scalable and robust incentivized network which satisfies all three components of the anonymity trilemma. Although HOPR is indebted to previous developments in the space, particularly the Sphinx packet format and the Ethereum blockchain, we believe its unique combination of probabilistic payments and verifiable but unlinkable cryptographic tickets is the first viable approach to creating a global privacy network which does not rely on any centralized entity to provide data transmission or incentive management.
-\\~\\The HOPR protocol is still under active development, with much research and implementation work still to be completed, but a working proof of concept is already live and available to use. 
+This paper explained how the HOPR protocol, particularly its proof-of-relay mechanism, provides a first solution to building a scalable and robust incentivized network which provides full anonymity with minimal trade-offs in latency and bandwidth. Although HOPR is indebted to previous developments in the space, particularly the Sphinx packet format and the Ethereum blockchain, we believe its unique combination of probabilistic payments and verifiable but unlinkable cryptographic tickets is the first viable approach to creating a global privacy network which does not rely on any centralized entity to provide data transmission or incentive management.
+
+The HOPR protocol is still under active development, with much research and implementation work still to be completed, but a working proof of concept is already live and available to use. 
 
 \subsection{Future work}
 
@@ -12,7 +13,7 @@ This paper explains how the HOPR protocol, particularly its proof-of-relay mecha
 In HOPR, payments are performed at each hop along a packet’s route. These
 incentives weaken the unlinkability guarantees inherited from the Sphinx packet
 format \cite{sphinxpaper} as they reveal the identity of the packet sender, who
-must transfer these incentives to using their signature. To solve this
+must transfer these incentives using their signature. To solve this
 problem, HOPR forwards incentives along with the packet.
 
 \begin{figure}[H]
@@ -39,8 +40,7 @@ problem, HOPR forwards incentives along with the packet.
     \label{fig:incentive worklow}
 \end{figure}
 
-\hspace{-5mm}However, this leaks the relayer’s position within the selected path,
-since the value of the ticket is set according to the current relay fee and the
+However, this leaks the relayer’s position within the selected path, since the value of the ticket is set according to the current relay fee and the
 number of intermediate hops, more precisely $$amount:=\frac{(hops -1)* relayFee}{winProb}$$
 This leak is considered low severity, but further research will be
 conducted on the subject.
@@ -59,15 +59,15 @@ Nevertheless, there might be nodes who actively try to attack the network by:
 \end{itemize}
 
 Since nodes need to monitor the network to select paths, they need to filter
-nodes that behave inappropriately. To help nodes achieve this, HOPR plans to implement a
+nodes that behave inappropriately. To help nodes achieve this, HOPR is considering implementing a
 transitive reputation system which assigns a score to each node that acts as a
 relayer. A node’s behaviour will affect its reputation, which will in turn affect its probability of
 being chosen as a relayer.
 
 \subsubsection*{Transitive trust evaluation }
 
-Reputation with a network can be defined as:``a peer’s belief in another peer’s
-capabilities, honesty, and reliability based on the other peers recommendations.”
+Reputation within a network can be defined as ``a peer’s belief in another peer’s
+capabilities, honesty, and reliability based on other peers recommendations” \cite{Wang_2003}.
 Trust is represented by a triplet (trust, distrust, uncertainty) where:
 
 \begin{itemize}
@@ -79,5 +79,11 @@ Trust is represented by a triplet (trust, distrust, uncertainty) where:
         of the trustor’s negative experience.
 
     \item Uncertainty = 1 - trust - distrust.
+ 
+ \subsubsection*{Commitment derivation}
+  In the future $comm_0$ will be derived from the private key of the node as $$ comm_0 = \mathsf{h}(privKey,chainId,
+contractAddr, channelId, channelEpoch)$$
+And there will be further research to determine whether such a design leaks information about the
+private key or not. 
 
 \end{itemize}

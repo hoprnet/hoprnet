@@ -192,7 +192,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:381
+packages/ethereum/types/HoprDistributor.d.ts:409
 
 ___
 
@@ -243,7 +243,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:498
+packages/ethereum/types/HoprDistributor.d.ts:561
 
 ___
 
@@ -256,9 +256,13 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `AllocationAdded` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
+| `AllocationAdded(address,uint128,string)` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
 | `Claimed` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
+| `Claimed(address,uint128,string)` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
 | `OwnershipTransferred` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `OwnershipTransferred(address,address)` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
 | `ScheduleAdded` | (`durations?`: ``null``, `percents?`: ``null``, `name?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`BigNumber`[], `BigNumber`[], `string`], `Object`\> |
+| `ScheduleAdded(uint128[],uint128[],string)` | (`durations?`: ``null``, `percents?`: ``null``, `name?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`BigNumber`[], `BigNumber`[], `string`], `Object`\> |
 
 #### Overrides
 
@@ -266,7 +270,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:461
+packages/ethereum/types/HoprDistributor.d.ts:489
 
 ___
 
@@ -303,7 +307,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:213
+packages/ethereum/types/HoprDistributor.d.ts:241
 
 ___
 
@@ -317,7 +321,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:211
+packages/ethereum/types/HoprDistributor.d.ts:239
 
 ___
 
@@ -354,7 +358,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:573
+packages/ethereum/types/HoprDistributor.d.ts:636
 
 ___
 
@@ -416,7 +420,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:298
+packages/ethereum/types/HoprDistributor.d.ts:326
 
 ___
 
@@ -513,7 +517,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:300
+packages/ethereum/types/HoprDistributor.d.ts:328
 
 ___
 
@@ -536,7 +540,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:307
+packages/ethereum/types/HoprDistributor.d.ts:335
 
 ___
 
@@ -558,7 +562,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:314
+packages/ethereum/types/HoprDistributor.d.ts:342
 
 ___
 
@@ -582,7 +586,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:172
+packages/ethereum/types/HoprDistributor.d.ts:200
 
 ___
 
@@ -603,7 +607,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:327
+packages/ethereum/types/HoprDistributor.d.ts:355
 
 ___
 
@@ -625,7 +629,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:332
+packages/ethereum/types/HoprDistributor.d.ts:360
 
 ___
 
@@ -649,7 +653,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:171
+packages/ethereum/types/HoprDistributor.d.ts:199
 
 ___
 
@@ -667,7 +671,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:173
+packages/ethereum/types/HoprDistributor.d.ts:201
 
 ___
 
@@ -738,7 +742,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:338
+packages/ethereum/types/HoprDistributor.d.ts:366
 
 ___
 
@@ -759,7 +763,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:344
+packages/ethereum/types/HoprDistributor.d.ts:372
 
 ___
 
@@ -814,7 +818,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:175
+packages/ethereum/types/HoprDistributor.d.ts:203
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -834,7 +838,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:198
+packages/ethereum/types/HoprDistributor.d.ts:226
 
 ___
 
@@ -854,7 +858,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:349
+packages/ethereum/types/HoprDistributor.d.ts:377
 
 ___
 
@@ -886,7 +890,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:178
+packages/ethereum/types/HoprDistributor.d.ts:206
 
 ▸ **off**(`eventName`, `listener`): [`HoprDistributor`](HoprDistributor.md)
 
@@ -907,7 +911,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:199
+packages/ethereum/types/HoprDistributor.d.ts:227
 
 ___
 
@@ -939,7 +943,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:182
+packages/ethereum/types/HoprDistributor.d.ts:210
 
 ▸ **on**(`eventName`, `listener`): [`HoprDistributor`](HoprDistributor.md)
 
@@ -960,7 +964,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:200
+packages/ethereum/types/HoprDistributor.d.ts:228
 
 ___
 
@@ -992,7 +996,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:186
+packages/ethereum/types/HoprDistributor.d.ts:214
 
 ▸ **once**(`eventName`, `listener`): [`HoprDistributor`](HoprDistributor.md)
 
@@ -1013,7 +1017,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:201
+packages/ethereum/types/HoprDistributor.d.ts:229
 
 ___
 
@@ -1033,7 +1037,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:351
+packages/ethereum/types/HoprDistributor.d.ts:379
 
 ___
 
@@ -1066,7 +1070,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:205
+packages/ethereum/types/HoprDistributor.d.ts:233
 
 ___
 
@@ -1097,7 +1101,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:194
+packages/ethereum/types/HoprDistributor.d.ts:222
 
 ▸ **removeAllListeners**(`eventName?`): [`HoprDistributor`](HoprDistributor.md)
 
@@ -1117,7 +1121,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:203
+packages/ethereum/types/HoprDistributor.d.ts:231
 
 ___
 
@@ -1149,7 +1153,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:190
+packages/ethereum/types/HoprDistributor.d.ts:218
 
 ▸ **removeListener**(`eventName`, `listener`): [`HoprDistributor`](HoprDistributor.md)
 
@@ -1170,7 +1174,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:202
+packages/ethereum/types/HoprDistributor.d.ts:230
 
 ___
 
@@ -1190,7 +1194,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:353
+packages/ethereum/types/HoprDistributor.d.ts:381
 
 ___
 
@@ -1212,7 +1216,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:357
+packages/ethereum/types/HoprDistributor.d.ts:385
 
 ___
 
@@ -1232,7 +1236,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:363
+packages/ethereum/types/HoprDistributor.d.ts:391
 
 ___
 
@@ -1252,7 +1256,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:365
+packages/ethereum/types/HoprDistributor.d.ts:393
 
 ___
 
@@ -1272,7 +1276,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:367
+packages/ethereum/types/HoprDistributor.d.ts:395
 
 ___
 
@@ -1292,7 +1296,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:369
+packages/ethereum/types/HoprDistributor.d.ts:397
 
 ___
 
@@ -1313,7 +1317,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:371
+packages/ethereum/types/HoprDistributor.d.ts:399
 
 ___
 
@@ -1334,7 +1338,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprDistributor.d.ts:376
+packages/ethereum/types/HoprDistributor.d.ts:404
 
 ___
 

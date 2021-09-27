@@ -62,6 +62,14 @@ jobs:
           ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
           NETWORK: goerli
 
+      - name: '[SMART-CONTRACTS] Deploy on Polygon'
+        if: ${{ !env.ACT }}
+        run: ./scripts/deploy-smart-contracts.sh
+        env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
+          NETWORK: polygon
+
       - name: '[SMART-CONTRACTS] Deploy on xDai'
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
@@ -97,9 +105,15 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: '[NPM] Wait for package to be accessible'
+      - name: '[NPM] Wait for packages to be accessible'
         if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
-        run: ./scripts/wait-for-npm-package.sh
+        run: |
+          ./scripts/wait-for-npm-package.sh hoprd
+          ./scripts/wait-for-npm-package.sh core
+          ./scripts/wait-for-npm-package.sh core-ethereum
+          ./scripts/wait-for-npm-package.sh utils
+          ./scripts/wait-for-npm-package.sh ethereum
+          ./scripts/wait-for-npm-package.sh cover-traffic-daemon
 
       - name: '[FINISH] Send notification if anything failed on master or release branches'
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
@@ -250,6 +264,115 @@ jobs:
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
 
+  build_hopr_cover_traffic_daemon_docker:
+    name: Build HOPR cover traffic daemon docker
+    runs-on: ubuntu-latest
+    needs: [build_deploy_sc_npm]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
+      - name: Setup Google Cloud Credentials
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+
+      - name: Pull recent Git changes
+        if: ${{ !env.ACT }}
+        run: |
+          # need to pull changes because we've updated the package versions in
+          # the job publish_npm beforehand
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          git pull origin "${branch}" --rebase
+
+      - name: Set image version
+        id: set-image-version
+        run: echo "::set-output name=vsn::$(date +%s)"
+
+      - name: Set package version
+        id: set-package-version
+        run: echo "::set-output name=vsn::$(./scripts/get-package-version.sh)"
+        env:
+          HOPR_PACKAGE: hopr-cover-traffic-daemon
+
+      - name: Set latest release tag
+        id: set-latest-release-tag
+        run: |
+          # we must set the tag specific to the release to prevent overrides
+          # from other release branches
+          declare release_name=${HOPR_GITHUB_REF##refs/heads/release/}
+          declare tag="latest-${release_name}"
+          echo "::set-output name=tag::${tag}"
+
+      - name: Building Docker image using Google Cloud Build
+        working-directory: packages/cover-traffic-daemon
+        run: |
+          gcloud builds submit --config cloudbuild.yaml \
+            --substitutions=_PACKAGE_VERSION=${PACKAGE_VERSION},_IMAGE_VERSION=${IMAGE_VERSION}
+        env:
+          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
+          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Verify the correct package version has been bundled
+        run: |
+          declare v=$(docker run --pull always ${DOCKER_IMAGE}:${IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
+          [ "${v}" = "${PACKAGE_VERSION}" ]
+        env:
+          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
+          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Add additional tags to new Docker image (on master and release branches)
+        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:${PACKAGE_VERSION}
+        env:
+          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
+          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Add tag latest to new Docker image on master
+        if: ${{ !env.ACT }} && ${{ github.ref == 'refs/heads/master' }}
+        run: |
+          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:latest
+        env:
+          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
+          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+
+      - name: Add tag for latest release to new Docker image on release branches
+        if: ${{ !env.ACT &&  startsWith(github.ref, 'refs/heads/release/') }}
+        run: |
+          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:${TAG}
+        env:
+          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
+          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          TAG: ${{ steps.set-latest-release-tag.outputs.tag }}
+
+      - name: Add debug tags to new Docker image (on debug-deploy branches)
+        if: ${{ startsWith(github.ref, 'refs/heads/debug-deploy/') && !env.ACT }}
+        run: |
+          declare last_git_tag="$(git describe --tags --abbrev=0)"
+          declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
+          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
+          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:${tag}
+        env:
+          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
+          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Send notification if anything failed on master or release branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"
+
   avado:
     name: Build Avado (master or release pushes)
     runs-on: ubuntu-latest
@@ -340,6 +463,9 @@ jobs:
             network="xdai"
           fi
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/wildhorn ]]; then
+            network="polygon"
+          fi
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/rio ]]; then
             network="polygon"
           fi
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/master ]]; then

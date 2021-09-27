@@ -10,7 +10,9 @@ import { TileDocument } from '@ceramicnetwork/stream-tile'
 
 export type Socket = ws
 
-let debugLog = debug('hoprd')
+// ensure log including JSON objects is always printed on a single line
+const debugBase = debug('hoprd')
+const debugLog = (msg) => debugBase('%o', msg)
 
 const MAX_MESSAGES_CACHED = 100
 
