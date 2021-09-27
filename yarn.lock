@@ -1022,7 +1022,7 @@ __metadata:
     heap-js: ^2.1.6
     leveldown: ~6.0.1
     levelup: ~5.0.1
-    libp2p: 0.32.5
+    libp2p: 0.33.0
     libp2p-kad-dht: 0.24.2
     libp2p-mplex: 0.10.4
     libp2p-tcp: ^0.17.2
@@ -1142,7 +1142,7 @@ __metadata:
     it-pipe: ^1.1.0
     leveldown: ^6.0.1
     levelup: ^5.0.1
-    libp2p: 0.32.5
+    libp2p: 0.33.0
     libp2p-crypto: 0.19.7
     memdown: ^6.0.0
     mocha: 9.1.2
@@ -8740,10 +8740,28 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
+"interface-datastore@npm:^6.0.2":
+  version: 6.0.3
+  resolution: "interface-datastore@npm:6.0.3"
+  dependencies:
+    interface-store: ^2.0.1
+    nanoid: ^3.0.2
+    uint8arrays: ^3.0.0
+  checksum: a7a8fc090f67fc6b36d189913f952feb959e0e2b86b686b88e7a943030a0d2b5f568132b2c2e1b142724564d73fd8c0190172a3f7a5128bd9bcce3fffb1783a7
+  languageName: node
+  linkType: hard
+
 "interface-store@npm:^1.0.2":
   version: 1.0.2
   resolution: "interface-store@npm:1.0.2"
   checksum: 62039ad87f6fc7330b1e78b1aa448174f6f6bb05993535ed8afd14abc02b64321c80e9ffd0f2f824f343408ccd0e4e9150ba782b4f781d68882bd2c5dd56aab6
+  languageName: node
+  linkType: hard
+
+"interface-store@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "interface-store@npm:2.0.1"
+  checksum: 39d82d315c7ed7b105f314a6397c5a425985b2dcb08813251d1a0d10bf13302664bd8afdac5469b8bfb9159b112001168e58d21dccfe402f7756cef12ea26197
   languageName: node
   linkType: hard
 
@@ -10595,9 +10613,9 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.32.5":
-  version: 0.32.5
-  resolution: "libp2p@npm:0.32.5"
+"libp2p@npm:0.33.0":
+  version: 0.33.0
+  resolution: "libp2p@npm:0.33.0"
   dependencies:
     "@motrix/nat-api": ^0.3.1
     "@vascosantos/moving-average": ^1.1.0
@@ -10612,7 +10630,7 @@ fsevents@~2.1.1:
     es6-promisify: ^7.0.0
     events: ^3.3.0
     hashlru: ^2.3.0
-    interface-datastore: ^5.1.1
+    interface-datastore: ^6.0.2
     it-all: ^1.0.4
     it-buffer: ^0.1.2
     it-drain: ^1.0.3
@@ -10650,7 +10668,7 @@ fsevents@~2.1.1:
     varint: ^6.0.0
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: 44ebdf1449133e185c5179d0eac5e84a9336f0f1487dea586f8333b5da0f84663870592e5ef35010fa8b771d0ea6ad7745e25ed7b0437988f0cd28efe8a87f02
+  checksum: efe2f3899fa3b180401a61d71307091ec49cfaf592105274e8a9fbfd48d05374fac4fca242b7342b6f62b345650be490a3f4d108259a23ab3491675ee7c5668d
   languageName: node
   linkType: hard
 
