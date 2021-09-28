@@ -469,7 +469,9 @@ describe('test indexer', function () {
   })
 
   it('should process events in the right order', async function () {
-    const { indexer, newEvent, newBlock, COMMITTED_CHANNEL, chain } = await useFixtures()
+    const { indexer, newEvent, newBlock, COMMITTED_CHANNEL, chain } = await useFixtures({
+      latestBlockNumber: 3
+    })
     await indexer.start(chain, 0)
 
     newEvent(fixtures.PARTY_A_INITIALIZED_EVENT)
@@ -478,16 +480,11 @@ describe('test indexer', function () {
     newEvent(fixtures.OPENED_EVENT)
 
     newBlock()
-    newBlock()
-    newBlock()
-    newBlock()
-    newBlock()
-    newBlock()
 
     const blockMined = new Defer()
 
     indexer.on('block-processed', (blockNumber: number) => {
-      if (blockNumber === 6) blockMined.resolve()
+      if (blockNumber === 4) blockMined.resolve()
     })
 
     await blockMined.promise
