@@ -148,6 +148,9 @@ const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event
     chain,
     OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
       Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
+    ),
+    COMMITTED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.COMMITTED_EVENT, (a: Address) =>
+      Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
     )
   }
 }
@@ -463,5 +466,33 @@ describe('test indexer', function () {
       alice.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID))),
       bob.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID)))
     ])
+  })
+
+  it.only('should process events in the right order', async function () {
+    const { indexer, newEvent, newBlock, COMMITTED_CHANNEL, chain } = await useFixtures()
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.PARTY_A_INITIALIZED_EVENT)
+    newEvent(fixtures.PARTY_B_INITIALIZED_EVENT)
+    newEvent(fixtures.COMMITTED_EVENT) // setting commited first to test event sorting
+    newEvent(fixtures.OPENED_EVENT)
+
+    newBlock()
+    newBlock()
+    newBlock()
+    newBlock()
+    newBlock()
+    newBlock()
+
+    const blockMined = new Defer()
+
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 6) blockMined.resolve()
+    })
+
+    await blockMined.promise
+
+    const channel = await indexer.getChannel(COMMITTED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, COMMITTED_CHANNEL)
   })
 })

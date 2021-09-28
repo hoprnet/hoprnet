@@ -211,7 +211,6 @@ class Indexer extends EventEmitter {
     }
 
     let lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
-    const confirmedEvents = []
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
@@ -221,7 +220,6 @@ class Indexer extends EventEmitter {
     ) {
       const event = this.unconfirmedEvents.pop()
       log('Processing event %s', event.event)
-      // log(chalk.blue(event.blockNumber.toString(), event.transactionIndex.toString(), event.logIndex.toString()))
 
       // if we find a previous snapshot, compare event's snapshot with last processed
       if (lastSnapshot) {
@@ -239,19 +237,7 @@ class Indexer extends EventEmitter {
           continue
         }
       }
-      confirmedEvents.push(event)
-    }
 
-    // Sort announcements first, so we have a record of address => publickeys
-    // when processing other updates.
-    confirmedEvents.sort((a, b) => {
-      if (a.event === ANNOUNCEMENT) {
-        return b.event === ANNOUNCEMENT ? 0 : -1
-      }
-      return b.event === ANNOUNCEMENT ? 1 : 0
-    })
-
-    for (const event of confirmedEvents) {
       const eventName = event.event as EventNames
 
       try {

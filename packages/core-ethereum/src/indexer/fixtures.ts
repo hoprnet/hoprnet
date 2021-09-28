@@ -43,7 +43,7 @@ export const PARTY_B_INITIALIZED_EVENT = {
   event: 'Announcement',
   transactionHash: '',
   blockNumber: 1,
-  transactionIndex: 0,
+  transactionIndex: 1,
   logIndex: 0,
   args: {
     account: PARTY_B.toAddress().toHex(),
@@ -71,6 +71,27 @@ export const OPENED_EVENT = {
       ticketEpoch: BigNumber.from('0'),
       ticketIndex: BigNumber.from('0'),
       status: 1,
+      channelEpoch: BigNumber.from('0'),
+      closureTime: BigNumber.from('0')
+    }
+  } as any
+} as Event<'ChannelUpdated'>
+
+export const COMMITTED_EVENT = {
+  event: 'ChannelUpdated',
+  transactionHash: '',
+  blockNumber: 2,
+  transactionIndex: 0,
+  logIndex: 10,
+  args: {
+    source: PARTY_A.toAddress().toHex(),
+    destination: PARTY_B.toAddress().toHex(),
+    newState: {
+      balance: BigNumber.from('3'),
+      commitment: new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1)).toHex(),
+      ticketEpoch: BigNumber.from('0'),
+      ticketIndex: BigNumber.from('0'),
+      status: 2,
       channelEpoch: BigNumber.from('0'),
       closureTime: BigNumber.from('0')
     }
