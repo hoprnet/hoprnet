@@ -468,7 +468,7 @@ describe('test indexer', function () {
     ])
   })
 
-  it.only('should process events in the right order', async function () {
+  it('should process events in the right order', async function () {
     const { indexer, newEvent, newBlock, COMMITTED_CHANNEL, chain } = await useFixtures()
     await indexer.start(chain, 0)
 
