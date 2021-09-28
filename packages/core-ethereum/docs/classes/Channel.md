@@ -22,8 +22,9 @@
 - [finalizeClosure](Channel.md#finalizeclosure)
 - [fund](Channel.md#fund)
 - [getAcknowledgedTickets](Channel.md#getacknowledgedtickets)
-- [getBalances](Channel.md#getbalances)
 - [getChainCommitment](Channel.md#getchaincommitment)
+- [getThemToUsId](Channel.md#getthemtousid)
+- [getUsToThemId](Channel.md#getustothemid)
 - [initializeClosure](Channel.md#initializeclosure)
 - [open](Channel.md#open)
 - [redeemAllTickets](Channel.md#redeemalltickets)
@@ -120,7 +121,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L237)
+[packages/core-ethereum/src/channel.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L240)
 
 ___
 
@@ -140,7 +141,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:164](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L164)
+[packages/core-ethereum/src/channel.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L167)
 
 ___
 
@@ -164,7 +165,7 @@ a ticket without any value
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:218](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L218)
+[packages/core-ethereum/src/channel.ts:221](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L221)
 
 ___
 
@@ -194,7 +195,7 @@ a signed ticket
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:187](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L187)
+[packages/core-ethereum/src/channel.ts:190](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L190)
 
 ___
 
@@ -208,7 +209,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L154)
+[packages/core-ethereum/src/channel.ts:157](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L157)
 
 ___
 
@@ -229,7 +230,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L114)
+[packages/core-ethereum/src/channel.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L117)
 
 ___
 
@@ -243,21 +244,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:247](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L247)
-
-___
-
-### getBalances
-
-▸ **getBalances**(): `Promise`<`Balance`[]\>
-
-#### Returns
-
-`Promise`<`Balance`[]\>
-
-#### Defined in
-
-[packages/core-ethereum/src/channel.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L110)
+[packages/core-ethereum/src/channel.ts:250](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L250)
 
 ___
 
@@ -275,6 +262,34 @@ ___
 
 ___
 
+### getThemToUsId
+
+▸ **getThemToUsId**(): `Hash`
+
+#### Returns
+
+`Hash`
+
+#### Defined in
+
+[packages/core-ethereum/src/channel.ts:109](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L109)
+
+___
+
+### getUsToThemId
+
+▸ **getUsToThemId**(): `Hash`
+
+#### Returns
+
+`Hash`
+
+#### Defined in
+
+[packages/core-ethereum/src/channel.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L101)
+
+___
+
 ### initializeClosure
 
 ▸ **initializeClosure**(): `Promise`<`string`\>
@@ -285,7 +300,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:145](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L145)
+[packages/core-ethereum/src/channel.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L148)
 
 ___
 
@@ -305,7 +320,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L125)
+[packages/core-ethereum/src/channel.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L128)
 
 ___
 
@@ -319,7 +334,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:251](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L251)
+[packages/core-ethereum/src/channel.ts:254](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L254)
 
 ___
 
@@ -339,7 +354,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:255](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L255)
+[packages/core-ethereum/src/channel.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L258)
 
 ___
 
@@ -353,7 +368,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L105)
+[packages/core-ethereum/src/channel.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L113)
 
 ___
 
@@ -367,4 +382,4 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L101)
+[packages/core-ethereum/src/channel.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L105)
