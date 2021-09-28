@@ -509,17 +509,9 @@ class Hopr extends EventEmitter {
         const channel = ethereum.getChannel(ticketIssuer, ticketReceiver)
         const channelState = await channel.usToThem()
 
-        if (typeof channelState === 'undefined') {
-          throw Error(
-            `Channel from ${ticketIssuer.toPeerId().toB58String()} to ${ticketReceiver
-              .toPeerId()
-              .toB58String()} not found`
-          )
-        } else if (channelState.status !== ChannelStatus.Open) {
+        if (channelState.status !== ChannelStatus.Open) {
           throw Error(`Channel ${channelState.getId().toHex()} is not open`)
-        }
-
-        if (channelState.ticketEpoch.toBN().isZero()) {
+        } else if (channelState.ticketEpoch.toBN().isZero()) {
           throw Error(
             `Cannot use manually set path because apparently there is no commitment set for the channel between ${ticketIssuer
               .toPeerId()
@@ -771,7 +763,7 @@ class Hopr extends EventEmitter {
     }
 
     return {
-      channelId: (await channel.usToThem()).getId()
+      channelId: channel.getUsToThemId()
     }
   }
 

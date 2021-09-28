@@ -98,17 +98,20 @@ class Channel {
     return (await this.themToUs()).commitment
   }
 
+  getUsToThemId(): Hash {
+    return generateChannelId(this.self.toAddress(), this.counterparty.toAddress())
+  }
+
   async usToThem(): Promise<ChannelEntry> {
-    return await this.indexer.getChannel(generateChannelId(this.self.toAddress(), this.counterparty.toAddress()))
+    return await this.indexer.getChannel(this.getUsToThemId())
+  }
+
+  getThemToUsId(): Hash {
+    return generateChannelId(this.counterparty.toAddress(), this.self.toAddress())
   }
 
   async themToUs(): Promise<ChannelEntry> {
-    return await this.indexer.getChannel(generateChannelId(this.counterparty.toAddress(), this.self.toAddress()))
-  }
-
-  // TODO kill
-  async getBalances() {
-    return [await this.usToThem(), await this.themToUs()].map((x) => x.balance)
+    return await this.indexer.getChannel(this.getThemToUsId())
   }
 
   async fund(myFund: Balance, counterpartyFund: Balance) {
