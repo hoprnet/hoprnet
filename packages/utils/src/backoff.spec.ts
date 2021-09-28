@@ -1,6 +1,6 @@
 import assert from 'assert'
 import sinon from 'sinon'
-import { wait, backoff } from './backoff'
+import { wait, retryWithBackoff as backoff } from './backoff'
 
 const getRoundedDiff = (startTime: number, endTime: number): number => {
   return Math.round((endTime - startTime) / 100) * 100

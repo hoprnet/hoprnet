@@ -13,7 +13,8 @@ import {
   generateChannelId,
   ChannelStatus,
   PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB
+  INVERSE_TICKET_WIN_PROB,
+  retryWithBackoff
 } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import type { RedeemTicketResponse } from '.'
@@ -81,12 +82,10 @@ class Channel {
       )
 
       try {
-        await commitment.bumpCommitment()
+        await retryWithBackoff(() => commitment.bumpCommitment())
         this.events.emit('ticket:win', ack, this)
         return ack
       } catch (e) {
-        // NB: this is a valid response, but probably not a very useful one, we
-        // should probably retry
         log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
         return null
       }
