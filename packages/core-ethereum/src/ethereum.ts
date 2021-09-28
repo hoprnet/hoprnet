@@ -112,7 +112,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     method: T,
     ...rest: Parameters<T>
   ): Promise<ContractTransaction | { hash: string }> {
-    const gasLimit = 300e3
+    const gasLimit = 400e3
     const gasPrice = networkInfo?.gas ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
