@@ -57,12 +57,11 @@ describe('test backoff', function () {
     }
 
     assert(timedout)
-    assert.strictEqual(fn.callCount, 6)
+    assert.strictEqual(fn.callCount, 5)
     assert.strictEqual(getRoundedDiff(ticks[0], ticks[1]), 100)
     assert.strictEqual(getRoundedDiff(ticks[1], ticks[2]), 200)
     assert.strictEqual(getRoundedDiff(ticks[2], ticks[3]), 400)
     assert.strictEqual(getRoundedDiff(ticks[3], ticks[4]), 800)
-    assert.strictEqual(getRoundedDiff(ticks[4], ticks[5]), 1000)
   })
 
   it('should resolve after 4th try', async function () {

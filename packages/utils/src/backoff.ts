@@ -37,7 +37,7 @@ export async function retryWithBackoff<T>(
         if (delay >= maxDelay) return reject(err)
         log(`failed, attempting again in ${delay} (${err})`)
         await wait(delay)
-        delay = Math.min(delay * delayMultiple, maxDelay)
+        delay = delay * delayMultiple
       }
     }
   })
