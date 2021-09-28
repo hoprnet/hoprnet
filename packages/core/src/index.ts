@@ -308,7 +308,7 @@ class Hopr extends EventEmitter {
   }
 
   private async onChannelWaitingForCommitment(c: ChannelEntry) {
-    if (this.strategy.shouldCommitToChannel(c)){
+    if (this.strategy.shouldCommitToChannel(c)) {
       const chain = await this.startedPaymentChannels()
       log(`Found channel ${c.getId().toHex()} to us with unset commitment. Setting commitment`)
       chain.commitToChannel(c)

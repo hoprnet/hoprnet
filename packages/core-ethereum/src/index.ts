@@ -181,7 +181,6 @@ export default class HoprEthereum extends EventEmitter {
       c.getId(),
       this.indexer
     ).initialize()
-
   }
 }
 
