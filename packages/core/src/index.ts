@@ -233,6 +233,7 @@ class Hopr extends EventEmitter {
 
     chain.indexer.on('peer', this.onPeerAnnouncement.bind(this))
     chain.indexer.off('peer', pushToRecentlyAnnouncedNodes)
+    chain.indexer.on('channel-waiting-for-commitment', (c: ChannelEntry) => this.onChannelWaitingForCommitment(c))
 
     recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
 
@@ -303,6 +304,14 @@ class Hopr extends EventEmitter {
       } catch (e) {
         console.log(e)
       }
+    }
+  }
+
+  private async onChannelWaitingForCommitment(c: ChannelEntry) {
+    if (this.strategy.shouldCommitToChannel(c)){
+      const chain = await this.startedPaymentChannels()
+      log(`Found channel ${c.getId().toHex()} to us with unset commitment. Setting commitment`)
+      chain.commitToChannel(c)
     }
   }
 

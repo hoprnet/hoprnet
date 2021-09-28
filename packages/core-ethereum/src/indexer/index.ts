@@ -22,7 +22,6 @@ import {
 
 import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames } from './types'
-import { Commitment } from '../commitment'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 
 const log = Debug('hopr-core-ethereum:indexer')
@@ -260,7 +259,7 @@ class Indexer extends EventEmitter {
         } else if (eventName === 'ChannelUpdated') {
           await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
         } else {
-          log(`ignoring event '${eventName}'`)
+          log(`ignoring event '${String(eventName)}'`)
         }
       } catch (err) {
         log('error processing event:', event, err)
@@ -322,7 +321,7 @@ class Indexer extends EventEmitter {
       if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
-          await this.onOwnUnsetCommitment(channel)
+          this.onOwnUnsetCommitment(channel)
         } else if (channel.status === ChannelStatus.Open) {
           this.resolveCommitmentPromise(channel.getId())
         }
@@ -334,24 +333,7 @@ class Indexer extends EventEmitter {
     if (!channel.destination.toAddress().eq(this.address)) {
       throw new Error('shouldnt be called unless we are the destination')
     }
-    log(`Found channel ${chalk.yellow(channel.getId().toHex())} to us with unset commitment. Setting commitment`)
-
-    const setCommitment = (commitment: Hash): Promise<string> => {
-      try {
-        return this.chain.setCommitment(channel.source.toAddress(), commitment)
-      } catch (e) {
-        log('Error setting commitment', e)
-        // TODO: defer to channel strategy for this, and allow for retries.
-      }
-    }
-
-    return new Commitment(
-      setCommitment,
-      async () => (await this.getChannel(channel.getId())).commitment,
-      this.db,
-      channel.getId(),
-      this
-    ).initialize()
+    this.emit('channel-waiting-for-commitment', channel)
   }
 
   public waitForCommitment(channelId: Hash): Promise<void> {

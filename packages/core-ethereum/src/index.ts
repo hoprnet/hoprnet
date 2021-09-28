@@ -161,6 +161,10 @@ export default class HoprEthereum extends EventEmitter {
   public async waitForPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     return await this.indexer.getPublicNodes()
   }
+
+  public commitToChannel(c: ChannelEntry): Promise<void> {
+
+  }
 }
 
 export { ChannelEntry, Channel, Indexer, createChainWrapper, INDEXER_BLOCK_RANGE, CONFIRMATIONS }

@@ -28,8 +28,6 @@ const log = Debug('hopr-core-ethereum:channel')
 
 // TODO - legacy, models bidirectional channel.
 class Channel {
-  private commitment: Commitment
-
   constructor(
     private readonly self: PublicKey,
     private readonly counterparty: PublicKey,
@@ -38,24 +36,7 @@ class Channel {
     private readonly indexer: Indexer,
     private readonly privateKey: Uint8Array,
     private readonly events: EventEmitter
-  ) {
-    const setCommitment = (commitment: Hash): Promise<string> => {
-      try {
-        return this.chain.setCommitment(counterparty.toAddress(), commitment)
-      } catch (e) {
-        log('Error setting commitment', e)
-        // TODO: defer to channel strategy for this, and allow for retries.
-      }
-    }
-
-    this.commitment = new Commitment(
-      setCommitment,
-      () => this.getChainCommitment(),
-      this.db,
-      generateChannelId(counterparty.toAddress(), self.toAddress()), // Counterparty to us
-      indexer
-    )
-  }
+  ) {}
 
   /**
    * Reserve a preImage for the given ticket if it is a winning ticket.
@@ -73,7 +54,22 @@ class Channel {
 
     const ticket = unacknowledgedTicket.ticket
 
-    const opening = await this.commitment.findPreImage(await this.commitment.getCurrentCommitment())
+    const setCommitment = (commitment: Hash): Promise<string> => {
+      // NB: We do not catch any error here, as we want it to propagate
+      // to the place where the commitment was triggered, namely the bump
+      // commitment
+      return this.chain.setCommitment(this.counterparty.toAddress(), commitment)
+    }
+
+    const commitment = new Commitment(
+      setCommitment,
+      () => this.getChainCommitment(),
+      this.db,
+      generateChannelId(this.counterparty.toAddress(), this.self.toAddress()), // Counterparty to us
+      this.indexer
+    )
+
+    const opening = await commitment.findPreImage(await commitment.getCurrentCommitment())
 
     if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
       const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
@@ -84,9 +80,16 @@ class Channel {
         )}`
       )
 
-      await this.commitment.bumpCommitment()
-      this.events.emit('ticket:win', ack, this)
-      return ack
+      try {
+        await commitment.bumpCommitment()
+        this.events.emit('ticket:win', ack, this)
+        return ack
+      } catch (e) {
+        // NB: this is a valid response, but probably not a very useful one, we
+        // should probably retry
+        log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
+        return null
+      }
     } else {
       log(`Got a ticket that is not a win. Dropping ticket.`)
       await this.db.markLosing(unacknowledgedTicket)
