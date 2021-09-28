@@ -56,4 +56,4 @@ $$s_i^{sub} \longleftarrow \mathsf{expand}(s_i^{master}, length(purpose), hashKe
     \end{tabular}
 \end{center}
 
-Since the values for PoR are used as field elements on the curve, there exist a non-zero probability that the application of $\mathsf{expand}$ leads to a value outside of the field. In this case, the hash key is padded by ``\_'' until it leads to a field element.
+Since the values for PoR are used as field elements on the curve, there exists a non-zero probability that the application of $\mathsf{expand}$ leads to a value outside of the field. In this case, the hash key is padded by ``\_'' until it leads to a field element.
