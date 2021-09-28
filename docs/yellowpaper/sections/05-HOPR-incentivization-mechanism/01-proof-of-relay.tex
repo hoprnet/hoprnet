@@ -40,24 +40,84 @@ The values $H_i$ and $T_{c_i}$ are sent with the routing information $\beta_i$ a
 $$\beta_i=y_{i+1}\|H_i\|T_{c_i}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]}$$
 By decrypting $\beta_i$, each mix node $n_i$ will retrieve the public key of the next downstream node and both the hint and challenge required by proof of relay to ensure relay services are verifiable.
 
-\begin{figure}[H]
-    \centering
-    \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
-        \hline
-        $\alpha$ & $\beta$                   & $\gamma$ \\
-                 & \begin{tabular}{| c m{2em} | m{3em} | m{6em} |}
-            \hline
-            \multicolumn{2}{| c |}{$Y_B$} & $hint_B$                 & $challenge_{BC}$ \\
-            \hline
-            \multicolumn{2}{| c |}{$Y_C$} & $hint_C$                 & $random$         \\
-            \hline
-            \multicolumn{2}{| c |}{$Y_D$} & $hint_D$                 & $random$         \\
-            \hline
-            End                           & \multicolumn{3}{| l |}{}                    \\
-            \hline
-        \end{tabular} &          \\[3em]
-        \hline
-    \end{tabular}
-    \caption{Sphinx with PoR}
-    \label{fig:Sphinx with PoR}
-\end{figure}
+\begin{center}
+    \begin{figure}[H]
+        \begin{tikzpicture}
+            \def\one{0.3}
+            \draw[decoration={brace,raise=5pt},decorate] (0,0.5) -- node[above=5pt] {33 bytes} (33*\one,0.5);
+            \draw[decoration={brace,raise=5pt},decorate] (-1,0) -- node[left=6pt] {$\alpha$} (-1,0.5) ;
+            \draw[black] (0,0) rectangle (\one*33,0.5);
+
+            \draw[decoration={brace,raise=5pt},decorate] (-1,-8.4) -- node[left=6pt] {$\beta$} (-1,-0.6) ;
+            \foreach \name\length\offset\hatching in{y/33/-1.2/1,hint/32/-1.8/1,challenge/32/-2.4/1,y/33/-3.6/2,hint/32/-4.2/2,challenge/32/-4.8/2,y/33/-6.0/3,hint/32/-6.6/3,challenge/32/-7.2/3}{
+                    \draw (0,\offset) rectangle (\one*\length,\offset+0.6);
+                    \begin{scope}[shift={(0,\offset)}]
+                        \ifnum\length=33
+                            \def\a{9.9}
+                            \def\diff{9.4}
+
+                        \else
+                            \def\a{9.6}
+                            \def\diff{9.1}
+
+                        \fi
+                        \def\b{0.6}
+                        \def\lw{0.2}
+
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                                \draw [line width=\lw mm](\x,0)--(0,\x) (\a-\b+\x,\b)--(\a,\x);
+                            }
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                                \draw [line width=\lw mm](\x+\b,0)--(\x,\b); %(\a,\a-\x)--(\a-\x,\a);
+                            }
+
+                        \ifnum\hatching>1
+                            \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                                    \draw [line width=\lw mm](0,\x)--(\b-\x,\b) (\a-\b+\x,0)--(\a,\b-\x);
+                                }
+                            \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                                    \draw [line width=\lw mm](\x,0)--(\b+\x,\b); %(\a,\a-\x)--(\a-\x,\a);
+                                }
+                        \fi
+
+                        \ifnum\hatching>2
+                            \foreach \x [count=\i] in{0,0.15,0.45,...,\a}{
+                                    \draw [line width=\lw mm](\x,0)--(\x,\b);
+                                }
+                        \fi
+                    \end{scope}
+
+                    \draw (2.0,\offset+0.25) node[fill=white,above=-7pt] {\name};
+
+                }
+
+            \draw (0,-7.8) rectangle (\one*1,-8.4);
+            \begin{scope}[shift={(0,-8.4)}]
+                \def\lw{0.2}
+
+                \draw [line width=\lw mm](0,0)--(0.3,0.3);
+                \draw [line width=\lw mm](0,0.3)--(0.3,0.6);
+
+                \draw [line width=\lw mm](0,0.6)--(0.3,0.3);
+                \draw [line width=\lw mm](0,0.3)--(0.3,0);
+
+                \draw [line width=\lw mm](0.15,0)--(0.15,0.6);
+
+                \draw [line width=\lw mm](0,0.15)--(0.3,0.15);
+                \draw [line width=\lw mm](0,0.45)--(0.3,0.45);
+
+                \draw (2.0,0.25) node[fill=white,above=-7pt] {end};
+            \end{scope}
+
+
+            \draw[decoration={brace,raise=5pt},decorate] (-1,-9.6) -- node[left=6pt] {$\gamma$} (-1,-9.0) ;
+            \draw (0,-9.0) rectangle (\one*32,-9.6);
+            \draw[decoration={brace,mirror,raise=5pt},decorate] (0,-9.6) -- node[below=5pt] {32 bytes} (32*\one,-9.6);
+
+            \draw[decoration={brace,raise=5pt},decorate] (33*\one,0.5) -- node[right=12pt,above=2pt,rotate=-90] {300 bytes} (33*\one,-9.6) ;
+
+
+        \end{tikzpicture}
+        \caption{Sphinx packet with PoR}
+    \end{figure}
+\end{center}
