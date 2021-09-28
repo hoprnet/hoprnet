@@ -1020,7 +1020,7 @@ __metadata:
     chalk: ~4.1.1
     debug: ^4.3.2
     heap-js: ^2.1.6
-    leveldown: ~6.0.1
+    leveldown: 6.1.0
     levelup: ~5.0.1
     libp2p: 0.33.0
     libp2p-kad-dht: 0.25.0
@@ -1140,7 +1140,7 @@ __metadata:
     ethers: 5.4.7
     futoin-hkdf: ~1.4.1
     it-pipe: ^1.1.0
-    leveldown: ^6.0.1
+    leveldown: 6.1.0
     levelup: ^5.0.1
     libp2p: 0.33.0
     libp2p-crypto: 0.19.7
@@ -2455,6 +2455,20 @@ __metadata:
     level-supports: ^2.0.0
     queue-microtask: ^1.2.3
   checksum: 4bcea074fde49bc4bcc46863a015fc0fd11d5bae9e58567163079ba84e5dedde4bf3bd70c86318efa44756d1ff5d212740a83b37c5304c8141aed2ef589cb177
+  languageName: node
+  linkType: hard
+
+"abstract-leveldown@npm:^7.2.0":
+  version: 7.2.0
+  resolution: "abstract-leveldown@npm:7.2.0"
+  dependencies:
+    buffer: ^6.0.3
+    catering: ^2.0.0
+    is-buffer: ^2.0.5
+    level-concat-iterator: ^3.0.0
+    level-supports: ^2.0.1
+    queue-microtask: ^1.2.3
+  checksum: d558111f2d123da95ac80b8ba3b9b0a5bc8cd87296e64b05dca693f5f4839aa0e2fc97bad56a101766f499824e2962611750f8a76bbac4a5db35801968fbbe02
   languageName: node
   linkType: hard
 
@@ -10309,6 +10323,13 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
+"level-supports@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "level-supports@npm:2.0.1"
+  checksum: 4f2bcfe9eb67ec2e891e109a1faa8490fcac401ede704f0366e24d818ece482d110275d92d00537f581006dd0974905b3eee9b728314b45e24098f4e52d48dbd
+  languageName: node
+  linkType: hard
+
 "level-supports@npm:~1.0.0":
   version: 1.0.1
   resolution: "level-supports@npm:1.0.1"
@@ -10350,7 +10371,19 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"leveldown@npm:^6.0.0, leveldown@npm:^6.0.1, leveldown@npm:~6.0.1":
+"leveldown@npm:6.1.0":
+  version: 6.1.0
+  resolution: "leveldown@npm:6.1.0"
+  dependencies:
+    abstract-leveldown: ^7.2.0
+    napi-macros: ~2.0.0
+    node-gyp: latest
+    node-gyp-build: ^4.3.0
+  checksum: e984b61e9fbe057cfd5c81ac0afe5d7e35d695ff130a95991e0ecb66390e4c4ff6aa3980a65b6c53edaba80527a47790bb26e3cfbd52a054957b3546d9941fe4
+  languageName: node
+  linkType: hard
+
+"leveldown@npm:^6.0.0":
   version: 6.0.2
   resolution: "leveldown@npm:6.0.2"
   dependencies:
@@ -12078,7 +12111,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"node-gyp-build@npm:^4.2.0":
+"node-gyp-build@npm:^4.2.0, node-gyp-build@npm:^4.3.0":
   version: 4.3.0
   resolution: "node-gyp-build@npm:4.3.0"
   bin:
