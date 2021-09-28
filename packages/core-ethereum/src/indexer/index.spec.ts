@@ -332,7 +332,6 @@ describe('test indexer', function () {
     })
 
     const opened = new Defer()
-    const commitmentSet = new Defer()
     const pendingIniated = new Defer()
     const closed = new Defer()
 
@@ -340,9 +339,6 @@ describe('test indexer', function () {
       switch (channel.status) {
         case ChannelStatus.WaitingForCommitment:
           opened.resolve()
-          break
-        case ChannelStatus.Open:
-          commitmentSet.resolve()
           break
         case ChannelStatus.PendingToClose: {
           pendingIniated.resolve()
@@ -383,12 +379,6 @@ describe('test indexer', function () {
     newBlock()
     newBlock()
     await opened.promise
-    // Total hack as this test sucks. There is no way to await the actual
-    // commitment setting as this is behind an event.
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    newBlock()
-    newBlock()
-    await commitmentSet.promise
 
     const evClose = {
       event: 'ChannelUpdated',
