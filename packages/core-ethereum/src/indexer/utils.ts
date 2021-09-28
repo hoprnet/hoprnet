@@ -12,13 +12,13 @@ export const snapshotComparator = (
     logIndex: number
   }
 ): number => {
-  if (snapA.blockNumber < snapB.blockNumber) return -1
-  else if (snapA.blockNumber > snapB.blockNumber) return 1
-  else if (snapA.transactionIndex < snapB.transactionIndex) return -1
-  else if (snapA.transactionIndex > snapB.transactionIndex) return 1
-  else if (snapA.logIndex < snapB.logIndex) return -1
-  else if (snapA.logIndex > snapB.logIndex) return 1
-  else return 0
+  if (snapA.blockNumber !== snapB.blockNumber) {
+    return snapA.blockNumber - snapB.blockNumber
+  } else if (snapA.transactionIndex !== snapB.transactionIndex) {
+    return snapA.transactionIndex - snapB.transactionIndex
+  } else {
+    return snapA.logIndex - snapB.logIndex
+  }
 }
 
 /**
