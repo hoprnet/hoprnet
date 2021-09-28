@@ -103,11 +103,7 @@ class Channel {
   }
 
   async usToThem(): Promise<ChannelEntry> {
-    try {
-      return await this.indexer.getChannel(this.getUsToThemId())
-    } catch {
-      throw Error(`Channel from ${this.self.toHex()} to ${this.counterparty.toHex()} not found`)
-    }
+    return await this.indexer.getChannel(this.getUsToThemId())
   }
 
   getThemToUsId(): Hash {
@@ -115,11 +111,7 @@ class Channel {
   }
 
   async themToUs(): Promise<ChannelEntry> {
-    try {
-      return await this.indexer.getChannel(this.getThemToUsId())
-    } catch {
-      throw Error(`Channel from ${this.counterparty.toHex()} to ${this.self.toHex()} not found`)
-    }
+    return await this.indexer.getChannel(this.getThemToUsId())
   }
 
   async fund(myFund: Balance, counterpartyFund: Balance) {
