@@ -24,10 +24,10 @@ The following are a series of manual tasks that are needed to be executed for th
 
 - [ ] Transfer 1M HOPR token and 20 native $chain to our leaderboard wallet in network.hoprnet.org.
 
-
 # Scripts
 
 ## `cover-traffic` deployment script
+
 ```
 CT_PRIV_KEY=14e6...a6a5 \
 HOPRD_INFURA_KEY=51d4...caf6 \
@@ -46,6 +46,3 @@ HOPRD_TOKEN_CONTRACT="0x6F80d1a3AB9006548c2fBb180879b87364D63Bf7" \
 HOPRD_SHOW_PRESTART_INFO=true \
 ./scripts/setup-gcloud-cluster.sh matic-testnet-01 gcr.io/hoprassociation/hoprd:latest `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
-
-
-
