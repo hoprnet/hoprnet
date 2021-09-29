@@ -3,23 +3,46 @@
 
 HOPR incentivizes packet transformation and delivery using a mechanism called \textbf{proof of relay}. This mechanism guarantees that a node's relay services are verifiable.
 
-\paragraph{Construction}
+Each node derives two keys, $s_i^{own}$ and $_i^{ack}$, by using the $s_i$ as given by the SPHINX packet, see section \href{sec:keyderivation}{key derivation} for more details. $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
 
-\begin{itemize}
-    \item Every packet is sent together with a ticket.
-    \item Each ticket contains a challenge.
-    \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket.
-\end{itemize}
+Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requires the cooperation of the next downstream node $n_{i+1}$ and is sent as an \textit{acknowledgement} if $n_{i+1}$ has received the transformed packet \textit{and} considers packet and the embedded ticket valid.
 
-\subsection{Challenge and Hint}
-\label{sec:PoR:Challenge}
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[auto]
+        \draw (0,0) node (a) {};
+        \draw (3.0,0) node (b) [rectangle,draw] {$n_{i-1}$};
+        \draw (6,0) node (c) [rectangle,draw] {$n_i$};
+        \draw (9.0,0) node (d) [rectangle,draw] {$n_{i+1}$};
+        \draw (12.0,0) node (e) {};
+
+        \draw (6.0, -1.5) node [circle,draw] (intermediateResult) {};
+        \draw (6.0, -2.5) node (response) {$s_i^{response}$};
+
+        \draw [->,draw,dashed] (a.east) to node [align=center,below] {packet$_{i-2}$} (b.west);
+        \draw [->,draw,dashed] (b.east) to node [align=center,below] {packet$_{i-1}$} node [align=center,above,circle,draw] {1} (c.west);
+        \draw [->,draw,dashed] (c.east) to node [align=center,below] {packet$_i$} (d.west);
+        \draw [->,draw,dashed] (d.east) to node [align=center,below] {packet$_{i+1}$} (e.west);
+
+        \draw [->,draw] (c.south) to node [right] {$s_i^{own}$} node [align=center,left,circle,draw] {2}  (intermediateResult.north);
+        \draw [->,draw,bend left] (d.south) to node[below] {$s_{i+1}^{ack}$} node [align=center,right,circle,draw] {3} (intermediateResult.east);
+        \draw [->,draw] (intermediateResult.south) to (response.north);
+
+
+        % \path [->,draw,bend left,dashed] (a.north east) to node [above] {3$\cdot$incentive} (b.north west);
+        % \path [->,draw,bend left,dashed] (b.north east) to node [above] {2$\cdot$incentive} (c.north west);
+        % \path [->,draw,bend left,dashed] (c.north east) to node [above] {1$\cdot$incentive} (d.north west);
+        % \path [->,draw,bend left,dashed] (d.north east) to node [above] {0$\cdot$incentive} (z.north west);
+
+    \end{tikzpicture}
+    \caption{PoR workflow}
+    \label{fig:proofofrelay}
+\end{figure}
+
+\paragraph{Challenge and Hint}
+\label{sec:proofofrelay:challenge}
 
 $A$ creates a shared group element $\alpha_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange as introduced in section \nameref{sec:sphinx:keyderivation}. This shared key is a session key generated from the master DH Sphinx key and will be used to derive new keys $s_i^{(0)}$ and $s_{i}^{(1)}$.  The first key, $s_i^{(0)}$, will be used as the node's \textit{own key share} and the second key, $s_i^{(1)}$, will be used as the \textit{acknowledgement key}. The acknowledgement key will be embedded in the acknowledgement for a packet and thereby unlocks the reward for the previous relayer, earned for transforming and delivering the packet.
-
-\paragraph{Key derivation}
-
-
-If the result of HKDF does not lead to a field element, $hashKey$ is padded until it does.
 
 $A$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
 The hint value, $H$, is computed as
@@ -40,84 +63,82 @@ The values $H_i$ and $T_{c_i}$ are sent with the routing information $\beta_i$ a
 $$\beta_i=y_{i+1}\|H_i\|T_{c_i}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]}$$
 By decrypting $\beta_i$, each mix node $n_i$ will retrieve the public key of the next downstream node and both the hint and challenge required by proof of relay to ensure relay services are verifiable.
 
-\begin{center}
-    \begin{figure}[H]
-        \begin{tikzpicture}
-            \def\one{0.3}
-            \draw[decoration={brace,raise=5pt},decorate] (0,0.5) -- node[above=5pt] {33 bytes} (33*\one,0.5);
-            \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=6pt] {$\alpha$} (0,0.5) ;
-            \draw[black] (0,0) rectangle (\one*33,0.5);
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \def\one{0.3}
+        \draw[decoration={brace,raise=5pt},decorate] (0,0.5) -- node[above=5pt] {33 bytes} (33*\one,0.5);
+        \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=6pt] {$\alpha$} (0,0.5) ;
+        \draw[black] (0,0) rectangle (\one*33,0.5);
 
-            \draw[decoration={brace,raise=5pt},decorate] (0,-8.4) -- node[left=6pt] {$\beta$} (0,-0.6) ;
-            \foreach \name\length\offset\hatching in{y/33/-1.2/1,hint/32/-1.8/1,challenge/32/-2.4/1,y/33/-3.6/2,hint/32/-4.2/2,challenge/32/-4.8/2,y/33/-6.0/3,hint/32/-6.6/3,challenge/32/-7.2/3}{
-                    \draw (0,\offset) rectangle (\one*\length,\offset+0.6);
-                    \begin{scope}[shift={(0,\offset)}]
-                        \ifnum\length=33
-                            \def\a{9.9}
-                            \def\diff{9.4}
+        \draw[decoration={brace,raise=5pt},decorate] (0,-9.0) -- node[left=6pt] {$\beta$} (0,-0.3);
 
-                        \else
-                            \def\a{9.6}
-                            \def\diff{9.1}
+        \foreach \name\length\offset\hatching in{y/33/-0.9/1,$\gamma$/32/-1.5/1,hint/32/-2.1/1,challenge/32/-2.7/1,y/33/-3.6/2,$\gamma$/32/-4.2/2,hint/32/-4.8/2,challenge/32/-5.4/2,y/33/-6.3/3,$\gamma$/32/-6.9/3,hint/32/-7.5/3,challenge/32/-8.1/3}{
+                \draw (0,\offset) rectangle (\one*\length,\offset+0.6);
+                \begin{scope}[shift={(0,\offset)}]
+                    \ifnum\length=33
+                        \def\a{9.9}
+                        \def\diff{9.4}
+                    \else
+                        \def\a{9.6}
+                        \def\diff{9.1}
+                    \fi
+                    \def\b{0.6}
+                    \def\lw{0.2}
 
-                        \fi
-                        \def\b{0.6}
-                        \def\lw{0.2}
+                    \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                            \draw [line width=\lw mm](\x,0)--(0,\x) (\a-\b+\x,\b)--(\a,\x);
+                        }
+                    \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                            \draw [line width=\lw mm](\x+\b,0)--(\x,\b); %(\a,\a-\x)--(\a-\x,\a);
+                        }
 
+                    \ifnum\hatching>1
                         \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
-                                \draw [line width=\lw mm](\x,0)--(0,\x) (\a-\b+\x,\b)--(\a,\x);
+                                \draw [line width=\lw mm](0,\x)--(\b-\x,\b) (\a-\b+\x,0)--(\a,\b-\x);
                             }
                         \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
-                                \draw [line width=\lw mm](\x+\b,0)--(\x,\b); %(\a,\a-\x)--(\a-\x,\a);
+                                \draw [line width=\lw mm](\x,0)--(\b+\x,\b); %(\a,\a-\x)--(\a-\x,\a);
                             }
+                    \fi
 
-                        \ifnum\hatching>1
-                            \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
-                                    \draw [line width=\lw mm](0,\x)--(\b-\x,\b) (\a-\b+\x,0)--(\a,\b-\x);
-                                }
-                            \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
-                                    \draw [line width=\lw mm](\x,0)--(\b+\x,\b); %(\a,\a-\x)--(\a-\x,\a);
-                                }
-                        \fi
+                    \ifnum\hatching>2
+                        \foreach \x [count=\i] in{0,0.15,0.45,...,\a}{
+                                \draw [line width=\lw mm](\x,0)--(\x,\b);
+                            }
+                    \fi
+                \end{scope}
 
-                        \ifnum\hatching>2
-                            \foreach \x [count=\i] in{0,0.15,0.45,...,\a}{
-                                    \draw [line width=\lw mm](\x,0)--(\x,\b);
-                                }
-                        \fi
-                    \end{scope}
+                \draw (2.0,\offset+0.25) node[fill=white,above=-7.5pt] {\name};
 
-                    \draw (2.0,\offset+0.25) node[fill=white,above=-7pt] {\name};
+            }
 
-                }
+        \draw (0,-8.4) rectangle (\one*1,-9.0);
 
-            \draw (0,-7.8) rectangle (\one*1,-8.4);
-            \begin{scope}[shift={(0,-8.4)}]
-                \def\lw{0.2}
+        \begin{scope}[shift={(0,-9.0)}]
+            \def\lw{0.2}
 
-                \draw [line width=\lw mm](0,0)--(0.3,0.3);
-                \draw [line width=\lw mm](0,0.3)--(0.3,0.6);
+            \draw [line width=\lw mm](0,0)--(0.3,0.3);
+            \draw [line width=\lw mm](0,0.3)--(0.3,0.6);
 
-                \draw [line width=\lw mm](0,0.6)--(0.3,0.3);
-                \draw [line width=\lw mm](0,0.3)--(0.3,0);
+            \draw [line width=\lw mm](0,0.6)--(0.3,0.3);
+            \draw [line width=\lw mm](0,0.3)--(0.3,0);
 
-                \draw [line width=\lw mm](0.15,0)--(0.15,0.6);
+            \draw [line width=\lw mm](0.15,0)--(0.15,0.6);
 
-                \draw [line width=\lw mm](0,0.15)--(0.3,0.15);
-                \draw [line width=\lw mm](0,0.45)--(0.3,0.45);
+            \draw [line width=\lw mm](0,0.15)--(0.3,0.15);
+            \draw [line width=\lw mm](0,0.45)--(0.3,0.45);
 
-                \draw (2.0,0.25) node[fill=white,above=-7pt] {end};
-            \end{scope}
+            \draw (2.0,0.25) node[fill=white,above=-7pt] {end};
+        \end{scope}
 
+        \draw[decoration={brace,raise=5pt},decorate] (0,-9.9) -- node[left=6pt] {$\gamma$} (0,-9.3);
 
-            \draw[decoration={brace,raise=5pt},decorate] (0,-9.6) -- node[left=6pt] {$\gamma$} (0,-9.0) ;
-            \draw (0,-9.0) rectangle (\one*32,-9.6);
-            \draw[decoration={brace,mirror,raise=5pt},decorate] (0,-9.6) -- node[below=5pt] {32 bytes} (32*\one,-9.6);
+        \draw (0,-9.3) rectangle (\one*32,-9.9);
+        \draw[decoration={brace,mirror,raise=5pt},decorate] (0,-9.9) -- node[below=5pt] {32 bytes} (32*\one,-9.9);
 
-            \draw[decoration={brace,raise=5pt},decorate] (33*\one,0.5) -- node[right=12pt,above=2pt,rotate=-90] {357 bytes} (33*\one,-9.6) ;
+        \draw[decoration={brace,raise=5pt},decorate] (33*\one,0.5) -- node[right=12pt,above=2pt,rotate=-90] {453 bytes} (33*\one,-9.9) ;
 
-
-        \end{tikzpicture}
-        \caption{Sphinx packet with PoR}
-    \end{figure}
-\end{center}
+    \end{tikzpicture}
+    \caption{Sphinx header with PoR}
+\end{figure}
