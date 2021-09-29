@@ -39,7 +39,7 @@ HOPR's proof-of-relay mechanism threads this needle, and is the major innovation
 
 Generally, the HOPR protocol aims to hide the fact that two parties are communicating with each other, as well as the contents of the communication. This information should be hidden from any party external to the network, all intermediaries involved in transferring the data between the communicating parties, and even the communicating parties themselves, if one or both of them desires it.
 
-Specifically, the HOPR protocol aims to build a network with the following features (definitions based on \cite{AnoA}, \cite{loopix} and \cite{sphinxpaper}) for senders that are indicated by letter $S$ and recipients indicated by the letter $Z$. 
+Specifically, the HOPR protocol aims to build a network with the following features (definitions based on \cite{AnoA}, \cite{loopix} and \cite{sphinxpaper}) for senders that are indicated by letter $S$ and recipients indicated by the letter $Z$.
 
 \subsubsection{Sender anonymity}
 In a network with sender anonymity, an observer is not able to tell if a particular packet was sent by any adversary-selected honest senders $A_1$ or $A_2$ to the honest recipient $Z$. Formally this is denoted as $\{A_1 \rightarrow Z, A_2 \not\rightarrow \}$ or $\{A_1 \not\rightarrow, A_2 \rightarrow Z \}$.
@@ -55,7 +55,7 @@ For any pair of senders, $A_1 and A_2$, communicating with any pair of recipient
 
 These properties assume senders and recipients are honest, but they should hold for any honest senders and recipients of the adversary's choice.
 
-To provide these features, the HOPR protocol builds on top of the Sphinx packet format \cite{sphinxpaper}, the specifics of which are explained in Section \ref{sec:sphinx} and we utilize \nameref{sec:CT}. The additional parameters required for HOPR's incentive scheme are encapsulated in the Sphinx header as described in section \ref{sec:PoR:Challenge} as additional routing parameters and as such do not change the privacy guarantees of Sphinx.
+To provide these features, the HOPR protocol builds on top of the Sphinx packet format \cite{sphinxpaper}, the specifics of which are explained in Section \ref{sec:sphinx} and we utilize \nameref{sec:CT}. The additional parameters required for HOPR's incentive scheme are encapsulated in the Sphinx header as described in section \ref{sec:proofofrelay:challenge} as additional routing parameters and as such do not change the privacy guarantees of Sphinx.
 
 
 
@@ -104,14 +104,14 @@ The Invisible Internet Project (\textit{I2P}) is an implementation of onion-rout
 
 \begin{itemize}
 
-    \item \textbf{Packet switched instead of circuit switched}
-          Tor allocates connection to long-lived circuits; this allocation does not change until either the connection or the circuit closes. In contrast, routers in I2P maintain multiple tunnels per destination. This significantly increases scalability and failure resistance since packets are used in parallel.
+      \item \textbf{Packet switched instead of circuit switched}
+            Tor allocates connection to long-lived circuits; this allocation does not change until either the connection or the circuit closes. In contrast, routers in I2P maintain multiple tunnels per destination. This significantly increases scalability and failure resistance since packets are used in parallel.
 
-    \item \textbf{Unidirectional tunnels}
-          Employing unidirectional rather than bidirectional tunnels makes deanonymization harder, because tunnel participants see half as much data and need two sets of peers to be profiled.
+      \item \textbf{Unidirectional tunnels}
+            Employing unidirectional rather than bidirectional tunnels makes deanonymization harder, because tunnel participants see half as much data and need two sets of peers to be profiled.
 
-    \item \textbf{Peer profiles instead of directory authorities}
-          I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
+      \item \textbf{Peer profiles instead of directory authorities}
+            I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
 \end{itemize}
 
 Despite these improvements, I2P is vulnerable to eclipse attacks since no I2P router has a full view of the global network (similar to other peer-to-peer networks). Like Tor, I2P only provides protection against local adversaries, making it vulnerable to timing, intersection, and traffic analysis attacks. I2P has also been shown to be vulnerable to Sybil and predecessor attacks, in spite of various countermeasures implemented to thwart these.
@@ -140,10 +140,10 @@ The Raiden network \cite{raiden} is a layer-2 payment solution for the Ethereum 
 We present in the following a comparison table (from the Loopix paper) between different anonymous communication systems.
 
 \begin{figure}[H]
-    \centering
-    \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/state-of-the-art.png}
-    \caption{Comparison between anonymous communication systems}
-    \label{fig:Comparison between anonymous communication systems}
+      \centering
+      \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/state-of-the-art.png}
+      \caption{Comparison between anonymous communication systems}
+      \label{fig:Comparison between anonymous communication systems}
 \end{figure}
 \end{comment}
 
