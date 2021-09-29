@@ -3,9 +3,12 @@
 
 HOPR incentivizes packet transformation and delivery using a mechanism called \textbf{proof of relay}. This mechanism guarantees that a node's relay services are verifiable.
 
-Each node derives two keys, $s_i^{own}$ and $_i^{ack}$, by using the $s_i$ as given by the SPHINX packet, see section \href{appendix:keyderivation}{key derivation} for more details. $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
+\paragraph{Secret sharing}
+\label{sec:proofofrelay:secretSharing}
 
-Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requires the cooperation of the next downstream node $n_{i+1}$ and is sent as an \textit{acknowledgement} if $n_{i+1}$ has received the transformed packet \textit{and} considers packet and the embedded ticket valid.
+Each node derives two keys, $s_i^{own}$ and $_i^{ack}$, by using the $s_i$ as given by the SPHINX packet, see section \lcnameref{appendix:keyderivation} for more details. $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
+
+Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requires the cooperation of the next downstream node $n_{i+1}$ and is sent as an \textit{acknowledgement} if $n_{i+1}$ has received the transformed packet \textit{and} considers packet as well as the embedded ticket valid.
 
 \begin{figure}[H]
     \centering
@@ -28,33 +31,22 @@ Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requ
         \draw [->,draw,bend left] (d.south) to node[below] {$s_{i+1}^{ack}$} node [align=center,right=5pt,circle] {\color{blue}4.} (intermediateResult.east);
         \draw [->,draw] (intermediateResult.south) to (response.north);
     \end{tikzpicture}
-    \caption{PoR workflow}
+    \caption{\color{blue}1. \color{black} Node $n_i$ receives $packet_{i-1}$, validates it, transforms it and \color{blue}2. \color{black} sends it to node $n_{i+1}$. \color{blue}3. \color{black} While processing $packet_i$, node $n_i$ derives $s_i^{own}$ and once node $n_{i+1}$ considered $packet_i$ valid, it \textit{acknowledges} the reception of $packet_i$ and thereby reveals $s_{i+1}^{ack}$ to node $n_i$ which allows node $n_i$ to reconstruct $s_i^{response}$.}
     \label{fig:proofofrelay}
 \end{figure}
+
+\paragraph{Challenge-response}
+
+Tickets that that are sent next to a mixnet packet include a challenge $C_i$ which is computed as $$C_i = s_i^{response} \cdot G = (s_i^{own} + s_{i+1}^{ack}) \cdot G$$ where $G$ refers to the base-point and $\cdot$ means scalar multiplication on the curve. Hence, in order to solve the challenge, it is necessary to know $s_i^{own}$ as well as $s_{i+1}^{ack}$.
 
 \paragraph{Challenge and Hint}
 \label{sec:proofofrelay:challenge}
 
-$A$ creates a shared group element $\alpha_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange as introduced in section \nameref{sec:sphinx:keyderivation}. This shared key is a session key generated from the master DH Sphinx key and will be used to derive new keys $s_i^{(0)}$ and $s_{i}^{(1)}$.  The first key, $s_i^{(0)}$, will be used as the node's \textit{own key share} and the second key, $s_i^{(1)}$, will be used as the \textit{acknowledgement key}. The acknowledgement key will be embedded in the acknowledgement for a packet and thereby unlocks the reward for the previous relayer, earned for transforming and delivering the packet.
+Once a node receives a packet, it is able to derive $s_i^{own}$ but it is unable to decide whether $s_{i+i}^{ack}$ will ever lead to $s_i^{response}$ that solves the challenge. Since the underlying field preserves the distributivity, it holds that $$C_i = s_i^{response} \cdot G = (s_i^{own} + s_{i+1}^{ack}) \cdot G = s_i^{own} \cdot G + s_{i+1}^{ack} \cdot G$$
 
-$A$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
-The hint value, $H$, is computed as
-\begin{align}
-    H_i & =s_{i+1}^{(1)}*G,
-\end{align}
-where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the \nameref{sec:sphinx} section).
+Hence by knowing $hint_i = s_{i+1}^{ack} \cdot G$, the node can verify that $s_i^{own} \cdot G + hint_i = C_i$ and thereby check that the creator of the challenge must have known a value $\tilde{s}_{i+1}^{ack}$ that led to $hint_i$. Due to the infeasibility to invert scalar multiplication on the utilized curve, knwowing $hint_i$ does not reveal $s_{i+1}^{ack}$. Hence, by embedding $hint_i$ into the part of $\beta$ within the SPHINX packet that is readable by node $n_i$, the sender of the makes the validity of the embedded challenge verifiable.
 
-The hint for party $n_i$ is used to check whether the returned value $s_{i+1}'^{(1)}$ matches the promised value $s_{i+1}^{(1)}$ by checking whether $H_i$ equals $s_{i+1}'^{(1)}*G$.
-
-The sender $A$ also creates a challenge $T_{c_i}$, such that
-\begin{align}
-    T_{c_i} & =(s_i^{(0)}+s_{i+1}^{(1)})*G
-\end{align}
-Since proof of relay is used to ensure the relay services of nodes are verifiable, it is the duty of each node to check that given challenges are derivable from the given and expected information. Packets with inappropriate challenges should be dropped, as they might not result in winning tickets with the expected probability (see Section \ref{sec:tickets}).
-
-The values $H_i$ and $T_{c_i}$ are sent with the routing information $\beta_i$ as follows:
-$$\beta_i=y_{i+1}\|H_i\|T_{c_i}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]}$$
-By decrypting $\beta_i$, each mix node $n_i$ will retrieve the public key of the next downstream node and both the hint and challenge required by proof of relay to ensure relay services are verifiable.
+As the next downstream node would not accept a packet without a ticket\footnote{By default, nodes are only forwarding packets that include incentives. Nevertheless, the protocol does not prevent them from processing packets without enforcing an incentive.}, the node $n_i$ does not only need to transform the packet but also issue a ticket to the next downstream node $n_{i+1}$. Therefore, it needs to know \textit{which} challenge $\tilde{C}_{i+1}$ to put into the ticket issued for node $n_{i+1}$. As in the previous section, this is done with the help of the creator of the packet which embeds $C_{i+1}$ into the part of the SPINX packet that is readable by node $n_{i+1}$.
 
 \begin{figure}[H]
     \centering
@@ -135,3 +127,7 @@ By decrypting $\beta_i$, each mix node $n_i$ will retrieve the public key of the
     \end{tikzpicture}
     \caption{Sphinx header with PoR}
 \end{figure}
+
+By chaining this principle, nodes are forced to \textit{always} issue a ticket to the next downstream node because they are unable to claim their own incentive without the help of the next downstream node.
+
+Since the very last node, namely the final receiver, of the message, does not need to forward the message to anyone else, it has no direct incentive to acknowledge tickets, hence there are no \textit{direct} consequences for \textit{not} acknowledging packet. In its current version, the protocol does not prevent this kind of behavior but it is foreseen to solve this issue by using a reputation system.
