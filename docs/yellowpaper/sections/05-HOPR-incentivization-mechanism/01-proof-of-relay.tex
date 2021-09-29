@@ -75,7 +75,7 @@ As the next downstream node would not accept a packet without a ticket\footnote{
                             \draw [line width=\lw mm](\x,0)--(0,\x) (\a-\b+\x,\b)--(\a,\x);
                         }
                     \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
-                            \draw [line width=\lw mm](\x+\b,0)--(\x,\b); %(\a,\a-\x)--(\a-\x,\a);
+                            \draw [line width=\lw mm](\x+\b,0)--(\x,\b);
                         }
 
                     \ifnum\hatching>1
@@ -83,7 +83,7 @@ As the next downstream node would not accept a packet without a ticket\footnote{
                                 \draw [line width=\lw mm](0,\x)--(\b-\x,\b) (\a-\b+\x,0)--(\a,\b-\x);
                             }
                         \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
-                                \draw [line width=\lw mm](\x,0)--(\b+\x,\b); %(\a,\a-\x)--(\a-\x,\a);
+                                \draw [line width=\lw mm](\x,0)--(\b+\x,\b);
                             }
                     \fi
 
