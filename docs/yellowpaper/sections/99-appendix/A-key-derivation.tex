@@ -1,7 +1,7 @@
 \section{Key Derivation}
 \label{appendix:keyderivation}
 
-During a protocol execution, a node derives a master secret from the SPHINX header that then used to derive multiple sub-secrets for several purposes by using BLAKE2s within HKDF. HKDF is given by two algorithms $\mathsf{extract}$ and $\mathsf{expand}$ where $\mathsf{extract}$ is used to extract the entropy from a given secret $s$, such as an elliptic-curve point, and produces the intermediate keying material (IKM). The IKM then serves as a master secret to feed $\mathsf{expand}$ in order to derive pseudorandom subkeys in the desired length.
+During a protocol execution, a node derives a master secret from the SPHINX header that then used to derive multiple sub-secrets for several purposes by using BLAKE2s within HKDF. HKDF is given by two algorithms: $\mathsf{extract}$ and $\mathsf{expand}$ where $\mathsf{extract}$ is used to extract the entropy from a given secret $s$, such as an elliptic-curve point, and produces the intermediate keying material (IKM). The IKM then serves as a master secret to feed $\mathsf{expand}$ in order to derive pseudorandom subkeys in the desired length.
 
 \subsection{Extraction}
 
