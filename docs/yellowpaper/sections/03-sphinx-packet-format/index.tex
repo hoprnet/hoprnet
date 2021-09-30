@@ -56,7 +56,7 @@ $$\alpha_0=g^x,\varphi_0=y^x_B,b_0=h_b(a_0,\varphi_0)$$
 and
 \begin{equation}
     \begin{cases}
-        \alpha_i=g^{x\Pi_{j=0}^{j=i-2}b_j}\\
+        \alpha_i=g^{x\Pi_{j=0}^{j=i-2}b_j}  \\
         \varphi_i=y^{x\Pi_{j=0}^{j=i-2}b_j} \\
         b_i=h_b(a_i,\varphi_i)
     \end{cases}\,.
@@ -65,14 +65,14 @@ and
 for $1\le i < r-1$, where $y_0,y_1, y_2, y_3$, and $y_4$ are the public keys of the nodes $B$, $C$, $D$, and $Z$, which we assume to be available to $A$ .
 
 \subsubsection{Routing information}
-Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message.  The $END$ message is a distinguished prefix byte which is added to the final recipient's compressed public key. For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$. 
+Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message.  The $END$ message is a distinguished prefix byte which is added to the final recipient's compressed public key. For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$.
 
 The $y$ coordinate is extracted from $x$ by resolving the secp256k1 elliptic curve equation $Y^2=X^3+7$ \cite{secp}. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is $0\times02$ or $0\times03$, depending on that bit).
 
 The routing information is computed as follows:
 
 \begin{align}
-    \beta_{v-1} & =(y_Z\|0_{(2(r-v)+2)\kappa-|y_Z|}\oplus \rho(h_{\rho}(\varphi_{v-1}))_{[ \,0....(2(r-v)+3)\kappa-1\,]})\|\phi_{v-1}                  \\
+    \beta_{v-1} & =(y_Z\|0_{(2(r-v)+2)\kappa-|y_Z|}\oplus \rho(h_{\rho}(\varphi_{v-1}))_{[ \,0....(2(r-v)+3)\kappa-1\,]})\|\phi_{v-1}                \\
     and         & \nonumber                                                                                                                          \\
     \beta_i     & =y_{i+1}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(\varphi_{i}))_{[ \,0....(2r+1)\kappa-1\,]}
     \label{eq:2}
@@ -123,9 +123,8 @@ $B$ parses the routing instructions from $A$ in order to obtain the address of t
 
 \subsubsection{Delete and shift}
 After $B$ extracts the public key of $C$, it deletes the routing information from the packet. $B$ then fills the empty space with its own blinding (which is different from the one received from $A$) by setting the key share $\alpha_0$ to $\alpha_1=g^{xb_0}$. $B$ also computes $\beta_1$ as follows:
+
 \begin{comment}
-
-
 \begin{figure}[H]
     \centering
     \includegraphics[width=6cm,height=6cm,keepaspectratio]{../yellowpaper/images/FigureB.png}
@@ -154,24 +153,136 @@ $$HKDF.expand(h_b, |h_b|,\varphi_0, |\varphi_i + PRP_IV_LENGTH|, hash\_Key\_PRP)
 \textbf{Expand} This step takes $\varphi_i$, as a seed and creates output key material $u_i$ for all $1\le i < 4 $ which is expanded from hashes of $\varphi_i$ and an optional info message (salt). The process occurs as follows:
 
 Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $u_2$ and $u_4$ are used to key the hash function. Sphinx uses the LIONESS wide block cipher scheme for encryption and decryption purposes. Let $S_u$ be a pseudorandom function (stream cipher) which given the input $m$ will generate an output of arbitrary length. We add a padding tag $\tau$ to $m$ before encryption and a 0-padding string as follows:
-\begin{align}
-   m &\leftarrow 0_{l} \|\tau\|m
-\end{align}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \def\one{0.3}
+        \def\lw{0.2}
+        \def\middle{16*\one}
+        \def\offset{8*\one}
+        \def\packetLength{500}
+
+        \def\paddingLength{29*\one}
+        \def\payloadLength{31*\one}
+
+
+        \draw[decoration={brace,raise=5pt},decorate] (0,0.5) -- node[above=5pt] {$\packetLength - |payload| - 4$ bytes} (\paddingLength,0.5);
+        % \draw (0,-0.0) rectangle (\one*33,0.5);
+        \begin{scope}
+            \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=10pt] {padding} (0,0.5);
+            \def\width{\paddingLength}
+            \draw (1,0.25) node {$\mathtt{0...0}$};
+            \draw [line width=\lw mm] (\middle,0.5) -- (0,0.5) --  (0,0) -- (\middle,0);
+            \draw [line width=\lw mm] (\middle,0) --  (\middle+\offset, 0) [dashed];
+            \draw [line width=\lw mm] (\middle,0.5) --  (\middle+\offset, 0.5) [dashed];
+            \draw [line width=\lw mm] (\middle+\offset,0.5) -- (\width,0.5) --  (\width,0) -- (\middle+\offset,0);
+        \end{scope}
+
+        \begin{scope}[shift={(0,-0.5)}]
+            \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=10pt] {tag} (0,0.5);
+            \draw [draw] (0,0) rectangle (2,0.5);
+            \draw (1,0.25) node {$\mathtt{HOPR}$};
+        \end{scope}
+
+        \begin{scope}[shift={(0,-1)}]
+            \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=10pt] {payload} (0,0.5);
+            \draw (1,0.25) node {$\mathtt{message}$};
+            \def\width{\payloadLength}
+            \draw [line width=\lw mm] (\middle,0.5) -- (0,0.5) --  (0,0) -- (\middle,0);
+            \draw [line width=\lw mm] (\middle,0) --  (\middle+\offset, 0) [dashed];
+            \draw [line width=\lw mm] (\middle,0.5) --  (\middle+\offset, 0.5) [dashed];
+            \draw [line width=\lw mm] (\middle+\offset,0.5) -- (\width,0.5) --  (\width,0) -- (\middle+\offset,0);
+        \end{scope}
+
+        \draw[decoration={brace,raise=5pt,mirror},decorate] (0,-1.0) -- node[below=5pt] {$|payload|$ bytes} (\payloadLength,-1.0);
+        \draw[decoration={brace,raise=5pt,mirror},decorate] (0,-1.25) -- node[below=5pt] {4 bytes} (2,-1.25);
+
+        \draw[decoration={brace,raise=5pt},decorate] (\payloadLength,0.5) -- node[right=8pt] {$\packetLength$ bytes} (\payloadLength,-1.0);
+    \end{tikzpicture}
+    \caption{Padded message consisting of padding, tag $\tau$ ($\mathtt{0x484f5052}$, ASCII-encoded ``HOPR"), and payload $m$.}
+\end{figure}
+
 where $\tau$ is generated arbitrarily and $|\tau|=4$ is its length ($\tau=``HOPR "$ in ASCII). $l$ is the $0$ padding length where
 $0 <= l <= |m| - 4$. The payloads that do not include the correct padding are considered invalid.
 
 $m$ is divided into two blocks, left ($m_l$) and right ($m_r$), whose sizes are $|m_l|=w$ and $|m_r|=j-w$. We thus get $m=m_r\|m_l$.
+
+\begin{comment}
 \subparagraph{Encryption}
 The blocks $m_l$ and $m_r$ are transformed using a four-round Feistel structure:
 
 $$m_r\leftarrow m_r \oplus S_{u1}(m_l), m_l\leftarrow m_l \oplus H_{u2}(m_r), m_r\leftarrow m_r\oplus S_{u3}(m_l), m_l\leftarrow m_l\oplus H_{u4}(m_r)$$
 
 The updated $m_l\|m_r$ constitutes the ciphertext $\delta$.
+\end{comment}
 
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \def\hashLength{2}
+        \def\cipherLength{7}
+        \draw[decoration={brace,raise=5pt},decorate] (0,0.5) -- node[above=5pt] {32 bytes} (\hashLength,0.5);
+        \draw[decoration={brace,raise=5pt},decorate] (\hashLength,0.5) -- node[above=5pt] {468 bytes} (\hashLength+\cipherLength,0.5);
+
+        \foreach \i\j\offset in{1/2/0,3/4/-4.5} {
+                \begin{scope}[shift={(0,\offset)}]
+                    \draw (0,0) rectangle (\hashLength,0.5);
+                    \draw (\hashLength,0) rectangle (\hashLength+\cipherLength,0.5);
+
+                    \draw (0.5,0.25) node {$m_l$};
+                    \draw (\hashLength+0.5,0.25) node {$m_r$};
+
+                    % Encryption
+                    \draw (0.5,-1) node {$\bigoplus$};
+                    \draw (-0.5,-1) node {$k_\i$};
+
+                    \draw [->] (0.5,0) -- (0.5,-0.75);
+                    \draw [->] (-0.25,-1) -- (0.25,-1);
+                    \draw [->] (0.5,-1.3) -- (0.5,-1.9);
+
+                    \draw (0,-2.5) rectangle (3, -2);
+                    \draw (1.5, -2.25) node [align=center] {stream cipher};
+
+                    % into stream cipher
+                    \draw [->] (\hashLength+1.5, 0) -- (\hashLength+1.5, -1.7) -- (-0.5,-1.7) -- (-0.5,-2.25) -- (0,-2.25);
+
+                    \draw [->] (1.5,-2.5) -- (1.5,-3) -- (\hashLength+1.5,-3) -- (\hashLength+1.5,-4);
+
+                    %Hashing
+                    \draw (5.5,-1) node {$k_\j$};
+
+                    \draw [->] (5.5,-1.2) -- (5.5,-2);
+
+                    \draw (5,-2.5) rectangle (7, -2);
+                    \draw (5.5, -2.25) node [align=center] {hash};
+
+                    \draw [->] (5.5,-2.5) -- (5.5, -2.75) -- (0.5,-2.75) -- (0.5,-3.2);
+                    \draw (0.5,-3.5) node {$\bigoplus$};
+
+                    \draw [->] (0.5,-0.5) -- (-1,-0.5) -- (-1,-3.5) -- (0.25,-3.5);
+                    \draw [->] (0.5, -3.6) -- (0.5, -4);
+
+                    %m_r into hash
+                    \draw [->] (\hashLength+1.5,-1.7) -- (\hashLength+1.5, -2.25) -- (5,-2.25);
+                \end{scope}
+            }
+
+        \begin{scope}[shift={(0,-9.0)}]
+            \draw (0,0) rectangle (\hashLength+\cipherLength,0.5);
+            \draw (1.2,0.25) node {$ciphertext$};
+        \end{scope}
+
+    \end{tikzpicture}
+    \caption{Encryption using LIONESS \cite{lionesspaper} scheme}
+\end{figure}
+
+\begin{comment}
 \subparagraph{Decryption}
 Decryption happens as follows:
 
 $$m_l\leftarrow m_l\oplus H_{u4}(m_r), m_r\leftarrow S_{u3}(m_l), m_l\leftarrow m_l\oplus H_{u2}(m_r), m_r\leftarrow m_r\oplus S_{u1}(m_l)$$
+\end{comment}
 
 \subsubsection{Integrity}
 The payload is encrypted using a bidirectional error propagating block cipher and protected with an integrity check for the recipient, but not for processing relays. Packet integrity is authenticated by prepending a tag set so that any alteration to the encrypted payload as it traverses the network will result in an irrecoverably corrupted plaintext when the payload is decrypted by the recipient.
