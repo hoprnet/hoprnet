@@ -14,6 +14,7 @@
     "build": "yarn workspaces foreach -pvi --topological-dev --no-private run build",
     "build:core": "yarn workspace @hoprnet/hopr-core run build",
     "build:admin": "yarn workspace @hoprnet/hoprd run buildAdmin",
+    "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
     "lint": "npx prettier --check .",
     "lint:fix": "npx prettier --write .",
     "test": "yarn workspaces foreach -pvi --topological-dev --no-private run test",

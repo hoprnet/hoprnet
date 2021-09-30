@@ -3,82 +3,131 @@
 
 HOPR incentivizes packet transformation and delivery using a mechanism called \textbf{proof of relay}. This mechanism guarantees that a node's relay services are verifiable.
 
-\paragraph{Construction}
+\paragraph{Secret sharing}
+\label{sec:proofofrelay:secretSharing}
 
-\begin{itemize}
-    \item Every packet is sent together with a ticket.
-    \item Each ticket contains a challenge.
-    \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket.
-\end{itemize}
+Each node derives two keys, $s_i^{own}$ and $_i^{ack}$, by using the $s_i$ as given by the SPHINX packet, see section \lcnameref{appendix:keyderivation} for more details. $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
 
-\subsection{Challenge and Hint}
-\label{sec:PoR:Challenge}
+Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requires the cooperation of the next downstream node $n_{i+1}$ and is sent as an \textit{acknowledgement} if $n_{i+1}$ has received the transformed packet \textit{and} considers packet as well as the embedded ticket valid.
 
-$A$ creates a shared group element $\alpha_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange as introduced in section \nameref{sec:sphinx:keyderivation}. This shared key is a session key generated from the master DH Sphinx key and will be used to derive new keys $s_i^{(0)}$ and $s_{i}^{(1)}$.  The first key, $s_i^{(0)}$, will be used as the node's \textit{own key share} and the second key, $s_i^{(1)}$, will be used as the \textit{acknowledgement key}. The acknowledgement key will be embedded in the acknowledgement for a packet and thereby unlocks the reward for the previous relayer, earned for transforming and delivering the packet.
-
-\paragraph{Key derivation}
-$A$ first creates a ``session secret", $s_i$, then uses it as a seed to derive subkeys $s_i^{(0)},s_i^{(1)}$ for each node on the route. This is done using an HKDF (HMAC-based key derivation function), a cryptographic hash function that derives one or more secret keys from a secret value using a pseudorandom function. The key derivation works as follows:
-\begin{itemize}
-    \item \textbf{Extract} This step creates a pseudo-random key $s_i$   
-    $$HKDF.extract(h_b, |h_b|, (\alpha_i* privKey) || pubKey)$$   
-
-    \item \textbf{Expand} This step takes the output of the previous one, $s_i$, as a seed and creates output key material $s_i^{(0)},s_i^{(1)}$ which is expanded from hashes of $s_i$ and an optional info message (salt). The process occurs as follows:
-    $$HKDF.expand(h_b, |h_b|,s_i, |s_i|, hashKey)$$
-\end{itemize}
-where $||$ is concatenation and $*$ is scalar multiplication on the curve. $h_b$ is the BLAKE2s 256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudorandom key used as a seed and $|s_i|$ is its length. $hashKey$ is an identifier used to create a``virtual" hash function for each purpose, e.g., one for the PRG, one for PRP, etc. and also for the proof-of-relay scheme. We use the same hash function under the hood but we "virtually" create 
-$$h_i: x -> hash(hashKey_i || x)$$ where: 
-\begin{center}
-\begin{tabular}{c|c|} 
-      \textbf{hashKey} & \textbf{Value}\\
-       Blinding& $"HASH\_KEY\_BLINDING"$ \\
-      \hline
-      PRG & "HASH\_KEY\_PRG" \\
-      PRP & "HASH\_KEY\_PRP" \\
-      Packet tag & "HASH\_KEY\_PACKET\_TAG" \\
-    \end{tabular}
-\end{center}
-    
-If the result of HKDF does not lead to a field element, $hashKey$ is padded until it does. 
-    
-$A$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
-The hint value, $H$, is computed as 
-\begin{align}  
-    H_i&=s_{i+1}^{(1)}*G,
-        \end{align}
-where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the \nameref{sec:sphinx} section). 
-    
-The hint for party $n_i$ is used to check whether the returned value $s_{i+1}'^{(1)}$ matches the promised value $s_{i+1}^{(1)}$ by checking whether $H_i$ equals $s_{i+1}'^{(1)}*G$. 
-   
-The sender $A$ also creates a challenge $T_{c_i}$, such that 
-\begin{align}  
-T_{c_i}&=(s_i^{(0)}+s_{i+1}^{(1)})*G
-    \end{align}
-Since proof of relay is used to ensure the relay services of nodes are verifiable, it is the duty of each node to check that given challenges are derivable from the given and expected information. Packets with inappropriate challenges should be dropped, as they might not result in winning tickets with the expected probability (see Section \ref{sec:tickets}).
-
-The values $H_i$ and $T_{c_i}$ are sent with the routing information $\beta_i$ as follows:
-$$\beta_i=y_{i+1}\|H_i\|T_{c_i}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]}$$
-By decrypting $\beta_i$, each mix node $n_i$ will retrieve the public key of the next downstream node and both the hint and challenge required by proof of relay to ensure relay services are verifiable.
-
-\begin{comment}
- \begin{figure}[H]
+\begin{figure}[H]
     \centering
-    \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
-        \hline
-        $\alpha$ & $\beta$                   & $\gamma$ \\
-                 & \begin{tabular}{| c m{2em} | m{3em} | m{6em} |}
-            \hline
-            \multicolumn{2}{| c |}{$Y_B$} & $hint_B$                 & $challenge_{BC}$ \\
-            \hline
-            \multicolumn{2}{| c |}{$Y_C$} & $hint_C$                 & $random$         \\
-            \hline
-            \multicolumn{2}{| c |}{$Y_D$} & $hint_D$                 & $random$         \\
-            \hline
-            End                           & \multicolumn{3}{| l |}{}                    \\
-            \hline
-        \end{tabular} &          \\[3em]
-        \hline
-    \end{tabular}
-    \caption{Sphinx with PoR}
-    \label{fig:Sphinx with PoR}
+    \begin{tikzpicture}[auto]
+        \draw (0,0) node (a) {};
+        \draw (3.0,0) node (b) [rectangle,draw] {$n_{i-1}$};
+        \draw (6,0) node (c) [rectangle,draw] {$n_i$};
+        \draw (9.0,0) node (d) [rectangle,draw] {$n_{i+1}$};
+        \draw (12.0,0) node (e) {};
+
+        \draw (6.0, -1.5) node [circle,draw] (intermediateResult) {};
+        \draw (6.0, -2.5) node (response) {$s_i^{response}$};
+
+        \draw [->,draw,dashed] (a.east) to node [align=center,below] {packet$_{i-2}$} (b.west);
+        \draw [->,draw,dashed] (b.east) to node [align=center,below] {packet$_{i-1}$} node [align=center,above,circle] {\color{blue}1.} (c.west);
+        \draw [->,draw,dashed] (c.east) to node [align=center,below] {packet$_i$} node [align=center,above,circle] {\color{blue}2.} (d.west);
+        \draw [->,draw,dashed] (d.east) to node [align=center,below] {packet$_{i+1}$} (e.west);
+
+        \draw [->,draw] (c.south) to node [right] {$s_i^{own}$} node [align=center,left=1pt,circle] {\color{blue}3.}  (intermediateResult.north);
+        \draw [->,draw,bend left] (d.south) to node[below] {$s_{i+1}^{ack}$} node [align=center,right=5pt,circle] {\color{blue}4.} (intermediateResult.east);
+        \draw [->,draw] (intermediateResult.south) to (response.north);
+    \end{tikzpicture}
+    \caption{\color{blue}1. \color{black} Node $n_i$ receives $packet_{i-1}$, validates it, transforms it and \color{blue}2. \color{black} sends it to node $n_{i+1}$. \color{blue}3. \color{black} While processing $packet_i$, node $n_i$ derives $s_i^{own}$ and once node $n_{i+1}$ considered $packet_i$ valid, it \textit{acknowledges} the reception of $packet_i$ and thereby reveals $s_{i+1}^{ack}$ to node $n_i$ which allows node $n_i$ to reconstruct $s_i^{response}$.}
+    \label{fig:proofofrelay}
 \end{figure}
-\end{comment}
+
+\paragraph{Challenge-response}
+
+Tickets that that are sent next to a mixnet packet include a challenge $C_i$ which is computed as $$C_i = s_i^{response} \cdot G = (s_i^{own} + s_{i+1}^{ack}) \cdot G$$ where $G$ refers to the base-point and $\cdot$ means scalar multiplication on the curve. Hence, in order to solve the challenge, it is necessary to know $s_i^{own}$ as well as $s_{i+1}^{ack}$.
+
+\paragraph{Challenge and Hint}
+\label{sec:proofofrelay:challenge}
+
+Once a node receives a packet, it is able to derive $s_i^{own}$ but it is unable to decide whether $s_{i+i}^{ack}$ will ever lead to $s_i^{response}$ that solves the challenge. Since the underlying field preserves the distributivity, it holds that $$C_i = s_i^{response} \cdot G = (s_i^{own} + s_{i+1}^{ack}) \cdot G = s_i^{own} \cdot G + s_{i+1}^{ack} \cdot G$$
+
+Hence by knowing $hint_i = s_{i+1}^{ack} \cdot G$, the node can verify that $s_i^{own} \cdot G + hint_i = C_i$ and thereby check that the creator of the challenge must have known a value $\tilde{s}_{i+1}^{ack}$ that led to $hint_i$. Due to the infeasibility to invert scalar multiplication on the utilized curve, knwowing $hint_i$ does not reveal $s_{i+1}^{ack}$. Hence, by embedding $hint_i$ into the part of $\beta$ within the SPHINX packet that is readable by node $n_i$, the sender of the makes the validity of the embedded challenge verifiable.
+
+As the next downstream node would not accept a packet without a ticket\footnote{By default, nodes are only forwarding packets that include incentives. Nevertheless, the protocol does not prevent them from processing packets without enforcing an incentive.}, the node $n_i$ does not only need to transform the packet but also issue a ticket to the next downstream node $n_{i+1}$. Therefore, it needs to know \textit{which} challenge $\tilde{C}_{i+1}$ to put into the ticket issued for node $n_{i+1}$. As in the previous section, this is done with the help of the creator of the packet which embeds $C_{i+1}$ into the part of the SPINX packet that is readable by node $n_{i+1}$.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \def\one{0.3}
+        \draw[decoration={brace,raise=5pt},decorate] (0,0.5) -- node[above=5pt] {33 bytes} (33*\one,0.5);
+        \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=6pt] {$\alpha_A$} (0,0.5) ;
+        \draw[black] (0,0) rectangle (\one*33,0.5);
+
+        \draw[decoration={brace,raise=5pt},decorate] (0,-9.0) -- node[left=6pt] {$\beta_A$} (0,-0.3);
+
+        \foreach \name\length\offset\hatching in{$pubKey_B$/33/-0.9/1,$\gamma_B$/32/-1.5/1,$hint_A$/32/-2.1/1,$C_B$/32/-2.7/1,$pubKey_C$/33/-3.6/2,$\gamma_C$/32/-4.2/2,$hint_B$/32/-4.8/2,$C_C$/32/-5.4/2,$pubKey_Z$/33/-6.3/3,$\gamma_Z$/32/-6.9/3,$hint_C$/32/-7.5/3,$C_Z$/32/-8.1/3}{
+                \draw (0,\offset) rectangle (\one*\length,\offset+0.6);
+                \begin{scope}[shift={(0,\offset)}]
+                    \ifnum\length=33
+                        \def\a{9.9}
+                        \def\diff{9.4}
+                    \else
+                        \def\a{9.6}
+                        \def\diff{9.1}
+                    \fi
+                    \def\b{0.6}
+                    \def\lw{0.2}
+
+                    \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                            \draw [line width=\lw mm](\x,0)--(0,\x) (\a-\b+\x,\b)--(\a,\x);
+                        }
+                    \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                            \draw [line width=\lw mm](\x+\b,0)--(\x,\b);
+                        }
+
+                    \ifnum\hatching>1
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                                \draw [line width=\lw mm](0,\x)--(\b-\x,\b) (\a-\b+\x,0)--(\a,\b-\x);
+                            }
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                                \draw [line width=\lw mm](\x,0)--(\b+\x,\b);
+                            }
+                    \fi
+
+                    \ifnum\hatching>2
+                        \foreach \x [count=\i] in{0,0.15,0.45,...,\a}{
+                                \draw [line width=\lw mm](\x,0)--(\x,\b);
+                            }
+                    \fi
+                \end{scope}
+
+                \draw (2.0,\offset+0.25) node[fill=white,above=-6pt,inner sep=2pt] {\name};
+
+            }
+
+        \draw (0,-8.4) rectangle (\one*1,-9.0);
+
+        \begin{scope}[shift={(0,-9.0)}]
+            \def\lw{0.2}
+
+            \draw [line width=\lw mm](0,0)--(0.3,0.3);
+            \draw [line width=\lw mm](0,0.3)--(0.3,0.6);
+
+            \draw [line width=\lw mm](0,0.6)--(0.3,0.3);
+            \draw [line width=\lw mm](0,0.3)--(0.3,0);
+
+            \draw [line width=\lw mm](0.15,0)--(0.15,0.6);
+
+            \draw [line width=\lw mm](0,0.15)--(0.3,0.15);
+            \draw [line width=\lw mm](0,0.45)--(0.3,0.45);
+
+            \draw (2.0,0.25) node[fill=white,above=-7pt] {end};
+        \end{scope}
+
+        \draw[decoration={brace,raise=5pt},decorate] (0,-9.9) -- node[left=6pt] {$\gamma_A$} (0,-9.3);
+
+        \draw (0,-9.3) rectangle (\one*32,-9.9);
+        \draw[decoration={brace,mirror,raise=5pt},decorate] (0,-9.9) -- node[below=5pt] {32 bytes} (32*\one,-9.9);
+
+        \draw[decoration={brace,raise=5pt},decorate] (33*\one,0.5) -- node[right=12pt,above=2pt,rotate=-90] {453 bytes} (33*\one,-9.9) ;
+
+    \end{tikzpicture}
+    \caption{Mixnet packet header with PoR fields that is sent from the sender $O$ through nodes $A, B, C$ to $Z$.}
+\end{figure}
+
+By chaining this principle, nodes are forced to \textit{always} issue a ticket to the next downstream node because they are unable to claim their own incentive without the help of the next downstream node.
+
+Since the very last node, namely the final receiver, of the message, does not need to forward the message to anyone else, it has no direct incentive to acknowledge tickets, hence there are no \textit{direct} consequences for \textit{not} acknowledging packet. In its current version, the protocol does not prevent this kind of behavior but it is foreseen to solve this issue by using a reputation system.
