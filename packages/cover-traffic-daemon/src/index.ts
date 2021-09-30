@@ -44,7 +44,6 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   return options
 }
 
-
 export async function main(update: (State: State) => void, peerId?: PeerId) {
   const options = await generateNodeOptions()
   if (!peerId) {
@@ -82,7 +81,6 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))
   node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))
 
-
   setInterval(async () => {
     // CT stats
     console.log('-- CT Stats --')
@@ -97,8 +95,10 @@ if (require.main === module) {
   process.on('uncaughtException', stopGracefully)
 
   main((state: State) => {
-    console.log(`CT: State update:` +
-                `${Object.keys(state.nodes).length} nodes, ` + 
-                `${Object.keys(state.channels).length} channels` )
+    console.log(
+      `CT: State update:` +
+        `${Object.keys(state.nodes).length} nodes, ` +
+        `${Object.keys(state.channels).length} channels`
+    )
   })
 }
