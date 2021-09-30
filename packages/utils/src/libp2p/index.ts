@@ -132,11 +132,9 @@ export async function dial(
   protocol: string,
   opts?: DialOpts
 ): Promise<DialResponse> {
-  let signal: AbortSignal
   let timeout: NodeJS.Timeout
 
   const abort = new AbortController()
-  signal = abort.signal
   timeout = setTimeout(() => {
     abort.abort()
     verbose(`timeout while trying to dial ${destination.toB58String()}`)
@@ -150,7 +148,7 @@ export async function dial(
   // Try to use known addresses
   if (addresses.length > 0) {
     try {
-      struct = await libp2p.dialProtocol(destination, protocol, { signal })
+      struct = await libp2p.dialProtocol(destination, protocol, { signal: abort.signal })
     } catch (_err) {
       err = _err
     }
@@ -161,7 +159,7 @@ export async function dial(
     return { status: 'SUCCESS', resp: struct }
   }
 
-  if (signal.aborted) {
+  if (abort.signal.aborted) {
     return { status: 'E_TIMEOUT' }
   }
 
@@ -188,7 +186,7 @@ export async function dial(
 
   const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
 
-  if (signal.aborted) {
+  if (abort.signal.aborted) {
     return { status: 'E_TIMEOUT' }
   }
 
@@ -199,7 +197,7 @@ export async function dial(
   }
 
   try {
-    struct = await libp2p.dialProtocol(destination, protocol, { signal })
+    struct = await libp2p.dialProtocol(destination, protocol, { signal: abort.signal })
     verbose(`Dial after DHT request successful`, struct)
   } catch (err) {
     logError(
@@ -215,7 +213,7 @@ export async function dial(
     return { status: 'E_DIAL', error: err.message, dhtContacted: true }
   }
 
-  if (signal.aborted) {
+  if (abort.signal.aborted) {
     return { status: 'E_TIMEOUT' }
   }
 
