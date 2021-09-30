@@ -1020,7 +1020,7 @@ __metadata:
     chalk: ~4.1.1
     debug: ^4.3.2
     heap-js: ^2.1.6
-    leveldown: ~6.0.1
+    leveldown: 6.1.0
     levelup: ~5.0.1
     libp2p: 0.33.0
     libp2p-kad-dht: 0.25.0
@@ -1140,7 +1140,7 @@ __metadata:
     ethers: 5.4.7
     futoin-hkdf: ~1.4.1
     it-pipe: ^1.1.0
-    leveldown: ^6.0.1
+    leveldown: 6.1.0
     levelup: ^5.0.1
     libp2p: 0.33.0
     libp2p-crypto: 0.19.7
@@ -10371,7 +10371,19 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"leveldown@npm:^6.0.0, leveldown@npm:^6.0.1, leveldown@npm:~6.0.1":
+"leveldown@npm:6.1.0":
+  version: 6.1.0
+  resolution: "leveldown@npm:6.1.0"
+  dependencies:
+    abstract-leveldown: ^7.2.0
+    napi-macros: ~2.0.0
+    node-gyp: latest
+    node-gyp-build: ^4.3.0
+  checksum: e984b61e9fbe057cfd5c81ac0afe5d7e35d695ff130a95991e0ecb66390e4c4ff6aa3980a65b6c53edaba80527a47790bb26e3cfbd52a054957b3546d9941fe4
+  languageName: node
+  linkType: hard
+
+"leveldown@npm:^6.0.0":
   version: 6.0.2
   resolution: "leveldown@npm:6.0.2"
   dependencies:
@@ -12112,7 +12124,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"node-gyp-build@npm:^4.2.0":
+"node-gyp-build@npm:^4.2.0, node-gyp-build@npm:^4.3.0":
   version: 4.3.0
   resolution: "node-gyp-build@npm:4.3.0"
   bin:
