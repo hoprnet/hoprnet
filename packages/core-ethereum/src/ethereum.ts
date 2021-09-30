@@ -62,8 +62,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     {
       getLatestBlockNumber: async () => provider.getBlockNumber(),
       getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
-      getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values()),
-      getPendingTransactions: (_addr) => Array.from(transactions.pending.values())
+      getPendingTransactions: (_addr) => transactions.getAllUnconfirmedTxs(),
+      getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values())
     },
     durations.minutes(15)
   )
@@ -112,7 +112,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     method: T,
     ...rest: Parameters<T>
   ): Promise<ContractTransaction | { hash: string }> {
-    const gasLimit = 300e3
+    const gasLimit = 400e3
     const gasPrice = networkInfo?.gas ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce

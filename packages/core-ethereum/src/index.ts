@@ -11,7 +11,8 @@ import {
   NativeBalance,
   cacheNoArgAsyncFunction,
   HoprDB,
-  ChannelEntry
+  ChannelEntry,
+  Hash
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
@@ -19,6 +20,7 @@ import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
+import { Commitment } from './commitment'
 
 const log = debug('hopr-core-ethereum')
 
@@ -160,6 +162,25 @@ export default class HoprEthereum extends EventEmitter {
 
   public async waitForPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     return await this.indexer.getPublicNodes()
+  }
+
+  public commitToChannel(c: ChannelEntry): Promise<void> {
+    const setCommitment = (commitment: Hash): Promise<string> => {
+      try {
+        return this.chain.setCommitment(c.source.toAddress(), commitment)
+      } catch (e) {
+        log('Error setting commitment', e)
+        // TODO: defer to channel strategy for this, and allow for retries.
+      }
+    }
+
+    return new Commitment(
+      setCommitment,
+      async () => (await this.indexer.getChannel(c.getId())).commitment,
+      this.db,
+      c.getId(),
+      this.indexer
+    ).initialize()
   }
 }
 

@@ -37,6 +37,7 @@ export interface ChannelStrategy {
 
   onChannelWillClose(c: Channel): Promise<void> // Before a channel closes
   onWinningTicket(t: AcknowledgedTicket, channel: Channel): Promise<void>
+  shouldCommitToChannel(c: ChannelEntry): Promise<boolean>
 
   tickInterval: number
 }
@@ -55,6 +56,10 @@ export abstract class SaneDefaults {
   async onChannelWillClose(c: Channel) {
     log('auto redeeming')
     await c.redeemAllTickets()
+  }
+
+  async shouldCommitToChannel(_c: ChannelEntry): Promise<boolean> {
+    return true
   }
 
   tickInterval = CHECK_TIMEOUT
