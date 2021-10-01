@@ -23,15 +23,15 @@ Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requ
         \draw (6.0, -2.5) node (response) {$s_i^{response}$};
 
         \draw [->,draw,dashed] (a.east) to node [align=center,below] {packet$_{i-2}$} (b.west);
-        \draw [->,draw,dashed] (b.east) to node [align=center,below] {packet$_{i-1}$} node [align=center,above,circle] {\color{blue}1.} (c.west);
-        \draw [->,draw,dashed] (c.east) to node [align=center,below] {packet$_i$} node [align=center,above,circle] {\color{blue}2.} (d.west);
+        \draw [->,draw,dashed] (b.east) to node [align=center,below] {packet$_{i-1}$} node [align=center,above,circle] {\color{hopr-blue}1.} (c.west);
+        \draw [->,draw,dashed] (c.east) to node [align=center,below] {packet$_i$} node [align=center,above,circle] {\color{hopr-blue}2.} (d.west);
         \draw [->,draw,dashed] (d.east) to node [align=center,below] {packet$_{i+1}$} (e.west);
 
-        \draw [->,draw] (c.south) to node [right] {$s_i^{own}$} node [align=center,left=1pt,circle] {\color{blue}3.}  (intermediateResult.north);
-        \draw [->,draw,bend left] (d.south) to node[below] {$s_{i+1}^{ack}$} node [align=center,right=5pt,circle] {\color{blue}4.} (intermediateResult.east);
+        \draw [->,draw] (c.south) to node [right] {$s_i^{own}$} node [align=center,left=1pt,circle] {\color{hopr-blue}3.}  (intermediateResult.north);
+        \draw [->,draw,bend left] (d.south) to node[below] {$s_{i+1}^{ack}$} node [align=center,right=5pt,circle] {\color{hopr-blue}4.} (intermediateResult.east);
         \draw [->,draw] (intermediateResult.south) to (response.north);
     \end{tikzpicture}
-    \caption{\color{blue}1. \color{black} Node $n_i$ receives $packet_{i-1}$, validates it, transforms it and \color{blue}2. \color{black} sends it to node $n_{i+1}$. \color{blue}3. \color{black} While processing $packet_i$, node $n_i$ derives $s_i^{own}$ and once node $n_{i+1}$ considered $packet_i$ valid, it \textit{acknowledges} the reception of $packet_i$ and thereby reveals $s_{i+1}^{ack}$ to node $n_i$ which allows node $n_i$ to reconstruct $s_i^{response}$.}
+    \caption{\color{hopr-blue}1. \color{black} Node $n_i$ receives $packet_{i-1}$, validates it, transforms it and \color{hopr-blue}2. \color{black} sends it to node $n_{i+1}$. \color{hopr-blue}3. \color{black} While processing $packet_i$, node $n_i$ derives $s_i^{own}$ and once node $n_{i+1}$ considered $packet_i$ valid, it \textit{acknowledges} the reception of $packet_i$ and thereby reveals $s_{i+1}^{ack}$ to node $n_i$ which allows node $n_i$ to reconstruct $s_i^{response}$.}
     \label{fig:proofofrelay}
 \end{figure}
 

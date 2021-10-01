@@ -1,22 +1,25 @@
 \subsubsection{Routing information}
-Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message.  The $END$ message is a distinguished prefix byte which is added to the final recipient's compressed public key. For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$.
+Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message.
 
-The $y$ coordinate is extracted from $x$ by resolving the secp256k1 elliptic curve equation $Y^2=X^3+7$ \cite{secp}. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is $0\times02$ or $0\times03$, depending on that bit).
+
+For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$.
+
+The $y$ coordinate is extracted from $x$ by resolving the secp256k1 elliptic curve equation $Y^2=X^3+7$ \cite{secp}. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is \texttt{0x02} if $Y$ is positve or \texttt{0x03} if $Y$ is negative).
 
 The routing information is computed as follows:
 
 \begin{align}
-      \beta_{v-1} & =(y_Z\|0_{(2(r-v)+2)\kappa-|y_Z|}\oplus \rho(h_{\rho}(\varphi_{v-1}))_{[ \,0....(2(r-v)+3)\kappa-1\,]})\|\phi_{v-1}                \\
-      and         & \nonumber                                                                                                                          \\
-      \beta_i     & =y_{i+1}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(\varphi_{i}))_{[ \,0....(2r+1)\kappa-1\,]}
-      \label{eq:2}
+    \beta_{v-1} & =(y_Z\|0_{(2(r-v)+2)\kappa-|y_Z|}\oplus \rho(h_{\rho}(\varphi_{v-1}))_{[ \,0....(2(r-v)+3)\kappa-1\,]})\|\phi_{v-1}                \\
+    and         & \nonumber                                                                                                                          \\
+    \beta_i     & =y_{i+1}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(\varphi_{i}))_{[ \,0....(2r+1)\kappa-1\,]}
+    \label{eq:2}
 \end{align}
 $0\le i < v-1$
 
 such that $y_Z$ is the destination's public key in compressed form (since this is only the $x$-coordinate, it is 32 bytes instead of 64) and $|y_Z|$ is its length. $\rho$ is a pseudorandom generator (PRG) and $h_{\rho}$ is the hash function used to key $\rho$.
 $v\leq r$ is the length of the path traversed by the packet, where $|y_Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string such that
 \begin{align}
-      \phi_i & =\{ \phi_{i-1}\|0_{2\kappa}\}\oplus \rho(h_{\rho}(\varphi_{i-1}))_{[ \,(2(r-i)+3)\kappa..(2r+3)\kappa-1\,]}
+    \phi_i & =\{ \phi_{i-1}\|0_{2\kappa}\}\oplus \rho(h_{\rho}(\varphi_{i-1}))_{[ \,(2(r-i)+3)\kappa..(2r+3)\kappa-1\,]}
 \end{align}
 where $\phi_0=\epsilon$ is an empty string. $\phi_i$ is generated using the shared secret $\varphi_{i-1}$ and used to ensure the header packets remain constant in size as layers of encryption are added or removed. Upon receiving a packet, the processing node extracts the information destined for it from the route information and the per-hop payload. The extraction is performed by deobfuscating and left-shifting the field. Ordinarily, this would make the field shorter at each hop, allowing an attacker to deduce the route length. For this reason, the field is pre-padded before forwarding. Since the padding is part of the HMAC, the origin node will have to pre-generate an identical padding (to that generated at each hop) in order to compute the HMACs correctly for each hop.
 
@@ -28,7 +31,7 @@ Padding is added at each mix stage in order to keep the length of the message in
 
 The mix header is constructed as follows:
 \begin{align}
-      M_i & =(\alpha_i,\beta_i,\gamma_i)
+    M_i & =(\alpha_i,\beta_i,\gamma_i)
 \end{align}
 
 $A$ sends the mix header $M_0$ to $B$. Once $B$ receives the packet, it derives the shared key $\varphi_0$ by computing

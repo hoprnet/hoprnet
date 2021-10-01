@@ -27,10 +27,11 @@ HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route d
 
 \subsection{Construction}
 
-The following explains the steps a Sphinx packet goes through before arriving at its final destination. We start with key derivation to extract shared keys for the relay nodes chosen by the sender. These shared keys will be used to unblind the routing information and find the public key of the next relay node.
+The following section explains how a Sphinx packet is created and how it is transformed by each hop before arriving its final destination. At first, the sender chooses a path, see section \ref{sec:path-selection}, and derives shared keys with each contained node. The shared keys serve as a master to derive subkeys to blind the routing information such that nodes can only determine the next downstream node, and to create an authentication tag to check the integrity of the header. In addition, the sender applies one layer of encryption for each node to the payload and finally send the packet to the first hop.
 
-The integrity of this routing information is checked before sending. At each hop along the route, the relaying node replaces the routing information with their own blinding and decrypts one layer of the payload. Similar to onion routing, the payload has several layers of encryption, chosen such that the final layer is removed as the packet reaches its destination. However, as layers of encryption are removed, the packet is padded to keep the message length constant. This ensures that an adversary cannot draw any conclusions from message length about a transmission's position along the route.
+Once a node receives a mixnet packet, it first derives the key that is shared with the sender of the packet and checks the integrity of the header. Afterwards, it unblinds the routing information to determine the next downstream node and removes one layer of encryption from the encrypted payload. At this point, the node is able to decide whether it is the final recipient or it is supposed to forward the packet to the next hop.
 
+\begin{comment}
 \paragraph{Notation:}Let $\kappa=128$ be the security parameter. With non-negligible probability, an adversary must perform around $2^\kappa$ operations to break the security of Sphinx.
 
 Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination.
@@ -42,7 +43,8 @@ $h_b:G^*\times G^*\rightarrow\mathbb{Z}^*_q$, where $\mathbb{Z}^*_q$ is the fiel
 
 Each node $i$ has a private key $x_{i}\in \mathbb{Z}^*_q$ and a public key $y_{i}=g^{x_{i}}\in G^*$.
 $\alpha_i$ is the group elements which, when combined with the nodes’ public keys, allow a shared key to be computed for each via Diffie-Hellman (DH) key exchange. This ensures that each node in the user-chosen route can forward the packet to the next, and only the receiving mix node can decrypt it.
-$\varphi_i$ are the DH shared secrets, $b_i$ are the blinding factors.
+$s_i$ are the DH shared secrets, $b_i$ are the blinding factors.
+\end{comment}
 
 \input{sections/03-sphinx-packet-format/01-key-derivation.tex}
 \input{sections/03-sphinx-packet-format/02-routing-information.tex}
