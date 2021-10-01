@@ -133,7 +133,8 @@ class Hopr extends EventEmitter {
       options.forceCreateDB
     )
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      provider: this.options.provider
+      provider: this.options.provider,
+      maxConfirmations: 100
     })
 
     this.publicNodesEmitter = new EventEmitter()
