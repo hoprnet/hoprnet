@@ -37,7 +37,7 @@ class Channel {
     private readonly indexer: Indexer,
     private readonly privateKey: Uint8Array,
     private readonly events: EventEmitter
-  ) { }
+  ) {}
 
   /**
    * Reserve a preImage for the given ticket if it is a winning ticket.
@@ -132,7 +132,7 @@ class Channel {
     let c: ChannelEntry
     try {
       c = await this.usToThem()
-    } catch { }
+    } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }
