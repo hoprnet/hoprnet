@@ -9,7 +9,7 @@ import { CoverTrafficStrategy } from './strategy'
 import { ChannelEntry, privKeyToPeerId, PublicKey } from '@hoprnet/hopr-utils'
 import type PeerId from 'peer-id'
 import BN from 'bn.js'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('cover-traffic')
 

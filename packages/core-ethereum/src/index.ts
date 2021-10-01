@@ -2,7 +2,7 @@ import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import {
   AcknowledgedTicket,
   PublicKey,
