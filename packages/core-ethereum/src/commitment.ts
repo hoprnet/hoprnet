@@ -28,7 +28,7 @@ export class Commitment {
     private db: HoprDB,
     private channelId: Hash, // used in db key
     private indexer: Indexer
-  ) { }
+  ) {}
 
   public async getCurrentCommitment(): Promise<Hash> {
     if (!this.initialized) {

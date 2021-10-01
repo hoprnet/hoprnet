@@ -100,22 +100,22 @@ export type DialOpts = {
 
 export type DialResponse =
   | {
-    status: 'SUCCESS'
-    resp: PromiseValue<ReturnType<LibP2P['dialProtocol']>>
-  }
+      status: 'SUCCESS'
+      resp: PromiseValue<ReturnType<LibP2P['dialProtocol']>>
+    }
   | {
-    status: 'E_TIMEOUT'
-  }
+      status: 'E_TIMEOUT'
+    }
   | {
-    status: 'E_DIAL'
-    error: string
-    dhtContacted: boolean
-  }
+      status: 'E_DIAL'
+      error: string
+      dhtContacted: boolean
+    }
   | {
-    status: 'E_DHT_QUERY'
-    error: Error
-    query: PeerId
-  }
+      status: 'E_DHT_QUERY'
+      error: Error
+      query: PeerId
+    }
 
 /**
  * Combines libp2p methods such as dialProtocol and peerRouting.findPeer

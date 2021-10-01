@@ -180,7 +180,7 @@ export class Packet {
   public ackChallenge: HalfKeyChallenge
   public oldChallenge: AcknowledgementChallenge
 
-  public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, public ticket: Ticket) { }
+  public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, public ticket: Ticket) {}
 
   private setReadyToForward(ackChallenge: HalfKeyChallenge) {
     this.ackChallenge = ackChallenge
