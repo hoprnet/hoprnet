@@ -6,7 +6,7 @@ To implement the PRP, HOPR makes use of the LIONESS \cite{lionesspaper} wide-blo
 
 During creation of the packet, the sender derives, as seen in section \ref{sec:sphinx:keyderivation}, a shared key $s_i$ with each node along the chosen path and uses them to create subkeys $s_i^{prp}$ to key the PRP. See Appendix \ref{appendix:keyderivation} for more details about the key derivation.
 
-To provide the final recipient the opportunity to determine whether a message \textit{is} meaningful content or not, each message is padded by a protocol-specific tag $\tau$ and and 0s to fit the packet size of 500 bytes, yielding $m_{pad}$. Decoded payloads that do not include $\tau$ are considered invalid and should be dropped.
+To provide the final recipient the opportunity to determine whether a message \textit{is} meaningful content or not, each message is padded by a protocol-specific tag $\tau$ and 0s to fit the packet size of 500 bytes, yielding $m_{pad}$. Decoded payloads that do not include $\tau$ are considered invalid and should be dropped.
 
 \begin{figure}[H]
     \centering
