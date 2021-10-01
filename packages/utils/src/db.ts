@@ -3,7 +3,7 @@ import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
-import Debug from 'debug'
+import { debug } from './debug'
 import { Hash, u8aConcat, Address, Intermediate, Ticket } from '.'
 import {
   AcknowledgedTicket,
@@ -20,7 +20,7 @@ import {
 import BN from 'bn.js'
 import { u8aEquals, u8aToNumber } from './u8a'
 
-const log = Debug(`hopr-core:db`)
+const log = debug(`hopr-core:db`)
 const encoder = new TextEncoder()
 
 const TICKET_PREFIX = encoder.encode('tickets-')

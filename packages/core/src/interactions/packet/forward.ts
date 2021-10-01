@@ -5,7 +5,7 @@ import type PeerId from 'peer-id'
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core:packet:forward')
 

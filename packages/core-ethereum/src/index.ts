@@ -2,7 +2,7 @@ import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import {
   AcknowledgedTicket,
   PublicKey,
@@ -26,18 +26,18 @@ const log = debug('hopr-core-ethereum')
 
 export type RedeemTicketResponse =
   | {
-      status: 'SUCCESS'
-      receipt: string
-      ackTicket: AcknowledgedTicket
-    }
+    status: 'SUCCESS'
+    receipt: string
+    ackTicket: AcknowledgedTicket
+  }
   | {
-      status: 'FAILURE'
-      message: string
-    }
+    status: 'FAILURE'
+    message: string
+  }
   | {
-      status: 'ERROR'
-      error: Error | string
-    }
+    status: 'ERROR'
+    error: Error | string
+  }
 
 export default class HoprEthereum extends EventEmitter {
   public indexer: Indexer
