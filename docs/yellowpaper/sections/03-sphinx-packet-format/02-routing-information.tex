@@ -1,16 +1,13 @@
 \subsubsection{Routing information}
-Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message.
+Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message.  The $END$ message is a distinguished prefix byte which is added to the final recipient's compressed public key. For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$.
 
-
-For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$.
-
-The $y$ coordinate is extracted from $x$ by resolving the secp256k1 elliptic curve equation $Y^2=X^3+7$ \cite{secp}. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is \texttt{0x02} if $Y$ is positve or \texttt{0x03} if $Y$ is negative).
+The $y$ coordinate is extracted from $x$ by resolving the secp256k1 elliptic curve equation $Y^2=X^3+7$ \cite{secp}. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is $0\times02$ or $0\times03$, depending on that bit).
 
 The routing information is computed as follows:
 
 \begin{align}
     \beta_{v-1} & =(y_Z\|0_{(2(r-v)+2)\kappa-|y_Z|}\oplus \rho(h_{\rho}(\varphi_{v-1}))_{[ \,0....(2(r-v)+3)\kappa-1\,]})\|\phi_{v-1}                \\
-    and         & \nonumber                                                                                                                          \\
+    \text{and}  & \nonumber                                                                                                                          \\
     \beta_i     & =y_{i+1}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(\varphi_{i}))_{[ \,0....(2r+1)\kappa-1\,]}
     \label{eq:2}
 \end{align}
@@ -39,3 +36,4 @@ $A$ sends the mix header $M_0$ to $B$. Once $B$ receives the packet, it derives 
 $$\varphi_0=(\alpha_0)^b=(g^x)^b=(g^b)^x=y^x_B$$
 
 and removes its blindings. Here $b$ is the private key of node B. This allows $B$ to unblind the routing info that tells $B$ the public key of the next downstream node, $C$. The process happens in the same fashion for all further downstream nodes after $B$.
+
