@@ -16,7 +16,7 @@ import {
   INVERSE_TICKET_WIN_PROB,
   retryWithBackoff
 } from '@hoprnet/hopr-utils'
-import Debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import type { RedeemTicketResponse } from '.'
 import { Commitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
@@ -25,7 +25,7 @@ import type { HoprDB } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { EventEmitter } from 'events'
 
-const log = Debug('hopr-core-ethereum:channel')
+const log = debug('hopr-core-ethereum:channel')
 
 // TODO - legacy, models bidirectional channel.
 class Channel {
@@ -37,7 +37,7 @@ class Channel {
     private readonly indexer: Indexer,
     private readonly privateKey: Uint8Array,
     private readonly events: EventEmitter
-  ) {}
+  ) { }
 
   /**
    * Reserve a preImage for the given ticket if it is a winning ticket.
@@ -132,7 +132,7 @@ class Channel {
     let c: ChannelEntry
     try {
       c = await this.usToThem()
-    } catch {}
+    } catch { }
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }

@@ -1,10 +1,10 @@
 import { iterateHash, recoverIteratedHash, HoprDB, Hash } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
-import Debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import type { Receipt } from './ethereum'
 import Indexer from './indexer'
 
-const log = Debug('hopr-core-ethereum:commitment')
+const log = debug('hopr-core-ethereum:commitment')
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
@@ -28,7 +28,7 @@ export class Commitment {
     private db: HoprDB,
     private channelId: Hash, // used in db key
     private indexer: Indexer
-  ) {}
+  ) { }
 
   public async getCurrentCommitment(): Promise<Hash> {
     if (!this.initialized) {

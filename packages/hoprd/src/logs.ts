@@ -1,5 +1,5 @@
 import ws from 'ws'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import RunQueue from 'run-queue'
 import { randomBytes } from 'crypto'
 import { Ed25519Provider } from 'key-did-provider-ed25519'
