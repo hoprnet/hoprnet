@@ -44,7 +44,6 @@ Each node $i$ has a private key $x_{i}\in \mathbb{Z}^*_q$ and a public key $y_{i
 $\alpha_i$ is the group elements which, when combined with the nodes’ public keys, allow a shared key to be computed for each via Diffie-Hellman (DH) key exchange. This ensures that each node in the user-chosen route can forward the packet to the next, and only the receiving mix node can decrypt it.
 $\varphi_i$ are the DH shared secrets, $b_i$ are the blinding factors.
 
-
 \input{sections/03-sphinx-packet-format/01-key-derivation.tex}
 \input{sections/03-sphinx-packet-format/02-routing-information.tex}
 \input{sections/03-sphinx-packet-format/03-integrity.tex}

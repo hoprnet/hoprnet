@@ -1,7 +1,7 @@
 \section{Key Derivation}
 \label{appendix:keyderivation}
 
-During a protocol execution, a node derives a master secret from the SPHINX header that then used to derive multiple sub-secrets for several purposes by using BLAKE2s within HKDF. HKDF is given by two algorithms: $\mathsf{extract}$ and $\mathsf{expand}$ where $\mathsf{extract}$ is used to extract the entropy from a given secret $s$, such as an elliptic-curve point, and produces the intermediate keying material (IKM). The IKM then serves as a master secret to feed $\mathsf{expand}$ in order to derive pseudorandom subkeys in the desired length.
+During a protocol execution, a node derives a master secret $s_i$ from the SPHINX header that is then used to derive multiple sub-secrets for multiple purposes by using the BLAKE2s hash function within HKDF. HKDF is given by two algorithms: $\mathsf{extract}$ and $\mathsf{expand}$ where $\mathsf{extract}$ is used to extract the entropy from a given secret $s$, such as an elliptic-curve point, and produces the intermediate keying material (IKM). The IKM then serves as a master secret to feed $\mathsf{expand}$ in order to derive pseudorandom subkeys in the desired length.
 
 \subsection{Extraction}
 
@@ -18,20 +18,20 @@ Each subkey $s_i^{sub}$ is used for one purpose, such as keying the \textit{pseu
 $$s_i^{sub} \longleftarrow \mathsf{expand}(s_i^{master}, length(purpose), hashKey(purpose))$$
 
 \begin{center}
-    \begin{tabular}{|c | c| c | c |}
+    \begin{tabular}{|c | c| c | l |}
         \hline
-        Usage                           & Purpose         & Length & Hash Key (UTF-8)       \\
+        Usage                           & Purpose         & Length   & Hash Key (UTF-8)                \\
         \hline
         \hline
-        \multirow{3}{*}{SPHINX packet}  & PRG             & 32     & HASH\_KEY\_PRG         \\
-                                        & PRP             & 128    & HASH\_KEY\_PRP         \\
-                                        & Packet tag      & 32     & HASH\_KEY\_PACKET\_TAG \\
+        \multirow{3}{*}{SPHINX packet}  & PRG             & 32       & \texttt{HASH\_KEY\_PRG}         \\
+                                        & PRP             & 128 + 64 & \texttt{HASH\_KEY\_PRP}         \\
+                                        & Packet tag      & 32       & \texttt{HASH\_KEY\_PACKET\_TAG} \\
         \hline
-        \multirow{2}{*}{Proof of Relay} & acknowledgement & 32*    & HASH\_KEY\_ACK\_KEY    \\
-                                        & ownKey          & 32*    & HASH\_KEY\_OWN\_KEY    \\
+        \multirow{2}{*}{Proof of Relay} & acknowledgement & 32*      & \texttt{HASH\_KEY\_ACK\_KEY}    \\
+                                        & ownKey          & 32*      & \texttt{HASH\_KEY\_OWN\_KEY}    \\
 
         \hline
     \end{tabular}
 \end{center}
 
-Since the values for PoR are used as field elements on the curve, there exists a non-zero probability that the application of $\mathsf{expand}$ leads to a value outside of the field. In this case, the hash key is padded by ``\_'' until it leads to a field element.
+The values marked with a * are treated as field elements, hence there exists a non-zero probability that $\mathsf{expand}$ produces a value outside of the field. In this specific case, the utilized hash key is repeatedly padded by ``\_'' until $\mathsf{expand}$ returns a field element.

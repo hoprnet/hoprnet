@@ -1,15 +1,12 @@
 \subsubsection{Encrypt and decrypt}
-The encrypted payload $\delta$ is where the actual message is hidden. This is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing which is basically a pseudo-random permutation process (PRP). $\delta$ is repeatedly encrypted via keys derived from the DH key exchange between the packet’s group element $\alpha_i$ and the public key of each node in the path $y_i$.
 
-\paragraph{Notation}
-Let $j$ be the block size in bits, which will typically be large. Let $H_u$ be a keyed hash function with the key $u$ for the payload. $u$ consists of four independent keys, $u_1$, $u_2$, $u_3$, and $u_4$, which $A$ derives from the master keys $\varphi_0$, $\varphi_1$, $\varphi_2$, and $\varphi_3$ using the HKDF key derivation function explained in \lcnameref{sec:proofofrelay} section using the packet tag as hash key. The derivation is as follow:
+In contrast to the header, the integrity of the payload is not directly protected by the protocol. To make potential manipulations of the message nonetheless visible to the final recipient of the message, hiding the content of the payload is done using a pseudorandom permutation scheme (PRP) and its inverse to undo the transformation. This comes with the property that if there were any modifications to the payload such as a bit flip, the probability that the decoded message contains any relevant information is expected to be negligible.
 
-$$HKDF.expand(h_b, |h_b|,\varphi_0, |\varphi_i + PRP_IV_LENGTH|, hash\_Key\_PRP)$$
+To implement the PRP, HOPR makes use of the LIONESS \cite{lionesspaper} wide-block cipher scheme, instantiated by using Chacha20 as a stream cipher and BLAKE2s as a hash function as suggested by \href{https://katzenpost.mixnetworks.org/docs/specs/lioness.html}{Katzenpost}, see appendix \ref{appendix:lioness} for a detailed description and the chosen parameters.
 
+During creation of the packet, the sender derives, as seen in section \ref{sec:sphinx:keyderivation}, a shared key $s_i$ with each node along the chosen path and uses them to create subkeys $s_i^{prp}$ to key the PRP. See Appendix \ref{appendix:keyderivation} for more details about the key derivation.
 
-\textbf{Expand} This step takes $\varphi_i$, as a seed and creates output key material $u_i$ for all $1\le i < 4 $ which is expanded from hashes of $\varphi_i$ and an optional info message (salt). The process occurs as follows:
-
-Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $u_2$ and $u_4$ are used to key the hash function. Sphinx uses the LIONESS wide block cipher scheme for encryption and decryption purposes. Let $S_u$ be a pseudorandom function (stream cipher) which given the input $m$ will generate an output of arbitrary length. We add a padding tag $\tau$ to $m$ before encryption and a 0-padding string as follows:
+To provide the final recipient the opportunity to determine whether a message \textit{is} meaningful content or not, each message is padded by a protocol-specific tag $\tau$ and and 0s to fit the packet size of 500 bytes, yielding $m_{pad}$. Decoded payloads that do not include $\tau$ are considered invalid and should be dropped.
 
 \begin{figure}[H]
     \centering
@@ -25,7 +22,6 @@ Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $
 
 
         \draw[decoration={brace,raise=5pt},decorate] (0,0.5) -- node[above=5pt] {$\packetLength - |payload| - 4$ bytes} (\paddingLength,0.5);
-        % \draw (0,-0.0) rectangle (\one*33,0.5);
         \begin{scope}
             \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=10pt] {padding} (0,0.5);
             \def\width{\paddingLength}
@@ -57,26 +53,10 @@ Of the four keys, $u_1$ and $u_3$ will be used to key the stream cipher, while $
 
         \draw[decoration={brace,raise=5pt},decorate] (\payloadLength,0.5) -- node[right=8pt] {$\packetLength$ bytes} (\payloadLength,-1.0);
     \end{tikzpicture}
-    \caption{Padded message consisting of padding, tag $\tau$ ($\mathtt{0x484f5052}$, ASCII-encoded ``HOPR"), and payload $m$.}
+    \caption{Padded message consisting of 0-padding, protocol tag $\tau$ ($\mathtt{0x484f5052}$, ASCII-encoded ``HOPR"), and payload $m$.}
 \end{figure}
 
-where $\tau$ is generated arbitrarily and $|\tau|=4$ is its length ($\tau=``HOPR "$ in ASCII). $l$ is the $0$ padding length where
-$0 <= l <= |m| - 4$. The payloads that do not include the correct padding are considered invalid.
+The sender takes the padded message and encrypts it using $\mathsf{PRP.permutate}$ with the derived subkeys in reverse order ($...,s_{i+1}^{prp}, s_i^{prp}, s_{i-1}^{prp},....$) $$\delta_i = \mathsf{PRP.permutate}_{s_i^{prp}}(\delta_{i+1})$$ where $\delta_4 = m_{pad}$ and $\delta_0$ is the ciphertext that is sent to the first relayer when using three intermediate hops.
 
-$m$ is divided into two blocks, left ($m_l$) and right ($m_r$), whose sizes are $|m_l|=w$ and $|m_r|=j-w$. We thus get $m=m_r\|m_l$.
+Each node $n_i$ along the chosen path then removes one layer of encryption by setting $$\delta_{i-1} = \mathsf{PRP.inverse}_{s_i^{prp}}(\delta_i)$$ yielding $\delta_0 = m_{pad}$ in case the node is the final recipient.
 
-\begin{comment}
-\subparagraph{Encryption}
-The blocks $m_l$ and $m_r$ are transformed using a four-round Feistel structure:
-
-$$m_r\leftarrow m_r \oplus S_{u1}(m_l), m_l\leftarrow m_l \oplus H_{u2}(m_r), m_r\leftarrow m_r\oplus S_{u3}(m_l), m_l\leftarrow m_l\oplus H_{u4}(m_r)$$
-
-The updated $m_l\|m_r$ constitutes the ciphertext $\delta$.
-\end{comment}
-
-\begin{comment}
-\subparagraph{Decryption}
-Decryption happens as follows:
-
-$$m_l\leftarrow m_l\oplus H_{u4}(m_r), m_r\leftarrow S_{u3}(m_l), m_l\leftarrow m_l\oplus H_{u2}(m_r), m_r\leftarrow m_r\oplus S_{u1}(m_l)$$
-\end{comment}
