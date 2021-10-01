@@ -24,6 +24,7 @@
 
 - [onChannelWillClose](SaneDefaults.md#onchannelwillclose)
 - [onWinningTicket](SaneDefaults.md#onwinningticket)
+- [shouldCommitToChannel](SaneDefaults.md#shouldcommittochannel)
 
 ## Constructors
 
@@ -39,7 +40,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L60)
+[packages/core/src/channel-strategy.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L65)
 
 ## Methods
 
@@ -59,7 +60,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L55)
+[packages/core/src/channel-strategy.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L56)
 
 ___
 
@@ -80,4 +81,24 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L50)
+[packages/core/src/channel-strategy.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L51)
+
+___
+
+### shouldCommitToChannel
+
+▸ **shouldCommitToChannel**(`_c`): `Promise`<`boolean`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `_c` | `ChannelEntry` |
+
+#### Returns
+
+`Promise`<`boolean`\>
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L61)

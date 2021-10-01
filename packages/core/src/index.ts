@@ -56,7 +56,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
-import { localAddressesFirst, AddressSorter, backoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
+import { localAddressesFirst, AddressSorter, retryWithBackoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -233,6 +233,7 @@ class Hopr extends EventEmitter {
 
     chain.indexer.on('peer', this.onPeerAnnouncement.bind(this))
     chain.indexer.off('peer', pushToRecentlyAnnouncedNodes)
+    chain.indexer.on('channel-waiting-for-commitment', (c: ChannelEntry) => this.onChannelWaitingForCommitment(c))
 
     recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
 
@@ -303,6 +304,14 @@ class Hopr extends EventEmitter {
       } catch (e) {
         console.log(e)
       }
+    }
+  }
+
+  private async onChannelWaitingForCommitment(c: ChannelEntry) {
+    if (this.strategy.shouldCommitToChannel(c)) {
+      const chain = await this.startedPaymentChannels()
+      log(`Found channel ${c.getId().toHex()} to us with unset commitment. Setting commitment`)
+      retryWithBackoff(() => chain.commitToChannel(c))
     }
   }
 
@@ -917,11 +926,8 @@ class Hopr extends EventEmitter {
    * MAX_DELAY is reached, this function will reject.
    */
   public async waitForFunds(): Promise<void> {
-    const MIN_DELAY = durations.seconds(30)
-    const MAX_DELAY = durations.seconds(200)
-
     try {
-      return backoff(
+      return retryWithBackoff(
         () => {
           return new Promise<void>(async (resolve, reject) => {
             try {
@@ -939,13 +945,13 @@ class Hopr extends EventEmitter {
           })
         },
         {
-          minDelay: MIN_DELAY,
-          maxDelay: MAX_DELAY,
+          minDelay: durations.seconds(30),
+          maxDelay: durations.seconds(200),
           delayMultiple: 1.05
         }
       )
     } catch {
-      log(`unfunded for more than ${Math.round(MAX_DELAY / 60e3)} minutes, shutting down`)
+      log(`unfunded for more than 200 seconds, shutting down`)
       await this.stop()
     }
   }

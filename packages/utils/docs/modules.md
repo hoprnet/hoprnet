@@ -86,7 +86,6 @@
 
 ### Functions
 
-- [backoff](modules.md#backoff)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
@@ -130,6 +129,7 @@
 - [randomPermutation](modules.md#randompermutation)
 - [randomSubset](modules.md#randomsubset)
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
+- [retryWithBackoff](modules.md#retrywithbackoff)
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeToU8a](modules.md#serializetou8a)
 - [stringToU8a](modules.md#stringtou8a)
@@ -639,32 +639,6 @@ ___
 [time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
 
 ## Functions
-
-### backoff
-
-▸ **backoff**(`fn`, `options?`): `ReturnType`<typeof `fn`\>
-
-A general use backoff that will reject once MAX_DELAY is reached.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `Promise`<`any`\> | asynchronous function to run on every tick |
-| `options` | `Object` | - |
-| `options.delayMultiple?` | `number` | multiplier to apply to increase running delay |
-| `options.maxDelay?` | `number` | maximum delay, we reject once we reach this |
-| `options.minDelay?` | `number` | minimum delay, we start with this |
-
-#### Returns
-
-`ReturnType`<typeof `fn`\>
-
-#### Defined in
-
-[backoff.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L14)
-
-___
 
 ### cacheNoArgAsyncFunction
 
@@ -1742,6 +1716,38 @@ ___
 
 ___
 
+### retryWithBackoff
+
+▸ **retryWithBackoff**<`T`\>(`fn`, `options?`): `Promise`<`T`\>
+
+A general use backoff that will reject once MAX_DELAY is reached.
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `fn` | () => `Promise`<`T`\> | asynchronous function to run on every tick |
+| `options` | `Object` | - |
+| `options.delayMultiple?` | `number` | multiplier to apply to increase running delay |
+| `options.maxDelay?` | `number` | maximum delay, we reject once we reach this |
+| `options.minDelay?` | `number` | minimum delay, we start with this |
+
+#### Returns
+
+`Promise`<`T`\>
+
+#### Defined in
+
+[backoff.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L17)
+
+___
+
 ### sampleGroupElement
 
 ▸ **sampleGroupElement**(`compressed?`): [exponent: Uint8Array, groupElement: Uint8Array]
@@ -2265,4 +2271,4 @@ ___
 
 #### Defined in
 
-[backoff.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L3)
+[backoff.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L6)

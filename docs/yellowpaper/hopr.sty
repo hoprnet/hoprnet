@@ -9,8 +9,9 @@
 \usepackage{xcolor}
 \definecolor{hopr-blue}{HTML}{0000b4}
 
-%%% bibliograph and reference
+%%% bibliograph, appendix and reference
 \usepackage{hyperref}
+\usepackage{appendix}
 \hypersetup{colorlinks = true,
             linkcolor = hopr-blue,
             urlcolor  = hopr-blue,
@@ -34,7 +35,7 @@
 \usepackage{float}
 \usepackage{pgf}
 \usepackage{tikz}
-\usetikzlibrary{shapes,arrows,topaths}
+\usetikzlibrary{decorations.pathreplacing,shapes,arrows,topaths}
 
 %%% math/symbol/algorithm
 \usepackage{amssymb}
@@ -63,6 +64,73 @@ December\fi \ \number \year}
 
 \newtheorem{defnsub}{Definition}[subsection]
 
+
+% Beautiful lowercase namerefs https://tex.stackexchange.com/questions/445404/capitalization-variants-of-nameref/449775
+\AtBeginDocument{%
+  \newcommand\My@Macro[1]{#1}%
+  \newcommand\My@Thirdoffive[5]{\My@Macro{#3}}%
+  \renewcommand*\@namerefstar[1]{%
+    \HyRef@StarSetRef{#1}\My@Thirdoffive
+  }%
+  \renewcommand*\T@nameref[1]{%
+    \begingroup
+    \let\label\@gobble
+    \NR@setref{#1}\My@Thirdoffive{#1}%
+    \endgroup
+  }%
+  \DeclareRobustCommand\fucnameref{%
+    \@ifstar\fucnameref@star\fucnameref@nostar
+  }%
+  \newcommand\callemakefirstuc[1]{%
+    \MakeLowercase{\emakefirstuc{#1}}%
+  }%
+  \newcommand\fucnameref@star[1]{%
+    \begingroup
+    \let\My@Macro=\callemakefirstuc
+    \nameref*{#1}%
+    \endgroup
+  }%
+  \newcommand\fucnameref@nostar[1]{%
+    \begingroup
+    \let\My@Macro=\callemakefirstuc
+    \nameref{#1}%
+    \endgroup
+  }%
+  \DeclareRobustCommand\ucnameref{%
+    \@ifstar\ucnameref@star\ucnameref@nostar
+  }%
+  \newcommand\ucnameref@star[1]{%
+    \begingroup
+    \MFUhyphentrue
+    \let\My@Macro=\ecapitalisefmtwords
+    \nameref*{#1}%
+    \endgroup
+  }%
+  \newcommand\ucnameref@nostar[1]{%
+    \begingroup
+    \MFUhyphentrue
+    \let\My@Macro=\ecapitalisefmtwords
+    \nameref{#1}%
+    \endgroup
+  }%
+  \DeclareRobustCommand\lcnameref{%
+    \@ifstar\lcnameref@star\lcnameref@nostar
+  }%
+  \newcommand\lcnameref@star[1]{%
+    \begingroup
+    \let\My@Macro=\MakeLowercase
+    \nameref*{#1}%
+    \endgroup
+  }%
+  \newcommand\lcnameref@nostar[1]{%
+    \begingroup
+    \let\My@Macro=\MakeLowercase
+    \nameref{#1}%
+    \endgroup
+  }%
+}%
+
+
 %%% formatting document layout
 % Beginning of the document
 \AtBeginDocument{
@@ -74,3 +142,6 @@ December\fi \ \number \year}
 
 \setlength{\parindent}{0em} % no indentation in paragraph
 \setlength{\parskip}{1em}   % spacing between paragraphs
+
+% Do not use word breaks for some words
+\hyphenation{LIONESS}
