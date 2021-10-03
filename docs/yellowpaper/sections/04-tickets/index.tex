@@ -52,11 +52,11 @@ $A$ then signs the ticket with its private key and sends $T = (t, Sig_I(t))$ to 
             \draw [->,draw] (c.east) to node [align=center,below] {packet,\\ticket} (d.west);
             \draw [->,draw,dashed] (d.east) to node [align=center,below] {packet,\\(ticket)}  (z.west);
 
-            \path[->] (a) edge [out=-120,in=-60,distance=2em,below] node [align=center] {send\\message}  (a);    % \draw 
+            \path[->] (a) edge [out=-120,in=-60,distance=2em,below] node [align=center] {send\\packet}  (a);    % \draw 
             \path[->] (b) edge [out=-120,in=-60,distance=2em,below] node [align=center] {issue\\packet}  (b);    % \draw 
             \path[->] (c) edge [out=-120,in=-60,distance=2em,below] node [align=center] {relay\\packet}  (c);    % \draw 
             \path[->] (d) edge [out=-120,in=-60,distance=2em,below] node [align=center] {create\\ack}  (d);    % \draw 
-            \path[->] (z) edge [out=-120,in=-60,distance=2em,below] node [align=center] {receive\\message}  (z);    % \draw 
+            \path[->] (z) edge [out=-120,in=-60,distance=2em,below] node [align=center] {receive\\packet}  (z);    % \draw 
 
             \path[->,draw,looseness=1.5,dashed,bend right] (d.north west) to [above] node {ack} (c.north east);
       \end{tikzpicture}    \caption{Ticket workflow}
