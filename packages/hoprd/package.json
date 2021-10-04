@@ -11,6 +11,9 @@
     "lib",
     "hopr-admin/.next/**"
   ],
+  "engines": {
+    "node": "16"
+  },
   "scripts": {
     "clean": "rimraf ./lib",
     "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin && chmod u+x lib/*.js",
