@@ -1,8 +1,8 @@
 \section{Paths and Path Selection}
 \label{sec:path-selection}
-HOPR currently utilizes free-route sender-selected paths which are known to provide better privacy as well as better packet delivery in the event of partial network failure than other topologies \cite{Dingledine2004SynchronousBF}. HOPR makes it easy to customize various different routing strategies. In this section, we present the free-routing strategy that HOPR nodes are currently following. Another strategy is later introduced in the \nameref{sec:CT} section.
+HOPR currently utilizes free-route sender-selected paths which are known to provide better privacy as well as better packet delivery in the event of partial network failure than other topologies \cite{Dingledine2004SynchronousBF}. HOPR makes it easy to customize various different routing strategies. In this section, we present the free-routing strategy that HOPR nodes are currently following. Another strategy is later introduced in the \lcnameref{sec:CT} section.
 
-Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to their final destination. To meet HOPR's stated \nameref{sec:securitygoals}, it is crucial for nodes in the network to keep the chosen path secret.
+Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to their final destination. To meet HOPR's stated \lcnameref{sec:securitygoals}, it is crucial for nodes in the network to keep the chosen path secret.
 
 As relay nodes differ in their ability to forward packets, path choices need to consider the nodes' resources and cannot be chosen entirely at random.
 
@@ -10,7 +10,7 @@ Path selection is therefore done in multiple steps: first, there is a preprocess
 
 The score is then multiplied by a random number to yield the channel's final weight. This randomization helps reduce linkability, which is a risk is a purely deterministic selection process. Finally, a path is chosen to the destination based on these scores while considering the relative availability of intermediate hops in a depth-first greedy search.
 
-This chapter details in \nameref{sec:path-selection:node-score} based on a nodes payment channel balances, \nameref{sec:path-selection:randomization} of the edge weights of the graph and \ref{sec:path-selection:graph-traversal} to find a path in HOPR network relative to randomized channel weights and node availability.
+This chapter details in \lcnameref{sec:path-selection:node-score} based on a nodes payment channel balances, \lcnameref{sec:path-selection:randomization} of the edge weights of the graph and \ref{sec:path-selection:graph-traversal} to find a path in HOPR network relative to randomized channel weights and node availability.
 
 \subsection{Node score assignment}
 \label{sec:path-selection:node-score}
@@ -31,7 +31,7 @@ When the network score is below the network quality threshold, the node is consi
 
 \subsubsection{Payment channel graph and stake}
 
-Incentives for relaying mixnet packages require the existence of an open payment channel that is funded towards the relay node. Hence, it is necessary to be in sync with the latest on-chain state.
+Incentives for relaying mixnet packet require the existence of an open payment channel that is funded towards the relay node. Hence, it is necessary to be in sync with the latest on-chain state.
 
 Funding a payment channel with HOPR tokens means staking these tokens in the HOPR network. The more tokens a node stakes to an outgoing payment channel, the more likely the payment channel is selected as a path, hence the more likely the node is chosen as a relayer by other nodes.
 
@@ -65,31 +65,31 @@ The algorithm terminates once a path with $targetLength$ is found. To prevent th
     $iterations \leftarrow 0$\;
     \;
     \While{$size(queue) > 0 \ \mathsf{and} \ iterations < maxIterations$}{
-    $path \leftarrow queue.peek()$\;
-    \If{$length(path) = targetLength$}{
-        \Return{$path$}
-    }
-    \;
-    $current \leftarrow last(path)$\;
-    $open \leftarrow \emptyset$\;
-    \;
-    \ForEach{$next \in \{ y \in V \ | \ (x,y) \in E \ \land \ x = current \}$}{
-        \If{$score(next) > threshold \ \mathbf{and} \ y \notin closed \ \mathbf{and} \ y \notin path$}{
-            $open.push(y)$\;
+        $path \leftarrow queue.peek()$\;
+        \If{$length(path) = targetLength$}{
+            \Return{$path$}
         }
-    }
-    \;
-    \uIf{$size(open) = 0$} {
-        $queue.pop()$\;
-        $closed.add(current)$\;
-    }
-    \Else{
-        \ForEach{$node \in open$}{
-            $queue.push(\ (...path, node) \ )$\;
+        \;
+        $current \leftarrow last(path)$\;
+        $open \leftarrow \emptyset$\;
+        \;
+        \ForEach{$next \in \{ y \in V \ | \ (x,y) \in E \ \land \ x = current \}$}{
+            \If{$score(next) > threshold \ \mathbf{and} \ y \notin closed \ \mathbf{and} \ y \notin path$}{
+                $open.push(y)$\;
+            }
         }
-    }
-    \;
-    $iterations \leftarrow iterations + 1$\;
+        \;
+        \uIf{$size(open) = 0$} {
+            $queue.pop()$\;
+            $closed.add(current)$\;
+        }
+        \Else{
+            \ForEach{$node \in open$}{
+                $queue.push(\ (...path, node) \ )$\;
+            }
+        }
+        \;
+        $iterations \leftarrow iterations + 1$\;
     }
     \Return{$queue.peek()$}
     \caption{Path selection}

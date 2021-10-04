@@ -1,0 +1,37 @@
+\section{Key Derivation}
+\label{appendix:keyderivation}
+
+During a protocol execution, a node derives a master secret $s_i$ from the SPHINX header that is then used to derive multiple sub-secrets for multiple purposes by using the BLAKE2s hash function within HKDF. HKDF is given by two algorithms: $\mathsf{extract}$ and $\mathsf{expand}$ where $\mathsf{extract}$ is used to extract the entropy from a given secret $s$, such as an elliptic-curve point, and produces the intermediate keying material (IKM). The IKM then serves as a master secret to feed $\mathsf{expand}$ in order to derive pseudorandom subkeys in the desired length.
+
+\subsection{Extraction}
+
+As a result of the packet creation and its transformation, the sender is able to derive a shared secret $s_i$ given as a compressed elliptic-curve point (33 bytes) with each of the nodes along the path.
+
+$$s_i^{master} \longleftarrow \mathsf{extract}(s_i, 33, pubKey)$$
+
+By adding their own public key $pubKey$ as a salt, each node derives a unique $s_i^{master}$ for each $s_i$.
+
+\subsection{Expansion}
+
+Each subkey $s_i^{sub}$ is used for one purpose, such as keying the \textit{pseudorandomness generator} (PRG).
+
+$$s_i^{sub} \longleftarrow \mathsf{expand}(s_i^{master}, length(purpose), hashKey(purpose))$$
+
+\begin{center}
+    \begin{tabular}{|c | c| c | l |}
+        \hline
+        Usage                           & Purpose         & Length   & Hash Key (UTF-8)                \\
+        \hline
+        \hline
+        \multirow{3}{*}{SPHINX packet}  & PRG             & 32       & \texttt{HASH\_KEY\_PRG}         \\
+                                        & PRP             & 128 + 64 & \texttt{HASH\_KEY\_PRP}         \\
+                                        & Packet tag      & 32       & \texttt{HASH\_KEY\_PACKET\_TAG} \\
+        \hline
+        \multirow{2}{*}{Proof of Relay} & acknowledgement & 32*      & \texttt{HASH\_KEY\_ACK\_KEY}    \\
+                                        & ownKey          & 32*      & \texttt{HASH\_KEY\_OWN\_KEY}    \\
+
+        \hline
+    \end{tabular}
+\end{center}
+
+The values marked with a * are treated as field elements, hence there exists a non-zero probability that $\mathsf{expand}$ produces a value outside of the field. In this specific case, the utilized hash key is repeatedly padded by ``\_'' until $\mathsf{expand}$ returns a field element.
