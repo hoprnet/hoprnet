@@ -1,11 +1,11 @@
 import Heap from 'heap-js'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
-import Debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import type { ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
 import { PATH_RANDOMNESS } from '../constants'
 
 import BN from 'bn.js'
-const log = Debug('hopr-core:pathfinder')
+const log = debug('hopr-core:pathfinder')
 
 export type Path = PublicKey[]
 type ChannelPath = { weight: BN; path: ChannelEntry[] }

@@ -110,7 +110,7 @@ validate_node_balance_gt0() {
   local balance eth_balance hopr_balance
 
   balance="$(run_command ${1} "balance")"
-  eth_balance="$(echo -e "$balance" | grep -c " MATIC" || true)"
+  eth_balance="$(echo -e "$balance" | grep -c " xDAI" || true)"
   hopr_balance="$(echo -e "$balance" | grep -c " HOPR" || true)"
 
   if [[ "$eth_balance" != "0" && "$hopr_balance" != "Hopr Balance: 0 HOPR" ]]; then

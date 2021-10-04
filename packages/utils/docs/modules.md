@@ -92,6 +92,7 @@
 - [createPacket](modules.md#createpacket)
 - [createPoRString](modules.md#createporstring)
 - [createPoRValuesForSender](modules.md#createporvaluesforsender)
+- [debug](modules.md#debug)
 - [decodePoRBytes](modules.md#decodeporbytes)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
 - [dial](modules.md#dial)
@@ -806,6 +807,39 @@ the challenge for the first ticket sent to the first relayer
 #### Defined in
 
 [crypto/por/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L20)
+
+___
+
+### debug
+
+▸ `Const` **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `any`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `namespace` | `any` |
+
+#### Returns
+
+`fn`
+
+▸ (`message`, ...`parameters`): `any`
+
+##### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `message` | `any` |
+| `...parameters` | `any`[] |
+
+##### Returns
+
+`any`
+
+#### Defined in
+
+[debug.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/debug.ts#L14)
 
 ___
 
