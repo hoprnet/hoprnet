@@ -18,4 +18,27 @@ and
     \end{cases}\,.
     \label{eq:1}
 \end{equation}
-for $1\le i < r-1$, where $y_0,y_1, y_2, y_3$, and $y_4$ are the public keys of the nodes $B$, $C$, $D$, and $Z$, which we assume to be available to $A$ .
+for $1\le i < r-1$, where $y_0,y_1, y_2, y_3$, and $y_4$ are the public keys of the nodes $B$, $C$, $D$, and $Z$, which we assume to be available to $A$.
+
+\begin{figure}[H]
+    \begin{tikzpicture}
+        \def\offset{3}
+        \def\nodeWidth{0.8}
+        \def\padding{1.0}
+        \def\lowerpadding{0.7}
+        \def\nodeHeight{0.6}
+        \foreach \i\name\bi in{0/A/0,1/B/$^{b_A}$,2/C/$^{b_Ab_B}$,3/D/$^{b_Ab_Bb_C}$,4/Z/$^{b_Ab_Bb_Cb_D}$} {
+                \draw (\i*\offset,0) rectangle (\i*\offset+\nodeWidth,\nodeHeight) node [midway] {\name};
+
+                \ifnum\i>0
+                    \draw (-0.1*\i,\nodeHeight+0.1*\i) -- (-0.1*\i,-\padding-0.1*\i) -- (\i*\offset+0.1+\nodeWidth,-\padding-0.1*\i) -- (\i*\offset+0.1+\nodeWidth,\nodeHeight+0.1) -- (\i*\offset-0.1,\nodeHeight+0.1) -- (\i*\offset-0.1,-\lowerpadding+0.1*\i) -- (\nodeWidth+0.1*\i,-\lowerpadding+0.1*\i) -- (\nodeWidth+0.1*\i,\nodeHeight+0.1*\i) -- (-0.1*\i,\nodeHeight+0.1*\i);
+                \fi
+
+                \ifnum\i>0
+                    \draw [->,dashed] (\i*\offset-\offset+\nodeWidth,0.3) -- (\i*\offset,0.3) node [midway,below] {packet} node [midway,below=23pt,shift={(0.13*\i,0)}] {{\smaller$s_{\name}=(y_{\name})^x$\bi}};
+                \fi
+            }
+    \end{tikzpicture}
+    \caption{$A$ derives shared keys $s_B,s_C,s_D,s_Z$ with $B,C,D,Z$ using their public keys $y_B,y_C,y_D,y_Z$.}
+    \label{fig:sphinx:keyderivation}
+\end{figure}
