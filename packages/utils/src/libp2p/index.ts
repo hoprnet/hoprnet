@@ -11,7 +11,6 @@ import AbortController from 'abort-controller'
 import Debug from 'debug'
 import pipe from 'it-pipe'
 import type { PromiseValue } from '../typescript'
-import { PublicKey } from '..'
 
 export * from './privKeyToPeerId'
 export * from './pubKeyToPeerId'
@@ -24,25 +23,6 @@ export * from './verifySignatureFromPeerId'
  */
 
 export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
-
-/**
- * Takes a peerId and returns its corresponding public key.
- *
- * @param peerId the PeerId used to generate a public key
- */
-export function convertPubKeyFromPeerId(peerId: PeerId): PublicKey {
-  return PublicKey.fromPeerId(peerId)
-}
-
-/**
- *
- * Takes a B58String and converts them to a PublicKey
- *
- * @param string the B58String used to represent the PeerId
- */
-export function convertPubKeyFromB58String(b58string: string): PublicKey {
-  return convertPubKeyFromPeerId(PeerId.createFromB58String(b58string))
-}
 
 /**
  *

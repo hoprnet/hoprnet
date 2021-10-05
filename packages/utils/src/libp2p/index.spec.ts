@@ -2,8 +2,6 @@ import assert from 'assert'
 import PeerId from 'peer-id'
 import {
   isSecp256k1PeerId,
-  convertPubKeyFromPeerId,
-  convertPubKeyFromB58String,
   hasB58String,
   getB58String,
   libp2pSubscribe,
@@ -15,20 +13,6 @@ import BL from 'bl'
 import { Defer } from '../defer'
 import { u8aEquals } from '../u8a'
 import { Multiaddr } from 'multiaddr'
-
-describe(`test convertPubKeyFromPeerId`, function () {
-  it(`should equal to a newly created pubkey from PeerId`, async function () {
-    const id = await PeerId.create({ keyType: 'secp256k1' })
-    const pubKey = convertPubKeyFromPeerId(id)
-    assert(u8aEquals(id.pubKey.marshal(), pubKey.serialize()))
-  })
-  it(`should equal to pubkey from a PeerId CID`, async function () {
-    const testIdB58String = '16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg'
-    const pubKey = convertPubKeyFromB58String(testIdB58String)
-    const id = PeerId.createFromB58String(testIdB58String)
-    assert(u8aEquals(id.pubKey.marshal(), pubKey.serialize()))
-  })
-})
 
 describe(`test hasB58String`, function () {
   it(`should return a boolean value`, function () {
