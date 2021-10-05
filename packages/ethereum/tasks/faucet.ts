@@ -11,7 +11,8 @@ const send = (signer, txparams) =>
     console.log(`transactionHash: ${transactionHash}`)
   })
 
-const nativeAddress = async (hoprAddress: string) => PublicKey.fromPeerId(PeerId.createFromB58String(hoprAddress)).toAddress().toHex()
+const nativeAddress = async (hoprAddress: string) =>
+  PublicKey.fromPeerId(PeerId.createFromB58String(hoprAddress)).toAddress().toHex()
 
 /**
  * Faucets HOPR and ETH tokens to a local account with HOPR
