@@ -132,10 +132,9 @@ export async function dial(
   protocol: string,
   opts?: DialOpts
 ): Promise<DialResponse> {
-
   let timeout: NodeJS.Timeout
   const abort = new AbortController()
-  let timeoutPromise = new Promise<DialResponse>( (_, reject) => {
+  let timeoutPromise = new Promise<DialResponse>((_, reject) => {
     timeout = setTimeout(() => {
       abort.abort()
       verbose(`timeout while trying to dial ${destination.toB58String()}`)
@@ -143,7 +142,7 @@ export async function dial(
     }, opts.timeout || DEFAULT_DHT_QUERY_TIMEOUT)
   })
 
-  async function doDial(): Promise<DialResponse>{
+  async function doDial(): Promise<DialResponse> {
     let err: any
     let struct: PromiseValue<ReturnType<LibP2P['dialProtocol']>> | null
 
