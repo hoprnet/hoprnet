@@ -79,6 +79,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
 }
 
 if (require.main === module) {
+  console.log('CT: Params', "privateKey", argv.privateKey, "provider", argv.provider)
   process.once('exit', stopGracefully)
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)
