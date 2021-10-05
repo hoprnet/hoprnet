@@ -6,9 +6,9 @@ HOPR incentivizes packet transformation and delivery using a mechanism called \t
 \paragraph{Secret sharing}
 \label{sec:proofofrelay:secretSharing}
 
-Each node derives two keys, $s_i^{own}$ and $_i^{ack}$, by using the $s_i$ as given by the SPHINX packet, see section \lcnameref{appendix:keyderivation} for more details. $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
+Each node derives two keys, $s_i^{own}$ and $_i^{ack}$, by using the $s_i$ as given by the SPHINX packet (see the \lcnameref{appendix:keyderivation} section for more details). $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
 
-Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requires the cooperation of the next downstream node $n_{i+1}$ and is sent as an \textit{acknowledgement} if $n_{i+1}$ has received the transformed packet \textit{and} considers packet as well as the embedded ticket valid.
+Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requires the cooperation of the next downstream node $n_{i+1}$ and is sent as an \textit{acknowledgement} if $n_{i+1}$ has received the transformed packet and considers both the packet and embedded ticket valid.
 
 \begin{figure}[H]
     \centering
@@ -31,22 +31,22 @@ Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requ
         \draw [->,draw,bend left] (d.south) to node[below] {$s_{i+1}^{ack}$} node [align=center,right=5pt,circle] {\color{hopr-blue}4.} (intermediateResult.east);
         \draw [->,draw] (intermediateResult.south) to (response.north);
     \end{tikzpicture}
-    \caption{\color{hopr-blue}1. \color{black} Node $n_i$ receives $packet_{i-1}$, validates it, transforms it and \color{hopr-blue}2. \color{black} sends it to node $n_{i+1}$. \color{hopr-blue}3. \color{black} While processing $packet_i$, node $n_i$ derives $s_i^{own}$ and once node $n_{i+1}$ considered $packet_i$ valid, it \textit{acknowledges} the reception of $packet_i$ and thereby reveals $s_{i+1}^{ack}$ to node $n_i$ which allows node $n_i$ to reconstruct $s_i^{response}$.}
+    \caption{\color{hopr-blue}1. \color{black} Node $n_i$ receives $packet_{i-1}$, validates it, transforms it and \color{hopr-blue}2. \color{black} sends it to node $n_{i+1}$. \color{hopr-blue}3. \color{black} While processing $packet_i$, node $n_i$ derives $s_i^{own}$ and \color{hopr-blue}1. \color{black} once node $n_{i+1}$ considers $packet_i$ valid, it \textit{acknowledges} the receipt of $packet_i$ and thereby reveals $s_{i+1}^{ack}$ to node $n_i$ which allows node $n_i$ to reconstruct $s_i^{response}$.}
     \label{fig:proofofrelay}
 \end{figure}
 
-\paragraph{Challenge-response}
+\paragraph{Challenge response}
 
-Tickets that that are sent next to a mixnet packet include a challenge $C_i$ which is computed as $$C_i = s_i^{response} \cdot G = (s_i^{own} + s_{i+1}^{ack}) \cdot G$$ where $G$ refers to the base-point and $\cdot$ means scalar multiplication on the curve. Hence, in order to solve the challenge, it is necessary to know $s_i^{own}$ as well as $s_{i+1}^{ack}$.
+Tickets sent next to a mixnet packet include a challenge $C_i$ which is computed as $$C_i = s_i^{response} \cdot G = (s_i^{own} + s_{i+1}^{ack}) \cdot G$$ where $G$ refers to the base point and $\cdot$ means scalar multiplication on the curve. Hence, in order to solve the challenge, it is necessary to know $s_i^{own}$ as well as $s_{i+1}^{ack}$.
 
 \paragraph{Challenge and Hint}
 \label{sec:proofofrelay:challenge}
 
 Once a node receives a packet, it is able to derive $s_i^{own}$ but it is unable to decide whether $s_{i+i}^{ack}$ will ever lead to $s_i^{response}$ that solves the challenge. Since the underlying field preserves the distributivity, it holds that $$C_i = s_i^{response} \cdot G = (s_i^{own} + s_{i+1}^{ack}) \cdot G = s_i^{own} \cdot G + s_{i+1}^{ack} \cdot G$$
 
-Hence by knowing $hint_i = s_{i+1}^{ack} \cdot G$, the node can verify that $s_i^{own} \cdot G + hint_i = C_i$ and thereby check that the creator of the challenge must have known a value $\tilde{s}_{i+1}^{ack}$ that led to $hint_i$. Due to the infeasibility to invert scalar multiplication on the utilized curve, knwowing $hint_i$ does not reveal $s_{i+1}^{ack}$. Hence, by embedding $hint_i$ into the part of $\beta$ within the SPHINX packet that is readable by node $n_i$, the sender of the makes the validity of the embedded challenge verifiable.
+Hence by knowing $hint_i = s_{i+1}^{ack} \cdot G$, the node can verify that $s_i^{own} \cdot G + hint_i = C_i$ and thereby check that the creator of the challenge must have known a value $\tilde{s}_{i+1}^{ack}$ that led to $hint_i$. Due to the infeasibility of inverting scalar multiplication on the chosen curve, knowing $hint_i$ does not reveal $s_{i+1}^{ack}$. Hence, by embedding $hint_i$ into the part of $\beta$ within the SPHINX packet that is readable by node $n_i$, the sender makes the validity of the embedded challenge verifiable.
 
-As the next downstream node would not accept a packet without a ticket\footnote{By default, nodes are only forwarding packets that include incentives. Nevertheless, the protocol does not prevent them from processing packets without enforcing an incentive.}, the node $n_i$ does not only need to transform the packet but also issue a ticket to the next downstream node $n_{i+1}$. Therefore, it needs to know \textit{which} challenge $\tilde{C}_{i+1}$ to put into the ticket issued for node $n_{i+1}$. As in the previous section, this is done with the help of the creator of the packet which embeds $C_{i+1}$ into the part of the SPINX packet that is readable by node $n_{i+1}$.
+As the next downstream node would not accept a packet without a ticket\footnote{By default, nodes only forward packets that include incentives. Nevertheless, the protocol does not prevent them from processing packets without enforcing an incentive.}, the node $n_i$ not only needs to transform the packet but must also issue a ticket to the next downstream node $n_{i+1}$. Therefore, it needs to know which challenge $\tilde{C}_{i+1}$ to put into the ticket issued for node $n_{i+1}$. As in the previous section, this is done with the help of the creator of the packet, who embeds $C_{i+1}$ into the part of the SPHINX packet that is readable by node $n_{i+1}$.
 
 \begin{figure}[H]
     \centering
@@ -129,4 +129,4 @@ As the next downstream node would not accept a packet without a ticket\footnote{
 
 By chaining this principle, nodes are forced to \textit{always} issue a ticket to the next downstream node because they are unable to claim their own incentive without the help of the next downstream node.
 
-Since the very last node, namely the final receiver, of the packet, does not need to forward the packet to anyone else, it has no direct incentive to acknowledge tickets, hence there are no \textit{direct} consequences for \textit{not} acknowledging packet. In its current version, the protocol does not prevent this kind of behavior but it is foreseen to solve this issue by using a reputation system.
+Since the very last node, namely the final receiver, of the packet, does not need to forward the packet to anyone else, it has no direct incentive to acknowledge tickets, hence there are no direct consequences for not acknowledging packet. In its current version, the protocol does not prevent this kind of behaviour, but research is being conducted into the necessity and feasibility of solving this issue via a reputation system.

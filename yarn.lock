@@ -986,7 +986,7 @@ __metadata:
     ethers: 5.4.7
     heap-js: ^2.1.2
     it-pipe: ^1.1.0
-    levelup: ^5.0.1
+    levelup: 5.1.1
     memdown: 6.1.1
     mocha: 9.1.2
     multiaddr: ^10.0.0
@@ -1021,7 +1021,7 @@ __metadata:
     debug: ^4.3.2
     heap-js: ^2.1.6
     leveldown: 6.1.0
-    levelup: ~5.0.1
+    levelup: 5.1.1
     libp2p: 0.33.0
     libp2p-kad-dht: 0.25.0
     libp2p-mplex: 0.10.4
@@ -1142,7 +1142,7 @@ __metadata:
     futoin-hkdf: ~1.4.1
     it-pipe: ^1.1.0
     leveldown: 6.1.0
-    levelup: ^5.0.1
+    levelup: 5.1.1
     libp2p: 0.33.0
     libp2p-crypto: 0.19.7
     memdown: 6.1.1
@@ -5445,6 +5445,16 @@ __metadata:
     abstract-leveldown: ^7.0.0
     inherits: ^2.0.3
   checksum: 284f52610617942a3ce1745ab070aa5280ae736dd70101e491ee9b6bd4462ef27d5f371f6f6ebc5e8e3d962eb11583ee341a852fee1eb8ae0b2680abf3d62552
+  languageName: node
+  linkType: hard
+
+"deferred-leveldown@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "deferred-leveldown@npm:7.0.0"
+  dependencies:
+    abstract-leveldown: ^7.2.0
+    inherits: ^2.0.3
+  checksum: 1ed5eb73e381aeb36d7153bf94dd957060b0294903660c1c8123a375e2b5cd5b3865428d7490aa1561c6ea08a5559563751e59e468d5786c99c765d2a868c658
   languageName: node
   linkType: hard
 
@@ -10297,6 +10307,13 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
+"level-errors@npm:^3.0.1":
+  version: 3.0.1
+  resolution: "level-errors@npm:3.0.1"
+  checksum: fe4486c423e78ab509a8f7908b89a1692cc810dd47e02d9ceca50543b5be0ce3a4d555fb8f4d3c82122f56bd48c27e6175ca06da359b8e359ea2c7848209d8e7
+  languageName: node
+  linkType: hard
+
 "level-errors@npm:~1.0.3":
   version: 1.0.5
   resolution: "level-errors@npm:1.0.5"
@@ -10519,6 +10536,20 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
+"levelup@npm:5.1.1":
+  version: 5.1.1
+  resolution: "levelup@npm:5.1.1"
+  dependencies:
+    catering: ^2.0.0
+    deferred-leveldown: ^7.0.0
+    level-errors: ^3.0.1
+    level-iterator-stream: ^5.0.0
+    level-supports: ^2.0.1
+    queue-microtask: ^1.2.3
+  checksum: 3053cd3495f615874f1695a47bc7c1eaf432f4c1323b41d58770230b39f2b845100c6e6e912bcffdc504051a8540a39b5d05f3b54f65cfdcb43ce613f6182dd6
+  languageName: node
+  linkType: hard
+
 "levelup@npm:^1.2.1":
   version: 1.3.9
   resolution: "levelup@npm:1.3.9"
@@ -10547,7 +10578,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"levelup@npm:^5.0.0, levelup@npm:^5.0.1, levelup@npm:~5.0.1":
+"levelup@npm:^5.0.0":
   version: 5.0.1
   resolution: "levelup@npm:5.0.1"
   dependencies:

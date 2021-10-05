@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.81.0-next.3",
+  "version": "1.81.0-next.5",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -37,7 +37,7 @@
     "futoin-hkdf": "~1.4.1",
     "it-pipe": "^1.1.0",
     "leveldown": "6.1.0",
-    "levelup": "^5.0.1",
+    "levelup": "5.1.1",
     "libp2p": "0.33.0",
     "libp2p-crypto": "0.19.7",
     "memdown": "6.1.1",
