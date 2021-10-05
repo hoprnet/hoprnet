@@ -134,11 +134,11 @@ export async function dial(
 ): Promise<DialResponse> {
   let timeout: NodeJS.Timeout
   const abort = new AbortController()
-  let timeoutPromise = new Promise<DialResponse>((_, reject) => {
+  let timeoutPromise = new Promise<DialResponse>((resolve) => {
     timeout = setTimeout(() => {
       abort.abort()
       verbose(`timeout while trying to dial ${destination.toB58String()}`)
-      reject({ status: 'E_TIMEOUT' })
+      resolve({ status: 'E_TIMEOUT' })
     }, opts.timeout || DEFAULT_DHT_QUERY_TIMEOUT)
   })
 
@@ -230,6 +230,13 @@ export async function dial(
     throw new Error('Missing error case in dial')
   }
 
+  // You may be wondering why we race the timeout promise here rather than just
+  // relying on the Abort signal.
+  // As of #2611, we noticed that the E_TIMEOUT was not being returned until
+  // after the request came back, thus the timeout signal was not functioning 
+  // correctly in this version of libp2p. This is a compromise that means we 
+  // regain control flow after the timeout, but at the expense of a timed out
+  // dial potentially succeeding and being discarded.
   return Promise.race([timeoutPromise, doDial()])
 }
 
