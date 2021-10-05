@@ -19,6 +19,28 @@ The routing information is computed as follows:
 \end{align}
 $0\le i < v-1$
 
+\begin{tikzpicture}
+    \def\one{0.6}
+    \def\scale{0.9}
+    \def\nodeWidth{3*\one}
+    \def\endWidth{1.2}
+    \def\width{3*2*\nodeWidth+\endWidth}
+    \foreach \i\name in{0/B,1/C,2/D,3/Z} {
+            \ifnum\i<3
+                \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black] {$y_{\name}$};
+                \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
+                \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black] {$\gamma_{\name}$};
+                \draw (\i*2*\nodeWidth+\nodeWidth,0) -- (\i*2*\nodeWidth+\nodeWidth,\one);
+            \else
+                \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black] {$end$};
+                \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
+
+            \fi
+        }
+
+    \draw (0,0) rectangle (\width,\one);
+\end{tikzpicture}
+
 such that $y_Z$ is the destination's public key in compressed form (since this is only the $x$-coordinate, it is 33 bytes instead of 64) and $|y_Z|$ is its length. $\rho$ is a pseudorandom generator (PRG) and $h_{\rho}$ is the hash function used to key $\rho$.
 $v\leq r$ is the length of the path traversed by the packet, where $|y_Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string such that
 \begin{align}
