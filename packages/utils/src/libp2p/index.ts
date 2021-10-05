@@ -233,8 +233,8 @@ export async function dial(
   // You may be wondering why we race the timeout promise here rather than just
   // relying on the Abort signal.
   // As of #2611, we noticed that the E_TIMEOUT was not being returned until
-  // after the request came back, thus the timeout signal was not functioning 
-  // correctly in this version of libp2p. This is a compromise that means we 
+  // after the request came back, thus the timeout signal was not functioning
+  // correctly in this version of libp2p. This is a compromise that means we
   // regain control flow after the timeout, but at the expense of a timed out
   // dial potentially succeeding and being discarded.
   return Promise.race([timeoutPromise, doDial()])
