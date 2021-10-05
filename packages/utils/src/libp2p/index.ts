@@ -132,97 +132,106 @@ export async function dial(
   protocol: string,
   opts?: DialOpts
 ): Promise<DialResponse> {
+
   let timeout: NodeJS.Timeout
-
   const abort = new AbortController()
-  timeout = setTimeout(() => {
-    abort.abort()
-    verbose(`timeout while trying to dial ${destination.toB58String()}`)
-  }, opts.timeout || DEFAULT_DHT_QUERY_TIMEOUT)
+  let timeoutPromise = new Promise<DialResponse>( (_, reject) => {
+    timeout = setTimeout(() => {
+      abort.abort()
+      verbose(`timeout while trying to dial ${destination.toB58String()}`)
+      reject({ status: 'E_TIMEOUT' })
+    }, opts.timeout || DEFAULT_DHT_QUERY_TIMEOUT)
+  })
 
-  let err: any
-  let struct: PromiseValue<ReturnType<LibP2P['dialProtocol']>> | null
+  async function doDial(): Promise<DialResponse>{
+    let err: any
+    let struct: PromiseValue<ReturnType<LibP2P['dialProtocol']>> | null
 
-  let addresses = (libp2p.peerStore.get(destination)?.addresses ?? []).map((addr) => addr.multiaddr.toString())
+    let addresses = (libp2p.peerStore.get(destination)?.addresses ?? []).map((addr) => addr.multiaddr.toString())
 
-  // Try to use known addresses
-  if (addresses.length > 0) {
+    // Try to use known addresses
+    if (addresses.length > 0) {
+      try {
+        struct = await libp2p.dialProtocol(destination, protocol, { signal: abort.signal })
+      } catch (_err) {
+        err = _err
+      }
+    }
+
+    if (struct != null) {
+      clearTimeout(timeout)
+      return { status: 'SUCCESS', resp: struct }
+    }
+
+    if (abort.signal.aborted) {
+      return { status: 'E_TIMEOUT' }
+    }
+
+    if ((err != null || struct == null) && libp2p._dht == undefined) {
+      logError(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
+      clearTimeout(timeout)
+      return { status: 'E_DIAL', error: err.message, dhtContacted: false }
+    }
+
+    verbose(`could not dial directly (${err.message}), looking in the DHT`)
+
+    // Try to get some fresh addresses from the DHT
+    let dhtResponse: PromiseValue<ReturnType<PeerRoutingModule['findPeer']>>
+    try {
+      // Let libp2p populate its internal peerStore with fresh addresses
+      dhtResponse = await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
+    } catch (err) {
+      logError(
+        `Querying the DHT for ${destination.toB58String()} failed. Known addresses:\n  ${(
+          libp2p.peerStore.get(destination)?.addresses ?? []
+        )
+          .map((addr) => addr.multiaddr.toString())
+          .join('\n  ')}.\n${err.message}`
+      )
+    }
+
+    const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
+
+    if (abort.signal.aborted) {
+      return { status: 'E_TIMEOUT' }
+    }
+
+    // Only start a dial attempt if we have received new addresses
+    if (newAddresses.length == 0) {
+      clearTimeout(timeout)
+      return { status: 'E_DIAL', error: 'No new addresses after contacting the DHT', dhtContacted: true }
+    }
+
     try {
       struct = await libp2p.dialProtocol(destination, protocol, { signal: abort.signal })
-    } catch (_err) {
-      err = _err
+      verbose(`Dial after DHT request successful`, struct)
+    } catch (err) {
+      logError(
+        `Cannot connect to ${green(
+          destination.toB58String()
+        )}. New addresses after DHT request did not lead to a connection. Used addresses:\n  ${(
+          libp2p.peerStore.get(destination)?.addresses ?? []
+        )
+          .map((addr) => addr.multiaddr.toString())
+          .join('\n  ')}\n${err.message}`
+      )
+      clearTimeout(timeout)
+      return { status: 'E_DIAL', error: err.message, dhtContacted: true }
     }
+
+    if (abort.signal.aborted) {
+      return { status: 'E_TIMEOUT' }
+    }
+
+    if (struct != null) {
+      clearTimeout(timeout)
+      return { status: 'SUCCESS', resp: struct }
+    }
+
+    throw new Error('Missing error case in dial')
   }
 
-  if (struct != null) {
-    clearTimeout(timeout)
-    return { status: 'SUCCESS', resp: struct }
-  }
-
-  if (abort.signal.aborted) {
-    return { status: 'E_TIMEOUT' }
-  }
-
-  if ((err != null || struct == null) && libp2p._dht == undefined) {
-    logError(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
-    clearTimeout(timeout)
-    return { status: 'E_DIAL', error: err.message, dhtContacted: false }
-  }
-
-  // Try to get some fresh addresses from the DHT
-  let dhtResponse: PromiseValue<ReturnType<PeerRoutingModule['findPeer']>>
-  try {
-    // Let libp2p populate its internal peerStore with fresh addresses
-    dhtResponse = await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
-  } catch (err) {
-    logError(
-      `Querying the DHT for ${destination.toB58String()} failed. Knwon addresses:\n  ${(
-        libp2p.peerStore.get(destination)?.addresses ?? []
-      )
-        .map((addr) => addr.multiaddr.toString())
-        .join('\n  ')}.\n${err.message}`
-    )
-  }
-
-  const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
-
-  if (abort.signal.aborted) {
-    return { status: 'E_TIMEOUT' }
-  }
-
-  // Only start a dial attempt if we have received new addresses
-  if (newAddresses.length == 0) {
-    clearTimeout(timeout)
-    return { status: 'E_DIAL', error: 'No new addresses after contacting the DHT', dhtContacted: true }
-  }
-
-  try {
-    struct = await libp2p.dialProtocol(destination, protocol, { signal: abort.signal })
-    verbose(`Dial after DHT request successful`, struct)
-  } catch (err) {
-    logError(
-      `Cannot connect to ${green(
-        destination.toB58String()
-      )}. New addresses after DHT request did not lead to a connection. Used addresses:\n  ${(
-        libp2p.peerStore.get(destination)?.addresses ?? []
-      )
-        .map((addr) => addr.multiaddr.toString())
-        .join('\n  ')}\n${err.message}`
-    )
-    clearTimeout(timeout)
-    return { status: 'E_DIAL', error: err.message, dhtContacted: true }
-  }
-
-  if (abort.signal.aborted) {
-    return { status: 'E_TIMEOUT' }
-  }
-
-  if (struct != null) {
-    clearTimeout(timeout)
-    return { status: 'SUCCESS', resp: struct }
-  }
-
-  throw new Error('Missing error case in dial')
+  return Promise.race([timeoutPromise, doDial()])
 }
 
 export async function libp2pSendMessage(
@@ -259,7 +268,7 @@ export async function libp2pSendMessageAndExpectResponse(
       return vals
     })
   }
-  logError(r)
+  logError('libp2p error', r)
   throw new Error(r.status)
 }
 

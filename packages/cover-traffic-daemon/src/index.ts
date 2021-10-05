@@ -37,7 +37,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     provider: argv.provider,
     createDbIfNotExist: true,
     password: '',
-    forceCreateDB: true,
+    //forceCreateDB: true,
     announce: false
   }
 

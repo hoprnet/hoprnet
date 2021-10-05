@@ -52,7 +52,7 @@ export default class Heartbeat {
       log('ping success to', id.toB58String())
       return true
     } catch (e) {
-      log(`Connection to ${id.toB58String()} failed: ${e}`)
+      log(`Connection to ${id.toB58String()} failed: ${JSON.stringify(e)}`)
       return false
     }
   }
