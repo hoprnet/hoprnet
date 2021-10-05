@@ -52,7 +52,7 @@ export default class Heartbeat {
       log('ping success to', id.toB58String())
       return true
     } catch (e) {
-      log(`Connection to ${id.toB58String()} failed: ${e}`)
+      log(`Connection to ${id.toB58String()} failed: ${JSON.stringify(e)}`)
       return false
     }
   }
@@ -68,12 +68,17 @@ export default class Heartbeat {
     }
 
     await limitConcurrency<void>(MAX_PARALLEL_CONNECTIONS, () => toPing.length <= 0, doPing)
+    log(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
     log(this.networkPeers.debugLog())
   }
 
   private tick() {
     this.timeout = setTimeout(async () => {
-      await this.checkNodes()
+      try {
+        await this.checkNodes()
+      } catch (e) {
+        log('FATAL ERROR IN HEARTBEAT', e)
+      }
       this.tick()
     }, randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE))
   }
