@@ -9,12 +9,13 @@ $A$ performs an offline Diffie-Hellman (DH) key exchange with each of these node
 
 $A$ computes a sequence of tuples $(\alpha_i,s_i,b_i) \in \{ B, C, D, Z \}$ with $\alpha_A = g^x$ and $b_A = h_b(\alpha_A, s_B = y_B^{x b_A})$ as follows:
 
-\begin{align*}
-    (\alpha_B,s_B,b_B) & = (g^{x b_A},y_B^{x b_A},h_b(\alpha_B,s_B))                         \\
-    (\alpha_C,s_C,b_C) & = (g^{x b_A b_B},y_C^{x b_A b_B},h_b(\alpha_C,s_C))                 \\
-    (\alpha_D,s_D,b_D) & = (g^{x b_A b_B b_C},y_D^{x b_A b_B b_C},h_b(\alpha_D,s_D))         \\
-    (\alpha_Z,s_Z,b_Z) & = (g^{x b_A b_B b_C b_D},y_Z^{x b_A b_B b_C b_D},h_b(\alpha_Z,s_Z))
-\end{align*}
+\begin{align}
+    \nonumber(\alpha_B,s_B,b_B) & = (g^{x b_A},y_B^{x b_A},h_b(\alpha_B,s_B))                         \\
+    \nonumber(\alpha_C,s_C,b_C) & = (g^{x b_A b_B},y_C^{x b_A b_B},h_b(\alpha_C,s_C))                 \\
+    \nonumber(\alpha_D,s_D,b_D) & = (g^{x b_A b_B b_C},y_D^{x b_A b_B b_C},h_b(\alpha_D,s_D))         \\
+    (\alpha_Z,s_Z,b_Z)          & = (g^{x b_A b_B b_C b_D},y_Z^{x b_A b_B b_C b_D},h_b(\alpha_Z,s_Z))
+    \label{eq:1}
+\end{align}
 % % $$\alpha_0=g^x,s_0=y^x_B,b_0=h_b(a_0,s_0)$$
 % and
 % \begin{equation}
