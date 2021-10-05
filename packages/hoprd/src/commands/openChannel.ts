@@ -7,8 +7,6 @@ import { checkPeerIdInput, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
 export class OpenChannel extends AbstractCommand {
-  hidden = true
-
   constructor(public node: Hopr) {
     super()
   }

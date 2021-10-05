@@ -3,8 +3,8 @@ import PeerId from 'peer-id'
 import { privKeyToPeerId, SECP256K1_CONSTANTS, stringToU8a } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 import { resolve } from 'path'
-import Debug from 'debug'
-const log = Debug(`hoprd:identity`)
+import { debug } from '@hoprnet/hopr-utils'
+const log = debug(`hoprd:identity`)
 
 import Wallet from 'ethereumjs-wallet'
 
