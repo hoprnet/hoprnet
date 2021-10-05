@@ -1,4 +1,4 @@
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import { PublicKey, durations, oneAtATime } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'

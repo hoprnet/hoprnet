@@ -14,7 +14,7 @@ import {
   CT_CHANNEL_STALL_TIMEOUT,
   CT_OPEN_CHANNEL_QUALITY_THRESHOLD
 } from './constants'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('cover-traffic')
 

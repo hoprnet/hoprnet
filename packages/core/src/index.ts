@@ -50,7 +50,7 @@ import {
   ChannelsToOpen,
   ChannelsToClose
 } from './channel-strategy'
-import Debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
@@ -58,8 +58,8 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 import { Packet } from './messages'
 import { localAddressesFirst, AddressSorter, retryWithBackoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
 
-const log = Debug(`hopr-core`)
-const verbose = Debug('hopr-core:verbose')
+const log = debug(`hopr-core`)
+const verbose = debug('hopr-core:verbose')
 
 interface NetOptions {
   ip: string

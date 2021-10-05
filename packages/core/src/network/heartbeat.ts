@@ -1,6 +1,6 @@
 import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import { Hash } from '@hoprnet/hopr-utils'
 import { randomInteger, limitConcurrency, LibP2PHandlerFunction, u8aEquals, DialOpts } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'

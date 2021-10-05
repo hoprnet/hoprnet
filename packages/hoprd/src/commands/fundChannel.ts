@@ -16,7 +16,7 @@ export default class FundChannel extends AbstractCommand {
   }
 
   public help() {
-    return 'Fund a channel, if channel is closed it will open it'
+    return '(deprecated) Fund a channel, if channel is closed it will open it'
   }
 
   async execute(log, query: string, state: GlobalState): Promise<void> {

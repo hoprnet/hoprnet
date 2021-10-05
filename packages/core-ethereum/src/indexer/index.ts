@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import Debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -24,7 +24,7 @@ import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames } from './types'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 
-const log = Debug('hopr-core-ethereum:indexer')
+const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
 const ANNOUNCEMENT = 'Announcement'
 
