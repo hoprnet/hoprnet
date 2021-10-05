@@ -21,7 +21,7 @@ function stopGracefully(signal: number) {
 const argv = yargs(process.argv.slice(2))
   .option('provider', {
     describe: 'A provider url for the network this node shall operate on',
-    default: 'https://provider-proxy.hoprnet.workers.dev/matic_rio',
+    default: 'https://provider-proxy.hoprnet.workers.dev/xdai_mainnet',
     string: true
   })
   .option('privateKey', {
