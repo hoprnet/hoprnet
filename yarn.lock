@@ -987,7 +987,7 @@ __metadata:
     heap-js: ^2.1.2
     it-pipe: ^1.1.0
     levelup: ^5.0.1
-    memdown: 6.1.0
+    memdown: 6.1.1
     mocha: 9.1.2
     multiaddr: ^10.0.0
     peer-id: 0.15.3
@@ -1026,7 +1026,7 @@ __metadata:
     libp2p-kad-dht: 0.25.0
     libp2p-mplex: 0.10.4
     libp2p-tcp: ^0.17.2
-    memdown: 6.1.0
+    memdown: 6.1.1
     mocha: 9.1.2
     multiaddr: ^10.0.0
     peer-id: ^0.15.1
@@ -1145,7 +1145,7 @@ __metadata:
     levelup: ^5.0.1
     libp2p: 0.33.0
     libp2p-crypto: 0.19.7
-    memdown: 6.1.0
+    memdown: 6.1.1
     mocha: 9.1.2
     multiaddr: ^10.0.0
     multihashes: ~4.0.1
@@ -11252,16 +11252,16 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"memdown@npm:6.1.0":
-  version: 6.1.0
-  resolution: "memdown@npm:6.1.0"
+"memdown@npm:6.1.1":
+  version: 6.1.1
+  resolution: "memdown@npm:6.1.1"
   dependencies:
     abstract-leveldown: ^7.2.0
     buffer: ^6.0.3
     functional-red-black-tree: ^1.0.1
     inherits: ^2.0.1
     ltgt: ^2.2.0
-  checksum: 7368322bc4e1367562bfab05f9f28886d0304e3eb757d31aaef65f17b95701f55140b3e31538c7d09508d6ad47e5932076e939d8426df6b9a52264c5c9e6cc08
+  checksum: a8c418620781a396e650834ab18022c1ae13060b3ca47dc80152eff45caf0e4780598610fd0f9b5a50ebdf195e686ed53fadbae1272addfafad98d598a165a4b
   languageName: node
   linkType: hard
 
