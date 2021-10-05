@@ -11,6 +11,7 @@
     "build": "yarn clean && yarn build:sol && yarn build:tsc",
     "build:sol": "hardhat compile",
     "build:tsc": "tsc && cp -R ./types/*d.ts ./lib/types/",
+    "flatten": "hardhat flat",
     "fund": "hardhat fund",
     "faucet": "hardhat faucet",
     "network": "DEVELOPMENT=true hardhat node",
