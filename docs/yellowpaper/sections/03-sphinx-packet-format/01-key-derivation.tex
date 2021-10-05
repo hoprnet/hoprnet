@@ -5,7 +5,7 @@ The sender $A$ picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new k
 
 $A$ randomly picks a path consisting of intermediate nodes $B$, $C$, $D$, and the packet's final destination, $Z$.
 
-$A$ performs an offline DH key exchange with each of these nodes and derives shared keys with each of them.
+$A$ performs an offline Diffie-Hellman (DH) key exchange with each of these nodes and derives shared keys with each of them.
 
 $A$ computes a sequence of $r$ tuples (in our case $r$=4)  $$(\alpha_0,s_0,b_0),.................,(\alpha_{r-1},s_{r-1},b_{r-1})$$ as follows:
 $$\alpha_0=g^x,s_0=y^x_B,b_0=h_b(a_0,s_0)$$
@@ -18,6 +18,7 @@ and
     \end{cases}\,.
     \label{eq:1}
 \end{equation}
+
 for $1\le i < r-1$, where $y_0,y_1, y_2, y_3$, and $y_4$ are the public keys of the nodes $B$, $C$, $D$, and $Z$, which we assume to be available to $A$.
 
 \begin{figure}[H]

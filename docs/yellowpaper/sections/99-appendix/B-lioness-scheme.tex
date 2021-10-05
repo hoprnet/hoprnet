@@ -3,7 +3,7 @@
 
 HOPR uses the LIONESS \cite{lionesspaper} wide-block cipher scheme with ChaCha20 as stream cipher and BLAKE2s as hash function, resulting in a key length of 128 bytes and 64 bytes for the initialisation vector.
 
-The key $k$ is split into four chunks of 32 bytes $k = k_1 \ || \ k_2 \ || \  k_3 \ || \ k_4$ where $k_1, k_3$ are used as keys for the stream cipher and $k_2, k_4$ are used to key the hash function. The same applies to the initialisation vector $iv$ which is split int four chunks of 16 bytes $iv = iv_1 \ || \ iv_2 \ || \  iv_3 \ || \ iv_4$ with $iv_1, iv_3$ as an inititialisation for the stream cipher and $iv_2, iv_4$ as an initialisation vector for the hash function.
+The key $k$ is split into four chunks of 32 bytes $k = k_1 \ || \ k_2 \ || \  k_3 \ || \ k_4$, where $k_1, k_3$ are used as keys for the stream cipher and $k_2, k_4$ are used to key the hash function. The same applies to the initialisation vector $iv$ which is split into four chunks of 16 bytes $iv = iv_1 \ || \ iv_2 \ || \  iv_3 \ || \ iv_4$ with $iv_1, iv_3$ as an initialisation vector for the stream cipher and $iv_2, iv_4$ as an initialisation vector for the hash function.
 
 \begin{figure}[H]
     \centering
@@ -88,6 +88,6 @@ The key $k$ is split into four chunks of 32 bytes $k = k_1 \ || \ k_2 \ || \  k_
     \caption{Schematic overview of encryption and decryption of the LIONESS \cite{lionesspaper} scheme}
 \end{figure}
 
-LIONESS is an unbalanced Feistel scheme, hence decryption is achieved by applying the operations used for encryption in the inverse order. In contrast to other Feistel schemes, the plaintext $m$ is not split in equally and the size of the parts depend on the output length of used hash function.
+LIONESS is an unbalanced Feistel scheme, hence decryption is achieved by applying the operations used for encryption in the inverse order. In contrast to other Feistel schemes, the plaintext $m$ is not split equally and the size of the parts depend on the output length of used hash function.
 
 As HOPR payloads have a size of 500 bytes, messages are split as $m = m_l \ || \ m_r$ where $|m_l| = 32$ bytes and $|m_r| = 468$ bytes.
