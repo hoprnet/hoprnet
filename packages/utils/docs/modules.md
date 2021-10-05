@@ -237,7 +237,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L273)
+[libp2p/index.ts:286](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L286)
 
 ___
 
@@ -262,7 +262,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:274](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L274)
+[libp2p/index.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L287)
 
 ___
 
@@ -1312,7 +1312,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L230)
+[libp2p/index.ts:243](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L243)
 
 ___
 
@@ -1336,7 +1336,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L246)
+[libp2p/index.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L259)
 
 ___
 
@@ -1359,7 +1359,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:309](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L309)
+[libp2p/index.ts:322](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L322)
 
 ___
 
