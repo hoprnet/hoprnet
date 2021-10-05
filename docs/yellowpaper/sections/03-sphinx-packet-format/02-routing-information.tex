@@ -19,27 +19,84 @@ The routing information is computed as follows:
 \end{align}
 $0\le i < v-1$
 
-\begin{tikzpicture}
-    \def\one{0.6}
-    \def\scale{0.9}
-    \def\nodeWidth{3*\one}
-    \def\endWidth{1.2}
-    \def\width{3*2*\nodeWidth+\endWidth}
-    \foreach \i\name in{0/B,1/C,2/D,3/Z} {
-            \ifnum\i<3
-                \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black] {$y_{\name}$};
-                \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
-                \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black] {$\gamma_{\name}$};
-                \draw (\i*2*\nodeWidth+\nodeWidth,0) -- (\i*2*\nodeWidth+\nodeWidth,\one);
-            \else
-                \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black] {$end$};
-                \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \def\one{0.6}
+        \def\scale{0.9}
+        \def\nodeWidth{1.95}
+        \def\endWidth{1.2}
+        \def\width{3*2*\nodeWidth+\endWidth}
+        \foreach \i\name in{0/B,1/C,2/D,3/Z} {
+                \begin{scope}[shift={(\i*\nodeWidth*2,0)}]
+                    \ifnum\i=0
+                        \def\a{11.7}
+                        \def\diff{11.1}
+                    \fi
 
-            \fi
-        }
+                    \ifnum\i=1
+                        \def\a{7.8}
+                        \def\diff{7.2}
+                    \fi
 
-    \draw (0,0) rectangle (\width,\one);
-\end{tikzpicture}
+                    \ifnum\i=2
+                        \def\a{3.9}
+                        \def\diff{3.3}
+
+                    \fi
+
+                    \ifnum\i=3
+                        \def\a{\endWidth}
+                        \def\diff{0.6}
+                    \fi
+
+
+                    \def\b{0.6}
+                    \def\lw{0.2}
+
+                    \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                            \draw [line width=\lw mm](\x,0)--(0,\x) (\a-\b+\x,\b)--(\a,\x);
+                        }
+                    \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                            \draw [line width=\lw mm](\x+\b,0)--(\x,\b);
+                        }
+
+                    \ifnum\i>0
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                                \draw [line width=\lw mm](0,\x)--(\b-\x,\b) (\a-\b+\x,0)--(\a,\b-\x);
+                            }
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                                \draw [line width=\lw mm](\x,0)--(\b+\x,\b);
+                            }
+                    \fi
+
+                    \ifnum\i>1
+                        \foreach \x [count=\i] in{0.15,0.45,...,\a}{
+                                \draw [line width=\lw mm](\x,0)--(\x,\b);
+                            }
+                    \fi
+
+                    \ifnum\i>2
+                        \foreach \x [count=\i] in{0.15,0.45,...,\b}{
+                                \draw [line width=\lw mm](0,\x)--(\a,\x);
+                            }
+                    \fi
+                \end{scope}
+                \ifnum\i<3
+                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black] {$y_{\name}$};
+                    \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
+                    \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black] {$\gamma_{\name}$};
+                    \draw (\i*2*\nodeWidth+\nodeWidth,0) -- (\i*2*\nodeWidth+\nodeWidth,\one);
+                \else
+                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black] {$end$};
+                    \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
+                \fi
+            }
+
+        \draw (0,0) rectangle (\width,\one);
+    \end{tikzpicture}
+    \caption{Routing information}
+\end{figure}
 
 such that $y_Z$ is the destination's public key in compressed form (since this is only the $x$-coordinate, it is 33 bytes instead of 64) and $|y_Z|$ is its length. $\rho$ is a pseudorandom generator (PRG) and $h_{\rho}$ is the hash function used to key $\rho$.
 $v\leq r$ is the length of the path traversed by the packet, where $|y_Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string such that
