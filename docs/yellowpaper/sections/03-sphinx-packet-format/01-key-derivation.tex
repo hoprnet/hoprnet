@@ -7,7 +7,7 @@ $A$ randomly picks a path consisting of intermediate nodes $B$, $C$, $D$, and th
 
 $A$ performs an offline Diffie-Hellman (DH) key exchange with each of these nodes and derives shared keys with each of them.
 
-$A$ computes a sequence of tuples $(\alpha_i,s_i,b_i) \in \{ B, C, D, Z \}$ with $\alpha_A = g^x$ and $b_A = h_b(\alpha_A, s_B = y_B^{x b_A})$ as follows:
+$A$ computes a sequence of tuples $(\alpha_i,s_i,b_i) \in \{ B, C, D, Z \}$ with $\alpha_A = g^x$ and $b_A = h_b(\alpha_A, y_B^{x})$ as follows:
 
 \begin{align}
     \nonumber(\alpha_B,s_B,b_B) & = (g^{x b_A},y_B^{x b_A},h_b(\alpha_B,s_B))                         \\
