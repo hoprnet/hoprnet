@@ -44,9 +44,9 @@ const hardhatConfig: HardhatUserConfig = {
       saveDeployments: true,
       mining: DEVELOPMENT
         ? {
-          auto: true, // every transaction will trigger a new block (without this deployments fail)
-          interval: [1000, 3000] // mine new block every 1 - 3s
-        }
+            auto: true, // every transaction will trigger a new block (without this deployments fail)
+            interval: [1000, 3000] // mine new block every 1 - 3s
+          }
         : undefined
     },
     goerli: {
@@ -129,7 +129,7 @@ task('accounts', 'View unlocked accounts', async (...args: any[]) => {
 })
 
 function getSortedFiles(dependenciesGraph) {
-  const tsort = require("tsort")
+  const tsort = require('tsort')
   const graph = tsort()
 
   const filesMap = {}
@@ -155,17 +155,17 @@ function getSortedFiles(dependenciesGraph) {
 function getFileWithoutImports(resolvedFile) {
   const IMPORT_SOLIDITY_REGEX = /^\s*import(\s+)[\s\S]*?;\s*$/gm
 
-  return resolvedFile.content.rawContent.replace(IMPORT_SOLIDITY_REGEX, "").trim()
+  return resolvedFile.content.rawContent.replace(IMPORT_SOLIDITY_REGEX, '').trim()
 }
 
-subtask("flat:get-flattened-sources", "Returns all contracts and their dependencies flattened")
-  .addOptionalParam("files", undefined, undefined, types.any)
-  .addOptionalParam("output", undefined, undefined, types.string)
+subtask('flat:get-flattened-sources', 'Returns all contracts and their dependencies flattened')
+  .addOptionalParam('files', undefined, undefined, types.any)
+  .addOptionalParam('output', undefined, undefined, types.string)
   .setAction(async ({ files, output }, { run }) => {
-    const dependencyGraph = await run("flat:get-dependency-graph", { files })
+    const dependencyGraph = await run('flat:get-dependency-graph', { files })
     console.log(dependencyGraph)
 
-    let flattened = ""
+    let flattened = ''
 
     if (dependencyGraph.getResolvedFiles().length === 0) {
       return flattened
@@ -176,7 +176,7 @@ subtask("flat:get-flattened-sources", "Returns all contracts and their dependenc
     let isFirst = true
     for (const file of sortedFiles) {
       if (!isFirst) {
-        flattened += "\n"
+        flattened += '\n'
       }
       flattened += `// File ${file.getVersionedName()}\n`
       flattened += `${getFileWithoutImports(file)}\n`
@@ -185,44 +185,51 @@ subtask("flat:get-flattened-sources", "Returns all contracts and their dependenc
     }
 
     // Remove every line started with "// SPDX-License-Identifier:"
-    flattened = flattened.replace(/SPDX-License-Identifier:/gm, "License-Identifier:")
+    flattened = flattened.replace(/SPDX-License-Identifier:/gm, 'License-Identifier:')
 
     flattened = `// SPDX-License-Identifier: MIXED\n\n${flattened}`
 
     // Remove every line started with "pragma experimental ABIEncoderV2;" except the first one
-    flattened = flattened.replace(/pragma experimental ABIEncoderV2;\n/gm, ((i) => (m) => (!i++ ? m : ""))(0))
+    flattened = flattened.replace(
+      /pragma experimental ABIEncoderV2;\n/gm,
+      (
+        (i) => (m) =>
+          !i++ ? m : ''
+      )(0)
+    )
 
     flattened = flattened.trim()
     if (output) {
-      console.log("Writing to", output)
+      console.log('Writing to', output)
       fs.writeFileSync(output, flattened)
-      return ""
+      return ''
     }
     return flattened
   })
 
-subtask("flat:get-dependency-graph")
-  .addOptionalParam("files", undefined, undefined, types.any)
+subtask('flat:get-dependency-graph')
+  .addOptionalParam('files', undefined, undefined, types.any)
   .setAction(async ({ files }, { run }) => {
-    const sourcePaths = files === undefined ? await run("compile:solidity:get-source-paths") : files.map((f) => fs.realpathSync(f))
+    const sourcePaths =
+      files === undefined ? await run('compile:solidity:get-source-paths') : files.map((f) => fs.realpathSync(f))
 
-    const sourceNames = await run("compile:solidity:get-source-names", {
-      sourcePaths,
+    const sourceNames = await run('compile:solidity:get-source-names', {
+      sourcePaths
     })
 
-    const dependencyGraph = await run("compile:solidity:get-dependency-graph", { sourceNames })
+    const dependencyGraph = await run('compile:solidity:get-dependency-graph', { sourceNames })
 
     return dependencyGraph
   })
 
-task("flat", "Flattens and prints contracts and their dependencies")
-  .addOptionalVariadicPositionalParam("files", "The files to flatten", undefined, types.inputFile)
-  .addOptionalParam("output", "Specify the output file", undefined, types.string)
+task('flat', 'Flattens and prints contracts and their dependencies')
+  .addOptionalVariadicPositionalParam('files', 'The files to flatten', undefined, types.inputFile)
+  .addOptionalParam('output', 'Specify the output file', undefined, types.string)
   .setAction(async ({ files, output }, { run }) => {
     console.log(
-      await run("flat:get-flattened-sources", {
+      await run('flat:get-flattened-sources', {
         files,
-        output,
+        output
       })
     )
   })
