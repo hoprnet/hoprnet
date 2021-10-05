@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.80.4",
+  "version": "1.81.0-next.5",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -11,6 +11,9 @@
     "lib",
     "hopr-admin/.next/**"
   ],
+  "engines": {
+    "node": "16"
+  },
   "scripts": {
     "clean": "rimraf ./lib",
     "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin && chmod u+x lib/*.js",
@@ -51,7 +54,7 @@
     "run-queue": "^2.0.1",
     "strip-ansi": "6.0.1",
     "tiny-hashes": "^1.0.1",
-    "ws": "^8.2.1",
+    "ws": "8.2.3",
     "yargs": "17.2.1"
   },
   "devDependencies": {

@@ -39,7 +39,7 @@ HOPR's proof-of-relay mechanism threads this needle, and is the major innovation
 
 Generally, the HOPR protocol aims to hide the fact that two parties are communicating with each other, as well as the contents of the communication. This information should be hidden from any party external to the network, all intermediaries involved in transferring the data between the communicating parties, and even the communicating parties themselves, if one or both of them desires it.
 
-Specifically, the HOPR protocol aims to build a network with the following features (definitions based on \cite{AnoA}, \cite{loopix} and \cite{sphinxpaper}) for senders that are indicated by letter $S$ and recipients indicated by the letter $Z$. 
+Specifically, the HOPR protocol aims to build a network with the following features (definitions based on \cite{AnoA}, \cite{loopix} and \cite{sphinxpaper}) for senders, indicated by $A_n$ and recipients, indicated by $Z_n$.
 
 \subsubsection{Sender anonymity}
 In a network with sender anonymity, an observer is not able to tell if a particular packet was sent by any adversary-selected honest senders $A_1$ or $A_2$ to the honest recipient $Z$. Formally this is denoted as $\{A_1 \rightarrow Z, A_2 \not\rightarrow \}$ or $\{A_1 \not\rightarrow, A_2 \rightarrow Z \}$.
@@ -50,32 +50,32 @@ In analogy to sender anonymity, here an observer is not able to tell if a partic
 
 
 \subsubsection{Sender-recipient unlinkability}
-For any pair of senders, $A_1 and A_2$, communicating with any pair of recipients, $Z_1 and Z_2$, an adversary must be unable to determine whether two packets went from $\{A_1 \rightarrow Z_1, A_2 \rightarrow Z_2 \}$ or $\{A_1 \rightarrow Z_2, A_2 \rightarrow Z_1 \}$.
+For any pair of senders, $A_1$ and $A_2$, communicating with any pair of recipients, $Z_1$ and $Z_2$, an adversary must be unable to determine whether two packets travelled from $\{A_1 \rightarrow Z_1, A_2 \rightarrow Z_2 \}$ or $\{A_1 \rightarrow Z_2, A_2 \rightarrow Z_1 \}$.
 
 
 These properties assume senders and recipients are honest, but they should hold for any honest senders and recipients of the adversary's choice.
 
-To provide these features, the HOPR protocol builds on top of the Sphinx packet format \cite{sphinxpaper}, the specifics of which are explained in Section \ref{sec:sphinx} and we utilize \nameref{sec:CT}. The additional parameters required for HOPR's incentive scheme are encapsulated in the Sphinx header as described in section \ref{sec:PoR:Challenge} as additional routing parameters and as such do not change the privacy guarantees of Sphinx.
+To provide these features, the HOPR protocol builds on top of the Sphinx packet format \cite{sphinxpaper}, the specifics of which are explained in Section \ref{sec:sphinx}. HOPR also employs cover traffic, explained in Section \ref{sec:CT}. The additional parameters required for HOPR's incentive scheme are encapsulated in the Sphinx header as described in section \ref{sec:proofofrelay:challenge} as additional routing parameters and as such do not change the privacy guarantees of Sphinx.
 
 
 
 \subsection{Threat Model}
 
-Although we assume that nodes in the HOPR network can communicate reliably, the network must still be protected from malicious actors and node failures. We assume a threat model with Byzantine nodes with the ability to either observe all network traffic and launch network attacks or to inject, drop, or delay messages as follows:
+Although we assume that nodes in the HOPR network can communicate reliably, the network must still be protected from malicious actors and node failures. We assume a threat model with Byzantine nodes with the ability to either observe all network traffic and launch network attacks or to inject, drop, or delay packets as follows:
 
-\subsubsection{Global passive adversaries (GPAs)} A global passive adversary (GPA) is a theoretical attacker who can observe the entirety of network traffic passing between users. A GPA is considered passive because their attacks are based on observation alone. A GPA is arbitrarily powerful, and the full abilities of a GPA are unlikely to be manifest in any real-world attacker. Nonetheless, building a network which is GPA-resistant introduced extra security through redundancy and future-proofing.
+\subsubsection{Global passive adversaries (GPAs)} A global passive adversary (GPA) is an attacker who can observe the entirety of network traffic passing between users. A GPA is considered passive because their attacks are based on observation alone. A theoretical GPA is arbitrarily powerful, and their full abilities are unlikely to be manifest in any real-world attacker. Nonetheless, building a network which is GPA-resistant introduces extra security through redundancy and future-proofing.
 
-Thanks to the properties of Sphinx (see Section \ref{sec:sphinx}) and proof of relay (see Section \ref{sec:proofofrelay}), HOPR is able to defend against GPAs. Nonetheless, it is worth mention some additional attacks that a decentralized mixnet like HOPR is particularly vulnerable to by virture of its decentralized and anonymous nature.
+Thanks to the properties of Sphinx (see Section \ref{sec:sphinx}) and proof of relay (see Section \ref{sec:proofofrelay}), HOPR is able to defend against GPAs. Nonetheless, it is worth mentioning some additional attacks that a decentralized mixnet like HOPR is particularly vulnerable to by virtue of its decentralized and anonymous nature.
 
 \subsubsection{Sybil attacks}
-In a Sybil attack, an attacker forges multiple identities in the network, thereby introducing network redundancy and reducing system security. The attacker can potentially de-anonymize packet traffic and thus link the sender and recipient's identities. HOPR mitigates Sybil attacks via the trust assumption of the Sphinx packet format: only a single honest relayer is needed to ensure integrity of the entire transmission chain, and since the traffic is source routed, users can choose routes themselves to ensure this minimal requirement of one honest relayer is met. Since path selection is depending on a financial stake, launching a Sybil attack would be increasingly prohibitively expensive.
+In a Sybil attack, an attacker forges multiple identities in the network, thereby introducing network redundancy and reducing system security. The attacker can potentially de-anonymize packet traffic and thus link the sender and recipient's identities. HOPR mitigates Sybil attacks via the trust assumption of the Sphinx packet format: only a single honest relayer is needed to ensure integrity of the entire transmission chain, and since the traffic is source routed, users can choose routes themselves to ensure this minimal requirement of one honest relayer is met. Since path selection is dependant on a financial stake, launching a Sybil attack would be prohibitively expensive.
 
 \subsubsection{Eclipse attacks}
-Many decentralized network suffer from a general unavailability of a general understanding of its topology, hence nodes cannot determine whether the respective local view is complete or accurate. As an attacker it might be attractive to flood a victim with inappropriate information about collaborating node whilst withholding the information about honest nodes.
+Many decentralized networks suffer from a general unavailability of a general understanding of their topology, hence nodes cannot determine whether their respective local views are complete or accurate. As an attacker, it might be attractive to flood a victim with inaccurate information about collaborating nodes while withholding information about honest nodes.
 
-HOPR mitigates this issue by using a different medium to announce entry nodes to the network. This is done using a smart contract on a blockchain and known within HOPR as DEADR (Decentralized Entry Advertisement and Distributed Relaying). DEADR nodes are serving two functions: (1) providing access to the Distributed Hash Table (DHT) that is used within the libp2p environment that HOPR leverages and (2) facilitating network address translation (NAT) or relaying traffic that cannot be sent directly between adjacent nodes who are residing in separate internet sub-networks such as computers without a public internet-facing internet protocoll (IP) address behind typical home routers. A HOPR node only requires access one honest DEADR node and it is computationally significantly cheaper to facilitate a check if a DEADR node is honest than the attack that requires on-chain transactions. Running a successful eclipse attack therefore requires controlling all announced DEADR nodes or forging a public blockchain which we assume are both impossible and out of scope of this work.
+HOPR mitigates this issue by using a different medium to announce entry nodes to the network. This is done using a smart contract on a blockchain and known within HOPR as DEADR (Decentralized Entry Advertisement and Distributed Relaying). DEADR nodes serve two functions: (1) providing access to the distributed hash table (DHT) that is used within the libp2p environment that HOPR leverages and (2) facilitating network address translation (NAT) or relaying traffic that cannot be sent directly between adjacent nodes who reside in separate internet sub-networks (e.g., computers without a public internet-facing internet protocol (IP) address behind typical home routers). A HOPR node only requires access to one honest DEADR node and it is significantly cheaper in computational terms to check whether a DEADR node is honest than to conduct an eclipse attack, which requires on-chain transactions. A successful eclipse attack therefore requires controlling all announced DEADR nodes or forging a public blockchain, both of which we assume are impossible and beyond the scope of this work.
 
-However, security cannot come at the expense of usability. To be appealing to users and node runners alike, it is important for HOPR to find a satisfactory compromise to what is known as the ``anonymity trilemma" \cite{AnonymityTrilemma}, which states that a privacy network can provide at most two of the following properties: low-latency communication, low bandwidth overhead, and strong anonymity.
+Thus we are satisfied that HOPR more than adequately protects users against attack. However, security cannot come at the expense of usability. To be appealing to users and node runners alike, it is important for HOPR to find a satisfactory compromise to what is known as the ``anonymity trilemma" \cite{AnonymityTrilemma}, which states that a privacy network can provide at most two of the following properties: low latency communication, low bandwidth overhead, and strong anonymity.
 
 The rest of this paper will outline the current state of the art among anonymous communication protocols and layer-2 scalability protocols, describe how the HOPR network is built, and explain how HOPR provides a satisfactory resolution to the anonymity trilemma.
 
@@ -84,7 +84,7 @@ The rest of this paper will outline the current state of the art among anonymous
 \subsection{State of the Art}
 \label{sec:stateoftheart}
 
-HOPR has been built on top of, or as a reaction to, various technologies and research projects which try to meet some or all of the design ethos and security goals outlined above. These technologies and research projects can be broadly divided into two groups for which we separately present the state of the art in the following sections: (1) \nameref{sec:privacyprotocols} which attempt to hide user information; (2) \nameref{sec:l2protocols} which allow systems to perform micro-payments via the Ethereum blockchain.
+HOPR has been built on top of, or as a reaction to, various technologies and research projects which try to meet some or all of the design ethos and security goals outlined above. These technologies and research projects can be broadly divided into two groups: (1) \lcnameref{sec:privacyprotocols} which attempt to hide user information; (2) \lcnameref{sec:l2protocols} which allow systems to perform micro-payments via the Ethereum blockchain. The following sections present the state of the art for each of these groups.
 
 \subsubsection{Anonymous Communication Protocols}
 \label{sec:privacyprotocols}
@@ -100,28 +100,27 @@ A research project called VPN$^0$ \cite{vpn0} aims to provide better privacy gua
 
 \paragraph{Onion Routing} is another approach to network privacy, implemented by projects such as Tor \cite{tor}. Tor encapsulates messages in layers of encryption and transmits them through a series of network nodes called \textit{onion routers}. However, Tor is susceptible to end-to-end correlation attacks from adversaries who can eavesdrop on the communication channels. These attacks reveal a wide range of information, including the identity of the communicating peers.
 
-The Invisible Internet Project (\textit{I2P}) is an implementation of onion-routing with notably different characteristics than Tor \cite{i2p}:
+The Invisible Internet Project (\textit{I2P}) is an implementation of onion routing with notably different characteristics than Tor \cite{i2p}:
 
 \begin{itemize}
 
-    \item \textbf{Packet switched instead of circuit switched}
-          Tor allocates connection to long-lived circuits; this allocation does not change until either the connection or the circuit closes. In contrast, routers in I2P maintain multiple tunnels per destination. This significantly increases scalability and failure resistance since packets are used in parallel.
+      \item \textbf{Packet switched instead of circuit switched}
+            Tor allocates connection to long-lived circuits; this allocation does not change until either the connection or the circuit closes. In contrast, routers in I2P maintain multiple tunnels per destination. This significantly increases scalability and failure resistance since packets are used in parallel.
 
-    \item \textbf{Unidirectional tunnels}
-          Employing unidirectional rather than bidirectional tunnels makes deanonymization harder, because tunnel participants see half as much data and need two sets of peers to be profiled.
+      \item \textbf{Unidirectional tunnels}
+            Employing unidirectional rather than bidirectional tunnels makes deanonymization harder, because tunnel participants see half as much data and need two sets of peers to be profiled.
 
-    \item \textbf{Peer profiles instead of directory authorities}
-          I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
+      \item \textbf{Peer profiles instead of directory authorities}
+            I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
 \end{itemize}
 
 Despite these improvements, I2P is vulnerable to eclipse attacks since no I2P router has a full view of the global network (similar to other peer-to-peer networks). Like Tor, I2P only provides protection against local adversaries, making it vulnerable to timing, intersection, and traffic analysis attacks. I2P has also been shown to be vulnerable to Sybil and predecessor attacks, in spite of various countermeasures implemented to thwart these.
 
-\paragraph{Mixnets} are overlay networks of so-called \textit{mix nodes} which route messages anonymously, similarly to Tor \cite{mixnets}. Mixnets originally used a cascade topology where each node would receive a batch of encrypted messages, decrypt them, randomly permute packets, and transfer them in parallel. Cascade topology makes it easy to prove the anonymity properties of a given mixnet design for a particular mix. However, it does not scale well with respect to increasing mixnet traffic and is susceptible to traffic attacks. Since then, research has evolved to provide solutions with low latency while still providing high anonymity by using a method called \textit{cover traffic}. Cover traffic is designed to hide communication messages among random noise. An external adversary able to observe the message flow should not be able to
-distinguish communication messages from these cover traffic messages, increasing privacy.
+\paragraph{Mixnets} are overlay networks of so-called \textit{mix nodes} which route packets anonymously, similarly to Tor \cite{mixnets}. Mixnets originally used a cascade topology where each node would receive a batch of encrypted messages, decrypt them, randomly permute packets, and transfer them in parallel. Cascade topology makes it easy to prove the anonymity properties of a given mixnet design for a particular mix. However, it does not scale well with respect to increasing mixnet traffic and is susceptible to traffic attacks. Since then, research has evolved to provide solutions with low latency while still providing high anonymity by using a method called \textit{cover traffic}. Cover traffic is designed to hide communication packets among random noise. An external adversary able to observe the packet flow should not be able to distinguish communication packets from these cover traffic packets, increasing privacy.
 
 The application of cover traffic provides metadata protection from global network adversaries, a considerable improvement on projects such as Tor and I2P. However, because mixnets add extra latency to network traffic, they are better suited to applications that are not as sensitive to increased latency, such as messaging or email applications. For applications such as real-time video streaming, Tor may be more suitable, provided the user feels the latency improvements outweigh the increased privacy risks.
 
-Loopix \cite{loopix} is another research project which uses cover traffic to resist traffic analysis while still achieving low latency. To achieve this, Loopix employs a mixing strategy called \textit{Poisson mix}. Poisson mix nodes independently delay messages, making packets unlinkable via timing analysis.
+Loopix \cite{loopix} is another research project which uses cover traffic to resist traffic analysis while still achieving low latency. To achieve this, Loopix employs a mixing strategy called \textit{Poisson mix}. Poisson mix nodes independently delay packets, making packets unlinkable via timing analysis.
 
 \subsubsection{Layer-2 Scalability Protocols}
 \label{sec:l2protocols}
@@ -130,7 +129,7 @@ Blockchain technology (mostly public blockchains like Bitcoin and Ethereum) suff
 
 Multiple solutions have been proposed to resolve the scalability issue, including sharding and off-chain computation. Both approaches intend to create a second layer of computation to reduce the load on the blockchain mainnet.
 
-Off-chain solutions such as Plasma \cite{plasma}, Truebit \cite{truebit}, and state channels process transactions outside the blockchain while still guaranteeing a sufficient level of security and finality. State channels are better known as "payment channels". In models like the Lightning Network \cite{lightningnetwork}, a payment channel is opened between two parties by committing a funding transaction. Those parties may then make any number of signed transactions that update the channel's funds without broadcasting those to the blockchain. The channel is eventually closed by broadcasting the final version of the settlement transaction. The channel balance is updated by creating a new set of commitment transactions, followed by trade revocation keys which render the previous set of commitment transactions unusable. Both parties always have the option to "cash out" by submitting the latest commitment transaction to the blockchain. If one party tries to cheat by submitting an outdated commitment transaction, the other party can use the corresponding revocation key to take all the funds in the channel.
+Off-chain solutions such as Plasma \cite{plasma}, Truebit \cite{truebit}, and state channels process transactions outside the blockchain while still guaranteeing a sufficient level of security and finality. State channels are better known as ``payment channels". In models like the Lightning Network \cite{lightningnetwork}, a payment channel is opened between two parties by committing a funding transaction. Those parties may then make any number of signed transactions that update the channel's funds without broadcasting those to the blockchain. The channel is eventually closed by broadcasting the final version of the settlement transaction. The channel balance is updated by creating a new set of commitment transactions, followed by trade revocation keys which render the previous set of commitment transactions unusable. Both parties always have the option to ``cash out" by submitting the latest commitment transaction to the blockchain. If one party tries to cheat by submitting an outdated commitment transaction, the other party can use the corresponding revocation key to take all the funds in the channel.
 
 As soon as closure is initiated, the channel can no longer be used to route payments. There are different channel closure transactions depending on whether both parties agree on closing the channel. If both agree, they provide a digital signature that authorizes this cooperative settlement transaction. In the case where they disagree or only one party is online, a unilateral closure is initiated without the cooperation of the other party. This is done by broadcasting a ``commitment transaction". Both parties will receive their portion of the money in the channel, but the party that initiates the closure must wait for a certain delay to receive their money. This delay time is negotiated by the nodes before the channel is opened, for the protection of both parties.
 
@@ -140,10 +139,10 @@ The Raiden network \cite{raiden} is a layer-2 payment solution for the Ethereum 
 We present in the following a comparison table (from the Loopix paper) between different anonymous communication systems.
 
 \begin{figure}[H]
-    \centering
-    \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/state-of-the-art.png}
-    \caption{Comparison between anonymous communication systems}
-    \label{fig:Comparison between anonymous communication systems}
+      \centering
+      \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/state-of-the-art.png}
+      \caption{Comparison between anonymous communication systems}
+      \label{fig:Comparison between anonymous communication systems}
 \end{figure}
 \end{comment}
 
@@ -153,9 +152,9 @@ We present in the following a comparison table (from the Loopix paper) between d
 
 Although there are numerous projects attempting to solve the problem of online privacy, most fail to satisfy the design principles and security goals outlined in Section \ref{sec:securitygoals}.
 
-\paragraph{Privacy} The metadata privacy properties that a mixnet like HOPR provides are significantly beyond what VPNs, dVPNs or even Tor can deliver. VPNs and dVPNs have single points of trust and failure. Tor and I2P have been shown to be subject to a large variety of de-anonymizing attacks, which a mixnet like HOPR is resilient against. The HOPR mixnet unlinks sender and recipient even facing powerful global passive adversaries (GPAs) which can monitor every packet in the network. This is achieved by packet transformation, mixing and introducing delays before forwarding a packet as well as bandwidth overhead in form of Cover Traffic and packet padding.
+\paragraph{Privacy} The metadata privacy properties that a mixnet like HOPR provides are significantly beyond what VPNs, dVPNs, or even Tor can deliver. VPNs and dVPNs have single points of trust and failure. Tor and I2P have been shown to be subject to a large variety of de-anonymizing attacks, which a mixnet like HOPR is resilient against. The HOPR mixnet unlinks sender and recipient even when faced by powerful global passive adversaries (GPAs) which can monitor every packet in the network. This is achieved by packet transformation, mixing, and introducing delays before forwarding a packet, as well as bandwidth overhead in form of cover traffic and packet padding.
 
-\paragraph{Decentralization} Most projects presented above have decentralization as a core goal, with the exception of VPNs, where the service is provided by a centralized entity, at the expense of user privacy. However, many projects lack the impetus to scale, which prevents them from leveraging many of the advantages which come with a decentralized network, such as privacy through obscurity, while retaining all of the challenges, such as coordination and consensus issues. It is our opinion that the only way to solve the scalability problem is with the introduction of a robust incentivization scheme for node runners.
+\paragraph{Decentralization} Most projects presented above have decentralization as a core goal (with the exception of VPNs, where the service is provided by a centralized entity, at the expense of user privacy). However, many projects lack the impetus to scale, which prevents them from leveraging many of the advantages which come with a decentralized network, such as privacy through obscurity, while retaining all of the challenges, such as coordination and consensus issues. It is our opinion that the only way to solve the scalability problem is with the introduction of a robust incentivization scheme for node runners.
 
 \paragraph{Incentivization} Many projects referenced in this section lack incentivization of any kind. VPNs incentivize the service provider, but since this is a centralized entity this fails the privacy condition.
 
@@ -163,6 +162,6 @@ Bandwidth providers in dVPNs share their resources and are granted tokens accord
 
 Tor and I2P rely on donations and government funding, which only covers the cost of running a node, not any additional reward. This has discouraged volunteers from joining these networks and the number of relayers in both networks has stayed mostly static in recent years, even as usage and the demand for privacy has risen sharply.
 
-Mixnet designs are generally unconcerned with the problem of incentivization, and most existing implementations rely on a group of volunteer agents who lack incentives to participate. However, it is possible to add incentivization on top of a mixnet design, which is what HOPR does. Some mixnets have proposed adding digital coins to messages, such that each volunteer can extract only the digital coin designated as a payment for them. However, here the anonymity provided by the mixnet acts as a double-edged sword: since there is no verification for whether a message arrives at its final destination, and node identities are kept secret by the mixnet, selfish nodes can extract payment without performing their relaying task. Thus a naive implementation of this approach does not actually provide an incentive at all.
+Mixnet designs are generally unconcerned with the problem of incentivization, and most existing implementations rely on a group of volunteer agents who lack incentives to participate. However, it is possible to add incentivization on top of a mixnet design, which is what HOPR does. Some authors have proposed adding digital coins to packet delivery in mixnets \cite{MixnetCoins}. However, here the anonymity provided by the mixnet acts as a double-edged sword: since there is no verification for whether a packet arrives at its final destination, and node identities are kept secret by the mixnet, selfish nodes can extract payment without performing their relaying task or without passing on acknoledgements to the next node. Thus a naive implementation of this approach does not actually provide an incentive at all.
 
 It is in this last area that HOPR provides its main innovation: HOPR's proof-of-relay mechanism ensures that node runners are only paid if they complete their relaying duties. The challenge is to enforce this without publicizing data which would allow an adversary to break the anonymity of the network, and to provide both incentivization and anonymity without introducing unacceptable latency and bandwidth costs. The remainder of this paper will explain how this is achieved.
