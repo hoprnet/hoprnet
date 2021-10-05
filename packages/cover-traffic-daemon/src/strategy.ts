@@ -124,7 +124,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
         toOpen.find((x) => x[0].eq(c)) ||
         toClose.find((x) => x.eq(c))
       ) {
-        console.error('skipping node', c.toB58String())
+        //console.error('skipping node', c.toB58String())
         continue
       }
       // It should fulfil the quality threshold

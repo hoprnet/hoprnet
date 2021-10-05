@@ -1,6 +1,6 @@
 \section{Paths and Path Selection}
 \label{sec:path-selection}
-HOPR currently utilizes free-route sender-selected paths which are known to provide better privacy as well as better packet delivery in the event of partial network failure than other topologies \cite{Dingledine2004SynchronousBF}. HOPR makes it easy to customize various different routing strategies. In this section, we present the free-routing strategy that HOPR nodes are currently following. Another strategy is later introduced in the \lcnameref{sec:CT} section.
+HOPR currently utilizes free-route sender-selected paths which are known to provide better privacy than other topologies, as well as better packet delivery in the event of partial network failure \cite{Dingledine2004SynchronousBF}. HOPR makes it easy to customize various different routing strategies. In this section, we present the free-routing strategy that HOPR nodes are currently following. Another strategy is later introduced in the \lcnameref{sec:CT} section.
 
 Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to their final destination. To meet HOPR's stated \lcnameref{sec:securitygoals}, it is crucial for nodes in the network to keep the chosen path secret.
 
@@ -8,9 +8,9 @@ As relay nodes differ in their ability to forward packets, path choices need to 
 
 Path selection is therefore done in multiple steps: first, there is a preprocessing step to assign each payment channel a score, which by default equals to its balance (the number of HOPR tokens locked in a payment channel). Here we use the balance that a node has staked in a particular payment channel as a signal for how much traffic the node is willing to relay in a fashion that aligns its incentives with the rest of the network.
 
-The score is then multiplied by a random number to yield the channel's final weight. This randomization helps reduce linkability, which is a risk is a purely deterministic selection process. Finally, a path is chosen to the destination based on these scores while considering the relative availability of intermediate hops in a depth-first greedy search.
+The score is then multiplied by a random number to yield the channel's final weight. This randomization helps reduce linkability, which is a risk in a purely deterministic selection process. Finally, a path is chosen to the destination based on these scores while considering the relative availability of intermediate hops in a depth-first greedy search.
 
-This chapter details in \lcnameref{sec:path-selection:node-score} based on a nodes payment channel balances, \lcnameref{sec:path-selection:randomization} of the edge weights of the graph and \ref{sec:path-selection:graph-traversal} to find a path in HOPR network relative to randomized channel weights and node availability.
+This chapter explains \lcnameref{sec:path-selection:node-score} based on a node's payment channel balances, \lcnameref{sec:path-selection:randomization} of the edge weights of the graph, and how nodes employ \lcnameref{sec:path-selection:graph-traversal} to find a path through the HOPR network based on randomized channel weights and node availability.
 
 \subsection{Node score assignment}
 \label{sec:path-selection:node-score}
