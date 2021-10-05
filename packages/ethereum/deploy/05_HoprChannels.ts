@@ -1,7 +1,7 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { DeploymentTypes } from '../constants'
-import { durations, u8aToHex } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex, pickVersion } from '@hoprnet/hopr-utils'
 
 const closures: {
   [key in DeploymentTypes]: number
@@ -21,7 +21,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   let salt: string
   if (hre.environment === 'default') {
-    salt = require('../package.json').version
+    salt = pickVersion(require('../package.json').version)
   } else {
     salt = hre.environment
   }
