@@ -300,7 +300,7 @@ export class NativeBalance {
   constructor(private bn: BN) {}
 
   static get SYMBOL(): string {
-    return `MATIC`
+    return `xDAI`
   }
 
   static get DECIMALS(): number {

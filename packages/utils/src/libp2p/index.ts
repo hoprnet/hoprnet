@@ -9,7 +9,7 @@ import type { PeerRoutingModule, Connection, MuxedStream } from 'libp2p'
 import type LibP2P from 'libp2p'
 
 import AbortController from 'abort-controller'
-import Debug from 'debug'
+import { debug } from '../debug'
 import pipe from 'it-pipe'
 import type { PromiseValue } from '../typescript'
 
@@ -89,8 +89,8 @@ export function isSecp256k1PeerId(peer: PeerId): boolean {
   return decoded.Type == keys.keysPBM.KeyType.Secp256k1
 }
 
-const verbose = Debug('hopr-core:libp2p:verbose')
-const logError = Debug(`hopr-core:libp2p:error`)
+const verbose = debug('hopr-core:libp2p:verbose')
+const logError = debug(`hopr-core:libp2p:error`)
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 10000
 

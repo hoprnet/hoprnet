@@ -29,13 +29,13 @@ import type PeerId from 'peer-id'
 import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
-import Debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 export const INTERMEDIATE_HOPS = 3 // 3 relayers and 1 destination
 
 const PACKET_LENGTH = getPacketLength(INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, 0)
 
-const log = Debug('hopr-core:message:packet')
+const log = debug('hopr-core:message:packet')
 
 /**
  * Validate newly created tickets

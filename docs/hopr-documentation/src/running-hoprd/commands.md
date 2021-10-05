@@ -67,9 +67,9 @@ Type `balance` to display your current HOPR and native balances.
 
 Type `withdraw [amount] [native / hopr] [address]` to withdraw the specified amount of native or HOPR tokens to the target address. Ensure you have sufficient native tokens in your balance to pay for the gas fees.
 
-<!-- ## open
+## open
 
-Type `open [HOPR addresss] [HOPR amount]` to manually open a payment channel to the specified node and fund it with the specified amount of HOPR tokens. Make sure you have sufficient native tokens to pay the gas fees. -->
+Type `open [HOPR addresss] [HOPR amount]` to manually open a payment channel to the specified node and fund it with the specified amount of HOPR tokens. Make sure you have sufficient native tokens to pay the gas fees.
 
 ## fund
 

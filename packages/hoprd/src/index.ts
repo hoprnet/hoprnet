@@ -18,7 +18,7 @@ const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 const argv = yargs(process.argv.slice(2))
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'https://provider-proxy.hoprnet.workers.dev/matic_rio'
+    default: 'https://provider-proxy.hoprnet.workers.dev/xdai_mainnet'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',

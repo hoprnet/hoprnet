@@ -4,7 +4,7 @@ import { BigNumber } from 'bignumber.js'
 import { PublicKey, ChannelEntry } from '@hoprnet/hopr-utils'
 import type { State, ChannelData, PersistedState } from './state'
 import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('cover-traffic')
 

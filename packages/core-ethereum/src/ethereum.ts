@@ -24,10 +24,10 @@ import {
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager, { TransactionPayload } from './transaction-manager'
-import Debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import { CONFIRMATIONS } from './constants'
 
-const log = Debug('hopr:core-ethereum:chain-operations')
+const log = debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
 const knownNetworks = Object.entries(networks).map(([name, data]) => ({
   name: name as Networks,

@@ -16,7 +16,7 @@ import {
   INVERSE_TICKET_WIN_PROB,
   retryWithBackoff
 } from '@hoprnet/hopr-utils'
-import Debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import type { RedeemTicketResponse } from '.'
 import { Commitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
@@ -25,7 +25,7 @@ import type { HoprDB } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { EventEmitter } from 'events'
 
-const log = Debug('hopr-core-ethereum:channel')
+const log = debug('hopr-core-ethereum:channel')
 
 // TODO - legacy, models bidirectional channel.
 class Channel {
