@@ -7,11 +7,9 @@ In the HOPR protocol, nodes that have staked funds within a payment channel can 
 
 A ticket can be issued when two nodes have established a payment channel with each other. By definition this means at least one of them has staked HOPR tokens.
 
-The ticket issuer $A$ (who could also be the packet creator) sets a winning probability and relay fee that for now is static, network-wide the winning probability of the ticket and the relay fee to use and sets the amount to: $$\sigma=\dfrac{L\times F}{P_w}$$ where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee, and $P_w$ is the ticket's winning probability.
+The ticket issuer $A$ (who could also be the packet creator) sets a winning probability and relay fee to use and sets the amount to: $$\sigma=\dfrac{L\times F}{P_w}$$ where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee, and $P_w$ is the ticket's winning probability. These are currently static values which apply network wide. 
 
-$A$ issues a ticket for the next downstream node. The challenge is given together with the routing information by the packet.
-
-$A$ does not know whether the ticket is a winner or not.
+$A$ issues a ticket for the next downstream node. The challenge is given together with the routing information by the packet. $A$ does not know whether the ticket is a winner or not.
 
 $A$ sets the content of the ticket to: $$t=(R,\sigma,P_w,\alpha,I,T_c,\zeta),$$ where $t$ has the following components, in addition to those already defined above:
 
@@ -83,7 +81,7 @@ with
 
 $$s_i^{(0)}*G+H_i=s_i^{(0)}*G+s_{i+1}^{(1)}*G=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
 
-This allows the recipient to verify that the promised value $s_{i+1}^{(1)}$ indeed leads to a solution of the challenge given in the ticket. If this is not the case, the node should drop the packet. Without this check, the sender could intentionally create false challenges which lead to unredeemable tickets.
+This allows the recipient to verify that the promised value $s_{i+1}^{(1)}$ indeed leads to a solution for the challenge given in the ticket. If this is not the case, the node should drop the packet. Without this check, the sender could intentionally create false challenges which lead to unredeemable tickets.
 
 
 \subsection{Ticket Redemption}
@@ -113,9 +111,9 @@ Both the node and the smart contract then perform the following checks:
             \textbf{Commitment verification} The node then verifies that $r_i$ and $comm_{i-1}$ lead to a winning ticket. This is the case if $$h(t_h, comm_{i-1}, r_i) <P_w$$ where $t_h=h(t)$ is the ticket hash. The values are first ABI encoded, then hashed using keccak256 and last but not least converted to uint256.
 
             If the check is not valid, the node should drop the packet.
-            The final recipient of the packet does not receive a ticket because packet reception is not incentivized by the HOPR protocol.
+            The final recipient of the packet does not receive a ticket because packet receipt is not incentivized by the HOPR protocol.
       \item
-            \textbf{Issuer identity} The ticket signer must be same as the ticket issuer. Both node and smart contract verify if the public key associated to the private key used to sign $$T= (t, Sig_I(t))$$ is the issuer's public key. The packet is dropped if this test fails and ticket redemption reverts.
+            \textbf{Issuer identity} The ticket signer must be same as the ticket issuer. Both node and smart contract verify whether the public key associated to the private key used to sign $$T= (t, Sig_I(t))$$ is the issuer's public key. The packet is dropped if this test fails and ticket redemption reverts.
       \item
             \textbf{Prior redemption} The ticket must not have been already redeemed and the ticket index must be strictly greater than the current value in the smart contract (replay protection).
             $$I_c <I$$ where $I_c$ is the current value in the smart contract and $I$ is the ticket index.
