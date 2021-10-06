@@ -59,8 +59,8 @@ const hardhatConfig: HardhatUserConfig = {
     },
     xdai: {
       ...networks.xdai,
-      live: true,
-      tags: ['production'] as NetworkTag[],
+      live: false,
+      tags: ['testing'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://provider-proxy.hoprnet.workers.dev/xdai_mainnet`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
