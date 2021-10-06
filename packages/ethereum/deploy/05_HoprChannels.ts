@@ -27,6 +27,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   if (hre.environment === 'default') {
     // version bumping happens AFTER deployments are run
     // this means that the salt used here always used an outdated version
+    // see https://github.com/hoprnet/hoprnet/issues/2635
     salt = pickVersion(require('../package.json').version)
   } else {
     salt = hre.environment
