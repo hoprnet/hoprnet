@@ -16,7 +16,7 @@ import {
 } from './constants'
 import { debug } from '@hoprnet/hopr-utils'
 
-const log = debug('cover-traffic')
+const log = debug('hopr:cover-traffic')
 
 export class CoverTrafficStrategy extends SaneDefaults {
   name = 'covertraffic'
