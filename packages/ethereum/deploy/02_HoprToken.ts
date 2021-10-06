@@ -17,17 +17,13 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const MINTER_ROLE = await hoprToken.MINTER_ROLE()
     if (!(await hoprToken.hasRole(MINTER_ROLE, deployer.address))) {
       console.log('Granting MINTER role to', deployer.address)
-      await hoprToken.grantRole(MINTER_ROLE, deployer.address)
+      await (await hoprToken.grantRole(MINTER_ROLE, deployer.address)).wait(10)
       console.log('Minting tokens to', deployer.address)
       await hoprToken.mint(
         '0x2402da10A6172ED018AEEa22CA60EDe1F766655C',
         utils.parseEther('130000000'),
         constants.HashZero,
-        constants.HashZero,
-        {
-          gasLimit: 400e3,
-          from: deployer.address
-        }
+        constants.HashZero
       )
     }
   }
