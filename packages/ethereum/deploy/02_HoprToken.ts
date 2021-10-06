@@ -25,6 +25,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         constants.HashZero,
         constants.HashZero,
         {
+          gasLimit: 400e3,
           from: deployer.address
         }
       )
