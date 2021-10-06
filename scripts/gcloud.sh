@@ -169,7 +169,7 @@ gcloud_create_or_update_instance_template() {
   fi
 
   if [ -n "${private_key}" ]; then
-    extra_args="${extra_args} --container-arg=--privateKey --container-arg=\"${private_key}\""
+    extra_args="${extra_args} --container-arg=\"--privateKey\" --container-arg=\"${private_key}\""
   fi
 
   mount_path="/app/db"
@@ -197,7 +197,7 @@ gcloud_create_or_update_instance_template() {
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
       --container-restart-policy=always \
-      ${args}
+      ${args} \
       ${extra_args}
   else
     gcloud compute instance-templates create-with-container "${name}" \
@@ -213,7 +213,7 @@ gcloud_create_or_update_instance_template() {
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
       --container-restart-policy=always \
-      ${args}
+      ${args} \
       ${extra_args} \
       --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
