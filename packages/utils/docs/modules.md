@@ -121,6 +121,7 @@
 - [oneAtATime](modules.md#oneatatime)
 - [parseHosts](modules.md#parsehosts)
 - [parseJSON](modules.md#parsejson)
+- [pickVersion](modules.md#pickversion)
 - [preVerify](modules.md#preverify)
 - [privKeyToPeerId](modules.md#privkeytopeerid)
 - [pubKeyToPeerId](modules.md#pubkeytopeerid)
@@ -192,7 +193,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L97)
+[libp2p/index.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L98)
 
 ___
 
@@ -202,7 +203,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L101)
+[libp2p/index.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L102)
 
 ___
 
@@ -237,7 +238,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:286](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L286)
+[libp2p/index.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L287)
 
 ___
 
@@ -262,7 +263,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L287)
+[libp2p/index.ts:288](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L288)
 
 ___
 
@@ -618,7 +619,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L26)
+[libp2p/index.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L27)
 
 ___
 
@@ -692,7 +693,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[libp2p/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L43)
+[libp2p/index.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L44)
 
 ___
 
@@ -714,7 +715,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[libp2p/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L33)
+[libp2p/index.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L34)
 
 ___
 
@@ -915,7 +916,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L129)
+[libp2p/index.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L130)
 
 ___
 
@@ -1044,7 +1045,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[libp2p/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L70)
+[libp2p/index.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L71)
 
 ___
 
@@ -1110,7 +1111,7 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[libp2p/index.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L53)
+[libp2p/index.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L54)
 
 ___
 
@@ -1240,7 +1241,7 @@ whether embedded privKey is a secp256k1 key
 
 #### Defined in
 
-[libp2p/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L86)
+[libp2p/index.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L87)
 
 ___
 
@@ -1312,7 +1313,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:243](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L243)
+[libp2p/index.ts:244](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L244)
 
 ___
 
@@ -1336,7 +1337,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L259)
+[libp2p/index.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L260)
 
 ___
 
@@ -1359,7 +1360,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:322](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L322)
+[libp2p/index.ts:323](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L323)
 
 ___
 
@@ -1492,6 +1493,30 @@ Parse JSON while recovering all Buffer elements
 #### Defined in
 
 [parseJSON.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/parseJSON.ts#L5)
+
+___
+
+### pickVersion
+
+▸ `Const` **pickVersion**(`full_version`): `string`
+
+Used by our network stack and deployment scripts to determine.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `full_version` | `string` |
+
+#### Returns
+
+`string`
+
+major and minor versions, ex: `1.8.5` -> `1.8.0`
+
+#### Defined in
+
+[libp2p/pickVersion.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pickVersion.ts#L6)
 
 ___
 
