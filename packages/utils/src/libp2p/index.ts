@@ -17,6 +17,7 @@ export * from './privKeyToPeerId'
 export * from './pubKeyToPeerId'
 export * from './addressSorters'
 export * from './verifySignatureFromPeerId'
+export * from './pickVersion'
 
 /**
  * Regular expresion used to match b58Strings
