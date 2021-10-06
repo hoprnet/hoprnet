@@ -717,7 +717,11 @@ class Hopr extends EventEmitter {
     if (amountToFund.lten(0)) {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
     } else if (amountToFund.gt(myAvailableTokens.toBN())) {
-      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)} at address ${selfPubKey.toAddress().toHex()}`)
+      throw Error(
+        `You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens
+          .toBN()
+          .toString(10)} at address ${selfPubKey.toAddress().toHex()}`
+      )
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
@@ -759,7 +763,11 @@ class Hopr extends EventEmitter {
     if (totalFund.lten(0)) {
       throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
     } else if (totalFund.gt(myBalance.toBN())) {
-      throw Error(`You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.toBN().toString(10)} at address ${selfPubKey.toAddress().toHex()}`)
+      throw Error(
+        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance
+          .toBN()
+          .toString(10)} at address ${selfPubKey.toAddress().toHex()}`
+      )
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
