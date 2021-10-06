@@ -6,7 +6,7 @@ import type { State, ChannelData, PersistedState } from './state'
 import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
 import { debug } from '@hoprnet/hopr-utils'
 
-const log = debug('cover-traffic')
+const log = debug('hopr:cover-traffic')
 
 export const addBN = (a: BN, b: BN): BN => a.add(b)
 export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().integerValue().toFixed(), 10)
