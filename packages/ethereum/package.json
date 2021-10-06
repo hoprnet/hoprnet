@@ -48,7 +48,7 @@
     "dotenv": "^10.0.0",
     "ethereum-waffle": "^3.3.0",
     "ethers": "5.4.7",
-    "hardhat": "^2.6.2",
+    "hardhat": "2.6.5",
     "hardhat-deploy": "0.9.3",
     "hardhat-gas-reporter": "^1.0.4",
     "multiaddr": "^10.0.0",
