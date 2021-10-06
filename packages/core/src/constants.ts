@@ -5,7 +5,7 @@ const pkg = require('../package.json')
 export const PACKET_SIZE = 500
 export const FULL_VERSION = pkg.version
 
-export const VERSION = pickVersion(pkg.version) // Version on major versions only
+export const VERSION = pickVersion(pkg.version)
 
 const PROTOCOL_NAME = 'hopr'
 
