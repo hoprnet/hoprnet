@@ -20,8 +20,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       await hoprToken.mint(
         '0x2402da10A6172ED018AEEa22CA60EDe1F766655C',
         utils.parseEther('130000000'),
-        ethers.constants.HashZero,
-        ethers.constants.HashZero
+        constants.HashZero,
+        constants.HashZero
       )
     }
   }
