@@ -1,7 +1,7 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import { HoprToken__factory } from '../types'
-import { utils } from 'ethers'
+import { utils, constants } from 'ethers'
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { ethers, deployments, network, getNamedAccounts } = hre
@@ -17,7 +17,12 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const MINTER_ROLE = await hoprToken.MINTER_ROLE()
     if (!(await hoprToken.hasRole(MINTER_ROLE, deployer.address))) {
       await hoprToken.grantRole(MINTER_ROLE, deployer.address)
-      await hoprToken.mint('0x2402da10A6172ED018AEEa22CA60EDe1F766655C', utils.parseEther('130000000'), '0x0', '0x0')
+      await hoprToken.mint(
+        '0x2402da10A6172ED018AEEa22CA60EDe1F766655C',
+        utils.parseEther('130000000'),
+        ethers.constants.HashZero,
+        ethers.constants.HashZero
+      )
     }
   }
 }
