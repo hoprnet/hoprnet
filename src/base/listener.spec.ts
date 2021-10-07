@@ -650,6 +650,8 @@ describe('error cases', function () {
   })
 
   it('throw unexpected error', async function () {
+    // This unit test case produces an uncaught error in case there
+    // is no "global" try / catch on incoming socket connections
     const peer = await PeerId.create({ keyType: 'secp256k1' })
     const stunServer = await startStunServer(undefined)
 
@@ -665,6 +667,7 @@ describe('error cases', function () {
           return {}
         }
       } as any,
+      // Simulate an unexpected error while processing data
       (conn: any) => conn.nonExisting()
     )
 
