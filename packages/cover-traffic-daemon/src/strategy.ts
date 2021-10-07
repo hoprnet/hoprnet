@@ -103,6 +103,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
           Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT
         ) {
           // handle waiting for commitment stalls
+          log('unreliable channel, closing', openChannel.destination.toB58String())
           toClose.push(openChannel.destination)
         }
       }

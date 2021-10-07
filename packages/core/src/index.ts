@@ -363,7 +363,7 @@ class Hopr extends EventEmitter {
   // On the strategy interval, poll the strategy to see what channel changes
   // need to be made.
   private async tickChannelStrategy() {
-    verbose('strategy tick', this.status)
+    verbose('strategy tick', this.status, this.strategy.name)
     if (this.status != 'RUNNING') {
       return
     }
