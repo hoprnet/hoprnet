@@ -43,6 +43,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
     peers: any,
     _getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+    log(`tick, balance ${balance.toString()}`)
     const toOpen = []
     const toClose = []
     const state = this.data.get()
@@ -75,6 +76,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       }
     }
     this.data.setCTChannels(ctChannels)
+    log('channels', ctChannels)
 
     // Network must have at least some channels to create a full cover-traffic loop.
     if (this.data.openChannelCount() > CT_INTERMEDIATE_HOPS + 1) {
@@ -92,6 +94,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
             this.data
           )
           if (!success) {
+            log('failed to send', openChannel.destination)
             this.data.incrementMessageFails(openChannel.destination)
           }
         } else if (
