@@ -89,7 +89,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
             openChannel.destination,
             this.selfPub,
             async (path: PublicKey[]) => {
-              await this.node.sendMessage(new Uint8Array(1), openChannel.destination.toPeerId(), path)
+              await this.node.sendMessage(new Uint8Array(1), this.selfPub.toPeerId(), path)
             },
             this.data
           )
