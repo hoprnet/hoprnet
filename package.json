@@ -32,6 +32,7 @@
     "abortable-iterator": "^3.0.0",
     "bl": "^5.0",
     "debug": "^4.3.2",
+    "heap-js": "^2.1.6",
     "it-handshake": "^2.0.0",
     "multiaddr": "10.0.0",
     "multihashes": "^4.0.3",

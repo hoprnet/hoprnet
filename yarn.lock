@@ -462,6 +462,7 @@ __metadata:
     chai: ^4.3.4
     chai-spies: ^1.0.0
     debug: ^4.3.2
+    heap-js: ^2.1.6
     it-handshake: ^2.0.0
     it-pair: ^1.0.0
     it-pipe: ^1.1.0
@@ -2247,6 +2248,13 @@ fsevents@~2.3.2:
   bin:
     he: bin/he
   checksum: 3d4d6babccccd79c5c5a3f929a68af33360d6445587d628087f39a965079d84f18ce9c3d3f917ee1e3978916fc833bb8b29377c3b403f919426f91bc6965e7a7
+  languageName: node
+  linkType: hard
+
+"heap-js@npm:^2.1.6":
+  version: 2.1.6
+  resolution: "heap-js@npm:2.1.6"
+  checksum: cb712678bc441b5e9d5b825b1c8db170e1bc5757144ce10687d427ec53ac7ae0d8b9c9d4c18b7554949d7aad2ab8d6c71316355839bc1b7b498eaae088db5d94
   languageName: node
   linkType: hard
 
