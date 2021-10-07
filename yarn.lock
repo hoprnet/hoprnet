@@ -467,10 +467,10 @@ __metadata:
     it-pipe: ^1.1.0
     it-pushable: ^1.4.2
     libp2p: ^0.33.0
-    libp2p-interfaces: 1.0.1
+    libp2p-interfaces: ^1.0.0
     libp2p-mplex: 0.10.4
     mocha: ^9.1.2
-    multiaddr: ~9.0.1
+    multiaddr: 10.0.0
     multihashes: ^4.0.3
     p-defer: 3
     peer-id: ~0.15.3
@@ -1472,18 +1472,6 @@ __metadata:
   version: 2.0.0
   resolution: "chownr@npm:2.0.0"
   checksum: c57cf9dd0791e2f18a5ee9c1a299ae6e801ff58fee96dc8bfd0dcb4738a6ce58dd252a3605b1c93c6418fe4f9d5093b28ffbf4d66648cb2a9c67eaef9679be2f
-  languageName: node
-  linkType: hard
-
-"cids@npm:^1.0.0":
-  version: 1.1.9
-  resolution: "cids@npm:1.1.9"
-  dependencies:
-    multibase: ^4.0.1
-    multicodec: ^3.0.1
-    multihashes: ^4.0.1
-    uint8arrays: ^3.0.0
-  checksum: 58ad9411b51c4f2d1568a3542578cf8c05028631ef8d9b0aa46db4ebbc812c4d7159216b310e333a81ff9f1b8e44c1c8ff3debdc0a8e9d83421af7f776677e41
   languageName: node
   linkType: hard
 
@@ -2902,7 +2890,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"libp2p-interfaces@npm:1.0.1, libp2p-interfaces@npm:^1.0.0":
+"libp2p-interfaces@npm:^1.0.0":
   version: 1.0.1
   resolution: "libp2p-interfaces@npm:1.0.1"
   dependencies:
@@ -3281,7 +3269,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"multiaddr@npm:^10.0.0":
+"multiaddr@npm:10.0.0, multiaddr@npm:^10.0.0":
   version: 10.0.0
   resolution: "multiaddr@npm:10.0.0"
   dependencies:
@@ -3292,21 +3280,6 @@ fsevents@~2.3.2:
     uint8arrays: ^2.1.3
     varint: ^6.0.0
   checksum: ced881c8a2430e88c780a1eac8a296142c307cd59d9e646de3aef5f4e95d002320644a82445e7f373039d594b8903faadc974509ef8b5481318d8b5364d9dab5
-  languageName: node
-  linkType: hard
-
-"multiaddr@npm:~9.0.1":
-  version: 9.0.2
-  resolution: "multiaddr@npm:9.0.2"
-  dependencies:
-    cids: ^1.0.0
-    dns-over-http-resolver: ^1.0.0
-    err-code: ^3.0.1
-    is-ip: ^3.1.0
-    multibase: ^4.0.2
-    uint8arrays: ^2.1.3
-    varint: ^6.0.0
-  checksum: 9ab709b46592292569493510d569edc35d2f6d0c507a08f7863fc2a9e16ddf13e8b45466a2ad2a27dba63d10193e2b104e4477934f6e2f572a5ee7e64647825c
   languageName: node
   linkType: hard
 
@@ -3326,15 +3299,6 @@ fsevents@~2.3.2:
   dependencies:
     "@multiformats/base-x": ^4.0.1
   checksum: 7d112ae9a12aeefda4dac0ae7e1f2e845a00e374ccb7bb3d521b8be17078dd86e2ae4f0f0f21d8ceb32ea5e8153b8b2cd611b884639a0ddba3c97f2b3217f47c
-  languageName: node
-  linkType: hard
-
-"multibase@npm:^4.0.2":
-  version: 4.0.6
-  resolution: "multibase@npm:4.0.6"
-  dependencies:
-    "@multiformats/base-x": ^4.0.1
-  checksum: 891ce47f509c6070d2306e7e00aef3ef41fbb50a848a1e1bec5e75ca63c5032015a436cf09e9e3939b5b2ca81e74804151eb410a388f10e9aabf7a2f5a35d272
   languageName: node
   linkType: hard
 
