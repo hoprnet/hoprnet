@@ -85,18 +85,19 @@ export class CoverTrafficStrategy extends SaneDefaults {
         const channel = this.data.findChannel(this.selfPub, openChannel.destination)
         if (channel && channel.status == ChannelStatus.Open) {
           // send messages for open channels
-          const success = sendCTMessage(
+          sendCTMessage(
             openChannel.destination,
             this.selfPub,
             async (path: PublicKey[]) => {
               await this.node.sendMessage(new Uint8Array(1), this.selfPub.toPeerId(), path)
             },
             this.data
-          )
-          if (!success) {
-            log('failed to send', openChannel.destination)
-            this.data.incrementMessageFails(openChannel.destination)
-          }
+          ).then((success) => {
+            if (!success) {
+              log('failed to send', openChannel.destination)
+              this.data.incrementMessageFails(openChannel.destination)
+            }
+          })
         } else if (
           channel &&
           channel.status == ChannelStatus.WaitingForCommitment &&
@@ -110,6 +111,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
     } else {
       log('aborting send messages - less channels in network than hops required')
     }
+    log('message send phase complete')
 
     let attempts = 0
     // When there is no enough cover traffic channels, providing node exists and adequete past attempts, the node will open some channels.
