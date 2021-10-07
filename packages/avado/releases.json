@@ -1389,5 +1389,12 @@
     "uploadedTo": {
       "http://80.208.229.228:5001": "Thu, 07 Oct 2021 09:07:43 GMT"
     }
+  },
+  "1.81.6": {
+    "hash": "/ipfs/QmRz1WixkC1S95hjmEcUw4ymqpu1Q5D6F4xADQunpkG3Hc",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Thu, 07 Oct 2021 13:27:06 GMT"
+    }
   }
 }
