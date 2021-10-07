@@ -450,13 +450,13 @@ __metadata:
     "@hoprnet/hopr-utils": 1.81.7
     "@types/bl": ^5.0.1
     "@types/bn.js": ^5.1.0
-    "@types/chai": ^4.2.21
+    "@types/chai": ^4.2.22
     "@types/chai-spies": ^1.0.3
     "@types/debug": ^4.1.7
     "@types/mocha": ^9.0.0
     "@types/node": 16
     "@types/simple-peer": ^9.11.3
-    "@types/yargs": ^17.0.2
+    "@types/yargs": ^17.0.3
     abortable-iterator: ^3.0.0
     bl: ^5.0
     chai: ^4.3.4
@@ -481,7 +481,7 @@ __metadata:
     typescript: ^4.4.3
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
-    yargs: ^17.1.1
+    yargs: ^17.2.1
   languageName: unknown
   linkType: soft
 
@@ -812,10 +812,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai@npm:*, @types/chai@npm:^4.2.21":
+"@types/chai@npm:*":
   version: 4.2.21
   resolution: "@types/chai@npm:4.2.21"
   checksum: dbd852dfea5065c2e86059bdc011c42a380c43bbcf80d427da228dc2a9e1efae27e7baf16570a3158571d92c206782e07fab3b703c28452a75a74380b33d1443
+  languageName: node
+  linkType: hard
+
+"@types/chai@npm:^4.2.22":
+  version: 4.2.22
+  resolution: "@types/chai@npm:4.2.22"
+  checksum: dca66a263b25c26112c0a8c6df20316412fa54b557443a108836c07cee961aa56cc5b1763273f69eb450c83ca9f28069ff78b617bffc01806cdd83afc1c20c2a
   languageName: node
   linkType: hard
 
@@ -910,12 +917,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/yargs@npm:^17.0.2":
-  version: 17.0.2
-  resolution: "@types/yargs@npm:17.0.2"
+"@types/yargs@npm:^17.0.3":
+  version: 17.0.3
+  resolution: "@types/yargs@npm:17.0.3"
   dependencies:
     "@types/yargs-parser": "*"
-  checksum: 6f4600d3b786c0eb083782f59c9ed61bb4c204269b0a07819bb9e9b1fc29deaf4fe28abde7dca5fbf3cf851beca9458cbcf63ebd128ebfe83d31002d84337b31
+  checksum: 8c4e01f893f0b372a37efb2da2191b63793a25126e0b468c7eb8886176fec2a10f063d9718fa75f1fa00e82fbed4a614bb06661d968e4233be8a00468b94ac60
   languageName: node
   linkType: hard
 
@@ -5050,9 +5057,9 @@ typescript@^4.4.3:
   languageName: node
   linkType: hard
 
-"yargs@npm:^17.1.1":
-  version: 17.1.1
-  resolution: "yargs@npm:17.1.1"
+"yargs@npm:^17.2.1":
+  version: 17.2.1
+  resolution: "yargs@npm:17.2.1"
   dependencies:
     cliui: ^7.0.2
     escalade: ^3.1.1
@@ -5061,7 +5068,7 @@ typescript@^4.4.3:
     string-width: ^4.2.0
     y18n: ^5.0.5
     yargs-parser: ^20.2.2
-  checksum: b05a9467937172e01a4af7a7ad4361a22ee510cd12d1d5a3ad3b4c2e57eb8c35ca94ee22e4bdfbb40fe693fbf8000771e41824f77f6b224f1496c57f20f192b6
+  checksum: 451aac46f82da776f436018feed0244bc0e7b4355f7e397bcb53d34c691b177c0d71db3dda9653760e1bc240254d8b763a252ff918ef9e235a8d202e2909c4eb
   languageName: node
   linkType: hard
 
