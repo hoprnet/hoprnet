@@ -1,26 +1,30 @@
-/// <reference path="./@types/stream-to-it.ts" />
-/// <reference path="./@types/libp2p.ts" />
-
 import net from 'net'
 import abortable, { AbortError } from 'abortable-iterator'
 import type { Socket, AddressInfo } from 'net'
 import Debug from 'debug'
-import { nodeToMultiaddr } from './utils'
+import { nodeToMultiaddr } from '../utils'
+import { once } from 'events'
 
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
 const verbose = Debug('hopr-connect:verbose:tcp')
 
-const SOCKET_CLOSE_TIMEOUT = 2000
+export const SOCKET_CLOSE_TIMEOUT = 1000
 
-import type { MultiaddrConnection, Stream, DialOptions, StreamType } from 'libp2p'
+import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+
 import { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
-import { toU8aStream } from './utils'
-import { PeerId } from 'libp2p-interfaces'
+import { toU8aStream } from '../utils'
+import type PeerId from 'peer-id'
+import type { Stream, StreamType, DialOptions } from '../types'
 
+/**
+ * Class to encapsulate TCP sockets
+ */
 class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
+  // @ts-ignore
   public sink: Stream['sink']
   public source: Stream['source']
 
@@ -63,59 +67,56 @@ class TCPConnection implements MultiaddrConnection {
 
   public async close(): Promise<void> {
     if (this.conn.destroyed) {
-      return Promise.resolve()
+      return
     }
 
-    return new Promise<void>((resolve, reject) => {
-      const start = Date.now()
+    const closePromise = once(this.conn, 'close')
 
-      // Attempt to end the socket. If it takes longer to close than the
-      // timeout, destroy it manually.
-      const timeout = setTimeout(() => {
-        const cOptions = this.remoteAddr.toOptions()
-        log(
-          'timeout closing socket to %s:%s after %dms, destroying it manually',
-          cOptions.host,
-          cOptions.port,
-          Date.now() - start
-        )
+    const start = Date.now()
 
-        if (this.conn.destroyed) {
-          log('%s:%s is already destroyed', cOptions.host, cOptions.port)
-        } else {
-          this.conn.destroy()
-        }
+    // Attempt to end the socket. If it takes longer to close than the
+    // timeout, destroy it manually.
+    const timeout = setTimeout(() => {
+      const cOptions = this.remoteAddr.toOptions()
+      log(
+        'timeout closing socket to %s:%s after %dms, destroying it manually',
+        cOptions.host,
+        cOptions.port,
+        Date.now() - start
+      )
 
-        resolve()
-      }, SOCKET_CLOSE_TIMEOUT)
+      if (this.conn.destroyed) {
+        log('%s:%s is already destroyed', cOptions.host, cOptions.port)
+      } else {
+        log(`destroying connection`)
+        this.conn.destroy()
+      }
+    }, SOCKET_CLOSE_TIMEOUT)
 
-      this.conn.once('close', () => clearTimeout(timeout))
-      this.conn.end((err?: Error) => {
-        this.timeline.close = Date.now()
-        if (err) {
-          error(err)
-          return reject(err)
-        }
+    try {
+      this.conn.end()
+    } catch (err) {
+      console.log(err)
+    }
 
-        resolve()
-      })
-    })
+    await closePromise
+
+    clearTimeout(timeout)
   }
 
   private async _sink(source: Stream['source']): Promise<void> {
+    const u8aStream = toU8aStream(source)
     try {
       await this._stream.sink(
-        this._signal != undefined
-          ? (abortable(toU8aStream(source), this._signal) as Stream['source'])
-          : toU8aStream(source)
+        this._signal != undefined ? (abortable(u8aStream, this._signal) as Stream['source']) : u8aStream
       )
-    } catch (err) {
+    } catch (err: any) {
       // If aborted we can safely ignore
       if (err.type !== 'aborted') {
         // If the source errored the socket will already have been destroyed by
         // toIterable.duplex(). If the socket errored it will already be
         // destroyed. There's nothing to do here except log the error & return.
-        error(err)
+        error(err.message)
       }
     }
   }
@@ -126,12 +127,12 @@ class TCPConnection implements MultiaddrConnection {
    * @param options.signal Used to abort dial requests
    * @returns Resolves a TCP Socket
    */
-  public static create(ma: Multiaddr, self: PeerId, options?: DialOptions): Promise<MultiaddrConnection> {
+  public static create(ma: Multiaddr, self: PeerId, options?: DialOptions): Promise<TCPConnection> {
     if (options?.signal?.aborted) {
       throw new AbortError()
     }
 
-    return new Promise<MultiaddrConnection>((resolve, reject) => {
+    return new Promise<TCPConnection>((resolve, reject) => {
       const start = Date.now()
       const cOpts = ma.toOptions()
 
@@ -142,7 +143,7 @@ class TCPConnection implements MultiaddrConnection {
       })
 
       const onError = (err: Error) => {
-        verbose('Error connecting:', err)
+        verbose('Error connecting:', err.message)
         // ENETUNREACH
         // ECONNREFUSED
         // @TODO check error(s)
@@ -152,9 +153,7 @@ class TCPConnection implements MultiaddrConnection {
 
       const onTimeout = () => {
         log('connnection timeout %s:%s', cOpts.host, cOpts.port)
-        const err = new Error(`connection timeout after ${Date.now() - start}ms`)
-        // Note: this will result in onError() being called
-        rawSocket.emit('error', err)
+        done(new Error(`connection timeout after ${Date.now() - start}ms`))
       }
 
       const onConnect = () => {

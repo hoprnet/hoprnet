@@ -8,18 +8,22 @@ Therefore it is for the moment necessary to test `hopr-connect` with multiple pr
 
 Test setup:
 
-- bootstrap server (first node that will help as a signalling server to connect all subsequent nodes)
-- 2 or more clients
+- Charly: a bootstrap server and a relay (first node that will help as a signalling server to connect all subsequent nodes)
+- Alice & Bob: 2 clients using Charly as a bootstrap and relay
 
 The clients will use the bootstrap server to determine their own "public" IPv4 addresses. The bootstrap server itself will use external and publicly available bootstrap servers to determine its own public IPv4 address.
 
-```sh
-# server
-DEBUG=hopr-connect*,simple-peer ts-node examples/server.ts
-
-# clients
-DEBUG=hopr-connect*,simple-peer ts-node examples/client.ts 1
-DEBUG=hopr-connect*,simple-peer ts-node examples/client.ts 0
+```
+./scripts/integration-test.sh
 ```
 
-Client 0 will attach to a network socket and wait ~ 15 seconds to give client 1 time to attach to its network socket. Afterwards, client 0 will establish a relayed connection to client 1 and will try to upgrade to a direct WebRTC connection. Both clients are started with a debug flag that prevents from direct connection - even if they were possible.
+Alice will attach to a network socket and wait 8 seconds to give Bob time to attach to its network socket. Afterwards, Alice will establish a relayed connection (using Charly as a relay) to Bob and will try to upgrade to a direct WebRTC connection. Both clients are started with a debug flag that prevents from direct connection - even if they were possible.
+
+The test will provide separate logging for all parties, e.g.:
+
+```
+Test started
+21-07-14T11:45:28Z [hopr-connect-test] alice -> /var/tmp/hopr-connect-alice.log
+21-07-14T11:45:28Z [hopr-connect-test] bob -> /var/tmp/hopr-connect-bob.log
+21-07-14T11:45:28Z [hopr-connect-test] charly -> /var/tmp/hopr-connect-charly.log
+```

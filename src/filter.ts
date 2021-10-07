@@ -1,10 +1,10 @@
-import { Multiaddr } from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import type { Network } from './utils/constants'
 import { getLocalAddresses, isPrivateAddress, checkNetworks, isLinkLocaleAddress } from './utils'
 import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from './constants'
 import Multihash from 'multihashes'
 import { NetworkInterfaceInfo } from 'os'
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 import { u8aEquals, u8aToNumber } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import { green } from 'chalk'
@@ -31,7 +31,7 @@ function checkCircuitAddress(maTuples: [code: number, addr: Uint8Array][], peerI
     Multihash.validate(firstAddress) // throws if invalid
   } catch (err) {
     // Could not decode address
-    console.log(`first address not valid`, err)
+    log(`first address not valid`, err)
     return false
   }
 
@@ -111,6 +111,8 @@ export class Filter {
             this.listenFamilies.push(CODE_IP6)
           }
           break
+        default:
+          throw new Error(`Invalid address found. ${listenAddr.toString()}`)
       }
     }
   }

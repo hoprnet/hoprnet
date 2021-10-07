@@ -1,24 +1,29 @@
-/// <reference path="../@types/libp2p.ts" />
-/// <reference path="../@types/bl.ts" />
-
-import type { Stream, StreamType, Handler } from 'libp2p'
+import type { HandlerProps } from 'libp2p'
 import type LibP2P from 'libp2p'
+import type { Stream, StreamType } from '../types'
 import Debug from 'debug'
-import AbortController, { AbortSignal } from 'abort-controller'
-import PeerId from 'peer-id'
-import { Multiaddr } from 'multiaddr'
-import { AddressInfo } from 'net'
+import { green } from 'chalk'
+import AbortController from 'abort-controller'
+import type { AbortSignal } from 'abort-controller'
+import type PeerId from 'peer-id'
+import type { Multiaddr } from 'multiaddr'
+import type { AddressInfo } from 'net'
+import type { Address } from 'libp2p/src/peer-store/address-book'
 
 const verbose = Debug('hopr-connect:dialer:verbose')
 const error = Debug('hopr-connect:dialer:error')
 
 export * from './network'
-
-type MyStream = AsyncGenerator<StreamType | Buffer | string, void>
+export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 2000 // ms
 
-export function toU8aStream(source: MyStream): Stream['source'] {
+/**
+ * Converts messages of a stream into Uint8Arrays.
+ * @param source a stream
+ * @returns a stream of Uint8Arrays
+ */
+export function toU8aStream(source: Stream<StreamType | string>['source']): Stream['source'] {
   return (async function* () {
     for await (const msg of source) {
       if (typeof msg === 'string') {
@@ -30,6 +35,34 @@ export function toU8aStream(source: MyStream): Stream['source'] {
       }
     }
   })()
+}
+
+/**
+ * Changes the behavior of the given iterator such that it
+ * fetches new messages before they are consumed by the
+ * consumer.
+ * @param iterator an async iterator
+ * @returns given iterator that eagerly fetches messages
+ */
+export function eagerIterator<T>(iterator: AsyncIterator<T>): AsyncGenerator<T> {
+  let result = iterator.next()
+  let received: IteratorResult<T>
+
+  return (async function* () {
+    while (true) {
+      received = await result
+
+      if (received.done) {
+        break
+      }
+      result = iterator.next()
+      yield received.value
+    }
+  })()
+}
+
+function renderPeerStoreAddresses(addresses: Address[], delimiter: string = '\n  '): string {
+  return addresses.map((addr: Address) => addr.multiaddr.toString()).join(delimiter)
 }
 
 export async function dialHelper(
@@ -45,7 +78,7 @@ export async function dialHelper(
         timeout: number
         signal?: AbortSignal
       }
-): Promise<Handler | undefined> {
+): Promise<Omit<HandlerProps, 'connection'> | void> {
   let signal: AbortSignal
   let timeout: NodeJS.Timeout | undefined
   if (opts.signal == undefined) {
@@ -60,7 +93,7 @@ export async function dialHelper(
   }
 
   let err: any
-  let struct: Handler | undefined
+  let struct: Omit<HandlerProps, 'connection'> | undefined
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal })
   } catch (_err) {
@@ -68,52 +101,92 @@ export async function dialHelper(
   }
 
   if (struct != null) {
-    clearTimeout(timeout as NodeJS.Timeout)
+    if (timeout != undefined) {
+      clearTimeout(timeout)
+    }
     return struct
   }
 
-  if (signal.aborted || ((err != null || struct == null) && libp2p._dht == undefined)) {
+  if (signal.aborted) {
+    return
+  }
+
+  if ((err != null || struct == null) && libp2p.peerRouting._routers.length == 0) {
+    if (timeout != undefined) {
+      clearTimeout(timeout)
+    }
     error(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
-    return undefined
+    return
   }
 
   let addresses = (libp2p.peerStore.get(destination)?.addresses ?? []).map((addr: any) => addr.multiaddr.toString())
 
   // Try to get some fresh addresses from the DHT
-  let dhtAddresses: Multiaddr[]
+  let dhtResponse:
+    | {
+        id: PeerId
+        multiaddrs: Multiaddr[]
+      }
+    | undefined
 
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
-    dhtAddresses =
-      (await (libp2p._dht as any)?.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })?.multiaddrs) ?? []
+    dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     error(
-      `Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${destination.toB58String()} failed. ${err.message}`
+      `Querying the DHT for ${green(destination.toB58String())} failed. Known addresses:\n` +
+        `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n`
     )
-    return undefined
+
+    if (err instanceof Error) {
+      error(err.message)
+    } else {
+      console.trace()
+      error(`Non-error message was thrown`, err)
+    }
   }
 
-  const newAddresses = dhtAddresses.filter((addr) => addresses.includes(addr.toString()))
+  const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
+
+  if (signal.aborted) {
+    return
+  }
 
   // Only start a dial attempt if we have received new addresses
-  if (signal.aborted || newAddresses.length > 0) {
-    return undefined
+  if (newAddresses.length == 0) {
+    if (timeout != undefined) {
+      clearTimeout(timeout)
+    }
+    return
   }
 
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal })
-    verbose(`Dial after DHT request successful`, struct)
+    verbose(`Dial after DHT request successful`)
   } catch (err) {
-    error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
-    return undefined
+    error(
+      `Cannot connect to ${green(
+        destination.toB58String()
+      )}. New addresses after DHT request did not lead to a connection. Used addresses:\n` +
+        `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}\n`
+    )
+
+    if (err instanceof Error) {
+      error(err.message)
+    } else {
+      console.trace()
+      error(`Non-error instance was thrown`, err)
+    }
+
+    return
   }
 
   if (struct != null) {
-    clearTimeout(timeout as NodeJS.Timeout)
+    if (timeout != undefined) {
+      clearTimeout(timeout)
+    }
     return struct
   }
-
-  return undefined
 }
 
 export function nodeToMultiaddr(addr: AddressInfo): Parameters<typeof Multiaddr.fromNodeAddress>[0] {

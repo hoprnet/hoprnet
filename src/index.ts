@@ -1,61 +1,67 @@
-/// <reference path="./@types/libp2p.ts" />
-
-import debug from 'debug'
-import Listener from './listener'
-import { CODE_IP4, CODE_IP6, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
+import Debug from 'debug'
+import { CODE_IP4, CODE_IP6, CODE_P2P, USE_WEBRTC } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
-import type libp2p from 'libp2p'
-import type { Dialer, Upgrader, DialOptions, ConnHandler, Handler, ConnectionManager } from 'libp2p'
-import { Transport, Connection } from 'libp2p-interfaces'
+import type { Upgrader } from 'libp2p-interfaces/src/transport/types'
+import type { default as libp2p, Connection } from 'libp2p'
+import { Transport } from 'libp2p-interfaces/src/transport/types'
 import chalk from 'chalk'
-import { TCPConnection } from './tcp'
+import { TCPConnection, Listener } from './base'
 import { WebRTCUpgrader } from './webrtc'
-import Relay from './relay'
-import { WebRTCConnection } from './webRTCConnection'
-import type { RelayConnection } from './relayConnection'
+import { Relay } from './relay'
 import { Discovery } from './discovery'
 import { Filter } from './filter'
+import { dialHelper } from './utils'
 
-const log = debug('hopr-connect')
-const error = debug('hopr-connect:error')
-const verbose = debug('hopr-connect:verbose')
+import type { PublicNodesEmitter, PeerStoreType, DialOptions } from './types'
+
+const log = Debug('hopr-connect')
+const verbose = Debug('hopr-connect:verbose')
+
+export type HoprConnectOptions = {
+  publicNodes?: PublicNodesEmitter
+  initialNodes?: PeerStoreType[]
+  interface?: string
+  __noDirectConnections?: boolean
+  __noWebRTCUpgrade?: boolean
+  maxRelayedConnections?: number
+  __relayFreeTimeout?: number
+}
 
 /**
  * @class HoprConnect
  */
-class HoprConnect implements Transport {
+class HoprConnect implements Transport<DialOptions, any> {
   get [Symbol.toStringTag]() {
     return 'HoprConnect'
   }
 
   public discovery: Discovery
 
+  private publicNodes?: PublicNodesEmitter
+  private initialNodes?: PeerStoreType[]
+
+  private relayPeerIds?: Set<string>
+
   private __noDirectConnections?: boolean
   private __noWebRTCUpgrade?: boolean
   private _upgrader: Upgrader
   private _peerId: PeerId
-  private relays?: Multiaddr[]
-  private stunServers?: Multiaddr[]
-  private _relay: Relay
-  private _connectionManager: ConnectionManager
-  private _dialer: Dialer
+  private relay: Relay
   private _webRTCUpgrader?: WebRTCUpgrader
   private _interface?: string
   private _addressFilter: Filter
   private _libp2p: libp2p
 
-  private connHandler?: ConnHandler
+  private connHandler: ((conn: Connection) => void) | undefined
 
-  constructor(opts: {
-    upgrader: Upgrader
-    libp2p: libp2p
-    bootstrapServers?: Multiaddr[] | Multiaddr
-    interface?: string
-    __noDirectConnections?: boolean
-    __noWebRTCUpgrade?: boolean
-  }) {
+  constructor(
+    opts: {
+      upgrader: Upgrader
+      libp2p: libp2p
+    } & HoprConnectOptions
+  ) {
     if (!opts.upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
     }
@@ -64,46 +70,8 @@ class HoprConnect implements Transport {
       throw new Error('Transport module needs access to libp2p.')
     }
 
-    if (opts.bootstrapServers != undefined) {
-      if (!Array.isArray(opts.bootstrapServers)) {
-        opts.bootstrapServers = [opts.bootstrapServers]
-      }
-
-      for (const bs of opts.bootstrapServers) {
-        const bsPeerId = bs.getPeerId()
-
-        if (bsPeerId == undefined) {
-          continue
-        }
-
-        if (opts.libp2p.peerId.equals(PeerId.createFromCID(bsPeerId))) {
-          continue
-        }
-
-        const cOpts = bs.toOptions()
-
-        if (this.relays == undefined) {
-          this.relays = [bs]
-        } else {
-          this.relays.push(bs)
-        }
-
-        switch (cOpts.family) {
-          case 6:
-            // We do not use STUN for IPv6 for the moment
-            break
-          case 4:
-            if (this.stunServers == undefined) {
-              this.stunServers = [bs]
-            } else {
-              this.stunServers.push(bs)
-            }
-            break
-          default:
-            throw Error(`Invalid address family as STUN server. Got ${cOpts.family}`)
-        }
-      }
-    }
+    this.publicNodes = opts.publicNodes
+    this.initialNodes = opts.initialNodes
 
     this._peerId = opts.libp2p.peerId
 
@@ -113,19 +81,28 @@ class HoprConnect implements Transport {
     this._addressFilter = new Filter(this._peerId)
 
     this._upgrader = opts.upgrader
-    this._connectionManager = opts.libp2p.connectionManager
-    this._dialer = opts.libp2p.dialer
     this._interface = opts.interface
 
     if (USE_WEBRTC) {
-      this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
+      this._webRTCUpgrader = new WebRTCUpgrader(this.publicNodes, this.initialNodes)
     }
 
     this.discovery = new Discovery()
 
-    opts.libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
-
-    this._relay = new Relay(opts.libp2p, this._webRTCUpgrader, opts.__noWebRTCUpgrade)
+    this.relay = new Relay(
+      (peer: PeerId, protocol: string, options: { timeout: number } | DialOptions) =>
+        dialHelper(opts.libp2p, peer, protocol, options as any) as any,
+      opts.libp2p.dialer,
+      opts.libp2p.connectionManager,
+      opts.libp2p.handle.bind(opts.libp2p),
+      this._peerId,
+      this._upgrader,
+      this.connHandler,
+      this._webRTCUpgrader,
+      opts.__noWebRTCUpgrade,
+      opts.maxRelayedConnections,
+      opts.__relayFreeTimeout
+    )
 
     // Used for testing
     this.__noDirectConnections = opts.__noDirectConnections
@@ -134,22 +111,34 @@ class HoprConnect implements Transport {
     try {
       const { version } = require('../package.json')
 
-      log(`HoprConnect:`, version)
-    } catch {}
+      log(`HoprConnect: `, version)
+    } catch {
+      console.error(`Cannot find package.json to load version tag. Exitting.`)
+      return
+    }
 
     if (this.__noDirectConnections) {
+      // Whenever we don't allow direct connections, we need to store
+      // the known relays and make sure that we allow direct connections
+      // to them.
+      this.relayPeerIds = new Set<string>()
+
+      for (const initialNode of this.initialNodes ?? []) {
+        this.relayPeerIds ??= new Set<string>()
+        this.relayPeerIds.add(initialNode.id.toB58String())
+      }
+
+      this.publicNodes?.on('addPublicNode', (peer: PeerStoreType) => {
+        this.relayPeerIds ??= new Set<string>()
+        this.relayPeerIds.add(peer.id.toB58String())
+      })
+
       verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
     }
 
     if (this.__noWebRTCUpgrade) {
       verbose(`DEBUG mode: no WebRTC upgrade`)
     }
-
-    verbose(
-      `Created ${this[Symbol.toStringTag]} stack (Stun: ${this.stunServers
-        ?.map((server: Multiaddr) => server.toString())
-        .join(',')})`
-    )
   }
 
   /**
@@ -170,7 +159,7 @@ class HoprConnect implements Transport {
     // This works because destination peerId is for both address
     // types at the third place.
     // Other addresses are not supported.
-    const destination = PeerId.createFromBytes((maTuples[2][1] as unknown as Uint8Array).slice(1))
+    const destination = PeerId.createFromBytes((maTuples[2][1] as Uint8Array).slice(1))
 
     if (destination.equals(this._peerId)) {
       throw new AbortError(`Cannot dial ourself`)
@@ -185,11 +174,11 @@ class HoprConnect implements Transport {
 
         return await this.dialDirectly(ma, options)
       case CODE_P2P:
-        const relay = PeerId.createFromBytes((maTuples[0][1] as unknown as Uint8Array).slice(1))
+        const relay = PeerId.createFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
         return await this.dialWithRelay(relay, destination, options)
       default:
-        throw new AbortError(`Protocol not supported`)
+        throw new AbortError(`Protocol not supported. Given address: ${ma.toString()}`)
     }
   }
 
@@ -206,11 +195,12 @@ class HoprConnect implements Transport {
     } else {
       this.connHandler = handler
     }
+
     return new Listener(
       this.connHandler,
       this._upgrader,
-      this.stunServers,
-      this.stunServers, // use STUN servers as relays
+      this.publicNodes,
+      this.initialNodes,
       this._peerId,
       this._interface
     )
@@ -244,14 +234,14 @@ class HoprConnect implements Transport {
    * @param relays potential relays that we can use
    * @param options optional dial options
    */
-  private async dialWithRelay(relay: PeerId, destination: PeerId, options?: DialOptions): Promise<Connection> {
-    let conn = await this._relay.connect(relay, destination, this.onReconnect.bind(this), options)
+  private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
+    let conn = await this.relay.connect(relay, destination, options)
 
     if (conn == undefined) {
       throw Error(`Could not establish relayed connection.`)
     }
 
-    return await this._upgrader.upgradeOutbound(conn)
+    return await this._upgrader.upgradeOutbound(conn as any)
   }
 
   /**
@@ -265,74 +255,7 @@ class HoprConnect implements Transport {
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
-    return await this._upgrader.upgradeOutbound(maConn)
-  }
-
-  /**
-   * Dialed once a reconnect happens
-   * @param newStream new relayed connection
-   * @param counterparty counterparty of the relayed connection
-   */
-  private async onReconnect(this: HoprConnect, newStream: RelayConnection, counterparty: PeerId): Promise<void> {
-    log(`####### inside reconnect #######`)
-
-    let newConn: Connection
-
-    try {
-      if (this._webRTCUpgrader != undefined) {
-        newConn = await this._upgrader.upgradeInbound(
-          new WebRTCConnection(
-            {
-              conn: newStream,
-              self: this._peerId,
-              counterparty,
-              channel: newStream.webRTC!.channel,
-              libp2p: {
-                connectionManager: this._connectionManager
-              } as any
-            },
-            {
-              __noWebRTCUpgrade: this.__noWebRTCUpgrade
-            }
-          )
-        )
-      } else {
-        newConn = await this._upgrader.upgradeInbound(newStream)
-      }
-    } catch (err) {
-      error(err)
-      return
-    }
-
-    this._dialer._pendingDials[counterparty.toB58String()]?.destroy()
-    this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
-
-    this.connHandler?.(newConn)
-  }
-
-  /**
-   * Called once a relayed connection is establishing
-   * @param handler handles the relayed connection
-   */
-  private async handleIncoming(this: HoprConnect, handler: Handler): Promise<void> {
-    let newConn: Connection
-
-    try {
-      const relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect.bind(this))
-
-      if (relayConnection == undefined) {
-        return
-      }
-
-      newConn = await this._upgrader.upgradeInbound(relayConnection)
-    } catch (err) {
-      error(`Could not upgrade relayed connection. Error was: ${err}`)
-      return
-    }
-
-    this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])
-
-    this.connHandler?.(newConn)
+    return await this._upgrader.upgradeOutbound(maConn as any)
   }
 
   /**
@@ -340,12 +263,15 @@ class HoprConnect implements Transport {
    * @param ma Multiaddr to check
    */
   private shouldAttemptDirectDial(ma: Multiaddr): boolean {
+    const maPeerId = ma.getPeerId()
     if (
       // Forces the node to only use relayed connections and
-      // don't try a direct dial attempts.
+      // don't try a direct dial attempt.
       // @dev Used for testing
       this.__noDirectConnections &&
-      (this.relays == undefined || !this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId()))
+      (this.relayPeerIds == undefined ||
+        this.relayPeerIds.size == 0 ||
+        (maPeerId != null && !this.relayPeerIds.has(maPeerId)))
     ) {
       return false
     }

@@ -2,7 +2,8 @@ import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import type { Network } from './constants'
 import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOCALHOST_ADDRS } from './constants'
 
-import { NetworkInterfaceInfo, networkInterfaces } from 'os'
+import type { NetworkInterfaceInfo } from 'os'
+import { networkInterfaces } from 'os'
 
 export function isAnyAddress(address: string, family: NetworkInterfaceInfo['family']): boolean {
   switch (family.toLowerCase()) {

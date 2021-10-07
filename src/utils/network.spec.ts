@@ -14,7 +14,6 @@ import {
 import type { Network } from './constants'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import {} from './network'
 
 describe('test utils', function () {
   it('should convert ip addresses', function () {

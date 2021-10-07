@@ -1,3 +1,137 @@
+<a name="0.2.42"></a>
+
+## [0.2.42](https://github.com/hoprnet/hopr-connect/compare/v0.2.41...v0.2.42) (2021-09-10)
+
+Changes:
+
+- remove type hacks (#308)
+- handle stream pipeline errors (#300)
+- fix infinite loop error (#295)
+- package upgrades
+
+<a name="0.2.41"></a>
+
+## [0.2.41](https://github.com/hoprnet/hopr-connect/compare/v0.2.40...v0.2.41) (2021-08-13)
+
+Changes:
+
+- improved STUN logic, now filtering STUN responses containing local addresses (#283)
+- package upgrade: `ts-node@10.2.0`
+
+<a name="0.2.40"></a>
+
+## [0.2.40](https://github.com/hoprnet/hopr-connect/compare/v0.2.35...v0.2.40) (2021-07-28)
+
+Changes:
+
+- deprecate Node 14, now exclusively using Node 16
+- changed relay management API (#271)
+
+<a name="0.2.35"></a>
+
+## [0.2.35](https://github.com/hoprnet/hopr-connect/compare/v0.2.34...v0.2.35) (2021-07-23)
+
+Changes:
+
+- less strict node version (#258)
+- use native yarn caching in GH actions (#257)
+
+<a name="0.2.34"></a>
+
+## [0.2.34](https://github.com/hoprnet/hopr-connect/compare/v0.2.33...v0.2.34) (2021-07-23)
+
+Changes:
+
+- dependency cleanup (#251)
+
+<a name="0.2.33"></a>
+
+## [0.2.33](https://github.com/hoprnet/hopr-connect/compare/v0.2.32...v0.2.33) (2021-07-22)
+
+Changes:
+
+- upgrade to `libp2p@0.32.1` (#249)
+- fix automated relay CI test (#242)
+- improved logging (#248)
+
+<a name="0.2.32"></a>
+
+## [0.2.32](https://github.com/hoprnet/hopr-connect/compare/v0.2.31...v0.2.32) (2021-07-21)
+
+Changes:
+
+- upgrade to `libp2p@0.32`
+
+<a name="0.2.31"></a>
+
+## [0.2.31](https://github.com/hoprnet/hopr-connect/compare/v0.2.30...v0.2.31) (2021-07-21)
+
+### Breaking changes:
+
+- Changed configuration object:
+
+```ts
+new HoprConnect(upgrader, {
+  publicNodes, // EventEmitter
+  initialNodes // Multiaddr[], list of already known nodes
+})
+```
+
+The property `bootstrapNodes` is ignored.
+
+### New features:
+
+- support for relay slots, actively limitting maximum number of simultaneous relayed connections (#237)
+- relay management API: dynamically add and remove potential relays and use them to bypass NATs (#243, #231)
+- improved CI testing (#222, #227, #230, #232, #233, #234, #235)
+
+### Fixes:
+
+- fix `hangUp()` producing hanging promise (#240)
+
+<a name="0.2.30"></a>
+
+## [0.2.30](https://github.com/hoprnet/hopr-connect/compare/v0.2.29...v0.2.30) (2021-07-02)
+
+Bugfix release
+
+- see (#193) for improvements and bugfixes
+- stricter testing
+- improved socket tracking
+- show meaningful message when connecting to wrong node
+- show available addresses (#187)
+- limit STUN request to reasonable amount (#185)
+- package upgrades (#204)
+
+<a name="0.2.29"></a>
+
+## [0.2.29](https://github.com/hoprnet/hopr-connect/compare/v0.2.28...v0.2.29) (2021-06-15)
+
+- fix STUN request failing on DNS failures
+- minor bugfixes in STUN code
+
+<a name="0.2.28"></a>
+
+## [0.2.28](https://github.com/hoprnet/hopr-connect/compare/v0.2.27...v0.2.28) (2021-06-10)
+
+- adds `node-pre-gyp` as dependency to make sure that `hopr-connect` includes all necessary dependencies for a standalone install
+- fixes `wrtc` missing dependency `node-pre-gyp`
+
+<a name="0.2.27"></a>
+
+## [0.2.27](https://github.com/hoprnet/hopr-connect/compare/v0.2.26...v0.2.27) (2021-06-10)
+
+- control-flow fixes
+- remove console.log and console.trace
+
+<a name="0.2.26"></a>
+
+## [0.2.26](https://github.com/hoprnet/hopr-connect/compare/v0.2.25...v0.2.26) (2021-06-09)
+
+- package upgrades
+- correctly distinguish private and link-locale addresses from public addresses
+- minor refactoring
+
 <a name="0.2.25"></a>
 
 ## [0.2.25](https://github.com/hoprnet/hopr-connect/compare/v0.2.23...v0.2.25) (2021-05-11)

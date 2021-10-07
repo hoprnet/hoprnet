@@ -1,13 +1,15 @@
-name: HOPR Test
+name: HOPR Connect integration tests
 
 on:
   push:
     branches: ['**']
+    paths-ignore:
+      - '**/docs/**/*'
 
 jobs:
-  build:
-    name: Build & Test
+  integration-test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
 
     strategy:
       matrix:
@@ -25,8 +27,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          yarn install
-
+          yarn install        
+      
       - name: Test
-        run: |
-          yarn test
+        run: ./scripts/integration-test.sh
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: hopr-connect-integration-test-logs
+          path: |
+            /var/tmp/hopr-connect-*.log
+            /tmp/hopr-connect-*.log

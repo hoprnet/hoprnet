@@ -1,5 +1,8 @@
 declare module 'it-pair' {
-  type Stream = import('libp2p').Stream
+  type Stream<T> = {
+    sink: (source: Stream<T>['source']) => Promise<void>
+    source: AsyncGenerator<T, void>
+  }
 
-  export default function Pair(): Stream
+  export default function Pair<T>(): Stream<T>
 }
