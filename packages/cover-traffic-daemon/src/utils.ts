@@ -120,7 +120,7 @@ export const sendCTMessage = async (
   try {
     data.incrementSent(startNode)
     await sendMessage(path)
-    log('success sending', path)
+    log('success sending', path.map(x => x.toB58String()))
     return true
   } catch (e) {
     //console.log(e)
