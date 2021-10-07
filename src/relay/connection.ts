@@ -19,6 +19,7 @@ const DEBUG_PREFIX = 'hopr-connect'
 
 const _log = Debug(DEBUG_PREFIX)
 const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
+const _flow = Debug(`flow:${DEBUG_PREFIX}`)
 const _error = Debug(`${DEBUG_PREFIX}:error`)
 
 type WebRTC = {
@@ -206,28 +207,28 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       this.verbose(`close called. No error`)
     }
 
-    this.verbose(`FLOW: queueing STOP`)
+    this.flow(`FLOW: queueing STOP`)
     this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
 
     if (this.destroyed) {
-      this.verbose(`FLOW: connection already destroyed, finish`)
+      this.flow(`FLOW: connection already destroyed, finish`)
       return
     }
 
-    this.verbose(`FLOW: setting closed`)
+    this.flow(`FLOW: setting closed`)
     this.setClosed()
 
-    this.verbose(`FLOW: awaiting destroyed promise / timeout`)
+    this.flow(`FLOW: awaiting destroyed promise / timeout`)
     // @TODO remove timeout once issue with destroyPromise is solved
     await Promise.race([new Promise((resolve) => setTimeout(resolve, 100)), this._destroyedPromise.promise])
-    this.verbose(`FLOW: close complete, finish`)
+    this.flow(`FLOW: close complete, finish`)
   }
 
   /**
    * Send UPGRADED status msg to the relay, so it can free the slot
    */
   public sendUpgraded() {
-    this.verbose(`FLOW: sending UPGRADED`)
+    this.flow(`FLOW: sending UPGRADED`)
     this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.UPGRADED))
   }
 
@@ -250,6 +251,13 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    */
   private error(..._: any[]) {
     _error(`RC [${this._id}]`, ...arguments)
+  }
+
+  /**
+   * Log errors and add identity tag to distinguish multiple instances
+   */
+  private flow(..._: any[]) {
+    _flow(`RC [${this._id}]`, ...arguments)
   }
 
   /**
@@ -340,13 +348,13 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       // 3. Handle source attach
       // 4. Handle status messages
       // 5. Handle payload messages
-      this.verbose(`FLOW: outgoing: awaiting promises`)
+      this.flow(`FLOW: outgoing: awaiting promises`)
       result = await Promise.race(promises)
-      this.verbose(`FLOW: outgoing: promise ${resolvedPromiseName} resolved`)
+      this.flow(`FLOW: outgoing: promise ${resolvedPromiseName} resolved`)
 
       // Stream is done, nothing to do
       if (this._streamClosed && this.destroyed) {
-        this.verbose(`FLOW: stream is closed, break`)
+        this.flow(`FLOW: stream is closed, break`)
         break
       }
 
@@ -363,7 +371,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         currentSource = undefined
         streamPromise = undefined
         this._migrationDone?.resolve()
-        this.verbose(`FLOW: stream switched, continue`)
+        this.flow(`FLOW: stream switched, continue`)
         continue
       }
 
@@ -375,7 +383,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
         streamPromise = undefined
         result = undefined
-        this.verbose(`FLOW: source attached, forwarding`)
+        this.flow(`FLOW: source attached, forwarding`)
         continue
       }
 
@@ -387,12 +395,12 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
           this.destroyed = true
           this._destroyedPromise.resolve()
 
-          this.verbose(`FLOW: STOP received, break`)
+          this.flow(`FLOW: STOP received, break`)
           yield statusMsg
           break
         }
 
-        this.verbose(`FLOW: unrelated status message received, continue`)
+        this.flow(`FLOW: unrelated status message received, continue`)
         yield statusMsg
 
         continue
@@ -407,18 +415,18 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       if (received.done) {
         currentSource = undefined
         streamPromise = undefined
-        this.verbose(`FLOW: received.done == true, break`)
+        this.flow(`FLOW: received.done == true, break`)
         break
       }
 
       result = undefined
       streamPromise = (currentSource as Stream['source']).next()
 
-      this.verbose(`FLOW: loop end`)
+      this.flow(`FLOW: loop end`)
 
       yield Uint8Array.from([RelayPrefix.PAYLOAD, ...received.value.slice()])
     }
-    this.verbose(`FLOW: breaked out the loop`)
+    this.flow(`FLOW: breaked out the loop`)
   }
 
   /**
@@ -448,7 +456,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       }
 
       while (this._iteration == drainIteration) {
-        this.verbose(`FLOW: incoming: new loop iteration`)
+        this.flow(`FLOW: incoming: new loop iteration`)
         const promises: Promise<any>[] = []
 
         let resolvedPromiseName
@@ -474,7 +482,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
         result = (await Promise.race(promises)) as any
 
-        this.verbose(`FLOW: incoming: promise ${resolvedPromiseName} resolved`)
+        this.flow(`FLOW: incoming: promise ${resolvedPromiseName} resolved`)
 
         // End stream once new instance is used
         if (this._iteration != drainIteration) {
@@ -486,13 +494,13 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         }
 
         if (this._streamClosed) {
-          this.verbose(`FLOW: stream closed`)
+          this.flow(`FLOW: stream closed`)
           break
         }
 
         if (result == undefined && this._sourceSwitched) {
           migrationDone.resolve()
-          this.verbose(`FLOW: migration done`)
+          this.flow(`FLOW: migration done`)
           continue
         }
 
@@ -500,7 +508,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
         if (received.done) {
           // @TODO how to proceed ???
-          this.verbose(`FLOW: received done`)
+          this.flow(`FLOW: received done`)
           break
         }
 
