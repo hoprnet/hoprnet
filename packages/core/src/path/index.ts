@@ -16,7 +16,7 @@ const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => !pathFrom(p).
 const rand = () => Math.random() // TODO - swap for something crypto safe
 const debugPath = (p: ChannelPath) =>
   pathFrom(p)
-    .map((x) => x.toString())
+    .map((x) => x.toB58String())
     .join(',')
 
 // Weight a node based on stake, and a random component.
