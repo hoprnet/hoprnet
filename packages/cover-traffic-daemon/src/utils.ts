@@ -110,6 +110,7 @@ export const sendCTMessage = async (
       weight
     )
 
+    path.unshift(startNode) // Path doesn't normally include this
     path.forEach((p) => data.incrementForwards(p))
     log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
