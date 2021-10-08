@@ -132,7 +132,7 @@ describe('packet interaction', function () {
 
     fakePacket.storeUnacknowledgedTicket(db)
 
-    const defer = new Defer()
+    const defer = Defer<void>()
 
     subscribeToAcknowledgements(libp2pSelf.subscribe, db, chainSelf as any, self, () => {
       defer.resolve()
@@ -163,7 +163,7 @@ describe('packet interaction', function () {
     const testMsg = new TextEncoder().encode('testMsg')
     const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any)
 
-    const msgDefer = new Defer()
+    const msgDefer = Defer<void>()
 
     const senderInteraction = new PacketForwardInteraction(
       libp2pSender.subscribe,

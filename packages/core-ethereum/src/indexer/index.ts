@@ -22,6 +22,7 @@ import {
 
 import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames } from './types'
+import type { DeferType } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 
 const log = debug('hopr-core-ethereum:indexer')
@@ -37,7 +38,7 @@ class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
-  private pendingCommitments: Map<string, Defer<void>>
+  private pendingCommitments: Map<string, DeferType<void>>
   private chain: ChainWrapper
   private genesisBlock: number
 
@@ -48,7 +49,7 @@ class Indexer extends EventEmitter {
     private blockRange: number
   ) {
     super()
-    this.pendingCommitments = new Map<string, Defer<void>>()
+    this.pendingCommitments = new Map<string, DeferType<void>>()
   }
 
   /**
@@ -329,7 +330,7 @@ class Indexer extends EventEmitter {
       return waiting.promise
     }
 
-    waiting = new Defer()
+    waiting = Defer<void>()
 
     this.pendingCommitments.set(channelId.toHex(), waiting)
   }

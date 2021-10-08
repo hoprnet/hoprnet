@@ -1,20 +1,17 @@
-export class Defer<T> {
-  public promise: Promise<T>
-  private _resolve: (value?: T | PromiseLike<T>) => void
-  private _reject: (reason?: any) => void
+export type DeferType<T> = {
+  promise: Promise<T>
+  resolve: (value?: T | PromiseLike<T>) => void
+  reject: (reason?: any) => void
+}
 
-  constructor() {
-    this.promise = new Promise<T>((resolve, reject) => {
-      this._resolve = resolve
-      this._reject = reject
-    })
-  }
+// Typed version of https://github.com/sindresorhus/p-defer
+export function Defer<T>(): DeferType<T> {
+  const deferred = {} as DeferType<T>
 
-  public resolve(value?: T | PromiseLike<T>): void {
-    this._resolve(value)
-  }
+  deferred.promise = new Promise<T>((resolve, reject) => {
+    deferred.resolve = resolve
+    deferred.reject = reject
+  })
 
-  public reject(reason?: any): void {
-    this._reject(reason)
-  }
+  return deferred
 }

@@ -81,7 +81,7 @@ describe(`test libp2pSendMessage`, function () {
     const msgToReceive = new TextEncoder().encode(`This message should be received.`)
 
     const desintation = await PeerId.create({ keyType: 'secp256k1' })
-    const msgReceived = new Defer()
+    const msgReceived = Defer<void>()
 
     const fakeLibp2p = {
       dialProtocol(destination: Multiaddr, protocol: string, ..._opts: any[]): Promise<LibP2PHandlerArgs> {
@@ -130,9 +130,9 @@ describe(`test libp2pSendMessageAndExpectResponse`, function () {
 
     const desintation = await PeerId.create({ keyType: 'secp256k1' })
 
-    const msgReceived = new Defer()
+    const msgReceived = Defer<void>()
 
-    const waitUntilSend = new Defer()
+    const waitUntilSend = Defer<void>()
 
     const fakeLibp2p = {
       dialProtocol(destination: Multiaddr, protocol: string, ..._opts: any[]): Promise<LibP2PHandlerArgs> {
@@ -193,8 +193,8 @@ describe(`test libp2pSubscribe`, async function () {
 
     const remotePeer = await PeerId.create({ keyType: 'secp256k1' })
 
-    let msgReceived = new Defer()
-    let msgReplied = new Defer()
+    let msgReceived = Defer<void>()
+    let msgReplied = Defer<void>()
 
     const fakeOnMessage = async (msg: Uint8Array) => {
       if (u8aEquals(msg, msgToReceive)) {
@@ -243,7 +243,7 @@ describe(`test libp2pSubscribe`, async function () {
 
     const remotePeer = await PeerId.create({ keyType: 'secp256k1' })
 
-    let msgReceived = new Defer()
+    let msgReceived = Defer<void>()
 
     const fakeOnMessage = async (msg: Uint8Array) => {
       await new Promise((resolve) => setTimeout(resolve, 50))
