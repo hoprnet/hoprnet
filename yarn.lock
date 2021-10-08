@@ -473,7 +473,6 @@ __metadata:
     mocha: ^9.1.1
     multiaddr: ^10.0.0
     multihashes: ^4.0.2
-    p-defer: 3
     peer-id: ^0.15.3
     prettier: ~2.4.0
     simple-peer: 9.11
@@ -3805,7 +3804,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"p-defer@npm:3, p-defer@npm:^3.0.0":
+"p-defer@npm:^3.0.0":
   version: 3.0.0
   resolution: "p-defer@npm:3.0.0"
   checksum: ac3b0976a1c76b67cca1a34e00f7299b0cc230891f820749686aa84f8947326bbe0f8e3b7d9ca511578ee06f0c1a6e0ff68c8e9c325eac455f09d99f91697161
