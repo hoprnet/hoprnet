@@ -172,11 +172,12 @@ class HoprConnect implements Transport<DialOptions, any> {
           throw new AbortError()
         }
 
-        return await this.dialDirectly(ma, options)
+        return this.dialDirectly(ma, options)
+
       case CODE_P2P:
         const relay = PeerId.createFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
-        return await this.dialWithRelay(relay, destination, options)
+        return this.dialWithRelay(relay, destination, options)
       default:
         throw new AbortError(`Protocol not supported. Given address: ${ma.toString()}`)
     }

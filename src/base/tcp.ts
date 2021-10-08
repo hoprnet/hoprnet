@@ -137,10 +137,7 @@ class TCPConnection implements MultiaddrConnection {
       const cOpts = ma.toOptions()
 
       log('dialing %j', cOpts)
-      const rawSocket = net.createConnection({
-        host: cOpts.host,
-        port: cOpts.port
-      })
+      let rawSocket: Socket
 
       const onError = (err: Error) => {
         verbose('Error connecting:', err.message)
@@ -163,26 +160,31 @@ class TCPConnection implements MultiaddrConnection {
 
       const onAbort = () => {
         log('connection aborted %j', cOpts)
-        rawSocket.destroy()
         done(new AbortError())
       }
 
       const done = (err?: Error) => {
-        rawSocket.removeListener('error', onError)
-        rawSocket.removeListener('timeout', onTimeout)
-        rawSocket.removeListener('connect', onConnect)
+        rawSocket?.removeListener('timeout', onTimeout)
+        rawSocket?.removeListener('connect', onConnect)
         options?.signal?.removeEventListener('abort', onAbort)
 
         if (err) {
+          rawSocket?.destroy()
           return reject(err)
         }
 
         resolve(new TCPConnection(ma, self, rawSocket))
       }
 
-      rawSocket.on('error', onError)
-      rawSocket.on('timeout', onTimeout)
-      rawSocket.on('connect', onConnect)
+      rawSocket = net
+        .createConnection({
+          host: cOpts.host,
+          port: cOpts.port
+        })
+        .on('error', onError)
+        .on('timeout', onTimeout)
+        .on('connect', onConnect)
+
       options?.signal?.addEventListener('abort', onAbort)
     })
   }
