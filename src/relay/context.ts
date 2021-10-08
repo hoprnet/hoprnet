@@ -13,6 +13,7 @@ const DEBUG_PREFIX = `hopr-connect`
 
 const _log = Debug(DEBUG_PREFIX)
 const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
+const _flow = Debug(`flow:${DEBUG_PREFIX}`)
 const _error = Debug(`${DEBUG_PREFIX}:error`)
 
 import { RelayPrefix, StatusMessages, ConnectionStatusMessages, isValidPrefix } from '../constants'
@@ -165,6 +166,10 @@ class RelayContext extends EventEmitter {
     _error(`RX [${this._id}]`, ...arguments)
   }
 
+  private flow(..._: any[]) {
+    _flow(`RX [${this._id}]`, ...arguments)
+  }
+
   /**
    * Forwards incoming messages from current incoming stream
    * @returns an async iterator
@@ -179,9 +184,9 @@ class RelayContext extends EventEmitter {
         this._sourcePromise = this._stream.source.next()
       }
 
-      this.verbose(`FLOW: relay_incoming: started loop`)
+      this.flow(`FLOW: relay_incoming: started loop`)
       while (true) {
-        this.verbose(`FLOW: relay_incoming: new loop iteration`)
+        this.flow(`FLOW: relay_incoming: new loop iteration`)
 
         const promises: Promise<Stream['source'] | StreamResult>[] = []
         let resolvedPromiseName
@@ -205,11 +210,11 @@ class RelayContext extends EventEmitter {
           pushPromise(this._sourcePromise, 'sourcePromise')
         }
 
-        this.verbose(`FLOW: relay_incoming: awaiting promises`)
+        this.flow(`FLOW: relay_incoming: awaiting promises`)
         // 1. Handle Stream switches
         // 2. Handle payload / status messages
         result = await Promise.race(promises)
-        this.verbose(`FLOW: relay_incoming: promise ${resolvedPromiseName} resolved`)
+        this.flow(`FLOW: relay_incoming: promise ${resolvedPromiseName} resolved`)
 
         if (result == undefined) {
           // @TODO throw Error to make debugging easier
@@ -225,7 +230,7 @@ class RelayContext extends EventEmitter {
 
           next()
 
-          this.verbose(`FLOW: relay_incoming: source switched continue`)
+          this.flow(`FLOW: relay_incoming: source switched continue`)
           yield Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
           continue
         }
@@ -233,7 +238,7 @@ class RelayContext extends EventEmitter {
         const received = result as IteratorYieldResult<Uint8Array>
 
         if (received.done) {
-          this.verbose(`FLOW: relay_incoming: received done, continue`)
+          this.flow(`FLOW: relay_incoming: received done, continue`)
           continue
         }
 
@@ -242,7 +247,7 @@ class RelayContext extends EventEmitter {
           this.log(`got empty message`)
           next()
 
-          this.verbose(`FLOW: relay_incoming: empty message, continue`)
+          this.flow(`FLOW: relay_incoming: empty message, continue`)
           // Ignore empty messages
           continue
         }
@@ -255,7 +260,7 @@ class RelayContext extends EventEmitter {
           next()
 
           // Ignore invalid prefixes
-          this.verbose(`FLOW: relay_incoming: invalid prefix, continue`)
+          this.flow(`FLOW: relay_incoming: invalid prefix, continue`)
           continue
         }
 
@@ -274,7 +279,7 @@ class RelayContext extends EventEmitter {
 
           next()
 
-          this.verbose(`FLOW: relay_incoming: got PING or PONG, continue`)
+          this.flow(`FLOW: relay_incoming: got PING or PONG, continue`)
           continue
           // Interprete connection sub-protocol
         } else if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS) {
@@ -283,7 +288,7 @@ class RelayContext extends EventEmitter {
 
             this.emit('close')
 
-            this.verbose(`FLOW: relay_incoming: STOP relayed, break`)
+            this.flow(`FLOW: relay_incoming: STOP relayed, break`)
             // forward STOP message
             yield received.value
 
@@ -291,29 +296,29 @@ class RelayContext extends EventEmitter {
             break
           } else if (SUFFIX[0] == ConnectionStatusMessages.UPGRADED) {
             // this is an artificial timeout to test the relay slot being properly freed during the integration test
-            this.verbose(`FLOW: waiting ${this.relayFreeTimeout}ms before freeing relay`)
+            this.flow(`FLOW: waiting ${this.relayFreeTimeout}ms before freeing relay`)
             if (this.relayFreeTimeout > 0) {
               await new Promise((resolve) => setTimeout(resolve, this.relayFreeTimeout))
             }
-            this.verbose(`FLOW: freeing relay`)
+            this.flow(`FLOW: freeing relay`)
 
             this.emit('upgrade')
             next()
             continue
           } else if ((SUFFIX[0] = ConnectionStatusMessages.RESTART)) {
             this.verbose(`RESTART relayed`)
-            this.verbose(`FLOW: relay_incoming: RESTART relayed, break`)
+            this.flow(`FLOW: relay_incoming: RESTART relayed, break`)
           }
         }
 
-        this.verbose(`FLOW: relay_incoming: loop iteration end`)
+        this.flow(`FLOW: relay_incoming: loop iteration end`)
 
         yield received.value
 
         next()
       }
 
-      this.verbose(`FLOW: relay_incoming: loop ended`)
+      this.flow(`FLOW: relay_incoming: loop ended`)
     }.call(this)
 
     return eagerIterator(iterator)
@@ -346,9 +351,9 @@ class RelayContext extends EventEmitter {
         ended = true
       })
 
-      this.verbose(`FLOW: relay_outgoing: loop started`)
+      this.flow(`FLOW: relay_outgoing: loop started`)
       while (true) {
-        this.verbose(`FLOW: relay_outgoing: new loop iteration`)
+        this.flow(`FLOW: relay_outgoing: new loop iteration`)
 
         const promises: Promise<SinkResult>[] = []
 
@@ -381,14 +386,14 @@ class RelayContext extends EventEmitter {
         // 1. Handle stream switches
         // 2. Handle status messages
         // 3. Handle payload messages
-        this.verbose(`FLOW: relay_outgoing: awaiting promises`)
+        this.flow(`FLOW: relay_outgoing: awaiting promises`)
         result = await Promise.race(promises)
 
-        this.verbose(`FLOW: relay_outgoing: promise ${resolvedPromiseName} resolved`)
+        this.flow(`FLOW: relay_outgoing: promise ${resolvedPromiseName} resolved`)
 
         // Don't handle incoming messages after migration
         if (ended) {
-          this.verbose(`FLOW: relay_outgoing: ended, break`)
+          this.flow(`FLOW: relay_outgoing: ended, break`)
           break
         }
 
@@ -397,50 +402,50 @@ class RelayContext extends EventEmitter {
           currentSource = result as Stream['source']
 
           result = undefined
-          this.verbose(`FLOW: relay_outgoing: sinkSource attacked, continue`)
+          this.flow(`FLOW: relay_outgoing: sinkSource attacked, continue`)
           continue
         }
 
         if (this._statusMessages.length > 0) {
           yield this.unqueueStatusMessage()
-          this.verbose(`FLOW: relay_outgoing: unqueuedStatusMsg, continue`)
+          this.flow(`FLOW: relay_outgoing: unqueuedStatusMsg, continue`)
           continue
         }
 
         let received = result as StreamResult
 
         if (received.done) {
-          this.verbose(`FLOW: relay_outgoing: received done, continue`)
+          this.flow(`FLOW: relay_outgoing: received done, continue`)
           continue
         }
 
         if (received.value.length == 0) {
-          this.verbose(`Ignoring empty message`)
+          this.flow(`Ignoring empty message`)
           next()
-          this.verbose(`FLOW: relay_outgoing: empty msg, continue`)
+          this.flow(`FLOW: relay_outgoing: empty msg, continue`)
           continue
         }
 
         let [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
 
         if (SUFFIX.length == 0) {
-          this.verbose(`Ignoring empty payload`)
+          this.flow(`Ignoring empty payload`)
           next()
-          this.verbose(`FLOW: relay_outgoing: empty payload, continue`)
+          this.flow(`FLOW: relay_outgoing: empty payload, continue`)
           continue
         }
 
         if (PREFIX[0] == RelayPrefix.CONNECTION_STATUS && SUFFIX[0] == ConnectionStatusMessages.STOP) {
-          this.verbose(`FLOW: relay_outgoing: STOP, break`)
+          this.flow(`FLOW: relay_outgoing: STOP, break`)
           yield received.value
           break
         }
 
         next()
-        this.verbose(`FLOW: relay_outgoing: end of loop iteration`)
+        this.flow(`FLOW: relay_outgoing: end of loop iteration`)
         yield received.value
       }
-      this.verbose(`FLOW: relay_outgoing: loop ended`)
+      this.flow(`FLOW: relay_outgoing: loop ended`)
     }
 
     while (true) {

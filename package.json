@@ -21,7 +21,6 @@
   "scripts": {
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "spawn-test-node": "ts-node tests/node.ts",
     "clean": "rm -Rf ./lib",
     "build": "yarn clean && tsc -p .",
     "test": "yarn node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --parallel --full-trace",
