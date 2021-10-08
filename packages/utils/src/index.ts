@@ -1,3 +1,4 @@
+export * from './async'
 export * from './collection'
 export * from './crypto'
 export * from './libp2p'
