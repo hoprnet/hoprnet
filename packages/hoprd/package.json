@@ -52,7 +52,7 @@
     "restana": "^4.8.0",
     "rlp": "2.2.7",
     "run-queue": "^2.0.1",
-    "strip-ansi": "6.0.1",
+    "strip-ansi": "7.0.1",
     "tiny-hashes": "^1.0.1",
     "ws": "8.2.3",
     "yargs": "17.2.1"
