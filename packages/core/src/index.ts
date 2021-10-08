@@ -35,7 +35,8 @@ import {
   AcknowledgedTicket,
   ChannelStatus,
   MIN_NATIVE_BALANCE,
-  u8aConcat
+  u8aConcat,
+  isMultiaddrLocal
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -640,9 +641,11 @@ class Hopr extends EventEmitter {
     const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
     const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
 
-    const p2p = new Multiaddr('/p2p/' + this.getId().toB58String())
+    let addrToAnnounce = ip4 ?? ip6
 
-    const addrToAnnounce = ip4 ?? ip6 ?? p2p
+    if (addrToAnnounce == undefined || isMultiaddrLocal(addrToAnnounce)) {
+      addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
+    }
     const isRoutableAddress = (ip4 ?? ip6) != undefined
 
     const ownAccount = await chain.getAccount(await this.getEthereumAddress())
