@@ -1,3 +1,12 @@
+<a name="0.2.43"></a>
+
+## [0.2.43](https://github.com/hoprnet/hopr-connect/compare/v0.2.42...v0.2.43) (2021-10-08)
+
+Changes:
+
+- add more try / catch blocks to prevent from uncaught errors
+- package upgrades
+
 <a name="0.2.42"></a>
 
 ## [0.2.42](https://github.com/hoprnet/hopr-connect/compare/v0.2.41...v0.2.42) (2021-09-10)
