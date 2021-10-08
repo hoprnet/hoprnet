@@ -79,10 +79,7 @@ function bindToUdpSocket(port?: number): Promise<Socket> {
  * @param port port to listen to
  * @param state used to track incoming messages
  */
-async function startStunServer(
-  port: number | undefined,
-  state: { msgReceived: Defer<void> }
-): Promise<Socket> {
+async function startStunServer(port: number | undefined, state: { msgReceived: Defer<void> }): Promise<Socket> {
   const socket = await bindToUdpSocket(port)
 
   socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
@@ -356,7 +353,7 @@ describe('check listening to sockets', function () {
     })
 
     const node = await startNode([stunPeer], {
-      msgReceived:new  Defer()
+      msgReceived: new Defer()
     })
 
     let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
@@ -535,7 +532,7 @@ describe('check listening to sockets', function () {
     const newRelay = await startNode(
       [stunPeer],
       {
-        msgReceived:new Defer()
+        msgReceived: new Defer()
       },
       undefined,
       relay.peerId
@@ -561,7 +558,7 @@ describe('check listening to sockets', function () {
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
     const relay = await startNode([stunPeer], {
-      msgReceived:new  Defer()
+      msgReceived: new Defer()
     })
 
     const node = await startNode([stunPeer], {
