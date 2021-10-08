@@ -1152,7 +1152,6 @@ __metadata:
     peer-id: 0.15.3
     pino: ^6.13.3
     pino-logflare: ^0.3.12
-    private-ip: ^2.2.1
     rewiremock: ^3.14.3
     rimraf: ^3.0.2
     secp256k1: ^4.0.2
