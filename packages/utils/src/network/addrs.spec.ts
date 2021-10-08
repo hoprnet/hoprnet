@@ -12,7 +12,7 @@ import {
   getPublicAddresses
 } from './addrs'
 import type { Network } from './constants'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aEquals } from '..'
 import assert from 'assert'
 
 describe('test utils', function () {

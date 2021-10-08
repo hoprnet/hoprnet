@@ -1,4 +1,4 @@
-import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex } from '..'
 import type { Network } from './constants'
 import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS } from './constants'
 
