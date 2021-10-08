@@ -135,7 +135,13 @@ class Listener extends EventEmitter implements InterfaceListener {
     this.tcpSocket.on('error', (err) => this.emit('error', err))
     this.udpSocket.on('error', (err) => this.emit('error', err))
 
-    this.tcpSocket.on('connection', this.onTCPConnection.bind(this))
+    this.tcpSocket.on('connection', async (socket: TCPSocket) => {
+      try {
+        await this.onTCPConnection(socket)
+      } catch (err) {
+        error(`network error`, err)
+      }
+    })
     this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
 
     this.addrs = {

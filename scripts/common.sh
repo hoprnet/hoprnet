@@ -36,8 +36,8 @@ function start_node {
     declare script=${3}
     declare rest_args=${@:4}
 
-    DEBUG=hopr-connect*,simple-peer \
-    yarn run spawn-test-node \
+    DEBUG=flow:hopr-connect*,hopr-connect*,simple-peer \
+    node_modules/.bin/ts-node ${filename} \
         > "${log_file}" \
         ${rest_args} \
         --script "${script}" \
