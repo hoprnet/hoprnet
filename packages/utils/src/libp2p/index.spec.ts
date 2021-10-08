@@ -12,7 +12,7 @@ import {
   LibP2PHandlerArgs
 } from '.'
 import BL from 'bl'
-import { Defer } from '../defer'
+import { Defer } from '../async'
 import { u8aEquals } from '../u8a'
 import { Multiaddr } from 'multiaddr'
 
