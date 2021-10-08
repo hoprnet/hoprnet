@@ -11,11 +11,11 @@ import { ipToU8aAddress, isLocalhost, isPrivateAddress, nodeToMultiaddr } from '
 import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
 import { once } from 'events'
-import Defer, { DeferredPromise } from 'p-defer'
+import { Defer } from '@hoprnet/hopr-utils'
 
 type ServerType = {
   socket: Socket
-  gotContacted: DeferredPromise<number>
+  gotContacted: Defer<number>
   contactCount: number
   index: number
 }
@@ -67,7 +67,7 @@ describe('test STUN', function () {
           new Promise<ServerType>((resolve, reject) => {
             const socket = dgram.createSocket('udp4')
 
-            const gotContacted = Defer<number>()
+            const gotContacted = new Defer<number>()
             let contactCount = 0
 
             socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {

@@ -7,13 +7,11 @@ import type { Socket, RemoteInfo } from 'dgram'
 import { handleStunRequest } from './stun'
 import PeerId from 'peer-id'
 import net from 'net'
-import Defer from 'p-defer'
-import type { DeferredPromise } from 'p-defer'
 import * as stun from 'webrtc-stun'
 import { once, on, EventEmitter } from 'events'
 
 import { networkInterfaces } from 'os'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aEquals, Defer } from '@hoprnet/hopr-utils'
 
 import type { PublicNodesEmitter, PeerStoreType } from '../types'
 
@@ -83,7 +81,7 @@ function bindToUdpSocket(port?: number): Promise<Socket> {
  */
 async function startStunServer(
   port: number | undefined,
-  state: { msgReceived: DeferredPromise<void> }
+  state: { msgReceived: Defer<void> }
 ): Promise<Socket> {
   const socket = await bindToUdpSocket(port)
 
@@ -114,7 +112,7 @@ async function waitUntilListening(socket: Listener, ma: Multiaddr) {
  */
 async function startNode(
   initialNodes: PeerStoreType[],
-  state: { msgReceived: DeferredPromise<void>; expectedMessageReceived?: DeferredPromise<void> },
+  state: { msgReceived: Defer<void>; expectedMessageReceived?: Defer<void> },
   expectedMessage?: Uint8Array,
   peerId?: PeerId
 ) {
@@ -180,7 +178,7 @@ describe('check listening to sockets', function () {
     let listener: Listener
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
-    const msgReceived = [Defer<void>(), Defer<void>()]
+    const msgReceived = [new Defer<void>(), new Defer<void>()]
 
     const stunServers = [
       await startStunServer(undefined, { msgReceived: msgReceived[0] }),
@@ -209,9 +207,9 @@ describe('check listening to sockets', function () {
   it('should contact potential relays and expose relay addresses', async function () {
     this.timeout(4e3)
 
-    const relayContacted = Defer<void>()
+    const relayContacted = new Defer<void>()
 
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer() })
 
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
@@ -219,7 +217,7 @@ describe('check listening to sockets', function () {
       msgReceived: relayContacted
     })
 
-    const node = await startNode([stunPeer], { msgReceived: Defer() })
+    const node = await startNode([stunPeer], { msgReceived: new Defer<void>() })
 
     const eventPromise = once(node.listener.emitter, '_newNodeRegistered')
 
@@ -242,9 +240,9 @@ describe('check listening to sockets', function () {
   })
 
   it('check that node is reachable', async function () {
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
-    const msgReceived = Defer<void>()
-    const expectedMessageReceived = Defer<void>()
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer<void>() })
+    const msgReceived = new Defer<void>()
+    const expectedMessageReceived = new Defer<void>()
 
     const testMessage = new TextEncoder().encode('test')
 
@@ -284,7 +282,7 @@ describe('check listening to sockets', function () {
       return
     }
 
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer() })
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
     const listener = new Listener(
@@ -306,11 +304,11 @@ describe('check listening to sockets', function () {
   })
 
   it('check that node speaks STUN', async function () {
-    const defer = Defer<void>()
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const defer = new Defer<void>()
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer() })
 
     const node = await startNode([await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)], {
-      msgReceived: Defer()
+      msgReceived: new Defer()
     })
 
     const socket = dgram.createSocket({ type: 'udp4' })
@@ -350,15 +348,15 @@ describe('check listening to sockets', function () {
   })
 
   it('get the right addresses', async function () {
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer() })
 
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
     const relay = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived: new Defer()
     })
 
     const node = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived:new  Defer()
     })
 
     let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
@@ -397,17 +395,17 @@ describe('check listening to sockets', function () {
   })
 
   it('check connection tracking', async function () {
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer() })
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
-    const msgReceived = Defer<void>()
-    const expectedMessageReceived = Defer<void>()
+    const msgReceived = new Defer<void>()
+    const expectedMessageReceived = new Defer<void>()
 
     const node = await startNode([stunPeer], {
       msgReceived,
       expectedMessageReceived
     })
 
-    const bothConnectionsOpened = Defer()
+    const bothConnectionsOpened = new Defer()
     let connections = 0
 
     node.listener.on('connection', () => {
@@ -450,15 +448,15 @@ describe('check listening to sockets', function () {
   })
 
   it('add relay node only once', async function () {
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer() })
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
     const relay = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived: new Defer()
     })
 
     const node = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived: new Defer()
     })
 
     let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
@@ -498,15 +496,15 @@ describe('check listening to sockets', function () {
   })
 
   it('overwrite existing relays', async function () {
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer() })
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
     const relay = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived: new Defer()
     })
 
     const node = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived: new Defer()
     })
 
     let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
@@ -537,7 +535,7 @@ describe('check listening to sockets', function () {
     const newRelay = await startNode(
       [stunPeer],
       {
-        msgReceived: Defer()
+        msgReceived:new Defer()
       },
       undefined,
       relay.peerId
@@ -559,15 +557,15 @@ describe('check listening to sockets', function () {
   })
 
   it('remove offline relay nodes', async function () {
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer() })
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
     const relay = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived:new  Defer()
     })
 
     const node = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived: new Defer()
     })
 
     let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
@@ -601,15 +599,15 @@ describe('check listening to sockets', function () {
   })
 
   it('remove offline relay nodes - edge cases', async function () {
-    const stunServer = await startStunServer(undefined, { msgReceived: Defer() })
+    const stunServer = await startStunServer(undefined, { msgReceived: new Defer() })
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
     const relay = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived: new Defer()
     })
 
     const node = await startNode([stunPeer], {
-      msgReceived: Defer()
+      msgReceived: new Defer()
     })
 
     let addrs = node.listener.getAddrs().map((ma: Multiaddr) => ma.toString())

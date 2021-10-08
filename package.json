@@ -37,7 +37,6 @@
     "it-handshake": "^2.0.0",
     "multiaddr": "^10.0.0",
     "multihashes": "^4.0.2",
-    "p-defer": "3",
     "peer-id": "^0.15.3",
     "simple-peer": "9.11",
     "stream-to-it": "^0.2.4",
