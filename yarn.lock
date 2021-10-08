@@ -471,7 +471,7 @@ __metadata:
     libp2p-interfaces: ^1.0.0
     libp2p-mplex: 0.10.4
     mocha: ^9.1.2
-    multiaddr: 10.0.0
+    multiaddr: ^10.0.0
     multihashes: ^4.0.3
     p-defer: 3
     peer-id: ~0.15.3
@@ -3284,7 +3284,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"multiaddr@npm:10.0.0, multiaddr@npm:^10.0.0":
+"multiaddr@npm:^10.0.0":
   version: 10.0.0
   resolution: "multiaddr@npm:10.0.0"
   dependencies:
