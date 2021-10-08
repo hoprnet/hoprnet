@@ -244,8 +244,8 @@ describe('check listening to sockets', function () {
 
   it('check that node is reachable', async function () {
     const stunServer = await startStunServer(undefined)
-    const msgReceived = Defer<void>()
-    const expectedMessageReceived = Defer<void>()
+    const msgReceived = new Defer<void>()
+    const expectedMessageReceived = new Defer<void>()
 
     const testMessage = new TextEncoder().encode('test')
 
