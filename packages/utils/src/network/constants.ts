@@ -64,7 +64,7 @@ export const LOOPBACK_ADDRS: Network[] = [
   },
   {
     subnet: Uint8Array.from([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 254]),
-    networkPrefix: Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+    networkPrefix: Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
     family: 'IPv6'
   }
 ]

@@ -129,6 +129,11 @@ describe('test utils', function () {
     assert(!isPrivateAddress(ipToU8aAddress('172.15.0.131', 'IPv4'), 'IPv4'))
   })
 
+  it('should detect local addresses', function () {
+    assert(isLocalhost(ipToU8aAddress('127.0.0.1', 'IPv4'), 'IPv4'))
+    assert(isLocalhost(ipToU8aAddress('::1', 'IPv6'), 'IPv6'))
+  })
+
   it('should detect local addresses as local', function () {
     assert(getLocalHosts().every((network: Network) => isLocalhost(network.networkPrefix, network.family)))
     assert(getPrivateAddresses().every((network: Network) => isPrivateAddress(network.networkPrefix, network.family)))
