@@ -94,7 +94,7 @@ export function checkNetworks(
 export function ipToU8aAddress(address: string, family: NetworkInterfaceInfo['family']): Uint8Array {
   switch (family.toLowerCase()) {
     case 'ipv4':
-      return Uint8Array.from(address.split('.').map(parseInt))
+      return Uint8Array.from(address.split('.').map((x) => parseInt(x)))
     case 'ipv6':
       const splitted = address.split(':')
       if (address.endsWith(':')) {

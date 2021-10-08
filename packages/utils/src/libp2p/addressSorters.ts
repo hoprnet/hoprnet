@@ -1,5 +1,5 @@
 import { Address } from 'libp2p/src/peer-store'
-import { isPrivateAddress, ipToU8aAddress } from '../network'
+import { isPrivateAddress, isLocalhost, ipToU8aAddress } from '../network'
 import { Multiaddr } from 'multiaddr'
 import type { NetworkInterfaceInfo } from 'os'
 
@@ -24,7 +24,8 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
         throw Error(`Invalid address family in Multiaddr. Got ${family} but expected either '4' or '6'.`)
     }
 
-    return isPrivateAddress(ipToU8aAddress(address, ipFamily), ipFamily)
+    const u8aAddr = ipToU8aAddress(address, ipFamily)
+    return isLocalhost(u8aAddr, ipFamily) || isPrivateAddress(u8aAddr, ipFamily)
   } catch (e: any) {
     return false
   }
