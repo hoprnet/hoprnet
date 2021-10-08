@@ -948,9 +948,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@hoprnet/hopr-connect@npm:0.2.43":
-  version: 0.2.43
-  resolution: "@hoprnet/hopr-connect@npm:0.2.43"
+"@hoprnet/hopr-connect@npm:0.2.44":
+  version: 0.2.44
+  resolution: "@hoprnet/hopr-connect@npm:0.2.44"
   dependencies:
     "@hoprnet/hopr-utils": 1.81.7
     abortable-iterator: ^3.0.0
@@ -958,7 +958,7 @@ __metadata:
     debug: ^4.3.2
     heap-js: ^2.1.6
     it-handshake: ^2.0.0
-    multiaddr: 10.0.0
+    multiaddr: ^10.0.0
     multihashes: ^4.0.3
     p-defer: 3
     peer-id: ~0.15.3
@@ -966,7 +966,7 @@ __metadata:
     stream-to-it: ^0.2.4
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
-  checksum: 2b1c01c12c23ed4b70648ca66a6633f869fa239fd8174e40c347db89a87f2341620cdcb15692600272210402a0bc241a5921e6afc68c031c0959fb16ee68a875
+  checksum: 0c99b71dceef5dcbe818a4f92b604766a2584905a0493afb230e3c48b13d172e41bf5bcecf05ac28ffb8a2bce2702ddc598deccc982412d41e0acee985e797ca
   languageName: node
   linkType: hard
 
@@ -1007,7 +1007,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": ^4.1.1
     "@google-cloud/profiler": 4.1.5
-    "@hoprnet/hopr-connect": 0.2.43
+    "@hoprnet/hopr-connect": 0.2.44
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
@@ -5675,7 +5675,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dns-over-http-resolver@npm:^1.0.0, dns-over-http-resolver@npm:^1.2.3":
+"dns-over-http-resolver@npm:^1.2.3":
   version: 1.2.3
   resolution: "dns-over-http-resolver@npm:1.2.3"
   dependencies:
@@ -11560,20 +11560,6 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"multiaddr@npm:10.0.0":
-  version: 10.0.0
-  resolution: "multiaddr@npm:10.0.0"
-  dependencies:
-    dns-over-http-resolver: ^1.0.0
-    err-code: ^3.0.1
-    is-ip: ^3.1.0
-    multiformats: ^9.0.2
-    uint8arrays: ^2.1.3
-    varint: ^6.0.0
-  checksum: ced881c8a2430e88c780a1eac8a296142c307cd59d9e646de3aef5f4e95d002320644a82445e7f373039d594b8903faadc974509ef8b5481318d8b5364d9dab5
-  languageName: node
-  linkType: hard
-
 "multiaddr@npm:^10.0.0":
   version: 10.0.1
   resolution: "multiaddr@npm:10.0.1"
@@ -11650,13 +11636,6 @@ fsevents@~2.1.1:
   version: 9.4.7
   resolution: "multiformats@npm:9.4.7"
   checksum: f8879f94f82e617a262fe917045d34110ef069068d889f9cefb02df3e05a04a0d08756cbba3bb287cd0a96e34d7bd322cbb081a94b1155e478d128715f11d522
-  languageName: node
-  linkType: hard
-
-"multiformats@npm:^9.0.2":
-  version: 9.4.8
-  resolution: "multiformats@npm:9.4.8"
-  checksum: 161fd721ab5e301a1740d15ac158e7506942ef0be99be79a60bdf1a03142f7055f9c0609072da590eb840453b3996ffd37b974996d7eddfa3c765eebaba03708
   languageName: node
   linkType: hard
 
