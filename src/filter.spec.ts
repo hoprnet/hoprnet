@@ -10,7 +10,7 @@ class TestFilter extends Filter {
    * @dev Used to set falsy local network
    * @param mAddrs new local addresses
    */
-   _setLocalAddressesForTesting(networks: Network[]): void {
+  _setLocalAddressesForTesting(networks: Network[]): void {
     this.myLocalAddresses = networks
   }
 }
