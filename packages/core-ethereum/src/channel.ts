@@ -242,7 +242,6 @@ class Channel {
       log('redeeming ticket', ticket)
       this.redeemTicket(ticket)
       log('ticket was redeemed')
-      // TODO handle failures due to foreseeable chain issues, gas etc.
     }
   }
 
