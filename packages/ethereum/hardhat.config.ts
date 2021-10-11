@@ -67,7 +67,7 @@ const hardhatConfig: HardhatUserConfig = {
     },
     mumbai: {
       ...networks.mumbai,
-      live: false,
+      live: true,
       tags: ['development'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
@@ -76,7 +76,7 @@ const hardhatConfig: HardhatUserConfig = {
     polygon: {
       ...networks.polygon,
       live: true,
-      tags: ['testing'] as NetworkTag[],
+      tags: ['development'] as NetworkTag[],
       url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     }
