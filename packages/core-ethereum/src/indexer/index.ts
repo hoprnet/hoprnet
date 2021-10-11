@@ -305,7 +305,7 @@ class Indexer extends EventEmitter {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           this.onOwnUnsetCommitment(channel)
-        } 
+        }
       }
     }
   }
@@ -316,7 +316,6 @@ class Indexer extends EventEmitter {
     }
     this.emit('channel-waiting-for-commitment', channel)
   }
-
 
   public async getAccount(address: Address) {
     return this.db.getAccount(address)
