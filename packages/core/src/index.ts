@@ -643,9 +643,10 @@ class Hopr extends EventEmitter {
 
     let addrToAnnounce = ip4 ?? ip6
 
-    if (addrToAnnounce == undefined || isMultiaddrLocal(addrToAnnounce)) {
+    if (addrToAnnounce == undefined || (isMultiaddrLocal(addrToAnnounce) && !this.options.preferLocalAddresses)) {
       addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
     }
+
     const isRoutableAddress = (ip4 ?? ip6) != undefined
 
     const ownAccount = await chain.getAccount(await this.getEthereumAddress())
