@@ -14,7 +14,7 @@
   "exclude": ["lib"],
   "include": ["src/**/*.ts"],
   "typedocOptions": {
-    "entryPoints": ["index.ts"],
+    "entryPoints": ["src/index.ts"],
     "disableOutputCheck": true,
     "out": "docs",
     // by default we don't want links to source code to change on every change
