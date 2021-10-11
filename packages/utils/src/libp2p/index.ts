@@ -166,7 +166,7 @@ export async function dial(
       return { status: 'E_TIMEOUT' }
     }
 
-    if ((err != null || struct == null) && libp2p._dht == undefined) {
+    if ((err != null || struct == null) && libp2p.peerRouting._routers.length > 0) {
       logError(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
       clearTimeout(timeout)
       return { status: 'E_DIAL', error: err.message, dhtContacted: false }
@@ -175,10 +175,10 @@ export async function dial(
     verbose(`could not dial directly (${err.message}), looking in the DHT`)
 
     // Try to get some fresh addresses from the DHT
-    let dhtResponse: PromiseValue<ReturnType<PeerRoutingModule['findPeer']>>
+    let dhtResponse: PromiseValue<ReturnType<LibP2P.PeerRoutingModule['findPeer']>>
     try {
       // Let libp2p populate its internal peerStore with fresh addresses
-      dhtResponse = await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
+      dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
     } catch (err) {
       logError(
         `Querying the DHT for ${destination.toB58String()} failed. Known addresses:\n  ${(
