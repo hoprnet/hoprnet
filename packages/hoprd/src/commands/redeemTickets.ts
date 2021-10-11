@@ -1,6 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { styleValue } from './utils'
-import { AbstractCommand } from './abstractCommand'
+import { styleValue } from './utils/index.js'
+import { AbstractCommand } from './abstractCommand.js'
 
 export default class RedeemTickets extends AbstractCommand {
   constructor(public node: Hopr) {

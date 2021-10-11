@@ -4,9 +4,9 @@ import { privKeyToPeerId, SECP256K1_CONSTANTS, stringToU8a } from '@hoprnet/hopr
 import fs from 'fs'
 import { resolve } from 'path'
 import { debug } from '@hoprnet/hopr-utils'
-const log = debug(`hoprd:identity`)
-
 import Wallet from 'ethereumjs-wallet'
+
+const log = debug(`hoprd:identity`)
 
 export enum IdentityErrors {
   FAIL_TO_LOAD_IDENTITY = 'Could not load identity',

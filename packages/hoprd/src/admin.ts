@@ -1,15 +1,14 @@
 import Hopr from '@hoprnet/hopr-core'
 import http from 'http'
 import fs from 'fs'
-import ws from 'ws'
+import { WebSocketServer } from 'ws'
 import path from 'path'
 import { debug } from '@hoprnet/hopr-utils'
 import { parse, URL } from 'url'
 import next from 'next'
 import type { Server } from 'http'
-import stripAnsi from 'strip-ansi'
-import { LogStream } from './logs'
-import { NODE_ENV } from './env'
+import { LogStream } from './logs.js'
+import { NODE_ENV } from './env.js'
 import { Balance, NativeBalance, SUGGESTED_BALANCE, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import cookie from 'cookie'
@@ -72,10 +71,10 @@ export class AdminServer {
   }
 
   async setup() {
-    let adminPath = path.resolve(__dirname, '../hopr-admin/')
+    let adminPath = path.resolve('../hopr-admin/')
     if (!fs.existsSync(adminPath)) {
       // In Docker
-      adminPath = path.resolve(__dirname, './hopr-admin')
+      adminPath = path.resolve('./hopr-admin')
     }
     debugLog('using', adminPath)
 
@@ -100,7 +99,7 @@ export class AdminServer {
     this.server.listen(this.port, this.host)
     this.logs.log('Admin server listening on port ' + this.port)
 
-    this.wsServer = new ws.Server({ server: this.server })
+    this.wsServer = new WebSocketServer({ server: this.server })
 
     this.wsServer.on('connection', (socket: any, req: any) => {
       if (!this.authenticate(req)) {
@@ -119,10 +118,10 @@ export class AdminServer {
         debugLog('Message from client', message)
         this.logs.logFullLine(`admin > ${message}`)
         if (this.cmds) {
-          this.cmds.execute((resp: string) => {
+          this.cmds.execute(async (resp: string) => {
             if (resp) {
               // Strings may have ansi stuff in it, get rid of it:
-              resp = stripAnsi(resp)
+              resp = (await import('strip-ansi')).default(resp)
               this.logs.logFullLine(resp)
             }
           }, message.toString())

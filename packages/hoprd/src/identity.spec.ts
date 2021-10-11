@@ -1,4 +1,4 @@
-import { getIdentity, IdentityErrors, IdentityOptions } from './identity'
+import { getIdentity, IdentityErrors, IdentityOptions } from './identity.js'
 import { unlinkSync, existsSync } from 'fs'
 import { resolve } from 'path'
 import assert from 'assert'

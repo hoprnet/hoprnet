@@ -1,8 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 
-import { AbstractCommand } from './abstractCommand'
-import { styleValue } from './utils'
+import { AbstractCommand } from './abstractCommand.js'
+import { styleValue } from './utils/index.js'
 
 export default class Sign extends AbstractCommand {
   constructor(public node: Hopr) {

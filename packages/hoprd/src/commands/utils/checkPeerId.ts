@@ -1,5 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
-import type { GlobalState } from '../abstractCommand'
+import type { GlobalState } from '../abstractCommand.js'
 import PeerId from 'peer-id'
 
 /**

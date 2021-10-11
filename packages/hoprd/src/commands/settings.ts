@@ -1,5 +1,5 @@
-import { getPaddingLength, styleValue } from './utils'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import { getPaddingLength, styleValue } from './utils/index.js'
+import { AbstractCommand, GlobalState } from './abstractCommand.js'
 import type Hopr from '@hoprnet/hopr-core'
 import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
 

@@ -1,8 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import chalk from 'chalk'
-import { AbstractCommand, GlobalState } from './abstractCommand'
-import { checkPeerIdInput, styleValue } from './utils'
+import { AbstractCommand, GlobalState } from './abstractCommand.js'
+import { checkPeerIdInput, styleValue } from './utils/index.js'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
 export default class CloseChannel extends AbstractCommand {

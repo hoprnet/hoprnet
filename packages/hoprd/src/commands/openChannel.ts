@@ -3,8 +3,8 @@ import type PeerId from 'peer-id'
 import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'
-import { checkPeerIdInput, styleValue } from './utils'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import { checkPeerIdInput, styleValue } from './utils/index.js'
+import { AbstractCommand, GlobalState } from './abstractCommand.js'
 
 export class OpenChannel extends AbstractCommand {
   constructor(public node: Hopr) {

@@ -1,4 +1,4 @@
-import * as mod from './index'
+import * as mod from './index.js'
 import assert from 'assert'
 // @ts-ignore
 import sinon from 'sinon'

@@ -1,5 +1,5 @@
 import type PeerId from 'peer-id'
-import { styleValue } from './utils'
+import { styleValue } from './utils/index.js'
 
 export type GlobalState = {
   aliases: Map<string, PeerId>

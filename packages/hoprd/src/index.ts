@@ -3,13 +3,13 @@ import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { decode } from 'rlp'
-import { Commands } from './commands'
-import { LogStream } from './logs'
-import { AdminServer } from './admin'
-import yargs from 'yargs/yargs'
-import { terminalWidth } from 'yargs'
-import setupAPI from './api'
-import { getIdentity } from './identity'
+import { Commands } from './commands/index.js'
+import { LogStream } from './logs.js'
+import { AdminServer } from './admin.js'
+import yargs from 'yargs'
+// import { terminalWidth } from 'yargs'
+import setupAPI from './api.js'
+import { getIdentity } from './identity.js'
 import path from 'path'
 import { passwordStrength } from 'check-password-strength'
 
@@ -133,7 +133,7 @@ const argv = yargs(process.argv.slice(2))
     describe: 'no remote authentication for easier testing',
     default: false
   })
-  .wrap(Math.min(120, terminalWidth()))
+  // .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
 function parseHosts(): HoprOptions['hosts'] {

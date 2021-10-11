@@ -1,5 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { Commands } from './commands'
+import { Commands } from './commands/index.js'
 import bodyParser from 'body-parser'
 
 export default function setupAPI(node: Hopr, logs: any, options: any) {

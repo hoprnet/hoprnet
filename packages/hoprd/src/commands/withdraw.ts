@@ -1,7 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
-import { AbstractCommand } from './abstractCommand'
-import { styleValue } from './utils'
+import { AbstractCommand } from './abstractCommand.js'
+import { styleValue } from './utils/index.js'
 import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
 
 export default class Withdraw extends AbstractCommand {

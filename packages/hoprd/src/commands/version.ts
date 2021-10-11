@@ -1,4 +1,4 @@
-import { AbstractCommand } from './abstractCommand'
+import { AbstractCommand } from './abstractCommand.js'
 import type Hopr from '@hoprnet/hopr-core'
 
 export default class Version extends AbstractCommand {

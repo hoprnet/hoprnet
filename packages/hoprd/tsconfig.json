@@ -1,11 +1,12 @@
 {
   "compilerOptions": {
-    "esModuleInterop": true,
-    "lib": ["es2021", "dom"],
-    "module": "commonjs",
-    "target": "es2021",
+    "lib": ["es2020", "dom"],
+    "module": "nodenext",
+    "moduleResolution": "node",
+    "target": "es2020",
     "declaration": true,
     "skipLibCheck": true,
+    // "allowSyntheticDefaultImports": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "sourceMap": true,
