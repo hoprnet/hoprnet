@@ -52,9 +52,7 @@ async function createCommitmentChain(db: HoprDB, channelId: Hash, setChainCommit
   log('commitment chain initialized')
 }
 
-
 export async function initializeCommitment(db: HoprDB, channelId, getChainCommitment, setChainCommitment) {
-  // check we don't have already
   const dbContainsAlready = (await db.getCommitment(channelId, 0)) != undefined
   const chainCommitment = await getChainCommitment()
   if (chainCommitment && dbContainsAlready) {
@@ -65,7 +63,6 @@ export async function initializeCommitment(db: HoprDB, channelId, getChainCommit
       log(`Secret is found but failed to find preimage, reinitializing.. ${e.message}`)
     }
   }
-
   log(`reinitializing (db: ${dbContainsAlready}, chain: ${chainCommitment}})`)
   await createCommitmentChain(db, channelId, setChainCommitment)
 }
