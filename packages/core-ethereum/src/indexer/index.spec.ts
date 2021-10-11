@@ -9,7 +9,7 @@ import {
   stringToU8a,
   Address,
   ChannelEntry,
-  Defer,
+  defer,
   Hash,
   HoprDB,
   generateChannelId,
@@ -239,7 +239,7 @@ describe('test indexer', function () {
     newEvent(fixtures.OPENED_EVENT)
     newBlock()
 
-    const blockMined = Defer<void>()
+    const blockMined = defer<void>()
 
     indexer.on('block-processed', (blockNumber: number) => {
       if (blockNumber === 4) blockMined.resolve()
@@ -301,7 +301,7 @@ describe('test indexer', function () {
 
     assert.strictEqual(indexer.status, 'stopped')
 
-    const started = Defer<void>()
+    const started = defer<void>()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
@@ -319,7 +319,7 @@ describe('test indexer', function () {
 
     hoprChannels.emit('error', new Error('MOCK'))
 
-    const started = Defer<void>()
+    const started = defer<void>()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
@@ -334,9 +334,9 @@ describe('test indexer', function () {
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
 
-    const opened = Defer<void>()
-    const pendingIniated = Defer<void>()
-    const closed = Defer<void>()
+    const opened = defer<void>()
+    const pendingIniated = defer<void>()
+    const closed = defer<void>()
 
     indexer.on('own-channel-updated', (channel: ChannelEntry) => {
       switch (channel.status) {
@@ -471,7 +471,7 @@ describe('test indexer', function () {
 
     newBlock()
 
-    const blockMined = Defer<void>()
+    const blockMined = defer<void>()
 
     indexer.on('block-processed', (blockNumber: number) => {
       if (blockNumber === 4) blockMined.resolve()

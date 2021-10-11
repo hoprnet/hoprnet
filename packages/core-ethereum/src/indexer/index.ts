@@ -12,7 +12,7 @@ import {
   ChannelStatus,
   Address,
   ChannelEntry,
-  Defer,
+  defer,
   AccountEntry,
   Hash,
   PublicKey,
@@ -330,7 +330,7 @@ class Indexer extends EventEmitter {
       return waiting.promise
     }
 
-    waiting = Defer<void>()
+    waiting = defer<void>()
 
     this.pendingCommitments.set(channelId.toHex(), waiting)
   }
