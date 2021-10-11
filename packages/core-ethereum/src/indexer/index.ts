@@ -12,7 +12,6 @@ import {
   ChannelStatus,
   Address,
   ChannelEntry,
-  Defer,
   AccountEntry,
   Hash,
   PublicKey,
@@ -37,7 +36,6 @@ class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
-  private pendingCommitments: Map<string, Defer<void>>
   private chain: ChainWrapper
   private genesisBlock: number
 
@@ -48,7 +46,6 @@ class Indexer extends EventEmitter {
     private blockRange: number
   ) {
     super()
-    this.pendingCommitments = new Map<string, Defer<void>>()
   }
 
   /**
@@ -308,9 +305,7 @@ class Indexer extends EventEmitter {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           this.onOwnUnsetCommitment(channel)
-        } else if (channel.status === ChannelStatus.Open) {
-          this.resolveCommitmentPromise(channel.getId())
-        }
+        } 
       }
     }
   }
@@ -322,21 +317,6 @@ class Indexer extends EventEmitter {
     this.emit('channel-waiting-for-commitment', channel)
   }
 
-  public waitForCommitment(channelId: Hash): Promise<void> {
-    let waiting = this.pendingCommitments.get(channelId.toHex())
-
-    if (waiting != undefined) {
-      return waiting.promise
-    }
-
-    waiting = new Defer()
-
-    this.pendingCommitments.set(channelId.toHex(), waiting)
-  }
-
-  private resolveCommitmentPromise(channelId: Hash) {
-    this.pendingCommitments.get(channelId.toHex())?.resolve()
-  }
 
   public async getAccount(address: Address) {
     return this.db.getAccount(address)

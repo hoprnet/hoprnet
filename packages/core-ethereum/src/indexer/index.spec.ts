@@ -6,7 +6,6 @@ import assert from 'assert'
 import EventEmitter from 'events'
 import Indexer from '.'
 import {
-  stringToU8a,
   Address,
   ChannelEntry,
   Defer,
@@ -17,7 +16,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
-import { CHANNEL_ID, PARTY_A, PARTY_B } from '../fixtures'
+import { PARTY_A, PARTY_B } from '../fixtures'
 import { BigNumber } from 'ethers'
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
@@ -152,37 +151,6 @@ const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event
     COMMITTED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.COMMITTED_EVENT, (a: Address) =>
       Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
     )
-  }
-}
-
-const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
-  const latestBlockNumber = ops.latestBlockNumber ?? 0
-  const pastEvents = ops.pastEvents ?? []
-
-  const db = HoprDB.createMock()
-  const { provider, newBlock } = createProviderMock({ latestBlockNumber })
-  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
-
-  const chainAlice = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_A)
-  const chainBob = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_B)
-
-  const indexerAlice = new Indexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5)
-  const indexerBob = new Indexer(Address.fromString(fixtures.ACCOUNT_B.address), db, 1, 5)
-
-  return {
-    db,
-    provider,
-    newBlock,
-    hoprChannels,
-    newEvent,
-    alice: {
-      indexer: indexerAlice,
-      chain: chainAlice
-    },
-    bob: {
-      indexer: indexerBob,
-      chain: chainBob
-    }
   }
 }
 
@@ -437,25 +405,6 @@ describe('test indexer', function () {
     newBlock()
 
     await closed.promise
-  })
-
-  it('should start two indexers and should set commitments only once', async function () {
-    const { alice, bob, newBlock, newEvent } = useMultiPartyFixtures({
-      latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
-    })
-
-    await Promise.all([alice.indexer.start(alice.chain, 0), bob.indexer.start(bob.chain, 0)])
-    newEvent(fixtures.OPENED_EVENT)
-
-    newBlock()
-    newBlock()
-    newBlock()
-
-    await Promise.all([
-      alice.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID))),
-      bob.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID)))
-    ])
   })
 
   it('should process events in the right order', async function () {
