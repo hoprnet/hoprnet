@@ -86,13 +86,13 @@
 
 ### Functions
 
-- [backoff](modules.md#backoff)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
 - [createPacket](modules.md#createpacket)
 - [createPoRString](modules.md#createporstring)
 - [createPoRValuesForSender](modules.md#createporvaluesforsender)
+- [debug](modules.md#debug)
 - [decodePoRBytes](modules.md#decodeporbytes)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
 - [dial](modules.md#dial)
@@ -130,6 +130,7 @@
 - [randomPermutation](modules.md#randompermutation)
 - [randomSubset](modules.md#randomsubset)
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
+- [retryWithBackoff](modules.md#retrywithbackoff)
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeToU8a](modules.md#serializetou8a)
 - [stringToU8a](modules.md#stringtou8a)
@@ -236,7 +237,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L273)
+[libp2p/index.ts:286](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L286)
 
 ___
 
@@ -261,7 +262,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:274](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L274)
+[libp2p/index.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L287)
 
 ___
 
@@ -640,32 +641,6 @@ ___
 
 ## Functions
 
-### backoff
-
-▸ **backoff**(`fn`, `options?`): `ReturnType`<typeof `fn`\>
-
-A general use backoff that will reject once MAX_DELAY is reached.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `fn` | () => `Promise`<`any`\> | asynchronous function to run on every tick |
-| `options` | `Object` | - |
-| `options.delayMultiple?` | `number` | multiplier to apply to increase running delay |
-| `options.maxDelay?` | `number` | maximum delay, we reject once we reach this |
-| `options.minDelay?` | `number` | minimum delay, we start with this |
-
-#### Returns
-
-`ReturnType`<typeof `fn`\>
-
-#### Defined in
-
-[backoff.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L14)
-
-___
-
 ### cacheNoArgAsyncFunction
 
 ▸ **cacheNoArgAsyncFunction**<`T`\>(`func`, `expiry`): () => `Promise`<`T`\>
@@ -832,6 +807,39 @@ the challenge for the first ticket sent to the first relayer
 #### Defined in
 
 [crypto/por/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L20)
+
+___
+
+### debug
+
+▸ `Const` **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `any`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `namespace` | `any` |
+
+#### Returns
+
+`fn`
+
+▸ (`message`, ...`parameters`): `any`
+
+##### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `message` | `any` |
+| `...parameters` | `any`[] |
+
+##### Returns
+
+`any`
+
+#### Defined in
+
+[debug.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/debug.ts#L14)
 
 ___
 
@@ -1304,7 +1312,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L230)
+[libp2p/index.ts:243](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L243)
 
 ___
 
@@ -1328,7 +1336,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L246)
+[libp2p/index.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L259)
 
 ___
 
@@ -1351,7 +1359,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:309](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L309)
+[libp2p/index.ts:322](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L322)
 
 ___
 
@@ -1739,6 +1747,38 @@ ___
 #### Defined in
 
 [crypto/hashIterator.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L55)
+
+___
+
+### retryWithBackoff
+
+▸ **retryWithBackoff**<`T`\>(`fn`, `options?`): `Promise`<`T`\>
+
+A general use backoff that will reject once MAX_DELAY is reached.
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `fn` | () => `Promise`<`T`\> | asynchronous function to run on every tick |
+| `options` | `Object` | - |
+| `options.delayMultiple?` | `number` | multiplier to apply to increase running delay |
+| `options.maxDelay?` | `number` | maximum delay, we reject once we reach this |
+| `options.minDelay?` | `number` | minimum delay, we start with this |
+
+#### Returns
+
+`Promise`<`T`\>
+
+#### Defined in
+
+[backoff.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L17)
 
 ___
 
@@ -2265,4 +2305,4 @@ ___
 
 #### Defined in
 
-[backoff.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L3)
+[backoff.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L6)

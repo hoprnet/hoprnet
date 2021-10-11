@@ -24,10 +24,11 @@ import {
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager, { TransactionPayload } from './transaction-manager'
-import Debug from 'debug'
 import { TX_CONFIRMATION_WAIT } from './constants'
+import { debug } from '@hoprnet/hopr-utils'
+import { CONFIRMATIONS } from './constants'
 
-const log = Debug('hopr:core-ethereum:chain-operations')
+const log = debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
 const knownNetworks = Object.entries(networks).map(([name, data]) => ({
   name: name as Networks,
@@ -108,7 +109,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     method: T,
     ...rest: Parameters<T>
   ): Promise<ContractTransaction | { hash: string }> {
-    const gasLimit = 300e3
+    const gasLimit = 400e3
     const gasPrice = networkInfo?.gas ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce

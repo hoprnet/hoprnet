@@ -9,7 +9,7 @@ import { CoverTrafficStrategy } from './strategy'
 import { ChannelEntry, privKeyToPeerId, PublicKey } from '@hoprnet/hopr-utils'
 import type PeerId from 'peer-id'
 import BN from 'bn.js'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('cover-traffic')
 
@@ -73,9 +73,19 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   log('starting node ...')
   await node.start()
   log('node is running')
+
+  console.log(node.getVersion())
+  console.log(node.smartContractInfo())
+
   const channels = await node.getChannelsFrom(selfAddr)
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))
   node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))
+
+  setInterval(async () => {
+    // CT stats
+    console.log('-- CT Stats --')
+    console.log(await node.connectionReport())
+  }, 5000)
 }
 
 if (require.main === module) {
@@ -84,7 +94,11 @@ if (require.main === module) {
   process.on('SIGTERM', stopGracefully)
   process.on('uncaughtException', stopGracefully)
 
-  main((_state: State) => {
-    console.log('CT: State update')
+  main((state: State) => {
+    console.log(
+      `CT: State update:` +
+        `${Object.keys(state.nodes).length} nodes, ` +
+        `${Object.keys(state.channels).length} channels`
+    )
   })
 }

@@ -8,7 +8,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import type NetworkPeers from './network/network-peers'
 const log = debug('hopr-core:channel-strategy')
 
@@ -37,6 +37,7 @@ export interface ChannelStrategy {
 
   onChannelWillClose(c: Channel): Promise<void> // Before a channel closes
   onWinningTicket(t: AcknowledgedTicket, channel: Channel): Promise<void>
+  shouldCommitToChannel(c: ChannelEntry): Promise<boolean>
 
   tickInterval: number
 }
@@ -55,6 +56,10 @@ export abstract class SaneDefaults {
   async onChannelWillClose(c: Channel) {
     log('auto redeeming')
     await c.redeemAllTickets()
+  }
+
+  async shouldCommitToChannel(_c: ChannelEntry): Promise<boolean> {
+    return true
   }
 
   tickInterval = CHECK_TIMEOUT

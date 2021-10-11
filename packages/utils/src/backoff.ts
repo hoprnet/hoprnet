@@ -1,4 +1,7 @@
 import { durations } from './time'
+import { debug } from './debug'
+
+const log = debug('hopr:utils:retry')
 
 export async function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
@@ -11,32 +14,30 @@ export async function wait(milliseconds: number): Promise<void> {
  * @param options.maxDelay maximum delay, we reject once we reach this
  * @param options.delayMultiple multiplier to apply to increase running delay
  */
-export async function backoff(
-  fn: () => Promise<any>,
+export async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
   options: {
     minDelay?: number
     maxDelay?: number
     delayMultiple?: number
   } = {}
-): ReturnType<typeof fn> {
+): Promise<T> {
   const { minDelay = durations.seconds(1), maxDelay = durations.minutes(10), delayMultiple = 2 } = options
-  let delay: number | undefined
+  let delay = minDelay
 
   if (minDelay >= maxDelay) throw Error('minDelay should be smaller than maxDelay')
   else if (delayMultiple <= 1) throw Error('delayMultiple should be larger than 1')
 
-  return new Promise<ReturnType<typeof fn>>(async (resolve, reject) => {
+  return new Promise<T>(async (resolve, reject) => {
     while (true) {
       try {
         const result = await fn()
         return resolve(result)
       } catch (err) {
         if (delay >= maxDelay) return reject(err)
-
-        // if delay is not set, our first delay is minDelay
-        // else we start exp increasing
-        delay = typeof delay === 'undefined' ? minDelay : Math.min(delay * delayMultiple, maxDelay)
+        log(`failed, attempting again in ${delay} (${err})`)
         await wait(delay)
+        delay = delay * delayMultiple
       }
     }
   })

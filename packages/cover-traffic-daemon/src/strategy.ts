@@ -14,7 +14,7 @@ import {
   CT_CHANNEL_STALL_TIMEOUT,
   CT_OPEN_CHANNEL_QUALITY_THRESHOLD
 } from './constants'
-import debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('cover-traffic')
 
@@ -124,7 +124,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
         toOpen.find((x) => x[0].eq(c)) ||
         toClose.find((x) => x.eq(c))
       ) {
-        console.error('skipping node', c.toB58String())
+        //console.error('skipping node', c.toB58String())
         continue
       }
       // It should fulfil the quality threshold

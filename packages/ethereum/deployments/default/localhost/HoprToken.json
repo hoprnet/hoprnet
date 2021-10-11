@@ -1,7 +1,7 @@
 {
   "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  "transactionHash": "0x1fff542ebbdaacf727fa8cf3bf3a3eaa250b28f96692c1d9f42f66c3fd34c9dd",
-  "blockNumber": 3,
+  "transactionHash": "0x7b6fcfd68d75c16bb456ffd39029ee8d3049ddac895bbce724281825a359682c",
+  "blockNumber": 4,
   "metadata": {
     "solcVersion": "0.6.6",
     "input": {
@@ -253,6 +253,31 @@
         }
       ],
       "name": "RevokedOperator",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "previousAdminRole",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "newAdminRole",
+          "type": "bytes32"
+        }
+      ],
+      "name": "RoleAdminChanged",
       "type": "event"
     },
     {

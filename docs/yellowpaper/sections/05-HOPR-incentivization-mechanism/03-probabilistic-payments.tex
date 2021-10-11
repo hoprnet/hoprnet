@@ -1,7 +1,7 @@
 \subsection{Probabilistic Payments}
 \label{sec:probabilisticpayments}
 
-In traditional payment channels, two parties $A$ and $B$ lock some funds within a smart contract, make transactions off-chain and only commit the aggregation on-chain. Thus, a payment channel is bidirectional, which means both $A$ and $B$ can send and receive transactions within the same payment channel. The HOPR protocol uses unidirectional payment channels to implement bidirectional payment channel behavior, where one payment channel is created from $A$ to $B$ and another from $B$ to $A$. The payment channel creator is the sole owner of funds in the payment channel and the only one able to create \textbf{tickets}, encapsulated funds which are described in detail in Section \ref{sec:tickets}. A payment channel created from party $A$ to party $B$ is different from a payment channel created from party $B$ to party $A$.
+In traditional payment channels, two parties $A$ and $B$ lock some funds within a smart contract, make transactions off-chain and only commit the aggregation on-chain. Thus, a payment channel is bidirectional, which means both $A$ and $B$ can send and receive transactions within the same payment channel. The HOPR protocol uses unidirectional payment channels to implement bidirectional payment channel behaviour, where one payment channel is created from $A$ to $B$ and another from $B$ to $A$. The payment channel creator is the sole owner of funds in the payment channel and the only one able to create \textbf{tickets}, encapsulated funds which are described in detail in Section \ref{sec:tickets}. A payment channel created from party $A$ to party $B$ is different from a payment channel created from party $B$ to party $A$.
 
 $$A\rightarrow B \neq B\rightarrow A$$
 

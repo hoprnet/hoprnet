@@ -77,7 +77,7 @@ export class SendMessage extends AbstractCommand {
       console.log(`Sending message to ${styleValue(peerId.toB58String(), 'peerId')} ...`)
       log(await this.sendMessage(state, peerId, message))
     } catch (err) {
-      log(styleValue(err.message, 'failure'))
+      log(styleValue(`Could not send message. Error was: ${err.message}`, 'failure'))
     }
   }
 }

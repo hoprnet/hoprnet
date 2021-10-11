@@ -1,6 +1,6 @@
 {
-  "address": "0x9a8114412E1d1eb4644c7a6212D9A28A79269aA7",
-  "transactionHash": "0x2bd144942996e8aaac29622793d93227c3e57cba447e0c294ec13df99e9e744f",
+  "address": "0x82aa438D1955647aE157a16E2197E5E35F4A4fd5",
+  "transactionHash": "0x3b4e65aa8b0fcf753cacc9a76fc40b08add3725f436b2e7f2621b38491f163d2",
   "blockNumber": 9,
   "metadata": {
     "solcVersion": "0.8.3",
@@ -107,6 +107,12 @@
           "internalType": "address",
           "name": "account",
           "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "publicKey",
+          "type": "bytes"
         },
         {
           "indexed": false,
@@ -414,6 +420,11 @@
       "inputs": [
         {
           "internalType": "bytes",
+          "name": "publicKey",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
           "name": "multiaddr",
           "type": "bytes"
         }
@@ -585,6 +596,25 @@
         }
       ],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "publicKeys",
+      "outputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {

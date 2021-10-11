@@ -1,7 +1,7 @@
-import Debug from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'ethers'
 import { isDeepStrictEqual } from 'util'
-const log = Debug('hopr-core-ethereum:transcation-manager')
+const log = debug('hopr-core-ethereum:transcation-manager')
 
 export type TransactionPayload = {
   to: string
