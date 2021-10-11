@@ -1,5 +1,9 @@
 <a name="1.81"></a>
 
+## Next
+
+None
+
 ## [1.81](https://github.com/hoprnet/hoprnet/compare/release/constantine...hoprnet:release/limassol) (2021-10-04)
 
 # Breaking changes
