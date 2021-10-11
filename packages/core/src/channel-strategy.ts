@@ -59,6 +59,7 @@ export abstract class SaneDefaults {
   }
 
   async shouldCommitToChannel(_c: ChannelEntry): Promise<boolean> {
+    log('committing to channel')
     return true
   }
 

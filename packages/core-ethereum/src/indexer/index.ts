@@ -304,19 +304,12 @@ class Indexer extends EventEmitter {
       if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
-          this.onOwnUnsetCommitment(channel)
+          log('channel to us waiting for commitment', channel)
+          this.emit('channel-waiting-for-commitment', channel)
         } 
       }
     }
   }
-
-  private onOwnUnsetCommitment(channel: ChannelEntry) {
-    if (!channel.destination.toAddress().eq(this.address)) {
-      throw new Error('shouldnt be called unless we are the destination')
-    }
-    this.emit('channel-waiting-for-commitment', channel)
-  }
-
 
   public async getAccount(address: Address) {
     return this.db.getAccount(address)
