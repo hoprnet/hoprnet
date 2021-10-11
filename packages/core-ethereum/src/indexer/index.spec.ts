@@ -1,6 +1,6 @@
 import type { providers as Providers, Wallet } from 'ethers'
-import type { HoprChannels } from '@hoprnet/hopr-ethereum'
-import type { Event } from './types'
+import type { HoprChannels, HoprToken } from '@hoprnet/hopr-ethereum'
+import type { Event, TokenEvent } from './types'
 import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
@@ -106,9 +106,39 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   }
 }
 
+const createHoprTokenMock = () => {
+  class FakeToken extends EventEmitter {
+    async transfer() {
+      let newEvent = {
+        event: 'Transfer',
+        transactionHash: '',
+        blockNumber: 8,
+        transactionIndex: 0,
+        logIndex: 0,
+        args: {
+          source: PARTY_A.toAddress().toHex(),
+          destination: PARTY_B.toAddress().toHex(),
+          balance: BigNumber.from('1')
+        } as any
+      } as TokenEvent<'Transfer'>
+      this.emit('*', newEvent)
+    }
+  }
+
+  const hoprToken = new FakeToken() as unknown as HoprToken
+
+  return {
+    hoprToken,
+    newEvent(event: Event<any>) {
+      hoprToken.emit('*', event)
+    }
+  }
+}
+
 const createChainMock = (
   provider: Providers.WebSocketProvider,
   hoprChannels: HoprChannels,
+  hoprToken: HoprToken,
   account?: Wallet
 ): ChainWrapper => {
   return {
@@ -119,6 +149,9 @@ const createChainMock = (
       hoprChannels.on('error', cb)
     },
     subscribeChannelEvents: (cb) => hoprChannels.on('*', cb),
+    subscribeTokenEvents: (cb) => hoprToken.on('*', cb),
+    getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => [],
+    updateConfirmedTransaction: (_hash: string) => {},
     unsubscribe: () => {
       provider.removeAllListeners()
       hoprChannels.removeAllListeners()
@@ -137,7 +170,8 @@ const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event
   const db = HoprDB.createMock()
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
-  const chain = createChainMock(provider, hoprChannels)
+  const { hoprToken } = createHoprTokenMock()
+  const chain = createChainMock(provider, hoprChannels, hoprToken)
   return {
     db,
     provider,
@@ -162,9 +196,10 @@ const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: E
   const db = HoprDB.createMock()
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
+  const { hoprToken } = createHoprTokenMock()
 
-  const chainAlice = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_A)
-  const chainBob = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_B)
+  const chainAlice = createChainMock(provider, hoprChannels, hoprToken, fixtures.ACCOUNT_A)
+  const chainBob = createChainMock(provider, hoprChannels, hoprToken, fixtures.ACCOUNT_B)
 
   const indexerAlice = new Indexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5)
   const indexerBob = new Indexer(Address.fromString(fixtures.ACCOUNT_B.address), db, 1, 5)
