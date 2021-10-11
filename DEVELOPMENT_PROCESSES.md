@@ -312,23 +312,23 @@ particular branch to deploy on every change.
 #### Release Cycle
 
 ```
-release/hello/hotfix/patch-hello     release/hello     master
+hotfix/hello/patch-hello     release/hello     master
 
-             x                              x             x 1.74.0-next.44
-             x                              │ ◄───────────x
-             x                              │             x
-             x                              │ 1.74.0      x
-             x                              │             x
-             x                              ▼             x
-             ┌◄──────────────────────────────             x
-             │                              x             x
-             │                              x             x
-             │                              x             x
-             ▼──────────────────────────────► 1.74.1      x
-             x                              │             x
-             x                              ▼────────────►x 1.75.0-next.0
-             x                              x             x
-             x                              x             x
+     x                              x             x 1.74.0-next.44
+     x                              │ ◄───────────x
+     x                              │             x
+     x                              │ 1.74.0      x
+     x                              │             x
+     x                              ▼             x
+     ┌◄──────────────────────────────             x
+     │                              x             x
+     │                              x             x
+     │                              x             x
+     ▼──────────────────────────────► 1.74.1      x
+     x                              │             x
+     x                              ▼────────────►x 1.75.0-next.0
+     x                              x             x
+     x                              x             x
 ```
 
 1. On every public release agreed as a [Milestone](https://github.com/hoprnet/hoprnet/milestones),
@@ -346,7 +346,7 @@ release/hello/hotfix/patch-hello     release/hello     master
    then shared within our `#release` channel. On the `#testing` channel, members are expected
    to run their own nodes (either AVADO or via their workstation) to participate in the release.
 
-3. Patches to the release are created via `release/*/hotfix/**` branches.
+3. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
    Each of these merges will trigger a new release version, and re-build our infrastructure
    for that version. Upon successfullly testing a release, the release branch may be merged back into
    `master` by following these steps:
