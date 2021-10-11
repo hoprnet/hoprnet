@@ -5,7 +5,7 @@ import PeerId from 'peer-id'
 import { keys, PublicKey } from 'libp2p-crypto'
 import multihashes from 'multihashes'
 import { green } from 'chalk'
-import type { PeerRoutingModule, Connection, MuxedStream } from 'libp2p'
+import type { Connection, MuxedStream } from 'libp2p'
 import type LibP2P from 'libp2p'
 
 import AbortController from 'abort-controller'
