@@ -59,7 +59,7 @@ export class Filter {
   private announcedAddrs?: Multiaddr[]
   private listenFamilies?: number[]
 
-  private myLocalAddresses: Network[]
+  protected myLocalAddresses: Network[]
 
   constructor(private peerId: PeerId) {
     this.myLocalAddresses = getLocalAddresses()
@@ -72,14 +72,6 @@ export class Filter {
     return this.announcedAddrs != undefined && this.listenFamilies != undefined
   }
 
-  /**
-   * THIS METHOD IS USED FOR TESTING
-   * @dev Used to set falsy local network
-   * @param mAddrs new local addresses
-   */
-  _setLocalAddressesForTesting(networks: Network[]): void {
-    this.myLocalAddresses = networks
-  }
 
   /**
    * Used to attach addresses once libp2p is initialized and

@@ -2,10 +2,22 @@ import { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import { Filter } from './filter'
 import assert from 'assert'
+import type { Network } from './utils/constants'
+
+class TestFilter extends Filter {
+  /**
+   * THIS METHOD IS ONLY USED FOR TESTING
+   * @dev Used to set falsy local network
+   * @param mAddrs new local addresses
+   */
+   _setLocalAddressesForTesting(networks: Network[]): void {
+    this.myLocalAddresses = networks
+  }
+}
 
 describe('test addr filtering', function () {
   let firstPeer: PeerId, secondPeer: PeerId
-  let filter: Filter
+  let filter: TestFilter
 
   before(async function () {
     firstPeer = await PeerId.create({ keyType: 'secp256k1' })
@@ -13,7 +25,7 @@ describe('test addr filtering', function () {
   })
 
   beforeEach(function () {
-    filter = new Filter(firstPeer)
+    filter = new TestFilter(firstPeer)
   })
 
   it('should accept valid circuit addresses', function () {
