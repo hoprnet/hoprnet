@@ -13,7 +13,7 @@ import {
   generateChannelId,
   ChannelStatus,
   PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB,
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 import type { RedeemTicketResponse } from '.'
@@ -53,7 +53,7 @@ class Channel {
     const response = unacknowledgedTicket.getResponse(acknowledgement)
 
     const ticket = unacknowledgedTicket.ticket
-    const channelId = this.getThemToUsId() 
+    const channelId = this.getThemToUsId()
     const opening = await findCommitmentPreImage(this.db, channelId)
 
     if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
