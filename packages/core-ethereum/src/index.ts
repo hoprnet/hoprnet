@@ -20,7 +20,7 @@ import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
-import { Commitment } from './commitment'
+import { initializeCommitment } from './commitment'
 
 const log = debug('hopr-core-ethereum')
 
@@ -164,7 +164,7 @@ export default class HoprEthereum extends EventEmitter {
     return await this.indexer.getPublicNodes()
   }
 
-  public commitToChannel(c: ChannelEntry): Promise<void> {
+  public async commitToChannel(c: ChannelEntry): Promise<void> {
     const setCommitment = (commitment: Hash): Promise<string> => {
       try {
         return this.chain.setCommitment(c.source.toAddress(), commitment)
@@ -174,13 +174,9 @@ export default class HoprEthereum extends EventEmitter {
       }
     }
 
-    return new Commitment(
-      setCommitment,
-      async () => (await this.indexer.getChannel(c.getId())).commitment,
-      this.db,
-      c.getId(),
-      this.indexer
-    ).initialize()
+    const getCommitment = async () => (await this.indexer.getChannel(c.getId())).commitment
+
+    initializeCommitment(this.db, c.getId(), getCommitment, setCommitment)
   }
 }
 
