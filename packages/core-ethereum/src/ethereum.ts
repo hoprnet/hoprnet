@@ -25,7 +25,7 @@ import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager, { TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
-import { CONFIRMATIONS } from './constants'
+import { TX_CONFIRMATION_WAIT } from './constants'
 
 const log = debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
@@ -73,25 +73,21 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   // is fixed
   async function waitForConfirmations(
     transactionHash: string,
-    confimations: number,
     timeout: number,
     onMined: (nonce: number, hash: string) => void,
-    onConfirmed: (nonce: number, hash: string) => void
   ): Promise<providers.TransactionResponse> {
-    const wait = 1e3
     let started = 0
     let response: providers.TransactionResponse
 
     while (started < timeout) {
       response = await provider.getTransaction(transactionHash)
-      if (response && response.confirmations == 0) onMined(response.nonce, response.hash)
-      if (response && response.confirmations >= confimations) {
-        onConfirmed(response.nonce, response.hash)
+      if (response && response.confirmations >= 0) {
+        onMined(response.nonce, response.hash)
         break
       }
       // wait 1 sec
-      await new Promise((resolve) => setTimeout(resolve, wait))
-      started += wait
+      await new Promise((resolve) => setTimeout(resolve, TX_CONFIRMATION_WAIT))
+      started += TX_CONFIRMATION_WAIT
     }
 
     if (!response) throw Error(errors.TIMEOUT)
@@ -172,15 +168,10 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     try {
       await waitForConfirmations(
         transaction.hash,
-        CONFIRMATIONS,
         30e3,
         (nonce: number, hash: string) => {
           log('Transaction with nonce %d and hash %s mined', nonce, hash)
           transactions.moveToMined(hash)
-        },
-        (nonce: number, hash: string) => {
-          log('Transaction with nonce %d and hash %s confirmed', nonce, hash)
-          transactions.moveToConfirmed(hash)
         }
       )
     } catch (error) {
