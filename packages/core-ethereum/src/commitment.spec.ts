@@ -4,7 +4,7 @@ import sinon from 'sinon'
 import { Hash, HoprDB } from '@hoprnet/hopr-utils'
 
 describe('commitment', function () {
-  let fakeSet, fakeGet, fakeDB, fakeId: Hash 
+  let fakeSet, fakeGet, fakeDB, fakeId: Hash
   beforeEach(async function () {
     fakeSet = sinon.fake.resolves(undefined)
     fakeGet = sinon.fake.resolves(undefined)
@@ -22,7 +22,7 @@ describe('commitment', function () {
     assert(fakeSet.callCount == 1, 'should set a new commitment on chain')
 
     await bumpCommitment(fakeDB, fakeId)
-    let c2 = await findCommitmentPreImage(fakeDB, fakeId) 
+    let c2 = await findCommitmentPreImage(fakeDB, fakeId)
     assert(c2, 'gives current commitment')
     assert(c2.hash().eq(c1), 'c2 is commitment of c1')
 
