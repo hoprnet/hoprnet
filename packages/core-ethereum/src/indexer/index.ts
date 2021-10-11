@@ -306,7 +306,7 @@ class Indexer extends EventEmitter {
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           log('channel to us waiting for commitment', channel)
           this.emit('channel-waiting-for-commitment', channel)
-        } 
+        }
       }
     }
   }
