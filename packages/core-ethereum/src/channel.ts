@@ -237,8 +237,17 @@ class Channel {
     return await this.db.getAcknowledgedTickets({ signer: this.counterparty })
   }
 
-  async redeemAllTickets(): Promise<RedeemTicketResponse[]> {
-    return await Promise.all((await this.getAcknowledgedTickets()).map((a) => this.redeemTicket(a)))
+  async redeemAllTickets(): Promise<void> {
+    // Because tickets are ordered and require the previous redemption to
+    // have succeeded before we can redeem the next, we need to do this
+    // sequentially.
+    
+    const tickets = await this.getAcknowledgedTickets()
+    // TODO pop while rather than load first
+    // TODO lock while redeeming
+    for (const ticket of tickets) {
+      this.redeemTicket(ticket)
+    }
   }
 
   async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
