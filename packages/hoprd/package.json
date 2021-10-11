@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.81.0-next.11",
+  "version": "1.81.0-next.13",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -39,7 +39,7 @@
     "cookie": "^0.4.1",
     "debug": "^4.3.2",
     "dids": "^2.4.0",
-    "ethereumjs-wallet": "^1.0.1",
+    "ethereumjs-wallet": "1.0.2",
     "jazzicon": "^1.5.0",
     "js-cookie": "^3.0.0",
     "key-did-provider-ed25519": "^1.1.0",
