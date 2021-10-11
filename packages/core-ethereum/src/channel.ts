@@ -237,7 +237,7 @@ class Channel {
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
-    const tickets = await this.db.getAcknowledgedTickets({ signer: this.counterparty }) 
+    const tickets = await this.db.getAcknowledgedTickets({ signer: this.counterparty })
     for (const ticket of tickets) {
       log('redeeming ticket', ticket)
       this.redeemTicket(ticket)
