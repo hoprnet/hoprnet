@@ -220,7 +220,9 @@ class Indexer extends EventEmitter {
     // Confirm native token transactions in that previous block.
     const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
     // update transaction manager
-    nativeTxs.forEach((nativeTx) => this.chain.updateConfirmedTransaction(nativeTx))
+    if (nativeTxs.length > 0) {
+      nativeTxs.forEach((nativeTx) => this.chain.updateConfirmedTransaction(nativeTx))
+    }
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
