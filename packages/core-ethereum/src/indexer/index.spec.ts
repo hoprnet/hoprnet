@@ -150,7 +150,7 @@ const createChainMock = (
     },
     subscribeChannelEvents: (cb) => hoprChannels.on('*', cb),
     subscribeTokenEvents: (cb) => hoprToken.on('*', cb),
-    getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => ([]),
+    getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => [],
     updateConfirmedTransaction: (_hash: string) => {},
     unsubscribe: () => {
       provider.removeAllListeners()
