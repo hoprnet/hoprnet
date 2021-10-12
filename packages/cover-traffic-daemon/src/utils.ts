@@ -6,7 +6,7 @@ import type { State, ChannelData, PersistedState } from './state'
 import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
 import { debug } from '@hoprnet/hopr-utils'
 
-const log = debug('cover-traffic')
+const log = debug('hopr:cover-traffic')
 
 export const addBN = (a: BN, b: BN): BN => a.add(b)
 export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().integerValue().toFixed(), 10)
@@ -110,6 +110,7 @@ export const sendCTMessage = async (
       weight
     )
 
+    path.unshift(startNode) // Path doesn't normally include this
     path.forEach((p) => data.incrementForwards(p))
     log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
@@ -120,6 +121,10 @@ export const sendCTMessage = async (
   try {
     data.incrementSent(startNode)
     await sendMessage(path)
+    log(
+      'success sending',
+      path.map((x) => x.toB58String())
+    )
     return true
   } catch (e) {
     //console.log(e)

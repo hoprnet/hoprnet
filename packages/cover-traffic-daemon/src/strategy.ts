@@ -16,7 +16,7 @@ import {
 } from './constants'
 import { debug } from '@hoprnet/hopr-utils'
 
-const log = debug('cover-traffic')
+const log = debug('hopr:cover-traffic')
 
 export class CoverTrafficStrategy extends SaneDefaults {
   name = 'covertraffic'
@@ -43,6 +43,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
     peers: any,
     _getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+    log(`tick, balance ${balance.toString()}`)
     const toOpen = []
     const toClose = []
     const state = this.data.get()
@@ -75,6 +76,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       }
     }
     this.data.setCTChannels(ctChannels)
+    log('channels', ctChannels)
 
     // Network must have at least some channels to create a full cover-traffic loop.
     if (this.data.openChannelCount() > CT_INTERMEDIATE_HOPS + 1) {
@@ -83,29 +85,33 @@ export class CoverTrafficStrategy extends SaneDefaults {
         const channel = this.data.findChannel(this.selfPub, openChannel.destination)
         if (channel && channel.status == ChannelStatus.Open) {
           // send messages for open channels
-          const success = sendCTMessage(
+          sendCTMessage(
             openChannel.destination,
             this.selfPub,
             async (path: PublicKey[]) => {
-              await this.node.sendMessage(new Uint8Array(1), openChannel.destination.toPeerId(), path)
+              await this.node.sendMessage(new Uint8Array(1), this.selfPub.toPeerId(), path)
             },
             this.data
-          )
-          if (!success) {
-            this.data.incrementMessageFails(openChannel.destination)
-          }
+          ).then((success) => {
+            if (!success) {
+              log('failed to send', openChannel.destination)
+              this.data.incrementMessageFails(openChannel.destination)
+            }
+          })
         } else if (
           channel &&
           channel.status == ChannelStatus.WaitingForCommitment &&
           Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT
         ) {
           // handle waiting for commitment stalls
+          log('unreliable channel, closing', openChannel.destination.toB58String())
           toClose.push(openChannel.destination)
         }
       }
     } else {
       log('aborting send messages - less channels in network than hops required')
     }
+    log('message send phase complete')
 
     let attempts = 0
     // When there is no enough cover traffic channels, providing node exists and adequete past attempts, the node will open some channels.

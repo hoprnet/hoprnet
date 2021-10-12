@@ -56,7 +56,7 @@ declare number_of_nodes=${3:-1}
 declare docker_image="gcr.io/hoprassociation/hopr-cover-traffic-daemon:${docker_image_tag}"
 declare provider="${HOPRD_PROVIDER:-https://goerli.infura.io/v3/${HOPRD_INFURA_KEY}}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
-declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
+declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-1}"
 
 test -z "${CT_PRIV_KEY:-}" && { msg "Missing environment variable CT_PRIV_KEY"; usage; exit 1; }
 
