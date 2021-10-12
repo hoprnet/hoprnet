@@ -312,39 +312,52 @@ particular branch to deploy on every change.
 #### Release Cycle
 
 ```
+hotfix/hello/patch-hello     release/hello     master
 
-   hotfix/patch-constantine    release/constantine          master
-
-         x                   x                       x 1.74.0-next.44
-         x                   │ ◄─────────────────────x
-         x                   │                       x
-         x                   │ 1.74.0                x
-         x                   │                       x
-         x                   ▼                       x
-         ┌◄──────────────────x                       x
-         │                   x                       x
-         │                   x                       x
-         │                   x                       x
-         ▼──────────────────►┐ 1.74.1                x
-         x                   │                       x
-         x                   ▼──────────────────────►x 1.75.0-next.0
-         x                   x                       x
-         x                   x                       x
-
+     x                              x             x 1.74.0-next.44
+     x                              │ ◄───────────x
+     x                              │             x
+     x                              │ 1.74.0      x
+     x                              │             x
+     x                              ▼             x
+     ┌◄──────────────────────────────             x
+     │                              x             x
+     │                              x             x
+     │                              x             x
+     ▼──────────────────────────────► 1.74.1      x
+     x                              │             x
+     x                              ▼────────────►x 1.75.0-next.0
+     x                              x             x
+     x                              x             x
 ```
 
 1. On every public release agreed as a [Milestone](https://github.com/hoprnet/hoprnet/milestones),
-   the PM Lead of the week will code-freeze `master` by creating a `release/**` branch
+   the PM Lead of the week will code-freeze `master` by creating a `release/*` branch
    tracking `master`. Release specific changes will be done in this branch to trigger
    this particular release, which requires to insert name and release version of the new milestone
-   in the file `scripts/environment.sh` as well as `packages/avado/Dockerfile` and add an entry to `CHANGELOG.md`.
+   in the files:
+
+- `scripts/environment.sh`
+- `packages/avado/Dockerfile`
+- `packages/avado/docker-compose.yml`
+- `packages/avado/Dockerfile`
+- add an entry to `CHANGELOG.md`
 
 2. The information about the release, how to test and what commands to run, are
-   then shared within our #release channel. On the #testing channel, members are expected
+   then shared within our `#release` channel. On the `#testing` channel, members are expected
    to run their own nodes (either AVADO or via their workstation) to participate in the release.
-3. Patches to the release are created via `hotfix/**` branches. Each of these merges will trigger
-   a new release version, and re-build our infrastructure for that version. Upon successfullly
-   testing a release, merge it back to trigger a new pre-release version via our actions.
+
+3. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
+   Each of these merges will trigger a new release version, and re-build our infrastructure
+   for that version. Upon successfullly testing a release, the release branch may be merged back into
+   `master` by following these steps:
+
+- locally create a merge-back branch based on the release branch
+- merge the latest `master` branch into the merge-back branch, in case of conflicts changes
+  from `master` have preference
+- bump the package versions to the next preminor version:
+  `yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version preminor --preid=next`
+- revert changes made to Avado configuration files as part of the initial release creation
 
 ### Actions
 

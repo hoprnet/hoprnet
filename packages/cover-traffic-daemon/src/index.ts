@@ -11,7 +11,7 @@ import type PeerId from 'peer-id'
 import BN from 'bn.js'
 import { debug } from '@hoprnet/hopr-utils'
 
-const log = debug('cover-traffic')
+const log = debug('hopr:cover-traffic')
 
 function stopGracefully(signal: number) {
   console.log(`Process exiting with signal ${signal}`)
