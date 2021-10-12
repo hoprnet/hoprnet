@@ -66,7 +66,7 @@ class Channel {
       )
 
       try {
-        bumpCommitment(this.db, channelId)
+        await bumpCommitment(this.db, channelId)
         this.events.emit('ticket:win', ack, this)
         return ack
       } catch (e) {
