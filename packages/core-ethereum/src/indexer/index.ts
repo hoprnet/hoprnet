@@ -440,14 +440,14 @@ class Indexer extends EventEmitter {
   public async resolvePendingTransaction(eventType: IndexerEvents, tx: string): Promise<string> {
     return new Promise((resolve) => {
       const listener = (txHash: string[]) => {
-        const indexed = txHash.find(emitted => emitted === tx);
+        const indexed = txHash.find((emitted) => emitted === tx)
         if (indexed) {
           this.removeListener(eventType, listener)
-          resolve(tx);
+          resolve(tx)
         }
       }
       this.addListener(eventType, listener)
-    });
+    })
   }
 }
 

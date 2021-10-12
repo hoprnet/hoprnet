@@ -97,14 +97,14 @@ export default class HoprEthereum extends EventEmitter {
     // promise of tx hash gets resolved when the tx is mined.
     const tx = await this.chain.announce(multiaddr)
     // event emitted by the indexer
-    return this.indexer.resolvePendingTransaction('annouce', tx);
+    return this.indexer.resolvePendingTransaction('annouce', tx)
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
     const tx = await this.chain.withdraw(currency, recipient, amount)
     // event emitted by the indexer
-    return this.indexer.resolvePendingTransaction(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx);
+    return this.indexer.resolvePendingTransaction(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx)
   }
 
   public getOpenChannelsFrom(p: PublicKey) {
@@ -174,7 +174,9 @@ export default class HoprEthereum extends EventEmitter {
   public commitToChannel(c: ChannelEntry): Promise<void> {
     const setCommitment = (commitment: Hash): Promise<string> => {
       try {
-        return this.chain.setCommitment(c.source.toAddress(), commitment).then((tx) => this.indexer.resolvePendingTransaction('set-commitment', tx))
+        return this.chain
+          .setCommitment(c.source.toAddress(), commitment)
+          .then((tx) => this.indexer.resolvePendingTransaction('set-commitment', tx))
       } catch (e) {
         log('Error setting commitment', e)
         // TODO: defer to channel strategy for this, and allow for retries.
