@@ -13,6 +13,6 @@ import PeerId from 'peer-id'
  * @param signature the generated signature created by the PeerId
  */
 export async function verifySignatureFromPeerId(peerId: string, message: string, signature: string): Promise<boolean> {
-  const pId = await PeerId.createFromB58String(peerId)
+  const pId = PeerId.createFromB58String(peerId)
   return await pId.pubKey.verify(new TextEncoder().encode(message), utils.arrayify(signature))
 }
