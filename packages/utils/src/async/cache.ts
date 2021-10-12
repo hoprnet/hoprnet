@@ -1,4 +1,4 @@
-import { isExpired } from '.'
+import { isExpired } from '..'
 
 // Cache the result of a function until expiry, and return that.
 //

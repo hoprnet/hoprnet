@@ -4,7 +4,7 @@ import { keys as libp2p_crypto } from 'libp2p-crypto'
 import { stringToU8a } from '../u8a'
 
 import secp256k1 from 'secp256k1'
-import mh from 'multihashes'
+import { encode } from 'multihashes'
 
 const PRIVKEY_LENGTH = 32
 
@@ -16,7 +16,7 @@ const PRIVKEY_LENGTH = 32
  * @param privKey the plain private key
  */
 export function privKeyToPeerId(privKey: Uint8Array | string): PeerId {
-  if (typeof privKey == 'string') {
+  if (typeof privKey === 'string') {
     privKey = stringToU8a(privKey, PRIVKEY_LENGTH)
   }
 
@@ -31,7 +31,7 @@ export function privKeyToPeerId(privKey: Uint8Array | string): PeerId {
     secp256k1.publicKeyCreate(privKey)
   )
 
-  const id = mh.encode(secp256k1PrivKey.public.bytes, 'identity')
+  const id = encode(secp256k1PrivKey.public.bytes, 'identity')
 
   return new PeerId(id, secp256k1PrivKey, secp256k1PrivKey.public)
 }

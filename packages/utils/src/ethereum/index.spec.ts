@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { logger, errors } from 'ethers'
-import { isErrorOutOfNativeFunds, isErrorOutOfHoprFunds, isErrorOutOfFunds } from './ethereum'
+import { isErrorOutOfNativeFunds, isErrorOutOfHoprFunds, isErrorOutOfFunds } from '.'
 
 describe('test out of funds', function () {
   it('should understand out of NATIVE funds error', function () {

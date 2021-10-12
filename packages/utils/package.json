@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.81.0-next.13",
+  "version": "1.81.0-next.16",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -46,7 +46,6 @@
     "peer-id": "0.15.3",
     "pino": "^6.13.3",
     "pino-logflare": "^0.3.12",
-    "private-ip": "^2.2.1",
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
