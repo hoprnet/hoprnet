@@ -669,6 +669,7 @@ class Hopr extends EventEmitter {
   }
 
   public async setChannelStrategy(strategy: ChannelStrategy) {
+    log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
   }
 
