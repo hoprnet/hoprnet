@@ -48,9 +48,9 @@ const hardhatConfig: HardhatUserConfig = {
             interval: [1000, 3000] // mine new block every 1 - 3s
           }
         : {
-          auto: false, // True: every transaction will trigger a new block (without this deployments fail). False: a new block is mined in an interval
-          interval: [1000, 3000] // mine new block every 1 - 3s
-        }
+            auto: false, // True: every transaction will trigger a new block (without this deployments fail). False: a new block is mined in an interval
+            interval: [1000, 3000] // mine new block every 1 - 3s
+          }
     },
     goerli: {
       ...networks.goerli,
