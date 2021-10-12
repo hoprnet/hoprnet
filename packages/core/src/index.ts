@@ -374,7 +374,7 @@ class Hopr extends EventEmitter {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
 
-    let balance
+    let balance: Balance
     try {
       balance = await this.getBalance()
     } catch (e) {
@@ -634,23 +634,42 @@ class Hopr extends EventEmitter {
     this.checkTimeout = setTimeout(() => this.periodicCheck(), this.strategy.tickInterval)
   }
 
-  private async announce(includeRouting: boolean = false): Promise<void> {
+  /**
+   * Announces address of node on-chain to be reachable by other nodes.
+   * @dev Promise resolves before own announcment appear in the indexer
+   * @param includeRouting publish routable address if true
+   * @returns Promise that resolves once announce transaction has been published
+   */
+  private async announce(includeRouting = false): Promise<void> {
     const chain = await this.startedPaymentChannels()
-    const multiaddrs = await this.getAnnouncedAddresses()
 
-    const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
-    const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
+    let isRoutableAddress = false
+    let addrToAnnounce: Multiaddr
 
-    let addrToAnnounce = ip4 ?? ip6
+    if (includeRouting) {
+      const multiaddrs = await this.getAnnouncedAddresses()
 
-    if (addrToAnnounce == undefined || (isMultiaddrLocal(addrToAnnounce) && !this.options.preferLocalAddresses)) {
+      const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
+      const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
+
+      // Prefer IPv4 addresses over IPv6 addresses, if any
+      addrToAnnounce = ip4 ?? ip6
+
+      // Submit P2P address if IPv4 or IPv6 address is not routable because link-locale, reserved or private address
+      // except if testing locally, e.g. as part of an integration test
+      if (addrToAnnounce == undefined || (isMultiaddrLocal(addrToAnnounce) && !this.options.preferLocalAddresses)) {
+        addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
+      } else {
+        isRoutableAddress = true
+      }
+    } else {
       addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
     }
 
-    const isRoutableAddress = (ip4 ?? ip6) != undefined
-
+    // Check if there was a previous annoucement from us
     const ownAccount = await chain.getAccount(await this.getEthereumAddress())
 
+    // Do not announce if our last is equal to what we intend to announce
     if (ownAccount?.multiAddr?.equals(addrToAnnounce)) {
       log(`intended address has already been announced, nothing to do`)
       return
