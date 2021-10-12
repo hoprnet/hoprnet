@@ -240,7 +240,12 @@ class Channel {
     const tickets = await this.db.getAcknowledgedTickets({ signer: this.counterparty })
     for (const ticket of tickets) {
       log('redeeming ticket', ticket)
-      this.redeemTicket(ticket)
+      const result = await this.redeemTicket(ticket)
+      if (result.status !== 'SUCCESS') {
+        log('Error redeeming ticket', result)
+        // We need to abort as tickets require ordered redemption.
+        return
+      }
       log('ticket was redeemed')
     }
   }
