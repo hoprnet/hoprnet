@@ -22,7 +22,7 @@ describe('transaction-manager', function () {
 
   it('should move transaction from pending to mined', function () {
     transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
-    transactionManager.moveFromPendingToMined(TX[0])
+    transactionManager.moveToMined(TX[0])
 
     expect(transactionManager.pending.size).to.equal(0)
     expect(transactionManager.mined.size).to.equal(1)
@@ -32,8 +32,8 @@ describe('transaction-manager', function () {
 
   it('should move transaction from mined to confirmed', function () {
     transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
-    transactionManager.moveFromPendingToMined(TX[0])
-    transactionManager.moveFromMinedToConfirmed(TX[0])
+    transactionManager.moveToMined(TX[0])
+    transactionManager.moveToConfirmed(TX[0])
 
     expect(transactionManager.pending.size).to.equal(0)
     expect(transactionManager.mined.size).to.equal(0)
@@ -52,7 +52,7 @@ describe('transaction-manager', function () {
 
   it('should remove transaction from mined', function () {
     transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
-    transactionManager.moveFromPendingToMined(TX[0])
+    transactionManager.moveToMined(TX[0])
     transactionManager.remove(TX[0])
 
     expect(transactionManager.pending.size).to.equal(0)
@@ -62,8 +62,8 @@ describe('transaction-manager', function () {
 
   it('should remove transaction from confirmed', function () {
     transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
-    transactionManager.moveFromPendingToMined(TX[0])
-    transactionManager.moveFromMinedToConfirmed(TX[0])
+    transactionManager.moveToMined(TX[0])
+    transactionManager.moveToConfirmed(TX[0])
     transactionManager.remove(TX[0])
 
     expect(transactionManager.pending.size).to.equal(0)
@@ -82,8 +82,8 @@ describe('transaction-manager', function () {
     // add them to confirmed
     for (const [hash, tx] of txs) {
       transactionManager.addToPending(hash, tx, PAYLOAD)
-      transactionManager.moveFromPendingToMined(hash)
-      transactionManager.moveFromMinedToConfirmed(hash)
+      transactionManager.moveToMined(hash)
+      transactionManager.moveToConfirmed(hash)
     }
 
     transactionManager.prune()
