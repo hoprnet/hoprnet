@@ -267,16 +267,21 @@ class Hopr extends EventEmitter {
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     )
 
+    ethereum.on('ticket:win', (ack, channel) => {
+      this.onWinningTicket(ack, channel) 
+    })
+
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
     await this.announce(this.options.announce)
     log('announcing done, starting heartbeat')
-
     this.heartbeat.start()
+
     this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
     this.status = 'RUNNING'
-    this.emit('running')
+    this.emit('running with strategy', this.strategy.name)
+
 
     // Log information
     log('# STARTED NODE')
@@ -665,11 +670,10 @@ class Hopr extends EventEmitter {
 
   public async setChannelStrategy(strategy: ChannelStrategy) {
     this.strategy = strategy
-    const ethereum = this.paymentChannels
-    ethereum.on('ticket:win', (ack, channel) => {
-      // TODO - don't double bind here
-      this.strategy.onWinningTicket(ack, channel)
-    })
+  }
+
+  private onWinningTicket(ack, channel) {
+    this.strategy.onWinningTicket(ack, channel)
   }
 
   public getChannelStrategy(): string {
