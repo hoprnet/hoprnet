@@ -5,6 +5,9 @@ import type { NetworkInterfaceInfo } from 'os'
 import { u8aEquals, u8aToNumber } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 
+const MULTIHASH_LENGTH = 37
+const MULTIHASH_TYPE = 'identity'
+
 type DirectAddress = {
   type: NetworkInterfaceInfo['family']
   address: Uint8Array
@@ -29,6 +32,10 @@ type ParseResult<Type> =
 
 const log = Debug('hopr-connect:addr')
 
+/**
+ * Checks a given Multihash
+ * @param mh Multihash to check
+ */
 function parseMultihash(mh: Uint8Array): { valid: false } | { valid: true; result: ReturnType<typeof decode> } {
   let decoded: ReturnType<typeof decode>
   try {
@@ -38,7 +45,8 @@ function parseMultihash(mh: Uint8Array): { valid: false } | { valid: true; resul
     return { valid: false }
   }
 
-  if (decoded.name !== 'identity' || decoded.length != 37) {
+  if (decoded.name !== MULTIHASH_TYPE || decoded.length != MULTIHASH_LENGTH) {
+    log(`address length is not ${MULTIHASH_LENGTH} bytes long or type is not ${MULTIHASH_TYPE}`)
     return { valid: false }
   }
 
@@ -48,6 +56,10 @@ function parseMultihash(mh: Uint8Array): { valid: false } | { valid: true; resul
   }
 }
 
+/**
+ * Checks a given circuit address
+ * @param maTuples tuples of a Multiaddr
+ */
 function parseCircuitAddress(maTuples: [code: number, addr: Uint8Array][]): ParseResult<CircuitAddress> {
   if (
     maTuples.length != 3 ||
@@ -75,10 +87,6 @@ function parseCircuitAddress(maTuples: [code: number, addr: Uint8Array][]): Pars
     decoded.push(tmp.result.digest)
   }
 
-  if (decoded.length != 2) {
-    log(`p2p address decoding failed`, decoded)
-  }
-
   if (u8aEquals(decoded[0], decoded[1])) {
     log(`first and second address must not be the same`)
     return { valid: false }
@@ -94,6 +102,10 @@ function parseCircuitAddress(maTuples: [code: number, addr: Uint8Array][]): Pars
   }
 }
 
+/**
+ * Checks a given direct address
+ * @param maTuples tuples of a Multiaddr
+ */
 function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): ParseResult<DirectAddress> {
   if (
     maTuples.length < 2 ||
@@ -107,6 +119,7 @@ function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): Parse
   }
 
   let family: NetworkInterfaceInfo['family']
+
   switch (maTuples[0][0]) {
     case CODE_IP4:
       family = 'IPv4'
@@ -124,12 +137,13 @@ function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): Parse
     type: family
   }
 
+
   if (maTuples.length == 3) {
-    if (maTuples[2].length < 2 || maTuples[2][0] != CODE_P2P) {
+    if (maTuples[2].length < 2 || maTuples[2][0] != CODE_P2P || maTuples[2][1].length == 0) {
       return { valid: false }
     }
 
-    const decoded = parseMultihash(maTuples[2][1])
+    const decoded = parseMultihash(maTuples[2][1].slice(1))
 
     if (!decoded.valid) {
       return { valid: false }
@@ -141,6 +155,10 @@ function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): Parse
   return { valid: true, address: result }
 }
 
+/**
+ * Checks and parses a given Multiaddr
+ * @param ma Multiaddr to check and parse
+ */
 export function parseAddress(ma: Multiaddr): ParseResult<DirectAddress | CircuitAddress> {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
