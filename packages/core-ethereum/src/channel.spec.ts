@@ -20,6 +20,7 @@ import { utils } from 'ethers'
 import { Channel } from './channel'
 import * as fixtures from './fixtures'
 import { EventEmitter } from 'events'
+import { IndexerEvents } from './indexer/types'
 
 const createChainMock = (): ChainWrapper => {
   return {
@@ -37,6 +38,9 @@ const createIndexerMock = (channelUsThem: ChannelEntry, channelThemUs: ChannelEn
   return {
     async getChannel(id: Hash) {
       return id.eq(channelUsThem.getId()) ? channelUsThem : channelThemUs
+    },
+    async resolvePendingTransaction(_eventType: IndexerEvents, tx: string) {
+      return tx
     }
   } as Indexer
 }

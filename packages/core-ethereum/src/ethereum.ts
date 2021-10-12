@@ -1,4 +1,4 @@
-import type { ContractTransaction, UnsignedTransaction } from 'ethers'
+import { ContractTransaction, UnsignedTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
 import {
@@ -410,7 +410,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       token.on('error', cb)
     },
     subscribeChannelEvents: (cb) => channels.on('*', cb),
-    subscribeTokenEvents: (cb) => token.on(token.filters.Transfer(wallet.address), cb), // subscribe all the Transfer events from current nodes in HoprToken
+    // Cannot directly apply filters here because it does not return a full event object
+    subscribeTokenEvents: (cb) => token.on('*', cb), // subscribe all the Transfer events from current nodes in HoprToken.
     unsubscribe: () => {
       provider.removeAllListeners()
       channels.removeAllListeners()
