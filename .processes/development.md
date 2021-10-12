@@ -8,7 +8,7 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
     - [Trifecta](#trifecta)
   - [Daily updates](#daily-updates)
     - [Start of work](#start-of-work)
-      - [Text Update](#text-update)
+      - [Text update](#text-update)
       - [Video call](#video-call)
     - [End of working day](#end-of-working-day)
     - [Absence](#absence)
@@ -25,16 +25,10 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
     - [Issue creation](#issue-creation)
     - [Labels](#labels)
     - [Rules](#rules)
-    - [Releases](#releases)
     - [Workflow](#workflow)
       - [Daily Development](#daily-development)
-      - [Release Cycle](#release-cycle)
-    - [Actions](#actions)
-      - [Pre-release Version Bump (`feature` -> `master` = `x.y.z-0.next.*` -> `x.y.z-0.next.* + 1`)](#pre-release-version-bump-feature---master--xyz-0next---xyz-0next--1)
-      - [Release Version Bump (`master` -> `release/**` = `x.y.z-0.next.*` -> `x.y.0`)](#release-version-bump-master---release--xyz-0next---xy0)
-      - [Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)](#minor-version-bump-release---master--xy---xy10-next0)
+      - [Releases](#releases)
     - [Branches](#branches)
-  - [Processes](#processes)
 
 ## Legend
 
@@ -73,7 +67,7 @@ _Current:_ [Ambassadors](#ambassadors), [Sebastian](https://github.com/SCBuergel
 
 ### Start of work
 
-#### Text Update
+#### Text update
 
 For every working day, all members are required to write an update on what they will be working on throughout the day. Ideally, the list should be accompanied by github issues or PRs.
 
@@ -238,18 +232,25 @@ All HOPR repositories must support at most these issue templates, more templates
 - [Feature Template](./.github/ISSUE_TEMPLATE/feature.md)
 - [Custom Template](./.github/ISSUE_TEMPLATE/custom.md)
 
+- A _tech_ member, or an external contributor creates an issue using one of our templates, these templates may add some labels by default.
+- All new issues except `epics` will contain a `new issue` label.
+- A _tech_ member may review the new issue and label it accordingly, see [#labels](#labels) for descriptions on the standard labels.
+  - Some repositories may contain their own unique labels.
+- Once a new issue is reviewed, 'new issue' must be removed and the issue may be updated with any other relevant labels.
+
 ### Labels
 
 All HOPR repositories must support at most these labels, more labels may be added which make sense for each specific repository.
 Since PRs should link to an issue, it's not necessary to label PRs. However, some automation tools like `dependabot` doesn't create issues, in cases like this, it will label it's PRs.
 
-| Name         | Description                                             | Color                                           |
-| ------------ | ------------------------------------------------------- | ----------------------------------------------- |
-| epic         | An issue which tracks multiple issues                   | <span style="background:#2473b7">#2473b7</span> |
-| bug          | Something isn't working                                 | <span style="background:#d73a4a">#d73a4a</span> |
-| feature      | New feature request                                     | <span style="background:#a2eeef">#a2eeef</span> |
-| new issue    | **Automatic**, this is a new issue                      | <span style="background:#000000">#000000</span> |
-| dependencies | **Automatic** for **PRs**, this PR updates a dependancy | <span style="background:#0366d6">#0366d6</span> |
+| Name              | Description                                             | Color                                           |
+| ----------------- | ------------------------------------------------------- | ----------------------------------------------- |
+| epic              | An issue which tracks multiple issues                   | <span style="background:#2473b7">#2473b7</span> |
+| bug               | Something isn't working                                 | <span style="background:#d73a4a">#d73a4a</span> |
+| feature           | New feature request                                     | <span style="background:#a2eeef">#a2eeef</span> |
+| needs information | Further information is requested                        | <span style="background:#d876e3">#d876e3</span> |
+| new issue         | **Automatic**, this is a new issue                      | <span style="background:#000000">#000000</span> |
+| dependencies      | **Automatic** for **PRs**, this PR updates a dependancy | <span style="background:#0366d6">#0366d6</span> |
 
 ### Rules
 
@@ -258,12 +259,6 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 - All PR‘s must pass all status checks/tests before merging.
 - Releases can be merged back to `master`, but not always necessary.
 - When in conflict, chat and engage with the team.
-
-### Releases
-
-To release, we do a code-freeze in our codebase by branching out a specific
-release by naming the branch `release/*`. New patches are then merged on that
-particular branch to deploy on every change.
 
 ### Workflow
 
@@ -309,64 +304,9 @@ particular branch to deploy on every change.
    can be merged. If the history is messy, the PR can be squashed, otherwise, it is
    merged. Use common sense to decide when you should do which one.
 
-#### Release Cycle
+#### Releases
 
-```
-
-   hotfix/patch-constantine    release/constantine          master
-
-         x                   x                       x 1.74.0-next.44
-         x                   │ ◄─────────────────────x
-         x                   │                       x
-         x                   │ 1.74.0                x
-         x                   │                       x
-         x                   ▼                       x
-         ┌◄──────────────────x                       x
-         │                   x                       x
-         │                   x                       x
-         │                   x                       x
-         ▼──────────────────►┐ 1.74.1                x
-         x                   │                       x
-         x                   ▼──────────────────────►x 1.75.0-next.0
-         x                   x                       x
-         x                   x                       x
-
-```
-
-1. On every public release agreed as a [Milestone](https://github.com/hoprnet/hoprnet/milestones),
-   the PM Lead of the week will code-freeze `master` by creating a `release/**` branch
-   tracking `master`. Release specific changes will be done in this branch to trigger
-   this particular release, which requires to insert name and release version of the new milestone
-   in the file `scripts/environment.sh` as well as `packages/avado/Dockerfile` and add an entry to `CHANGELOG.md`.
-
-2. The information about the release, how to test and what commands to run, are
-   then shared within our #release channel. On the #testing channel, members are expected
-   to run their own nodes (either AVADO or via their workstation) to participate in the release.
-3. Patches to the release are created via `hotfix/**` branches. Each of these merges will trigger
-   a new release version, and re-build our infrastructure for that version. Upon successfullly
-   testing a release, merge it back to trigger a new pre-release version via our actions.
-
-### Actions
-
-We made active use of actions to automate tasks trivial to our workflow.
-
-#### Pre-release Version Bump (`feature` -> `master` = `x.y.z-0.next.*` -> `x.y.z-0.next.* + 1`)
-
-When a PR to `master` is merged, an action bumps the package.json pre-release
-version and commits that change to `master`. When a PR to `master` is merged,
-a tag on GitHub is pushed specifying that feature on that version.
-
-#### Release Version Bump (`master` -> `release/**` = `x.y.z-0.next.*` -> `x.y.0`)
-
-On first build, a `release/**` bumps the package.json by a `minor`, clearing
-the `pre-release` tag. Subsequent commits on `release` branches bump the
-`patch` version.
-
-#### Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)
-
-After testing a release, we can merge it back to `master` to trigger a bump on the
-package.json by a `minor`, and restoring the `pre-release` tag, to keep our normal
-daily workflow as it was before.
+See [Release Processes](./release.md)
 
 ### Branches
 
@@ -377,10 +317,4 @@ daily workflow as it was before.
   marked with a **PUBLIC RELEASE**, we cut a `release/**`
   branch, using an internal name to identify the release. Official milestones
   use a specific name with the codename of a mountain in Switzerland.
-
-## Processes
-
-All members may suggest changes to our development processes.
-
-1. For questions, reach out to one of the [Ambassadors](#ambassadors) through email, element, or simply asking the question in element channel `tech - pm`.
-2. For changes, make a PR modifying this file, the PR will have to be reviewed by the [Trifecta](#trifecta), the [Process Facilitator](#legend), and generally be accepted by the _tech_ team.
+  See [Release Processes](./release.md).

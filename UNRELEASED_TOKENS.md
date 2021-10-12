@@ -43,7 +43,7 @@ Read [#2093](https://github.com/hoprnet/hoprnet/issues/2093) for context.
    5. Inserted `HOPR_ID` is a valid HOPR ID _(link to tooling)_
 
 4. Team member adds another entry to [unreleasedTokens.json](./packages/cover-traffic/unreleasedTokens.json) using syntax `{ tokens: string, ethAddress: string, hoprId: string }[]`
-5. Team member creates a PR so another team member can review and approve, from here on we follow our usual [DEVELOPMENT_PROCESSES](./DEVELOPMENT_PROCESSES.md) steps, reviewer must verify the validity of the request as well.
+5. Team member creates a PR so another team member can review and approve, from here on we follow our usual [DEVELOPMENT_PROCESSES](./.processes/development.md) steps, reviewer must verify the validity of the request as well.
 6. Once merged, team member replies to user with:
 
 ```
@@ -54,7 +54,7 @@ Your HOPR ID has been added into the list.
 
 ## Who is "team member"
 
-The release's [PM](./DEVELOPMENT_PROCESSES.md) is responsible for ensuring that a new entry is added within atleast 2 working days.
+The release's [PM](./.processes/development.md) is responsible for ensuring that a new entry is added within atleast 2 working days.
 
 - PM has the ability to assign himself or a team member to follow up on newly created issue
 - Assigned team member must not be on holidays and should prioritize this issue
