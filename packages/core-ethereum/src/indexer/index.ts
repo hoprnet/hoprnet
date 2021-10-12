@@ -436,6 +436,19 @@ class Indexer extends EventEmitter {
       channels.filter((channel) => channel.status === ChannelStatus.Open)
     )
   }
+
+  public async resolvePendingTransaction(eventType: IndexerEvents, tx: string): Promise<string> {
+    return new Promise((resolve) => {
+      const listener = (txHash: string[]) => {
+        const indexed = txHash.find(emitted => emitted === tx);
+        if (indexed) {
+          this.removeListener(eventType, listener)
+          resolve(tx);
+        }
+      }
+      this.addListener(eventType, listener)
+    });
+  }
 }
 
 export default Indexer
