@@ -95,7 +95,7 @@ export default class HoprEthereum extends EventEmitter {
 
   async announce(multiaddr: Multiaddr): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
-    const tx = await this.chain.announce(multiaddr);
+    const tx = await this.chain.announce(multiaddr)
     // event emitted by the indexer
     return this.indexer.resolvePendingTransaction('annouce', tx);
   }
