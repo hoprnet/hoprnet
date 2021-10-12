@@ -1,6 +1,6 @@
 # HOPR Processes
 
-The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on the following processes to streamline the whole development cycle of HOPR.
+The HOPR Association _tech_ members and [Project Owner](./development.md#legend) have agreed on the following processes to streamline the whole development cycle of HOPR.
 
 1. [Development Process](./development.md)
 2. [Release Process](./release.md)
