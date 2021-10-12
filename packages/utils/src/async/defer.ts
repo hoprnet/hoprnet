@@ -5,7 +5,7 @@ export type DeferType<T> = {
 }
 
 // Typed version of https://github.com/sindresorhus/p-defer
-export function Defer<T>(): DeferType<T> {
+export function defer<T>(): DeferType<T> {
   const deferred = {} as DeferType<T>
 
   deferred.promise = new Promise<T>((resolve, reject) => {

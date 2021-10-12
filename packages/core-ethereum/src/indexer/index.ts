@@ -12,7 +12,7 @@ import {
   ChannelStatus,
   Address,
   ChannelEntry,
-  Defer,
+  defer,
   AccountEntry,
   Hash,
   PublicKey,
@@ -94,6 +94,10 @@ class Indexer extends EventEmitter {
       this.restart()
     })
     this.chain.subscribeChannelEvents((e) => {
+      this.onNewEvents([e])
+    })
+    this.chain.subscribeTokenEvents((e) => {
+      // save transfer events
       this.onNewEvents([e])
     })
 
@@ -212,6 +216,15 @@ class Indexer extends EventEmitter {
 
     let lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
+    // This new block markes a previous block
+    // (blockNumber - this.maxConfirmations) is final.
+    // Confirm native token transactions in that previous block.
+    const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
+    // update transaction manager
+    if (nativeTxs.length > 0) {
+      nativeTxs.forEach((nativeTx) => this.chain.updateConfirmedTransaction(nativeTx))
+    }
+
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
@@ -239,7 +252,8 @@ class Indexer extends EventEmitter {
       }
 
       const eventName = event.event as EventNames
-
+      // update transaction manager
+      this.chain.updateConfirmedTransaction(event.transactionHash as string)
       try {
         if (eventName === ANNOUNCEMENT) {
           await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
@@ -330,7 +344,7 @@ class Indexer extends EventEmitter {
       return waiting.promise
     }
 
-    waiting = Defer<void>()
+    waiting = defer<void>()
 
     this.pendingCommitments.set(channelId.toHex(), waiting)
   }

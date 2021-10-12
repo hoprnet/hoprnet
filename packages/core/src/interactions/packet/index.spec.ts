@@ -9,7 +9,7 @@ import {
   Address,
   Balance,
   Challenge,
-  Defer,
+  defer,
   HalfKey,
   Hash,
   HoprDB,
@@ -132,15 +132,15 @@ describe('packet interaction', function () {
 
     fakePacket.storeUnacknowledgedTicket(db)
 
-    const defer = Defer<void>()
+    const ackReceived = defer<void>()
 
     subscribeToAcknowledgements(libp2pSelf.subscribe, db, chainSelf as any, self, () => {
-      defer.resolve()
+      ackReceived.resolve()
     })
 
     sendAcknowledgement(fakePacket, self, libp2pCounterparty.send, counterparty)
 
-    await defer.promise
+    await ackReceived.promise
   })
 
   it('packet-acknowledgement workflow', async function () {
@@ -163,7 +163,7 @@ describe('packet interaction', function () {
     const testMsg = new TextEncoder().encode('testMsg')
     const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any)
 
-    const msgDefer = Defer<void>()
+    const msgDefer = defer<void>()
 
     const senderInteraction = new PacketForwardInteraction(
       libp2pSender.subscribe,
