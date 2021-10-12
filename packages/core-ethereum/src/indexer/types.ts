@@ -11,8 +11,4 @@ export type EventNames = keyof HoprChannels['filters']
 export type Event<T extends EventNames> = TypedEvent<extractEventArgs<ReturnType<HoprChannels['filters'][T]>>>
 export type TokenEventNames = keyof HoprToken['filters']
 export type TokenEvent<T extends TokenEventNames> = TypedEvent<extractEventArgs<ReturnType<HoprToken['filters'][T]>>>
-export type IndexerEvents =
-  | 'annouce'
-  | 'withdraw-hopr'
-  | 'withdraw-native'
-  | 'channel-updated'
+export type IndexerEvents = 'annouce' | 'withdraw-hopr' | 'withdraw-native' | 'channel-updated'
