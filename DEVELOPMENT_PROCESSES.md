@@ -336,11 +336,12 @@ hotfix/hello/patch-hello     release/hello     master
    tracking `master`. Release specific changes will be done in this branch to trigger
    this particular release, which requires to insert name and release version of the new milestone
    in the files:
-  - `scripts/environment.sh`
-  - `packages/avado/Dockerfile`
-  - `packages/avado/docker-compose.yml`
-  - `packages/avado/Dockerfile`
-  - add an entry to `CHANGELOG.md`
+
+- `scripts/environment.sh`
+- `packages/avado/Dockerfile`
+- `packages/avado/docker-compose.yml`
+- `packages/avado/Dockerfile`
+- add an entry to `CHANGELOG.md`
 
 2. The information about the release, how to test and what commands to run, are
    then shared within our `#release` channel. On the `#testing` channel, members are expected
@@ -350,12 +351,13 @@ hotfix/hello/patch-hello     release/hello     master
    Each of these merges will trigger a new release version, and re-build our infrastructure
    for that version. Upon successfullly testing a release, the release branch may be merged back into
    `master` by following these steps:
-  - locally create a merge-back branch based on the release branch
-  - merge the latest `master` branch into the merge-back branch, in case of conflicts changes
-    from `master` have preference
-  - bump the package versions to the next preminor version:
-    `yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version preminor --preid=next`
-  - revert changes made to Avado configuration files as part of the initial release creation
+
+- locally create a merge-back branch based on the release branch
+- merge the latest `master` branch into the merge-back branch, in case of conflicts changes
+  from `master` have preference
+- bump the package versions to the next preminor version:
+  `yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version preminor --preid=next`
+- revert changes made to Avado configuration files as part of the initial release creation
 
 ### Actions
 
