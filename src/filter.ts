@@ -72,7 +72,6 @@ export class Filter {
     return this.announcedAddrs != undefined && this.listenFamilies != undefined
   }
 
-
   /**
    * Used to attach addresses once libp2p is initialized and
    * sockets are bound to network interfaces
