@@ -161,6 +161,8 @@ The target of prioritization are issues marked as
 [epic](https://github.com/hoprnet/hoprnet/issues?q=is%3Aissue+is%3Aopen+label%3Aepic).
 Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/projects/9) which only contains epic issues.
 
+- epics are issues which encapsulate the work that need to be done for X feature/bug
+- epics are not bound by sprints and they can be long lived
 - closed epics are moved to `Acceptance`
 - epics within `Acceptance` column are accepted by [Trifecta](#trifecta) prior to the meeting
 - ensure newly created [epics](#issue-creation) are well created
