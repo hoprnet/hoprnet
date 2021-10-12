@@ -325,6 +325,7 @@ class Indexer extends EventEmitter {
 
     if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       this.emit('own-channel-updated', channel)
+      this.indexEvent('channel-updated', [event.transactionHash])
 
       if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us

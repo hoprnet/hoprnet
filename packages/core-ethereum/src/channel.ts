@@ -61,7 +61,7 @@ class Channel {
       // commitment
       return this.chain
         .setCommitment(this.counterparty.toAddress(), commitment)
-        .then((tx) => this.indexer.resolvePendingTransaction('set-commitment', tx))
+        .then((tx) => this.indexer.resolvePendingTransaction('channel-updated', tx))
     }
 
     const commitment = new Commitment(
@@ -127,7 +127,7 @@ class Channel {
       throw Error('We do not have enough balance to fund the channel')
     }
     const tx = await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
-    return await this.indexer.resolvePendingTransaction('fund-channel', tx)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   async open(fundAmount: Balance) {
@@ -147,7 +147,7 @@ class Channel {
       throw Error('We do not have enough balance to open a channel')
     }
     const tx = await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
-    await this.indexer.resolvePendingTransaction('open-channel', tx)
+    await this.indexer.resolvePendingTransaction('channel-updated', tx)
     return generateChannelId(myAddress, counterpartyAddress)
   }
 
@@ -158,7 +158,7 @@ class Channel {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
     const tx = await this.chain.initiateChannelClosure(counterpartyAddress)
-    return await this.indexer.resolvePendingTransaction('initiate-channel-closure', tx)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   async finalizeClosure() {
@@ -169,7 +169,7 @@ class Channel {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
     const tx = await this.chain.finalizeChannelClosure(counterpartyAddress)
-    return await this.indexer.resolvePendingTransaction('finalize-channel-closure', tx)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   private async bumpTicketIndex(channelId: Hash): Promise<UINT256> {
@@ -296,7 +296,7 @@ class Channel {
       }
 
       const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
-      await this.indexer.resolvePendingTransaction('redeem-ticket', receipt)
+      await this.indexer.resolvePendingTransaction('channel-updated', receipt)
 
       //this.commitment.updateChainState(ackTicket.preImage)
       log('Successfully submitted ticket', ackTicket.response.toHex())
