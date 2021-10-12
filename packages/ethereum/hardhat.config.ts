@@ -44,10 +44,13 @@ const hardhatConfig: HardhatUserConfig = {
       saveDeployments: true,
       mining: DEVELOPMENT
         ? {
-            auto: DEVELOPMENT ? false : true, // True: every transaction will trigger a new block (without this deployments fail). False: a new block is mined in an interval
+            auto: true, // True: every transaction will trigger a new block (without this deployments fail). False: a new block is mined in an interval
             interval: [1000, 3000] // mine new block every 1 - 3s
           }
-        : undefined
+        : {
+          auto: false, // True: every transaction will trigger a new block (without this deployments fail). False: a new block is mined in an interval
+          interval: [1000, 3000] // mine new block every 1 - 3s
+        }
     },
     goerli: {
       ...networks.goerli,
