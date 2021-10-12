@@ -21,7 +21,6 @@ import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 import { Commitment } from './commitment'
-import { IndexerEvents } from './indexer/types'
 
 const log = debug('hopr-core-ethereum')
 
