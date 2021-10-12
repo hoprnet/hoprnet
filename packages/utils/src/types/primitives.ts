@@ -255,7 +255,7 @@ export class Balance {
   constructor(private bn: BN) {}
 
   static get SYMBOL(): string {
-    return `txHOPR`
+    return `HOPR`
   }
 
   static get DECIMALS(): number {

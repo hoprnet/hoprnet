@@ -8,7 +8,7 @@ import "./ERC777/ERC777Snapshot.sol";
 contract HoprToken is AccessControl, ERC777Snapshot {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    constructor() ERC777("HOPR Token", "txHOPR", new address[](0)) public {
+    constructor() ERC777("HOPR Token", "HOPR", new address[](0)) public {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
