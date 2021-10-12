@@ -25,7 +25,7 @@ describe('commitment', function () {
     assert(c2.hash().eq(c1), 'c2 is commitment of c1')
 
     fakeGet = () => Promise.resolve(c2)
-    await initializeCommitment(fakeSet, fakeGet, fakeDB, fakeId)
+    await initializeCommitment(fakeDB, fakeId, fakeSet, fakeGet)
     let c3 = await findCommitmentPreImage(fakeDB, fakeId)
     assert(c2.eq(c3), 'Repeated initializations should return the same')
   })
