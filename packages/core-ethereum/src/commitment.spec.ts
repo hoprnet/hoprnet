@@ -14,7 +14,7 @@ describe('commitment', function () {
 
   it('should publish a hashed secret', async function () {
     this.timeout(3000)
-    await initializeCommitment(fakeDB, fakeId, fakeSet, fakeGet)
+    await initializeCommitment(fakeDB, fakeId, fakeGet, fakeSet)
     let c1 = await findCommitmentPreImage(fakeDB, fakeId)
     assert(c1 != null, 'gives current commitment')
     assert.strictEqual(fakeGet.callCount, 1, 'should look on chain')
@@ -26,7 +26,7 @@ describe('commitment', function () {
     assert(c2.hash().eq(c1), 'c2 is commitment of c1')
 
     fakeGet = () => Promise.resolve(c2)
-    await initializeCommitment(fakeDB, fakeId, fakeSet, fakeGet)
+    await initializeCommitment(fakeDB, fakeId, fakeGet, fakeSet)
     let c3 = await findCommitmentPreImage(fakeDB, fakeId)
     assert(c2.eq(c3), 'Repeated initializations should return the same')
   })
