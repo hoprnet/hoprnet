@@ -96,28 +96,28 @@ export default class HoprEthereum extends EventEmitter {
   private resolvePromise(eventType: IndexerEvents, tx: string): Promise<string> {
     return new Promise((resolve) => {
       const listener = (txHash: string[]) => {
-        const announced = txHash.find(emitted => emitted === tx);
+        const announced = txHash.find((emitted) => emitted === tx)
         if (announced) {
           this.indexer.removeListener(eventType, listener)
-          resolve(tx);
+          resolve(tx)
         }
       }
       this.indexer.addListener(eventType, listener)
-    });
+    })
   }
 
   async announce(multiaddr: Multiaddr): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
-    const tx = await this.chain.announce(multiaddr);
+    const tx = await this.chain.announce(multiaddr)
     // event emitted by the indexer
-    return this.resolvePromise('annouce', tx);
+    return this.resolvePromise('annouce', tx)
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
     const tx = await this.chain.withdraw(currency, recipient, amount)
     // event emitted by the indexer
-    return this.resolvePromise(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx);
+    return this.resolvePromise(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx)
   }
 
   public getOpenChannelsFrom(p: PublicKey) {
