@@ -97,7 +97,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     publicNodes: PublicNodesEmitter | undefined,
     private initialNodes: PeerStoreType[] = [],
     private peerId: PeerId,
-    private _interface: string | undefined
+    private _interface: string | undefined,
+    private __runningLocally: boolean
   ) {
     super()
 
@@ -590,7 +591,7 @@ class Listener extends EventEmitter implements InterfaceListener {
   private async determinePublicIpAddress(usableStunServers: Multiaddr[]): Promise<void> {
     let externalAddress: Address | undefined
     try {
-      externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
+      externalAddress = await getExternalIp(usableStunServers, this.udpSocket, this.__runningLocally)
     } catch (err) {
       error(`Determining public IP failed`)
 

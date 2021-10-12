@@ -27,6 +27,7 @@ export type HoprConnectOptions = {
   __noWebRTCUpgrade?: boolean
   maxRelayedConnections?: number
   __relayFreeTimeout?: number
+  __useLocalAddresses?: boolean
 }
 
 /**
@@ -44,8 +45,9 @@ class HoprConnect implements Transport<DialOptions, any> {
 
   private relayPeerIds?: Set<string>
 
-  private __noDirectConnections?: boolean
-  private __noWebRTCUpgrade?: boolean
+  private __noDirectConnections: boolean
+  private __noWebRTCUpgrade: boolean
+  private __useLocalAddress: boolean
   private _upgrader: Upgrader
   private _peerId: PeerId
   private relay: Relay
@@ -105,8 +107,9 @@ class HoprConnect implements Transport<DialOptions, any> {
     )
 
     // Used for testing
-    this.__noDirectConnections = opts.__noDirectConnections
-    this.__noWebRTCUpgrade = opts.__noWebRTCUpgrade
+    this.__noDirectConnections = opts.__noDirectConnections ?? false
+    this.__noWebRTCUpgrade = opts.__noWebRTCUpgrade ?? false
+    this.__useLocalAddress = opts.__useLocalAddresses ?? false
 
     try {
       const { version } = require('../package.json')
@@ -203,7 +206,8 @@ class HoprConnect implements Transport<DialOptions, any> {
       this.publicNodes,
       this.initialNodes,
       this._peerId,
-      this._interface
+      this._interface,
+      this.__useLocalAddress
     )
   }
 
