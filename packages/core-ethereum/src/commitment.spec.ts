@@ -13,6 +13,7 @@ describe('commitment', function () {
   })
 
   it('should publish a hashed secret', async function () {
+    this.timeout(3000)
     await initializeCommitment(fakeDB, fakeId, fakeSet, fakeGet)
     let c1 = await findCommitmentPreImage(fakeDB, fakeId)
     assert(c1 != null, 'gives current commitment')
