@@ -268,7 +268,7 @@ class Hopr extends EventEmitter {
     )
 
     ethereum.on('ticket:win', (ack, channel) => {
-      this.onWinningTicket(ack, channel) 
+      this.onWinningTicket(ack, channel)
     })
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
@@ -281,7 +281,6 @@ class Hopr extends EventEmitter {
     this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
     this.status = 'RUNNING'
     this.emit('running with strategy', this.strategy.name)
-
 
     // Log information
     log('# STARTED NODE')
