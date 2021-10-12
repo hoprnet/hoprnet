@@ -21,6 +21,7 @@ import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 import { Commitment } from './commitment'
+import { IndexerEvents } from './indexer/types'
 
 const log = debug('hopr-core-ethereum')
 
@@ -92,12 +93,31 @@ export default class HoprEthereum extends EventEmitter {
     return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey, this)
   }
 
+  private resolvePromise(eventType: IndexerEvents, tx: string): Promise<string> {
+    return new Promise((resolve) => {
+      const listener = (txHash: string[]) => {
+        const announced = txHash.find(emitted => emitted === tx);
+        if (announced) {
+          this.indexer.removeListener(eventType, listener)
+          resolve(tx);
+        }
+      }
+      this.indexer.addListener(eventType, listener)
+    });
+  }
+
   async announce(multiaddr: Multiaddr): Promise<string> {
-    return this.chain.announce(multiaddr)
+    // promise of tx hash gets resolved when the tx is mined.
+    const tx = await this.chain.announce(multiaddr);
+    // event emitted by the indexer
+    return this.resolvePromise('annouce', tx);
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
-    return this.chain.withdraw(currency, recipient, amount)
+    // promise of tx hash gets resolved when the tx is mined.
+    const tx = await this.chain.withdraw(currency, recipient, amount)
+    // event emitted by the indexer
+    return this.resolvePromise(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx);
   }
 
   public getOpenChannelsFrom(p: PublicKey) {

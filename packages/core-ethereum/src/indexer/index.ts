@@ -21,7 +21,7 @@ import {
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
-import type { Event, EventNames } from './types'
+import type { Event, EventNames, IndexerEvents, TokenEventNames } from './types'
 import type { DeferType } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 
@@ -222,7 +222,10 @@ class Indexer extends EventEmitter {
     const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
     // update transaction manager
     if (nativeTxs.length > 0) {
-      nativeTxs.forEach((nativeTx) => this.chain.updateConfirmedTransaction(nativeTx))
+      this.indexEvent('withdraw-native', nativeTxs)
+      nativeTxs.forEach((nativeTx) => {
+        this.chain.updateConfirmedTransaction(nativeTx)
+      })
     }
 
     // check unconfirmed events and process them if found
@@ -251,14 +254,18 @@ class Indexer extends EventEmitter {
         }
       }
 
-      const eventName = event.event as EventNames
+      const eventName = event.event as EventNames | TokenEventNames
       // update transaction manager
       this.chain.updateConfirmedTransaction(event.transactionHash as string)
       try {
         if (eventName === ANNOUNCEMENT) {
+          this.indexEvent('annouce', [event.transactionHash])
           await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
         } else if (eventName === 'ChannelUpdated') {
           await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
+        } else if (eventName === 'Transfer') {
+          // handle HOPR token transfer
+          this.indexEvent('withdraw-hopr', [event.transactionHash])
         } else {
           log(`ignoring event '${String(eventName)}'`)
         }
@@ -335,6 +342,10 @@ class Indexer extends EventEmitter {
       throw new Error('shouldnt be called unless we are the destination')
     }
     this.emit('channel-waiting-for-commitment', channel)
+  }
+
+  private indexEvent(indexerEvent: IndexerEvents, txHash: string[]) {
+    this.emit(indexerEvent, txHash)
   }
 
   public waitForCommitment(channelId: Hash): Promise<void> {
