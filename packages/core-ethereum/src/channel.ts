@@ -59,7 +59,9 @@ class Channel {
       // NB: We do not catch any error here, as we want it to propagate
       // to the place where the commitment was triggered, namely the bump
       // commitment
-    return this.chain.setCommitment(this.counterparty.toAddress(), commitment).then(tx => this.indexer.resolvePendingTransaction('set-commitment', tx))
+      return this.chain
+        .setCommitment(this.counterparty.toAddress(), commitment)
+        .then((tx) => this.indexer.resolvePendingTransaction('set-commitment', tx))
     }
 
     const commitment = new Commitment(
@@ -125,7 +127,7 @@ class Channel {
       throw Error('We do not have enough balance to fund the channel')
     }
     const tx = await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
-    return await this.indexer.resolvePendingTransaction('fund-channel', tx);
+    return await this.indexer.resolvePendingTransaction('fund-channel', tx)
   }
 
   async open(fundAmount: Balance) {
@@ -145,7 +147,7 @@ class Channel {
       throw Error('We do not have enough balance to open a channel')
     }
     const tx = await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
-    await this.indexer.resolvePendingTransaction('open-channel', tx);
+    await this.indexer.resolvePendingTransaction('open-channel', tx)
     return generateChannelId(myAddress, counterpartyAddress)
   }
 
@@ -156,7 +158,7 @@ class Channel {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
     const tx = await this.chain.initiateChannelClosure(counterpartyAddress)
-    return await this.indexer.resolvePendingTransaction('initiate-channel-closure', tx);
+    return await this.indexer.resolvePendingTransaction('initiate-channel-closure', tx)
   }
 
   async finalizeClosure() {
@@ -294,7 +296,7 @@ class Channel {
       }
 
       const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
-      await this.indexer.resolvePendingTransaction('redeem-ticket', receipt);
+      await this.indexer.resolvePendingTransaction('redeem-ticket', receipt)
 
       //this.commitment.updateChainState(ackTicket.preImage)
       log('Successfully submitted ticket', ackTicket.response.toHex())
