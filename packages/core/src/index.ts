@@ -636,7 +636,7 @@ class Hopr extends EventEmitter {
 
   /**
    * Announces address of node on-chain to be reachable by other nodes.
-   * @dev Promise resolves before own announcment appear in the indexer
+   * @dev Promise resolves before own announcment appears in the indexer
    * @param includeRouting publish routable address if true
    * @returns Promise that resolves once announce transaction has been published
    */
