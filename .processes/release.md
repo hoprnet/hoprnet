@@ -14,6 +14,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
     - [HOPR team testing](#hopr-team-testing)
     - [Ambassador testing](#ambassador-testing)
   - [Release promotion](#release-promotion)
+  - [On a new chain](#on-a-new-chain)
   - [On a new release](#on-a-new-release)
     - [Release Cycle](#release-cycle)
     - [Actions](#actions)
@@ -22,7 +23,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
       - [Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)](#minor-version-bump-release---master--xy---xy10-next0)
     - [Deployment checklist](#deployment-checklist)
       - [Per $release](#per-release)
-    - [Per $chain](#per-chain)
+      - [Per $chain](#per-chain)
     - [Scripts](#scripts)
       - [`cover-traffic` deployment script](#cover-traffic-deployment-script)
       - [`topology` deployment script](#topology-deployment-script)
@@ -91,6 +92,13 @@ This is optional in the possibility we want to gather more data points and/or a 
 
 - All releases start by being internal releases.
 - An [internal release](#internal-release) may be promoted to a [public release](#public-release) when all [testing phases](#testing-phases) are succesful.
+
+## On a new chain
+
+Every chain has it's own unique characteristics. While it may be EVM compatible, various other factors can make the chain incompatible with HOPR.
+When an epic is prioritized to switch the default `HOPRd` chain to a new one, [this issue](../.github/ISSUE_TEMPLATE/new-chain-epic.md) must be added to the sprint as part of the new chain epic.
+
+This requirement will become simpler once [#2140](https://github.com/hoprnet/hoprnet/issues/2140) is completed.
 
 ## On a new release
 
@@ -175,7 +183,7 @@ The following are a series of manual tasks that are needed to be executed for th
 
 - [ ] Verify the $release smart contract in the explorer platform.
 
-### Per $chain
+#### Per $chain
 
 - [ ] Deploy HOPR token on $chain and mint 130M HOPR tokens for our Development Address `0x2402da10A6172ED018AEEa22CA60EDe1F766655C`.
 
