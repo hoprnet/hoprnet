@@ -93,11 +93,11 @@ export default class HoprEthereum extends EventEmitter {
     return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey, this)
   }
 
-  private resolvePromise(eventType: IndexerEvents, tx: string): Promise<string> {
+  private resolvePendingTransaction(eventType: IndexerEvents, tx: string): Promise<string> {
     return new Promise((resolve) => {
       const listener = (txHash: string[]) => {
-        const announced = txHash.find(emitted => emitted === tx);
-        if (announced) {
+        const indexed = txHash.find(emitted => emitted === tx);
+        if (indexed) {
           this.indexer.removeListener(eventType, listener)
           resolve(tx);
         }
@@ -110,14 +110,14 @@ export default class HoprEthereum extends EventEmitter {
     // promise of tx hash gets resolved when the tx is mined.
     const tx = await this.chain.announce(multiaddr);
     // event emitted by the indexer
-    return this.resolvePromise('annouce', tx);
+    return this.resolvePendingTransaction('annouce', tx);
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
     const tx = await this.chain.withdraw(currency, recipient, amount)
     // event emitted by the indexer
-    return this.resolvePromise(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx);
+    return this.resolvePendingTransaction(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx);
   }
 
   public getOpenChannelsFrom(p: PublicKey) {
@@ -187,7 +187,7 @@ export default class HoprEthereum extends EventEmitter {
   public commitToChannel(c: ChannelEntry): Promise<void> {
     const setCommitment = (commitment: Hash): Promise<string> => {
       try {
-        return this.chain.setCommitment(c.source.toAddress(), commitment)
+        return this.chain.setCommitment(c.source.toAddress(), commitment).then((tx) => this.resolvePendingTransaction('set-commitment', tx))
       } catch (e) {
         log('Error setting commitment', e)
         // TODO: defer to channel strategy for this, and allow for retries.
