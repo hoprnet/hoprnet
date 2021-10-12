@@ -199,7 +199,7 @@ ensure_port_is_free 19096
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
 DEVELOPMENT=false yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat --show-stack-traces > \
+  --network localhost --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
 log "Hardhat node started (127.0.0.1:8545)"
