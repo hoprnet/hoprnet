@@ -476,6 +476,7 @@ __metadata:
     p-defer: 3
     peer-id: ~0.15.3
     prettier: ~2.4.1
+    prettier-plugin-sh: ~0.7.1
     simple-peer: 9.11
     stream-to-it: ^0.2.4
     ts-node: ~10.2.1
@@ -3444,6 +3445,13 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
+"mvdan-sh@npm:^0.5.0":
+  version: 0.5.0
+  resolution: "mvdan-sh@npm:0.5.0"
+  checksum: b662308861c8d77076513d7f154ec2e340b28f34bedcf413450381255408dd6749b92b51b56946945cf016887789decfe7e89f3b201a71e3d908f59bd9e77474
+  languageName: node
+  linkType: hard
+
 "nan@npm:^2.14.2":
   version: 2.14.2
   resolution: "nan@npm:2.14.2"
@@ -3974,6 +3982,17 @@ fsevents@~2.3.2:
   bin:
     pino: bin.js
   checksum: a580decd47a1c8b32a846ba1cb478087b523636d697bd4c57833d10b3f2b35c7d06739715ad9a291b41caf002b8d1bbf98674bfb3e99989fd41b7d934cca861c
+  languageName: node
+  linkType: hard
+
+"prettier-plugin-sh@npm:~0.7.1":
+  version: 0.7.1
+  resolution: "prettier-plugin-sh@npm:0.7.1"
+  dependencies:
+    mvdan-sh: ^0.5.0
+  peerDependencies:
+    prettier: ^2.0.5
+  checksum: 861d66010cef9d354e96b1d980328dbf538f26b5c888697c2f2982e9d5b99db8df00c787293d9017b483acdcf6b226e9c86ea17b612d1c1c995a85255cc3a480
   languageName: node
   linkType: hard
 

@@ -22,7 +22,7 @@
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "clean": "rm -Rf ./lib",
-    "build": "yarn clean && tsc -p .",
+    "build": "yarn clean && tsc -p . && tsc -p ./tests",
     "test": "yarn node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --parallel --full-trace",
     "prepublishOnly": "yarn build"
   },
@@ -64,6 +64,7 @@
     "libp2p-mplex": "0.10.4",
     "mocha": "^9.1.2",
     "prettier": "~2.4.1",
+    "prettier-plugin-sh": "~0.7.1",
     "ts-node": "~10.2.1",
     "typescript": "^4.4.3",
     "yargs": "^17.2.1"
