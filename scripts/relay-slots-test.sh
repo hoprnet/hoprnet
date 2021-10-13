@@ -1,7 +1,10 @@
 # prevent souring of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
-          
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
+
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
@@ -19,8 +22,8 @@ setup "relay-slots"
 # should be able to send 'test from alice' to bob through relay charly
 # should be ablt to get 'echo: test' back from bob
 start_node tests/node.ts \
-    "${alice_log}" \
-    "[ 
+  "${alice_log}" \
+  "[ 
       {
         'cmd': 'wait',
         'waitForSecs': 2
@@ -45,18 +48,18 @@ start_node tests/node.ts \
         'targetIdentityName': 'bob'
       }
     ]" \
-    --port ${alice_port} \
-    --pipeFile "${alice_pipe}" \
-    --identityName 'alice' \
-    --bootstrapPort ${charly_port} \
-    --bootstrapIdentityName 'charly' \
-    --noDirectConnections true \
-    --noWebRTCUpgrade false \
-    
+  --port ${alice_port} \
+  --pipeFile "${alice_pipe}" \
+  --identityName 'alice' \
+  --bootstrapPort ${charly_port} \
+  --bootstrapIdentityName 'charly' \
+  --noDirectConnections true \
+  --noWebRTCUpgrade false
+
 # run bob (client)
 # should be able to receive 'test' from alice through charly
 # should be able to reply with 'echo: test'
-start_node tests/node.ts "${bob_log}"  \
+start_node tests/node.ts "${bob_log}" \
   "[ {
         'cmd': 'wait',
         'waitForSecs': 2
@@ -73,8 +76,8 @@ start_node tests/node.ts "${bob_log}"  \
   --bootstrapPort ${charly_port} \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
-  --noWebRTCUpgrade false \  
-  
+  --noWebRTCUpgrade false \ 
+
 # run charly
 # should able to serve as a bootstrap
 # should be able to relay 1 connection at a time
@@ -151,18 +154,18 @@ wait_for_regex_in_file "${dave_log}" "dialProtocol to bob failed"
 
 # create global flow log
 rm -Rf "${flow_log}"
-cat "${alice_log}" | sed -En 's/hopr-connect.*FLOW: /alice: /p' >> "${flow_log}"
-cat "${bob_log}" | sed -En 's/hopr-connect.*FLOW: /bob: /p' >> "${flow_log}"
-cat "${charly_log}" | sed -En 's/hopr-connect.*FLOW: /charly: /p' >> "${flow_log}"
-cat "${dave_log}" | sed -En 's/hopr-connect.*FLOW: /dave: /p' >> "${flow_log}"
+cat "${alice_log}" | sed -En 's/hopr-connect.*FLOW: /alice: /p' >>"${flow_log}"
+cat "${bob_log}" | sed -En 's/hopr-connect.*FLOW: /bob: /p' >>"${flow_log}"
+cat "${charly_log}" | sed -En 's/hopr-connect.*FLOW: /charly: /p' >>"${flow_log}"
+cat "${dave_log}" | sed -En 's/hopr-connect.*FLOW: /dave: /p' >>"${flow_log}"
 sort -k1,1 --stable --output "${flow_log}" "${flow_log}"
 
 expect_file_content "${alice_pipe}" \
-">bob: test from alice
+  ">bob: test from alice
 <bob: echo: test from alice"
 
 expect_file_content "${bob_pipe}" \
-"<alice: test from alice
+  "<alice: test from alice
 >alice: echo: test from alice
 <ed: test from ed
 >ed: echo: test from ed"
