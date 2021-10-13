@@ -3,7 +3,7 @@
   "transactionHash": "0x3b4e65aa8b0fcf753cacc9a76fc40b08add3725f436b2e7f2621b38491f163d2",
   "blockNumber": 9,
   "metadata": {
-    "solcVersion": "0.8.3",
+    "solcVersion": "0.8.9",
     "input": {
       "language": "Solidity",
       "sources": {
