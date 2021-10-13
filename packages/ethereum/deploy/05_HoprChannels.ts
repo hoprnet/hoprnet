@@ -1,7 +1,7 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { DeploymentTypes } from '../constants'
-import { durations, u8aToHex } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex, pickVersion } from '@hoprnet/hopr-utils'
 
 const closures: {
   [key in DeploymentTypes]: number
@@ -19,9 +19,16 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const hoprToken = await deployments.get('HoprToken')
 
+  // salt is used to ensure that a smart contract is re-deployed
+  // on new environments OR a changed version `X.X.0`
+  // this is necessary to ensure that all nodes that have announced
+  // in HoprChannels can reach each other
   let salt: string
   if (hre.environment === 'default') {
-    salt = require('../package.json').version
+    // version bumping happens AFTER deployments are run
+    // this means that the salt used here always used an outdated version
+    // see https://github.com/hoprnet/hoprnet/issues/2635
+    salt = pickVersion(require('../package.json').version)
   } else {
     salt = hre.environment
   }

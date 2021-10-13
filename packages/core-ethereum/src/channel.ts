@@ -13,12 +13,11 @@ import {
   generateChannelId,
   ChannelStatus,
   PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB,
-  retryWithBackoff
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 import type { RedeemTicketResponse } from '.'
-import { Commitment } from './commitment'
+import { findCommitmentPreImage, bumpCommitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
 import type { HoprDB } from '@hoprnet/hopr-utils'
@@ -54,23 +53,8 @@ class Channel {
     const response = unacknowledgedTicket.getResponse(acknowledgement)
 
     const ticket = unacknowledgedTicket.ticket
-
-    const setCommitment = (commitment: Hash): Promise<string> => {
-      // NB: We do not catch any error here, as we want it to propagate
-      // to the place where the commitment was triggered, namely the bump
-      // commitment
-      return this.chain.setCommitment(this.counterparty.toAddress(), commitment)
-    }
-
-    const commitment = new Commitment(
-      setCommitment,
-      () => this.getChainCommitment(),
-      this.db,
-      generateChannelId(this.counterparty.toAddress(), this.self.toAddress()), // Counterparty to us
-      this.indexer
-    )
-
-    const opening = await commitment.findPreImage(await commitment.getCurrentCommitment())
+    const channelId = this.getThemToUsId()
+    const opening = await findCommitmentPreImage(this.db, channelId)
 
     if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
       const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
@@ -82,7 +66,7 @@ class Channel {
       )
 
       try {
-        await retryWithBackoff(() => commitment.bumpCommitment())
+        await bumpCommitment(this.db, channelId)
         this.events.emit('ticket:win', ack, this)
         return ack
       } catch (e) {
@@ -249,12 +233,21 @@ class Channel {
     }
   }
 
-  async getAcknowledgedTickets(): Promise<AcknowledgedTicket[]> {
-    return await this.db.getAcknowledgedTickets({ signer: this.counterparty })
-  }
-
-  async redeemAllTickets(): Promise<RedeemTicketResponse[]> {
-    return await Promise.all((await this.getAcknowledgedTickets()).map((a) => this.redeemTicket(a)))
+  async redeemAllTickets(): Promise<void> {
+    // Because tickets are ordered and require the previous redemption to
+    // have succeeded before we can redeem the next, we need to do this
+    // sequentially.
+    const tickets = await this.db.getAcknowledgedTickets({ signer: this.counterparty })
+    for (const ticket of tickets) {
+      log('redeeming ticket', ticket)
+      const result = await this.redeemTicket(ticket)
+      if (result.status !== 'SUCCESS') {
+        log('Error redeeming ticket', result)
+        // We need to abort as tickets require ordered redemption.
+        return
+      }
+      log('ticket was redeemed')
+    }
   }
 
   async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {

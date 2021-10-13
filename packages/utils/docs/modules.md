@@ -135,6 +135,7 @@
 - [oneAtATime](modules.md#oneatatime)
 - [parseHosts](modules.md#parsehosts)
 - [parseJSON](modules.md#parsejson)
+- [pickVersion](modules.md#pickversion)
 - [preVerify](modules.md#preverify)
 - [privKeyToPeerId](modules.md#privkeytopeerid)
 - [pubKeyToPeerId](modules.md#pubkeytopeerid)
@@ -231,7 +232,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L92)
+[libp2p/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L93)
 
 ___
 
@@ -276,7 +277,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L139)
+[libp2p/index.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L140)
 
 ___
 
@@ -301,7 +302,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L140)
+[libp2p/index.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L141)
 
 ___
 
@@ -657,7 +658,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L24)
+[libp2p/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L25)
 
 ___
 
@@ -759,7 +760,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[libp2p/index.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L41)
+[libp2p/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L42)
 
 ___
 
@@ -781,7 +782,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[libp2p/index.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L31)
+[libp2p/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L32)
 
 ___
 
@@ -1131,7 +1132,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[libp2p/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L68)
+[libp2p/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L69)
 
 ___
 
@@ -1299,7 +1300,7 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[libp2p/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L51)
+[libp2p/index.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L52)
 
 ___
 
@@ -1604,7 +1605,7 @@ whether embedded privKey is a secp256k1 key
 
 #### Defined in
 
-[libp2p/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L84)
+[libp2p/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L85)
 
 ___
 
@@ -1676,7 +1677,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L96)
+[libp2p/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L97)
 
 ___
 
@@ -1700,7 +1701,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L112)
+[libp2p/index.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L113)
 
 ___
 
@@ -1723,7 +1724,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:175](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L175)
+[libp2p/index.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L176)
 
 ___
 
@@ -1860,6 +1861,30 @@ Parse JSON while recovering all Buffer elements
 #### Defined in
 
 [parseJSON.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/parseJSON.ts#L5)
+
+___
+
+### pickVersion
+
+▸ `Const` **pickVersion**(`full_version`): `string`
+
+Used by our network stack and deployment scripts to determine.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `full_version` | `string` |
+
+#### Returns
+
+`string`
+
+major and minor versions, ex: `1.8.5` -> `1.8.0`
+
+#### Defined in
+
+[libp2p/pickVersion.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pickVersion.ts#L6)
 
 ___
 

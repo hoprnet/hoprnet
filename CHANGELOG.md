@@ -1,3 +1,27 @@
+<a name="1.81"></a>
+
+## Next
+
+None
+
+## [1.81](https://github.com/hoprnet/hoprnet/compare/release/constantine...hoprnet:release/limassol) (2021-10-04)
+
+# Breaking changes
+
+Nodes are required to `Announce` before being able to have an open channel.
+
+### Changes
+
+- improve CI (#2466, #2475, #2540)
+- switch to renovate
+- require `Announce` (#2473)
+- CT improvements (#2474)
+- various bug fixes (#2529, #2556, #2558, #2562)
+- various yellow paper updates
+- dependancy version updates
+
+---
+
 <a name="1.75"></a>
 
 ## [1.75](https://github.com/hoprnet/hoprnet/compare/release/moscow...hoprnet:release/constantine) (2021-07-30)

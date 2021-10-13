@@ -12,7 +12,6 @@ import {
   ChannelStatus,
   Address,
   ChannelEntry,
-  defer,
   AccountEntry,
   Hash,
   PublicKey,
@@ -22,7 +21,6 @@ import {
 
 import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames } from './types'
-import type { DeferType } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 
 const log = debug('hopr-core-ethereum:indexer')
@@ -38,7 +36,6 @@ class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
-  private pendingCommitments: Map<string, DeferType<void>>
   private chain: ChainWrapper
   private genesisBlock: number
 
@@ -49,7 +46,6 @@ class Indexer extends EventEmitter {
     private blockRange: number
   ) {
     super()
-    this.pendingCommitments = new Map<string, DeferType<void>>()
   }
 
   /**
@@ -308,35 +304,11 @@ class Indexer extends EventEmitter {
       if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
-          this.onOwnUnsetCommitment(channel)
-        } else if (channel.status === ChannelStatus.Open) {
-          this.resolveCommitmentPromise(channel.getId())
+          log('channel to us waiting for commitment', channel)
+          this.emit('channel-waiting-for-commitment', channel)
         }
       }
     }
-  }
-
-  private onOwnUnsetCommitment(channel: ChannelEntry) {
-    if (!channel.destination.toAddress().eq(this.address)) {
-      throw new Error('shouldnt be called unless we are the destination')
-    }
-    this.emit('channel-waiting-for-commitment', channel)
-  }
-
-  public waitForCommitment(channelId: Hash): Promise<void> {
-    let waiting = this.pendingCommitments.get(channelId.toHex())
-
-    if (waiting != undefined) {
-      return waiting.promise
-    }
-
-    waiting = defer<void>()
-
-    this.pendingCommitments.set(channelId.toHex(), waiting)
-  }
-
-  private resolveCommitmentPromise(channelId: Hash) {
-    this.pendingCommitments.get(channelId.toHex())?.resolve()
   }
 
   public async getAccount(address: Address) {

@@ -20,7 +20,7 @@ import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
-import { Commitment } from './commitment'
+import { initializeCommitment } from './commitment'
 
 const log = debug('hopr-core-ethereum')
 
@@ -164,23 +164,11 @@ export default class HoprEthereum extends EventEmitter {
     return await this.indexer.getPublicNodes()
   }
 
-  public commitToChannel(c: ChannelEntry): Promise<void> {
-    const setCommitment = (commitment: Hash): Promise<string> => {
-      try {
-        return this.chain.setCommitment(c.source.toAddress(), commitment)
-      } catch (e) {
-        log('Error setting commitment', e)
-        // TODO: defer to channel strategy for this, and allow for retries.
-      }
-    }
-
-    return new Commitment(
-      setCommitment,
-      async () => (await this.indexer.getChannel(c.getId())).commitment,
-      this.db,
-      c.getId(),
-      this.indexer
-    ).initialize()
+  public async commitToChannel(c: ChannelEntry): Promise<void> {
+    log('committing to channel', c)
+    const setCommitment = async (commitment: Hash) => this.chain.setCommitment(c.source.toAddress(), commitment)
+    const getCommitment = async () => (await this.indexer.getChannel(c.getId())).commitment
+    initializeCommitment(this.db, c.getId(), getCommitment, setCommitment)
   }
 }
 
