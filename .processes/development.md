@@ -238,7 +238,7 @@ All HOPR repositories must support at most these issue templates, more templates
 - All new issues created by external contributors will contain a `new issue` label.
 - A _tech_ member may review the new issue and label it accordingly, see [#labels](#labels) for descriptions on the standard labels.
   - Some repositories may contain their own unique labels.
-- Once a new issue is reviewed, 'new issue' must be removed and the issue may be updated with any other relevant labels.
+- Once a new issue is reviewed, the label 'new issue' shall be removed and the issue may be updated with any other relevant labels.
 
 ### Labels
 
