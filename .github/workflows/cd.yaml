@@ -47,8 +47,7 @@ jobs:
 
       - name: Building Docker image using Google Cloud Build
         run: |
-          gcloud builds submit --config cloudbuild.yaml \
-            --substitutions=_HOPR_PACKAGE_VERSION=${HOPR_PACKAGE_VERSION},_HOPR_IMAGE_VERSION=${HOPR_IMAGE_VERSION}
+          gcloud builds submit
         env:
           HOPR_PACKAGE: hoprd
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
