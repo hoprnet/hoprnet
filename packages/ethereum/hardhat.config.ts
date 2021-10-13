@@ -38,31 +38,17 @@ const hardhatConfig: HardhatUserConfig = {
     // we use an ENV variable (which is specified in our NPM script)
     // to let hardhat know we want to run hardhat in 'development' mode
     // this essentially enables mining, see below
-    localhost: {
-      live: false,
-      tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
-      saveDeployments: true,
-      mining: DEVELOPMENT
-        ? {
-            auto: true, // True: every transaction will trigger a new block (without this deployments fail). False: a new block is mined in an interval
-            interval: [1000, 3000] // mine new block every 1 - 3s
-          }
-        : {
-            auto: false, // True: every transaction will trigger a new block (without this deployments fail). False: a new block is mined in an interval
-            interval: [1000, 3000] // mine new block every 1 - 3s
-          }
-    },
     hardhat: {
       live: false,
       tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
       saveDeployments: true,
       mining: DEVELOPMENT
         ? {
-            auto: true, // True: every transaction will trigger a new block (without this deployments fail). False: a new block is mined in an interval
+            auto: true, // every transaction will trigger a new block (without this deployments fail)
             interval: [1000, 3000] // mine new block every 1 - 3s
           }
         : {
-            auto: false, // True: every transaction will trigger a new block (without this deployments fail). False: a new block is mined in an interval
+            auto: false, // a new block is mined in an interval
             interval: [1000, 3000] // mine new block every 1 - 3s
           }
     },

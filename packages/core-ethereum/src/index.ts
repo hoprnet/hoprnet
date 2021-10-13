@@ -175,7 +175,10 @@ export default class HoprEthereum extends EventEmitter {
       try {
         return this.chain
           .setCommitment(c.source.toAddress(), commitment)
-          .then((tx) => this.indexer.resolvePendingTransaction('channel-updated', tx))
+          .then((tx) => {
+            log('bump channel with tx %s', tx)
+            return this.indexer.resolvePendingTransaction('channel-updated', tx)
+          })
       } catch (e) {
         log('Error setting commitment', e)
         // TODO: defer to channel strategy for this, and allow for retries.

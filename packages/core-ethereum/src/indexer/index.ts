@@ -3,7 +3,7 @@ import { debug } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
-import { EventEmitter } from 'events'
+import { EventEmitter, getEventListeners } from 'events'
 import { Multiaddr } from 'multiaddr'
 import {
   randomChoice,
@@ -21,9 +21,10 @@ import {
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
-import type { Event, EventNames, IndexerEvents, TokenEventNames } from './types'
+import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } from './types'
 import type { DeferType } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
+import { utils } from "ethers"
 
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
@@ -37,7 +38,7 @@ const ANNOUNCEMENT = 'Announcement'
 class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
-  private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
+  private unconfirmedEvents = new Heap<Event<any> | TokenEvent<any>>(snapshotComparator)
   private pendingCommitments: Map<string, DeferType<void>>
   private chain: ChainWrapper
   private genesisBlock: number
@@ -94,11 +95,17 @@ class Indexer extends EventEmitter {
       this.restart()
     })
     this.chain.subscribeChannelEvents((e) => {
-      this.onNewEvents([e])
+      if (e.event === ANNOUNCEMENT || e.event === 'ChannelUpdated') {
+        log('found events - channel %o', e)
+        this.onNewEvents([e])
+      }
     })
     this.chain.subscribeTokenEvents((e) => {
-      // save transfer events
-      this.onNewEvents([e])
+      if (e.event === 'Transfer' && (e.topics[1] === utils.hexZeroPad(this.address.toHex(), 32) || e.topics[2] === utils.hexZeroPad(this.address.toHex(), 32))) {
+        log('found events - token %o', e)
+        // save transfer events
+        this.onNewEvents([e])
+      }
     })
 
     // get past events
@@ -182,7 +189,7 @@ class Indexer extends EventEmitter {
 
         continue
       }
-
+      log('found events - past %o', events)
       this.onNewEvents(events)
       await this.onNewBlock(toBlock)
       failedCount = 0
@@ -227,7 +234,8 @@ class Indexer extends EventEmitter {
         this.chain.updateConfirmedTransaction(nativeTx)
       })
     }
-
+    log('unconfirmedEvents %o', this.unconfirmedEvents)
+    log('At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)', blockNumber, this.unconfirmedEvents.length, this.unconfirmedEvents.length > 0 ? isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations) : null, this.unconfirmedEvents.length > 0 ? this.unconfirmedEvents.top(1)[0].blockNumber : 0, this.maxConfirmations)
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
@@ -235,7 +243,7 @@ class Indexer extends EventEmitter {
       isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
-      log('Processing event %s', event.event)
+      log('Processing event %s %s %s', event.event, blockNumber, this.maxConfirmations)
 
       // if we find a previous snapshot, compare event's snapshot with last processed
       if (lastSnapshot) {
@@ -257,6 +265,7 @@ class Indexer extends EventEmitter {
       const eventName = event.event as EventNames | TokenEventNames
       // update transaction manager
       this.chain.updateConfirmedTransaction(event.transactionHash as string)
+      log('Event name %s and hash %s', eventName, event.transactionHash)
       try {
         if (eventName === ANNOUNCEMENT) {
           this.indexEvent('annouce', [event.transactionHash])
@@ -285,7 +294,7 @@ class Indexer extends EventEmitter {
    * Called whenever we receive new events.
    * @param events
    */
-  private onNewEvents(events: Event<any>[]): void {
+  private onNewEvents(events: Event<any>[] | TokenEvent<any>[]): void {
     this.unconfirmedEvents.addAll(events)
   }
 
@@ -317,19 +326,21 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
+    this.indexEvent('channel-updated', [event.transactionHash])
+    log('channel-updated for hash %s', event.transactionHash)
     const channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
-
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
     this.emit('channel-update', channel)
+    log('channel-update for channel %s', channel)
 
     if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       this.emit('own-channel-updated', channel)
-      this.indexEvent('channel-updated', [event.transactionHash])
 
       if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
+
           this.onOwnUnsetCommitment(channel)
         } else if (channel.status === ChannelStatus.Open) {
           this.resolveCommitmentPromise(channel.getId())
@@ -444,10 +455,14 @@ class Indexer extends EventEmitter {
         const indexed = txHash.find((emitted) => emitted === tx)
         if (indexed) {
           this.removeListener(eventType, listener)
+          log('listener %s on %s is removed', eventType, tx)
+          log('all listener', getEventListeners(this, eventType))
           resolve(tx)
         }
       }
       this.addListener(eventType, listener)
+      log('listener %s on %s is added', eventType, tx)
+      log('all listener', getEventListeners(this, eventType))
     })
   }
 }
