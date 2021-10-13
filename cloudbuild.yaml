@@ -8,5 +8,5 @@ options:
   logStreamingOption: STREAM_ON
   machineType: N1_HIGHCPU_8
 images:
-  - 'gcr.io/hoprassociation/hoprd'
+  - 'gcr.io/hoprassociation/hoprd:debug'
 timeout: 630s
