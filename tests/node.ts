@@ -1,4 +1,4 @@
-#!/usr/bin/env -S yarn exec "ts-node"
+#!/usr/bin/env -S yarn exec "./node_modules/.bin/ts-node -T"
 import libp2p from 'libp2p'
 import type { Connection, HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
@@ -70,7 +70,8 @@ async function startNode({
   noWebRTCUpgrade,
   pipeFileStream,
   maxRelayedConnections,
-  relayFreeTimeout
+  relayFreeTimeout,
+  useLocalAddresses
 }: {
   peerId: PeerId
   port: number
@@ -80,14 +81,16 @@ async function startNode({
   pipeFileStream?: WriteStream
   maxRelayedConnections?: number
   relayFreeTimeout?: number
+  useLocalAddresses?: boolean
 }) {
-  console.log(`starting node, bootstrap address ${bootstrapAddress.id.toB58String()}`)
+  console.log(`starting node, bootstrap address ${bootstrapAddress ? bootstrapAddress.id.toB58String() : 'undefined'}`)
   const connectOpts: HoprConnectOptions = {
     initialNodes: bootstrapAddress ? [bootstrapAddress] : [],
     __noDirectConnections: noDirectConnections,
     __noWebRTCUpgrade: noWebRTCUpgrade,
     maxRelayedConnections,
-    __relayFreeTimeout: relayFreeTimeout
+    __relayFreeTimeout: relayFreeTimeout,
+    __useLocalAddresses: useLocalAddresses
   }
 
   const node = await libp2p.create({
@@ -307,7 +310,8 @@ async function main() {
     noWebRTCUpgrade: parsedOpts.noWebRTCUpgrade,
     pipeFileStream,
     maxRelayedConnections: parsedOpts.maxRelayedConnections,
-    relayFreeTimeout: parsedOpts.relayFreeTimeout
+    relayFreeTimeout: parsedOpts.relayFreeTimeout,
+    useLocalAddresses: parsedOpts.useLocalAddress
   })
 
   await executeCommands({ node, cmds: parsedOpts.script, pipeFileStream })

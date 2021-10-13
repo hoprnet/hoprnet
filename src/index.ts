@@ -142,6 +142,10 @@ class HoprConnect implements Transport<DialOptions, any> {
     if (this.__noWebRTCUpgrade) {
       verbose(`DEBUG mode: no WebRTC upgrade`)
     }
+
+    if (this.__useLocalAddress) {
+      verbose(`DEBUG mode: treat local addresses as public addresses.`)
+    }
   }
 
   /**
