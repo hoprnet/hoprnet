@@ -40,7 +40,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 
 - Internal releases are more frequent and their goal is to test new features and bug fixes.
 - There should be no public involvement unless the [internal release](#internal-release) is promoted to a [public release](#public-release).
-- All releases start by being an [internal release](#internal-release) release and may be promoted to a [public release](#public-release), see [release promotion](#release-promotion).
+- All releases start as an [internal release](#internal-release) release and may be promoted to a [public release](#public-release), see [release promotion](#release-promotion).
 
 ### Public release
 
