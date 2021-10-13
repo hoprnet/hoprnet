@@ -45,7 +45,8 @@ start_node tests/node.ts \
   --bootstrapPort ${charly_port} \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
-  --noWebRTCUpgrade true
+  --noWebRTCUpgrade true \
+  --useLocalAddress true
 
 # run bob (client)
 # should be able to receive 'test' from alice through charly
@@ -67,7 +68,8 @@ start_node tests/node.ts "${bob_log}" \
   --bootstrapPort ${charly_port} \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
-  --noWebRTCUpgrade true \ 
+  --noWebRTCUpgrade true \
+  --useLocalAddress true
 
 # run charly
 # should able to serve as a bootstrap
@@ -77,7 +79,8 @@ start_node tests/node.ts "${charly_log}" \
   --port ${charly_port} \
   --identityName 'charly' \
   --noDirectConnections true \
-  --noWebRTCUpgrade false
+  --noWebRTCUpgrade false \
+  --useLocalAddress true
 
 # wait till nodes finish communicating
 wait_for_regex_in_file "${alice_log}" "all tasks executed"
@@ -112,7 +115,8 @@ start_node tests/node.ts \
   --bootstrapPort ${charly_port} \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
-  --noWebRTCUpgrade true
+  --noWebRTCUpgrade true \
+  --useLocalAddress true
 
 # wait for the second alice to finish sending
 wait_for_regex_in_file "${alice2_log}" "all tasks executed"
