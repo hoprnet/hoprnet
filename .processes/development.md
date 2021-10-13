@@ -235,7 +235,7 @@ All HOPR repositories must support at most these issue templates, more templates
 - [Custom Template](./.github/ISSUE_TEMPLATE/custom.md)
 
 - A _tech_ member, or an external contributor creates an issue using one of our templates, these templates may add some labels by default.
-- All new issues except `epics` will contain a `new issue` label.
+- All new issues created by external contributors will contain a `new issue` label.
 - A _tech_ member may review the new issue and label it accordingly, see [#labels](#labels) for descriptions on the standard labels.
   - Some repositories may contain their own unique labels.
 - Once a new issue is reviewed, 'new issue' must be removed and the issue may be updated with any other relevant labels.
