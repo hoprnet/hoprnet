@@ -1,0 +1,56 @@
+name: HOPR CD
+
+on:
+  push:
+    branches: ['debug/**']
+    paths-ignore:
+      - 'docs/**/*'
+      - 'packages/*/docs/**/*'
+
+jobs:
+  cd:
+    name: Build HOPRD
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
+      - name: Setup Google Cloud Credentials
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+
+      - name: Set image version
+        id: set-image-version
+        run: echo "::set-output name=vsn::$(date +%s)"
+
+      - name: Set package version
+        id: set-package-version
+        run: echo "::set-output name=vsn::$(./scripts/get-package-version.sh)"
+        env:
+          HOPR_PACKAGE: hoprd
+
+      - name: Set latest release tag
+        id: set-latest-release-tag
+        run: |
+          # we must set the tag specific to the release to prevent overrides
+          # from other release branches
+          declare release_name=${HOPR_GITHUB_REF##refs/heads/release/}
+          declare tag="latest-${release_name}"
+          echo "::set-output name=tag::${tag}"
+
+      - name: Building Docker image using Google Cloud Build
+        run: |
+          gcloud builds submit --config cloudbuild.yaml \
+            --substitutions=_HOPR_PACKAGE_VERSION=${HOPR_PACKAGE_VERSION},_HOPR_IMAGE_VERSION=${HOPR_IMAGE_VERSION}
+        env:
+          HOPR_PACKAGE: hoprd
+          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
