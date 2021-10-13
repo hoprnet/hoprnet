@@ -194,7 +194,10 @@ describe.only('test addr filtering', function () {
 
   it.only('local networks', function () {
     filter.setAddrs(
-      [new Multiaddr(`/ip4/10.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`),new Multiaddr(`/ip4/192.168.1.1/tcp/123/p2p/${firstPeer.toB58String()}`)],
+      [
+        new Multiaddr(`/ip4/10.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`),
+        new Multiaddr(`/ip4/192.168.1.1/tcp/123/p2p/${firstPeer.toB58String()}`)
+      ],
       [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${firstPeer.toB58String()}`)]
     )
 
@@ -205,7 +208,10 @@ describe.only('test addr filtering', function () {
 
   it.only('local networks', function () {
     filter.setAddrs(
-      [new Multiaddr(`/ip4/10.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`),new Multiaddr(`/ip4/192.168.1.1/tcp/123/p2p/${firstPeer.toB58String()}`)],
+      [
+        new Multiaddr(`/ip4/10.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`),
+        new Multiaddr(`/ip4/192.168.1.1/tcp/123/p2p/${firstPeer.toB58String()}`)
+      ],
       [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${firstPeer.toB58String()}`)]
     )
 
