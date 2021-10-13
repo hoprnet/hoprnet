@@ -47,7 +47,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 - Public releases are less frequent and their goal is to showcase new features and bug fixes.
 - A [public release](#public-release) release occurs when an [internal release](#internal-release) release is promoted to a [public release](#public-release), see [release promotion](#release-promotion).
 
-## When release
+## When to release
 
 ### Milestone based releases
 
