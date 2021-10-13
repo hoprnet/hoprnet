@@ -27,7 +27,6 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
     - [Scripts](#scripts)
       - [`cover-traffic` deployment script](#cover-traffic-deployment-script)
       - [`topology` deployment script](#topology-deployment-script)
-  - [Migrating between releases](#migrating-between-releases)
 
 ## Types of release
 
@@ -200,7 +199,7 @@ The following are a series of manual tasks that are needed to be executed for th
 
 - [ ] Create a DNS alias for each node (cloud, cover-traffic, topology), to be accessed via our `hoprnet.link` domain (e.g. ct-1-$release.hoprnet.link)
 
-- [ ] Verify the $release smart contract in the explorer platform.
+- [ ] Verify the $release smart contract in the explorer platform, see [verification guide](../VERIFICATION_GUIDE.md).
 
 #### Per $chain
 
@@ -232,17 +231,3 @@ HOPRD_TOKEN_CONTRACT="0x6F80d1a3AB9006548c2fBb180879b87364D63Bf7" \
 HOPRD_SHOW_PRESTART_INFO=true \
 ./scripts/setup-gcloud-cluster.sh matic-testnet-01 gcr.io/hoprassociation/hoprd:latest `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
-
-## Migrating between releases
-
-At the moment we DO NOT HAVE backward compatibility between releases.
-We attempt to provide instructions on how to migrate your tokens between releases.
-
-1. Set your automatic channel strategy to `MANUAL`.
-2. Close all open payment channels.
-3. Once all payment channels have closed, withdraw your funds to an external
-   wallet.
-4. Run `info` and take note of the **network name**.
-5. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` and `.db` folders.
-6. Launch new `HOPRd` instance using latest release, this will create new `.hopr-identity` and `.db` folders, observe the account address.
-7. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
