@@ -139,7 +139,7 @@ export function inSameNetwork(
   return true
 }
 
-function toNetworkPrefix(addr: NetworkInterfaceInfo): Network {
+export function toNetworkPrefix(addr: NetworkInterfaceInfo): Network {
   const subnet = ipToU8aAddress(addr.netmask, addr.family)
   const address = ipToU8aAddress(addr.address, addr.family)
 

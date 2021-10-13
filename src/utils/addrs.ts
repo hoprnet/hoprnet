@@ -21,6 +21,8 @@ type CircuitAddress = {
   node: Uint8Array
 }
 
+export type ValidAddress = DirectAddress | CircuitAddress
+
 type ParseResult<Type> =
   | {
       valid: true
@@ -33,7 +35,7 @@ type ParseResult<Type> =
 const log = Debug('hopr-connect:addr')
 
 /**
- * Checks a given Multihash
+ * Checks and parses a given Multihash
  * @param mh Multihash to check
  */
 function parseMultihash(mh: Uint8Array): { valid: false } | { valid: true; result: ReturnType<typeof decode> } {
@@ -57,7 +59,7 @@ function parseMultihash(mh: Uint8Array): { valid: false } | { valid: true; resul
 }
 
 /**
- * Checks a given circuit address
+ * Checks and parses a given circuit address
  * @param maTuples tuples of a Multiaddr
  */
 function parseCircuitAddress(maTuples: [code: number, addr: Uint8Array][]): ParseResult<CircuitAddress> {
@@ -103,7 +105,7 @@ function parseCircuitAddress(maTuples: [code: number, addr: Uint8Array][]): Pars
 }
 
 /**
- * Checks a given direct address
+ * Checks and parses a given direct address
  * @param maTuples tuples of a Multiaddr
  */
 function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): ParseResult<DirectAddress> {
@@ -159,7 +161,7 @@ function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): Parse
  * Checks and parses a given Multiaddr
  * @param ma Multiaddr to check and parse
  */
-export function parseAddress(ma: Multiaddr): ParseResult<DirectAddress | CircuitAddress> {
+export function parseAddress(ma: Multiaddr): ParseResult<ValidAddress> {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
   switch (tuples[0][0]) {
