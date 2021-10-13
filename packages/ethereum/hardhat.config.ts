@@ -85,7 +85,7 @@ const hardhatConfig: HardhatUserConfig = {
     deployer: 0
   },
   solidity: {
-    compilers: ['0.8.3', '0.6.6', '0.4.24'].map<SolcUserConfig>((version) => ({
+    compilers: ['0.8.9', '0.6.6', '0.4.24'].map<SolcUserConfig>((version) => ({
       version,
       settings: {
         optimizer: {
