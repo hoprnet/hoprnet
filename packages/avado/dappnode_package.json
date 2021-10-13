@@ -19,8 +19,8 @@
       "9091:9091/tcp"
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
-    "hash": "/ipfs/Qmd9S1YTmjVQvjRFCyrm9F9LNmWyDyVnoo1vYvok32B1yC",
-    "size": 70114048,
+    "hash": "/ipfs/QmfQiQAaxVwnxbGymRGRh3cZRk9Xn6rrSXsGqD6PVarF8G",
+    "size": 70253280,
     "restart": "always"
   },
   "author": "HOPR",
