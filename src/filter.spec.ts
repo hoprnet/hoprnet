@@ -186,7 +186,7 @@ describe('test addr filtering', function () {
     assert(filter.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${secondPeer.toB58String()}`)) == false)
   })
 
-  it('local networks', function () {
+  it('link-locale addresses', function () {
     filter.setAddrs(
       [
         new Multiaddr(`/ip4/10.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`),
