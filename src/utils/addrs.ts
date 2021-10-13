@@ -139,7 +139,6 @@ function parseDirectAddress(maTuples: [code: number, addr: Uint8Array][]): Parse
     type: family
   }
 
-
   if (maTuples.length == 3) {
     if (maTuples[2].length < 2 || maTuples[2][0] != CODE_P2P || maTuples[2][1].length == 0) {
       return { valid: false }
