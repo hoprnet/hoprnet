@@ -16,7 +16,7 @@ class TestFilter extends Filter {
   }
 }
 
-describe.only('test addr filtering', function () {
+describe('test addr filtering', function () {
   let firstPeer: PeerId, secondPeer: PeerId
   let filter: TestFilter
 
@@ -192,7 +192,7 @@ describe.only('test addr filtering', function () {
     assert(filter.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${secondPeer.toB58String()}`)) == false)
   })
 
-  it.only('local networks', function () {
+  it('local networks', function () {
     filter.setAddrs(
       [
         new Multiaddr(`/ip4/10.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`),
@@ -206,7 +206,7 @@ describe.only('test addr filtering', function () {
     assert(filter.filter(new Multiaddr(`/ip4/169.254.0.1/tcp/2/p2p/${secondPeer.toB58String()}`)) == false)
   })
 
-  it.only('local networks', function () {
+  it('local networks', function () {
     filter.setAddrs(
       [
         new Multiaddr(`/ip4/10.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`),
