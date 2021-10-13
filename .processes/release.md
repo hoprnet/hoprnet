@@ -93,6 +93,8 @@ This is optional in the possibility we want to gather more data points and/or a 
 - All releases start by being internal releases.
 - An [internal release](#internal-release) may be promoted to a [public release](#public-release) when all [testing phases](#testing-phases) are succesful.
 
+An [internal release](#internal-release) is promoted to a [public release](#public-release) by tagging it's binaries with the public facing release name. See [Deployment checklist](#deployment-checklist).
+
 ## On a new chain
 
 Every chain has it's own unique characteristics. While it may be EVM compatible, various other factors can make the chain incompatible with HOPR.
@@ -223,8 +225,7 @@ We attempt to provide instructions on how to migrate your tokens between release
 2. Close all open payment channels.
 3. Once all payment channels have closed, withdraw your funds to an external
    wallet.
-4. Withdraw all funds from last release to a secure wallet.
-5. Run `info` and take note of the **network name**.
-6. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` and `.db` folders.
-7. Launch new `HOPRd` instance using latest release, this will create new `.hopr-identity` and `.db` folders, observe the account address.
-8. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
+4. Run `info` and take note of the **network name**.
+5. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` and `.db` folders.
+6. Launch new `HOPRd` instance using latest release, this will create new `.hopr-identity` and `.db` folders, observe the account address.
+7. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
