@@ -56,7 +56,7 @@ This new release is considered an [internal release](#internal-release) and may 
 
 ### Deadline based releases
 
-Deadline based releases are releases which have a defined deadline and scope decided by the [Trifecta](./development.md#trifecta).
+Deadline based releases are releases which have a defined deadline and scope agreed upon by the [Trifecta](./development.md#trifecta).
 These releases should be of a large scope and occur only on occasions where a release is necessary.
 
 ## Testing phases
