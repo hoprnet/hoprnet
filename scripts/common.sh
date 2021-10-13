@@ -1,22 +1,23 @@
-
-
 # setup paths
 # find usable tmp dir
 declare tmp="/tmp"
-[[ -d "${tmp}" && -h "${tmp}" ]] && tmp="/var/tmp"
-[[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
+[[ -d "${tmp}" && -L "${tmp}" ]] && tmp="/var/tmp"
+[[ -d "${tmp}" && -L "${tmp}" ]] && {
+  msg "Neither /tmp or /var/tmp can be used for writing logs"
+  exit 1
+}
 
 function free_port {
-    local port="${1}"
-    if lsof -i ":${port}" -s TCP:LISTEN > /dev/null; then
-        lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} 
-    fi
+  local port="${1}"
+  if lsof -i ":${port}" -s TCP:LISTEN >/dev/null; then
+    lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+  fi
 }
 
 function free_ports {
-    for port in ${alice_port} ${alice2_port} ${bob_port} ${charly_port} ${dave_port} ${ed_port}; do
-        free_port ${port}    
-    done
+  for port in ${alice_port} ${alice2_port} ${bob_port} ${charly_port} ${dave_port} ${ed_port}; do
+    free_port ${port}
+  done
 }
 
 function cleanup {
@@ -31,49 +32,54 @@ function cleanup {
 trap cleanup SIGINT SIGTERM ERR EXIT
 
 function start_node {
-    declare filename=${1}
-    declare log_file=${2}
-    declare script=${3}
-    declare rest_args=${@:4}
+  declare filename=${1}
+  declare log_file=${2}
+  declare script=${3}
+  declare rest_args=${@:4}
 
-    DEBUG=flow:hopr-connect*,hopr-connect*,simple-peer \
+  DEBUG=flow:hopr-connect*,hopr-connect*,simple-peer \
     node_modules/.bin/ts-node ${filename} \
-        > "${log_file}" \
-        ${rest_args} \
-        --script "${script}" \
-        2>&1 &
-    declare pid=$!
-    log "node started with PID ${pid}"
-    log "args: ${rest_args}"
-    log "script: "
-    log "${script}"
-    echo ${pid}
+    \
+    ${rest_args} \
+    --script "${script}" >"${log_file}" \
+    2>& \
+    \
+    1 &
+  declare pid=$!
+  log "node started with PID ${pid}"
+  log "args: ${rest_args}"
+  log "script: "
+  log "${script}"
+  echo ${pid}
 }
 
 # return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
+([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && {
+  usage
+  exit 0
+}
 
 declare exit_code=0
 
 # check prerequisites
-which yarn > /dev/null || exit_code=$?
+which yarn >/dev/null || exit_code=$?
 
 if [[ "${exit_code}" != 0 ]]; then
-    log "⛔️ yarn is not installed"
-    exit 1
+  log "⛔️ yarn is not installed"
+  exit 1
 fi
 
 declare yarn_version=$(yarn -v)
-declare yarn_version_parsed=( ${yarn_version//./ } )
+declare yarn_version_parsed=(${yarn_version//./ })
 if [[ "${yarn_version_parsed[0]}" != "3" ]]; then
-    log "⛔️ yarn v3.x.x required, ${yarn_version} found"
-    exit 1
+  log "⛔️ yarn v3.x.x required, ${yarn_version} found"
+  exit 1
 fi
 
 function remove_logs {
-  for file in "${alice_log}" ${alice2_log} "${bob_log}" "${charly_log}" "${dave_log}" "${ed_log}" "${alice_pipe}" ${alice2_pipe} "${bob_pipe}"; do 
+  for file in "${alice_log}" ${alice2_log} "${bob_log}" "${charly_log}" "${dave_log}" "${ed_log}" "${alice_pipe}" ${alice2_pipe} "${bob_pipe}"; do
     rm -Rf ${file}
-  done  
+  done
 }
 
 function ensure_ports {
@@ -100,53 +106,53 @@ declare ed_log
 declare ed_port
 
 function setup {
-    local test_name="${1}"
-    flow_log="${tmp}/hopr-connect-${test_name}-flow.log"
+  local test_name="${1}"
+  flow_log="${tmp}/hopr-connect-${test_name}-flow.log"
 
-    alice_log="${tmp}/hopr-connect-${test_name}-alice.log"
-    alice_pipe="${tmp}/hopr-connect-${test_name}-alice-pipe.log"
-    alice_port=11090
+  alice_log="${tmp}/hopr-connect-${test_name}-alice.log"
+  alice_pipe="${tmp}/hopr-connect-${test_name}-alice-pipe.log"
+  alice_port=11090
 
-    alice2_log="${tmp}/hopr-connect-${test_name}-alice2.log"
-    alice2_pipe="${tmp}/hopr-connect-${test_name}-alice2-pipe.log"
-    alice2_port=11096
+  alice2_log="${tmp}/hopr-connect-${test_name}-alice2.log"
+  alice2_pipe="${tmp}/hopr-connect-${test_name}-alice2-pipe.log"
+  alice2_port=11096
 
-    bob_log="${tmp}/hopr-connect-${test_name}-bob.log"
-    bob_pipe="${tmp}/hopr-connect-${test_name}-bob-pipe.log"
-    bob_port=11091
+  bob_log="${tmp}/hopr-connect-${test_name}-bob.log"
+  bob_pipe="${tmp}/hopr-connect-${test_name}-bob-pipe.log"
+  bob_port=11091
 
-    charly_log="${tmp}/hopr-connect-${test_name}-charly.log"
-    charly_port=11092
+  charly_log="${tmp}/hopr-connect-${test_name}-charly.log"
+  charly_port=11092
 
-    dave_log="${tmp}/hopr-connect-${test_name}-dave.log"
-    dave_port=11093
+  dave_log="${tmp}/hopr-connect-${test_name}-dave.log"
+  dave_port=11093
 
-    ed_log="${tmp}/hopr-connect-${test_name}-ed.log"
-    ed_port=11094
+  ed_log="${tmp}/hopr-connect-${test_name}-ed.log"
+  ed_port=11094
 
-    log "Setting up new test run ${test_name}"
-    
-    free_ports
-    remove_logs
-    ensure_ports
+  log "Setting up new test run ${test_name}"
 
-    log "alice logs -> ${alice_log}"
-    log "alice2 logs -> ${alice2_log}"
-    log "alice msgs -> ${alice_pipe}"
-    log "bob logs -> ${bob_log}"
-    log "bob msgs -> ${bob_pipe}"
-    log "charly logs -> ${charly_log}"
-    log "dave logs -> ${dave_log}"
-    log "ed logs -> ${ed_log}"
-    log "common flow log -> ${flow_log}"
+  free_ports
+  remove_logs
+  ensure_ports
 
-    log "Test run setup finished"    
+  log "alice logs -> ${alice_log}"
+  log "alice2 logs -> ${alice2_log}"
+  log "alice msgs -> ${alice_pipe}"
+  log "bob logs -> ${bob_log}"
+  log "bob msgs -> ${bob_pipe}"
+  log "charly logs -> ${charly_log}"
+  log "dave logs -> ${dave_log}"
+  log "ed logs -> ${ed_log}"
+  log "common flow log -> ${flow_log}"
+
+  log "Test run setup finished"
 }
 
 function teardown {
   log "Tearing down test run"
 
   free_ports
-  
+
   log "Test run teardown finished"
 }

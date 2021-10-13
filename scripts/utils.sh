@@ -2,7 +2,10 @@
 
 # prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
+test "$?" -eq "0" || {
+  echo "This script should only be sourced." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -37,21 +40,21 @@ function expect_file_content {
 
 # $1 = file to monitor
 # $2 = regexp to look for
-function wait_for_regex_in_file() {    
-    local file=${1}
-    local regex=${2}    
- 
-    log "Waiting for ${regex} in ${file}..."    
-    
-    local delay=0.1
-    
-    while true; do
-      sleep ${delay}
-      local res=$(grep -E "${regex}" "${file}" || echo "")
-      if [[ "${res}" != "" ]]; then
-        return 0
-      fi      
-    done
+function wait_for_regex_in_file() {
+  local file=${1}
+  local regex=${2}
+
+  log "Waiting for ${regex} in ${file}..."
+
+  local delay=0.1
+
+  while true; do
+    sleep ${delay}
+    local res=$(grep -E "${regex}" "${file}" || echo "")
+    if [[ "${res}" != "" ]]; then
+      return 0
+    fi
+  done
 }
 
 setup_colors() {
