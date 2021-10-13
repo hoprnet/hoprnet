@@ -1,13 +1,12 @@
 steps:
   - name: 'gcr.io/kaniko-project/executor:latest'
     args:
-    - --destination=gcr.io/hoprassociation/hoprd
-    - --cache=true
-    - --cache-ttl=1h
+      - --destination=gcr.io/hoprassociation/hoprd
+      - --cache=true
+      - --cache-ttl=1h
 options:
   logStreamingOption: STREAM_ON
   machineType: N1_HIGHCPU_8
 images:
   - 'gcr.io/hoprassociation/hoprd'
 timeout: 630s
- 
