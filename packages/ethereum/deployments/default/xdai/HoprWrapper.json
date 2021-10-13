@@ -1,7 +1,7 @@
 {
-  "address": "0x097707143e01318734535676cfe2e5cF8b656ae8",
-  "transactionHash": "0x4063a5afba53e7ee827120eac732b70aea61a67b584611d29a82dd2f623cc7db",
-  "blockNumber": 14744265,
+  "address": "0x38855943b48a6170b8Dc3b0F2fF8354614162063",
+  "transactionHash": "0x5565a16a5d649e21cf86ff4220b00b23a94723c5467e3c06c66e1f6d15d9d69f",
+  "blockNumber": 18439313,
   "metadata": {
     "solcVersion": "0.6.6",
     "input": {
@@ -114,260 +114,260 @@
   },
   "abi": [
     {
-      "type": "constructor",
-      "stateMutability": "nonpayable",
       "inputs": [
         {
-          "type": "address",
+          "internalType": "contract IERC20",
           "name": "_xHOPR",
-          "internalType": "contract IERC20"
+          "type": "address"
         },
         {
-          "type": "address",
+          "internalType": "contract HoprToken",
           "name": "_wxHOPR",
-          "internalType": "contract HoprToken"
+          "type": "address"
         }
-      ]
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
     },
     {
-      "type": "event",
-      "name": "OwnershipTransferred",
+      "anonymous": false,
       "inputs": [
         {
-          "type": "address",
+          "indexed": true,
+          "internalType": "address",
           "name": "previousOwner",
-          "internalType": "address",
-          "indexed": true
+          "type": "address"
         },
         {
-          "type": "address",
+          "indexed": true,
+          "internalType": "address",
           "name": "newOwner",
-          "internalType": "address",
-          "indexed": true
+          "type": "address"
         }
       ],
-      "anonymous": false
+      "name": "OwnershipTransferred",
+      "type": "event"
     },
     {
-      "type": "event",
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
       "name": "Unwrapped",
-      "inputs": [
-        {
-          "type": "address",
-          "name": "account",
-          "internalType": "address",
-          "indexed": true
-        },
-        {
-          "type": "uint256",
-          "name": "amount",
-          "internalType": "uint256",
-          "indexed": false
-        }
-      ],
-      "anonymous": false
+      "type": "event"
     },
     {
-      "type": "event",
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
       "name": "Wrapped",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "TOKENS_RECIPIENT_INTERFACE_HASH",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
-          "type": "address",
-          "name": "account",
-          "internalType": "address",
-          "indexed": true
+          "internalType": "bytes32",
+          "name": "interfaceHash",
+          "type": "bytes32"
         },
         {
-          "type": "uint256",
-          "name": "amount",
-          "internalType": "uint256",
-          "indexed": false
-        }
-      ],
-      "anonymous": false
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
-      "outputs": [
-        {
-          "type": "bytes32",
-          "name": "",
-          "internalType": "bytes32"
-        }
-      ],
-      "name": "TOKENS_RECIPIENT_INTERFACE_HASH",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
-      "outputs": [
-        {
-          "type": "bytes32",
-          "name": "",
-          "internalType": "bytes32"
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
         }
       ],
       "name": "canImplementInterfaceForAddress",
-      "inputs": [
-        {
-          "type": "bytes32",
-          "name": "interfaceHash",
-          "internalType": "bytes32"
-        },
-        {
-          "type": "address",
-          "name": "account",
-          "internalType": "address"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "nonpayable",
       "outputs": [
         {
-          "type": "bool",
-          "name": "success",
-          "internalType": "bool"
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
         }
       ],
       "name": "onTokenTransfer",
-      "inputs": [
-        {
-          "type": "address",
-          "name": "from",
-          "internalType": "address"
-        },
-        {
-          "type": "uint256",
-          "name": "amount",
-          "internalType": "uint256"
-        },
-        {
-          "type": "bytes",
-          "name": "data",
-          "internalType": "bytes"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
       "outputs": [
         {
-          "type": "address",
-          "name": "",
-          "internalType": "address"
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
         }
       ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "owner",
-      "inputs": []
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     },
     {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
+      "inputs": [],
       "name": "recoverTokens",
-      "inputs": []
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
     },
     {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
+      "inputs": [],
       "name": "renounceOwnership",
-      "inputs": []
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
     },
     {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "tokensReceived",
       "inputs": [
         {
-          "type": "address",
+          "internalType": "address",
           "name": "operator",
-          "internalType": "address"
+          "type": "address"
         },
         {
-          "type": "address",
+          "internalType": "address",
           "name": "from",
-          "internalType": "address"
+          "type": "address"
         },
         {
-          "type": "address",
+          "internalType": "address",
           "name": "to",
-          "internalType": "address"
+          "type": "address"
         },
         {
-          "type": "uint256",
+          "internalType": "uint256",
           "name": "amount",
-          "internalType": "uint256"
+          "type": "uint256"
         },
         {
-          "type": "bytes",
+          "internalType": "bytes",
           "name": "userData",
-          "internalType": "bytes"
+          "type": "bytes"
         },
         {
-          "type": "bytes",
+          "internalType": "bytes",
           "name": "operatorData",
-          "internalType": "bytes"
+          "type": "bytes"
         }
-      ]
+      ],
+      "name": "tokensReceived",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
     },
     {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "transferOwnership",
       "inputs": [
         {
-          "type": "address",
+          "internalType": "address",
           "name": "newOwner",
-          "internalType": "address"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
-      "outputs": [
-        {
-          "type": "address",
-          "name": "",
-          "internalType": "contract HoprToken"
+          "type": "address"
         }
       ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "wxHOPR",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
       "outputs": [
         {
-          "type": "address",
+          "internalType": "contract HoprToken",
           "name": "",
-          "internalType": "contract IERC20"
+          "type": "address"
         }
       ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "xHOPR",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
       "outputs": [
         {
-          "type": "uint256",
+          "internalType": "contract IERC20",
           "name": "",
-          "internalType": "uint256"
+          "type": "address"
         }
       ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "xHoprAmount",
-      "inputs": []
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     }
   ]
 }

@@ -216,12 +216,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@cspotcode/source-map-support@npm:0.6.1":
-  version: 0.6.1
-  resolution: "@cspotcode/source-map-support@npm:0.6.1"
+"@cspotcode/source-map-support@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@cspotcode/source-map-support@npm:0.7.0"
   dependencies:
     "@cspotcode/source-map-consumer": 0.8.0
-  checksum: da9fb4f6404ebd210537bfa8b2821a747407bf422d2d3d46f29bf85c7c3a68a126de1a9ec41398d57ca116c3bef56d58c2fb4def0800630b1ec82533ad2447c2
+  checksum: 9faddda7757cd778b5fd6812137b2cc265810043680d6399acc20441668fafcdc874053be9dccd0d9110087287bfad27eb3bf342f72bceca9aa9059f5d0c4be8
   languageName: node
   linkType: hard
 
@@ -994,10 +994,10 @@ __metadata:
     secp256k1: ^4.0.2
     sinon: ^11.0.0
     ts-generator: ^0.1.1
-    ts-node: ^10.1.0
+    ts-node: 10.3.0
     typedoc: 0.21.9
     typedoc-plugin-markdown: 3.10.4
-    typescript: 4.4.3
+    typescript: 4.4.4
   languageName: unknown
   linkType: soft
 
@@ -1032,10 +1032,10 @@ __metadata:
     rimraf: ^3.0.2
     secp256k1: ~4.0.2
     sinon: ^11.1.1
-    ts-node: ^10.1.0
+    ts-node: 10.3.0
     typedoc: 0.21.9
     typedoc-plugin-markdown: 3.10.4
-    typescript: 4.4.3
+    typescript: 4.4.4
   languageName: unknown
   linkType: soft
 
@@ -1055,7 +1055,7 @@ __metadata:
     rimraf: ^3.0.2
     typedoc: 0.21.9
     typedoc-plugin-markdown: 3.10.4
-    typescript: 4.4.3
+    typescript: 4.4.4
     yargs: 17.2.1
   bin:
     hopr-cover-traffic-daemon: lib/index.js
@@ -1089,11 +1089,11 @@ __metadata:
     rimraf: ^3.0.2
     solidity-coverage: ^0.7.17
     ts-generator: ^0.1.1
-    ts-node: ^10.1.0
+    ts-node: 10.3.0
     typechain: ^5.1.2
     typedoc: 0.21.9
     typedoc-plugin-markdown: 3.10.4
-    typescript: 4.4.3
+    typescript: 4.4.4
   languageName: unknown
   linkType: soft
 
@@ -1154,15 +1154,14 @@ __metadata:
     peer-id: 0.15.3
     pino: ^6.13.3
     pino-logflare: ^0.3.12
-    private-ip: ^2.2.1
     rewiremock: ^3.14.3
     rimraf: ^3.0.2
     secp256k1: ^4.0.2
     sinon: ^11.0.0
-    ts-node: ^10.1.0
+    ts-node: 10.3.0
     typedoc: 0.21.9
     typedoc-plugin-markdown: 3.10.4
-    typescript: 4.4.3
+    typescript: 4.4.4
   languageName: unknown
   linkType: soft
 
@@ -1201,10 +1200,10 @@ __metadata:
     sinon: ^11.1.1
     strip-ansi: 6.0.1
     tiny-hashes: ^1.0.1
-    ts-node: ^10.1.0
+    ts-node: 10.3.0
     typedoc: 0.21.9
     typedoc-plugin-markdown: 3.10.4
-    typescript: 4.4.3
+    typescript: 4.4.4
     ws: 8.2.3
     yargs: 17.2.1
   bin:
@@ -8520,7 +8519,7 @@ fsevents@~2.1.1:
   dependencies:
     "@ethersproject/cli": ^5.2.0
     rimraf: ^3.0.2
-    ts-node: ^10.1.0
+    ts-node: 10.3.0
     yargs: 17.2.1
   languageName: unknown
   linkType: soft
@@ -16143,11 +16142,11 @@ resolve@1.17.0:
   languageName: node
   linkType: hard
 
-"ts-node@npm:^10.1.0":
-  version: 10.2.1
-  resolution: "ts-node@npm:10.2.1"
+"ts-node@npm:10.3.0":
+  version: 10.3.0
+  resolution: "ts-node@npm:10.3.0"
   dependencies:
-    "@cspotcode/source-map-support": 0.6.1
+    "@cspotcode/source-map-support": 0.7.0
     "@tsconfig/node10": ^1.0.7
     "@tsconfig/node12": ^1.0.7
     "@tsconfig/node14": ^1.0.0
@@ -16175,7 +16174,7 @@ resolve@1.17.0:
     ts-node-script: dist/bin-script.js
     ts-node-transpile-only: dist/bin-transpile.js
     ts-script: dist/bin-script-deprecated.js
-  checksum: f37d2827a583c51d012cdd3d9b96629fba7a5b5dfad2c26ca48c7c89f904118924689ca56f4b9b2136217194870a76f26aae06e3490ee613b0e960f02dc96bbe
+  checksum: aea1b9eac4d4c735c453a0e7efef6fd76c7b59db3be158eabe21abad9d35209d243b210a9a5ef39742ffbda542250c2e771fa387e3b4829e8cb699e82f3820c4
   languageName: node
   linkType: hard
 
@@ -16413,23 +16412,23 @@ resolve@1.17.0:
   languageName: node
   linkType: hard
 
-typescript@4.4.3:
-  version: 4.4.3
-  resolution: "typescript@npm:4.4.3"
+typescript@4.4.4:
+  version: 4.4.4
+  resolution: "typescript@npm:4.4.4"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 05823f21796d450531a7e4ab299715d38fd9ded0e4ce7400876053f4b5166ca3dde7a68cecfe72d9086039f03c0b6edba36516fb10ed83c5837d9600532ea4c2
+  checksum: 89ecb8436bb48ef5594d49289f5f89103071716b6e4844278f4fb3362856e31203e187a9c76d205c3f0b674d221a058fd28310dbcbcf5d95e9a57229bb5203f1
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@4.4.3#~builtin<compat/typescript>":
-  version: 4.4.3
-  resolution: "typescript@patch:typescript@npm%3A4.4.3#~builtin<compat/typescript>::version=4.4.3&hash=d8b4e7"
+"typescript@patch:typescript@4.4.4#~builtin<compat/typescript>":
+  version: 4.4.4
+  resolution: "typescript@patch:typescript@npm%3A4.4.4#~builtin<compat/typescript>::version=4.4.4&hash=d8b4e7"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 215a59742afb7e0c3668e2c50ca19813deb24b3cc0d16ac3591990e033728050aaa99e159a72b54cb43653f16c778a5cf9dfeed1f51c3b105710ae082c064af7
+  checksum: 4a639b6886be13616582ab82abdb4ffbbf5b0458069d13c10cd5d44fc1cafa33eab005e8ac8691ad8fae249fee85844bb7d523263c4568fe9a2ca31cd3c91c3d
   languageName: node
   linkType: hard
 

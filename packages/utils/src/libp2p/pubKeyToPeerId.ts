@@ -1,7 +1,7 @@
 import PeerId from 'peer-id'
 import { keys as libp2p_crypto } from 'libp2p-crypto'
 import { stringToU8a } from '../u8a'
-import mh from 'multihashes'
+import { encode } from 'multihashes'
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 
@@ -15,7 +15,7 @@ const COMPRESSED_PUBLIC_KEY_LENGTH = 33
  * @param pubKey the plain public key
  */
 export function pubKeyToPeerId(pubKey: Uint8Array | string): PeerId {
-  if (typeof pubKey == 'string') {
+  if (typeof pubKey === 'string') {
     pubKey = stringToU8a(pubKey, COMPRESSED_PUBLIC_KEY_LENGTH)
   }
 
@@ -27,7 +27,7 @@ export function pubKeyToPeerId(pubKey: Uint8Array | string): PeerId {
 
   const secp256k1PubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(Buffer.from(pubKey))
 
-  const id = mh.encode(secp256k1PubKey.bytes, 'identity')
+  const id = encode(secp256k1PubKey.bytes, 'identity')
 
   return new PeerId(id, undefined, secp256k1PubKey)
 }

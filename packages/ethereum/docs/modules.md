@@ -141,9 +141,14 @@ ___
 
 Ƭ **DeploymentTypes**: ``"testing"`` \| ``"development"`` \| ``"staging"`` \| ``"production"``
 
+testing = for ganache / hardhat powered chains which do not auto mine
+development = chains which automine - may or may not be public chains
+staging = chain should be treated as production chain
+production = our current production chain
+
 #### Defined in
 
-[packages/ethereum/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L5)
+[packages/ethereum/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L12)
 
 ___
 
@@ -208,7 +213,7 @@ ___
 
 #### Defined in
 
-[packages/ethereum/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L6)
+[packages/ethereum/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L13)
 
 ___
 
@@ -269,7 +274,7 @@ packages/ethereum/types/commons.ts:15
 
 #### Defined in
 
-[packages/ethereum/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L8)
+[packages/ethereum/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L15)
 
 ## Functions
 

@@ -5,19 +5,10 @@ import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
 import Indexer from '.'
-import {
-  stringToU8a,
-  Address,
-  ChannelEntry,
-  Defer,
-  Hash,
-  HoprDB,
-  generateChannelId,
-  ChannelStatus
-} from '@hoprnet/hopr-utils'
+import { Address, ChannelEntry, Hash, HoprDB, generateChannelId, ChannelStatus, defer } from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
-import { CHANNEL_ID, PARTY_A, PARTY_B } from '../fixtures'
+import { PARTY_A, PARTY_B } from '../fixtures'
 import { BigNumber } from 'ethers'
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
@@ -155,37 +146,6 @@ const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event
   }
 }
 
-const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
-  const latestBlockNumber = ops.latestBlockNumber ?? 0
-  const pastEvents = ops.pastEvents ?? []
-
-  const db = HoprDB.createMock()
-  const { provider, newBlock } = createProviderMock({ latestBlockNumber })
-  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
-
-  const chainAlice = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_A)
-  const chainBob = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_B)
-
-  const indexerAlice = new Indexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5)
-  const indexerBob = new Indexer(Address.fromString(fixtures.ACCOUNT_B.address), db, 1, 5)
-
-  return {
-    db,
-    provider,
-    newBlock,
-    hoprChannels,
-    newEvent,
-    alice: {
-      indexer: indexerAlice,
-      chain: chainAlice
-    },
-    bob: {
-      indexer: indexerBob,
-      chain: chainBob
-    }
-  }
-}
-
 describe('test indexer', function () {
   it('should start indexer', async function () {
     const { indexer, chain } = await useFixtures()
@@ -239,7 +199,7 @@ describe('test indexer', function () {
     newEvent(fixtures.OPENED_EVENT)
     newBlock()
 
-    const blockMined = new Defer()
+    const blockMined = defer<void>()
 
     indexer.on('block-processed', (blockNumber: number) => {
       if (blockNumber === 4) blockMined.resolve()
@@ -301,7 +261,7 @@ describe('test indexer', function () {
 
     assert.strictEqual(indexer.status, 'stopped')
 
-    const started = new Defer()
+    const started = defer<void>()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
@@ -319,7 +279,7 @@ describe('test indexer', function () {
 
     hoprChannels.emit('error', new Error('MOCK'))
 
-    const started = new Defer()
+    const started = defer<void>()
     indexer.on('status', (status: string) => {
       if (status === 'started') started.resolve()
     })
@@ -334,9 +294,9 @@ describe('test indexer', function () {
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
 
-    const opened = new Defer()
-    const pendingIniated = new Defer()
-    const closed = new Defer()
+    const opened = defer<void>()
+    const pendingIniated = defer<void>()
+    const closed = defer<void>()
 
     indexer.on('own-channel-updated', (channel: ChannelEntry) => {
       switch (channel.status) {
@@ -439,25 +399,6 @@ describe('test indexer', function () {
     await closed.promise
   })
 
-  it('should start two indexers and should set commitments only once', async function () {
-    const { alice, bob, newBlock, newEvent } = useMultiPartyFixtures({
-      latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
-    })
-
-    await Promise.all([alice.indexer.start(alice.chain, 0), bob.indexer.start(bob.chain, 0)])
-    newEvent(fixtures.OPENED_EVENT)
-
-    newBlock()
-    newBlock()
-    newBlock()
-
-    await Promise.all([
-      alice.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID))),
-      bob.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID)))
-    ])
-  })
-
   it('should process events in the right order', async function () {
     const { indexer, newEvent, newBlock, COMMITTED_CHANNEL, chain } = await useFixtures({
       latestBlockNumber: 3
@@ -471,7 +412,7 @@ describe('test indexer', function () {
 
     newBlock()
 
-    const blockMined = new Defer()
+    const blockMined = defer<void>()
 
     indexer.on('block-processed', (blockNumber: number) => {
       if (blockNumber === 4) blockMined.resolve()
