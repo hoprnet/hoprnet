@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # prevent souring of this script, only allow execution
-$(return >/dev/null 2>&1)
+$(return > /dev/null 2>&1)
 test "$?" -eq "0" && {
   echo "This script should only be executed." >&2
   exit 1
@@ -9,7 +9,7 @@ test "$?" -eq "0" && {
 
 # set log id and use shared log function for readable logs
 declare mydir
-mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)
 declare HOPR_LOG_ID="hopr-connect-test"
 source "${mydir}/utils.sh"
 

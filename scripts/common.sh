@@ -7,20 +7,20 @@ declare tmp="/tmp"
   exit 1
 }
 
-function free_port {
+function free_port() {
   local port="${1}"
-  if lsof -i ":${port}" -s TCP:LISTEN >/dev/null; then
+  if lsof -i ":${port}" -s TCP:LISTEN > /dev/null; then
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   fi
 }
 
-function free_ports {
+function free_ports() {
   for port in ${alice_port} ${alice2_port} ${bob_port} ${charly_port} ${dave_port} ${ed_port}; do
     free_port ${port}
   done
 }
 
-function cleanup {
+function cleanup() {
   local EXIT_CODE=$?
 
   trap - SIGINT SIGTERM ERR EXIT
@@ -31,7 +31,7 @@ function cleanup {
 }
 trap cleanup SIGINT SIGTERM ERR EXIT
 
-function start_node {
+function start_node() {
   declare filename=${1}
   declare log_file=${2}
   declare script=${3}
@@ -41,7 +41,7 @@ function start_node {
     ${filename} \
     \
     ${rest_args} \
-    --script "${script}" >"${log_file}" \
+    --script "${script}" > "${log_file}" \
     2>& \
     \
     1 &
@@ -62,7 +62,7 @@ function start_node {
 declare exit_code=0
 
 # check prerequisites
-which yarn >/dev/null || exit_code=$?
+which yarn > /dev/null || exit_code=$?
 
 if [[ "${exit_code}" != 0 ]]; then
   log "⛔️ yarn is not installed"
@@ -76,13 +76,13 @@ if [[ "${yarn_version_parsed[0]}" != "3" ]]; then
   exit 1
 fi
 
-function remove_logs {
+function remove_logs() {
   for file in "${alice_log}" ${alice2_log} "${bob_log}" "${charly_log}" "${dave_log}" "${ed_log}" "${alice_pipe}" ${alice2_pipe} "${bob_pipe}"; do
     rm -Rf ${file}
   done
 }
 
-function ensure_ports {
+function ensure_ports() {
   for port in ${alice_port} ${alice2_port} ${bob_port} ${charly_port} ${dave_port}; do
     ensure_port_is_free ${port}
   done
@@ -105,7 +105,7 @@ declare dave_port
 declare ed_log
 declare ed_port
 
-function setup {
+function setup() {
   local test_name="${1}"
   flow_log="${tmp}/hopr-connect-${test_name}-flow.log"
 
@@ -149,7 +149,7 @@ function setup {
   log "Test run setup finished"
 }
 
-function teardown {
+function teardown() {
   log "Tearing down test run"
 
   free_ports

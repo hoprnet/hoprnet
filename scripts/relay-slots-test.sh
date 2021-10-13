@@ -1,5 +1,5 @@
 # prevent souring of this script, only allow execution
-$(return >/dev/null 2>&1)
+$(return > /dev/null 2>&1)
 test "$?" -eq "0" && {
   echo "This script should only be executed." >&2
   exit 1
@@ -7,7 +7,7 @@ test "$?" -eq "0" && {
 
 # set log id and use shared log function for readable logs
 declare mydir
-mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)
 declare HOPR_LOG_ID="hopr-connect-test"
 source "${mydir}/utils.sh"
 
@@ -159,10 +159,10 @@ wait_for_regex_in_file "${dave_log}" "dialProtocol to bob failed"
 
 # create global flow log
 rm -Rf "${flow_log}"
-cat "${alice_log}" | sed -En 's/hopr-connect.*FLOW: /alice: /p' >>"${flow_log}"
-cat "${bob_log}" | sed -En 's/hopr-connect.*FLOW: /bob: /p' >>"${flow_log}"
-cat "${charly_log}" | sed -En 's/hopr-connect.*FLOW: /charly: /p' >>"${flow_log}"
-cat "${dave_log}" | sed -En 's/hopr-connect.*FLOW: /dave: /p' >>"${flow_log}"
+cat "${alice_log}" | sed -En 's/hopr-connect.*FLOW: /alice: /p' >> "${flow_log}"
+cat "${bob_log}" | sed -En 's/hopr-connect.*FLOW: /bob: /p' >> "${flow_log}"
+cat "${charly_log}" | sed -En 's/hopr-connect.*FLOW: /charly: /p' >> "${flow_log}"
+cat "${dave_log}" | sed -En 's/hopr-connect.*FLOW: /dave: /p' >> "${flow_log}"
 sort -k1,1 --stable --output "${flow_log}" "${flow_log}"
 
 expect_file_content "${alice_pipe}" \
