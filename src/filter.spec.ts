@@ -46,12 +46,6 @@ describe('test addr filtering', function () {
         false,
       'Should not accept loopbacks'
     )
-
-    // assert(
-    //   filter.filter(new Multiaddr(`/p2p/${secondPeer.toB58String()}/p2p-circuit/p2p/${firstPeer.toB58String()}`)) ==
-    //     true,
-    //   'Should accept proper circuits'
-    // )
   })
 
   it('refuse listening to bad addresses', function () {
