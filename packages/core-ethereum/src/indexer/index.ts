@@ -3,7 +3,7 @@ import { debug } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
-import { EventEmitter, getEventListeners } from 'events'
+import { EventEmitter } from 'events'
 import { Multiaddr } from 'multiaddr'
 import {
   randomChoice,
@@ -238,7 +238,6 @@ class Indexer extends EventEmitter {
         this.chain.updateConfirmedTransaction(nativeTx)
       })
     }
-    log('unconfirmedEvents %o', this.unconfirmedEvents)
     log(
       'At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
       blockNumber,
@@ -468,13 +467,11 @@ class Indexer extends EventEmitter {
         if (indexed) {
           this.removeListener(eventType, listener)
           log('listener %s on %s is removed', eventType, tx)
-          log('all listener', getEventListeners(this, eventType))
           resolve(tx)
         }
       }
       this.addListener(eventType, listener)
       log('listener %s on %s is added', eventType, tx)
-      log('all listener', getEventListeners(this, eventType))
     })
   }
 }
