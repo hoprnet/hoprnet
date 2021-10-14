@@ -99,7 +99,7 @@ class TranscationManager {
    * Moves transcation from pending or mined to confirmed
    * @param hash transaction hash
    */
-   public moveToConfirmed(hash: string): void {
+  public moveToConfirmed(hash: string): void {
     if (this.pending.has(hash)) {
       this.moveFromPendingToMined(hash)
     }

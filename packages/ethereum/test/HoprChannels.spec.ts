@@ -200,17 +200,17 @@ const useFixtures = deployments.createFixture(
     await token.connect(deployer).grantRole(minterRole, deployer.address)
 
     const fundEther = async (addr, amount) => await deployer.sendTransaction({ to: addr, value: amount })
-    
+
     const fund = async (addr, amount) =>
-    await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
-    
+      await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
+
     const approve = async (account, amount) => await token.connect(account).approve(channels.address, amount)
-    
+
     const fundAndApprove = async (account, amount) => {
       await fund(account.address, amount)
       await approve(account, amount)
     }
-    
+
     const TICKET_AB_WIN = await createTicket(
       {
         recipient: ACCOUNT_B.address,
@@ -227,7 +227,7 @@ const useFixtures = deployments.createFixture(
 
     await fundEther(accountA.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
     await fundEther(accountB.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
-    
+
     // announce
     if (!ops?.skipAnnounceForAccountA) {
       await channels.connect(accountA).announce(ethers.utils.arrayify(accountAPubKey.toUncompressedPubKeyHex()), [])
