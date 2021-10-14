@@ -4,10 +4,10 @@ steps:
     args: ['install']
   - name: node:16
     entrypoint: yarn
-    args: ['test']
+    args: ['build']
   - name: node:16
     entrypoint: yarn
-    args: ['build']
+    args: ['test']
   - name: 'gcr.io/kaniko-project/executor:latest'
     args:
       - '--destination=gcr.io/$PROJECT_ID/hoprd:$_HOPR_IMAGE_VERSION'
