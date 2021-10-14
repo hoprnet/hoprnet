@@ -11,7 +11,9 @@ WORKDIR /app
 
 COPY . .
 # installing dependencies
-RUN yarn install --immutable
+RUN yarn install
+# run tests
+RUN yarn test
 # build hoprd locally
 RUN yarn build
 
