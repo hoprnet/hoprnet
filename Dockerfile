@@ -12,10 +12,10 @@ WORKDIR /app
 COPY . .
 # installing dependencies
 RUN yarn install
-# run tests
-RUN yarn test
 # build hoprd locally
 RUN yarn build
+# run tests
+RUN yarn test
 
 # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-buster-slim@sha256:a49f003fbc2439e20601ed466a2cbc80699f238b56bb78ccb934bb3d92a23d53 as runtime
