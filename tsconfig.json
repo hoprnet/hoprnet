@@ -1,8 +1,4 @@
 {
-  "ts-node": {
-    // Type-checking already done by 'yarn build'
-    "transpileOnly": true
-  },
   "compilerOptions": {
     "esModuleInterop": true,
     "lib": ["ES2021", "dom"],
