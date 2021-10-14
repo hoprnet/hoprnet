@@ -1,4 +1,22 @@
-# assuming build was already created in workdir via cloud build
+FROM node:16-buster-slim@sha256:a49f003fbc2439e20601ed466a2cbc80699f238b56bb78ccb934bb3d92a23d53 as build
+
+# making sure some standard environment variables are set for production use
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_OPTIONS=--max_old_space_size=4096
+ENV npm_config_build_from_source false
+
+# copying everything and preparing for installing
+WORKDIR /app
+
+COPY . .
+# installing dependencies
+RUN yarn install
+# build hoprd locally
+RUN yarn build
+# run tests
+RUN yarn test
+
 # use slim version of node on Debian buster for smaller image sizes
 FROM node:16-buster-slim@sha256:a49f003fbc2439e20601ed466a2cbc80699f238b56bb78ccb934bb3d92a23d53
 
