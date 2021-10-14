@@ -24,7 +24,7 @@
     "clean": "rm -Rf ./lib",
     "build": "yarn clean && tsc -p . && tsc -p ./tests",
     "test": "yarn node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --parallel --full-trace",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "yarn clean && tsc -p ./tsconfig.npm.json"
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "1.81.7",
