@@ -47,9 +47,19 @@ jobs:
 
       - name: Building Docker image using Google Cloud Build
         run: |
-          gcloud builds submit
+          gcloud builds submit --config cloudbuild.yaml \
+            --substitutions=_HOPR_PACKAGE_VERSION=${HOPR_PACKAGE_VERSION},_HOPR_IMAGE_VERSION=${HOPR_IMAGE_VERSION}
         env:
           HOPR_PACKAGE: hoprd
+          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
+          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Verify the correct hoprd package version has been bundled
+        run: |
+          declare v=$(docker run --pull always ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
+          [ "${v}" = "${HOPR_PACKAGE_VERSION}" ]
+        env:
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
           HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
           HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
