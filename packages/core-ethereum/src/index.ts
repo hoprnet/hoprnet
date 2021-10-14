@@ -172,10 +172,10 @@ export default class HoprEthereum extends EventEmitter {
 
   public async commitToChannel(c: ChannelEntry): Promise<void> {
     log('committing to channel', c)
-    const setCommitment = async (commitment: Hash) =>
-      this.chain
-        .setCommitment(c.source.toAddress(), commitment)
-        .then((tx) => this.indexer.resolvePendingTransaction('channel-updated', tx))
+    const setCommitment = async (commitment: Hash) => {
+      const tx = await this.chain.setCommitment(c.source.toAddress(), commitment)
+      return this.indexer.resolvePendingTransaction('channel-updated', tx)
+    }
     const getCommitment = async () => (await this.indexer.getChannel(c.getId())).commitment
     initializeCommitment(this.db, c.getId(), getCommitment, setCommitment)
   }
