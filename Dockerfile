@@ -1,22 +1,6 @@
-FROM node:16-buster-slim@sha256:a49f003fbc2439e20601ed466a2cbc80699f238b56bb78ccb934bb3d92a23d53 as build
-
-# making sure some standard environment variables are set for production use
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NODE_OPTIONS=--max_old_space_size=4096
-ENV npm_config_build_from_source false
-
-# copying everything and preparing for installing
-WORKDIR /app
-
-COPY . .
-# installing dependencies
-RUN yarn install --immutable
-# build hoprd locally
-RUN yarn build
-
+# assuming build was already created in workdir via cloud build
 # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-buster-slim@sha256:a49f003fbc2439e20601ed466a2cbc80699f238b56bb78ccb934bb3d92a23d53 as runtime
+FROM node:16-buster-slim@sha256:a49f003fbc2439e20601ed466a2cbc80699f238b56bb78ccb934bb3d92a23d53
 
 # making sure some standard environment variables are set for production use
 ENV NODE_ENV production
@@ -35,7 +19,7 @@ RUN apt-get update \
 WORKDIR /app
 
 # copy over the contents of node_modules etc
-COPY --from=build /app .
+COPY . .
 
 # create directory which is later used for the database, so that it inherits
 # permissions when mapped to a volume
