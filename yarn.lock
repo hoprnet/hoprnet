@@ -1082,7 +1082,7 @@ __metadata:
     dotenv: 10.0.0
     ethereum-waffle: 3.4.0
     ethers: 5.4.7
-    hardhat: 2.6.5
+    hardhat: 2.6.6
     hardhat-deploy: 0.9.3
     hardhat-gas-reporter: 1.0.4
     multiaddr: 10.0.1
@@ -8250,9 +8250,9 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"hardhat@npm:2.6.5":
-  version: 2.6.5
-  resolution: "hardhat@npm:2.6.5"
+"hardhat@npm:2.6.6":
+  version: 2.6.6
+  resolution: "hardhat@npm:2.6.6"
   dependencies:
     "@ethereumjs/block": ^3.4.0
     "@ethereumjs/blockchain": ^5.4.0
@@ -8303,7 +8303,7 @@ fsevents@~2.1.1:
     ws: ^7.4.6
   bin:
     hardhat: internal/cli/cli.js
-  checksum: dea61151b0961d8c4719a98c11b3aa9a8aeab73fc46003087841f23228a96ec65f460f10dd1ff36d7dae437eada3f3ec469f144b6debe2a6713e5078087d86ea
+  checksum: 845c0fa6d03ff7d1bf4b9b6906f1d9137b117b4f84f7b63361c5a0ee7bde2b2c4fd5188f1b3d7cd85852514e1b1935413a2e080b9816669eb3677a74fe976c6e
   languageName: node
   linkType: hard
 
