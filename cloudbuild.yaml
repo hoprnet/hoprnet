@@ -8,6 +8,4 @@ steps:
 options:
   logStreamingOption: STREAM_ON
   machineType: N1_HIGHCPU_8
-images:
-  - 'gcr.io/$PROJECT_ID/hoprd'
 timeout: 630s
