@@ -244,15 +244,21 @@ class Channel {
     // sequentially.
     const tickets = await this.db.getAcknowledgedTickets({ signer: this.counterparty })
     const _redeemAll = async () => {
-      for (const ticket of tickets) {
-        log('redeeming ticket', ticket)
-        const result = await this.redeemTicket(ticket)
-        if (result.status !== 'SUCCESS') {
-          log('Error redeeming ticket', result)
-          // We need to abort as tickets require ordered redemption.
-          return
+      try {
+        for (const ticket of tickets) {
+          log('redeeming ticket', ticket)
+          const result = await this.redeemTicket(ticket)
+          if (result.status !== 'SUCCESS') {
+            log('Error redeeming ticket', result)
+            // We need to abort as tickets require ordered redemption.
+            return
+          }
+          log('ticket was redeemed')
         }
-        log('ticket was redeemed')
+      } catch (e) {
+        // We are going to swallow the error here, as more than one consumer may
+        // be inspecting this same promise.
+        log('Error when redeeming tickets, aborting', e)
       }
       this._redeemingAll = undefined
     }
