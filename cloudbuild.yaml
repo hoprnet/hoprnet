@@ -1,9 +1,7 @@
 steps:
   - name: 'gcr.io/kaniko-project/executor:latest'
     args:
-      - 'build'
-      - '.'
-      - '--tag=gcr.io/$PROJECT_ID/hoprd:$_HOPR_IMAGE_VERSION'
+      - '--destination=gcr.io/$PROJECT_ID/hoprd:$_HOPR_IMAGE_VERSION'
       - '--build-arg=HOPRD_VERSION=$_HOPR_PACKAGE_VERSION'
       - --cache=true
       - --cache-ttl=1h
