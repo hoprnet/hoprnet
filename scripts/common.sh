@@ -9,7 +9,7 @@ declare tmp="/tmp"
 
 function free_port() {
   local port="${1}"
-  if lsof -i ":${port}" -s TCP:LISTEN >/dev/null; then
+  if lsof -i ":${port}" -s TCP:LISTEN > /dev/null; then
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   fi
 }
@@ -40,7 +40,7 @@ function start_node() {
   DEBUG=flow:hopr-connect*,hopr-connect*,simple-peer \
     ${filename} \
     ${rest_args} \
-    --script "${script}" >"${log_file}" \
+    --script "${script}" > "${log_file}" \
     2>&1 &
   declare pid=$!
   log "node started with PID ${pid}"
@@ -59,7 +59,7 @@ function start_node() {
 declare exit_code=0
 
 # check prerequisites
-which yarn >/dev/null || exit_code=$?
+which yarn > /dev/null || exit_code=$?
 
 if [[ "${exit_code}" != 0 ]]; then
   log "⛔️ yarn is not installed"
