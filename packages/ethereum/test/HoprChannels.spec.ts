@@ -200,17 +200,17 @@ const useFixtures = deployments.createFixture(
     await token.connect(deployer).grantRole(minterRole, deployer.address)
 
     const fundEther = async (addr, amount) => await deployer.sendTransaction({ to: addr, value: amount })
-
+    
     const fund = async (addr, amount) =>
-      await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
-
+    await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
+    
     const approve = async (account, amount) => await token.connect(account).approve(channels.address, amount)
-
+    
     const fundAndApprove = async (account, amount) => {
       await fund(account.address, amount)
       await approve(account, amount)
     }
-
+    
     const TICKET_AB_WIN = await createTicket(
       {
         recipient: ACCOUNT_B.address,
@@ -227,7 +227,7 @@ const useFixtures = deployments.createFixture(
 
     await fundEther(accountA.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
     await fundEther(accountB.address, ethers.utils.parseEther(ChannelStatus.Open + ''))
-
+    
     // announce
     if (!ops?.skipAnnounceForAccountA) {
       await channels.connect(accountA).announce(ethers.utils.arrayify(accountAPubKey.toUncompressedPubKeyHex()), [])
@@ -495,7 +495,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
     await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2) // TODO secret per account
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    blockTimestamp = (await ethers.provider.getBlock(ethers.provider.getBlockNumber())).timestamp
+    blockTimestamp = (await ethers.provider.getBlock('latest')).timestamp
   })
 
   it('should redeem ticket for account A', async function () {
