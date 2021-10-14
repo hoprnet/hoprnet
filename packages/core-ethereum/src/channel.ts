@@ -256,7 +256,7 @@ class Channel {
       }
       this._redeemingAll = undefined
     }
-    this._redeemingAll = _redeemAll() 
+    this._redeemingAll = _redeemAll()
     return this._redeemingAll
   }
 
