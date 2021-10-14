@@ -209,7 +209,10 @@ class Hopr extends EventEmitter {
         transport: {
           HoprConnect: {
             initialNodes,
-            publicNodes: this.publicNodesEmitter
+            publicNodes: this.publicNodesEmitter,
+            // Tells hopr-connect to treat local and private addresses
+            // as public addresses
+            __useLocalAddresses: this.options.announceLocalAddresses
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
