@@ -146,7 +146,7 @@ function fund_node() {
   fi
 
   log "Funding 1 ETH and 10 HOPR to ${eth_address}"
-  yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+  DEVELOPMENT=false yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
     --address "${eth_address}" --network localhost --ishopraddress true --amount 10
 }
 
@@ -198,7 +198,7 @@ ensure_port_is_free 19096
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
+DEVELOPMENT=false yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 

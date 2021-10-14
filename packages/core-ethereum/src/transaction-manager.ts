@@ -116,7 +116,7 @@ class TranscationManager {
   public moveFromPendingToMined(hash: string): void {
     if (!this.pending.has(hash)) return
 
-    log('Moving transaction to confirmed %s', hash)
+    log('Moving transaction to mined %s', hash)
     this.mined.set(hash, this.pending.get(hash))
     this.pending.delete(hash)
   }
