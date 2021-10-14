@@ -96,7 +96,7 @@ export default class HoprEthereum extends EventEmitter {
     // promise of tx hash gets resolved when the tx is mined.
     const tx = await this.chain.announce(multiaddr)
     // event emitted by the indexer
-    return this.indexer.resolvePendingTransaction('annouce', tx)
+    return this.indexer.resolvePendingTransaction('announce', tx)
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {

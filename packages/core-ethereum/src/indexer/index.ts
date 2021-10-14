@@ -276,7 +276,7 @@ class Indexer extends EventEmitter {
       log('Event name %s and hash %s', eventName, event.transactionHash)
       try {
         if (eventName === ANNOUNCEMENT) {
-          this.indexEvent('annouce', [event.transactionHash])
+          this.indexEvent('announce', [event.transactionHash])
           await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
         } else if (eventName === 'ChannelUpdated') {
           await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
