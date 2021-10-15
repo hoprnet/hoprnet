@@ -5,7 +5,7 @@ __metadata:
   version: 4
   cacheKey: 8
 
-"@chainsafe/libp2p-noise@npm:^4.1.1":
+"@chainsafe/libp2p-noise@npm:4.1.1":
   version: 4.1.1
   resolution: "@chainsafe/libp2p-noise@npm:4.1.1"
   dependencies:
@@ -446,43 +446,43 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
-    "@chainsafe/libp2p-noise": ^4.1.1
+    "@chainsafe/libp2p-noise": 4.1.1
     "@hoprnet/hopr-utils": 1.81.7
-    "@types/bl": ^5.0.1
-    "@types/bn.js": ^5.1.0
-    "@types/chai": ^4.2.22
-    "@types/chai-spies": ^1.0.3
-    "@types/debug": ^4.1.7
-    "@types/mocha": ^9.0.0
-    "@types/node": 16
-    "@types/simple-peer": ^9.11.3
-    "@types/yargs": ^17.0.3
-    abortable-iterator: ^3.0.0
+    "@types/bl": 5.0.1
+    "@types/bn.js": 5.1.0
+    "@types/chai": 4.2.22
+    "@types/chai-spies": 1.0.3
+    "@types/debug": 4.1.7
+    "@types/mocha": 9.0.0
+    "@types/node": 16.4.3
+    "@types/simple-peer": 9.11.3
+    "@types/yargs": 17.0.3
+    abortable-iterator: 3.0.0
     bl: ^5.0
-    chai: ^4.3.4
-    chai-spies: ^1.0.0
+    chai: 4.3.4
+    chai-spies: 1.0.0
     debug: ^4.3.2
     heap-js: ^2.1.6
     it-handshake: ^2.0.0
-    it-pair: ^1.0.0
-    it-pipe: ^1.1.0
-    it-pushable: ^1.4.2
-    libp2p: ^0.33.0
-    libp2p-interfaces: ^1.0.0
+    it-pair: 1.0.0
+    it-pipe: 1.1.0
+    it-pushable: 1.4.2
+    libp2p: 0.33.0
+    libp2p-interfaces: 1.0.1
     libp2p-mplex: 0.10.4
-    mocha: ^9.1.2
+    mocha: 9.1.2
     multiaddr: ^10.0.0
     multihashes: ^4.0.3
     p-defer: 3
     peer-id: ~0.15.3
-    prettier: ~2.4.1
+    prettier: 2.4.1
     simple-peer: 9.11
     stream-to-it: ^0.2.4
-    ts-node: ~10.2.1
-    typescript: ^4.4.3
+    ts-node: 10.2.1
+    typescript: 4.4.3
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
-    yargs: ^17.2.1
+    yargs: 17.2.1
   languageName: unknown
   linkType: soft
 
@@ -785,7 +785,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/bl@npm:^5.0.1":
+"@types/bl@npm:5.0.1":
   version: 5.0.1
   resolution: "@types/bl@npm:5.0.1"
   dependencies:
@@ -795,7 +795,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/bn.js@npm:^5.1.0":
+"@types/bn.js@npm:5.1.0":
   version: 5.1.0
   resolution: "@types/bn.js@npm:5.1.0"
   dependencies:
@@ -804,7 +804,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai-spies@npm:^1.0.3":
+"@types/chai-spies@npm:1.0.3":
   version: 1.0.3
   resolution: "@types/chai-spies@npm:1.0.3"
   dependencies:
@@ -820,14 +820,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai@npm:^4.2.22":
+"@types/chai@npm:4.2.22":
   version: 4.2.22
   resolution: "@types/chai@npm:4.2.22"
   checksum: dca66a263b25c26112c0a8c6df20316412fa54b557443a108836c07cee961aa56cc5b1763273f69eb450c83ca9f28069ff78b617bffc01806cdd83afc1c20c2a
   languageName: node
   linkType: hard
 
-"@types/debug@npm:^4.1.7":
+"@types/debug@npm:4.1.7":
   version: 4.1.7
   resolution: "@types/debug@npm:4.1.7"
   dependencies:
@@ -850,7 +850,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/mocha@npm:^9.0.0":
+"@types/mocha@npm:9.0.0":
   version: 9.0.0
   resolution: "@types/mocha@npm:9.0.0"
   checksum: 73e6edaba045bc250b69085a770d5029edfed006ed8e75344435474a2cb8d38064acd7b34b6cc62756caa845a5cf335bde66db11e8c8c6565c62a790e933704a
@@ -871,7 +871,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:16":
+"@types/node@npm:16.4.3":
   version: 16.4.3
   resolution: "@types/node@npm:16.4.3"
   checksum: 6b5fa8b524a9c770dcb96a24d862f240ce8c0072d7360fd088bfb9c5265b48bd1af58a3dd7f59e266b3214684c251e56bea2b2b0702b9901e57804221b6e07f2
@@ -902,7 +902,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/simple-peer@npm:^9.11.3":
+"@types/simple-peer@npm:9.11.3":
   version: 9.11.3
   resolution: "@types/simple-peer@npm:9.11.3"
   dependencies:
@@ -918,7 +918,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/yargs@npm:^17.0.3":
+"@types/yargs@npm:17.0.3":
   version: 17.0.3
   resolution: "@types/yargs@npm:17.0.3"
   dependencies:
@@ -964,7 +964,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"abortable-iterator@npm:^3.0.0":
+"abortable-iterator@npm:3.0.0, abortable-iterator@npm:^3.0.0":
   version: 3.0.0
   resolution: "abortable-iterator@npm:3.0.0"
   dependencies:
@@ -1410,7 +1410,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chai-spies@npm:^1.0.0":
+"chai-spies@npm:1.0.0":
   version: 1.0.0
   resolution: "chai-spies@npm:1.0.0"
   peerDependencies:
@@ -1419,7 +1419,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chai@npm:^4.3.4":
+"chai@npm:4.3.4":
   version: 4.3.4
   resolution: "chai@npm:4.3.4"
   dependencies:
@@ -2636,7 +2636,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"it-pair@npm:^1.0.0":
+"it-pair@npm:1.0.0, it-pair@npm:^1.0.0":
   version: 1.0.0
   resolution: "it-pair@npm:1.0.0"
   dependencies:
@@ -2656,14 +2656,14 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"it-pipe@npm:^1.0.1, it-pipe@npm:^1.1.0":
+"it-pipe@npm:1.1.0, it-pipe@npm:^1.0.1, it-pipe@npm:^1.1.0":
   version: 1.1.0
   resolution: "it-pipe@npm:1.1.0"
   checksum: d653078f1543851f55070e38426dbbebad1303e9adde5238e4192b8b38ac7e4a1dcc149ccf3e4269759d1cbdd00be98b346fc8db81117c81017f09577f050e8e
   languageName: node
   linkType: hard
 
-"it-pushable@npm:^1.4.0, it-pushable@npm:^1.4.1, it-pushable@npm:^1.4.2":
+"it-pushable@npm:1.4.2, it-pushable@npm:^1.4.0, it-pushable@npm:^1.4.1, it-pushable@npm:^1.4.2":
   version: 1.4.2
   resolution: "it-pushable@npm:1.4.2"
   dependencies:
@@ -2905,7 +2905,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"libp2p-interfaces@npm:^1.0.0":
+"libp2p-interfaces@npm:1.0.1, libp2p-interfaces@npm:^1.0.0":
   version: 1.0.1
   resolution: "libp2p-interfaces@npm:1.0.1"
   dependencies:
@@ -2957,7 +2957,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.33.0, libp2p@npm:^0.33.0":
+"libp2p@npm:0.33.0":
   version: 0.33.0
   resolution: "libp2p@npm:0.33.0"
   dependencies:
@@ -3235,7 +3235,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"mocha@npm:^9.1.2":
+"mocha@npm:9.1.2":
   version: 9.1.2
   resolution: "mocha@npm:9.1.2"
   dependencies:
@@ -3977,7 +3977,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"prettier@npm:~2.4.1":
+"prettier@npm:2.4.1":
   version: 2.4.1
   resolution: "prettier@npm:2.4.1"
   bin:
@@ -4676,7 +4676,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"ts-node@npm:~10.2.1":
+"ts-node@npm:10.2.1":
   version: 10.2.1
   resolution: "ts-node@npm:10.2.1"
   dependencies:
@@ -4735,7 +4735,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-typescript@^4.4.3:
+typescript@4.4.3:
   version: 4.4.3
   resolution: "typescript@npm:4.4.3"
   bin:
@@ -4745,7 +4745,7 @@ typescript@^4.4.3:
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@^4.4.3#~builtin<compat/typescript>":
+"typescript@patch:typescript@4.4.3#~builtin<compat/typescript>":
   version: 4.4.3
   resolution: "typescript@patch:typescript@npm%3A4.4.3#~builtin<compat/typescript>::version=4.4.3&hash=32657b"
   bin:
@@ -5065,7 +5065,7 @@ typescript@^4.4.3:
   languageName: node
   linkType: hard
 
-"yargs@npm:^17.2.1":
+"yargs@npm:17.2.1":
   version: 17.2.1
   resolution: "yargs@npm:17.2.1"
   dependencies:
