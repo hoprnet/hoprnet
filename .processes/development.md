@@ -71,7 +71,7 @@ _Current:_ [Ambassadors](#ambassadors), [Sebastian](https://github.com/SCBuergel
 
 #### Text update
 
-For every working day, all members are required to write an update on what they will be working on throughout the day. Ideally, the list should be accompanied by github issues or PRs.
+For every working day, all tech members are required to write an update on what they will be working on throughout the day. Ideally, the list should be accompanied by github issues or PRs.
 
 _Required:_ `True`
 
@@ -81,7 +81,7 @@ _Where:_ In element channel `tech - daily`
 
 #### Video call
 
-For every working day except Mondays, all members are required to join the video call with camera. The call is an opportunity for everybody to catch up, call out on things that are blocking them and any other unexpected issues.
+For every working day except Mondays, all tech members are required to join the video call with camera. The call is an opportunity for everybody to catch up, call out on things that are blocking them and any other unexpected issues.
 
 _Required:_ `True`
 
@@ -125,7 +125,7 @@ mostly the whole team is involved in:
 
 ### Task Grooming
 
-On the last day of a sprint all members shall spend time cleaning up
+On the last day of a sprint all tech members shall spend time cleaning up
 tasks and PRs on Github. This includes but is not limited to:
 
 - updating progress on tasks
@@ -134,7 +134,7 @@ tasks and PRs on Github. This includes but is not limited to:
 - moving tasks on sprint boards to correct columns
 - [responding to issues created by externals](#external-issues)
 
-_Who:_ all members individually
+_Who:_ all tech members individually
 
 _When:_ last day of the sprint or before a vacation
 
@@ -153,7 +153,7 @@ In `Retrospective` we aim to summarize the results of the last spring, in order 
 - what went worse than expected
 - lessons learned
 
-_Who:_ all members within a meeting
+_Who:_ all tech members within a meeting
 
 _When:_ first day of the sprint
 
@@ -204,7 +204,7 @@ account as much as possible.
 - Ideally each team member has only one task assigned which is `in progress`.
 - members which are coming back from vacation should already have tasks assigned to them.
 
-_Who:_ all members within a meeting
+_Who:_ all tech members within a meeting
 
 _When:_ first day of the sprint
 
