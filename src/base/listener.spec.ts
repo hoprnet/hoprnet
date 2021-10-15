@@ -79,10 +79,7 @@ function bindToUdpSocket(port?: number): Promise<Socket> {
  * @param port port to listen to
  * @param state used to track incoming messages
  */
-async function startStunServer(
-  port: number | undefined,
-  state?: { msgReceived?: Defer<void> }
-): Promise<Socket> {
+async function startStunServer(port: number | undefined, state?: { msgReceived?: Defer<void> }): Promise<Socket> {
   const socket = await bindToUdpSocket(port)
 
   socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
