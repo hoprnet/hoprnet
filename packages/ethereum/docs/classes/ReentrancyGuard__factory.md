@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ReentrancyGuard__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ReentrancyGuard\_\_factory
 
 # Class: ReentrancyGuard\_\_factory
 

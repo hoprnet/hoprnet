@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprWrapper__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprWrapper\_\_factory
 
 # Class: HoprWrapper\_\_factory
 
@@ -45,7 +45,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| object, signer?: Signer] \| [signer: Signer] |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 

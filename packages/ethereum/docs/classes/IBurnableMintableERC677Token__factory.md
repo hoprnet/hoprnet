@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / IBurnableMintableERC677Token__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / IBurnableMintableERC677Token\_\_factory
 
 # Class: IBurnableMintableERC677Token\_\_factory
 

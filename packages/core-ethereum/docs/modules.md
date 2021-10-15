@@ -38,7 +38,7 @@
 
 ### CONFIRMATIONS
 
-• `Const` **CONFIRMATIONS**: ``8``
+• **CONFIRMATIONS**: ``8``
 
 #### Defined in
 
@@ -48,7 +48,7 @@ ___
 
 ### INDEXER\_BLOCK\_RANGE
 
-• `Const` **INDEXER\_BLOCK\_RANGE**: ``2000``
+• **INDEXER\_BLOCK\_RANGE**: ``2000``
 
 #### Defined in
 

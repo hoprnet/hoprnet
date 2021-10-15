@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC1820Implementer__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC1820Implementer\_\_factory
 
 # Class: ERC1820Implementer\_\_factory
 
@@ -45,7 +45,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `...args` | [signer: Signer] \| [contractInterface: ContractInterface, bytecode: BytesLike \| object, signer?: Signer] |
+| `...args` | [signer: Signer] \| [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] |
 
 #### Overrides
 

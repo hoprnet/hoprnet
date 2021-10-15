@@ -180,7 +180,7 @@ ___
 
 ### networks
 
-• `Const` **networks**: { [network in PublicNetworks]: object}
+• **networks**: { [network in PublicNetworks]: Object }
 
 #### Defined in
 

@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC777Snapshot__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC777Snapshot\_\_factory
 
 # Class: ERC777Snapshot\_\_factory
 

@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / Multicall__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / Multicall\_\_factory
 
 # Class: Multicall\_\_factory
 

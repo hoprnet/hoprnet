@@ -371,7 +371,7 @@ ___
 
 ### ADDRESS\_LENGTH
 
-• `Const` **ADDRESS\_LENGTH**: ``20``
+• **ADDRESS\_LENGTH**: ``20``
 
 #### Defined in
 
@@ -381,7 +381,7 @@ ___
 
 ### A\_EQUALS\_B
 
-• `Const` **A\_EQUALS\_B**: ``0``
+• **A\_EQUALS\_B**: ``0``
 
 #### Defined in
 
@@ -391,7 +391,7 @@ ___
 
 ### A\_STRICLY\_LESS\_THAN\_B
 
-• `Const` **A\_STRICLY\_LESS\_THAN\_B**: ``-1``
+• **A\_STRICLY\_LESS\_THAN\_B**: ``-1``
 
 #### Defined in
 
@@ -401,7 +401,7 @@ ___
 
 ### A\_STRICTLY\_GREATER\_THAN\_B
 
-• `Const` **A\_STRICTLY\_GREATER\_THAN\_B**: ``1``
+• **A\_STRICTLY\_GREATER\_THAN\_B**: ``1``
 
 #### Defined in
 
@@ -411,7 +411,7 @@ ___
 
 ### HASH\_LENGTH
 
-• `Const` **HASH\_LENGTH**: ``32``
+• **HASH\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -421,7 +421,7 @@ ___
 
 ### INVERSE\_TICKET\_WIN\_PROB
 
-• `Const` **INVERSE\_TICKET\_WIN\_PROB**: `BN`
+• **INVERSE\_TICKET\_WIN\_PROB**: `BN`
 
 #### Defined in
 
@@ -431,7 +431,7 @@ ___
 
 ### LENGTH\_PREFIX\_LENGTH
 
-• `Const` **LENGTH\_PREFIX\_LENGTH**: ``4``
+• **LENGTH\_PREFIX\_LENGTH**: ``4``
 
 #### Defined in
 
@@ -441,7 +441,7 @@ ___
 
 ### MAX\_AUTO\_CHANNELS
 
-• `Const` **MAX\_AUTO\_CHANNELS**: ``5``
+• **MAX\_AUTO\_CHANNELS**: ``5``
 
 #### Defined in
 
@@ -451,7 +451,7 @@ ___
 
 ### MINIMUM\_REASONABLE\_CHANNEL\_STAKE
 
-• `Const` **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
+• **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
 
 #### Defined in
 
@@ -461,7 +461,7 @@ ___
 
 ### MIN\_NATIVE\_BALANCE
 
-• `Const` **MIN\_NATIVE\_BALANCE**: `BN`
+• **MIN\_NATIVE\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -471,7 +471,7 @@ ___
 
 ### MULTI\_ADDR\_MAX\_LENGTH
 
-• `Const` **MULTI\_ADDR\_MAX\_LENGTH**: ``200``
+• **MULTI\_ADDR\_MAX\_LENGTH**: ``200``
 
 #### Defined in
 
@@ -481,7 +481,7 @@ ___
 
 ### POR\_STRING\_LENGTH
 
-• `Const` **POR\_STRING\_LENGTH**: `number`
+• **POR\_STRING\_LENGTH**: `number`
 
 #### Defined in
 
@@ -491,7 +491,7 @@ ___
 
 ### PRG\_COUNTER\_LENGTH
 
-• `Const` **PRG\_COUNTER\_LENGTH**: ``4``
+• **PRG\_COUNTER\_LENGTH**: ``4``
 
 #### Defined in
 
@@ -501,7 +501,7 @@ ___
 
 ### PRG\_IV\_LENGTH
 
-• `Const` **PRG\_IV\_LENGTH**: ``12``
+• **PRG\_IV\_LENGTH**: ``12``
 
 #### Defined in
 
@@ -511,7 +511,7 @@ ___
 
 ### PRG\_KEY\_LENGTH
 
-• `Const` **PRG\_KEY\_LENGTH**: ``16``
+• **PRG\_KEY\_LENGTH**: ``16``
 
 #### Defined in
 
@@ -521,7 +521,7 @@ ___
 
 ### PRICE\_PER\_PACKET
 
-• `Const` **PRICE\_PER\_PACKET**: `BN`
+• **PRICE\_PER\_PACKET**: `BN`
 
 #### Defined in
 
@@ -531,7 +531,7 @@ ___
 
 ### PRIVATE\_KEY\_LENGTH
 
-• `Const` **PRIVATE\_KEY\_LENGTH**: ``32``
+• **PRIVATE\_KEY\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -541,7 +541,7 @@ ___
 
 ### PRP\_IV\_LENGTH
 
-• `Const` **PRP\_IV\_LENGTH**: `number`
+• **PRP\_IV\_LENGTH**: `number`
 
 #### Defined in
 
@@ -551,7 +551,7 @@ ___
 
 ### PRP\_KEY\_LENGTH
 
-• `Const` **PRP\_KEY\_LENGTH**: `number`
+• **PRP\_KEY\_LENGTH**: `number`
 
 #### Defined in
 
@@ -561,7 +561,7 @@ ___
 
 ### PRP\_MIN\_LENGTH
 
-• `Const` **PRP\_MIN\_LENGTH**: ``32``
+• **PRP\_MIN\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -571,7 +571,7 @@ ___
 
 ### PUBLIC\_KEY\_LENGTH
 
-• `Const` **PUBLIC\_KEY\_LENGTH**: ``33``
+• **PUBLIC\_KEY\_LENGTH**: ``33``
 
 #### Defined in
 
@@ -581,7 +581,7 @@ ___
 
 ### SECP256K1\_CONSTANTS
 
-• `Const` **SECP256K1\_CONSTANTS**: `Object`
+• **SECP256K1\_CONSTANTS**: `Object`
 
 Several ECDSA on secp256k1 related constants
 
@@ -603,7 +603,7 @@ ___
 
 ### SIGNATURE\_LENGTH
 
-• `Const` **SIGNATURE\_LENGTH**: ``64``
+• **SIGNATURE\_LENGTH**: ``64``
 
 #### Defined in
 
@@ -613,7 +613,7 @@ ___
 
 ### SIGNATURE\_RECOVERY\_LENGTH
 
-• `Const` **SIGNATURE\_RECOVERY\_LENGTH**: ``1``
+• **SIGNATURE\_RECOVERY\_LENGTH**: ``1``
 
 #### Defined in
 
@@ -623,7 +623,7 @@ ___
 
 ### SUGGESTED\_BALANCE
 
-• `Const` **SUGGESTED\_BALANCE**: `BN`
+• **SUGGESTED\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -633,7 +633,7 @@ ___
 
 ### SUGGESTED\_NATIVE\_BALANCE
 
-• `Const` **SUGGESTED\_NATIVE\_BALANCE**: `BN`
+• **SUGGESTED\_NATIVE\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -643,7 +643,7 @@ ___
 
 ### UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH
 
-• `Const` **UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH**: ``66``
+• **UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH**: ``66``
 
 #### Defined in
 
@@ -653,7 +653,7 @@ ___
 
 ### b58StringRegex
 
-• `Const` **b58StringRegex**: `RegExp`
+• **b58StringRegex**: `RegExp`
 
 Regular expresion used to match b58Strings
 
@@ -665,7 +665,7 @@ ___
 
 ### durations
 
-• `Const` **durations**: `Object`
+• **durations**: `Object`
 
 #### Type declaration
 
@@ -729,7 +729,7 @@ Checks if given address is in one of the given networks
 | :------ | :------ | :------ |
 | `networks` | `Network`[] | network address spaces to check |
 | `address` | `Uint8Array` | ip address to check |
-| `family` | `NetworkInterfaceInfo`[``"family"``] | ip address family, 'IPv4' or 'IPv6' |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
 #### Returns
 
@@ -993,7 +993,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `libp2p` | `LibP2P` | a libp2p instance |
+| `libp2p` | `Libp2p` | a libp2p instance |
 | `destination` | `PeerId` | PeerId of the destination |
 | `protocol` | `string` | - |
 | `opts?` | `DialOpts` |  |
@@ -1209,7 +1209,7 @@ ___
 | :------ | :------ |
 | `address` | `Uint8Array` |
 | `subnet` | `Uint8Array` |
-| `family` | `NetworkInterfaceInfo`[``"family"``] |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` |
 
 #### Returns
 
@@ -1316,7 +1316,7 @@ ___
 | `address` | `Uint8Array` |
 | `networkPrefix` | `Uint8Array` |
 | `subnetMask` | `Uint8Array` |
-| `family` | `NetworkInterfaceInfo`[``"family"``] |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` |
 
 #### Returns
 
@@ -1339,7 +1339,7 @@ Converts ip address string to Uint8Arrays
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `address` | `string` | ip address as string, e.g. 192.168.12.34 |
-| `family` | `NetworkInterfaceInfo`[``"family"``] | ip address family, 'IPv4' or 'IPv6' |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
 #### Returns
 
@@ -1364,7 +1364,7 @@ Checks if given address is any address
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `address` | `string` | ip address to check |
-| `family` | `NetworkInterfaceInfo`[``"family"``] | ip address family, 'IPv4' or 'IPv6' |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
 #### Returns
 
@@ -1473,7 +1473,7 @@ Checks if given address is link-locale address
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `address` | `Uint8Array` | ip address to check |
-| `family` | `NetworkInterfaceInfo`[``"family"``] | ip address family, 'IPv4' or 'IPv6' |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
 #### Returns
 
@@ -1498,7 +1498,7 @@ Checks if given address is a loopback address (localhost)
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `address` | `Uint8Array` | ip address to check |
-| `family` | `NetworkInterfaceInfo`[``"family"``] | ip address family, 'IPv4' or 'IPv6' |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
 #### Returns
 
@@ -1547,7 +1547,7 @@ Checks if given address is a private address
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `address` | `Uint8Array` | ip address to check |
-| `family` | `NetworkInterfaceInfo`[``"family"``] | ip address family, 'IPv4' or 'IPv6' |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
 #### Returns
 
@@ -1572,7 +1572,7 @@ Checks if given address is a reserved address
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `address` | `Uint8Array` | ip address to check |
-| `family` | `NetworkInterfaceInfo`[``"family"``] | ip address family, 'IPv4' or 'IPv6' |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
 #### Returns
 
@@ -1618,11 +1618,11 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `seed` | `Uint8Array` \| `undefined` |
+| `seed` | `Uint8Array` |
 | `hashFunc` | (`preImage`: `Uint8Array`) => `Uint8Array` |
 | `iterations` | `number` |
 | `stepSize` | `number` |
-| `hint?` | (`index`: `number`) => `Uint8Array` \| `undefined` \| `Promise`<`Uint8Array` \| `undefined`\> |
+| `hint?` | (`index`: `number`) => `Uint8Array` \| `Promise`<`Uint8Array`\> |
 
 #### Returns
 
@@ -1666,7 +1666,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `libp2p` | `LibP2P` |
+| `libp2p` | `Libp2p` |
 | `destination` | `PeerId` |
 | `protocol` | `string` |
 | `message` | `Uint8Array` |
@@ -1690,7 +1690,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `libp2p` | `LibP2P` |
+| `libp2p` | `Libp2p` |
 | `destination` | `PeerId` |
 | `protocol` | `string` |
 | `message` | `Uint8Array` |
@@ -1714,7 +1714,7 @@ ___
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `libp2p` | `LibP2P` | `undefined` |
+| `libp2p` | `Libp2p` | `undefined` |
 | `protocol` | `string` | `undefined` |
 | `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction) | `undefined` |
 | `includeReply` | `boolean` | `false` |
@@ -1790,7 +1790,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `amount` | `BigNumber` \| `string` \| `number` |
+| `amount` | `string` \| `number` \| `BigNumber` |
 | `position` | `number` |
 
 #### Returns
@@ -1931,7 +1931,7 @@ It equips the generated peerId with private key and public key.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `privKey` | `Uint8Array` \| `string` | the plain private key |
+| `privKey` | `string` \| `Uint8Array` | the plain private key |
 
 #### Returns
 
@@ -1957,7 +1957,7 @@ Using `libsecp256k1` directly does not work.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `pubKey` | `Uint8Array` \| `string` | the plain public key |
+| `pubKey` | `string` \| `Uint8Array` | the plain public key |
 
 #### Returns
 
@@ -2386,7 +2386,7 @@ Converts ip address from byte representation to string
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `address` | `Uint8Array` | ip addr given as Uint8Array |
-| `family` | `NetworkInterfaceInfo`[``"family"``] | ip address family, 'IPv4' or 'IPv6' |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
 #### Returns
 
@@ -2400,7 +2400,7 @@ ___
 
 ### u8aAllocate
 
-▸ **u8aAllocate**(`__namedParameters`, ...`list`): `Uint8Array`
+▸ **u8aAllocate**(`{`, ...`list`): `Uint8Array`
 
 Writes to the provided mempage the data on a given list of u8a on a given offset
 
@@ -2408,10 +2408,10 @@ Writes to the provided mempage the data on a given list of u8a on a given offset
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `__namedParameters` | `MemoryPage` |
-| `...list` | (`Uint8Array` \| `undefined`)[] |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `{` | `MemoryPage` | page: ArrayBuffer, offset: number } |
+| `...list` | `Uint8Array`[] |  |
 
 #### Returns
 
@@ -2465,7 +2465,7 @@ u8aConcat(
 
 | Name | Type |
 | :------ | :------ |
-| `...list` | (`Uint8Array` \| `undefined`)[] |
+| `...list` | `Uint8Array`[] |
 
 #### Returns
 

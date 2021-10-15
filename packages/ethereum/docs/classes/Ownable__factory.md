@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / Ownable__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / Ownable\_\_factory
 
 # Class: Ownable\_\_factory
 
