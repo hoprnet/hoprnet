@@ -85,7 +85,7 @@ A third and final phase of testing is to include ambassadors.
 This is optional in the possibility we want to gather more data points and/or a specific feature requires larger network topology.
 
 - May occur after [HOPR team testing](#hopr-team-testing) is succesful.
-- Launch and fund HOPRd, then turn on `promiscuous` mode.
+- Launch and fund HOPRd, then follow release instructions.
 
 ## Release promotion
 
