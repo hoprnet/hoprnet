@@ -3,14 +3,14 @@ import type { AddressInfo } from 'net'
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'
 import { once } from 'events'
 import { Multiaddr } from 'multiaddr'
-import { u8aEquals, Defer } from '@hoprnet/hopr-utils'
+import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import assert from 'assert'
 import type { EventEmitter } from 'events'
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {
-    const msgReceived = new Defer<void>()
+    const msgReceived = defer<void>()
 
     const testMessage = new TextEncoder().encode('test')
     const testMessageReply = new TextEncoder().encode('reply')

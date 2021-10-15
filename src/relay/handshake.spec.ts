@@ -1,5 +1,5 @@
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
-import { u8aEquals, Defer } from '@hoprnet/hopr-utils'
+import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
 import PeerId from 'peer-id'
 import assert from 'assert'
@@ -18,7 +18,7 @@ describe('test relay handshake', function () {
     const initiatorToRelay = Pair<StreamType>()
     const relayToInitiator = Pair<StreamType>()
 
-    const initiatorReceived = new Defer()
+    const initiatorReceived = defer()
 
     const initiatorHandshake = new RelayHandshake({
       source: relayToInitiator.source,
@@ -65,7 +65,7 @@ describe('test relay handshake', function () {
     const relayToDestination = Pair<StreamType>()
     const destinationToRelay = Pair<StreamType>()
 
-    const okReceived = new Defer()
+    const okReceived = defer()
 
     const relayHandshake = new RelayHandshake({
       source: (async function* () {

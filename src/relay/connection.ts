@@ -3,7 +3,7 @@ import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 import type { Stream, StreamResult } from '../types'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages } from '../constants'
-import { u8aEquals, u8aToHex, Defer } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToHex, defer, DeferType } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 
 import type { Instance as SimplePeer } from 'simple-peer'
@@ -82,13 +82,13 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _id: string
 
   // Mutexes
-  private _sinkSourceAttachedPromise: Defer<Stream['source']>
-  private _sinkSwitchPromise: Defer<void>
-  private _sourceSwitchPromise: Defer<void>
-  private _migrationDone: Defer<void> | undefined
-  private _destroyedPromise: Defer<void>
-  private _statusMessagePromise: Defer<void>
-  private _closePromise: Defer<void>
+  private _sinkSourceAttachedPromise: DeferType<Stream['source']>
+  private _sinkSwitchPromise: DeferType<void>
+  private _sourceSwitchPromise: DeferType<void>
+  private _migrationDone: DeferType<void> | undefined
+  private _destroyedPromise: DeferType<void>
+  private _statusMessagePromise: DeferType<void>
+  private _closePromise: DeferType<void>
 
   private _onReconnect: ((newStream: RelayConnection, counterparty: PeerId) => Promise<void>) | undefined
 
@@ -151,12 +151,12 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._sourceSwitched = false
     this._streamClosed = false
 
-    this._closePromise = new Defer<void>()
-    this._sinkSourceAttachedPromise = new Defer<Stream['source']>()
-    this._destroyedPromise = new Defer<void>()
-    this._statusMessagePromise = new Defer<void>()
-    this._sinkSwitchPromise = new Defer<void>()
-    this._sourceSwitchPromise = new Defer<void>()
+    this._closePromise = defer<void>()
+    this._sinkSourceAttachedPromise = defer<Stream['source']>()
+    this._destroyedPromise = defer<void>()
+    this._statusMessagePromise = defer<void>()
+    this._sinkSwitchPromise = defer<void>()
+    this._sourceSwitchPromise = defer<void>()
 
     this.source = this.createSource()
 
@@ -168,7 +168,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         await this._migrationDone.promise
       }
 
-      let deferred = new Defer<void>()
+      let deferred = defer<void>()
       // forward errors
       sinkCreator.catch(deferred.reject)
 
@@ -270,7 +270,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       } catch {}
     }
 
-    this._migrationDone = new Defer<void>()
+    this._migrationDone = defer<void>()
     this._iteration++
     this._sinkSourceSwitched = true
     this._sinkSwitchPromise.resolve()
@@ -360,11 +360,11 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       // wait until new source gets attached
       if (this._sinkSourceSwitched) {
         this._sinkSourceSwitched = false
-        this._sinkSwitchPromise = new Defer<void>()
+        this._sinkSwitchPromise = defer<void>()
 
         // Make sure that we don't create hanging promises
         this._sinkSourceAttachedPromise.resolve()
-        this._sinkSourceAttachedPromise = new Defer<Stream['source']>()
+        this._sinkSourceAttachedPromise = defer<Stream['source']>()
         result = undefined
         currentSource = undefined
         streamPromise = undefined
@@ -433,7 +433,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
    */
   private createSource() {
     // migration mutex
-    let migrationDone = new Defer<void>()
+    let migrationDone = defer<void>()
 
     const iterator = async function* (this: RelayConnection) {
       // deep-clone number
@@ -485,8 +485,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         // End stream once new instance is used
         if (this._iteration != drainIteration) {
           await migrationDone.promise
-          migrationDone = new Defer<void>()
-          this._sourceSwitchPromise = new Defer<void>()
+          migrationDone = defer<void>()
+          this._sourceSwitchPromise = defer<void>()
           this._sourceSwitched = false
           break
         }
@@ -630,7 +630,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       case 0:
         throw Error(`No status messages available`)
       case 1:
-        this._statusMessagePromise = new Defer<void>()
+        this._statusMessagePromise = defer<void>()
 
         return this.statusMessages.pop() as Uint8Array
       default:
