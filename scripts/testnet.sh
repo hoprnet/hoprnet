@@ -163,7 +163,6 @@ start_testnode_vm() {
       --container-arg="--provider" --container-arg="${rpc}" \
       --container-arg="--rest" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
-      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-restart-policy=always
   fi
 }

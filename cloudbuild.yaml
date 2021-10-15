@@ -32,11 +32,6 @@ steps:
         tar -zcf yarn-dependencies.tgz ./node_modules
         gsutil cp yarn-dependencies.tgz gs://${PROJECT_ID}_cloudbuild/cache/yarn-dependencies.tgz
 
-  - id: 'test'
-    name: node:16
-    entrypoint: yarn
-    args: ['test']
-
   - name: 'gcr.io/kaniko-project/executor:latest'
     waitFor: ['build']
     args:
