@@ -63,3 +63,42 @@ jobs:
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
           HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
           HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+
+      - name: Set rpc network to xdai on release branches or goerli on master branch
+        id: set-rpc-network
+        run: |
+          declare network
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
+            network="xdai"
+          fi
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/master ]]; then
+            network="goerli"
+          fi
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug/* ]]; then
+            network="xdai"
+          fi
+          echo "::set-output name=network::${network}"
+
+      - name: Run start script
+        if: ${{ !env.ACT }}
+        run: |
+          # get latest version
+          git pull
+          # need to install tools first which may be used during deployment
+          yarn
+          # set release to intermediate docker build for debugging PRs
+          if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
+            declare last_git_tag="$(git describe --tags --abbrev=0)"
+            declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
+            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
+          fi
+          echo "Pre-deploy env var RELEASE=${RELEASE}"
+          ./scripts/deploy-machine.sh
+        env:
+          FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
+          GITHUB_REF: ${{ github.ref }}
+          BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          RPC_NETWORK: ${{ steps.set-rpc-network.outputs.network }}
+          RELEASE: ${{ steps.set-image-version.outputs.vsn }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}

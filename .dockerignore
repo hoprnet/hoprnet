@@ -1,7 +1,0 @@
-node_modules
-!hopr-admin/.next
-.dockerignore
-npm-debug.log
-Dockerfile
-.git
-.gitignore
