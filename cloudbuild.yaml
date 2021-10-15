@@ -1,19 +1,50 @@
 steps:
-  - name: node:16
+  - id: 'download-cached-yarn-dependencies'
+    waitFor: ['-']
+    name: gcr.io/cloud-builders/gsutil
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        gsutil cp gs://${PROJECT_ID}_cloudbuild/cache/yarn-dependencies.tgz yarn-dependencies.tgz || exit 0
+        tar -zxf yarn-dependencies.tgz || exit 0
+
+  - id: 'install-yarn'
+    name: node:16
+    waitFor: ['download-cached-yarn-dependencies']
     entrypoint: yarn
     args: ['install']
-  - name: node:16
+
+  - id: 'build'
+    waitFor: ['install-yarn']
+    name: node:16
     entrypoint: yarn
     args: ['build']
-  - name: node:16
+
+  - id: 'upload-cached-yarn-dependencies'
+    waitFor: ['build']
+    name: gcr.io/cloud-builders/gsutil
+    entrypoint: bash
+    dir: cloudcmr-front
+    args:
+      - '-c'
+      - |
+        tar -zcf yarn-dependencies.tgz ./node_modules
+        gsutil cp yarn-dependencies.tgz gs://${PROJECT_ID}_cloudbuild/cache/yarn-dependencies.tgz
+
+  - id: 'test'
+    name: node:16
     entrypoint: yarn
     args: ['test']
+
   - name: 'gcr.io/kaniko-project/executor:latest'
+    waitFor: ['build']
     args:
       - '--destination=gcr.io/$PROJECT_ID/hoprd:$_HOPR_IMAGE_VERSION'
       - '--build-arg=HOPRD_VERSION=$_HOPR_PACKAGE_VERSION'
       - --cache=true
-      - --cache-ttl=1h
+      - --cache-ttl=4h
+
 options:
   logStreamingOption: STREAM_ON
   machineType: N1_HIGHCPU_8

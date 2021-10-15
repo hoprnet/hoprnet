@@ -223,8 +223,7 @@ gcloud_create_or_update_instance_template() {
       --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
       --container-arg="--init" \
       --container-arg="--rest" \
-      --container-arg="--restHost" --container-arg="0.0.0.0" \
-      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\""
+      --container-arg="--restHost" --container-arg="0.0.0.0"
   fi
 }
 
