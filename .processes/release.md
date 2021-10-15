@@ -32,7 +32,8 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 
 | Type     | Goal                                                   | Ambassadors | Public |
 | -------- | ------------------------------------------------------ | ----------- | ------ |
-| Internal | Test new features and bug fixes                        | MAYBE       | NO     |
+| Tech     | Test new features and bug fixes                        | NO          | NO     |
+| Internal | Test new features and bug fixes with a larger network  | YES         | NO     |
 | Public   | New HOPRd version, showcase new features and bug fixes | YES         | YES    |
 
 ### Internal release
@@ -40,6 +41,10 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 - Internal releases are more frequent and their goal is to test new features and bug fixes.
 - There should be no public involvement unless the [internal release](#internal-release) is promoted to a [public release](#public-release).
 - All releases start as an [internal release](#internal-release) release and may be promoted to a [public release](#public-release), see [release promotion](#release-promotion).
+- When an internal release is created, one of the [tech ambassadors](./development.md#ambassadors) is assigned to oversee the release cycle, this includes:
+  - [creating release](#release-cycle)
+  - [testing release](#testing-phases)
+  - [promoting release](#release-promotion)
 
 ### Public release
 
@@ -133,8 +138,7 @@ particular branch to deploy on every change.
 
 ```
 
-1. On every public release agreed as a [Milestone](https://github.com/hoprnet/hoprnet/milestones),
-   the PM Lead of the week will code-freeze `master` by creating a `release/**` branch
+1. On new release, there will be a code-freeze on `master` by creating a `release/**` branch
    tracking `master`. Release specific changes will be done in this branch to trigger
    this particular release, which requires to insert name and release version of the new milestone
    in the files:

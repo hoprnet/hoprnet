@@ -60,6 +60,8 @@ Responsibilities:
 
 - bi-weekly [epic priorities](#epic-prioritization) check
 - task duration estimation done before [Sprint Planning](#sprint-planning)
+- [file alarm](#fire-alarm) management
+- [release](./release.md#internal-release) management
 
 _Current:_ [Ambassadors](#ambassadors), [Sebastian](https://github.com/SCBuergel)
 
@@ -134,7 +136,7 @@ tasks and PRs on Github. This includes but is not limited to:
 
 _Who:_ all members individually
 
-_When:_ first day of the sprint or before a vacation
+_When:_ last day of the sprint or before a vacation
 
 #### External issues
 
@@ -165,7 +167,9 @@ Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/project
 - epics are not bound by sprints and they can be long lived
 - closed epics are moved to `Acceptance`
 - epics within `Acceptance` column are accepted by [Trifecta](#trifecta) prior to the meeting
+  - unaccepted epics are moved back to `Next` column with a comment explaining why it wasn't accepted
 - ensure newly created [epics](#issue-creation) are well created
+  - must use the [epic issue template](../.github/ISSUE_TEMPLATE/epic.md)
 - adapt epic priorities
 - create new [Sprint](#sprint-planning) project
 
@@ -242,7 +246,7 @@ All HOPR repositories must support at most these issue templates, more templates
 
 ### Labels
 
-All HOPR repositories must support at most these labels, more labels may be added which make sense for each specific repository.
+All HOPR repositories must support at least these labels, more labels may be added which make sense for each specific repository.
 Since PRs should link to an issue, it's not necessary to label PRs. However, some automation tools like `dependabot` doesn't create issues, in cases like this, it will label it's PRs.
 
 | Name              | Description                                             | Color                                           |
