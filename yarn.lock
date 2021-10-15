@@ -448,7 +448,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": 4.1.1
     "@hoprnet/hopr-utils": 1.81.7
-    "@types/bl": 5.0.1
+    "@types/bl": 5.0.2
     "@types/bn.js": 5.1.0
     "@types/chai": 4.2.22
     "@types/chai-spies": 1.0.3
@@ -785,13 +785,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/bl@npm:5.0.1":
-  version: 5.0.1
-  resolution: "@types/bl@npm:5.0.1"
+"@types/bl@npm:5.0.2":
+  version: 5.0.2
+  resolution: "@types/bl@npm:5.0.2"
   dependencies:
     "@types/node": "*"
     "@types/readable-stream": "*"
-  checksum: 2c54f1d4f2df1c9a66d53ae241fed267b90ed28bd37cfa538175c4c0a14dcab253fbb8c993ea4cfee3049c61b308f82f99b635c18c4fa28c25e4de69ffda5c99
+  checksum: 5fcdf594ab775fc221bbe9d62e6d597db2c9cec294ea337f65682b968cc6a21c9106b411cb3971f4140eedc4a3a72f12e9b748ccab1658d0e14c2838654168cd
   languageName: node
   linkType: hard
 
