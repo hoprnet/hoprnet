@@ -98,6 +98,7 @@ This is optional in the possibility we want to gather more data points and/or a 
 
 - All releases start by being internal releases.
 - An [internal release](#internal-release) may be promoted to a [public release](#public-release) when all [testing phases](#testing-phases) are succesful.
+- Before promoting, release owner ensures that community team actually needs this to be public.
 
 An [internal release](#internal-release) is promoted to a [public release](#public-release) by tagging it's binaries with the public facing release name. See [Deployment checklist](#deployment-checklist).
 
