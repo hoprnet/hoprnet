@@ -470,7 +470,7 @@ __metadata:
     libp2p: 0.33.0
     libp2p-interfaces: 1.0.1
     libp2p-mplex: 0.10.4
-    mocha: 9.1.2
+    mocha: 9.1.3
     multiaddr: ^10.0.0
     multihashes: ^4.0.3
     p-defer: 3
@@ -3235,9 +3235,9 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"mocha@npm:9.1.2":
-  version: 9.1.2
-  resolution: "mocha@npm:9.1.2"
+"mocha@npm:9.1.3":
+  version: 9.1.3
+  resolution: "mocha@npm:9.1.3"
   dependencies:
     "@ungap/promise-all-settled": 1.1.2
     ansi-colors: 4.1.1
@@ -3266,7 +3266,7 @@ fsevents@~2.3.2:
   bin:
     _mocha: bin/_mocha
     mocha: bin/mocha
-  checksum: 6e8ecd836db41d0c529592f8437ddcfed10a992f064ba56a6790e3539b0de8435be38b8d7d8f76a74260c942db72fc3594784fc755cbe3ed59edc5e454142c3b
+  checksum: 4185038f1d49c7c5ab2f8d77e42c182a77ed78f08f0ce713cc34919bc89b618ed9d6d4f24cbb92049f0d2ed03fb1a2a5b20e0fb07f8cf4a86ba83eb99dacde99
   languageName: node
   linkType: hard
 
