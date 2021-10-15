@@ -67,6 +67,8 @@ These releases should be of a large scope and occur only on occasions where a re
 
 Testing phases occur only when a release is queued and prioritized during [epic prioritization](./development.md#epic-prioritization).
 
+For every phase completed, release owner must update the release's PR with the current testing phase status.
+
 | Phase name                   | Description                                                            |
 | ---------------------------- | ---------------------------------------------------------------------- |
 | tech team testing            | First phase, testing by tech team members only                         |
@@ -99,7 +101,10 @@ This is optional in the possibility we want to gather more data points and/or a 
 
 An [internal release](#internal-release) is promoted to a [public release](#public-release) by tagging it's binaries with the public facing release name. See [Deployment checklist](#deployment-checklist).
 
-Once promoted, a [tech ambassador](./development.md#ambassadors) notifies the HOPR team that the [internal release](#internal-release) has been promoted to a [public release](#public-release) by writing in element channel `releases`.
+Once promoted, a release owner notifies the HOPR team that the [internal release](#internal-release) has been promoted to a [public release](#public-release):
+
+- by commenting into the release's epic
+- by writing in element channel `releases`
 
 ## On a new chain
 
