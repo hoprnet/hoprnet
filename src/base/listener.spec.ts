@@ -14,7 +14,6 @@ import { networkInterfaces } from 'os'
 import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import type { DeferType } from '@hoprnet/hopr-utils'
 
-
 import type { PublicNodesEmitter, PeerStoreType } from '../types'
 
 /**
