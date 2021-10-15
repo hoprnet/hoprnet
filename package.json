@@ -52,7 +52,7 @@
     "@types/mocha": "9.0.0",
     "@types/node": "16.4.3",
     "@types/simple-peer": "9.11.3",
-    "@types/yargs": "17.0.3",
+    "@types/yargs": "17.0.4",
     "abortable-iterator": "3.0.0",
     "chai": "4.3.4",
     "chai-spies": "1.0.0",
