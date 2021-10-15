@@ -28,6 +28,8 @@ const log = debug('hopr-core-ethereum:channel')
 
 // TODO - legacy, models bidirectional channel.
 class Channel {
+  _redeemingAll: Promise<void> | undefined = undefined
+
   constructor(
     private readonly self: PublicKey,
     private readonly counterparty: PublicKey,
@@ -234,20 +236,34 @@ class Channel {
   }
 
   async redeemAllTickets(): Promise<void> {
+    if (this._redeemingAll) {
+      return this._redeemingAll
+    }
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
     const tickets = await this.db.getAcknowledgedTickets({ signer: this.counterparty })
-    for (const ticket of tickets) {
-      log('redeeming ticket', ticket)
-      const result = await this.redeemTicket(ticket)
-      if (result.status !== 'SUCCESS') {
-        log('Error redeeming ticket', result)
-        // We need to abort as tickets require ordered redemption.
-        return
+    const _redeemAll = async () => {
+      try {
+        for (const ticket of tickets) {
+          log('redeeming ticket', ticket)
+          const result = await this.redeemTicket(ticket)
+          if (result.status !== 'SUCCESS') {
+            log('Error redeeming ticket', result)
+            // We need to abort as tickets require ordered redemption.
+            return
+          }
+          log('ticket was redeemed')
+        }
+      } catch (e) {
+        // We are going to swallow the error here, as more than one consumer may
+        // be inspecting this same promise.
+        log('Error when redeeming tickets, aborting', e)
       }
-      log('ticket was redeemed')
+      this._redeemingAll = undefined
     }
+    this._redeemingAll = _redeemAll()
+    return this._redeemingAll
   }
 
   async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
