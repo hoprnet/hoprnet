@@ -49,7 +49,7 @@ run_command(){
   local hopr_cmd="${2}"
   local assertion="${3:-}"
   local wait_time=${4:-0}
-  local step_time=${5:-5}
+  local step_time=${5:-20}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
   local cmd="curl -m ${step_time} --connect-timeout ${step_time} --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v1/command --data "
