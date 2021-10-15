@@ -12,7 +12,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
   - [Testing phases](#testing-phases)
     - [Tech team testing](#tech-team-testing)
     - [HOPR team testing](#hopr-team-testing)
-    - [Ambassador testing](#ambassador-testing)
+    - [Community Ambassador testing](#community-ambassador-testing)
   - [Release promotion](#release-promotion)
   - [On a new chain](#on-a-new-chain)
   - [On a new release](#on-a-new-release)
@@ -62,11 +62,11 @@ These releases should be of a large scope and occur only on occasions where a re
 
 Testing phases occur only when a release is queued and prioritized during [epic prioritization](./development.md#epic-prioritization).
 
-| Phase name         | Description                                                  |
-| ------------------ | ------------------------------------------------------------ |
-| tech team testing  | First phase, testing by tech team members only               |
-| HOPR team testing  | Second phase, testing by available HOPR team members         |
-| ambassador testing | Third (optional) phase, testing with the help of ambassadors |
+| Phase name                   | Description                                                            |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| tech team testing            | First phase, testing by tech team members only                         |
+| HOPR team testing            | Second phase, testing by available HOPR team members                   |
+| community ambassador testing | Third (optional) phase, testing with the help of community ambassadors |
 
 ### Tech team testing
 
@@ -79,7 +79,7 @@ Testing phases occur only when a release is queued and prioritized during [epic 
 - Occurs after [Tech team testing](#tech-team-testing) is succesful.
 - With the help of a [changelog](#release-cycle), test HOPRd.
 
-### Ambassador testing
+### Community Ambassador testing
 
 A third and final phase of testing is to include ambassadors.
 This is optional in the possibility we want to gather more data points and/or a specific feature requires larger network topology.
@@ -93,6 +93,8 @@ This is optional in the possibility we want to gather more data points and/or a 
 - An [internal release](#internal-release) may be promoted to a [public release](#public-release) when all [testing phases](#testing-phases) are succesful.
 
 An [internal release](#internal-release) is promoted to a [public release](#public-release) by tagging it's binaries with the public facing release name. See [Deployment checklist](#deployment-checklist).
+
+Once promoted, a [tech ambassador](./development.md#ambassadors) notifies the HOPR team that the [internal release](#internal-release) has been promoted to a [public release](#public-release) by writing in element channel `releases`.
 
 ## On a new chain
 
