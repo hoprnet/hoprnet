@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new ERC1820Implementer__factory**(`signer?`)
+• **new ERC1820Implementer__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [signer: Signer] \| [contractInterface: ContractInterface, bytecode: BytesLike \| object, signer?: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:64
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:70
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:63
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:69
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:57
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:63
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:60
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:66
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:47
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:53
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:52
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:58
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:68
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:74
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:65
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:71
 
 ___
 

@@ -91,13 +91,9 @@
 - [ContractData](modules.md#contractdata)
 - [ContractNames](modules.md#contractnames)
 - [DeploymentTypes](modules.md#deploymenttypes)
-- [GetARGsTypeFromFactory](modules.md#getargstypefromfactory)
-- [GetContractTypeFromFactory](modules.md#getcontracttypefromfactory)
-- [MinEthersFactory](modules.md#minethersfactory)
 - [NetworkTag](modules.md#networktag)
 - [Networks](modules.md#networks)
 - [PublicNetworks](modules.md#publicnetworks)
-- [TypedListener](modules.md#typedlistener)
 
 ### Variables
 
@@ -152,61 +148,6 @@ production = our current production chain
 
 ___
 
-### GetARGsTypeFromFactory
-
-Ƭ **GetARGsTypeFromFactory**<`F`\>: `F` extends [`MinEthersFactory`](modules.md#minethersfactory)<`any`, `any`\> ? `Parameters`<`F`[``"deploy"``]\> : `never`
-
-#### Type parameters
-
-| Name |
-| :------ |
-| `F` |
-
-#### Defined in
-
-packages/ethereum/types/commons.ts:34
-
-___
-
-### GetContractTypeFromFactory
-
-Ƭ **GetContractTypeFromFactory**<`F`\>: `F` extends [`MinEthersFactory`](modules.md#minethersfactory)<infer C, `any`\> ? `C` : `never`
-
-#### Type parameters
-
-| Name |
-| :------ |
-| `F` |
-
-#### Defined in
-
-packages/ethereum/types/commons.ts:28
-
-___
-
-### MinEthersFactory
-
-Ƭ **MinEthersFactory**<`C`, `ARGS`\>: `Object`
-
-#### Type parameters
-
-| Name |
-| :------ |
-| `C` |
-| `ARGS` |
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `deploy` | (...`a`: `ARGS`[]) => `Promise`<`C`\> |
-
-#### Defined in
-
-packages/ethereum/types/commons.ts:25
-
-___
-
 ### NetworkTag
 
 Ƭ **NetworkTag**: [`DeploymentTypes`](modules.md#deploymenttypes) \| ``"etherscan"``
@@ -234,37 +175,6 @@ ___
 #### Defined in
 
 [packages/ethereum/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L3)
-
-___
-
-### TypedListener
-
-Ƭ **TypedListener**<`EventArgsArray`, `EventArgsObject`\>: (...`listenerArg`: [...EventArgsArray, [`TypedEvent`](interfaces/TypedEvent.md)<`EventArgsArray` & `EventArgsObject`\>]) => `void`
-
-#### Type parameters
-
-| Name | Type |
-| :------ | :------ |
-| `EventArgsArray` | extends `any`[] |
-| `EventArgsObject` | `EventArgsObject` |
-
-#### Type declaration
-
-▸ (...`listenerArg`): `void`
-
-##### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `...listenerArg` | [...EventArgsArray, [`TypedEvent`](interfaces/TypedEvent.md)<`EventArgsArray` & `EventArgsObject`\>] |
-
-##### Returns
-
-`void`
-
-#### Defined in
-
-packages/ethereum/types/commons.ts:15
 
 ## Variables
 

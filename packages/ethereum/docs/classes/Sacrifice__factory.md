@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new Sacrifice__factory**(`signer?`)
+• **new Sacrifice__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:56
+packages/ethereum/types/factories/Sacrifice__factory.ts:62
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:55
+packages/ethereum/types/factories/Sacrifice__factory.ts:61
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:49
+packages/ethereum/types/factories/Sacrifice__factory.ts:55
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:52
+packages/ethereum/types/factories/Sacrifice__factory.ts:58
 
 ___
 
@@ -188,7 +188,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:37
+packages/ethereum/types/factories/Sacrifice__factory.ts:43
 
 ___
 
@@ -213,7 +213,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:43
+packages/ethereum/types/factories/Sacrifice__factory.ts:49
 
 ___
 
@@ -234,7 +234,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:60
+packages/ethereum/types/factories/Sacrifice__factory.ts:66
 
 ___
 
@@ -248,7 +248,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:57
+packages/ethereum/types/factories/Sacrifice__factory.ts:63
 
 ___
 

@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new HoprForwarder__factory**(`signer?`)
+• **new HoprForwarder__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:145
+packages/ethereum/types/factories/HoprForwarder__factory.ts:151
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:144
+packages/ethereum/types/factories/HoprForwarder__factory.ts:150
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:138
+packages/ethereum/types/factories/HoprForwarder__factory.ts:144
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:141
+packages/ethereum/types/factories/HoprForwarder__factory.ts:147
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:128
+packages/ethereum/types/factories/HoprForwarder__factory.ts:134
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:133
+packages/ethereum/types/factories/HoprForwarder__factory.ts:139
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:149
+packages/ethereum/types/factories/HoprForwarder__factory.ts:155
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:146
+packages/ethereum/types/factories/HoprForwarder__factory.ts:152
 
 ___
 

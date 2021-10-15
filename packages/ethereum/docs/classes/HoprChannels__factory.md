@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new HoprChannels__factory**(`signer?`)
+• **new HoprChannels__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:698
+packages/ethereum/types/factories/HoprChannels__factory.ts:704
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:697
+packages/ethereum/types/factories/HoprChannels__factory.ts:703
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:691
+packages/ethereum/types/factories/HoprChannels__factory.ts:697
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:694
+packages/ethereum/types/factories/HoprChannels__factory.ts:700
 
 ___
 
@@ -189,7 +189,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:673
+packages/ethereum/types/factories/HoprChannels__factory.ts:679
 
 ___
 
@@ -215,7 +215,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:684
+packages/ethereum/types/factories/HoprChannels__factory.ts:690
 
 ___
 
@@ -236,7 +236,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:702
+packages/ethereum/types/factories/HoprChannels__factory.ts:708
 
 ___
 
@@ -250,7 +250,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:699
+packages/ethereum/types/factories/HoprChannels__factory.ts:705
 
 ___
 

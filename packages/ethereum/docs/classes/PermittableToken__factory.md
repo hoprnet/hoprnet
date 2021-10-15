@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new PermittableToken__factory**(`signer?`)
+• **new PermittableToken__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:893
+packages/ethereum/types/factories/PermittableToken__factory.ts:899
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:892
+packages/ethereum/types/factories/PermittableToken__factory.ts:898
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:886
+packages/ethereum/types/factories/PermittableToken__factory.ts:892
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:889
+packages/ethereum/types/factories/PermittableToken__factory.ts:895
 
 ___
 
@@ -191,7 +191,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:856
+packages/ethereum/types/factories/PermittableToken__factory.ts:862
 
 ___
 
@@ -219,7 +219,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:871
+packages/ethereum/types/factories/PermittableToken__factory.ts:877
 
 ___
 
@@ -240,7 +240,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:897
+packages/ethereum/types/factories/PermittableToken__factory.ts:903
 
 ___
 
@@ -254,7 +254,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:894
+packages/ethereum/types/factories/PermittableToken__factory.ts:900
 
 ___
 

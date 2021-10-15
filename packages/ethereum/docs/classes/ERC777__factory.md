@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new ERC777__factory**(`signer?`)
+• **new ERC777__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777__factory.ts:629
+packages/ethereum/types/factories/ERC777__factory.ts:635
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777__factory.ts:628
+packages/ethereum/types/factories/ERC777__factory.ts:634
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777__factory.ts:622
+packages/ethereum/types/factories/ERC777__factory.ts:628
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777__factory.ts:625
+packages/ethereum/types/factories/ERC777__factory.ts:631
 
 ___
 
@@ -190,7 +190,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777__factory.ts:596
+packages/ethereum/types/factories/ERC777__factory.ts:602
 
 ___
 
@@ -217,7 +217,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777__factory.ts:609
+packages/ethereum/types/factories/ERC777__factory.ts:615
 
 ___
 
@@ -238,7 +238,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777__factory.ts:633
+packages/ethereum/types/factories/ERC777__factory.ts:639
 
 ___
 
@@ -252,7 +252,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777__factory.ts:630
+packages/ethereum/types/factories/ERC777__factory.ts:636
 
 ___
 
