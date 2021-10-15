@@ -32,8 +32,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 
 | Type     | Goal                                                   | Ambassadors | Public |
 | -------- | ------------------------------------------------------ | ----------- | ------ |
-| Tech     | Test new features and bug fixes                        | NO          | NO     |
-| Internal | Test new features and bug fixes with a larger network  | YES         | NO     |
+| Internal | Test new features and bug fixes                        | MAYBE       | NO     |
 | Public   | New HOPRd version, showcase new features and bug fixes | YES         | YES    |
 
 ### Internal release
@@ -42,6 +41,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 - There should be no public involvement unless the [internal release](#internal-release) is promoted to a [public release](#public-release).
 - All releases start as an [internal release](#internal-release) release and may be promoted to a [public release](#public-release), see [release promotion](#release-promotion).
 - When an internal release is created, one of the [tech ambassadors](./development.md#ambassadors) is assigned to oversee the release cycle, this includes:
+  - notifies the HOPR team that the [internal release](#internal-release) has been created in element channel `releases`
   - [creating release](#release-cycle)
   - [testing release](#testing-phases)
   - [promoting release](#release-promotion)
@@ -60,7 +60,7 @@ This new release is considered an [internal release](#internal-release) and may 
 
 ### Deadline based releases
 
-Deadline based releases are releases which have a defined deadline and scope agreed upon by the [Trifecta](./development.md#trifecta).
+Deadline based releases are releases which have a defined deadline and scope agreed between the [Trifecta](./development.md#trifecta) and `founders`.
 These releases should be of a large scope and occur only on occasions where a release is necessary.
 
 ## Testing phases

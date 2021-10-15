@@ -21,10 +21,11 @@ Tasks required to be completed for moving to a new chain.
 -->
 ### Relevant issues
 
-- [ ] Ensure `gasPrice` of the chain is not volatile.
+- [ ] Ensure that the `gasPrice` set in hopr is high enough to resist the volatility of `gasPrice` of the chain.
 - [ ] Update `CONFIRMATIONS` in [constants](../../packages/core-ethereum/src/constants.ts) using the chain's uncle block rate.
 - [ ] Update chain native token symbol.
 - [ ] Update chain HOPR token symbol.
+- [ ] Ensure E2E tests pass (step_time in [integration-test.sh](https://github.com/hoprnet/hoprnet/blob/3b25d9bc2c55f87cf23a0aa84620933eda6c2e39/test/integration-test.sh#L52) and [full_interconnected_cluster.sh](https://github.com/hoprnet/hoprnet/blob/3b25d9bc2c55f87cf23a0aa84620933eda6c2e39/scripts/topologies/full_interconnected_cluster.sh#L59) is affected by changing `CONFIRMATIONS`).
 
 <!--
   How can a team member know this epic was completed.
