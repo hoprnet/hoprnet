@@ -6,11 +6,6 @@ export type Network = {
   family: NetworkInterfaceInfo['family']
 }
 
-export type Address = {
-  address: Uint8Array
-  family: NetworkInterfaceInfo['family']
-}
-
 // Only useful if in same network
 export const PRIVATE_NETWORK: Network[] = [
   {
