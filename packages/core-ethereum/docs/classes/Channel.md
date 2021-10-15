@@ -54,6 +54,7 @@
 | `chain.getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `Networks`  } |
 | `chain.getLatestBlockNumber` | () => `Promise`<`number`\> |
 | `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
+| `chain.getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
 | `chain.getPrivateKey` | () => `Uint8Array` |
 | `chain.getPublicKey` | () => `PublicKey` |
 | `chain.getWallet` | () => `Wallet` |
@@ -64,7 +65,9 @@
 | `chain.subscribeBlock` | (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` |
 | `chain.subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
 | `chain.subscribeError` | (`cb`: `any`) => `void` |
+| `chain.subscribeTokenEvents` | (`cb`: `any`) => `HoprToken` |
 | `chain.unsubscribe` | () => `void` |
+| `chain.updateConfirmedTransaction` | (`hash`: `string`) => `void` |
 | `chain.waitUntilReady` | () => `Promise`<`Network`\> |
 | `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\> |
 | `indexer` | [`Indexer`](Indexer.md) |
@@ -120,7 +123,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:228](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L228)
+[packages/core-ethereum/src/channel.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L232)
 
 ___
 
@@ -140,7 +143,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L155)
+[packages/core-ethereum/src/channel.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L159)
 
 ___
 
@@ -164,7 +167,7 @@ a ticket without any value
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:209](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L209)
+[packages/core-ethereum/src/channel.ts:213](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L213)
 
 ___
 
@@ -194,7 +197,7 @@ a signed ticket
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L178)
+[packages/core-ethereum/src/channel.ts:182](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L182)
 
 ___
 
@@ -208,13 +211,13 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:145](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L145)
+[packages/core-ethereum/src/channel.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L148)
 
 ___
 
 ### fund
 
-▸ **fund**(`myFund`, `counterpartyFund`): `Promise`<`void`\>
+▸ **fund**(`myFund`, `counterpartyFund`): `Promise`<`string`\>
 
 #### Parameters
 
@@ -225,7 +228,7 @@ ___
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`<`string`\>
 
 #### Defined in
 
@@ -285,7 +288,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L136)
+[packages/core-ethereum/src/channel.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L138)
 
 ___
 
@@ -305,7 +308,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L116)
+[packages/core-ethereum/src/channel.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L117)
 
 ___
 
@@ -319,7 +322,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L238)
+[packages/core-ethereum/src/channel.ts:242](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L242)
 
 ___
 
@@ -339,7 +342,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:269](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L269)
+[packages/core-ethereum/src/channel.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L273)
 
 ___
 
