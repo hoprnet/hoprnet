@@ -3,6 +3,7 @@ import { join } from 'path'
 
 export * from './constants'
 export * from './types'
+export * from './types/common'
 
 export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'
 
