@@ -1047,7 +1047,7 @@ __metadata:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/blessed": 0.1.19
     "@types/rimraf": 3.0.2
-    "@types/yargs": 17.0.3
+    "@types/yargs": 17.0.4
     bignumber.js: 9.0.1
     bn.js: 5.2.0
     mocha: 9.1.2
@@ -1075,14 +1075,14 @@ __metadata:
     "@nomiclabs/hardhat-waffle": 2.0.1
     "@openzeppelin/contracts": 4.3.2
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
-    "@typechain/ethers-v5": 7.1.0
+    "@typechain/ethers-v5": 7.2.0
     "@typechain/hardhat": 2.3.1
     bn.js: 5.2.0
     chai: 4.3.4
     dotenv: 10.0.0
     ethereum-waffle: 3.4.0
     ethers: 5.4.7
-    hardhat: 2.6.5
+    hardhat: 2.6.6
     hardhat-deploy: 0.9.3
     hardhat-gas-reporter: 1.0.4
     multiaddr: 10.0.1
@@ -1152,7 +1152,7 @@ __metadata:
     multiaddr: ^10.0.0
     multihashes: ~4.0.1
     peer-id: 0.15.3
-    pino: ^6.13.3
+    pino: ^7.0.0
     pino-logflare: ^0.3.12
     rewiremock: 3.14.3
     rimraf: 3.0.2
@@ -1173,7 +1173,7 @@ __metadata:
     "@ceramicnetwork/stream-tile": ^1.2.0
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@types/yargs": 17.0.3
+    "@types/yargs": 17.0.4
     bn.js: 5.2.0
     body-parser: ^1.19.0
     bs58: ^4.0.1
@@ -2001,9 +2001,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typechain/ethers-v5@npm:7.1.0":
-  version: 7.1.0
-  resolution: "@typechain/ethers-v5@npm:7.1.0"
+"@typechain/ethers-v5@npm:7.2.0":
+  version: 7.2.0
+  resolution: "@typechain/ethers-v5@npm:7.2.0"
   dependencies:
     lodash: ^4.17.15
     ts-essentials: ^7.0.1
@@ -2014,7 +2014,7 @@ __metadata:
     ethers: ^5.1.3
     typechain: ^5.0.0
     typescript: ">=4.0.0"
-  checksum: b3c89e78df0779a4f9f28077675dd7e14cb2046958ce311002e59ff9a1ea8d0242489bd1df171d43c931da5049124a84e6f117d4c9841f5640ebfbdecc221b24
+  checksum: 23c7bcb6ef3582fe7ec32dec26bd5067a751b7e3b88ece0b98b2c4bb9623ac074f079ebe3dbcdf57f7e659d8d3a3f018105bd660806f6e7bdafa0dc56c5de450
   languageName: node
   linkType: hard
 
@@ -2384,12 +2384,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/yargs@npm:17.0.3":
-  version: 17.0.3
-  resolution: "@types/yargs@npm:17.0.3"
+"@types/yargs@npm:17.0.4":
+  version: 17.0.4
+  resolution: "@types/yargs@npm:17.0.4"
   dependencies:
     "@types/yargs-parser": "*"
-  checksum: 8c4e01f893f0b372a37efb2da2191b63793a25126e0b468c7eb8886176fec2a10f063d9718fa75f1fa00e82fbed4a614bb06661d968e4233be8a00468b94ac60
+  checksum: 570f5227bf7ae0ba7c5e64f825fb6168bf5fa2b9cba0cabf88c7f2094717287f6d95919ea8756596cc8c4bb3151313976163f911ca21f9cf6435b4e3cab1cb7e
   languageName: node
   linkType: hard
 
@@ -5760,7 +5760,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"duplexify@npm:^4.1.1":
+"duplexify@npm:^4.1.1, duplexify@npm:^4.1.2":
   version: 4.1.2
   resolution: "duplexify@npm:4.1.2"
   dependencies:
@@ -8264,9 +8264,9 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"hardhat@npm:2.6.5":
-  version: 2.6.5
-  resolution: "hardhat@npm:2.6.5"
+"hardhat@npm:2.6.6":
+  version: 2.6.6
+  resolution: "hardhat@npm:2.6.6"
   dependencies:
     "@ethereumjs/block": ^3.4.0
     "@ethereumjs/blockchain": ^5.4.0
@@ -8317,7 +8317,7 @@ fsevents@~2.1.1:
     ws: ^7.4.6
   bin:
     hardhat: internal/cli/cli.js
-  checksum: dea61151b0961d8c4719a98c11b3aa9a8aeab73fc46003087841f23228a96ec65f460f10dd1ff36d7dae437eada3f3ec469f144b6debe2a6713e5078087d86ea
+  checksum: 845c0fa6d03ff7d1bf4b9b6906f1d9137b117b4f84f7b63361c5a0ee7bde2b2c4fd5188f1b3d7cd85852514e1b1935413a2e080b9816669eb3677a74fe976c6e
   languageName: node
   linkType: hard
 
@@ -9859,7 +9859,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"json-stringify-safe@npm:~5.0.1":
+"json-stringify-safe@npm:^5.0.1, json-stringify-safe@npm:~5.0.1":
   version: 5.0.1
   resolution: "json-stringify-safe@npm:5.0.1"
   checksum: 48ec0adad5280b8a96bb93f4563aa1667fd7a36334f79149abd42446d0989f2ddc58274b479f4819f1f00617957e6344c886c55d05a4e15ebb4ab931e4a6a8ee
@@ -12416,6 +12416,13 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
+"on-exit-leak-free@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "on-exit-leak-free@npm:0.2.0"
+  checksum: d22b0f0538069110626b578db6e68b6ee0e85b1ee9cc5ef9b4de1bba431431d6a8da91a61e09d2ad46f22a96f968e5237833cb9d0b69bc4d294f7ec82f609b05
+  languageName: node
+  linkType: hard
+
 "on-finished@npm:~2.3.0":
   version: 2.3.0
   resolution: "on-finished@npm:2.3.0"
@@ -13102,6 +13109,16 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
+"pino-abstract-transport@npm:v0.4.0":
+  version: 0.4.0
+  resolution: "pino-abstract-transport@npm:0.4.0"
+  dependencies:
+    duplexify: ^4.1.2
+    split2: ^3.2.2
+  checksum: 9df1bc78e143008cbb6ef8d4d82f336d149e62cf5e395bb0cf3accb8dc46de1380609e8d661186217e2747a2358d22f50b232640f89c94759efa3efffe0c763d
+  languageName: node
+  linkType: hard
+
 "pino-logflare@npm:^0.3.12":
   version: 0.3.12
   resolution: "pino-logflare@npm:0.3.12"
@@ -13130,6 +13147,13 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
+"pino-std-serializers@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "pino-std-serializers@npm:4.0.0"
+  checksum: 89d487729b58c9d3273a0ee851ead068d6d2e2ccc1af8e1c1d28f1b3442423679bec7ec04d9a2aba36f94f335e82be9f4de19dc4fbc161e71c136aaa15b85ad3
+  languageName: node
+  linkType: hard
+
 "pino@npm:^6.13.3, pino@npm:^6.3.2":
   version: 6.13.3
   resolution: "pino@npm:6.13.3"
@@ -13144,6 +13168,26 @@ fsevents@~2.1.1:
   bin:
     pino: bin.js
   checksum: a580decd47a1c8b32a846ba1cb478087b523636d697bd4c57833d10b3f2b35c7d06739715ad9a291b41caf002b8d1bbf98674bfb3e99989fd41b7d934cca861c
+  languageName: node
+  linkType: hard
+
+"pino@npm:^7.0.0":
+  version: 7.0.1
+  resolution: "pino@npm:7.0.1"
+  dependencies:
+    fast-redact: ^3.0.0
+    fastify-warning: ^0.2.0
+    get-caller-file: ^2.0.5
+    json-stringify-safe: ^5.0.1
+    on-exit-leak-free: ^0.2.0
+    pino-abstract-transport: v0.4.0
+    pino-std-serializers: ^4.0.0
+    quick-format-unescaped: ^4.0.3
+    sonic-boom: ^2.2.1
+    thread-stream: ^0.11.1
+  bin:
+    pino: bin.js
+  checksum: eb50181e857b75cfb4ffc612cc31c049a536340a6daf3c54614e4dbe71342c8df5d469b76ef7f5e7be8a26ce2fc946de574df49f38ca04fcb9d83b2713c27c09
   languageName: node
   linkType: hard
 
@@ -15093,7 +15137,7 @@ resolve@1.17.0:
   languageName: node
   linkType: hard
 
-"sonic-boom@npm:^2.1.0":
+"sonic-boom@npm:^2.1.0, sonic-boom@npm:^2.2.1":
   version: 2.3.0
   resolution: "sonic-boom@npm:2.3.0"
   dependencies:
@@ -15240,7 +15284,7 @@ resolve@1.17.0:
   languageName: node
   linkType: hard
 
-"split2@npm:^3.1.1":
+"split2@npm:^3.1.1, split2@npm:^3.2.2":
   version: 3.2.2
   resolution: "split2@npm:3.2.2"
   dependencies:
@@ -15905,6 +15949,13 @@ resolve@1.17.0:
     promise: ^8.0.0
     qs: ^6.4.0
   checksum: a24a4fc95dd8591966bf3752f024f5cd4d53c2b2c29b23b4e40c3322df6a432d939bc17b589d8e9d760b90e92ab860f6f361a4dfcfe3542019e1615fb51afccc
+  languageName: node
+  linkType: hard
+
+"thread-stream@npm:^0.11.1":
+  version: 0.11.1
+  resolution: "thread-stream@npm:0.11.1"
+  checksum: 47f9bccc3ef0046743187401a6c5264700bd7bcbf98ecb98ddcb2bf0c7f0066394a3c0836f37499f74b57b698e0374deba318946144e8c32d35f8124ce4e6280
   languageName: node
   linkType: hard
 

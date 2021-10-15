@@ -151,6 +151,7 @@
 - [stringToU8a](modules.md#stringtou8a)
 - [timeoutAfter](modules.md#timeoutafter)
 - [toLengthPrefixedU8a](modules.md#tolengthprefixedu8a)
+- [toNetworkPrefix](modules.md#tonetworkprefix)
 - [toU8a](modules.md#tou8a)
 - [u8aAdd](modules.md#u8aadd)
 - [u8aAddrToString](modules.md#u8aaddrtostring)
@@ -2297,6 +2298,26 @@ Adds a length-prefix to a Uint8Array
 #### Defined in
 
 [u8a/toLengthPrefixedU8a.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toLengthPrefixedU8a.ts#L12)
+
+___
+
+### toNetworkPrefix
+
+▸ **toNetworkPrefix**(`addr`): `Network`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `addr` | `NetworkInterfaceInfo` |
+
+#### Returns
+
+`Network`
+
+#### Defined in
+
+[network/addrs.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L199)
 
 ___
 
