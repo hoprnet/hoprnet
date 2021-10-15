@@ -3,7 +3,7 @@ import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
 import PeerId from 'peer-id'
 import assert from 'assert'
-import { Stream, StreamType } from '../types'
+import type { Stream, StreamType } from '../types'
 
 describe('test relay handshake', function () {
   let initiator: PeerId, relay: PeerId, destination: PeerId

@@ -1,6 +1,6 @@
 import { Relay } from './index'
 import PeerId from 'peer-id'
-import { HandlerProps } from 'libp2p'
+import type { HandlerProps } from 'libp2p'
 import Pair from 'it-pair'
 import EventEmitter from 'events'
 import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'

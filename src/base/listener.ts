@@ -7,7 +7,8 @@ import { once, EventEmitter } from 'events'
 import { PeerStoreType, PublicNodesEmitter, DialOptions } from '../types'
 import Debug from 'debug'
 import { green, red } from 'chalk'
-import { NetworkInterfaceInfo, networkInterfaces } from 'os'
+import { networkInterfaces } from 'os'
+import type { NetworkInterfaceInfo } from 'os'
 
 import AbortController from 'abort-controller'
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, CODE_UDP, RELAY_CONTACT_TIMEOUT } from '../constants'
@@ -23,7 +24,7 @@ import { Multiaddr } from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
-import { isAnyAddress } from '../utils'
+import { isAnyAddress } from '@hoprnet/hopr-utils'
 import { TCPConnection } from './tcp'
 
 const log = Debug('hopr-connect:listener')

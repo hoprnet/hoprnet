@@ -7,13 +7,12 @@ import {
   PUBLIC_STUN_SERVERS,
   STUN_TIMEOUT
 } from './stun'
-import { ipToU8aAddress, isLocalhost, isPrivateAddress, nodeToMultiaddr } from '../utils'
+import { nodeToMultiaddr } from '../utils'
 import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
 import { once } from 'events'
-import { defer } from '@hoprnet/hopr-utils'
+import { defer, ipToU8aAddress, isLocalhost, isPrivateAddress } from '@hoprnet/hopr-utils'
 import type { DeferType } from '@hoprnet/hopr-utils'
-
 
 type ServerType = {
   socket: Socket

@@ -9,7 +9,7 @@ import pushable from 'it-pushable'
 
 import { EventEmitter } from 'events'
 import assert from 'assert'
-import { StreamType } from '../types'
+import type { StreamType } from '../types'
 import chai, { expect } from 'chai'
 import spies from 'chai-spies'
 

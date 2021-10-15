@@ -1,6 +1,6 @@
-import { Stream, StreamType } from '../types'
+import type { Stream, StreamType } from '../types'
 import handshake, { Handshake } from 'it-handshake'
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 
 import { green, yellow } from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'

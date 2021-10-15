@@ -1,14 +1,27 @@
 import type { Multiaddr } from 'multiaddr'
-import type { Network } from './utils/constants'
-import { getLocalAddresses, isPrivateAddress, checkNetworks, isLinkLocaleAddress } from './utils'
+// to be uncommented on hopr-utils upgraded
+// import type { Network } from '@hoprnet/hopr-utils'
 import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from './constants'
 import Multihash from 'multihashes'
-import { NetworkInterfaceInfo } from 'os'
+import type { NetworkInterfaceInfo } from 'os'
 import type PeerId from 'peer-id'
-import { u8aEquals, u8aToNumber } from '@hoprnet/hopr-utils'
+import {
+  u8aEquals,
+  u8aToNumber,
+  getLocalAddresses,
+  isPrivateAddress,
+  checkNetworks,
+  isLinkLocaleAddress
+} from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import { green } from 'chalk'
 
+// to be removed once hopr-utils is upgraded
+type Network = {
+  subnet: Uint8Array
+  networkPrefix: Uint8Array
+  family: NetworkInterfaceInfo['family']
+}
 const log = Debug('hopr-connect:filter')
 
 const INVALID_PORTS = [0]
