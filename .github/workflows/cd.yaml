@@ -36,15 +36,6 @@ jobs:
         env:
           HOPR_PACKAGE: hoprd
 
-      - name: Set latest release tag
-        id: set-latest-release-tag
-        run: |
-          # we must set the tag specific to the release to prevent overrides
-          # from other release branches
-          declare release_name=${HOPR_GITHUB_REF##refs/heads/release/}
-          declare tag="latest-${release_name}"
-          echo "::set-output name=tag::${tag}"
-
       - name: Building Docker image using Google Cloud Build
         run: |
           gcloud builds submit --config cloudbuild.yaml \
@@ -68,6 +59,7 @@ jobs:
         id: set-rpc-network
         run: |
           declare network
+          network="xdai"
           if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
             network="xdai"
           fi
@@ -82,16 +74,7 @@ jobs:
       - name: Run start script
         if: ${{ !env.ACT }}
         run: |
-          # get latest version
-          git pull
-          # need to install tools first which may be used during deployment
-          yarn
-          # set release to intermediate docker build for debugging PRs
-          if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
-            declare last_git_tag="$(git describe --tags --abbrev=0)"
-            declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
-            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
-          fi
+          yarn add @ethersproject/cli
           echo "Pre-deploy env var RELEASE=${RELEASE}"
           ./scripts/deploy-machine.sh
         env:

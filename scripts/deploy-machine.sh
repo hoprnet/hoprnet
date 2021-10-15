@@ -35,7 +35,7 @@ if [ -z "${RELEASE:-}" ]; then
   RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 fi
 
-HOPRD_API_TOKEN='d3f4ul+!_2021'
+HOPRD_API_TOKEN='D3f4ul+!_2021'
 BS_PASSWORD='d3f4ul+!_2021'
 
 echo "Starting single testing node for hoprd:$RELEASE"
