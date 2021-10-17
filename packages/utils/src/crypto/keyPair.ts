@@ -48,6 +48,11 @@ export async function serializeKeyPair(
   // not include the Ethereum address
   delete decoded.address
 
+  Object.assign(decoded, {
+    crypto: decoded.Crypto
+  })
+
+  delete decoded.Crypto
   return new TextEncoder().encode(JSON.stringify(decoded))
 }
 
@@ -81,7 +86,8 @@ export async function deserializeKeyPair(
 
   const decoded = JSON.parse(encodedString)
 
-  if ((decoded.Crypto.kdfparams.n == 1) != useWeakCrypto) {
+  console.log(decoded)
+  if ((decoded.crypto.kdfparams.n == 1) != useWeakCrypto) {
     logError(
       `Either tried to deserialize a key file using weak crypto or to deserialize a weak crypto key file without using weak crypto.`
     )
