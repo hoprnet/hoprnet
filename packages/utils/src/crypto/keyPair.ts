@@ -41,7 +41,14 @@ export async function serializeKeyPair(
     serialized = await w.encrypt(password)
   }
 
-  return new TextEncoder().encode(serialized)
+  const decoded = JSON.parse(serialized)
+
+  // Following the Ethereum specification,
+  // for privacy reasons keyStore files should
+  // not include the Ethereum address
+  delete decoded.address
+
+  return new TextEncoder().encode(JSON.stringify(decoded))
 }
 
 type DeserializationError = 'Wrong usage of weak crypto' | 'Invalid password'
