@@ -1,7 +1,7 @@
 {
-  "address": "0x987cb736fBfBc4a397Acd06045bf0cD9B9deFe66",
-  "transactionHash": "0xe11e1a3aed81826a6ad8b64bad8d46dddc1a5c57a0957661de9f68f0b0739d02",
-  "blockNumber": 14829414,
+  "address": "0x50C54Eaba136f81bb1D626fbf1A45Ba9457469f7",
+  "transactionHash": "0x26e15c7e8ac0e1129a2ec6759d07f0f65aab22c55ee7f7c65bf7616076c22720",
+  "blockNumber": 18439312,
   "metadata": {
     "solcVersion": "0.6.6",
     "input": {
@@ -114,425 +114,425 @@
   },
   "abi": [
     {
-      "type": "constructor",
-      "stateMutability": "nonpayable",
       "inputs": [
         {
-          "type": "address",
+          "internalType": "contract HoprToken",
           "name": "_token",
-          "internalType": "contract HoprToken"
+          "type": "address"
         },
         {
-          "type": "uint128",
+          "internalType": "uint128",
           "name": "_startTime",
-          "internalType": "uint128"
+          "type": "uint128"
         },
         {
-          "type": "uint128",
+          "internalType": "uint128",
           "name": "_maxMintAmount",
-          "internalType": "uint128"
+          "type": "uint128"
         }
-      ]
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
     },
     {
-      "type": "event",
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint128",
+          "name": "amount",
+          "type": "uint128"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "scheduleName",
+          "type": "string"
+        }
+      ],
       "name": "AllocationAdded",
-      "inputs": [
-        {
-          "type": "address",
-          "name": "account",
-          "internalType": "address",
-          "indexed": true
-        },
-        {
-          "type": "uint128",
-          "name": "amount",
-          "internalType": "uint128",
-          "indexed": false
-        },
-        {
-          "type": "string",
-          "name": "scheduleName",
-          "internalType": "string",
-          "indexed": false
-        }
-      ],
-      "anonymous": false
+      "type": "event"
     },
     {
-      "type": "event",
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint128",
+          "name": "amount",
+          "type": "uint128"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "scheduleName",
+          "type": "string"
+        }
+      ],
       "name": "Claimed",
-      "inputs": [
-        {
-          "type": "address",
-          "name": "account",
-          "internalType": "address",
-          "indexed": true
-        },
-        {
-          "type": "uint128",
-          "name": "amount",
-          "internalType": "uint128",
-          "indexed": false
-        },
-        {
-          "type": "string",
-          "name": "scheduleName",
-          "internalType": "string",
-          "indexed": false
-        }
-      ],
-      "anonymous": false
+      "type": "event"
     },
     {
-      "type": "event",
-      "name": "OwnershipTransferred",
+      "anonymous": false,
       "inputs": [
         {
-          "type": "address",
+          "indexed": true,
+          "internalType": "address",
           "name": "previousOwner",
-          "internalType": "address",
-          "indexed": true
+          "type": "address"
         },
         {
-          "type": "address",
+          "indexed": true,
+          "internalType": "address",
           "name": "newOwner",
-          "internalType": "address",
-          "indexed": true
+          "type": "address"
         }
       ],
-      "anonymous": false
+      "name": "OwnershipTransferred",
+      "type": "event"
     },
     {
-      "type": "event",
-      "name": "ScheduleAdded",
+      "anonymous": false,
       "inputs": [
         {
-          "type": "uint128[]",
+          "indexed": false,
+          "internalType": "uint128[]",
           "name": "durations",
-          "internalType": "uint128[]",
-          "indexed": false
+          "type": "uint128[]"
         },
         {
-          "type": "uint128[]",
+          "indexed": false,
+          "internalType": "uint128[]",
           "name": "percents",
-          "internalType": "uint128[]",
-          "indexed": false
+          "type": "uint128[]"
         },
         {
-          "type": "string",
-          "name": "name",
+          "indexed": false,
           "internalType": "string",
-          "indexed": false
-        }
-      ],
-      "anonymous": false
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
-      "outputs": [
-        {
-          "type": "uint128",
-          "name": "",
-          "internalType": "uint128"
-        }
-      ],
-      "name": "MULTIPLIER",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "addAllocations",
-      "inputs": [
-        {
-          "type": "address[]",
-          "name": "accounts",
-          "internalType": "address[]"
-        },
-        {
-          "type": "uint128[]",
-          "name": "amounts",
-          "internalType": "uint128[]"
-        },
-        {
-          "type": "string",
-          "name": "scheduleName",
-          "internalType": "string"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "addSchedule",
-      "inputs": [
-        {
-          "type": "uint128[]",
-          "name": "durations",
-          "internalType": "uint128[]"
-        },
-        {
-          "type": "uint128[]",
-          "name": "percents",
-          "internalType": "uint128[]"
-        },
-        {
-          "type": "string",
           "name": "name",
-          "internalType": "string"
+          "type": "string"
         }
-      ]
+      ],
+      "name": "ScheduleAdded",
+      "type": "event"
     },
     {
-      "type": "function",
-      "stateMutability": "view",
+      "inputs": [],
+      "name": "MULTIPLIER",
       "outputs": [
         {
-          "type": "uint128",
-          "name": "amount",
-          "internalType": "uint128"
+          "internalType": "uint128",
+          "name": "",
+          "type": "uint128"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "accounts",
+          "type": "address[]"
         },
         {
-          "type": "uint128",
-          "name": "claimed",
-          "internalType": "uint128"
+          "internalType": "uint128[]",
+          "name": "amounts",
+          "type": "uint128[]"
         },
         {
-          "type": "uint128",
-          "name": "lastClaim",
-          "internalType": "uint128"
+          "internalType": "string",
+          "name": "scheduleName",
+          "type": "string"
+        }
+      ],
+      "name": "addAllocations",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint128[]",
+          "name": "durations",
+          "type": "uint128[]"
         },
         {
-          "type": "bool",
-          "name": "revoked",
-          "internalType": "bool"
+          "internalType": "uint128[]",
+          "name": "percents",
+          "type": "uint128[]"
+        },
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        }
+      ],
+      "name": "addSchedule",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
         }
       ],
       "name": "allocations",
-      "inputs": [
-        {
-          "type": "address",
-          "name": "",
-          "internalType": "address"
-        },
-        {
-          "type": "string",
-          "name": "",
-          "internalType": "string"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "claim",
-      "inputs": [
-        {
-          "type": "string",
-          "name": "scheduleName",
-          "internalType": "string"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "claimFor",
-      "inputs": [
-        {
-          "type": "address",
-          "name": "account",
-          "internalType": "address"
-        },
-        {
-          "type": "string",
-          "name": "scheduleName",
-          "internalType": "string"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
       "outputs": [
         {
-          "type": "uint128",
-          "name": "",
-          "internalType": "uint128"
+          "internalType": "uint128",
+          "name": "amount",
+          "type": "uint128"
+        },
+        {
+          "internalType": "uint128",
+          "name": "claimed",
+          "type": "uint128"
+        },
+        {
+          "internalType": "uint128",
+          "name": "lastClaim",
+          "type": "uint128"
+        },
+        {
+          "internalType": "bool",
+          "name": "revoked",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "scheduleName",
+          "type": "string"
+        }
+      ],
+      "name": "claim",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "scheduleName",
+          "type": "string"
+        }
+      ],
+      "name": "claimFor",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "scheduleName",
+          "type": "string"
         }
       ],
       "name": "getClaimable",
-      "inputs": [
-        {
-          "type": "address",
-          "name": "account",
-          "internalType": "address"
-        },
-        {
-          "type": "string",
-          "name": "scheduleName",
-          "internalType": "string"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
       "outputs": [
         {
-          "type": "uint128[]",
+          "internalType": "uint128",
           "name": "",
-          "internalType": "uint128[]"
-        },
+          "type": "uint128"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
         {
-          "type": "uint128[]",
-          "name": "",
-          "internalType": "uint128[]"
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
         }
       ],
       "name": "getSchedule",
-      "inputs": [
-        {
-          "type": "string",
-          "name": "name",
-          "internalType": "string"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
       "outputs": [
         {
-          "type": "uint128",
+          "internalType": "uint128[]",
           "name": "",
-          "internalType": "uint128"
-        }
-      ],
-      "name": "maxMintAmount",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
-      "outputs": [
-        {
-          "type": "address",
-          "name": "",
-          "internalType": "address"
-        }
-      ],
-      "name": "owner",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "renounceOwnership",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "revokeAccount",
-      "inputs": [
-        {
-          "type": "address",
-          "name": "account",
-          "internalType": "address"
+          "type": "uint128[]"
         },
         {
-          "type": "string",
+          "internalType": "uint128[]",
+          "name": "",
+          "type": "uint128[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maxMintAmount",
+      "outputs": [
+        {
+          "internalType": "uint128",
+          "name": "",
+          "type": "uint128"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
           "name": "scheduleName",
-          "internalType": "string"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
-      "outputs": [
-        {
-          "type": "uint128",
-          "name": "",
-          "internalType": "uint128"
+          "type": "string"
         }
       ],
+      "name": "revokeAccount",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "startTime",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
       "outputs": [
         {
-          "type": "address",
+          "internalType": "uint128",
           "name": "",
-          "internalType": "contract HoprToken"
+          "type": "uint128"
         }
       ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "token",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
       "outputs": [
         {
-          "type": "uint128",
+          "internalType": "contract HoprToken",
           "name": "",
-          "internalType": "uint128"
+          "type": "address"
         }
       ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "totalMinted",
-      "inputs": []
-    },
-    {
-      "type": "function",
-      "stateMutability": "view",
       "outputs": [
         {
-          "type": "uint128",
+          "internalType": "uint128",
           "name": "",
-          "internalType": "uint128"
+          "type": "uint128"
         }
       ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "totalToBeMinted",
-      "inputs": []
+      "outputs": [
+        {
+          "internalType": "uint128",
+          "name": "",
+          "type": "uint128"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     },
     {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "transferOwnership",
       "inputs": [
         {
-          "type": "address",
+          "internalType": "address",
           "name": "newOwner",
-          "internalType": "address"
+          "type": "address"
         }
-      ]
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
     },
     {
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "outputs": [],
-      "name": "updateStartTime",
       "inputs": [
         {
-          "type": "uint128",
+          "internalType": "uint128",
           "name": "_startTime",
-          "internalType": "uint128"
+          "type": "uint128"
         }
-      ]
+      ],
+      "name": "updateStartTime",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
     }
   ]
 }

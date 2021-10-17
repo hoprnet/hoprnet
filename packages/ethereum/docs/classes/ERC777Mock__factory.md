@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC777Mock__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC777Mock\_\_factory
 
 # Class: ERC777Mock\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new ERC777Mock__factory**(`signer?`)
+• **new ERC777Mock__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Mock__factory.ts:705
+packages/ethereum/types/factories/ERC777Mock__factory.ts:711
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Mock__factory.ts:704
+packages/ethereum/types/factories/ERC777Mock__factory.ts:710
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Mock__factory.ts:698
+packages/ethereum/types/factories/ERC777Mock__factory.ts:704
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Mock__factory.ts:701
+packages/ethereum/types/factories/ERC777Mock__factory.ts:707
 
 ___
 
@@ -192,7 +192,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Mock__factory.ts:664
+packages/ethereum/types/factories/ERC777Mock__factory.ts:670
 
 ___
 
@@ -221,7 +221,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Mock__factory.ts:681
+packages/ethereum/types/factories/ERC777Mock__factory.ts:687
 
 ___
 
@@ -242,7 +242,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Mock__factory.ts:709
+packages/ethereum/types/factories/ERC777Mock__factory.ts:715
 
 ___
 
@@ -256,7 +256,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Mock__factory.ts:706
+packages/ethereum/types/factories/ERC777Mock__factory.ts:712
 
 ___
 

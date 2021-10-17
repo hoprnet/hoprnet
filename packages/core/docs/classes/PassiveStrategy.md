@@ -52,7 +52,7 @@ ChannelStrategy.name
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L70)
+[packages/core/src/channel-strategy.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L71)
 
 ___
 
@@ -70,7 +70,7 @@ ChannelStrategy.tickInterval
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L65)
+[packages/core/src/channel-strategy.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L66)
 
 ## Methods
 
@@ -181,4 +181,4 @@ ChannelStrategy.tick
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L72)
+[packages/core/src/channel-strategy.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L73)

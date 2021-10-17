@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / AccessControl__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / AccessControl\_\_factory
 
 # Class: AccessControl\_\_factory
 

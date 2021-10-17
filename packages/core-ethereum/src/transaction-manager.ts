@@ -96,13 +96,27 @@ class TranscationManager {
   }
 
   /**
+   * Moves transcation from pending or mined to confirmed
+   * @param hash transaction hash
+   */
+  public moveToConfirmed(hash: string): void {
+    if (this.pending.has(hash)) {
+      this.moveFromPendingToMined(hash)
+    }
+    if (this.mined.has(hash)) {
+      this.moveFromMinedToConfirmed(hash)
+    }
+    return
+  }
+
+  /**
    * Moves transcation from pending to mined
    * @param hash transaction hash
    */
-  public moveToMined(hash: string): void {
+  public moveFromPendingToMined(hash: string): void {
     if (!this.pending.has(hash)) return
 
-    log('Moving transaction to confirmed %s', hash)
+    log('Moving transaction to mined %s', hash)
     this.mined.set(hash, this.pending.get(hash))
     this.pending.delete(hash)
   }
@@ -111,7 +125,7 @@ class TranscationManager {
    * Moves transcation from mined to confirmed. Delete payload
    * @param hash transaction hash
    */
-  public moveToConfirmed(hash: string): void {
+  public moveFromMinedToConfirmed(hash: string): void {
     if (!this.mined.has(hash)) return
 
     log('Moving transaction to confirmed %s', hash)

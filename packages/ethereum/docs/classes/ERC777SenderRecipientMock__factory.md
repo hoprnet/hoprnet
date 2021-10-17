@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC777SenderRecipientMock__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC777SenderRecipientMock\_\_factory
 
 # Class: ERC777SenderRecipientMock\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new ERC777SenderRecipientMock__factory**(`signer?`)
+• **new ERC777SenderRecipientMock__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:391
+packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:397
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:390
+packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:396
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:384
+packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:390
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:387
+packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:393
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:374
+packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:380
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:379
+packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:385
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:395
+packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:401
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:392
+packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:398
 
 ___
 

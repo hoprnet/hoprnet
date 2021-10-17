@@ -1,7 +1,7 @@
 # Run HOPRd  within a single container using npm
 
 # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-buster-slim@sha256:283d85e5a64183046abad478f5f98428720c1b30a72cc11d0cd1cedc1cb53493 as build
+FROM node:16-buster-slim@sha256:a49f003fbc2439e20601ed466a2cbc80699f238b56bb78ccb934bb3d92a23d53 as build
 
 # python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update && \
@@ -29,7 +29,7 @@ ENV npm_config_build_from_source false
 RUN yarn add @hoprnet/hoprd@${HOPRD_VERSION}
 
 # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-buster-slim@sha256:283d85e5a64183046abad478f5f98428720c1b30a72cc11d0cd1cedc1cb53493 as runtime
+FROM node:16-buster-slim@sha256:a49f003fbc2439e20601ed466a2cbc80699f238b56bb78ccb934bb3d92a23d53 as runtime
 
 # we use tini as process 1 to catch signals properly, which is also built into
 # D<Plug>_ocker by default

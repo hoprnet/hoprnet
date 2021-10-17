@@ -112,47 +112,37 @@ ___
 
 ### CHECK\_TIMEOUT
 
-• `Const` **CHECK\_TIMEOUT**: ``60000``
+• **CHECK\_TIMEOUT**: ``60000``
 
 #### Defined in
 
-[packages/core/src/constants.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L33)
+[packages/core/src/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L34)
 
 ___
 
 ### DEFAULT\_STUN\_PORT
 
-• `Const` **DEFAULT\_STUN\_PORT**: ``3478``
+• **DEFAULT\_STUN\_PORT**: ``3478``
 
 #### Defined in
 
-[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
+[packages/core/src/constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L17)
 
 ___
 
 ### FULL\_VERSION
 
-• `Const` **FULL\_VERSION**: `any`
+• **FULL\_VERSION**: `any`
 
 #### Defined in
 
-[packages/core/src/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L4)
+[packages/core/src/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L6)
 
 ___
 
 ### HEARTBEAT\_INTERVAL
 
-• `Const` **HEARTBEAT\_INTERVAL**: ``3000``
-
-#### Defined in
-
-[packages/core/src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L18)
-
-___
-
-### HEARTBEAT\_INTERVAL\_VARIANCE
-
-• `Const` **HEARTBEAT\_INTERVAL\_VARIANCE**: ``2000``
+• **HEARTBEAT\_INTERVAL**: ``3000``
 
 #### Defined in
 
@@ -160,89 +150,29 @@ ___
 
 ___
 
-### HEARTBEAT\_TIMEOUT
+### HEARTBEAT\_INTERVAL\_VARIANCE
 
-• `Const` **HEARTBEAT\_TIMEOUT**: ``4000``
+• **HEARTBEAT\_INTERVAL\_VARIANCE**: ``2000``
 
 #### Defined in
 
-[packages/core/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L23)
+[packages/core/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L20)
+
+___
+
+### HEARTBEAT\_TIMEOUT
+
+• **HEARTBEAT\_TIMEOUT**: ``4000``
+
+#### Defined in
+
+[packages/core/src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L24)
 
 ___
 
 ### INTERMEDIATE\_HOPS
 
-• `Const` **INTERMEDIATE\_HOPS**: ``3``
-
-#### Defined in
-
-[packages/core/src/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L27)
-
-___
-
-### MAX\_NEW\_CHANNELS\_PER\_TICK
-
-• `Const` **MAX\_NEW\_CHANNELS\_PER\_TICK**: ``5``
-
-#### Defined in
-
-[packages/core/src/constants.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L31)
-
-___
-
-### MAX\_PACKET\_DELAY
-
-• `Const` **MAX\_PACKET\_DELAY**: ``200``
-
-#### Defined in
-
-[packages/core/src/constants.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L25)
-
-___
-
-### MAX\_PARALLEL\_CONNECTIONS
-
-• `Const` **MAX\_PARALLEL\_CONNECTIONS**: ``5``
-
-#### Defined in
-
-[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
-
-___
-
-### MAX\_PATH\_ITERATIONS
-
-• `Const` **MAX\_PATH\_ITERATIONS**: ``100``
-
-#### Defined in
-
-[packages/core/src/constants.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L29)
-
-___
-
-### NETWORK\_QUALITY\_THRESHOLD
-
-• `Const` **NETWORK\_QUALITY\_THRESHOLD**: ``0.5``
-
-#### Defined in
-
-[packages/core/src/constants.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L30)
-
-___
-
-### PACKET\_SIZE
-
-• `Const` **PACKET\_SIZE**: ``500``
-
-#### Defined in
-
-[packages/core/src/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L3)
-
-___
-
-### PATH\_RANDOMNESS
-
-• `Const` **PATH\_RANDOMNESS**: ``0.1``
+• **INTERMEDIATE\_HOPS**: ``3``
 
 #### Defined in
 
@@ -250,39 +180,79 @@ ___
 
 ___
 
+### MAX\_NEW\_CHANNELS\_PER\_TICK
+
+• **MAX\_NEW\_CHANNELS\_PER\_TICK**: ``5``
+
+#### Defined in
+
+[packages/core/src/constants.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L32)
+
+___
+
+### MAX\_PACKET\_DELAY
+
+• **MAX\_PACKET\_DELAY**: ``200``
+
+#### Defined in
+
+[packages/core/src/constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L26)
+
+___
+
+### MAX\_PARALLEL\_CONNECTIONS
+
+• **MAX\_PARALLEL\_CONNECTIONS**: ``5``
+
+#### Defined in
+
+[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
+
+___
+
+### MAX\_PATH\_ITERATIONS
+
+• **MAX\_PATH\_ITERATIONS**: ``100``
+
+#### Defined in
+
+[packages/core/src/constants.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L30)
+
+___
+
+### NETWORK\_QUALITY\_THRESHOLD
+
+• **NETWORK\_QUALITY\_THRESHOLD**: ``0.5``
+
+#### Defined in
+
+[packages/core/src/constants.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L31)
+
+___
+
+### PACKET\_SIZE
+
+• **PACKET\_SIZE**: ``500``
+
+#### Defined in
+
+[packages/core/src/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L5)
+
+___
+
+### PATH\_RANDOMNESS
+
+• **PATH\_RANDOMNESS**: ``0.1``
+
+#### Defined in
+
+[packages/core/src/constants.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L29)
+
+___
+
 ### PROTOCOL\_ACKNOWLEDGEMENT
 
-• `Const` **PROTOCOL\_ACKNOWLEDGEMENT**: `string`
-
-#### Defined in
-
-[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
-
-___
-
-### PROTOCOL\_HEARTBEAT
-
-• `Const` **PROTOCOL\_HEARTBEAT**: `string`
-
-#### Defined in
-
-[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
-
-___
-
-### PROTOCOL\_ONCHAIN\_KEY
-
-• `Const` **PROTOCOL\_ONCHAIN\_KEY**: `string`
-
-#### Defined in
-
-[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
-
-___
-
-### PROTOCOL\_PAYMENT\_CHANNEL
-
-• `Const` **PROTOCOL\_PAYMENT\_CHANNEL**: `string`
+• **PROTOCOL\_ACKNOWLEDGEMENT**: `string`
 
 #### Defined in
 
@@ -290,23 +260,53 @@ ___
 
 ___
 
-### PROTOCOL\_STRING
+### PROTOCOL\_HEARTBEAT
 
-• `Const` **PROTOCOL\_STRING**: `string`
+• **PROTOCOL\_HEARTBEAT**: `string`
 
 #### Defined in
 
-[packages/core/src/constants.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L11)
+[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
+
+___
+
+### PROTOCOL\_ONCHAIN\_KEY
+
+• **PROTOCOL\_ONCHAIN\_KEY**: `string`
+
+#### Defined in
+
+[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
+
+___
+
+### PROTOCOL\_PAYMENT\_CHANNEL
+
+• **PROTOCOL\_PAYMENT\_CHANNEL**: `string`
+
+#### Defined in
+
+[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
+
+___
+
+### PROTOCOL\_STRING
+
+• **PROTOCOL\_STRING**: `string`
+
+#### Defined in
+
+[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
 
 ___
 
 ### VERSION
 
-• `Const` **VERSION**: `string`
+• **VERSION**: `string`
 
 #### Defined in
 
-[packages/core/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L7)
+[packages/core/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L8)
 
 ## Functions
 

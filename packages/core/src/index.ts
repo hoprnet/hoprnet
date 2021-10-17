@@ -267,16 +267,20 @@ class Hopr extends EventEmitter {
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     )
 
+    ethereum.on('ticket:win', (ack, channel) => {
+      this.onWinningTicket(ack, channel)
+    })
+
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
     await this.announce(this.options.announce)
     log('announcing done, starting heartbeat')
-
     this.heartbeat.start()
+
     this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
     this.status = 'RUNNING'
-    this.emit('running')
+    this.emit('running with strategy', this.strategy.name)
 
     // Log information
     log('# STARTED NODE')
@@ -363,7 +367,7 @@ class Hopr extends EventEmitter {
   // On the strategy interval, poll the strategy to see what channel changes
   // need to be made.
   private async tickChannelStrategy() {
-    verbose('strategy tick', this.status)
+    verbose('strategy tick', this.status, this.strategy.name)
     if (this.status != 'RUNNING') {
       return
     }
@@ -664,12 +668,12 @@ class Hopr extends EventEmitter {
   }
 
   public async setChannelStrategy(strategy: ChannelStrategy) {
+    log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
-    const ethereum = this.paymentChannels
-    ethereum.on('ticket:win', (ack, channel) => {
-      // TODO - don't double bind here
-      this.strategy.onWinningTicket(ack, channel)
-    })
+  }
+
+  private onWinningTicket(ack, channel) {
+    this.strategy.onWinningTicket(ack, channel)
   }
 
   public getChannelStrategy(): string {
@@ -717,7 +721,11 @@ class Hopr extends EventEmitter {
     if (amountToFund.lten(0)) {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
     } else if (amountToFund.gt(myAvailableTokens.toBN())) {
-      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
+      throw Error(
+        `You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens
+          .toBN()
+          .toString(10)} at address ${selfPubKey.toAddress().toHex()}`
+      )
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
@@ -759,7 +767,11 @@ class Hopr extends EventEmitter {
     if (totalFund.lten(0)) {
       throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
     } else if (totalFund.gt(myBalance.toBN())) {
-      throw Error(`You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.toBN().toString(10)}`)
+      throw Error(
+        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance
+          .toBN()
+          .toString(10)} at address ${selfPubKey.toAddress().toHex()}`
+      )
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)

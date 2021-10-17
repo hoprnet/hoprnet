@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / IERC677__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / IERC677\_\_factory
 
 # Class: IERC677\_\_factory
 

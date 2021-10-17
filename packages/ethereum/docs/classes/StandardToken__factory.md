@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / StandardToken__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / StandardToken\_\_factory
 
 # Class: StandardToken\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new StandardToken__factory**(`signer?`)
+• **new StandardToken__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/StandardToken__factory.ts:256
+packages/ethereum/types/factories/StandardToken__factory.ts:262
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/StandardToken__factory.ts:255
+packages/ethereum/types/factories/StandardToken__factory.ts:261
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/StandardToken__factory.ts:249
+packages/ethereum/types/factories/StandardToken__factory.ts:255
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/StandardToken__factory.ts:252
+packages/ethereum/types/factories/StandardToken__factory.ts:258
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/StandardToken__factory.ts:239
+packages/ethereum/types/factories/StandardToken__factory.ts:245
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/StandardToken__factory.ts:244
+packages/ethereum/types/factories/StandardToken__factory.ts:250
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/StandardToken__factory.ts:260
+packages/ethereum/types/factories/StandardToken__factory.ts:266
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/StandardToken__factory.ts:257
+packages/ethereum/types/factories/StandardToken__factory.ts:263
 
 ___
 

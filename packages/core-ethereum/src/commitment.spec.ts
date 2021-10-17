@@ -1,19 +1,11 @@
 import assert from 'assert'
-import { Commitment } from './commitment'
+import { initializeCommitment, bumpCommitment, findCommitmentPreImage } from './commitment'
 import sinon from 'sinon'
 import { Hash, HoprDB } from '@hoprnet/hopr-utils'
-import EventEmitter from 'events'
 
-class FakeIndexer extends EventEmitter {
-  waitForCommitment() {
-    return undefined
-  }
-}
-
-describe('test commitment', function () {
-  let fakeSet, fakeGet, fakeDB, fakeId: Hash, fakeIndexer
+describe('commitment', function () {
+  let fakeSet, fakeGet, fakeDB, fakeId: Hash
   beforeEach(async function () {
-    fakeIndexer = new FakeIndexer()
     fakeSet = sinon.fake.resolves(undefined)
     fakeGet = sinon.fake.resolves(undefined)
     fakeDB = HoprDB.createMock()
@@ -22,20 +14,20 @@ describe('test commitment', function () {
 
   it('should publish a hashed secret', async function () {
     this.timeout(3000)
-
-    let cm = new Commitment(fakeSet, fakeGet, fakeDB, fakeId, fakeIndexer)
-    let c1 = await cm.getCurrentCommitment()
+    await initializeCommitment(fakeDB, fakeId, fakeGet, fakeSet)
+    let c1 = await findCommitmentPreImage(fakeDB, fakeId)
     assert(c1 != null, 'gives current commitment')
     assert.strictEqual(fakeGet.callCount, 1, 'should look on chain')
     assert(fakeSet.callCount == 1, 'should set a new commitment on chain')
-    await cm.bumpCommitment()
-    let c2 = await cm.getCurrentCommitment()
+
+    await bumpCommitment(fakeDB, fakeId)
+    let c2 = await findCommitmentPreImage(fakeDB, fakeId)
     assert(c2, 'gives current commitment')
     assert(c2.hash().eq(c1), 'c2 is commitment of c1')
-    //
+
     fakeGet = () => Promise.resolve(c2)
-    let cm2 = new Commitment(fakeSet, fakeGet, fakeDB, fakeId, fakeIndexer)
-    let c3 = await cm2.getCurrentCommitment()
+    await initializeCommitment(fakeDB, fakeId, fakeGet, fakeSet)
+    let c3 = await findCommitmentPreImage(fakeDB, fakeId)
     assert(c2.eq(c3), 'Repeated initializations should return the same')
   })
 })

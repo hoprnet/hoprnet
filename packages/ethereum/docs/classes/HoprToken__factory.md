@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprToken__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprToken\_\_factory
 
 # Class: HoprToken\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new HoprToken__factory**(`signer?`)
+• **new HoprToken__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:962
+packages/ethereum/types/factories/HoprToken__factory.ts:968
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:961
+packages/ethereum/types/factories/HoprToken__factory.ts:967
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:955
+packages/ethereum/types/factories/HoprToken__factory.ts:961
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:958
+packages/ethereum/types/factories/HoprToken__factory.ts:964
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:945
+packages/ethereum/types/factories/HoprToken__factory.ts:951
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:950
+packages/ethereum/types/factories/HoprToken__factory.ts:956
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:966
+packages/ethereum/types/factories/HoprToken__factory.ts:972
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:963
+packages/ethereum/types/factories/HoprToken__factory.ts:969
 
 ___
 

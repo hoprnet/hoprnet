@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC1820Implementer__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC1820Implementer\_\_factory
 
 # Class: ERC1820Implementer\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new ERC1820Implementer__factory**(`signer?`)
+• **new ERC1820Implementer__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [signer: Signer] \| [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] |
 
 #### Overrides
 
@@ -105,17 +105,17 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:64
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:70
 
 ___
 
 ### bytecode
 
-▪ `Static` `Readonly` **bytecode**: ``"0x608060405234801561001057600080fd5b50610112806100206000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063249cb3fa14602d575b600080fd5b603c603836600460a4565b604e565b60405190815260200160405180910390f35b6000828152602081815260408083206001600160a01b038516845290915281205460ff16607b576000609d565b7fa2ef4600d742022d532d4747cb3547474667d6f13804902513b2ec01c848f4b45b9392505050565b6000806040838503121560b5578182fd5b8235915060208301356001600160a01b038116811460d1578182fd5b80915050925092905056fea264697066735822122083955dced04baee5a5fe89f6ff23af051fe56c66fa086e20144b2a9a4782137d64736f6c63430008030033"``
+▪ `Static` `Readonly` **bytecode**: ``"0x608060405234801561001057600080fd5b50610114806100206000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063249cb3fa14602d575b600080fd5b603c603836600460a4565b604e565b60405190815260200160405180910390f35b6000828152602081815260408083206001600160a01b038516845290915281205460ff16607b576000609d565b7fa2ef4600d742022d532d4747cb3547474667d6f13804902513b2ec01c848f4b45b9392505050565b6000806040838503121560b657600080fd5b8235915060208301356001600160a01b038116811460d357600080fd5b80915050925092905056fea26469706673582212204988439123bdd16a515b523f093511dcd3c8c561f8274ad06cf078f8fdb3642364736f6c63430008090033"``
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:63
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:69
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:57
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:63
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:60
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:66
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:47
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:53
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:52
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:58
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:68
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:74
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:65
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:71
 
 ___
 

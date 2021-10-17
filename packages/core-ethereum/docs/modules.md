@@ -38,7 +38,7 @@
 
 ### CONFIRMATIONS
 
-• `Const` **CONFIRMATIONS**: ``8``
+• **CONFIRMATIONS**: ``8``
 
 #### Defined in
 
@@ -48,11 +48,11 @@ ___
 
 ### INDEXER\_BLOCK\_RANGE
 
-• `Const` **INDEXER\_BLOCK\_RANGE**: ``2000``
+• **INDEXER\_BLOCK\_RANGE**: ``2000``
 
 #### Defined in
 
-[packages/core-ethereum/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L8)
+[packages/core-ethereum/src/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L9)
 
 ## Functions
 

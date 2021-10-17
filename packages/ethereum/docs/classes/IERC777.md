@@ -722,7 +722,7 @@ ___
 
 ### listeners
 
-▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): `TypedListener`<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
@@ -739,7 +739,7 @@ ___
 
 #### Returns
 
-[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
+`TypedListener`<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -807,7 +807,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `eventFilter` | [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<`EventArgsArray`, `EventArgsObject`\> |
-| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | `TypedListener`<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
@@ -860,7 +860,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `eventFilter` | [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<`EventArgsArray`, `EventArgsObject`\> |
-| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | `TypedListener`<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
@@ -913,7 +913,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `eventFilter` | [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<`EventArgsArray`, `EventArgsObject`\> |
-| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | `TypedListener`<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
@@ -1099,7 +1099,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `eventFilter` | [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<`EventArgsArray`, `EventArgsObject`\> |
-| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | `TypedListener`<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 

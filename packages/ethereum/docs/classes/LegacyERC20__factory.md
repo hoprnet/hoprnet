@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / LegacyERC20__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / LegacyERC20\_\_factory
 
 # Class: LegacyERC20\_\_factory
 

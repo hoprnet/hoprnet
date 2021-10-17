@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / DetailedERC20__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / DetailedERC20\_\_factory
 
 # Class: DetailedERC20\_\_factory
 

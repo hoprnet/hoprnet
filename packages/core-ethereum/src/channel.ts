@@ -13,12 +13,11 @@ import {
   generateChannelId,
   ChannelStatus,
   PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB,
-  retryWithBackoff
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 import type { RedeemTicketResponse } from '.'
-import { Commitment } from './commitment'
+import { findCommitmentPreImage, bumpCommitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
 import type { HoprDB } from '@hoprnet/hopr-utils'
@@ -29,6 +28,8 @@ const log = debug('hopr-core-ethereum:channel')
 
 // TODO - legacy, models bidirectional channel.
 class Channel {
+  _redeemingAll: Promise<void> | undefined = undefined
+
   constructor(
     private readonly self: PublicKey,
     private readonly counterparty: PublicKey,
@@ -54,23 +55,8 @@ class Channel {
     const response = unacknowledgedTicket.getResponse(acknowledgement)
 
     const ticket = unacknowledgedTicket.ticket
-
-    const setCommitment = (commitment: Hash): Promise<string> => {
-      // NB: We do not catch any error here, as we want it to propagate
-      // to the place where the commitment was triggered, namely the bump
-      // commitment
-      return this.chain.setCommitment(this.counterparty.toAddress(), commitment)
-    }
-
-    const commitment = new Commitment(
-      setCommitment,
-      () => this.getChainCommitment(),
-      this.db,
-      generateChannelId(this.counterparty.toAddress(), this.self.toAddress()), // Counterparty to us
-      this.indexer
-    )
-
-    const opening = await commitment.findPreImage(await commitment.getCurrentCommitment())
+    const channelId = this.getThemToUsId()
+    const opening = await findCommitmentPreImage(this.db, channelId)
 
     if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
       const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
@@ -82,7 +68,7 @@ class Channel {
       )
 
       try {
-        await retryWithBackoff(() => commitment.bumpCommitment())
+        await bumpCommitment(this.db, channelId)
         this.events.emit('ticket:win', ack, this)
         return ack
       } catch (e) {
@@ -124,7 +110,8 @@ class Channel {
     if (totalFund.gt(new BN(myBalance.toBN().toString()))) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
+    const tx = await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   async open(fundAmount: Balance) {
@@ -143,7 +130,8 @@ class Channel {
     if (new BN(myBalance.toBN().toString()).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')
     }
-    await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
+    const tx = await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
+    await this.indexer.resolvePendingTransaction('channel-updated', tx)
     return generateChannelId(myAddress, counterpartyAddress)
   }
 
@@ -153,7 +141,8 @@ class Channel {
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return await this.chain.initiateChannelClosure(counterpartyAddress)
+    const tx = await this.chain.initiateChannelClosure(counterpartyAddress)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   async finalizeClosure() {
@@ -163,7 +152,8 @@ class Channel {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(counterpartyAddress)
+    const tx = await this.chain.finalizeChannelClosure(counterpartyAddress)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   private async bumpTicketIndex(channelId: Hash): Promise<UINT256> {
@@ -249,12 +239,35 @@ class Channel {
     }
   }
 
-  async getAcknowledgedTickets(): Promise<AcknowledgedTicket[]> {
-    return await this.db.getAcknowledgedTickets({ signer: this.counterparty })
-  }
-
-  async redeemAllTickets(): Promise<RedeemTicketResponse[]> {
-    return await Promise.all((await this.getAcknowledgedTickets()).map((a) => this.redeemTicket(a)))
+  async redeemAllTickets(): Promise<void> {
+    if (this._redeemingAll) {
+      return this._redeemingAll
+    }
+    // Because tickets are ordered and require the previous redemption to
+    // have succeeded before we can redeem the next, we need to do this
+    // sequentially.
+    const tickets = await this.db.getAcknowledgedTickets({ signer: this.counterparty })
+    const _redeemAll = async () => {
+      try {
+        for (const ticket of tickets) {
+          log('redeeming ticket', ticket)
+          const result = await this.redeemTicket(ticket)
+          if (result.status !== 'SUCCESS') {
+            log('Error redeeming ticket', result)
+            // We need to abort as tickets require ordered redemption.
+            return
+          }
+          log('ticket was redeemed')
+        }
+      } catch (e) {
+        // We are going to swallow the error here, as more than one consumer may
+        // be inspecting this same promise.
+        log('Error when redeeming tickets, aborting', e)
+      }
+      this._redeemingAll = undefined
+    }
+    this._redeemingAll = _redeemAll()
+    return this._redeemingAll
   }
 
   async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
@@ -290,6 +303,7 @@ class Channel {
       }
 
       const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
+      await this.indexer.resolvePendingTransaction('channel-updated', receipt)
 
       //this.commitment.updateChainState(ackTicket.preImage)
       log('Successfully submitted ticket', ackTicket.response.toHex())

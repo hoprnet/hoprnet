@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprWrapper__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprWrapper\_\_factory
 
 # Class: HoprWrapper\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new HoprWrapper__factory**(`signer?`)
+• **new HoprWrapper__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapper__factory.ts:301
+packages/ethereum/types/factories/HoprWrapper__factory.ts:307
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapper__factory.ts:300
+packages/ethereum/types/factories/HoprWrapper__factory.ts:306
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapper__factory.ts:294
+packages/ethereum/types/factories/HoprWrapper__factory.ts:300
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapper__factory.ts:297
+packages/ethereum/types/factories/HoprWrapper__factory.ts:303
 
 ___
 
@@ -189,7 +189,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapper__factory.ts:276
+packages/ethereum/types/factories/HoprWrapper__factory.ts:282
 
 ___
 
@@ -215,7 +215,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapper__factory.ts:287
+packages/ethereum/types/factories/HoprWrapper__factory.ts:293
 
 ___
 
@@ -236,7 +236,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapper__factory.ts:305
+packages/ethereum/types/factories/HoprWrapper__factory.ts:311
 
 ___
 
@@ -250,7 +250,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapper__factory.ts:302
+packages/ethereum/types/factories/HoprWrapper__factory.ts:308
 
 ___
 
