@@ -112,16 +112,21 @@ const hardhatConfig: HardhatUserConfig = {
   }
 }
 
+const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
+const DEFAULT_FUND_AMOUNT = '1'
+
 task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) => {
   return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
 })
-  .addParam<string>('address', 'HoprToken address', undefined, types.string)
-  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', '1', types.string)
-  .addOptionalParam<boolean>(
-    'ishopraddress',
-    'Whether the address passed is a HOPR address or not',
-    false,
-    types.boolean
+  .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
+  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
+  .addFlag('ishopraddress', 'Whether the address passed is a HOPR address or not')
+  .addFlag(`uselocalidentities`, `Fund all identities stored in ${DEFAULT_IDENTITY_DIRECTORY}`)
+  .addOptionalParam(
+    'identityDirectory',
+    'Overwrite default identity directory',
+    DEFAULT_IDENTITY_DIRECTORY,
+    types.string
   )
 
 task('accounts', 'View unlocked accounts', async (...args: any[]) => {
