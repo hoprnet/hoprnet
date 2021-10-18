@@ -48,9 +48,9 @@ export interface ChannelStrategy {
  * At present this does not take gas into consideration.
  */
 export abstract class SaneDefaults {
-  async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
+  async onWinningTicket(_a: AcknowledgedTicket, c: Channel) {
     log('auto redeeming')
-    await c.redeemTicket(ack)
+    await c.redeemAllTickets()
   }
 
   async onChannelWillClose(c: Channel) {

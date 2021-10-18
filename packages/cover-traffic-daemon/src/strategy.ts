@@ -94,7 +94,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
             this.data
           ).then((success) => {
             if (!success) {
-              log('failed to send', openChannel.destination)
+              log('failed to send', openChannel.destination.toB58String())
               this.data.incrementMessageFails(openChannel.destination)
             }
           })
