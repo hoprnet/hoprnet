@@ -4,7 +4,7 @@ import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp2
 import { moveDecimalPoint } from '../math'
 import { u8aToHex, u8aEquals, stringToU8a, u8aConcat, serializeToU8a, u8aToNumber, u8aSplit } from '../u8a'
 import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 import { pubKeyToPeerId } from '../libp2p'
 
 export class PublicKey {
@@ -33,6 +33,10 @@ export class PublicKey {
 
   static fromPeerId(peerId: PeerId) {
     return new PublicKey(peerId.pubKey.marshal())
+  }
+
+  static fromPeerIdString(peerIdString: string) {
+    return PublicKey.fromPeerId(PeerId.createFromB58String(peerIdString))
   }
 
   toAddress(): Address {
