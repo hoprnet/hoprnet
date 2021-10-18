@@ -101,7 +101,7 @@ ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `inputs`: `any`[] = []; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `inputs`: `any`[] = []; `name`: `string` = "ERC1820\_REGISTRY"; `outputs`: { `internalType`: `string` = "contract IERC1820Registry"; `name`: `string` = ""; `type`: `string` = "address" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" } \| { `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "token"; `type`: `string` = "address" }[] ; `name`: `string` = "recoverTokens"; `outputs`: `any`[] = []; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" })[]
+▪ `Static` `Readonly` **abi**: ({ `inputs`: `any`[] = []; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `inputs`: `any`[] = []; `name`: `string` = "ERC1820\_REGISTRY"; `outputs`: { `internalType`: `string` = "contract IERC1820Registry"; `name`: `string` = ""; `type`: `string` = "address" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" } \| { `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "token"; `type`: `string` = "address" }[] ; `name`: `string` = "recoverTokens"; `outputs`: `any`[] = []; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" })[] = `_abi`
 
 #### Defined in
 

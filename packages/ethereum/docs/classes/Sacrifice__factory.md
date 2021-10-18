@@ -101,7 +101,7 @@ ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: { `inputs`: { `name`: `string` = "\_recipient"; `type`: `string` = "address" }[] ; `payable`: `boolean` = true; `stateMutability`: `string` = "payable"; `type`: `string` = "constructor" }[]
+▪ `Static` `Readonly` **abi**: { `inputs`: { `name`: `string` = "\_recipient"; `type`: `string` = "address" }[] ; `payable`: `boolean` = true; `stateMutability`: `string` = "payable"; `type`: `string` = "constructor" }[] = `_abi`
 
 #### Defined in
 

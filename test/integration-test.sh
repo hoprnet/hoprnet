@@ -40,7 +40,8 @@ declare api5="${5}"
 # $3 = OPTIONAL: positive assertion message
 # $4 = OPTIONAL: maximum wait time in seconds during which we busy try
 # afterwards we fail, defaults to 0
-# $4 = OPTIONAL: step time between retries in seconds, defaults to 5 seconds
+# $4 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds 
+# (8 blocks with 1-3 s/block in ganache)
 # $5 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
 # priority than wait time, defaults to 0
 run_command(){
@@ -49,7 +50,7 @@ run_command(){
   local hopr_cmd="${2}"
   local assertion="${3:-}"
   local wait_time=${4:-0}
-  local step_time=${5:-5}
+  local step_time=${5:-25}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
   local cmd="curl -m ${step_time} --connect-timeout ${step_time} --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v1/command --data "

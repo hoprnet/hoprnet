@@ -27,7 +27,7 @@
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: { `inputs`: `any`[] = []; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" }[]
+▪ `Static` `Readonly` **abi**: { `inputs`: `any`[] = []; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" }[] = `_abi`
 
 #### Defined in
 

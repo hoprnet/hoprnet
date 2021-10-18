@@ -47,6 +47,7 @@
 - [Hosts](modules.md#hosts)
 - [LibP2PHandlerArgs](modules.md#libp2phandlerargs)
 - [LibP2PHandlerFunction](modules.md#libp2phandlerfunction)
+- [Network](modules.md#network)
 - [PRGParameters](modules.md#prgparameters)
 - [PRPParameters](modules.md#prpparameters)
 - [PromiseValue](modules.md#promisevalue)
@@ -61,6 +62,8 @@
 - [HASH\_LENGTH](modules.md#hash_length)
 - [INVERSE\_TICKET\_WIN\_PROB](modules.md#inverse_ticket_win_prob)
 - [LENGTH\_PREFIX\_LENGTH](modules.md#length_prefix_length)
+- [LINK\_LOCAL\_NETWORKS](modules.md#link_local_networks)
+- [LOOPBACK\_ADDRS](modules.md#loopback_addrs)
 - [MAX\_AUTO\_CHANNELS](modules.md#max_auto_channels)
 - [MINIMUM\_REASONABLE\_CHANNEL\_STAKE](modules.md#minimum_reasonable_channel_stake)
 - [MIN\_NATIVE\_BALANCE](modules.md#min_native_balance)
@@ -71,10 +74,12 @@
 - [PRG\_KEY\_LENGTH](modules.md#prg_key_length)
 - [PRICE\_PER\_PACKET](modules.md#price_per_packet)
 - [PRIVATE\_KEY\_LENGTH](modules.md#private_key_length)
+- [PRIVATE\_NETWORK](modules.md#private_network)
 - [PRP\_IV\_LENGTH](modules.md#prp_iv_length)
 - [PRP\_KEY\_LENGTH](modules.md#prp_key_length)
 - [PRP\_MIN\_LENGTH](modules.md#prp_min_length)
 - [PUBLIC\_KEY\_LENGTH](modules.md#public_key_length)
+- [RESERVED\_ADDRS](modules.md#reserved_addrs)
 - [SECP256K1\_CONSTANTS](modules.md#secp256k1_constants)
 - [SIGNATURE\_LENGTH](modules.md#signature_length)
 - [SIGNATURE\_RECOVERY\_LENGTH](modules.md#signature_recovery_length)
@@ -243,7 +248,7 @@ ___
 
 #### Defined in
 
-[libp2p/dialHelper.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L21)
+[libp2p/dialHelper.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L22)
 
 ___
 
@@ -304,6 +309,24 @@ ___
 #### Defined in
 
 [libp2p/index.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L141)
+
+___
+
+### Network
+
+Ƭ **Network**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `family` | `NetworkInterfaceInfo`[``"family"``] |
+| `networkPrefix` | `Uint8Array` |
+| `subnet` | `Uint8Array` |
+
+#### Defined in
+
+[network/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L3)
 
 ___
 
@@ -439,6 +462,26 @@ ___
 
 ___
 
+### LINK\_LOCAL\_NETWORKS
+
+• **LINK\_LOCAL\_NETWORKS**: [`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/constants.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L40)
+
+___
+
+### LOOPBACK\_ADDRS
+
+• **LOOPBACK\_ADDRS**: [`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/constants.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L54)
+
+___
+
 ### MAX\_AUTO\_CHANNELS
 
 • **MAX\_AUTO\_CHANNELS**: ``5``
@@ -539,6 +582,16 @@ ___
 
 ___
 
+### PRIVATE\_NETWORK
+
+• **PRIVATE\_NETWORK**: [`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L10)
+
+___
+
 ### PRP\_IV\_LENGTH
 
 • **PRP\_IV\_LENGTH**: `number`
@@ -576,6 +629,16 @@ ___
 #### Defined in
 
 [constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L4)
+
+___
+
+### RESERVED\_ADDRS
+
+• **RESERVED\_ADDRS**: [`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/constants.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L67)
 
 ___
 
@@ -727,7 +790,7 @@ Checks if given address is in one of the given networks
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `networks` | `Network`[] | network address spaces to check |
+| `networks` | [`Network`](modules.md#network)[] | network address spaces to check |
 | `address` | `Uint8Array` | ip address to check |
 | `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
@@ -1004,7 +1067,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L49)
+[libp2p/dialHelper.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L53)
 
 ___
 
@@ -1161,7 +1224,7 @@ ___
 
 ### getLocalAddresses
 
-▸ **getLocalAddresses**(`_iface?`): `Network`[]
+▸ **getLocalAddresses**(`_iface?`): [`Network`](modules.md#network)[]
 
 #### Parameters
 
@@ -1171,7 +1234,7 @@ ___
 
 #### Returns
 
-`Network`[]
+[`Network`](modules.md#network)[]
 
 #### Defined in
 
@@ -1181,7 +1244,7 @@ ___
 
 ### getLocalHosts
 
-▸ **getLocalHosts**(`_iface?`): `Network`[]
+▸ **getLocalHosts**(`_iface?`): [`Network`](modules.md#network)[]
 
 #### Parameters
 
@@ -1191,7 +1254,7 @@ ___
 
 #### Returns
 
-`Network`[]
+[`Network`](modules.md#network)[]
 
 #### Defined in
 
@@ -1245,7 +1308,7 @@ ___
 
 ### getPrivateAddresses
 
-▸ **getPrivateAddresses**(`_iface?`): `Network`[]
+▸ **getPrivateAddresses**(`_iface?`): [`Network`](modules.md#network)[]
 
 #### Parameters
 
@@ -1255,7 +1318,7 @@ ___
 
 #### Returns
 
-`Network`[]
+[`Network`](modules.md#network)[]
 
 #### Defined in
 
@@ -1265,7 +1328,7 @@ ___
 
 ### getPublicAddresses
 
-▸ **getPublicAddresses**(`_iface?`): `Network`[]
+▸ **getPublicAddresses**(`_iface?`): [`Network`](modules.md#network)[]
 
 #### Parameters
 
@@ -1275,7 +1338,7 @@ ___
 
 #### Returns
 
-`Network`[]
+[`Network`](modules.md#network)[]
 
 #### Defined in
 
@@ -2303,7 +2366,7 @@ ___
 
 ### toNetworkPrefix
 
-▸ **toNetworkPrefix**(`addr`): `Network`
+▸ **toNetworkPrefix**(`addr`): [`Network`](modules.md#network)
 
 #### Parameters
 
@@ -2313,7 +2376,7 @@ ___
 
 #### Returns
 
-`Network`
+[`Network`](modules.md#network)
 
 #### Defined in
 
