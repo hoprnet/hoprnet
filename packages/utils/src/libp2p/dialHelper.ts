@@ -16,7 +16,8 @@ const logError = debug(`hopr-core:libp2p:error`)
 const DEFAULT_DHT_QUERY_TIMEOUT = 10000
 
 export type DialOpts = {
-  timeout: number
+  timeout?: number
+  abort?: AbortController
 }
 
 export type DialResponse =
@@ -26,6 +27,9 @@ export type DialResponse =
     }
   | {
       status: 'E_TIMEOUT'
+    }
+  | {
+      status: 'E_ABORTED'
     }
   | {
       status: 'E_DIAL'
@@ -41,6 +45,7 @@ export type DialResponse =
 function renderPeerStoreAddresses(addresses: Address[], delimiter: string = '\n  '): string {
   return addresses.map((addr: Address) => addr.multiaddr.toString()).join(delimiter)
 }
+
 /**
  * Combines libp2p methods such as dialProtocol and peerRouting.findPeer
  * to establish a connection.
@@ -57,13 +62,21 @@ export async function dial(
   opts?: DialOpts
 ): Promise<DialResponse> {
   let timeout: NodeJS.Timeout
-  const abort = new AbortController()
+  const abort = opts.abort ?? new AbortController()
+
   let timeoutPromise = new Promise<DialResponse>((resolve) => {
     timeout = setTimeout(() => {
       abort.abort()
       verbose(`timeout while trying to dial ${destination.toB58String()}`)
       resolve({ status: 'E_TIMEOUT' })
-    }, opts.timeout || DEFAULT_DHT_QUERY_TIMEOUT)
+    }, opts.timeout ?? DEFAULT_DHT_QUERY_TIMEOUT)
+
+    const onAbort = () => {
+      clearTimeout(timeout)
+      abort.signal.removeEventListener('abort', onAbort)
+      resolve({ status: 'E_ABORTED' })
+    }
+    abort.signal.addEventListener('abort', onAbort)
   })
 
   async function doDial(): Promise<DialResponse> {
