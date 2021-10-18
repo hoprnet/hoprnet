@@ -328,7 +328,7 @@ ___
 
 ### redeemTicket
 
-▸ **redeemTicket**(`ackTicket`): `Promise`<[`RedeemTicketResponse`](../modules.md#redeemticketresponse)\>
+▸ `Protected` **redeemTicket**(`ackTicket`): `Promise`<[`RedeemTicketResponse`](../modules.md#redeemticketresponse)\>
 
 #### Parameters
 
@@ -342,7 +342,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/channel.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L273)
+[packages/core-ethereum/src/channel.ts:276](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L276)
 
 ___
 

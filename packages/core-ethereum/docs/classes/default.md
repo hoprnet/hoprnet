@@ -53,6 +53,7 @@
 - [prependListener](default.md#prependlistener)
 - [prependOnceListener](default.md#prependoncelistener)
 - [rawListeners](default.md#rawlisteners)
+- [redeemAllTickets](default.md#redeemalltickets)
 - [removeAllListeners](default.md#removealllisteners)
 - [removeListener](default.md#removelistener)
 - [setMaxListeners](default.md#setmaxlisteners)
@@ -978,6 +979,20 @@ EventEmitter.rawListeners
 #### Defined in
 
 node_modules/@types/node/events.d.ts:514
+
+___
+
+### redeemAllTickets
+
+▸ **redeemAllTickets**(): `Promise`<`void`\>
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L183)
 
 ___
 

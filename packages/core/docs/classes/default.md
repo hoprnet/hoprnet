@@ -42,7 +42,6 @@
 - [emit](default.md#emit)
 - [eventNames](default.md#eventnames)
 - [fundChannel](default.md#fundchannel)
-- [getAcknowledgedTickets](default.md#getacknowledgedtickets)
 - [getAllChannels](default.md#getallchannels)
 - [getAnnouncedAddresses](default.md#getannouncedaddresses)
 - [getBalance](default.md#getbalance)
@@ -76,7 +75,6 @@
 - [prependListener](default.md#prependlistener)
 - [prependOnceListener](default.md#prependoncelistener)
 - [rawListeners](default.md#rawlisteners)
-- [redeemAcknowledgedTicket](default.md#redeemacknowledgedticket)
 - [redeemAllTickets](default.md#redeemalltickets)
 - [removeAllListeners](default.md#removealllisteners)
 - [removeListener](default.md#removelistener)
@@ -516,20 +514,6 @@ Fund a payment channel
 
 ___
 
-### getAcknowledgedTickets
-
-▸ **getAcknowledgedTickets**(): `Promise`<`AcknowledgedTicket`[]\>
-
-#### Returns
-
-`Promise`<`AcknowledgedTicket`[]\>
-
-#### Defined in
-
-[packages/core/src/index.ts:822](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L822)
-
-___
-
 ### getAllChannels
 
 ▸ `Private` **getAllChannels**(): `Promise`<`ChannelEntry`[]\>
@@ -612,7 +596,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:880](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L880)
+[packages/core/src/index.ts:845](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L845)
 
 ___
 
@@ -632,7 +616,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:885](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L885)
+[packages/core/src/index.ts:850](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L850)
 
 ___
 
@@ -660,7 +644,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:902](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L902)
+[packages/core/src/index.ts:867](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L867)
 
 ___
 
@@ -697,7 +681,7 @@ that will relay that message before it reaches its destination.
 
 #### Defined in
 
-[packages/core/src/index.ts:924](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L924)
+[packages/core/src/index.ts:889](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L889)
 
 ___
 
@@ -792,7 +776,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:890](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L890)
+[packages/core/src/index.ts:855](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L855)
 
 ___
 
@@ -806,7 +790,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:826](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L826)
+[packages/core/src/index.ts:822](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L822)
 
 ___
 
@@ -1317,37 +1301,17 @@ node_modules/@types/node/events.d.ts:514
 
 ___
 
-### redeemAcknowledgedTicket
-
-▸ **redeemAcknowledgedTicket**(`ackTicket`): `Promise`<`RedeemTicketResponse`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `ackTicket` | `AcknowledgedTicket` |
-
-#### Returns
-
-`Promise`<`RedeemTicketResponse`\>
-
-#### Defined in
-
-[packages/core/src/index.ts:868](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L868)
-
-___
-
 ### redeemAllTickets
 
-▸ **redeemAllTickets**(): `Promise`<`Object`\>
+▸ **redeemAllTickets**(): `Promise`<`void`\>
 
 #### Returns
 
-`Promise`<`Object`\>
+`Promise`<`void`\>
 
 #### Defined in
 
-[packages/core/src/index.ts:844](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L844)
+[packages/core/src/index.ts:840](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L840)
 
 ___
 
@@ -1580,7 +1544,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:898](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L898)
+[packages/core/src/index.ts:863](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L863)
 
 ___
 
@@ -1690,7 +1654,7 @@ MAX_DELAY is reached, this function will reject.
 
 #### Defined in
 
-[packages/core/src/index.ts:940](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L940)
+[packages/core/src/index.ts:905](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L905)
 
 ___
 
@@ -1704,7 +1668,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:972](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L972)
+[packages/core/src/index.ts:937](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L937)
 
 ___
 
@@ -1726,7 +1690,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:907](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L907)
+[packages/core/src/index.ts:872](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L872)
 
 ___
 

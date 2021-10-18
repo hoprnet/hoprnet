@@ -104,13 +104,13 @@ ___
 
 ### onWinningTicket
 
-▸ **onWinningTicket**(`ack`, `c`): `Promise`<`void`\>
+▸ **onWinningTicket**(`_a`, `c`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `ack` | `AcknowledgedTicket` |
+| `_a` | `AcknowledgedTicket` |
 | `c` | `Channel` |
 
 #### Returns
