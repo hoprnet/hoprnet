@@ -846,20 +846,6 @@ class Hopr extends EventEmitter {
     await ethereum.redeemAllTickets()
   }
 
-  /*
-  public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
-    const ethereum = await this.startedPaymentChannels()
-    const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.signer)
-
-    try {
-      return await channel.redeemTicket(ackTicket)
-    } catch (err) {
-      await this.isOutOfFunds(err)
-      throw new Error(`Failed to redeemAcknowledgedTicket: ${err}`)
-    }
-  }
-  */
-
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
     const ethereum = await this.startedPaymentChannels()
     return await ethereum.getChannelsFrom(addr)
