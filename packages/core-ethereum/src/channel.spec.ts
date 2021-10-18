@@ -87,7 +87,6 @@ const createMocks = (from: string, to: string) => {
   const chain = createChainMock()
   const ev = new EventEmitter()
 
-
   class TestChannel extends Channel {
     //redefine privacy for test
     public async _redeemTicket(ackTicket: AcknowledgedTicket) {
