@@ -14,7 +14,6 @@ import { once } from 'events'
 import { defer } from '@hoprnet/hopr-utils'
 import type { DeferType } from '@hoprnet/hopr-utils'
 
-
 type ServerType = {
   socket: Socket
   gotContacted: DeferType<number>
