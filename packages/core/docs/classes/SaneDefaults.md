@@ -36,7 +36,7 @@
 
 ### tickInterval
 
-• **tickInterval**: `number`
+• **tickInterval**: `number` = `CHECK_TIMEOUT`
 
 #### Defined in
 

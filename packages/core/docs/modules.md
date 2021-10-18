@@ -132,7 +132,7 @@ ___
 
 ### FULL\_VERSION
 
-• **FULL\_VERSION**: `any`
+• **FULL\_VERSION**: `any` = `pkg.version`
 
 #### Defined in
 
@@ -320,14 +320,14 @@ Depth first search through potential paths based on weight
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `start` | `PublicKey` |
-| `destination` | `PublicKey` |
-| `hops` | `number` |
-| `networkQualityOf` | (`p`: `PublicKey`) => `number` |
-| `getOpenChannelsFromPeer` | (`p`: `PublicKey`) => `Promise`<`ChannelEntry`[]\> |
-| `weight` | (`edge`: `ChannelEntry`) => `Promise`<`BN`\> |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `start` | `PublicKey` | `undefined` |
+| `destination` | `PublicKey` | `undefined` |
+| `hops` | `number` | `undefined` |
+| `networkQualityOf` | (`p`: `PublicKey`) => `number` | `undefined` |
+| `getOpenChannelsFromPeer` | (`p`: `PublicKey`) => `Promise`<`ChannelEntry`[]\> | `undefined` |
+| `weight` | (`edge`: `ChannelEntry`) => `Promise`<`BN`\> | `defaultWeight` |
 
 #### Returns
 
