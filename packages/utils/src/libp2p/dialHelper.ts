@@ -64,14 +64,17 @@ export async function dial(
   let timeout: NodeJS.Timeout
   const abort = opts.abort ?? new AbortController()
 
+  let onAbort: () => void
+
   let timeoutPromise = new Promise<DialResponse>((resolve) => {
     timeout = setTimeout(() => {
+      abort.signal.removeEventListener('abort', onAbort)
       abort.abort()
       verbose(`timeout while trying to dial ${destination.toB58String()}`)
       resolve({ status: 'E_TIMEOUT' })
     }, opts.timeout ?? DEFAULT_DHT_QUERY_TIMEOUT)
 
-    const onAbort = () => {
+    onAbort = () => {
       clearTimeout(timeout)
       abort.signal.removeEventListener('abort', onAbort)
       resolve({ status: 'E_ABORTED' })
