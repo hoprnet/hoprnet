@@ -1,4 +1,8 @@
 {
+  "ts-node": {
+    // No need to check types again after running 'yarn build'
+    "transpileOnly": true
+  },
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "noImplicitReturns": true,
