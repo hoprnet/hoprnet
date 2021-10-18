@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprWrapperProxy__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprWrapperProxy\_\_factory
 
 # Class: HoprWrapperProxy\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new HoprWrapperProxy__factory**(`signer?`)
+• **new HoprWrapperProxy__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -101,11 +101,11 @@ ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `inputs`: `any`[] = []; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `inputs`: { `indexed`: `boolean` = false; `internalType`: `string` = "address"; `name`: `string` = "from"; `type`: `string` = "address" }[] ; `name`: `string` = "FowardedFrom"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "\_from"; `type`: `string` = "address" }[] ; `name`: `string` = "onTokenTransfer"; `outputs`: { `internalType`: `string` = "bool"; `name`: `string` = ""; `type`: `string` = "bool" }[] ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" })[]
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `inputs`: `any`[] = []; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `inputs`: { `indexed`: `boolean` = false; `internalType`: `string` = "address"; `name`: `string` = "from"; `type`: `string` = "address" }[] ; `name`: `string` = "FowardedFrom"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "\_from"; `type`: `string` = "address" }[] ; `name`: `string` = "onTokenTransfer"; `outputs`: { `internalType`: `string` = "bool"; `name`: `string` = ""; `type`: `string` = "bool" }[] ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" })[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:241
+packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:247
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:240
+packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:246
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:234
+packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:240
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:237
+packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:243
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:224
+packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:230
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:229
+packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:235
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:245
+packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:251
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:242
+packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:248
 
 ___
 

@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / BurnableToken__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / BurnableToken\_\_factory
 
 # Class: BurnableToken\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new BurnableToken__factory**(`signer?`)
+• **new BurnableToken__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -101,11 +101,11 @@ ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `constant`: `boolean` = true; `inputs`: { `name`: `string` = "\_owner"; `type`: `string` = "address" }[] ; `name`: `string` = "balanceOf"; `outputs`: { `name`: `string` = ""; `type`: `string` = "uint256" }[] ; `payable`: `boolean` = false; `stateMutability`: `string` = "view"; `type`: `string` = "function" } \| { `anonymous`: `boolean` = false; `constant`: `undefined` = true; `inputs`: { `indexed`: `boolean` = true; `name`: `string` = "burner"; `type`: `string` = "address" }[] ; `name`: `string` = "Burn"; `outputs`: `undefined` ; `payable`: `undefined` = false; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" })[]
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `constant`: `boolean` = true; `inputs`: { `name`: `string` = "\_owner"; `type`: `string` = "address" }[] ; `name`: `string` = "balanceOf"; `outputs`: { `name`: `string` = ""; `type`: `string` = "uint256" }[] ; `payable`: `boolean` = false; `stateMutability`: `string` = "view"; `type`: `string` = "function" } \| { `anonymous`: `boolean` = false; `constant`: `undefined` = true; `inputs`: { `indexed`: `boolean` = true; `name`: `string` = "burner"; `type`: `string` = "address" }[] ; `name`: `string` = "Burn"; `outputs`: `undefined` ; `payable`: `undefined` = false; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" })[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:146
+packages/ethereum/types/factories/BurnableToken__factory.ts:152
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:145
+packages/ethereum/types/factories/BurnableToken__factory.ts:151
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:139
+packages/ethereum/types/factories/BurnableToken__factory.ts:145
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:142
+packages/ethereum/types/factories/BurnableToken__factory.ts:148
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:129
+packages/ethereum/types/factories/BurnableToken__factory.ts:135
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:134
+packages/ethereum/types/factories/BurnableToken__factory.ts:140
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:150
+packages/ethereum/types/factories/BurnableToken__factory.ts:156
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:147
+packages/ethereum/types/factories/BurnableToken__factory.ts:153
 
 ___
 

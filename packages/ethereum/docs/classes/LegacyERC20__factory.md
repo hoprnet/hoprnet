@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / LegacyERC20__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / LegacyERC20\_\_factory
 
 # Class: LegacyERC20\_\_factory
 
@@ -27,7 +27,7 @@
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: { `constant`: `boolean` = false; `inputs`: { `name`: `string` = "\_owner"; `type`: `string` = "address" }[] ; `name`: `string` = "transferFrom"; `outputs`: `any`[] = []; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" }[]
+▪ `Static` `Readonly` **abi**: { `constant`: `boolean` = false; `inputs`: { `name`: `string` = "\_owner"; `type`: `string` = "address" }[] ; `name`: `string` = "transferFrom"; `outputs`: `any`[] = []; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" }[] = `_abi`
 
 #### Defined in
 

@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprDistributor__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprDistributor\_\_factory
 
 # Class: HoprDistributor\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new HoprDistributor__factory**(`signer?`)
+• **new HoprDistributor__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -101,11 +101,11 @@ ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "contract HoprToken"; `name`: `string` = "\_token"; `type`: `string` = "address" }[] ; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `inputs`: { `indexed`: `boolean` = true; `internalType`: `string` = "address"; `name`: `string` = "account"; `type`: `string` = "address" }[] ; `name`: `string` = "AllocationAdded"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = ""; `type`: `string` = "address" }[] ; `name`: `string` = "allocations"; `outputs`: { `internalType`: `string` = "uint128"; `name`: `string` = "amount"; `type`: `string` = "uint128" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" })[]
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "contract HoprToken"; `name`: `string` = "\_token"; `type`: `string` = "address" }[] ; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `inputs`: { `indexed`: `boolean` = true; `internalType`: `string` = "address"; `name`: `string` = "account"; `type`: `string` = "address" }[] ; `name`: `string` = "AllocationAdded"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = ""; `type`: `string` = "address" }[] ; `name`: `string` = "allocations"; `outputs`: { `internalType`: `string` = "uint128"; `name`: `string` = "amount"; `type`: `string` = "uint128" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" })[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:484
+packages/ethereum/types/factories/HoprDistributor__factory.ts:490
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:483
+packages/ethereum/types/factories/HoprDistributor__factory.ts:489
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:477
+packages/ethereum/types/factories/HoprDistributor__factory.ts:483
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:480
+packages/ethereum/types/factories/HoprDistributor__factory.ts:486
 
 ___
 
@@ -190,7 +190,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:451
+packages/ethereum/types/factories/HoprDistributor__factory.ts:457
 
 ___
 
@@ -217,7 +217,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:464
+packages/ethereum/types/factories/HoprDistributor__factory.ts:470
 
 ___
 
@@ -238,7 +238,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:488
+packages/ethereum/types/factories/HoprDistributor__factory.ts:494
 
 ___
 
@@ -252,7 +252,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:485
+packages/ethereum/types/factories/HoprDistributor__factory.ts:491
 
 ___
 

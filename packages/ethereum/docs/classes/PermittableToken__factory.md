@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / PermittableToken__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / PermittableToken\_\_factory
 
 # Class: PermittableToken\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new PermittableToken__factory**(`signer?`)
+• **new PermittableToken__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -101,11 +101,11 @@ ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `constant`: `boolean` = false; `inputs`: { `name`: `string` = "\_to"; `type`: `string` = "address" }[] ; `name`: `string` = "approve"; `outputs`: { `name`: `string` = "result"; `type`: `string` = "bool" }[] ; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" } \| { `anonymous`: `undefined` = false; `constant`: `undefined` = true; `inputs`: { `name`: `string` = "\_name"; `type`: `string` = "string" }[] ; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `constant`: `undefined` = true; `inputs`: { `indexed`: `boolean` = true; `name`: `string` = "to"; `type`: `string` = "address" }[] ; `name`: `string` = "Mint"; `outputs`: `undefined` ; `payable`: `undefined` = false; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" })[]
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `constant`: `boolean` = false; `inputs`: { `name`: `string` = "\_to"; `type`: `string` = "address" }[] ; `name`: `string` = "approve"; `outputs`: { `name`: `string` = "result"; `type`: `string` = "bool" }[] ; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" } \| { `anonymous`: `undefined` = false; `constant`: `undefined` = true; `inputs`: { `name`: `string` = "\_name"; `type`: `string` = "string" }[] ; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `constant`: `undefined` = true; `inputs`: { `indexed`: `boolean` = true; `name`: `string` = "to"; `type`: `string` = "address" }[] ; `name`: `string` = "Mint"; `outputs`: `undefined` ; `payable`: `undefined` = false; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" })[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:893
+packages/ethereum/types/factories/PermittableToken__factory.ts:899
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:892
+packages/ethereum/types/factories/PermittableToken__factory.ts:898
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:886
+packages/ethereum/types/factories/PermittableToken__factory.ts:892
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:889
+packages/ethereum/types/factories/PermittableToken__factory.ts:895
 
 ___
 
@@ -191,7 +191,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:856
+packages/ethereum/types/factories/PermittableToken__factory.ts:862
 
 ___
 
@@ -219,7 +219,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:871
+packages/ethereum/types/factories/PermittableToken__factory.ts:877
 
 ___
 
@@ -240,7 +240,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:897
+packages/ethereum/types/factories/PermittableToken__factory.ts:903
 
 ___
 
@@ -254,7 +254,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:894
+packages/ethereum/types/factories/PermittableToken__factory.ts:900
 
 ___
 

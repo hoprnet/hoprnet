@@ -28,6 +28,8 @@ const log = debug('hopr-core-ethereum:channel')
 
 // TODO - legacy, models bidirectional channel.
 class Channel {
+  _redeemingAll: Promise<void> | undefined = undefined
+
   constructor(
     private readonly self: PublicKey,
     private readonly counterparty: PublicKey,
@@ -108,7 +110,8 @@ class Channel {
     if (totalFund.gt(new BN(myBalance.toBN().toString()))) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
+    const tx = await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   async open(fundAmount: Balance) {
@@ -127,7 +130,8 @@ class Channel {
     if (new BN(myBalance.toBN().toString()).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')
     }
-    await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
+    const tx = await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
+    await this.indexer.resolvePendingTransaction('channel-updated', tx)
     return generateChannelId(myAddress, counterpartyAddress)
   }
 
@@ -137,7 +141,8 @@ class Channel {
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return await this.chain.initiateChannelClosure(counterpartyAddress)
+    const tx = await this.chain.initiateChannelClosure(counterpartyAddress)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   async finalizeClosure() {
@@ -147,7 +152,8 @@ class Channel {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(counterpartyAddress)
+    const tx = await this.chain.finalizeChannelClosure(counterpartyAddress)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   private async bumpTicketIndex(channelId: Hash): Promise<UINT256> {
@@ -234,20 +240,34 @@ class Channel {
   }
 
   async redeemAllTickets(): Promise<void> {
+    if (this._redeemingAll) {
+      return this._redeemingAll
+    }
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
     const tickets = await this.db.getAcknowledgedTickets({ signer: this.counterparty })
-    for (const ticket of tickets) {
-      log('redeeming ticket', ticket)
-      const result = await this.redeemTicket(ticket)
-      if (result.status !== 'SUCCESS') {
-        log('Error redeeming ticket', result)
-        // We need to abort as tickets require ordered redemption.
-        return
+    const _redeemAll = async () => {
+      try {
+        for (const ticket of tickets) {
+          log('redeeming ticket', ticket)
+          const result = await this.redeemTicket(ticket)
+          if (result.status !== 'SUCCESS') {
+            log('Error redeeming ticket', result)
+            // We need to abort as tickets require ordered redemption.
+            return
+          }
+          log('ticket was redeemed')
+        }
+      } catch (e) {
+        // We are going to swallow the error here, as more than one consumer may
+        // be inspecting this same promise.
+        log('Error when redeeming tickets, aborting', e)
       }
-      log('ticket was redeemed')
+      this._redeemingAll = undefined
     }
+    this._redeemingAll = _redeemAll()
+    return this._redeemingAll
   }
 
   async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
@@ -283,6 +303,7 @@ class Channel {
       }
 
       const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
+      await this.indexer.resolvePendingTransaction('channel-updated', receipt)
 
       //this.commitment.updateChainState(ackTicket.preImage)
       log('Successfully submitted ticket', ackTicket.response.toHex())

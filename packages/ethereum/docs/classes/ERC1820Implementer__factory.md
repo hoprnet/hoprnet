@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC1820Implementer__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC1820Implementer\_\_factory
 
 # Class: ERC1820Implementer\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new ERC1820Implementer__factory**(`signer?`)
+• **new ERC1820Implementer__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [signer: Signer] \| [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] |
 
 #### Overrides
 
@@ -101,11 +101,11 @@ ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: { `inputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = "interfaceHash"; `type`: `string` = "bytes32" }[] ; `name`: `string` = "canImplementInterfaceForAddress"; `outputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = ""; `type`: `string` = "bytes32" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" }[]
+▪ `Static` `Readonly` **abi**: { `inputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = "interfaceHash"; `type`: `string` = "bytes32" }[] ; `name`: `string` = "canImplementInterfaceForAddress"; `outputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = ""; `type`: `string` = "bytes32" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" }[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:64
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:70
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:63
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:69
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:57
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:63
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:60
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:66
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:47
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:53
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:52
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:58
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:68
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:74
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC1820Implementer__factory.ts:65
+packages/ethereum/types/factories/ERC1820Implementer__factory.ts:71
 
 ___
 
