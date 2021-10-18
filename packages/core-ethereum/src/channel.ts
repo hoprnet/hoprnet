@@ -247,6 +247,7 @@ class Channel {
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
     const tickets = await this.db.getAcknowledgedTickets({ signer: this.counterparty })
+    log(`redeeming ${tickets.length} tickets from ${this.counterparty.toB58String()}`)
     const _redeemAll = async () => {
       try {
         for (const ticket of tickets) {
@@ -264,6 +265,7 @@ class Channel {
         // be inspecting this same promise.
         log('Error when redeeming tickets, aborting', e)
       }
+      log(`redemption of tickets from ${this.counterparty.toB58String()} is complete`)
       this._redeemingAll = undefined
     }
     this._redeemingAll = _redeemAll()
