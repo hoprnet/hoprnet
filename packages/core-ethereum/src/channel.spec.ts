@@ -86,7 +86,16 @@ const createMocks = (from: string, to: string) => {
   const indexer = createIndexerMock(channelUsThem, channelThemUs)
   const chain = createChainMock()
   const ev = new EventEmitter()
-  const channel = new Channel(self, counterparty, db, chain, indexer, selfPrivateKey, ev)
+
+
+  class TestChannel extends Channel {
+    //redefine privacy for test
+    public async _redeemTicket(ackTicket: AcknowledgedTicket) {
+      return this.redeemTicket(ackTicket)
+    }
+  }
+
+  const channel = new TestChannel(self, counterparty, db, chain, indexer, selfPrivateKey, ev)
 
   return {
     self,
@@ -147,10 +156,10 @@ describe('test channel', function () {
       aliceMocks.self
     )
 
-    const goodResponse = await bobMocks.channel.redeemTicket(goodAck)
+    const goodResponse = await bobMocks.channel._redeemTicket(goodAck)
     assert(goodResponse.status === 'SUCCESS')
 
-    const badResponse = await bobMocks.channel.redeemTicket(badAck)
+    const badResponse = await bobMocks.channel._redeemTicket(badAck)
     assert(badResponse.status === 'FAILURE' && badResponse.message === 'Invalid response to acknowledgement')
 
     const aBalances = await aliceMocks.channel.balanceToThem()
@@ -167,7 +176,7 @@ describe('test channel', function () {
       aliceMocks.self
     )
 
-    const response = await bobMocks.channel.redeemTicket(acknowledgement)
+    const response = await bobMocks.channel._redeemTicket(acknowledgement)
     assert(response.status === 'FAILURE' && response.message === 'PreImage is empty.')
   })
 })

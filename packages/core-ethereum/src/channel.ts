@@ -270,7 +270,8 @@ class Channel {
     return this._redeemingAll
   }
 
-  async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
+  // Private as out of order redemption will break things - redeem all at once.
+  protected async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
     if (!ackTicket.verify(this.counterparty)) {
       return {
         status: 'FAILURE',

@@ -842,29 +842,11 @@ class Hopr extends EventEmitter {
   }
 
   public async redeemAllTickets() {
-    let count = 0,
-      redeemed = 0,
-      total = new BN(0)
-
-    for (const ackTicket of await this.getAcknowledgedTickets()) {
-      count++
-      const result = await this.redeemAcknowledgedTicket(ackTicket)
-
-      if (result.status === 'SUCCESS') {
-        redeemed++
-        total.iadd(ackTicket.ticket.amount.toBN())
-        console.log(`Redeemed ticket ${count}`)
-      } else {
-        console.log(`Failed to redeem ticket ${count}`)
-      }
-    }
-    return {
-      count,
-      redeemed,
-      total: new Balance(total)
-    }
+    const ethereum = await this.startedPaymentChannels()
+    await ethereum.redeemAllTickets()
   }
 
+  /*
   public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
     const ethereum = await this.startedPaymentChannels()
     const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.signer)
@@ -876,6 +858,7 @@ class Hopr extends EventEmitter {
       throw new Error(`Failed to redeemAcknowledgedTicket: ${err}`)
     }
   }
+  */
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
     const ethereum = await this.startedPaymentChannels()
