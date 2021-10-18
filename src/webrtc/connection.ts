@@ -1,12 +1,12 @@
 import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
 
 import type ConnectionManager from 'libp2p/src/connection-manager'
-import Defer from 'p-defer'
-import type { DeferredPromise } from 'p-defer'
 
 import type { Instance as SimplePeer } from 'simple-peer'
 import type PeerId from 'peer-id'
-import { durations, u8aToHex } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex, defer } from '@hoprnet/hopr-utils'
+import type { DeferType } from '@hoprnet/hopr-utils'
+
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import type { RelayConnection } from '../relay/connection'
@@ -42,9 +42,9 @@ function getAbortableSource(source: Stream['source'], signal?: AbortSignal) {
  * WebRTC connection
  */
 class WebRTCConnection implements MultiaddrConnection {
-  private _switchPromise: DeferredPromise<void>
+  private _switchPromise: DeferType<void>
   private _sinkSourceAttached: boolean
-  private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
+  private _sinkSourceAttachedPromise: DeferType<Stream['source']>
   private _webRTCHandshakeFinished: boolean
   private _webRTCAvailable: boolean
   private webRTCHandshakeTimeout?: NodeJS.Timeout
@@ -77,9 +77,9 @@ class WebRTCConnection implements MultiaddrConnection {
     this.conn = relayConn
 
     this.destroyed = false
-    this._switchPromise = Defer<void>()
+    this._switchPromise = defer<void>()
     this._sinkSourceAttached = false
-    this._sinkSourceAttachedPromise = Defer<Stream['source']>()
+    this._sinkSourceAttachedPromise = defer<Stream['source']>()
     this._webRTCHandshakeFinished = false
     this._webRTCAvailable = false
 
@@ -117,7 +117,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
     let sinkCreator: Promise<void>
     this.sink = (source: Stream['source']) => {
-      let deferred = Defer<void>()
+      let deferred = defer<void>()
       sinkCreator.catch(deferred.reject)
       this._sinkSourceAttached = true
       this._sinkSourceAttachedPromise.resolve(

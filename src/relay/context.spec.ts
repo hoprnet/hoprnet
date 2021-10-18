@@ -1,9 +1,8 @@
 import { RelayContext, DEFAULT_PING_TIMEOUT } from './context'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
 import handshake from 'it-handshake'
-import Defer from 'p-defer'
 
 import type { StreamType } from '../types'
 import assert from 'assert'
@@ -246,7 +245,7 @@ describe('relay switch context - falsy streams', function () {
 
     const falsySinkError = 'falsy sink error'
 
-    const waitForError = Defer<void>()
+    const waitForError = defer<void>()
 
     new RelayContext({
       source: nodeToRelay.source,

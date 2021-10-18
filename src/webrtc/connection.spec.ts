@@ -1,11 +1,10 @@
 import handshake from 'it-handshake'
 import Pair from 'it-pair'
 import { Multiaddr } from 'multiaddr'
-import Defer from 'p-defer'
 
 import { WebRTCConnection, MigrationStatus } from './connection'
 import { encodeWithLengthPrefix } from '../utils'
-import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import { privKeyToPeerId, stringToU8a, u8aEquals, defer } from '@hoprnet/hopr-utils'
 import pushable from 'it-pushable'
 
 import { EventEmitter } from 'events'
@@ -282,7 +281,7 @@ describe('webrtc connection - stream error propagation', function () {
 
     const falsySinkError = 'falsy sink error'
 
-    const waitForSinkAttach = Defer<Uint8Array>()
+    const waitForSinkAttach = defer<Uint8Array>()
 
     const fakedWebRTCInstance = new EventEmitter() as any
 
@@ -317,7 +316,7 @@ describe('webrtc connection - stream error propagation', function () {
 
     const falsySinkError = 'falsy sink error'
 
-    const waitForError = Defer<void>()
+    const waitForError = defer<void>()
 
     const fakedWebRTCInstance = new EventEmitter() as any
 

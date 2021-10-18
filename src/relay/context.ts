@@ -1,8 +1,8 @@
-import { u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aToHex, defer } from '@hoprnet/hopr-utils'
+import type { DeferType } from '@hoprnet/hopr-utils'
+
 import { randomBytes } from 'crypto'
 
-import type { DeferredPromise } from 'p-defer'
-import Defer from 'p-defer'
 import EventEmitter from 'events'
 
 import type { Stream, StreamResult } from '../types'
@@ -25,17 +25,17 @@ export const DEFAULT_PING_TIMEOUT = 300
  * Encapsulate the relay-side state management of a relayed connecion
  */
 class RelayContext extends EventEmitter {
-  private _streamSourceSwitchPromise: DeferredPromise<Stream['source']>
-  private _streamSinkSwitchPromise: DeferredPromise<Stream['sink']>
+  private _streamSourceSwitchPromise: DeferType<Stream['source']>
+  private _streamSinkSwitchPromise: DeferType<Stream['sink']>
 
   private _id: string
 
   private _sinkSourceAttached: boolean
-  private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
+  private _sinkSourceAttachedPromise: DeferType<Stream['source']>
 
-  private _statusMessagePromise: DeferredPromise<void>
+  private _statusMessagePromise: DeferType<void>
   private _statusMessages: Uint8Array[] = []
-  private _pingResponsePromise?: DeferredPromise<void>
+  private _pingResponsePromise?: DeferType<void>
   private _stream: Stream
 
   private _sourcePromise: Promise<StreamResult> | undefined
@@ -48,17 +48,17 @@ class RelayContext extends EventEmitter {
     super()
     this._id = u8aToHex(randomBytes(4), false)
 
-    this._statusMessagePromise = Defer<void>()
+    this._statusMessagePromise = defer<void>()
     this._statusMessages = []
     this._stream = stream
 
     this._sourceSwitched = false
 
     this._sinkSourceAttached = false
-    this._sinkSourceAttachedPromise = Defer<Stream['source']>()
+    this._sinkSourceAttachedPromise = defer<Stream['source']>()
 
-    this._streamSourceSwitchPromise = Defer<Stream['source']>()
-    this._streamSinkSwitchPromise = Defer<Stream['sink']>()
+    this._streamSourceSwitchPromise = defer<Stream['source']>()
+    this._streamSinkSwitchPromise = defer<Stream['sink']>()
 
     this.source = this.createSource()
 
@@ -66,7 +66,7 @@ class RelayContext extends EventEmitter {
     // to make sure we can attach an error handler to it
     let sinkCreator: Promise<void>
     this.sink = (source: Stream['source']): Promise<void> => {
-      let deferred = Defer<void>()
+      let deferred = defer<void>()
       // forward sink stream errors
       sinkCreator.catch(deferred.reject)
       this._sinkSourceAttached = true
@@ -100,11 +100,11 @@ class RelayContext extends EventEmitter {
    */
   public async ping(ms = DEFAULT_PING_TIMEOUT): Promise<number> {
     let start = Date.now()
-    this._pingResponsePromise = Defer<void>()
+    this._pingResponsePromise = defer<void>()
 
     let timeoutDone = false
 
-    const timeoutPromise = Defer<void>()
+    const timeoutPromise = defer<void>()
     const timeout = setTimeout(() => {
       this.log(`ping timeout done`)
       timeoutDone = true
@@ -226,7 +226,7 @@ class RelayContext extends EventEmitter {
           this._sourceSwitched = false
           this._stream.source = result as Stream['source']
 
-          this._streamSourceSwitchPromise = Defer<Stream['source']>()
+          this._streamSourceSwitchPromise = defer<Stream['source']>()
 
           next()
 
@@ -335,7 +335,7 @@ class RelayContext extends EventEmitter {
 
     let currentSource: Stream['source'] | undefined
 
-    async function* drain(this: RelayContext, end: DeferredPromise<void>): Stream['source'] {
+    async function* drain(this: RelayContext, end: DeferType<void>): Stream['source'] {
       type SinkResult = Stream['source'] | StreamResult | void
 
       let result: SinkResult
@@ -449,7 +449,7 @@ class RelayContext extends EventEmitter {
     }
 
     while (true) {
-      const endPromise = Defer<void>()
+      const endPromise = defer<void>()
 
       let err: any
 
@@ -464,7 +464,7 @@ class RelayContext extends EventEmitter {
         throw err
       } else {
         currentSink = await this._streamSinkSwitchPromise.promise
-        this._streamSinkSwitchPromise = Defer<Stream['sink']>()
+        this._streamSinkSwitchPromise = defer<Stream['sink']>()
         endPromise.resolve()
       }
     }
@@ -490,7 +490,7 @@ class RelayContext extends EventEmitter {
       case 0:
         throw Error(`Trying to unqueue empty status message queue`)
       case 1:
-        this._statusMessagePromise = Defer<void>()
+        this._statusMessagePromise = defer<void>()
         return this._statusMessages.pop() as Uint8Array
       default:
         return this._statusMessages.shift() as Uint8Array
