@@ -7,7 +7,7 @@ Right now verifying our smart contracts in Blockscout has been quite difficult w
 1. Create flatten version using workaround script
 
 ```
-yarn workspace @hoprnet/hopr-ethereum run flatten contracts/HoprChannels.sol --output HoprChannels-flatten.sol
+yarn workspace @hoprnet/hopr-ethereum run hardhat flat contracts/HoprChannels.sol --output HoprChannels-flatten.sol
 ```
 
 2. Go to https://blockscout.com/xdai/mainnet/address/$address_to_verify/contract_verifications/new, select `Via flattened source code` and click "Next".
@@ -17,7 +17,7 @@ yarn workspace @hoprnet/hopr-ethereum run flatten contracts/HoprChannels.sol --o
 ```
 Contract Name: HoprChannels.sol
 Include nightly builds: No
-Compiler: v0.8.3+commit.8d00100c (as of time of writing, might change)
+Compiler: v0.8.3+commit.8d00100c (as of time of writing, this might change, this also depends on the contract you are verifying)
 EVM Version: default
 Optimization: yes
 Optimization runs: 200 (as of time of writing, might change)
