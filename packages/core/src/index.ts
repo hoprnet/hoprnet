@@ -819,12 +819,8 @@ class Hopr extends EventEmitter {
     return { receipt: txHash, status: channelState.status }
   }
 
-  public async getAcknowledgedTickets() {
-    return this.db.getAcknowledgedTickets()
-  }
-
   public async getTicketStatistics() {
-    const ack = await this.getAcknowledgedTickets()
+    const ack = await this.db.getAcknowledgedTickets()
     const pending = await this.db.getPendingTicketCount()
     const losing = await this.db.getLosingTicketCount()
     const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
