@@ -39,30 +39,22 @@ export class PacketForwardInteraction {
   }
 
   async handleMixedPacket(packet: Packet): Promise<void> {
-    await packet.checkPacketTag(this.db)
-
-    if (packet.isReceiver) {
-      this.emitMessage(packet.plaintext)
-    } else {
-      try {
+    try {
+      await packet.checkPacketTag(this.db)
+      if (packet.isReceiver) {
+        this.emitMessage(packet.plaintext)
+      } else {
         await packet.validateUnacknowledgedTicket(this.db, this.chain, this.privKey)
-      } catch (e) {
-        log('error while validating unacknowledged ticket, packet is dropped', e)
-      }
-
-      await packet.storeUnacknowledgedTicket(this.db)
-
-      try {
+        await packet.storeUnacknowledgedTicket(this.db)
         await packet.forwardTransform(this.privKey, this.chain)
         await this.interact(pubKeyToPeerId(packet.nextHop), packet)
-      } catch (e) {
-        // Errors include:
-        // - not knowing about the channel in our db, because the
-        //   indexer is not caught up yet.
-        log('error while transforming packet, packet is dropped', e)
       }
+      sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
+    } catch (e) {
+      // Errors include:
+      // - not knowing about the channel in our db, because the
+      //   indexer is not caught up yet.
+      log('error while transforming packet, packet is dropped', e)
     }
-
-    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
   }
 }
