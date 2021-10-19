@@ -146,4 +146,13 @@ try_cmd() {
   fi
 }
 
+# $1 = file to monitor
+# $2 = regexp to look for
+function wait_for_regex {
+  local file=${1}
+  local regex=${2}
+
+  (tail -f ${file} &) | grep -q -E "${regex}"
+}
+
 setup_colors

@@ -127,7 +127,8 @@ function setup_node() {
     ${additional_args} \
     > "${log}" 2>&1 &
 
-  wait_for_http_port "${rest_port}" "127.0.0.1" "${log}" "${wait_delay}" "${wait_max_wait}"
+  # Wait until node has recovered its private key
+  wait_for_regex ${log} "using blockchain address"
 }
 
 # $1 = rest port
@@ -207,7 +208,7 @@ DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
-(tail -f -n0 ${hardhat_rpc_log} &) | grep -q -E "Started HTTP and WebSocket JSON-RPC server"
+wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server" 
 log "Hardhat node started (127.0.0.1:8545)"
 # }}}
 
@@ -230,11 +231,11 @@ fund_node 13306 "${node6_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_port 19091 "127.0.0.1" "${node1_log}"
-wait_for_port 19092 "127.0.0.1" "${node2_log}"
-wait_for_port 19093 "127.0.0.1" "${node3_log}"
-wait_for_port 19094 "127.0.0.1" "${node4_log}"
-wait_for_port 19095 "127.0.0.1" "${node5_log}"
+wait_for_regex ${node1_log} "STARTED NODE"
+wait_for_regex ${node2_log} "STARTED NODE"
+wait_for_regex ${node3_log} "STARTED NODE"
+wait_for_regex ${node4_log} "STARTED NODE"
+wait_for_regex ${node5_log} "STARTED NODE"
 # no need to wait for node 6 since that will stop right away
 # }}}
 
