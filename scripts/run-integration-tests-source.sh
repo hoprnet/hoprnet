@@ -36,7 +36,7 @@ fi
 
 # find usable tmp dir
 declare tmp="/tmp"
-[[ -d "${tmp}" && -L "${tmp}" ]] && tmp="/var/tmp"
+[[ -d "${tmp}" && -h "${tmp}" ]] && tmp="/var/tmp"
 [[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
 
 declare node1_dir="${tmp}/hopr-source-node-1"
@@ -125,7 +125,7 @@ function setup_node() {
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
     ${additional_args} \
-    >"${log}" 2>&1 &
+    > "${log}" 2>&1 &
 
   wait_for_http_port "${rest_port}" "127.0.0.1" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
