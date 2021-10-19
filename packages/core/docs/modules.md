@@ -32,6 +32,7 @@
 - [HEARTBEAT\_INTERVAL\_VARIANCE](modules.md#heartbeat_interval_variance)
 - [HEARTBEAT\_TIMEOUT](modules.md#heartbeat_timeout)
 - [INTERMEDIATE\_HOPS](modules.md#intermediate_hops)
+- [MAX\_HOPS](modules.md#max_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
 - [MAX\_PACKET\_DELAY](modules.md#max_packet_delay)
 - [MAX\_PARALLEL\_CONNECTIONS](modules.md#max_parallel_connections)
@@ -116,7 +117,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L34)
+[packages/core/src/constants.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L35)
 
 ___
 
@@ -177,6 +178,16 @@ ___
 #### Defined in
 
 [packages/core/src/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L28)
+
+___
+
+### MAX\_HOPS
+
+• **MAX\_HOPS**: ``3``
+
+#### Defined in
+
+[packages/core/src/constants.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L33)
 
 ___
 
