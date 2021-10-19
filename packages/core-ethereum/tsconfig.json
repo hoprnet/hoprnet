@@ -1,15 +1,10 @@
 {
-  "ts-node": {
-    // No need to check types again after running 'yarn build'
-    "transpileOnly": true
-  },
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "resolveJsonModule": true,
     "outDir": "./lib"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["lib"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",
