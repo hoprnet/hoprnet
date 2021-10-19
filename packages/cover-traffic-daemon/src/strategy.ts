@@ -138,7 +138,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       }
       // It should fulfil the quality threshold
       if (q < CT_OPEN_CHANNEL_QUALITY_THRESHOLD) {
-        log('low quality node skipped', c.toB58String(), q)
+        //log('low quality node skipped', c.toB58String(), q)
         continue
       }
 
