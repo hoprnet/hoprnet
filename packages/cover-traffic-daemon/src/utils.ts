@@ -115,7 +115,7 @@ export const sendCTMessage = async (
     log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
     // could not find path
-    log(`Could not find path: ${startNode.toB58String()} -> ${selfPub.toPeerId()} (${e})`)
+    log(`Could not find path: ${startNode.toB58String()} -> ${selfPub.toPeerId().toB58String()} (${e})`)
     return false
   }
   try {

@@ -43,7 +43,7 @@ export async function findPath(
   getOpenChannelsFromPeer: (p: PublicKey) => Promise<ChannelEntry[]>,
   weight = defaultWeight
 ): Promise<Path> {
-  log('find path from', start.toString(), 'to ', destination.toString(), 'length', hops)
+  log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
 
   // Weight the path with the sum of its' edges weight
   const pathWeight = async (a: ChannelEntry[]): Promise<BN> => (await Promise.all(a.map(weight))).reduce(sum, new BN(0))
