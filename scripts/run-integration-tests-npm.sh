@@ -157,7 +157,7 @@ function setup_node() {
   cd "${cwd}"
 
   # Make sure that node has produced some logs
-  sleep 1
+  sleep 0.2
 
   # Wait until node has recovered its private key
   wait_for_regex ${log} "using blockchain address"
@@ -267,10 +267,16 @@ fund_node 13306 "${node6_log}"
 
 #  --- Wait for ports to be bound --- {{{
 wait_for_regex ${node1_log} "STARTED NODE"
+log "node 1 started"
 wait_for_regex ${node2_log} "STARTED NODE"
+log "node 2 started"
 wait_for_regex ${node3_log} "STARTED NODE"
+log "node 3 started"
 wait_for_regex ${node4_log} "STARTED NODE"
+log "node 4 started"
 wait_for_regex ${node5_log} "STARTED NODE"
+log "node 5 started"
+
 # no need to wait for node 6 since that will stop right away
 # }}}
 

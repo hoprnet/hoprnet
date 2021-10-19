@@ -152,7 +152,15 @@ function wait_for_regex {
   local file=${1}
   local regex=${2}
 
-  (tail -f ${file} &) | grep -q -E "${regex}"
+  local delay=0.1
+
+  while true; do
+    sleep ${delay}
+    local res=$(grep -E "${regex}" "${file}" || echo "")
+    if [[ "${res}" != "" ]]; then
+      return 0
+    fi
+  done
 }
 
 setup_colors

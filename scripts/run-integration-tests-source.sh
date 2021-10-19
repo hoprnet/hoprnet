@@ -128,7 +128,7 @@ function setup_node() {
     > "${log}" 2>&1 &
 
   # Make sure that node has produced some logs
-  sleep 1
+  sleep 0.2
 
   # Wait until node has recovered its private key
   wait_for_regex ${log} "using blockchain address"
