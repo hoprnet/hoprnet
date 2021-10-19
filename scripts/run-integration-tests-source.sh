@@ -2,7 +2,10 @@
 
 # prevent souring of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -22,7 +25,10 @@ usage() {
 }
 
 # return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
+([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && {
+  usage
+  exit 0
+}
 
 # verify and set parameters
 declare wait_delay=2
@@ -36,8 +42,11 @@ fi
 
 # find usable tmp dir
 declare tmp="/tmp"
-[[ -d "${tmp}" && -h "${tmp}" ]] && tmp="/var/tmp"
-[[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
+[[ -d "${tmp}" && -L "${tmp}" ]] && tmp="/var/tmp"
+[[ -d "${tmp}" && -L "${tmp}" ]] && {
+  msg "Neither /tmp or /var/tmp can be used for writing logs"
+  exit 1
+}
 
 declare node1_dir="${tmp}/hopr-source-node-1"
 declare node2_dir="${tmp}/hopr-source-node-2"
@@ -125,7 +134,7 @@ function setup_node() {
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
     ${additional_args} \
-    > "${log}" 2>&1 &
+    >"${log}" 2>&1 &
 
   wait_for_http_port "${rest_port}" "127.0.0.1" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
@@ -196,14 +205,19 @@ ensure_port_is_free 19095
 ensure_port_is_free 19096
 # }}}
 
+# --- Cleanup old deployments to localhost {{{
+log "Removing artifacts from old deployments to localhost"
+rm -Rfv packages/ethereum/deployments/*/localhost
+# }}}
+
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
 DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
+(tail -f -n0 ${hardhat_rpc_log} &) | grep -q -E "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
-wait_for_http_port 8545 "127.0.0.1" "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
