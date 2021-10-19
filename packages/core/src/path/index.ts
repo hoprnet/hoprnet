@@ -60,7 +60,7 @@ export async function findPath(
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath: ChannelPath = queue.peek()
-    if (pathFrom(currentPath).length == hops) {
+    if (pathFrom(currentPath).length >= hops) {
       log('Path of correct length found', debugPath(currentPath), ':', currentPath.weight.toString())
       return pathFrom(currentPath)
     }
