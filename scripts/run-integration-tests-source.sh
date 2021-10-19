@@ -218,8 +218,6 @@ DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
 
 (tail -f -n0 ${hardhat_rpc_log} &) | grep -q -E "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
-
-# wait_for_http_port 8545 "127.0.0.1" "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
