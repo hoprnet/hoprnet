@@ -74,7 +74,6 @@ jobs:
       - name: Run start script
         if: ${{ !env.ACT }}
         run: |
-          yarn add @ethersproject/cli
           echo "Pre-deploy env var RELEASE=${RELEASE}"
           ./scripts/deploy-machine.sh
         env:
