@@ -76,7 +76,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       }
     }
     this.data.setCTChannels(ctChannels)
-    log('channels', ctChannels)
+    log('channels', ctChannels.map(c => `${c.destination.toB58String()} - ${c.latestQualityOf}, ${c.openFrom}`).join(', '))
 
     // Network must have at least some channels to create a full cover-traffic loop.
     if (this.data.openChannelCount() > CT_INTERMEDIATE_HOPS + 1) {
@@ -135,7 +135,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       }
       // It should fulfil the quality threshold
       if (q < CT_OPEN_CHANNEL_QUALITY_THRESHOLD) {
-        console.error('low quality node skipped', c.toB58String(), q)
+        log('low quality node skipped', c.toB58String(), q)
         continue
       }
 
