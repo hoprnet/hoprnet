@@ -38,13 +38,20 @@ export class PacketForwardInteraction {
     this.mixer.push(packet)
   }
 
-  async handleMixedPacket(packet: Packet) {
+  async handleMixedPacket(packet: Packet): Promise<void> {
     await packet.checkPacketTag(this.db)
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
     } else {
+      try {
+        await packet.validateUnacknowledgedTicket(this.db, this.chain, this.privKey)
+      } catch (e) {
+        log('error while validating unacknowledged ticket, packet is dropped', e)
+      }
+
       await packet.storeUnacknowledgedTicket(this.db)
+
       try {
         await packet.forwardTransform(this.privKey, this.chain)
         await this.interact(pubKeyToPeerId(packet.nextHop), packet)
