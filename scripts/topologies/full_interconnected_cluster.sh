@@ -104,7 +104,7 @@ validate_node_eth_address() {
     exit 1
   fi
 
-  IS_VALID_ETH_ADDRESS="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS'))")"
+  IS_VALID_ETH_ADDRESS="$(curl --silent https://api.hoprnet.org/api/validate/$ETH_ADDRESS/get?text=true)"
   if [ "$IS_VALID_ETH_ADDRESS" == "false" ]; then
     log "⛔️ Node returns an invalid address ETH_ADDRESS: $ETH_ADDRESS derived from $1"
     exit 1

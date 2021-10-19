@@ -33,17 +33,41 @@ disk_name() {
 # $2 = chain provider
 wallet_balance() {
   local address=${1}
-  local rpc=${2}
+  local rpc=${2} # @TODO: Replace RPC for chain to avoid calling only xdai
 
-  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('$1').then(b => formatEther(b))"
+  curl https://api.hoprnet.org/api/balance/xdai/$1/native/get?text=true
 }
 
 # $1 = chain provider
 funding_wallet_address() {
-  local rpc="${1}"
+  local rpc="${1}" # @TODO: Remove RPC
 
   # the value of FUNDING_PRIV_KEY must be prefixed with 0x
-  yarn run --silent ethers --rpc "${rpc}" --account ${FUNDING_PRIV_KEY} eval 'accounts[0].getAddress().then(a => a)'
+  curl --silent https://api.hoprnet.org/api/faucet/address/get?text=true
+}
+
+# $1 = account (hex)
+# $2 = token address (hex)
+faucet_address_token() {
+  local address="${1}"
+  local token="${2}"
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl --silent --request POST \
+  "https://api.hoprnet.org/api/faucet/xdai/$address/$token/default" \
+  --header 'Content-Type: application/json' \
+  --data-raw "{\"secret\": \"$secret\"}"
+}
+
+# $1 = account (hex)
+faucet_address_ether() {
+  local address="${1}"
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl --silent --request POST \
+  "https://api.hoprnet.org/api/faucet/xdai/$address/native/default" \
+  --header 'Content-Type: application/json' \
+  --data-raw "{\"secret\": \"$secret\"}"
 }
 
 # $1 = account (hex)
@@ -71,15 +95,16 @@ fund_if_empty() {
     log "Balance of ${address} is ${balance}"
     if [ "${balance}" = '0.0' ]; then
       # need to wait to make retries work
-      local ethers_opts="--rpc ${rpc} --account ${FUNDING_PRIV_KEY} --yes --wait"
+      local cmd_ether="faucet_address_ether ${address}"
 
       log "Funding account with native token -> ${address} ${min_funds}"
-      try_cmd "yarn run --silent ethers send ${address} ${min_funds} ${ethers_opts}" 12 10
+      try_cmd "${cmd_ether}" 12 10
 
       if [ -n "${token_contract}" ]; then
         # at this point we assume that the account needs HOPR as well
+        local cmd_token="faucet_address_token ${address} ${token_contract}"
         log "Funding account with HOPR token -> ${address} ${min_funds_hopr}"
-        try_cmd "yarn run --silent ethers send-token ${token_contract} ${address} ${min_funds_hopr} ${ethers_opts}" 12 10
+        try_cmd "${cmd_token}" 12 10
       fi
     fi
   fi
