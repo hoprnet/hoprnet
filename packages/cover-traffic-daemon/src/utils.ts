@@ -127,8 +127,7 @@ export const sendCTMessage = async (
     )
     return true
   } catch (e) {
-    //console.log(e)
-    log('error sending to' + startNode.toPeerId().toB58String())
+    log(`error ${e} sending to ${startNode.toB58String()}`)
     return false
   }
 }
