@@ -34,7 +34,7 @@
     "run:faucet:alice": "curl localhost:3011/api/v1/address/hopr | xargs -IRR yarn workspace @hoprnet/hopr-ethereum exec -- yarn faucet --address RR --network localhost --ishopraddress true",
     "run:faucet:bob": "curl localhost:3021/api/v1/address/hopr | xargs -IRR yarn workspace @hoprnet/hopr-ethereum exec -- yarn faucet --address RR --network localhost --ishopraddress true",
     "run:faucet:charlie": "curl localhost:3031/api/v1/address/hopr | xargs -IRR yarn workspace @hoprnet/hopr-ethereum exec -- yarn faucet --address RR --network localhost --ishopraddress true",
-    "run:faucet:all": "yarn run:faucet:alice && yarn run:faucet:bob && yarn run:faucet:charlie",
+    "run:faucet:all": "yarn workspace @hoprnet/hopr-ethereum faucet --uselocalidentities --network localhost",
     "util:clean": "yarn workspaces foreach -pvi --topological-dev --no-private run rimraf node_modules/@hoprnet",
     "docs:generate": "yarn workspaces foreach -pvi --topological-dev --no-private run docs:generate"
   },
