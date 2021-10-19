@@ -2,10 +2,7 @@
 
 # prevent souring of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && {
-  echo "This script should only be executed." >&2
-  exit 1
-}
+test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -25,10 +22,7 @@ usage() {
 }
 
 # return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && {
-  usage
-  exit 0
-}
+([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
 # verify and set parameters
 declare wait_delay=2
@@ -43,10 +37,7 @@ fi
 # find usable tmp dir
 declare tmp="/tmp"
 [[ -d "${tmp}" && -L "${tmp}" ]] && tmp="/var/tmp"
-[[ -d "${tmp}" && -L "${tmp}" ]] && {
-  msg "Neither /tmp or /var/tmp can be used for writing logs"
-  exit 1
-}
+[[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
 
 declare node1_dir="${tmp}/hopr-source-node-1"
 declare node2_dir="${tmp}/hopr-source-node-2"
