@@ -2,7 +2,7 @@ import Heap from 'heap-js'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
 import { debug } from '@hoprnet/hopr-utils'
 import type { ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
-import { PATH_RANDOMNESS } from '../constants'
+import { PATH_RANDOMNESS, MAX_HOPS } from '../constants'
 
 import BN from 'bn.js'
 const log = debug('hopr-core:pathfinder')
@@ -60,7 +60,8 @@ export async function findPath(
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath: ChannelPath = queue.peek()
-    if (pathFrom(currentPath).length >= hops) {
+    const currPathLen = pathFrom(currentPath).length
+    if (currPathLen >= hops && currPathLen <= MAX_HOPS) {
       log('Path of correct length found', debugPath(currentPath), ':', currentPath.weight.toString())
       return pathFrom(currentPath)
     }
