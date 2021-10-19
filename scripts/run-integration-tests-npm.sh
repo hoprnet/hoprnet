@@ -156,6 +156,9 @@ function setup_node() {
   # back to our original directory
   cd "${cwd}"
 
+  # Make sure that node has produced some logs
+  sleep 1
+
   # Wait until node has recovered its private key
   wait_for_regex ${log} "using blockchain address"
 }
