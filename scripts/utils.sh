@@ -156,9 +156,11 @@ function wait_for_regex {
 
   while true; do
     sleep ${delay}
-    local res=$(grep -E "${regex}" "${file}" || echo "")
-    if [[ "${res}" != "" ]]; then
-      return 0
+    if [ -f ${file} ]; then 
+      local res=$(grep -E "${regex}" "${file}" || echo "")
+      if [[ "${res}" != "" ]]; then
+        return 0
+      fi
     fi
   done
 }

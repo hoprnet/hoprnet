@@ -126,12 +126,6 @@ function setup_node() {
     --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
-
-  # Make sure that node has produced some logs
-  sleep 0.2
-
-  # Wait until node has recovered its private key
-  wait_for_regex ${log} "using blockchain address"
 }
 
 # $1 = rest port
@@ -222,6 +216,16 @@ setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
 setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+# }}}
+
+#  --- Wait until started --- {{{
+# Wait until node has recovered its private key
+wait_for_regex ${node1_log} "using blockchain address"
+wait_for_regex ${node2_log} "using blockchain address"
+wait_for_regex ${node3_log} "using blockchain address"
+wait_for_regex ${node4_log} "using blockchain address"
+wait_for_regex ${node5_log} "using blockchain address"
+wait_for_regex ${node6_log} "using blockchain address"
 # }}}
 
 #  --- Fund nodes --- {{{
