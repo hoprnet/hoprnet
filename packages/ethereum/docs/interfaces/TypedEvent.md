@@ -52,7 +52,7 @@ Event.address
 
 #### Defined in
 
-node_modules/@ethersproject/abstract-provider/lib/index.d.ts:56
+node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:56
 
 ___
 
@@ -80,7 +80,7 @@ Event.blockHash
 
 #### Defined in
 
-node_modules/@ethersproject/abstract-provider/lib/index.d.ts:53
+node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:53
 
 ___
 
@@ -94,7 +94,7 @@ Event.blockNumber
 
 #### Defined in
 
-node_modules/@ethersproject/abstract-provider/lib/index.d.ts:52
+node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:52
 
 ___
 
@@ -108,7 +108,7 @@ Event.data
 
 #### Defined in
 
-node_modules/@ethersproject/abstract-provider/lib/index.d.ts:57
+node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:57
 
 ___
 
@@ -164,7 +164,7 @@ Event.logIndex
 
 #### Defined in
 
-node_modules/@ethersproject/abstract-provider/lib/index.d.ts:60
+node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:60
 
 ___
 
@@ -178,7 +178,7 @@ Event.removed
 
 #### Defined in
 
-node_modules/@ethersproject/abstract-provider/lib/index.d.ts:55
+node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:55
 
 ___
 
@@ -192,7 +192,7 @@ Event.topics
 
 #### Defined in
 
-node_modules/@ethersproject/abstract-provider/lib/index.d.ts:58
+node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:58
 
 ___
 
@@ -206,7 +206,7 @@ Event.transactionHash
 
 #### Defined in
 
-node_modules/@ethersproject/abstract-provider/lib/index.d.ts:59
+node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:59
 
 ___
 
@@ -220,7 +220,7 @@ Event.transactionIndex
 
 #### Defined in
 
-node_modules/@ethersproject/abstract-provider/lib/index.d.ts:54
+node_modules/@ethersproject/contracts/node_modules/@ethersproject/abstract-provider/lib/index.d.ts:54
 
 ## Methods
 
