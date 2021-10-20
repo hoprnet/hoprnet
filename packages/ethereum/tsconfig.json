@@ -1,11 +1,10 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "lib"
+    "outDir": "./lib"
   },
   "include": ["type-extension.ts", "hardhat.config.ts", "constants.ts", "index.ts", "test", "tasks", "deploy"],
-  "files": ["./hardhat.config.ts"],
-  "exclude": ["lib", "types"],
+  "exclude": ["types"],
   "typedocOptions": {
     "entryPoints": ["index.ts"],
     "out": "docs",
