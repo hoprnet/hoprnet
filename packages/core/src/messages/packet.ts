@@ -21,7 +21,8 @@ import {
   Challenge,
   ChannelStatus,
   PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB
+  INVERSE_TICKET_WIN_PROB,
+  ChannelEntry
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
@@ -83,12 +84,12 @@ export async function validateUnacknowledgedTicket(
     throw Error(`The signer of the ticket does not match the sender`)
   }
 
+  // ignore dummy tickets
   if (UINT256.DUMMY_INVERSE_PROBABILITY.toBN().eq(ticketWinProb) && ticketAmount.eqn(0)) {
-    // Dummy ticket detected, ticket has no value and is therefore valid
     return
   }
 
-  let channelState
+  let channelState: ChannelEntry
   try {
     channelState = await channel.themToUs()
   } catch (err) {
@@ -128,16 +129,15 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket's channelIteration MUST match the current channelIteration
-  const currentChannelIteration = channelState.channelEpoch
+  const currentChannelIteration = channelState.channelEpoch.toBN()
   const ticketChannelIteration = ticket.channelIteration.toBN()
-  if (!ticketChannelIteration.eq(currentChannelIteration.toBN())) {
+  if (!ticketChannelIteration.eq(currentChannelIteration)) {
     throw Error(
       `Ticket was created for a different channel iteration ${ticketChannelIteration.toString()} != ${currentChannelIteration.toString()}`
     )
   }
 
   // channel MUST have enough funds
-  // (performance) we are making a request to blockchain
   const senderBalance = channelState.balance
   if (senderBalance.toBN().lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds`)
@@ -150,7 +150,7 @@ export async function validateUnacknowledgedTicket(
     (signedTicket) =>
       signedTicket.counterparty.eq(selfAddress) &&
       signedTicket.epoch.toBN().eq(channelTicketEpoch) &&
-      ticket.channelIteration.toBN().eq(currentChannelIteration.toBN())
+      ticket.channelIteration.toBN().eq(currentChannelIteration)
   )
 
   // calculate total unredeemed balance

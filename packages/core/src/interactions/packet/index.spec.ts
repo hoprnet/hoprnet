@@ -21,7 +21,9 @@ import {
   UnacknowledgedTicket,
   createPoRValuesForSender,
   deriveAckKeyShare,
-  u8aEquals
+  u8aEquals,
+  ChannelEntry,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 
 import { AcknowledgementChallenge, Packet } from '../../messages'
@@ -29,12 +31,18 @@ import { PacketForwardInteraction } from './forward'
 
 const SECRET_LENGTH = 32
 
-function createFakeTicket(privKey: PeerId, challenge: Challenge, counterparty: Address, amount: Balance) {
+function createFakeTicket(
+  privKey: PeerId,
+  challenge: Challenge,
+  counterparty: Address,
+  amount: Balance,
+  ticketIndex: BN
+) {
   return Ticket.create(
     counterparty,
     challenge,
     new UINT256(new BN(0)),
-    new UINT256(new BN(0)),
+    new UINT256(ticketIndex),
     amount,
     UINT256.fromInverseProbability(new BN(1)),
     new UINT256(new BN(0)),
@@ -56,11 +64,17 @@ function createFakeChain(privKey: PeerId) {
     acknowledge,
     createTicket: (pathLength: number, challenge: Challenge) => {
       return Promise.resolve(
-        createFakeTicket(privKey, challenge, counterparty.toAddress(), new Balance(PRICE_PER_PACKET.muln(pathLength)))
+        createFakeTicket(
+          privKey,
+          challenge,
+          counterparty.toAddress(),
+          new Balance(PRICE_PER_PACKET.muln(pathLength)),
+          new BN(pathLength)
+        )
       )
     },
-    createDummyTicket: (challenge: Challenge) =>
-      Ticket.create(
+    createDummyTicket: (challenge: Challenge) => {
+      return Ticket.create(
         counterparty.toAddress(),
         challenge,
         new UINT256(new BN(0)),
@@ -70,6 +84,20 @@ function createFakeChain(privKey: PeerId) {
         new UINT256(new BN(0)),
         privKey.privKey.marshal()
       )
+    },
+    async themToUs(): Promise<ChannelEntry> {
+      return new ChannelEntry(
+        counterparty,
+        _self,
+        new Balance(new BN(PRICE_PER_PACKET.muln(100))),
+        Hash.create(),
+        new UINT256(new BN(0)),
+        new UINT256(new BN(0)),
+        ChannelStatus.Open,
+        new UINT256(new BN(0)),
+        new UINT256(new BN(0))
+      )
+    }
   })
 
   return { getChannel }
@@ -121,7 +149,13 @@ describe('packet interaction', function () {
     const fakePacket = new Packet(
       new Uint8Array(),
       challenge,
-      createFakeTicket(self, ticketChallenge, PublicKey.fromPeerId(counterparty).toAddress(), new Balance(new BN(1)))
+      createFakeTicket(
+        self,
+        ticketChallenge,
+        PublicKey.fromPeerId(counterparty).toAddress(),
+        new Balance(new BN(1)),
+        new BN(1)
+      )
     )
 
     fakePacket.ownKey = ownKey
