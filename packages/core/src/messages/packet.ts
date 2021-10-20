@@ -253,8 +253,8 @@ export class Packet {
         new Balance(new BN(0)),
         UINT256.DUMMY_INVERSE_PROBABILITY,
         UINT256.fromString('0'),
-        chain.getPrivateKey() 
-    )
+        chain.getPrivateKey()
+      )
     } else {
       ticket = await channel.createTicket(path.length, ticketChallenge)
     }
@@ -402,7 +402,7 @@ export class Packet {
         new Balance(new BN(0)),
         UINT256.DUMMY_INVERSE_PROBABILITY,
         UINT256.fromString('0'),
-        chain.getPrivateKey() 
+        chain.getPrivateKey()
       )
     } else {
       this.ticket = await channel.createTicket(pathPosition, this.nextChallenge)

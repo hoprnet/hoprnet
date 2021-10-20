@@ -307,7 +307,6 @@ class Channel {
     return ticket
   }
 
-  
   // @TODO Replace this with (truely) random data
   /**
    * Creates a ticket that is sent next to the packet to the last node.
