@@ -14,6 +14,9 @@ import { HardhatUserConfig, task, types, extendEnvironment, extendConfig, subtas
 import { networks, NetworkTag } from './constants'
 import fs from 'fs'
 
+import runFaucet from './tasks/faucet'
+import runAccounts from './tasks/getAccounts'
+
 const {
   DEPLOYER_WALLET_PRIVATE_KEY,
   ETHERSCAN_KEY,
@@ -115,23 +118,20 @@ const hardhatConfig: HardhatUserConfig = {
 const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
 const DEFAULT_FUND_AMOUNT = '1'
 
-task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) => {
-  return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
-})
+task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', runFaucet)
   .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
-  .addFlag('ishopraddress', 'Whether the address passed is a HOPR address or not')
-  .addFlag(`uselocalidentities`, `Fund all identities stored in ${DEFAULT_IDENTITY_DIRECTORY}`)
+  .addFlag('useLocalIdentities', `Fund all identities stored in identity directory`)
+  .addFlag('password', `Password to decrypt identities stored in identity directory`)
   .addOptionalParam(
     'identityDirectory',
-    'Overwrite default identity directory',
+    `Overwrite default identity directory, default ['/tmp']`,
     DEFAULT_IDENTITY_DIRECTORY,
     types.string
   )
+  .addOptionalParam('identityPrefix', `only use identity files with prefix`, undefined, types.string)
 
-task('accounts', 'View unlocked accounts', async (...args: any[]) => {
-  return (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
-})
+task('accounts', 'View unlocked accounts', runAccounts)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

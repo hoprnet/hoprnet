@@ -86,7 +86,6 @@ export async function deserializeKeyPair(
 
   const decoded = JSON.parse(encodedString)
 
-  console.log(decoded)
   if ((decoded.crypto.kdfparams.n == 1) != useWeakCrypto) {
     logError(
       `Either tried to deserialize a key file using weak crypto or to deserialize a weak crypto key file without using weak crypto.`
