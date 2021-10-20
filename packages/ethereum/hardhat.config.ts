@@ -121,14 +121,19 @@ task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR 
   .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
   .addFlag('useLocalIdentities', `Fund all identities stored in identity directory`)
-  .addFlag('password', `Password to decrypt identities stored in identity directory`)
-  .addOptionalParam(
+  .addOptionalParam<string>(
+    'password',
+    `Password to decrypt identities stored in identity directory`,
+    undefined,
+    types.string
+  )
+  .addOptionalParam<string>(
     'identityDirectory',
     `Overwrite default identity directory, default ['/tmp']`,
     DEFAULT_IDENTITY_DIRECTORY,
     types.string
   )
-  .addOptionalParam('identityPrefix', `only use identity files with prefix`, undefined, types.string)
+  .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
 
 task('accounts', 'View unlocked accounts', async (...args: any[]) =>
   (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])

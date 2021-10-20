@@ -15,14 +15,11 @@ import { join } from 'path'
  * @param txparams the transaction
  */
 async function send(signer: providers.JsonRpcSigner, txparams: UnsignedTransaction): Promise<void> {
-  let txResponse: providers.TransactionResponse
   try {
-    txResponse = await signer.sendTransaction(txparams)
+    await signer.sendTransaction(txparams)
   } catch (err) {
     console.log(`Error: ${err}`)
   }
-
-  console.log(`transactionHash: ${txResponse.hash}`)
 }
 /**
  * Reads the identity files from the given directory, decrypts
@@ -104,6 +101,7 @@ async function createTransaction(
 
 type CLIOPts = {
   address?: string
+  password: string
   useLocalIdentities: boolean
   amount: string
   identityDirectory?: string
@@ -131,7 +129,7 @@ async function main(opts: CLIOPts, { ethers, network }: HardhatRuntimeEnvironmen
   const identities: string[] = []
 
   if (opts.useLocalIdentities) {
-    identities.push(...(await getIdentities(opts.identityDirectory, 'e2e-test', opts.identityPrefix)))
+    identities.push(...(await getIdentities(opts.identityDirectory, opts.password, opts.identityPrefix)))
   }
 
   if (opts.address) {
@@ -155,11 +153,16 @@ async function main(opts: CLIOPts, { ethers, network }: HardhatRuntimeEnvironmen
   const signer = ethers.provider.getSigner()
   const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(hoprTokenAddress) as HoprToken
 
-  const finalAmount = utils.parseEther('1.0')
+  const txs: UnsignedTransaction[] = []
+  for (const identity of identities) {
+    txs.push(
+      ...(await createTransaction(hoprToken, identity, utils.parseEther('1.0'), utils.parseEther('10.0'), network.name))
+    )
+  }
 
-  const txs = await createTransaction(hoprToken, identities[0], finalAmount, finalAmount, network.name)
-
-  await Promise.all(txs.map((tx) => send(signer, tx)))
+  for (const tx of txs) {
+    await send(signer, tx)
+  }
 }
 
 export default main
