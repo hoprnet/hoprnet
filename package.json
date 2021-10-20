@@ -39,7 +39,7 @@
     "docs:generate": "yarn workspaces foreach -pvi --topological-dev --no-private run docs:generate"
   },
   "devDependencies": {
-    "@ethersproject/cli": "5.4.0",
+    "@ethersproject/cli": "5.5.0",
     "rimraf": "3.0.2",
     "ts-node": "10.3.0",
     "yargs": "17.2.1"
