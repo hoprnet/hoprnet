@@ -185,6 +185,10 @@ export default class HoprEthereum extends EventEmitter {
       await redeemTickets(ce.source, this.db, this.chain, this.indexer, this)
     }
   }
+
+  public getPrivateKey(): Uint8Array {
+    return this.privateKey
+  }
 }
 
 export { ChannelEntry, Channel, Indexer, createChainWrapper, INDEXER_BLOCK_RANGE, CONFIRMATIONS }

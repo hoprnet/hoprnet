@@ -20,6 +20,7 @@ import {
   HalfKey,
   Challenge,
   ChannelStatus,
+  Balance,
   PRICE_PER_PACKET,
   INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
@@ -243,7 +244,17 @@ export class Packet {
 
     let ticket: Ticket
     if (isDirectMessage) {
-      ticket = channel.createDummyTicket(ticketChallenge)
+      // Dummy Ticket
+      ticket = Ticket.create(
+        nextPeer.toAddress(),
+        ticketChallenge,
+        UINT256.fromString('0'),
+        UINT256.fromString('0'),
+        new Balance(new BN(0)),
+        UINT256.DUMMY_INVERSE_PROBABILITY,
+        UINT256.fromString('0'),
+        chain.getPrivateKey() 
+    )
     } else {
       ticket = await channel.createTicket(path.length, ticketChallenge)
     }
@@ -382,7 +393,17 @@ export class Packet {
 
     const pathPosition = this.ticket.getPathPosition()
     if (pathPosition == 1) {
-      this.ticket = channel.createDummyTicket(this.nextChallenge)
+      // Dummy Ticket
+      this.ticket = Ticket.create(
+        nextPeer.toAddress(),
+        this.nextChallenge,
+        UINT256.fromString('0'),
+        UINT256.fromString('0'),
+        new Balance(new BN(0)),
+        UINT256.DUMMY_INVERSE_PROBABILITY,
+        UINT256.fromString('0'),
+        chain.getPrivateKey() 
+      )
     } else {
       this.ticket = await channel.createTicket(pathPosition, this.nextChallenge)
     }

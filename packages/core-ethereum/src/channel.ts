@@ -307,12 +307,14 @@ class Channel {
     return ticket
   }
 
+  
   // @TODO Replace this with (truely) random data
   /**
    * Creates a ticket that is sent next to the packet to the last node.
    * @param challenge dummy challenge, potential no valid response known
    * @returns a ticket without any value
    */
+  /*
   createDummyTicket(challenge: Challenge): Ticket {
     // TODO: document how dummy ticket works
     return Ticket.create(
@@ -326,6 +328,7 @@ class Channel {
       this.privateKey
     )
   }
+  */
 }
 
 export { Channel }
