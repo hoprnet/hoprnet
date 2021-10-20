@@ -79,7 +79,10 @@ export class CoverTrafficStrategy extends SaneDefaults {
       }
     }
     this.data.setCTChannels(ctChannels)
-    log('channels', ctChannels.map(c => `${c.destination.toB58String()} - ${c.latestQualityOf}, ${c.openFrom}`).join('; '))
+    log(
+      'channels',
+      ctChannels.map((c) => `${c.destination.toB58String()} - ${c.latestQualityOf}, ${c.openFrom}`).join('; ')
+    )
 
     // Network must have at least some channels to create a full cover-traffic loop.
     if (this.data.openChannelCount() > CT_INTERMEDIATE_HOPS + 1) {
@@ -97,7 +100,11 @@ export class CoverTrafficStrategy extends SaneDefaults {
             this.data
           ).then((success) => {
             if (!success) {
-              log(`failed to send to ${openChannel.destination.toB58String()} fails: ${this.data.messageFails(openChannel.destination)}`)
+              log(
+                `failed to send to ${openChannel.destination.toB58String()} fails: ${this.data.messageFails(
+                  openChannel.destination
+                )}`
+              )
               this.data.incrementMessageFails(openChannel.destination)
             }
           })
