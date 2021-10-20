@@ -1456,7 +1456,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-ethereum@workspace:packages/ethereum"
   dependencies:
-    "@ethersproject/wallet": 5.4.0
+    "@ethersproject/wallet": 5.5.0
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@nomiclabs/hardhat-ethers": 2.0.2
     "@nomiclabs/hardhat-etherscan": 2.1.6

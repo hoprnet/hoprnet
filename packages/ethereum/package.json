@@ -36,7 +36,7 @@
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
   },
   "devDependencies": {
-    "@ethersproject/wallet": "5.4.0",
+    "@ethersproject/wallet": "5.5.0",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@nomiclabs/hardhat-ethers": "2.0.2",
     "@nomiclabs/hardhat-etherscan": "2.1.6",
