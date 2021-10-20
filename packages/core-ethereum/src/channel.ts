@@ -326,21 +326,6 @@ class Channel {
       this.privateKey
     )
   }
-
-  /*
-   * As we issue probabilistic tickets, we can't be sure of the exact balance
-   * of our channels, but we can see the bounds based on how many tickets are
-   * outstanding.
-   */
-  async balanceToThem(): Promise<{ maximum: BN; minimum: BN }> {
-    const stake = (await this.usToThem()).balance
-    const outstandingTicketBalance = await this.db.getPendingBalanceTo(this.counterparty.toAddress())
-
-    return {
-      minimum: stake.toBN().sub(outstandingTicketBalance.toBN()),
-      maximum: stake.toBN()
-    }
-  }
 }
 
 export { Channel }

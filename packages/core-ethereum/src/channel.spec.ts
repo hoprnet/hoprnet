@@ -11,8 +11,7 @@ import {
   AcknowledgedTicket,
   Response,
   generateChannelId,
-  HalfKey,
-  PRICE_PER_PACKET
+  HalfKey 
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
@@ -167,9 +166,6 @@ describe('test channel', function () {
       bobMocks.events
     )
     assert(badResponse.status === 'FAILURE' && badResponse.message === 'Invalid response to acknowledgement')
-
-    const aBalances = await aliceMocks.channel.balanceToThem()
-    assert(aBalances.minimum.eq(aBalances.maximum.sub(PRICE_PER_PACKET)), 'max and min balance diverge')
   })
 
   it("should validate ticket's preimage", async function () {
