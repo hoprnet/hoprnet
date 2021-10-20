@@ -1,20 +1,29 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
+import type { UnsignedTransaction, BigNumber, providers } from 'ethers'
+import type { HoprToken } from '../types'
+
 import { utils, constants } from 'ethers'
-import type { UnsignedTransaction, BigNumber } from 'ethers'
 import { deserializeKeyPair, PublicKey, hasB58String } from '@hoprnet/hopr-utils'
-import { HoprToken__factory, HoprToken } from '../types'
 import { getContractData, Networks } from '..'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
 
-const send = (signer, txparams) =>
-  signer.sendTransaction(txparams, (error, transactionHash) => {
-    if (error) {
-      console.log(`Error: ${error}`)
-    }
-    console.log(`transactionHash: ${transactionHash}`)
-  })
+/**
+ * Takes an array of transactions, signs them and
+ * broadcasts them.
+ * @param signer Used to sign transactions
+ * @param txparams the transaction
+ */
+async function send(signer: providers.JsonRpcSigner, txparams: UnsignedTransaction): Promise<void> {
+  let txResponse: providers.TransactionResponse
+  try {
+    txResponse = await signer.sendTransaction(txparams)
+  } catch (err) {
+    console.log(`Error: ${err}`)
+  }
 
+  console.log(`transactionHash: ${txResponse.hash}`)
+}
 /**
  * Reads the identity files from the given directory, decrypts
  * them and returns their Ethereum addresses
@@ -60,6 +69,16 @@ async function getIdentities(directory: string, password: string, prefix?: strin
   return identites
 }
 
+/**
+ * Creates two transaction: one that sends ETH to the address
+ * and a second one which sends HOPR tokens to that address
+ * @param token instance of the HOPR token
+ * @param address where to send the HOPR tokens and ETH to
+ * @param amountEth how many ETH
+ * @param amountHopr how many HOPR
+ * @param networkName which network to use
+ * @returns
+ */
 async function createTransaction(
   token: HoprToken,
   address: string,
@@ -134,7 +153,7 @@ async function main(opts: CLIOPts, { ethers, network }: HardhatRuntimeEnvironmen
   }
 
   const signer = ethers.provider.getSigner()
-  const hoprToken = HoprToken__factory.connect(hoprTokenAddress, ethers.provider)
+  const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(hoprTokenAddress) as HoprToken
 
   const finalAmount = utils.parseEther('1.0')
 

@@ -14,9 +14,6 @@ import { HardhatUserConfig, task, types, extendEnvironment, extendConfig, subtas
 import { networks, NetworkTag } from './constants'
 import fs from 'fs'
 
-import runFaucet from './tasks/faucet'
-import runAccounts from './tasks/getAccounts'
-
 const {
   DEPLOYER_WALLET_PRIVATE_KEY,
   ETHERSCAN_KEY,
@@ -118,7 +115,9 @@ const hardhatConfig: HardhatUserConfig = {
 const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
 const DEFAULT_FUND_AMOUNT = '1'
 
-task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', runFaucet)
+task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) =>
+  (await import('./tasks/faucet')).default(args[0], args[1], args[2])
+)
   .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
   .addFlag('useLocalIdentities', `Fund all identities stored in identity directory`)
@@ -131,7 +130,9 @@ task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR 
   )
   .addOptionalParam('identityPrefix', `only use identity files with prefix`, undefined, types.string)
 
-task('accounts', 'View unlocked accounts', runAccounts)
+task('accounts', 'View unlocked accounts', async (...args: any[]) =>
+  (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
+)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')
