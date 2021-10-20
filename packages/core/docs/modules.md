@@ -59,7 +59,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
+[packages/core/src/channel-strategy.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L17)
 
 ___
 
@@ -69,7 +69,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L15)
+[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
 
 ___
 

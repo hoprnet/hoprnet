@@ -1039,18 +1039,17 @@ ___
 
 ### onWinningTicket
 
-▸ `Private` **onWinningTicket**(`ack`, `channel`): `void`
+▸ `Private` **onWinningTicket**(`ack`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `ack` | `any` |
-| `channel` | `any` |
 
 #### Returns
 
-`void`
+`Promise`<`void`\>
 
 #### Defined in
 
