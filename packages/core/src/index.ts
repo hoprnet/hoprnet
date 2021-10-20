@@ -267,8 +267,8 @@ class Hopr extends EventEmitter {
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     )
 
-    ethereum.on('ticket:win', (ack, channel) => {
-      this.onWinningTicket(ack, channel)
+    ethereum.on('ticket:win', (ack) => {
+      this.onWinningTicket(ack)
     })
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
@@ -666,8 +666,8 @@ class Hopr extends EventEmitter {
     this.strategy = strategy
   }
 
-  private onWinningTicket(ack, channel) {
-    this.strategy.onWinningTicket(ack, channel)
+  private async onWinningTicket(ack) {
+    this.strategy.onWinningTicket(ack, await this.startedPaymentChannels())
   }
 
   public getChannelStrategy(): string {
@@ -795,7 +795,7 @@ class Hopr extends EventEmitter {
     }
 
     if (channelState.status === ChannelStatus.Open) {
-      await this.strategy.onChannelWillClose(channel)
+      await this.strategy.onChannelWillClose(channelState, ethereum)
     }
 
     let txHash: string

@@ -16,7 +16,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
-import { Channel } from './channel'
+import { Channel, redeemTickets } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
@@ -43,6 +43,7 @@ export default class HoprEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
   private started: Promise<HoprEthereum> | undefined
+  private redeemingAll: Promise<void> | undefined = undefined
 
   constructor(
     //private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
@@ -181,10 +182,17 @@ export default class HoprEthereum extends EventEmitter {
   }
 
   public async redeemAllTickets(): Promise<void> {
-    for (const ce of await this.getChannelsTo(this.publicKey.toAddress())) {
-      const channel = this.getChannel(ce.source, ce.destination)
-      await channel.redeemAllTickets()
+    if (this.redeemingAll) {
+      return this.redeemingAll
     }
+    const _redeemAll = async () => {
+      for (const ce of await this.getChannelsTo(this.publicKey.toAddress())) {
+        await redeemTickets(ce.source, this.db, this.chain, this.indexer, this)
+      }
+      this.redeemingAll = undefined
+    }
+    this.redeemingAll = _redeemAll()
+    return this.redeemingAll
   }
 }
 
