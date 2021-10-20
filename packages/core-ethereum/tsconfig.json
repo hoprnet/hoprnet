@@ -5,7 +5,6 @@
     "outDir": "./lib"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["lib"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",

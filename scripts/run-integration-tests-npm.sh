@@ -84,7 +84,7 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${npm_install_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${npm_install_dir}"
 
   log "Cleaning up processes"
   for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096; do
@@ -126,9 +126,14 @@ function setup_node() {
   mkdir -p "${npm_install_dir}"
   cd "${npm_install_dir}"
 
-  yarn add @hoprnet/hoprd@${version}
+  npm install @hoprnet/hoprd@${version}
 
-  DEBUG="hopr*" yarn hoprd \
+  # Copies local deployment information to npm install directory
+  # Fixme: copy also other environments
+  log "Copying deployment information to npm directory (${npm_install_dir})"
+  cp -R ${cwd}/packages/ethereum/deployments/default/localhost ${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/default
+  
+  DEBUG="hopr*" npx hoprd \
     --admin \
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \
@@ -150,8 +155,6 @@ function setup_node() {
 
   # back to our original directory
   cd "${cwd}"
-
-  wait_for_http_port "${rest_port}" "127.0.0.1" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
 
 # $1 = port
@@ -223,14 +226,19 @@ ensure_port_is_free 19095
 ensure_port_is_free 19096
 # }}}
 
+# --- Cleanup old deployments to localhost {{{
+log "Removing artifacts from old deployments to localhost"
+rm -Rfv packages/ethereum/deployments/*/localhost
+# }}}
+
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
 DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
+wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server" 
 log "Hardhat node started (127.0.0.1:8545)"
-wait_for_http_port 8545 "127.0.0.1" "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
@@ -240,6 +248,16 @@ setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "${npm_
 setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${npm_package_version}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${npm_package_version}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${npm_package_version}" "--run \"info;balance\""
+# }}}
+
+#  --- Wait until started --- {{{
+# Wait until node has recovered its private key
+wait_for_regex ${node1_log} "using blockchain address"
+wait_for_regex ${node2_log} "using blockchain address"
+wait_for_regex ${node3_log} "using blockchain address"
+wait_for_regex ${node4_log} "using blockchain address"
+wait_for_regex ${node5_log} "using blockchain address"
+wait_for_regex ${node6_log} "using blockchain address"
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -252,11 +270,11 @@ fund_node 13306 "${node6_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_port 19091 "127.0.0.1" "${node1_log}"
-wait_for_port 19092 "127.0.0.1" "${node2_log}"
-wait_for_port 19093 "127.0.0.1" "${node3_log}"
-wait_for_port 19094 "127.0.0.1" "${node4_log}"
-wait_for_port 19095 "127.0.0.1" "${node5_log}"
+wait_for_regex ${node1_log} "STARTED NODE"
+wait_for_regex ${node2_log} "STARTED NODE"
+wait_for_regex ${node3_log} "STARTED NODE"
+wait_for_regex ${node4_log} "STARTED NODE"
+wait_for_regex ${node5_log} "STARTED NODE"
 # no need to wait for node 6 since that will stop right away
 # }}}
 
