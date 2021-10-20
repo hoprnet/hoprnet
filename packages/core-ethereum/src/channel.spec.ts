@@ -148,10 +148,24 @@ describe('test channel', function () {
       aliceMocks.self
     )
 
-    const goodResponse = await _redeemTicket(aliceMocks.self, goodAck, bobMocks.db, bobMocks.chain, bobMocks.indexer, bobMocks.events)
+    const goodResponse = await _redeemTicket(
+      aliceMocks.self,
+      goodAck,
+      bobMocks.db,
+      bobMocks.chain,
+      bobMocks.indexer,
+      bobMocks.events
+    )
     assert(goodResponse.status === 'SUCCESS')
 
-    const badResponse = await _redeemTicket(aliceMocks.self, badAck, bobMocks.db, bobMocks.chain, bobMocks.indexer, bobMocks.events)
+    const badResponse = await _redeemTicket(
+      aliceMocks.self,
+      badAck,
+      bobMocks.db,
+      bobMocks.chain,
+      bobMocks.indexer,
+      bobMocks.events
+    )
     assert(badResponse.status === 'FAILURE' && badResponse.message === 'Invalid response to acknowledgement')
 
     const aBalances = await aliceMocks.channel.balanceToThem()
@@ -168,7 +182,14 @@ describe('test channel', function () {
       aliceMocks.self
     )
 
-    const response = await _redeemTicket(aliceMocks.self, acknowledgement, bobMocks.db, bobMocks.chain, bobMocks.indexer, bobMocks.events)
+    const response = await _redeemTicket(
+      aliceMocks.self,
+      acknowledgement,
+      bobMocks.db,
+      bobMocks.chain,
+      bobMocks.indexer,
+      bobMocks.events
+    )
     assert(response.status === 'FAILURE' && response.message === 'PreImage is empty.')
   })
 })

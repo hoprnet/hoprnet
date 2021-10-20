@@ -30,7 +30,7 @@ const log = debug('hopr-core-ethereum:channel')
 let _redeemingAll: Promise<void> | undefined = undefined
 
 export async function redeemTickets(
-  source: PublicKey, 
+  source: PublicKey,
   db: HoprDB,
   chain: ChainWrapper,
   indexer: Indexer,
@@ -42,7 +42,7 @@ export async function redeemTickets(
   // Because tickets are ordered and require the previous redemption to
   // have succeeded before we can redeem the next, we need to do this
   // sequentially.
-  const tickets = await db.getAcknowledgedTickets({ signer: source})
+  const tickets = await db.getAcknowledgedTickets({ signer: source })
   log(`redeeming ${tickets.length} tickets from ${source.toB58String()}`)
   const _redeemAll = async () => {
     try {
@@ -72,7 +72,7 @@ export async function redeemTickets(
 async function redeemTicket(
   counterparty: PublicKey,
   ackTicket: AcknowledgedTicket,
-  db: HoprDB, 
+  db: HoprDB,
   chain: ChainWrapper,
   indexer: Indexer,
   events: EventEmitter
@@ -133,7 +133,6 @@ export const _redeemTicket = redeemTicket // For tests
 
 // TODO - legacy, models bidirectional channel.
 class Channel {
-
   constructor(
     private readonly self: PublicKey,
     private readonly counterparty: PublicKey,
@@ -342,7 +341,6 @@ class Channel {
       maximum: stake.toBN()
     }
   }
-
 }
 
 export { Channel }
