@@ -623,7 +623,9 @@ class Hopr extends EventEmitter {
     if (this.status != 'RUNNING') {
       return
     }
-    const logTimeout = setTimeout(() => {log('strategy tick took longer than 10 secs')}, 10000)
+    const logTimeout = setTimeout(() => {
+      log('strategy tick took longer than 10 secs')
+    }, 10000)
     try {
       await this.tickChannelStrategy()
     } catch (e) {
