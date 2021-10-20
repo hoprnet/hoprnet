@@ -149,6 +149,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
         continue
       }
 
+      log(`opening ${c.toB58String()}`)
       toOpen.push([c, CHANNEL_STAKE])
     }
 

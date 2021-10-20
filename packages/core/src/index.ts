@@ -524,12 +524,6 @@ class Hopr extends EventEmitter {
 
         if (channelState.status !== ChannelStatus.Open) {
           throw Error(`Channel ${channelState.getId().toHex()} is not open`)
-        } else if (channelState.ticketEpoch.toBN().isZero()) {
-          throw Error(
-            `Cannot use manually set path because apparently there is no commitment set for the channel between ${ticketIssuer
-              .toPeerId()
-              .toB58String()} and ${ticketReceiver.toPeerId().toB58String()}`
-          )
         }
       }
     }
