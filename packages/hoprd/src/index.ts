@@ -177,7 +177,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
 function addUnhandledPromiseRejectionHandler() {
   process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason)
-    process.exit(1)
+    // process.exit(1)
   })
 }
 
