@@ -20,7 +20,9 @@ import {
   HalfKey,
   Challenge,
   ChannelStatus,
+  ChannelEntry,
   Balance,
+  Hash,
   PRICE_PER_PACKET,
   INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
@@ -37,6 +39,52 @@ export const INTERMEDIATE_HOPS = 3 // 3 relayers and 1 destination
 const PACKET_LENGTH = getPacketLength(INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, 0)
 
 const log = debug('hopr-core:message:packet')
+
+
+async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<UINT256> {
+  let currentTicketIndex = await db.getCurrentTicketIndex(channelId)
+
+  if (currentTicketIndex == undefined) {
+    currentTicketIndex = new UINT256(new BN(1))
+  }
+
+  await db.setCurrentTicketIndex(channelId, new UINT256(currentTicketIndex.toBN().addn(1)))
+
+  return currentTicketIndex
+}
+
+/**
+ * Creates a signed ticket that includes the given amount of
+ * tokens
+ * @dev Due to a missing feature, namely ECMUL, in Ethereum, the
+ * challenge is given as an Ethereum address because the signature
+ * recovery algorithm is used to perform an EC-point multiplication.
+ * @param amount value of the ticket
+ * @param challenge challenge to solve in order to redeem the ticket
+ * @param winProb the winning probability to use
+ * @returns a signed ticket
+ */
+export async function createTicket(channel: ChannelEntry, pathLength: number, privateKey: Uint8Array, challenge: Challenge, db: HoprDB) {
+  const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
+  const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
+  const winProb = new BN(INVERSE_TICKET_WIN_PROB)
+
+  const ticket = Ticket.create(
+    channel.destination.toAddress(),
+    challenge,
+    channel.ticketEpoch,
+    currentTicketIndex,
+    amount,
+    UINT256.fromInverseProbability(winProb),
+    channel.channelEpoch,
+    privateKey
+  )
+  await db.markPending(ticket)
+
+  log(`Creating ticket in channel ${channel.getId().toHex()}. Ticket data: \n${ticket.toString()}`)
+
+  return ticket
+}
 
 /**
  * Validate newly created tickets

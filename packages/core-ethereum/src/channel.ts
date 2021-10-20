@@ -4,16 +4,11 @@ import {
   Balance,
   Hash,
   HalfKey,
-  UINT256,
-  Ticket,
   AcknowledgedTicket,
   ChannelEntry,
   UnacknowledgedTicket,
-  Challenge,
   generateChannelId,
   ChannelStatus,
-  PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 import type { RedeemTicketResponse } from '.'
@@ -139,7 +134,6 @@ class Channel {
     private readonly db: HoprDB,
     private readonly chain: ChainWrapper,
     private readonly indexer: Indexer,
-    private readonly privateKey: Uint8Array,
     private readonly events: EventEmitter
   ) {}
 
@@ -259,76 +253,7 @@ class Channel {
     return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
-  private async bumpTicketIndex(channelId: Hash): Promise<UINT256> {
-    let currentTicketIndex = await this.db.getCurrentTicketIndex(channelId)
 
-    if (currentTicketIndex == undefined) {
-      currentTicketIndex = new UINT256(new BN(1))
-    }
-
-    await this.db.setCurrentTicketIndex(channelId, new UINT256(currentTicketIndex.toBN().addn(1)))
-
-    return currentTicketIndex
-  }
-
-  /**
-   * Creates a signed ticket that includes the given amount of
-   * tokens
-   * @dev Due to a missing feature, namely ECMUL, in Ethereum, the
-   * challenge is given as an Ethereum address because the signature
-   * recovery algorithm is used to perform an EC-point multiplication.
-   * @param amount value of the ticket
-   * @param challenge challenge to solve in order to redeem the ticket
-   * @param winProb the winning probability to use
-   * @returns a signed ticket
-   */
-  async createTicket(pathLength: number, challenge: Challenge) {
-    const counterpartyAddress = this.counterparty.toAddress()
-    const channelState = await this.usToThem()
-    const id = generateChannelId(this.self.toAddress(), this.counterparty.toAddress())
-    const currentTicketIndex = await this.bumpTicketIndex(id)
-    const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
-    const winProb = new BN(INVERSE_TICKET_WIN_PROB)
-
-    const ticket = Ticket.create(
-      counterpartyAddress,
-      challenge,
-      channelState.ticketEpoch,
-      currentTicketIndex,
-      amount,
-      UINT256.fromInverseProbability(winProb),
-      channelState.channelEpoch,
-      this.privateKey
-    )
-    await this.db.markPending(ticket)
-
-    log(`Creating ticket in channel ${chalk.yellow(channelState.getId().toHex())}. Ticket data: \n${ticket.toString()}`)
-
-    return ticket
-  }
-
-  
-  // @TODO Replace this with (truely) random data
-  /**
-   * Creates a ticket that is sent next to the packet to the last node.
-   * @param challenge dummy challenge, potential no valid response known
-   * @returns a ticket without any value
-   */
-  /*
-  createDummyTicket(challenge: Challenge): Ticket {
-    // TODO: document how dummy ticket works
-    return Ticket.create(
-      this.counterparty.toAddress(),
-      challenge,
-      UINT256.fromString('0'),
-      UINT256.fromString('0'),
-      new Balance(new BN(0)),
-      UINT256.DUMMY_INVERSE_PROBABILITY,
-      UINT256.fromString('0'),
-      this.privateKey
-    )
-  }
-  */
 }
 
 export { Channel }
