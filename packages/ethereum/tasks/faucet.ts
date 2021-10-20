@@ -45,6 +45,7 @@ async function getIdentities(directory: string, password: string, prefix?: strin
     }
   }
 
+  console.log(`identityFiles`, identityFiles)
   const identites: string[] = []
   for (const identityFile of identityFiles) {
     let file: Uint8Array
