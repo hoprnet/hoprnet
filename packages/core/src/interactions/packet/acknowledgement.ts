@@ -62,8 +62,8 @@ export function sendAcknowledgement(
         timeout: ACKNOWLEDGEMENT_TIMEOUT
       })
     } catch (err) {
-      // Currently unclear how to handle if we cannot send
-      // acknowledgements
+      // Currently unclear how to proceed if sending acknowledgements
+      // fails
       error(`could not send acknowledgement`, err)
     }
   })()
