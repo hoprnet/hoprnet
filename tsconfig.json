@@ -1,4 +1,8 @@
 {
+  "ts-node": {
+    // No need to check types again after running 'yarn build'
+    "transpileOnly": true
+  },
   "compilerOptions": {
     "esModuleInterop": true,
     "lib": ["ES2021", "dom"],
@@ -9,8 +13,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "sourceMap": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "forceConsistentCasingInFileNames": true
   },
   "exclude": ["node_modules"]
 }

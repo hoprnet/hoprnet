@@ -15,7 +15,19 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     hre.environment,
     hre.network.name === 'hardhat' ? 'localhost' : hre.network.name
   )
-  const contracts = (await readdir(basePath)).filter((filename: string) => filename.endsWith('.json'))
+
+  let contracts: string[]
+
+  try {
+    contracts = (await readdir(basePath)).filter((filename: string) => filename.endsWith('.json'))
+  } catch (err) {
+    // Ignore missing deployments in unit tests
+    if (hre.network.name === 'hardhat' && err.code === 'ENOENT') {
+      return
+    }
+
+    throw err
+  }
 
   for (const contract of contracts) {
     const filePath = join(basePath, contract)
