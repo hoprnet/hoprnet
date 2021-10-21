@@ -267,8 +267,8 @@ class Hopr extends EventEmitter {
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     )
 
-    ethereum.on('ticket:win', (ack, channel) => {
-      this.onWinningTicket(ack, channel)
+    ethereum.on('ticket:win', (ack) => {
+      this.onWinningTicket(ack)
     })
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
@@ -525,12 +525,6 @@ class Hopr extends EventEmitter {
 
         if (channelState.status !== ChannelStatus.Open) {
           throw Error(`Channel ${channelState.getId().toHex()} is not open`)
-        } else if (channelState.ticketEpoch.toBN().isZero()) {
-          throw Error(
-            `Cannot use manually set path because apparently there is no commitment set for the channel between ${ticketIssuer
-              .toPeerId()
-              .toB58String()} and ${ticketReceiver.toPeerId().toB58String()}`
-          )
         }
       }
     }
@@ -630,11 +624,16 @@ class Hopr extends EventEmitter {
     if (this.status != 'RUNNING') {
       return
     }
+    const logTimeout = setTimeout(() => {
+      log('strategy tick took longer than 10 secs')
+    }, 10000)
     try {
       await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
     }
+    clearTimeout(logTimeout)
+
     this.checkTimeout = setTimeout(() => this.periodicCheck(), this.strategy.tickInterval)
   }
 
@@ -673,8 +672,8 @@ class Hopr extends EventEmitter {
     this.strategy = strategy
   }
 
-  private onWinningTicket(ack, channel) {
-    this.strategy.onWinningTicket(ack, channel)
+  private async onWinningTicket(ack) {
+    this.strategy.onWinningTicket(ack, await this.startedPaymentChannels())
   }
 
   public getChannelStrategy(): string {
@@ -802,30 +801,31 @@ class Hopr extends EventEmitter {
     }
 
     if (channelState.status === ChannelStatus.Open) {
-      await this.strategy.onChannelWillClose(channel)
+      await this.strategy.onChannelWillClose(channelState, ethereum)
     }
 
+    log('closing channel', channelState.getId())
     let txHash: string
     try {
       if (channelState.status === ChannelStatus.Open || channelState.status == ChannelStatus.WaitingForCommitment) {
+        log('initiating closure')
         txHash = await channel.initializeClosure()
       } else {
+        log('finalizing closure')
         txHash = await channel.finalizeClosure()
       }
     } catch (err) {
+      log('failed to close channel', err)
       await this.isOutOfFunds(err)
       throw new Error(`Failed to closeChannel: ${err}`)
     }
 
+    log(`closed channel, ${channelState.getId()}`)
     return { receipt: txHash, status: channelState.status }
   }
 
-  public async getAcknowledgedTickets() {
-    return this.db.getAcknowledgedTickets()
-  }
-
   public async getTicketStatistics() {
-    const ack = await this.getAcknowledgedTickets()
+    const ack = await this.db.getAcknowledgedTickets()
     const pending = await this.db.getPendingTicketCount()
     const losing = await this.db.getLosingTicketCount()
     const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
@@ -843,39 +843,8 @@ class Hopr extends EventEmitter {
   }
 
   public async redeemAllTickets() {
-    let count = 0,
-      redeemed = 0,
-      total = new BN(0)
-
-    for (const ackTicket of await this.getAcknowledgedTickets()) {
-      count++
-      const result = await this.redeemAcknowledgedTicket(ackTicket)
-
-      if (result.status === 'SUCCESS') {
-        redeemed++
-        total.iadd(ackTicket.ticket.amount.toBN())
-        console.log(`Redeemed ticket ${count}`)
-      } else {
-        console.log(`Failed to redeem ticket ${count}`)
-      }
-    }
-    return {
-      count,
-      redeemed,
-      total: new Balance(total)
-    }
-  }
-
-  public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
     const ethereum = await this.startedPaymentChannels()
-    const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.signer)
-
-    try {
-      return await channel.redeemTicket(ackTicket)
-    } catch (err) {
-      await this.isOutOfFunds(err)
-      throw new Error(`Failed to redeemAcknowledgedTicket: ${err}`)
-    }
+    await ethereum.redeemAllTickets()
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {

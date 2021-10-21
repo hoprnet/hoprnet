@@ -54,7 +54,6 @@ describe('test pathfinder with some simple topologies', function () {
   ARROW.set(TEST_NODES[0], [TEST_NODES[1]])
   ARROW.set(TEST_NODES[1], [TEST_NODES[2]])
   ARROW.set(TEST_NODES[2], [TEST_NODES[3]])
-  ARROW.set(TEST_NODES[3], [TEST_NODES[4]])
 
   function fakeChannels(
     edges: Map<PublicKey, PublicKey[]>,
@@ -105,19 +104,19 @@ describe('test pathfinder with some simple topologies', function () {
     const path = await findPath(
       TEST_NODES[0],
       fakePublicKey(6),
-      4,
+      3,
       RELIABLE_NETWORK,
       fakeChannels(ARROW, STAKE_1),
       weight
     )
     checkPath(path, ARROW)
-    assert(path.length == 4, 'Should find a valid acyclic path')
+    assert(path.length == 3, 'Should find a valid acyclic path')
   })
 
   it('should not find a path if a node is unreliable', async () => {
     let thrown = false
     try {
-      await findPath(TEST_NODES[0], fakePublicKey(6), 4, UNRELIABLE_NETWORK, fakeChannels(ARROW, STAKE_1), weight)
+      await findPath(TEST_NODES[0], fakePublicKey(6), 3, UNRELIABLE_NETWORK, fakeChannels(ARROW, STAKE_1), weight)
     } catch (e) {
       thrown = true
     }
