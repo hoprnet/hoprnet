@@ -38,7 +38,7 @@
 
 #### Defined in
 
-[types/primitives.ts:255](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L255)
+[types/primitives.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L261)
 
 ## Accessors
 
@@ -52,7 +52,7 @@
 
 #### Defined in
 
-[types/primitives.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L261)
+[types/primitives.ts:267](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L267)
 
 ___
 
@@ -66,7 +66,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:289](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L289)
+[types/primitives.ts:295](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L295)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L257)
+[types/primitives.ts:263](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L263)
 
 ## Methods
 
@@ -100,7 +100,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L273)
+[types/primitives.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L279)
 
 ___
 
@@ -114,7 +114,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:281](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L281)
+[types/primitives.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L287)
 
 ___
 
@@ -128,7 +128,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:265](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L265)
+[types/primitives.ts:271](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L271)
 
 ___
 
@@ -142,7 +142,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:285](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L285)
+[types/primitives.ts:291](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L291)
 
 ___
 
@@ -156,7 +156,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:269](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L269)
+[types/primitives.ts:275](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L275)
 
 ___
 
@@ -170,7 +170,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:294](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L294)
+[types/primitives.ts:300](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L300)
 
 ___
 
@@ -190,4 +190,4 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:277](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L277)
+[types/primitives.ts:283](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L283)
