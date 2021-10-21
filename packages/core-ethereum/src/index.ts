@@ -18,7 +18,6 @@ import {
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
-import { redeemTickets } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
@@ -194,13 +193,93 @@ export default class HoprEthereum extends EventEmitter {
     }
     const _redeemAll = async () => {
       for (const ce of await this.getChannelsTo(this.publicKey.toAddress())) {
-        await redeemTickets(ce.source, this.db, this.chain, this.indexer, this)
+        await this.redeemTicketsInChannel(ce.source)
       }
       this.redeemingAll = undefined
     }
     this.redeemingAll = _redeemAll()
     return this.redeemingAll
   }
+
+  private async redeemTicketsInChannel(source: PublicKey) {
+    // Because tickets are ordered and require the previous redemption to
+    // have succeeded before we can redeem the next, we need to do this
+    // sequentially.
+    const tickets = await this.db.getAcknowledgedTickets({ signer: source })
+    log(`redeeming ${tickets.length} tickets from ${source.toB58String()}`)
+    try {
+      for (const ticket of tickets) {
+        log('redeeming ticket', ticket)
+        const result = await this.redeemTicket(source, ticket)
+        if (result.status !== 'SUCCESS') {
+          log('Error redeeming ticket', result)
+          // We need to abort as tickets require ordered redemption.
+          return
+        }
+        log('ticket was redeemed')
+      }
+    } catch (e) {
+      // We are going to swallow the error here, as more than one consumer may
+      // be inspecting this same promise.
+      log('Error when redeeming tickets, aborting', e)
+    }
+    log(`redemption of tickets from ${source.toB58String()} is complete`)
+  }
+
+  // Private as out of order redemption will break things - redeem all at once.
+  private async redeemTicket(counterparty: PublicKey, ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
+    if (!ackTicket.verify(counterparty)) {
+      return {
+        status: 'FAILURE',
+        message: 'Invalid response to acknowledgement'
+      }
+    }
+
+    try {
+      const ticket = ackTicket.ticket
+
+      log('Submitting ticket', ackTicket.response.toHex())
+      const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
+      const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
+      if (!hasPreImage) {
+        log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'PreImage is empty.'`)
+        return {
+          status: 'FAILURE',
+          message: 'PreImage is empty.'
+        }
+      }
+
+      const isWinning = ticket.isWinningTicket(ackTicket.preImage, ackTicket.response, ticket.winProb)
+
+      if (!isWinning) {
+        log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
+        return {
+          status: 'FAILURE',
+          message: 'Not a winning ticket.'
+        }
+      }
+
+      const receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket)
+      await this.indexer.resolvePendingTransaction('channel-updated', receipt)
+
+      log('Successfully submitted ticket', ackTicket.response.toHex())
+      await this.db.markRedeemeed(ackTicket)
+      this.emit('ticket:redeemed', ackTicket)
+      return {
+        status: 'SUCCESS',
+        receipt,
+        ackTicket
+      }
+    } catch (err) {
+      // TODO delete ackTicket -- check if it's due to gas!
+      log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
+      return {
+        status: 'ERROR',
+        error: err
+      }
+    }
+  }
+
 
   public getPrivateKey(): Uint8Array {
     return this.privateKey
