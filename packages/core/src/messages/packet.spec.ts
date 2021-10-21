@@ -56,10 +56,11 @@ describe('packet creation and transformation', function () {
     )
 
     const chain = createMockTickets(self.privKey.marshal())
+    const db = HoprDB.createMock()
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any)
+    let packet = await Packet.create(testMsg, path, self, db, chain as any)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
@@ -81,7 +82,7 @@ describe('packet creation and transformation', function () {
       } else {
         await packet.storeUnacknowledgedTicket(db)
 
-        await packet.forwardTransform(node, chain as any)
+        await packet.forwardTransform(node, chain as any, db)
       }
     }
   })
@@ -96,7 +97,8 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any)
+    const db = HoprDB.createMock()
+    let packet = await Packet.create(testMsg, path, self, db, chain as any)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
@@ -118,7 +120,7 @@ describe('packet creation and transformation', function () {
       } else {
         await packet.storeUnacknowledgedTicket(db)
 
-        await packet.forwardTransform(node, chain as any)
+        await packet.forwardTransform(node, chain as any, db)
       }
     }
   })
@@ -130,10 +132,11 @@ describe('packet creation and transformation', function () {
     )
 
     const chain = createMockTickets(self.privKey.marshal())
+    const db = HoprDB.createMock()
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any)
+    let packet = await Packet.create(testMsg, path, self, db, chain as any)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
@@ -155,7 +158,7 @@ describe('packet creation and transformation', function () {
       } else {
         await packet.storeUnacknowledgedTicket(db)
 
-        await packet.forwardTransform(node, chain as any)
+        await packet.forwardTransform(node, chain as any, db)
       }
     }
   })
@@ -167,14 +170,15 @@ describe('packet creation and transformation', function () {
     )
 
     const chain = createMockTickets(self.privKey.marshal())
+    const db = HoprDB.createMock()
 
     const testMsg = new TextEncoder().encode('test')
 
-    const packet = await Packet.create(testMsg, path, self, chain as any)
+    const packet = await Packet.create(testMsg, path, self, db, chain as any)
 
     const transformedPacket = Packet.deserialize(packet.serialize(), path[0], self)
 
-    await transformedPacket.forwardTransform(path[0], chain as any)
+    await transformedPacket.forwardTransform(path[0], chain as any, db)
 
     assert.throws(() => Packet.deserialize(transformedPacket.serialize(), path[0], self))
   })

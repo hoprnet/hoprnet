@@ -46,7 +46,7 @@ export class PacketForwardInteraction {
     } else {
       await packet.storeUnacknowledgedTicket(this.db)
       try {
-        await packet.forwardTransform(this.privKey, this.chain)
+        await packet.forwardTransform(this.privKey, this.chain, this.db)
         await this.interact(pubKeyToPeerId(packet.nextHop), packet)
       } catch (e) {
         // Errors include:

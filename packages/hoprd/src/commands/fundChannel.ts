@@ -53,8 +53,8 @@ export default class FundChannel extends AbstractCommand {
     log('Funding channel...')
 
     try {
-      const { channelId } = await this.node.fundChannel(peerId, myFund, counterpartyFund)
-      return log(`${chalk.green(`Successfully funded channel`)} ${styleValue(channelId.toHex(), 'hash')}`)
+      await this.node.fundChannel(peerId, myFund, counterpartyFund)
+      return log(`${chalk.green(`Successfully funded channel`)} to ${peerId.toB58String()}`)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

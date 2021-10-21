@@ -69,7 +69,7 @@ export async function createTicket(
   db: HoprDB,
   chain: HoprCoreEthereum,
 ) {
-  const channel = await chain.getChannelTo(dest)
+  const channel = await db.getChannelTo(dest)
   const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
   const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
   const winProb = new BN(INVERSE_TICKET_WIN_PROB)
@@ -395,9 +395,9 @@ export class Packet {
     await db.storeUnacknowledgedTicket(this.ackChallenge, unacknowledged)
   }
 
-  async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
+  async validateUnacknowledgedTicket(db: HoprDB, privKey: PeerId) {
     const previousHop = this.previousHop.toPeerId()
-    const channel = await chain.getChannelFrom(this.previousHop)
+    const channel = await db.getChannelFrom(this.previousHop)
 
     return validateUnacknowledgedTicket(
       privKey,
