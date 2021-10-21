@@ -29,7 +29,7 @@ async function acknowledge(
     throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
   }
 
-  const channelId = chain.getChannelFrom(unacknowledgedTicket.signer).getId()
+  const channelId = (await chain.getChannelFrom(unacknowledgedTicket.signer)).getId()
   const response = unacknowledgedTicket.getResponse(acknowledgement)
 
   const ticket = unacknowledgedTicket.ticket

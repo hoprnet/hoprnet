@@ -126,7 +126,7 @@ class Hopr extends EventEmitter {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
     this.db = new HoprDB(
-      PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(),
+      PublicKey.fromPrivKey(id.privKey.marshal()),
       options.createDbIfNotExist,
       VERSION,
       options.dbPath,
@@ -426,7 +426,7 @@ class Hopr extends EventEmitter {
   }
 
   private async getAllChannels(): Promise<ChannelEntry[]> {
-    return (await this.startedPaymentChannels()).getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress())
+    return this.db.getChannelsFrom(PublicKey.fromPeerId(this.getId()).toAddress())
   }
 
   /**
@@ -500,7 +500,6 @@ class Hopr extends EventEmitter {
    */
   public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]): Promise<void> {
     const promises: Promise<void>[] = []
-    const ethereum = await this.startedPaymentChannels()
 
     if (this.status != 'RUNNING') {
       throw new Error('Cannot send message until the node is running')
@@ -520,7 +519,7 @@ class Hopr extends EventEmitter {
           ticketReceiver = intermediatePath[i]
         }
 
-        const channel = await ethereum.getChannelX(ticketIssuer, ticketReceiver)
+        const channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
 
         if (channel.status !== ChannelStatus.Open) {
           throw Error(`Channel ${channel.getId().toHex()} is not open`)
@@ -550,6 +549,7 @@ class Hopr extends EventEmitter {
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
               path.map((x) => x.toPeerId()),
               this.getId(),
+              this.db,
               this.paymentChannels
             )
           } catch (err) {
@@ -778,7 +778,7 @@ class Hopr extends EventEmitter {
     const ethereum = await this.startedPaymentChannels()
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const channel = await ethereum.getChannelX(selfPubKey, counterpartyPubKey)
+    const channel = await this.db.getChannelX(selfPubKey, counterpartyPubKey)
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
@@ -833,13 +833,11 @@ class Hopr extends EventEmitter {
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
-    const ethereum = await this.startedPaymentChannels()
-    return await ethereum.getChannelsFrom(addr)
+    return await this.db.getChannelsFrom(addr)
   }
 
   public async getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
-    const ethereum = await this.startedPaymentChannels()
-    return await ethereum.getChannelsTo(addr)
+    return await this.db.getChannelsTo(addr)
   }
 
   public async getPublicKeyOf(addr: Address): Promise<PublicKey> {

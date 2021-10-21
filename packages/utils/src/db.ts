@@ -4,7 +4,7 @@ import MemDown from 'memdown'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import { debug } from './debug'
-import { Hash, u8aConcat, Address, Intermediate, Ticket } from '.'
+import { Hash, u8aConcat, Address, Intermediate, Ticket, generateChannelId} from '.'
 import {
   AcknowledgedTicket,
   UnacknowledgedTicket,
@@ -51,7 +51,7 @@ const PENDING_TICKETS_VALUE = (address: Address) =>
 export class HoprDB {
   private db: LevelUp
 
-  constructor(private id: Address, initialize: boolean, version: string, dbPath?: string, forceCreate?: boolean) {
+  constructor(private id: PublicKey, initialize: boolean, version: string, dbPath?: string, forceCreate?: boolean) {
     if (!dbPath) {
       dbPath = path.join(process.cwd(), 'db', version)
     }
@@ -73,7 +73,7 @@ export class HoprDB {
       }
     }
     this.db = levelup(leveldown(dbPath))
-    log('namespacing db by pubkey: ', id.toHex())
+    log('namespacing db by pubkey: ', id.toAddress().toHex())
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
@@ -404,5 +404,29 @@ export class HoprDB {
     Object.setPrototypeOf(mock, HoprDB.prototype)
 
     return mock
+  }
+
+  public async getChannelX(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
+    return await this.getChannel(generateChannelId(src.toAddress(), dest.toAddress()))
+  }
+
+  public async getChannelTo(dest: PublicKey): Promise<ChannelEntry> {
+    return await this.getChannel(generateChannelId(this.id.toAddress(), dest.toAddress()))
+  }
+
+  public async getChannelFrom(src: PublicKey): Promise<ChannelEntry> {
+    return await this.getChannel(generateChannelId(src.toAddress(), this.id.toAddress()))
+  }
+
+  public async getChannelsFrom(address: Address) {
+    return this.getChannels((channel) => {
+      return address.eq(channel.source.toAddress())
+    })
+  }
+
+  public async getChannelsTo(address: Address) {
+    return this.getChannels((channel) => {
+      return address.eq(channel.destination.toAddress())
+    })
   }
 }

@@ -13,7 +13,6 @@ import {
   Address,
   ChannelEntry,
   AccountEntry,
-  Hash,
   PublicKey,
   Snapshot,
   u8aConcat
@@ -365,25 +364,6 @@ class Indexer extends EventEmitter {
     return this.db.getAccount(address)
   }
 
-  public async getChannel(channelId: Hash) {
-    return this.db.getChannel(channelId)
-  }
-
-  public async getChannels(filter?: (channel: ChannelEntry) => boolean) {
-    return this.db.getChannels(filter)
-  }
-
-  public async getChannelsFrom(address: Address) {
-    return this.db.getChannels((channel) => {
-      return address.eq(channel.source.toAddress())
-    })
-  }
-
-  public async getChannelsTo(address: Address) {
-    return this.db.getChannels((channel) => {
-      return address.eq(channel.destination.toAddress())
-    })
-  }
 
   public async getPublicKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.db.getAccount(address)
@@ -412,7 +392,7 @@ class Indexer extends EventEmitter {
    * @returns an open channel
    */
   public async getRandomOpenChannel(): Promise<ChannelEntry> {
-    const channels = await this.getChannels((channel) => channel.status === ChannelStatus.Open)
+    const channels = await this.db.getChannels((channel) => channel.status === ChannelStatus.Open)
 
     if (channels.length === 0) {
       log('no open channels exist in indexer')
@@ -429,7 +409,7 @@ class Indexer extends EventEmitter {
    * @returns peer's open channels
    */
   public async getOpenChannelsFrom(source: PublicKey): Promise<ChannelEntry[]> {
-    return await this.getChannelsFrom(source.toAddress()).then((channels) =>
+    return await this.db.getChannelsFrom(source.toAddress()).then((channels) =>
       channels.filter((channel) => channel.status === ChannelStatus.Open)
     )
   }

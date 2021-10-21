@@ -1,4 +1,3 @@
-import { Channel } from '@hoprnet/hopr-core-ethereum'
 import {
   Ticket,
   UINT256,
@@ -19,6 +18,7 @@ import {
   HalfKeyChallenge,
   HalfKey,
   Challenge,
+  ChannelEntry,
   ChannelStatus,
   Balance,
   Hash,
@@ -118,7 +118,7 @@ export async function validateUnacknowledgedTicket(
   nodeInverseTicketWinProb: BN,
   senderPeerId: PeerId,
   ticket: Ticket,
-  channel: Channel,
+  channelState: ChannelEntry,
   getTickets: () => Promise<Ticket[]>
 ): Promise<void> {
   // self
@@ -140,13 +140,6 @@ export async function validateUnacknowledgedTicket(
   if (UINT256.DUMMY_INVERSE_PROBABILITY.toBN().eq(ticketWinProb) && ticketAmount.eqn(0)) {
     // Dummy ticket detected, ticket has no value and is therefore valid
     return
-  }
-
-  let channelState
-  try {
-    channelState = await channel.themToUs()
-  } catch (err) {
-    throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
   }
 
   // ticket MUST have at least X amount
@@ -279,7 +272,7 @@ export class Packet {
     return this
   }
 
-  static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, chain: HoprCoreEthereum): Promise<Packet> {
+  static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, db: HoprDB, chain: HoprCoreEthereum): Promise<Packet> {
     const isDirectMessage = path.length == 1
     const { alpha, secrets } = generateKeyShares(path)
     const { ackChallenge, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
@@ -404,7 +397,7 @@ export class Packet {
 
   async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
     const previousHop = this.previousHop.toPeerId()
-    const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), this.previousHop)
+    const channel = await chain.getChannelFrom(this.previousHop)
 
     return validateUnacknowledgedTicket(
       privKey,
@@ -428,7 +421,7 @@ export class Packet {
     return Acknowledgement.create(this.oldChallenge ?? this.challenge, this.ackKey, privKey)
   }
 
-  async forwardTransform(privKey: PeerId, chain: HoprCoreEthereum): Promise<void> {
+  async forwardTransform(privKey: PeerId, chain: HoprCoreEthereum, db: HoprDB): Promise<void> {
     if (privKey.privKey == null) {
       throw Error(`Invalid arguments`)
     }

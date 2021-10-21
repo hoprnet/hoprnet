@@ -21,7 +21,7 @@ import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './cons
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
-import { initializeCommitment } from './commitment'
+import { initializeCommitment, findCommitmentPreImage, bumpCommitment } from './commitment'
 
 const log = debug('hopr-core-ethereum')
 
@@ -91,13 +91,6 @@ export default class HoprEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  public async getChannelX(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
-    return await this.indexer.getChannel(generateChannelId(src.toAddress(), dest.toAddress()))
-  }
-
-  public async getChannelTo(dest: PublicKey): Promise<ChannelEntry> {
-    return await this.indexer.getChannel(generateChannelId(this.publicKey.toAddress(), dest.toAddress()))
-  }
 
   async announce(multiaddr: Multiaddr): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
@@ -117,13 +110,6 @@ export default class HoprEthereum extends EventEmitter {
     return this.indexer.getOpenChannelsFrom(p)
   }
 
-  public getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
-    return this.indexer.getChannelsFrom(addr)
-  }
-
-  public getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
-    return this.indexer.getChannelsTo(addr)
-  }
 
   public async getAccount(addr: Address) {
     return this.indexer.getAccount(addr)
@@ -183,7 +169,7 @@ export default class HoprEthereum extends EventEmitter {
       const tx = await this.chain.setCommitment(c.source.toAddress(), commitment)
       return this.indexer.resolvePendingTransaction('channel-updated', tx)
     }
-    const getCommitment = async () => (await this.indexer.getChannel(c.getId())).commitment
+    const getCommitment = async () => (await this.db.getChannel(c.getId())).commitment
     initializeCommitment(this.db, c.getId(), getCommitment, setCommitment)
   }
 
@@ -192,7 +178,7 @@ export default class HoprEthereum extends EventEmitter {
       return this.redeemingAll
     }
     const _redeemAll = async () => {
-      for (const ce of await this.getChannelsTo(this.publicKey.toAddress())) {
+      for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
         await this.redeemTicketsInChannel(ce.source)
       }
       this.redeemingAll = undefined
@@ -287,7 +273,7 @@ export default class HoprEthereum extends EventEmitter {
 
 
   async initializeClosure(dest: PublicKey): Promise<string> { 
-    const c = await this.getChannelTo(dest)
+    const c = await this.db.getChannelTo(dest)
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -296,7 +282,7 @@ export default class HoprEthereum extends EventEmitter {
   }
 
   public async finalizeClosure(dest: PublicKey): Promise<string> {
-    const c = await this.getChannelTo(dest)
+    const c = await this.db.getChannelTo(dest)
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
@@ -308,7 +294,7 @@ export default class HoprEthereum extends EventEmitter {
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
-      c = await this.getChannelTo(dest)
+      c = await this.db.getChannelTo(dest)
     } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
@@ -335,4 +321,4 @@ export default class HoprEthereum extends EventEmitter {
 
 }
 
-export { ChannelEntry, Indexer, createChainWrapper, INDEXER_BLOCK_RANGE, CONFIRMATIONS }
+export { ChannelEntry, Indexer, createChainWrapper, findCommitmentPreImage, bumpCommitment, INDEXER_BLOCK_RANGE, CONFIRMATIONS }
