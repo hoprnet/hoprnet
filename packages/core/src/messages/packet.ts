@@ -329,21 +329,25 @@ export class Packet {
   }
 
   async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
-    const previousHop = this.previousHop.toPeerId()
     const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), this.previousHop)
 
-    return validateUnacknowledgedTicket(
-      privKey,
-      previousHop,
-      PRICE_PER_PACKET,
-      INVERSE_TICKET_WIN_PROB,
-      this.ticket,
-      channel,
-      () =>
-        db.getTickets({
-          signer: this.previousHop
-        })
-    )
+    try {
+      await validateUnacknowledgedTicket(
+        privKey,
+        this.previousHop.toPeerId(),
+        PRICE_PER_PACKET,
+        INVERSE_TICKET_WIN_PROB,
+        this.ticket,
+        channel,
+        () =>
+          db.getTickets({
+            signer: this.previousHop
+          })
+      )
+    } catch (e) {
+      await db.markRejected(this.ticket)
+      throw e
+    }
   }
 
   createAcknowledgement(privKey: PeerId) {
