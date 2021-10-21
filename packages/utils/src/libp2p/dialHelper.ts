@@ -2,13 +2,13 @@
  * Add a more usable API on top of LibP2P
  */
 import type PeerId from 'peer-id'
-import { green } from 'chalk'
 import type LibP2P from 'libp2p'
+import type { PromiseValue } from '../typescript'
+import type { Address } from 'libp2p/src/peer-store/address-book'
 
 import AbortController from 'abort-controller'
 import { debug } from '../debug'
-import type { PromiseValue } from '../typescript'
-import type { Address } from 'libp2p/src/peer-store/address-book'
+import { green } from 'chalk'
 
 const verbose = debug('hopr-core:libp2p:verbose')
 const logError = debug(`hopr-core:libp2p:error`)
