@@ -42,7 +42,7 @@
 
 ### SIZE
 
-▪ `Static` **SIZE**: `number`
+▪ `Static` **SIZE**: `number` = `HASH_LENGTH`
 
 #### Defined in
 

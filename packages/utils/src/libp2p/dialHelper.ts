@@ -1,13 +1,14 @@
 /*
  * Add a more usable API on top of LibP2P
  */
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 import { green } from 'chalk'
 import type LibP2P from 'libp2p'
 
 import AbortController from 'abort-controller'
 import { debug } from '../debug'
 import type { PromiseValue } from '../typescript'
+import type { Address } from 'libp2p/src/peer-store/address-book'
 
 const verbose = debug('hopr-core:libp2p:verbose')
 const logError = debug(`hopr-core:libp2p:error`)
@@ -37,6 +38,9 @@ export type DialResponse =
       query: PeerId
     }
 
+function renderPeerStoreAddresses(addresses: Address[], delimiter: string = '\n  '): string {
+  return addresses.map((addr: Address) => addr.multiaddr.toString()).join(delimiter)
+}
 /**
  * Combines libp2p methods such as dialProtocol and peerRouting.findPeer
  * to establish a connection.
@@ -101,11 +105,8 @@ export async function dial(
       dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
     } catch (err) {
       logError(
-        `Querying the DHT for ${destination.toB58String()} failed. Known addresses:\n  ${(
-          libp2p.peerStore.get(destination)?.addresses ?? []
-        )
-          .map((addr) => addr.multiaddr.toString())
-          .join('\n  ')}.\n${err.message}`
+        `Querying the DHT for ${green(destination.toB58String())} failed. Known addresses:\n` +
+          `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n`
       )
     }
 
@@ -128,12 +129,11 @@ export async function dial(
       logError(
         `Cannot connect to ${green(
           destination.toB58String()
-        )}. New addresses after DHT request did not lead to a connection. Used addresses:\n  ${(
-          libp2p.peerStore.get(destination)?.addresses ?? []
-        )
-          .map((addr) => addr.multiaddr.toString())
-          .join('\n  ')}\n${err.message}`
+        )}. New addresses after DHT request did not lead to a connection. Used addresses:\n` +
+          `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}\n` +
+          `${err.message}`
       )
+
       clearTimeout(timeout)
       return { status: 'E_DIAL', error: err.message, dhtContacted: true }
     }

@@ -283,6 +283,7 @@ class Hopr extends EventEmitter {
     this.emit('running with strategy', this.strategy.name)
 
     // Log information
+    // Debug log used in e2e integration tests, please don't change
     log('# STARTED NODE')
     log('ID', this.getId().toB58String())
     log('Protocol version', VERSION)

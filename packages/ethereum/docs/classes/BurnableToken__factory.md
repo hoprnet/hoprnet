@@ -101,7 +101,7 @@ ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `constant`: `boolean` = true; `inputs`: { `name`: `string` = "\_owner"; `type`: `string` = "address" }[] ; `name`: `string` = "balanceOf"; `outputs`: { `name`: `string` = ""; `type`: `string` = "uint256" }[] ; `payable`: `boolean` = false; `stateMutability`: `string` = "view"; `type`: `string` = "function" } \| { `anonymous`: `boolean` = false; `constant`: `undefined` = true; `inputs`: { `indexed`: `boolean` = true; `name`: `string` = "burner"; `type`: `string` = "address" }[] ; `name`: `string` = "Burn"; `outputs`: `undefined` ; `payable`: `undefined` = false; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" })[]
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `constant`: `boolean` = true; `inputs`: { `name`: `string` = "\_owner"; `type`: `string` = "address" }[] ; `name`: `string` = "balanceOf"; `outputs`: { `name`: `string` = ""; `type`: `string` = "uint256" }[] ; `payable`: `boolean` = false; `stateMutability`: `string` = "view"; `type`: `string` = "function" } \| { `anonymous`: `boolean` = false; `constant`: `undefined` = true; `inputs`: { `indexed`: `boolean` = true; `name`: `string` = "burner"; `type`: `string` = "address" }[] ; `name`: `string` = "Burn"; `outputs`: `undefined` ; `payable`: `undefined` = false; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" })[] = `_abi`
 
 #### Defined in
 

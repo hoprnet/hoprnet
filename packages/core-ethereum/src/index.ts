@@ -70,6 +70,7 @@ export default class HoprEthereum extends EventEmitter {
       await this.chain.waitUntilReady()
       await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
+      // Debug log used in e2e integration tests, please don't change
       log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
       log(chalk.green('Connector started'))
       return this
