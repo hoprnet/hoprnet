@@ -83,7 +83,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket MUST have match X winning probability
-  if (ticket.winProb.toBN().eq(requiredTicketWinProb)) {
+  if (!ticket.winProb.toBN().eq(requiredTicketWinProb)) {
     throw Error(
       `Ticket winning probability '${ticket.winProb
         .toBN()
