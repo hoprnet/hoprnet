@@ -59,7 +59,7 @@ const createMocks = (from: string, to: string) => {
   const channelUsThem = new ChannelEntry(
     self,
     counterparty,
-    new Balance(new BN(7)),
+    new Balance(new BN(7).mul(PRICE_PER_PACKET)),
     commitmentPartyA,
     new UINT256(new BN(1)),
     new UINT256(new BN(1)),
@@ -70,7 +70,7 @@ const createMocks = (from: string, to: string) => {
   const channelThemUs = new ChannelEntry(
     counterparty,
     self,
-    new Balance(new BN(3)),
+    new Balance(new BN(3).mul(PRICE_PER_PACKET)),
     commitmentPartyB,
     new UINT256(new BN(1)),
     new UINT256(new BN(1)),
