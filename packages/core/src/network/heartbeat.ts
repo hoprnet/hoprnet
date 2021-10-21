@@ -8,13 +8,19 @@ import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../constants'
 import { randomBytes } from 'crypto'
 
 const log = debug('hopr-core:heartbeat')
+const error = debug('hopr-core:heartbeat:error')
 
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
 
   constructor(
     private networkPeers: NetworkPeerStore,
-    subscribe: (protocol: string, handler: LibP2PHandlerFunction, includeReply: boolean) => void,
+    subscribe: (
+      protocol: string,
+      handler: LibP2PHandlerFunction,
+      includeReply?: boolean,
+      errHandler?: (err: any) => void
+    ) => void,
     private sendMessageAndExpectResponse: (
       dst: PeerId,
       proto: string,
@@ -23,7 +29,11 @@ export default class Heartbeat {
     ) => Promise<Uint8Array[]>,
     private hangUp: (addr: PeerId) => Promise<void>
   ) {
-    subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true)
+    const errHandler = (err: any) => {
+      error(`Error while processing heartbeat request`, err)
+    }
+
+    subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true, errHandler)
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array {

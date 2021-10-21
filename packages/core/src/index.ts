@@ -251,8 +251,12 @@ class Hopr extends EventEmitter {
     )
 
     // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
-    const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
-      libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
+    const subscribe = (
+      protocol: string,
+      handler: LibP2PHandlerFunction,
+      includeReply = false,
+      errHandler: (err: any) => void
+    ) => libp2pSubscribe(this.libp2p, protocol, handler, includeReply, errHandler)
     const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
       libp2pSendMessageAndExpectResponse(this.libp2p, dest, protocol, msg, opts)
     const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>

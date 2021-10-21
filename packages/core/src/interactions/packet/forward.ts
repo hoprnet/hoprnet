@@ -2,6 +2,7 @@ import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import type PeerId from 'peer-id'
+import type { DialOpts } from '@hoprnet/hopr-utils'
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
@@ -16,7 +17,7 @@ export class PacketForwardInteraction {
 
   constructor(
     private subscribe: any,
-    private sendMessage: any,
+    private sendMessage: (destination: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) => Promise<void>,
     private privKey: PeerId,
     private chain: HoprCoreEthereum,
     private emitMessage: (msg: Uint8Array) => void,
@@ -47,12 +48,14 @@ export class PacketForwardInteraction {
       await packet.storeUnacknowledgedTicket(this.db)
       try {
         await packet.forwardTransform(this.privKey, this.chain)
+      } catch (err) {
+        log(`Packet transformation failed. Dropping packet`, err)
+      }
+
+      try {
         await this.interact(pubKeyToPeerId(packet.nextHop), packet)
-      } catch (e) {
-        // Errors include:
-        // - not knowing about the channel in our db, because the
-        //   indexer is not caught up yet.
-        log('error while transforming packet, packet is dropped', e)
+      } catch (err) {
+        log(`Forwarding transformed packet failed.`, err)
       }
     }
 

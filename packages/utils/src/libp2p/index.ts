@@ -100,7 +100,7 @@ export async function libp2pSendMessage(
   protocol: string,
   message: Uint8Array,
   opts?: DialOpts
-) {
+): Promise<void> {
   const r = await dial(libp2p, destination, protocol, opts)
 
   if (r.status !== 'SUCCESS') {
@@ -108,11 +108,7 @@ export async function libp2pSendMessage(
     throw new Error(r.status)
   }
 
-  try {
-    await pipe([message], r.resp.stream)
-  } catch (err) {
-    logError(`send failed`, err)
-  }
+  await pipe([message], r.resp.stream)
 }
 
 export async function libp2pSendMessageAndExpectResponse(
@@ -129,23 +125,14 @@ export async function libp2pSendMessageAndExpectResponse(
     throw new Error(r.status)
   }
 
-  let result: Uint8Array[]
-
-  try {
-    result = await pipe([message], r.resp.stream, async function collect(source: AsyncIterable<any>) {
-      const vals = []
-      for await (const val of source) {
-        // Convert from BufferList to Uint8Array
-        vals.push(Uint8Array.from(val.slice()))
-      }
-      return vals
-    })
-  } catch (err) {
-    logError(`libp2p err`, err)
-    return []
-  }
-
-  return result ?? []
+  return await pipe([message], r.resp.stream, async function collect(source: AsyncIterable<any>) {
+    const vals = []
+    for await (const val of source) {
+      // Convert from BufferList to Uint8Array
+      vals.push(Uint8Array.from(val.slice()))
+    }
+    return vals
+  })
 }
 
 /*
@@ -156,7 +143,7 @@ export async function libp2pSendMessageAndExpectResponse(
 export type LibP2PHandlerArgs = { connection: Connection; stream: MuxedStream; protocol: string }
 export type LibP2PHandlerFunction = (msg: Uint8Array, remotePeer: PeerId) => any
 
-function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = false) {
+function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = false, errHandler: (msg: any) => void) {
   // Return a function to be consumed by Libp2p.handle()
 
   if (includeReply) {
@@ -174,7 +161,8 @@ function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = 
           args.stream
         )
       } catch (err) {
-        logError(`libp2p error`, err)
+        // Mostly used to capture send errors
+        errHandler(err)
       }
     }
   } else {
@@ -198,7 +186,8 @@ export function libp2pSubscribe(
   libp2p: LibP2P,
   protocol: string,
   handler: LibP2PHandlerFunction,
-  includeReply = false
-) {
-  libp2p.handle([protocol], generateHandler(handler, includeReply))
+  includeReply = false,
+  errHandler: (msg: any) => void = () => {}
+): void {
+  libp2p.handle([protocol], generateHandler(handler, includeReply, errHandler))
 }
