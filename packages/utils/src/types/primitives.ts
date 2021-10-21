@@ -68,7 +68,7 @@ export class PublicKey {
   }
 
   toString(): string {
-    return `<PubKey:${this.toHex()}>`
+    return `<PubKey:${this.toB58String()}>`
   }
 
   toB58String(): string {

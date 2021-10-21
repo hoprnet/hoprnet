@@ -40,19 +40,20 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L66)
+[packages/core/src/channel-strategy.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L67)
 
 ## Methods
 
 ### onChannelWillClose
 
-▸ **onChannelWillClose**(`c`): `Promise`<`void`\>
+▸ **onChannelWillClose**(`_c`, `chain`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `c` | `Channel` |
+| `_c` | `ChannelEntry` |
+| `chain` | `default` |
 
 #### Returns
 
@@ -60,20 +61,20 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L56)
+[packages/core/src/channel-strategy.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L57)
 
 ___
 
 ### onWinningTicket
 
-▸ **onWinningTicket**(`ack`, `c`): `Promise`<`void`\>
+▸ **onWinningTicket**(`_a`, `chain`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `ack` | `AcknowledgedTicket` |
-| `c` | `Channel` |
+| `_a` | `AcknowledgedTicket` |
+| `chain` | `default` |
 
 #### Returns
 
@@ -81,7 +82,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L51)
+[packages/core/src/channel-strategy.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L52)
 
 ___
 
@@ -101,4 +102,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L61)
+[packages/core/src/channel-strategy.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L62)

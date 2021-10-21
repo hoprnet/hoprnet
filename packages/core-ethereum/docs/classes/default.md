@@ -21,6 +21,7 @@
 - [cachedGetNativeBalance](default.md#cachedgetnativebalance)
 - [chain](default.md#chain)
 - [indexer](default.md#indexer)
+- [redeemingAll](default.md#redeemingall)
 - [started](default.md#started)
 - [captureRejectionSymbol](default.md#capturerejectionsymbol)
 - [captureRejections](default.md#capturerejections)
@@ -53,6 +54,7 @@
 - [prependListener](default.md#prependlistener)
 - [prependOnceListener](default.md#prependoncelistener)
 - [rawListeners](default.md#rawlisteners)
+- [redeemAllTickets](default.md#redeemalltickets)
 - [removeAllListeners](default.md#removealllisteners)
 - [removeListener](default.md#removelistener)
 - [setMaxListeners](default.md#setmaxlisteners)
@@ -91,7 +93,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L47)
+[packages/core-ethereum/src/index.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L48)
 
 ## Properties
 
@@ -188,6 +190,16 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L43)
+
+___
+
+### redeemingAll
+
+• `Private` **redeemingAll**: `Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L46)
 
 ___
 
@@ -981,6 +993,20 @@ node_modules/@types/node/events.d.ts:514
 
 ___
 
+### redeemAllTickets
+
+▸ **redeemAllTickets**(): `Promise`<`void`\>
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L184)
+
+___
+
 ### removeAllListeners
 
 ▸ **removeAllListeners**(`event?`): [`default`](default.md)
@@ -1183,7 +1209,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L63)
+[packages/core-ethereum/src/index.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L64)
 
 ___
 
