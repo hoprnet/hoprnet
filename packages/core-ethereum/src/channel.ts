@@ -284,7 +284,7 @@ class Channel {
 
     // check if there is enough balance
     const { minimum } = await this.balanceToThem()
-    if (amount.toBN().lt(minimum)) {
+    if (minimum.lt(amount.toBN())) {
       throw Error(
         `We don't have enough funds in channel ${channelState
           .getId()
