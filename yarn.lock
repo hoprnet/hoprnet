@@ -1383,7 +1383,7 @@ __metadata:
     secp256k1: ^4.0.2
     sinon: 11.1.2
     ts-generator: 0.1.1
-    ts-node: 10.3.0
+    ts-node: 10.3.1
     typedoc: 0.22.6
     typedoc-plugin-markdown: 3.11.3
     typescript: 4.4.4
@@ -1421,7 +1421,7 @@ __metadata:
     rimraf: 3.0.2
     secp256k1: ~4.0.2
     sinon: 11.1.2
-    ts-node: 10.3.0
+    ts-node: 10.3.1
     typedoc: 0.22.6
     typedoc-plugin-markdown: 3.11.3
     typescript: 4.4.4
@@ -1478,7 +1478,7 @@ __metadata:
     rimraf: 3.0.2
     solidity-coverage: 0.7.17
     ts-generator: 0.1.1
-    ts-node: 10.3.0
+    ts-node: 10.3.1
     typechain: 5.2.0
     typedoc: 0.22.6
     typedoc-plugin-markdown: 3.11.3
@@ -1547,7 +1547,7 @@ __metadata:
     rimraf: 3.0.2
     secp256k1: ^4.0.2
     sinon: 11.1.2
-    ts-node: 10.3.0
+    ts-node: 10.3.1
     typedoc: 0.22.6
     typedoc-plugin-markdown: 3.11.3
     typescript: 4.4.4
@@ -1589,7 +1589,7 @@ __metadata:
     sinon: 11.1.2
     strip-ansi: 6.0.1
     tiny-hashes: ^1.0.1
-    ts-node: 10.3.0
+    ts-node: 10.3.1
     typedoc: 0.22.6
     typedoc-plugin-markdown: 3.11.3
     typescript: 4.4.4
@@ -8909,7 +8909,7 @@ fsevents@~2.1.1:
   dependencies:
     "@ethersproject/cli": 5.5.0
     rimraf: 3.0.2
-    ts-node: 10.3.0
+    ts-node: 10.3.1
     yargs: 17.2.1
   languageName: unknown
   linkType: soft
@@ -16572,9 +16572,9 @@ resolve@1.17.0:
   languageName: node
   linkType: hard
 
-"ts-node@npm:10.3.0":
-  version: 10.3.0
-  resolution: "ts-node@npm:10.3.0"
+"ts-node@npm:10.3.1":
+  version: 10.3.1
+  resolution: "ts-node@npm:10.3.1"
   dependencies:
     "@cspotcode/source-map-support": 0.7.0
     "@tsconfig/node10": ^1.0.7
@@ -16604,7 +16604,7 @@ resolve@1.17.0:
     ts-node-script: dist/bin-script.js
     ts-node-transpile-only: dist/bin-transpile.js
     ts-script: dist/bin-script-deprecated.js
-  checksum: aea1b9eac4d4c735c453a0e7efef6fd76c7b59db3be158eabe21abad9d35209d243b210a9a5ef39742ffbda542250c2e771fa387e3b4829e8cb699e82f3820c4
+  checksum: 27d700ecc973962acf4473f043be571f9a7169cfc2fae8850b26450d88a149eb329b28f01b1a2c1068fa1e8a47cfa447066f89bc481a8f64f9b512230b744efa
   languageName: node
   linkType: hard
 
