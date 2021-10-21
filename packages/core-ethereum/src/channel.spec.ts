@@ -1,4 +1,5 @@
-import type Indexer from './indexer'
+/*
+ * import type Indexer from './indexer'
 import type { ChainWrapper } from './ethereum'
 import {
   ChannelEntry,
@@ -131,7 +132,6 @@ describe('test channel', function () {
     )
   })
 
-  /*
   it("should validate ticket's response", async function () {
     const ticket = await aliceMocks.channel.createTicket(2, aliceMocks.response.toChallenge())
 
@@ -190,5 +190,5 @@ describe('test channel', function () {
     )
     assert(response.status === 'FAILURE' && response.message === 'PreImage is empty.')
   })
-  */
 })
+*/

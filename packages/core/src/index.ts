@@ -748,9 +748,7 @@ class Hopr extends EventEmitter {
     counterparty: PeerId,
     myFund: BN,
     counterpartyFund: BN
-  ): Promise<{
-    channelId: Hash
-  }> {
+  ): Promise<void> {
     const ethereum = await this.startedPaymentChannels()
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
@@ -769,7 +767,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      return await ethereum.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
+      await ethereum.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
     } catch (err) {
       await this.isOutOfFunds(err)
       throw new Error(`Failed to fundChannel: ${err}`)

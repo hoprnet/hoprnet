@@ -1,19 +1,14 @@
-import BN from 'bn.js'
 import {
   PublicKey,
-  Balance,
   Hash,
   HalfKey,
   AcknowledgedTicket,
   ChannelEntry,
   UnacknowledgedTicket,
   generateChannelId,
-  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
-import type { RedeemTicketResponse } from '.'
 import { findCommitmentPreImage, bumpCommitment } from './commitment'
-import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
 import type { HoprDB } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
@@ -28,7 +23,6 @@ class Channel {
     private readonly self: PublicKey,
     private readonly counterparty: PublicKey,
     private readonly db: HoprDB,
-    private readonly chain: ChainWrapper,
     private readonly indexer: Indexer,
     private readonly events: EventEmitter
   ) {}
@@ -93,39 +87,6 @@ class Channel {
 
   async themToUs(): Promise<ChannelEntry> {
     return await this.indexer.getChannel(this.getThemToUsId())
-  }
-
-  async fund(myFund: Balance, counterpartyFund: Balance) {
-    const myAddress = this.self.toAddress()
-    const counterpartyAddress = this.counterparty.toAddress()
-    const totalFund = myFund.toBN().add(counterpartyFund.toBN())
-    const myBalance = await this.chain.getBalance(myAddress)
-    if (totalFund.gt(new BN(myBalance.toBN().toString()))) {
-      throw Error('We do not have enough balance to fund the channel')
-    }
-    const tx = await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
-    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
-  }
-
-  async open(fundAmount: Balance) {
-    // channel may not exist, we can still open it
-    let c: ChannelEntry
-    try {
-      c = await this.usToThem()
-    } catch {}
-    if (c && c.status !== ChannelStatus.Closed) {
-      throw Error('Channel is already opened')
-    }
-
-    const myAddress = this.self.toAddress()
-    const counterpartyAddress = this.counterparty.toAddress()
-    const myBalance = await this.chain.getBalance(myAddress)
-    if (new BN(myBalance.toBN().toString()).lt(fundAmount.toBN())) {
-      throw Error('We do not have enough balance to open a channel')
-    }
-    const tx = await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
-    await this.indexer.resolvePendingTransaction('channel-updated', tx)
-    return generateChannelId(myAddress, counterpartyAddress)
   }
 
 }

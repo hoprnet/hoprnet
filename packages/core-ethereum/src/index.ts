@@ -302,6 +302,37 @@ export default class HoprEthereum extends EventEmitter {
     }
     return await this.chain.finalizeChannelClosure(dest.toAddress())
   }
+
+
+  public async openChannel(dest: PublicKey, amount: Balance): Promise<Hash> {
+    // channel may not exist, we can still open it
+    let c: ChannelEntry
+    try {
+      c = await this.getChannelTo(dest)
+    } catch {}
+    if (c && c.status !== ChannelStatus.Closed) {
+      throw Error('Channel is already opened')
+    }
+
+    const myBalance = await this.getBalance()
+    if (myBalance.lt(amount)) {
+      throw Error('We do not have enough balance to open a channel')
+    }
+    const tx = await this.chain.openChannel(this.publicKey.toAddress(), dest.toAddress(), amount)
+    await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    return generateChannelId(this.publicKey.toAddress(), dest.toAddress())
+  }
+
+  public async fundChannel(dest: PublicKey, myFund: Balance, counterpartyFund: Balance) {
+    const totalFund = myFund.add(counterpartyFund)
+    const myBalance = await this.getBalance()
+    if (totalFund.gt(myBalance)) {
+      throw Error('We do not have enough balance to fund the channel')
+    }
+    const tx = await this.chain.fundChannel(this.publicKey.toAddress(), dest.toAddress(), myFund, counterpartyFund)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+  }
+
 }
 
 export { ChannelEntry, Indexer, createChainWrapper, INDEXER_BLOCK_RANGE, CONFIRMATIONS }
