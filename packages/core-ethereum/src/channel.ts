@@ -21,9 +21,6 @@ import { EventEmitter } from 'events'
 
 const log = debug('hopr-core-ethereum:channel')
 
-// Lock
-let _redeemingAll: Promise<void> | undefined = undefined
-
 export async function redeemTickets(
   source: PublicKey,
   db: HoprDB,
@@ -31,36 +28,28 @@ export async function redeemTickets(
   indexer: Indexer,
   events: EventEmitter
 ): Promise<void> {
-  if (_redeemingAll) {
-    return _redeemingAll
-  }
   // Because tickets are ordered and require the previous redemption to
   // have succeeded before we can redeem the next, we need to do this
   // sequentially.
   const tickets = await db.getAcknowledgedTickets({ signer: source })
   log(`redeeming ${tickets.length} tickets from ${source.toB58String()}`)
-  const _redeemAll = async () => {
-    try {
-      for (const ticket of tickets) {
-        log('redeeming ticket', ticket)
-        const result = await redeemTicket(source, ticket, db, chain, indexer, events)
-        if (result.status !== 'SUCCESS') {
-          log('Error redeeming ticket', result)
-          // We need to abort as tickets require ordered redemption.
-          return
-        }
-        log('ticket was redeemed')
+  try {
+    for (const ticket of tickets) {
+      log('redeeming ticket', ticket)
+      const result = await redeemTicket(source, ticket, db, chain, indexer, events)
+      if (result.status !== 'SUCCESS') {
+        log('Error redeeming ticket', result)
+        // We need to abort as tickets require ordered redemption.
+        return
       }
-    } catch (e) {
-      // We are going to swallow the error here, as more than one consumer may
-      // be inspecting this same promise.
-      log('Error when redeeming tickets, aborting', e)
+      log('ticket was redeemed')
     }
-    log(`redemption of tickets from ${source.toB58String()} is complete`)
-    _redeemingAll = undefined
+  } catch (e) {
+    // We are going to swallow the error here, as more than one consumer may
+    // be inspecting this same promise.
+    log('Error when redeeming tickets, aborting', e)
   }
-  _redeemingAll = _redeemAll()
-  return _redeemingAll
+  log(`redemption of tickets from ${source.toB58String()} is complete`)
 }
 
 // Private as out of order redemption will break things - redeem all at once.

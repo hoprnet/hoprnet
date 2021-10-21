@@ -43,6 +43,7 @@ export default class HoprEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
   private started: Promise<HoprEthereum> | undefined
+  private redeemingAll: Promise<void> | undefined = undefined
 
   constructor(
     //private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
@@ -182,9 +183,17 @@ export default class HoprEthereum extends EventEmitter {
   }
 
   public async redeemAllTickets(): Promise<void> {
-    for (const ce of await this.getChannelsTo(this.publicKey.toAddress())) {
-      await redeemTickets(ce.source, this.db, this.chain, this.indexer, this)
+    if (this.redeemingAll) {
+      return this.redeemingAll
     }
+    const _redeemAll = async () => {
+      for (const ce of await this.getChannelsTo(this.publicKey.toAddress())) {
+        await redeemTickets(ce.source, this.db, this.chain, this.indexer, this)
+      }
+      this.redeemingAll = undefined
+    }
+    this.redeemingAll = _redeemAll()
+    return this.redeemingAll
   }
 
   public getPrivateKey(): Uint8Array {

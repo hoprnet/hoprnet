@@ -624,11 +624,16 @@ class Hopr extends EventEmitter {
     if (this.status != 'RUNNING') {
       return
     }
+    const logTimeout = setTimeout(() => {
+      log('strategy tick took longer than 10 secs')
+    }, 10000)
     try {
       await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
     }
+    clearTimeout(logTimeout)
+
     this.checkTimeout = setTimeout(() => this.periodicCheck(), this.strategy.tickInterval)
   }
 
@@ -799,18 +804,23 @@ class Hopr extends EventEmitter {
       await this.strategy.onChannelWillClose(channelState, ethereum)
     }
 
+    log('closing channel', channelState.getId())
     let txHash: string
     try {
       if (channelState.status === ChannelStatus.Open || channelState.status == ChannelStatus.WaitingForCommitment) {
+        log('initiating closure')
         txHash = await channel.initializeClosure()
       } else {
+        log('finalizing closure')
         txHash = await channel.finalizeClosure()
       }
     } catch (err) {
+      log('failed to close channel', err)
       await this.isOutOfFunds(err)
       throw new Error(`Failed to closeChannel: ${err}`)
     }
 
+    log(`closed channel, ${channelState.getId()}`)
     return { receipt: txHash, status: channelState.status }
   }
 

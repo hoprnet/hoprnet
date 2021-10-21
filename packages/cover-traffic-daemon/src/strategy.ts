@@ -160,4 +160,12 @@ export class CoverTrafficStrategy extends SaneDefaults {
     )
     return [toOpen, toClose]
   }
+
+  async onWinningTicket() {
+    log('cover traffic ignores winning ticket.')
+  }
+
+  async onChannelWillClose() {
+    log('cover traffic doesnt do anything as channel closes')
+  }
 }
