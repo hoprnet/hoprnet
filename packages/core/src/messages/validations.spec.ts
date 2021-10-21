@@ -117,9 +117,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        new BN(1),
-        new BN(1),
         SENDER,
+        new BN(1),
+        new BN(1),
         signedTicket,
         createMockChannel({}),
         getTicketsMock
@@ -134,9 +134,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
+        TARGET,
         new BN(2),
         new BN(1),
-        TARGET,
         signedTicket,
         createMockChannel({}),
         getTicketsMock
@@ -151,9 +151,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
+        SENDER,
         new BN(2),
         new BN(1),
-        SENDER,
         signedTicket,
         createMockChannel({}),
         getTicketsMock
@@ -170,9 +170,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        new BN(1),
-        new BN(1),
         SENDER,
+        new BN(1),
+        new BN(1),
         signedTicket,
         createMockChannel({}),
         getTicketsMock
@@ -187,9 +187,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        new BN(1),
-        new BN(1),
         SENDER,
+        new BN(1),
+        new BN(1),
         signedTicket,
         createMockChannel({
           isChannelOpen: false
@@ -206,9 +206,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        new BN(1),
-        new BN(1),
         SENDER,
+        new BN(1),
+        new BN(1),
         signedTicket,
         createMockChannel({
           isChannelStored: false
@@ -226,9 +226,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        new BN(1),
-        new BN(1),
         SENDER,
+        new BN(1),
+        new BN(1),
         signedTicket,
         mockChannel,
         getTicketsMock
@@ -244,9 +244,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        new BN(1),
-        new BN(1),
         SENDER,
+        new BN(1),
+        new BN(1),
         signedTicket,
         mockChannel,
         getTicketsMock
@@ -263,9 +263,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        new BN(1),
-        new BN(1),
         SENDER,
+        new BN(1),
+        new BN(1),
         signedTicket,
         createMockChannel({}),
         getTicketsMock
@@ -280,9 +280,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        new BN(1),
-        new BN(1),
         SENDER,
+        new BN(1),
+        new BN(1),
         signedTicket,
         createMockChannel({
           self: new Balance(new BN(100)),
@@ -305,9 +305,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        new BN(1),
-        new BN(1),
         SENDER,
+        new BN(1),
+        new BN(1),
         signedTicket,
         createMockChannel({}),
         async () => ticketsInDb

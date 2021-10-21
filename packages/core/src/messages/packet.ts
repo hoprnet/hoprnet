@@ -60,32 +60,25 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
  * Validate unacknowledged tickets as we receive them
  */
 export async function validateUnacknowledgedTicket(
-  id: PeerId,
-  nodeTicketAmount: BN,
-  nodeInverseTicketWinProb: BN,
-  senderPeerId: PeerId,
+  usPeerId: PeerId,
+  themPeerId: PeerId,
+  minTicketAmount: BN,
+  requiredInverseTicketWinProb: BN,
   ticket: Ticket,
   channel: Channel,
   getTickets: () => Promise<Ticket[]>
 ): Promise<void> {
-  // self
-  const selfPubKey = new PublicKey(id.pubKey.marshal())
-  const selfAddress = selfPubKey.toAddress()
-  // sender
-  const senderB58 = senderPeerId.toB58String()
-  const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
-  const ticketAmount = ticket.amount.toBN()
-  const ticketEpoch = ticket.epoch.toBN()
-  const ticketIndex = ticket.index.toBN()
-  const ticketWinProb = ticket.winProb.toBN()
+  const us = new PublicKey(usPeerId.pubKey.marshal())
+  const them = new PublicKey(themPeerId.pubKey.marshal())
+  const requiredTicketWinProb = UINT256.fromInverseProbability(requiredInverseTicketWinProb).toBN()
 
   // ticket signer MUST be the sender
-  if (!ticket.verify(senderPubKey)) {
+  if (!ticket.verify(them)) {
     throw Error(`The signer of the ticket does not match the sender`)
   }
 
   // ignore dummy tickets
-  if (UINT256.DUMMY_INVERSE_PROBABILITY.toBN().eq(ticketWinProb) && ticketAmount.eqn(0)) {
+  if (UINT256.DUMMY_INVERSE_PROBABILITY.toBN().eq(requiredInverseTicketWinProb) && ticket.amount.toBN().eqn(0)) {
     return
   }
 
@@ -97,49 +90,54 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket MUST have at least X amount
-  if (ticketAmount.lt(nodeTicketAmount)) {
-    throw Error(`Ticket amount '${ticketAmount.toString()}' is lower than '${nodeTicketAmount}'`)
+  if (ticket.amount.toBN().lt(minTicketAmount)) {
+    throw Error(`Ticket amount '${ticket.amount.toBN().toString()}' is lower than '${minTicketAmount.toString()}'`)
   }
 
-  // ticket MUST have at least X winning probability
-  if (ticketWinProb.lt(UINT256.fromInverseProbability(nodeInverseTicketWinProb).toBN())) {
-    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeInverseTicketWinProb}'`)
+  // ticket MUST have match X winning probability
+  if (ticket.winProb.toBN().eq(requiredTicketWinProb)) {
+    throw Error(
+      `Ticket winning probability '${ticket.winProb
+        .toBN()
+        .toString()}' is not equal to '${requiredTicketWinProb.toString()}'`
+    )
   }
 
   // channel MUST be open or pending to close
   if (channelState.status === ChannelStatus.Closed) {
-    throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
+    throw Error(`Payment channel with '${them.toB58String()}' is not open or pending to close`)
   }
 
   // ticket's epoch MUST match our account nonce
-  const channelTicketEpoch = channelState.ticketEpoch.toBN()
-  if (!ticketEpoch.eq(channelTicketEpoch)) {
+  if (!ticket.epoch.toBN().eq(channelState.ticketEpoch.toBN())) {
     throw Error(
-      `Ticket epoch '${ticketEpoch.toString()}' does not match our account epoch ${channelTicketEpoch.toString()}`
+      `Ticket epoch '${ticket.epoch.toBN().toString()}' does not match our account epoch ${channelState.ticketEpoch
+        .toBN()
+        .toString()}`
     )
   }
 
   // ticket's index MUST be higher than our account nonce
   // TODO: keep track of uncommited tickets
-  const channelTicketIndex = channelState.ticketIndex.toBN()
-  if (!ticketIndex.gt(channelTicketIndex)) {
+  if (!ticket.index.toBN().gt(channelState.ticketIndex.toBN())) {
     throw Error(
-      `Ticket index '${ticketIndex.toString()}' must be higher than last ticket index ${channelTicketIndex.toString()}`
+      `Ticket index '${ticket.index.toBN().toString()}' must be higher than last ticket index ${channelState.ticketIndex
+        .toBN()
+        .toString()}`
     )
   }
 
   // ticket's channelIteration MUST match the current channelIteration
-  const currentChannelIteration = channelState.channelEpoch.toBN()
-  const ticketChannelIteration = ticket.channelIteration.toBN()
-  if (!ticketChannelIteration.eq(currentChannelIteration)) {
+  if (!ticket.channelIteration.toBN().eq(channelState.channelEpoch.toBN())) {
     throw Error(
-      `Ticket was created for a different channel iteration ${ticketChannelIteration.toString()} != ${currentChannelIteration.toString()}`
+      `Ticket was created for a different channel iteration ${ticket.channelIteration
+        .toBN()
+        .toString()} != ${channelState.channelEpoch.toBN().toString()}`
     )
   }
 
   // channel MUST have enough funds
-  const senderBalance = channelState.balance
-  if (senderBalance.toBN().lt(ticket.amount.toBN())) {
+  if (channelState.balance.toBN().lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds`)
   }
 
@@ -148,9 +146,9 @@ export async function validateUnacknowledgedTicket(
   // we retrieve all signed tickets and filter the ones between sender and target
   let signedTickets = (await getTickets()).filter(
     (signedTicket) =>
-      signedTicket.counterparty.eq(selfAddress) &&
-      signedTicket.epoch.toBN().eq(channelTicketEpoch) &&
-      ticket.channelIteration.toBN().eq(currentChannelIteration)
+      signedTicket.counterparty.eq(us.toAddress()) &&
+      signedTicket.epoch.toBN().eq(channelState.ticketEpoch.toBN()) &&
+      ticket.channelIteration.toBN().eq(channelState.channelEpoch.toBN())
   )
 
   // calculate total unredeemed balance
@@ -159,7 +157,7 @@ export async function validateUnacknowledgedTicket(
   }, new BN(0))
 
   // ensure sender has enough funds
-  if (unredeemedBalance.add(ticket.amount.toBN()).gt(senderBalance.toBN())) {
+  if (unredeemedBalance.add(ticket.amount.toBN()).gt(channelState.balance.toBN())) {
     throw Error(`Payment channel does not have enough funds when you include unredeemed tickets`)
   }
 }
@@ -346,9 +344,9 @@ export class Packet {
 
     return validateUnacknowledgedTicket(
       privKey,
+      previousHop,
       PRICE_PER_PACKET,
       INVERSE_TICKET_WIN_PROB,
-      previousHop,
       this.ticket,
       channel,
       () =>
