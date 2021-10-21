@@ -173,19 +173,19 @@ log "Node 1 send 0-hop message to node 2"
 run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 600
 
 log "Node 1 open channel to Node 2"
-result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel" 600)
+result=$(run_command "${api1}" "open ${addr2} 1" "Successfully opened channel" 600)
 log "-- ${result}"
 
 log "Node 2 open channel to Node 3"
-result=$(run_command "${api2}" "open ${addr3} 0.1" "Successfully opened channel" 600)
+result=$(run_command "${api2}" "open ${addr3} 1" "Successfully opened channel" 600)
 log "-- ${result}"
 
 log "Node 3 open channel to Node 4"
-result=$(run_command "${api3}" "open ${addr4} 0.1" "Successfully opened channel" 600)
+result=$(run_command "${api3}" "open ${addr4} 1" "Successfully opened channel" 600)
 log "-- ${result}"
 
 log "Node 4 open channel to Node 5"
-result=$(run_command "${api4}" "open ${addr5} 0.1" "Successfully opened channel" 600)
+result=$(run_command "${api4}" "open ${addr5} 1" "Successfully opened channel" 600)
 log "-- ${result}"
 
 for i in `seq 1 10`; do
