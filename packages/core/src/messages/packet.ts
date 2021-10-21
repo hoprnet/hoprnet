@@ -50,7 +50,7 @@ const log = debug('hopr-core:message:packet')
 export async function validateUnacknowledgedTicket(
   usPeerId: PeerId,
   themPeerId: PeerId,
-  minTicketAmount: BN,
+  requiredTicketAmount: BN,
   requiredInverseTicketWinProb: BN,
   ticket: Ticket,
   channel: Channel,
@@ -77,9 +77,11 @@ export async function validateUnacknowledgedTicket(
     throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
   }
 
-  // ticket MUST have at least X amount
-  if (ticket.amount.toBN().gte(minTicketAmount)) {
-    throw Error(`Ticket amount '${ticket.amount.toBN().toString()}' is lower than '${minTicketAmount.toString()}'`)
+  // ticket amount MUST be greater or equal to requiredTicketAmount
+  if (!ticket.amount.toBN().gte(requiredTicketAmount)) {
+    throw Error(
+      `Ticket amount '${ticket.amount.toBN().toString()}' is not equal to '${requiredTicketAmount.toString()}'`
+    )
   }
 
   // ticket MUST have match X winning probability
