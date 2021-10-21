@@ -221,26 +221,6 @@ class Channel {
     return generateChannelId(myAddress, counterpartyAddress)
   }
 
-  async initializeClosure() {
-    const c = await this.usToThem()
-    const counterpartyAddress = this.counterparty.toAddress()
-    if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
-      throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
-    }
-    const tx = await this.chain.initiateChannelClosure(counterpartyAddress)
-    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
-  }
-
-  async finalizeClosure() {
-    const c = await this.usToThem()
-    const counterpartyAddress = this.counterparty.toAddress()
-
-    if (c.status !== ChannelStatus.PendingToClose) {
-      throw Error('Channel status is not PENDING_TO_CLOSE')
-    }
-    const tx = await this.chain.finalizeChannelClosure(counterpartyAddress)
-    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
-  }
 }
 
 export { Channel }

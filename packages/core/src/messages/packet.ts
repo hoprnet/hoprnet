@@ -20,7 +20,6 @@ import {
   HalfKey,
   Challenge,
   ChannelStatus,
-  ChannelEntry,
   Balance,
   Hash,
   PRICE_PER_PACKET,
@@ -64,12 +63,13 @@ async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<UINT256> {
  * @returns a signed ticket
  */
 export async function createTicket(
-  channel: ChannelEntry,
+  dest: PublicKey,
   pathLength: number,
-  privateKey: Uint8Array,
   challenge: Challenge,
-  db: HoprDB
+  db: HoprDB,
+  chain: HoprCoreEthereum,
 ) {
+  const channel = await chain.getChannelTo(dest)
   const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
   const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
   const winProb = new BN(INVERSE_TICKET_WIN_PROB)
@@ -82,7 +82,7 @@ export async function createTicket(
     amount,
     UINT256.fromInverseProbability(winProb),
     channel.channelEpoch,
-    privateKey
+    chain.getPrivateKey()
   )
   await db.markPending(ticket)
 
@@ -290,10 +290,8 @@ export class Packet {
     }
 
     const challenge = AcknowledgementChallenge.create(ackChallenge, privKey)
-    const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(path[0].pubKey.marshal())
     const packet = createPacket(secrets, alpha, msg, path, INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, porStrings)
-    const channel = chain.getChannel(self, nextPeer)
 
     let ticket: Ticket
     if (isDirectMessage) {
@@ -309,7 +307,7 @@ export class Packet {
         chain.getPrivateKey()
       )
     } else {
-      ticket = await channel.createTicket(path.length, ticketChallenge)
+      ticket = await createTicket(nextPeer, path.length, ticketChallenge, db, chain)
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -439,10 +437,7 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(this.nextHop)
-
-    const channel = chain.getChannel(self, nextPeer)
 
     const pathPosition = this.ticket.getPathPosition()
     if (pathPosition == 1) {
@@ -458,7 +453,7 @@ export class Packet {
         chain.getPrivateKey()
       )
     } else {
-      this.ticket = await channel.createTicket(pathPosition, this.nextChallenge)
+      this.ticket = await createTicket(nextPeer, pathPosition, this.nextChallenge, db, chain)
     }
     this.oldChallenge = this.challenge.clone()
     this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)

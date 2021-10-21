@@ -809,10 +809,10 @@ class Hopr extends EventEmitter {
     try {
       if (channelState.status === ChannelStatus.Open || channelState.status == ChannelStatus.WaitingForCommitment) {
         log('initiating closure')
-        txHash = await channel.initializeClosure()
+        txHash = await ethereum.initializeClosure(counterpartyPubKey)
       } else {
         log('finalizing closure')
-        txHash = await channel.finalizeClosure()
+        txHash = await ethereum.finalizeClosure(counterpartyPubKey)
       }
     } catch (err) {
       log('failed to close channel', err)

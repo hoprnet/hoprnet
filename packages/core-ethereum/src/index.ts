@@ -12,6 +12,8 @@ import {
   cacheNoArgAsyncFunction,
   HoprDB,
   ChannelEntry,
+  ChannelStatus,
+  generateChannelId,
   Hash
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
@@ -90,8 +92,8 @@ export default class HoprEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  public getChannel(src: PublicKey, counterparty: PublicKey) {
-    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey, this)
+  public async getChannelTo(dest: PublicKey): Promise<ChannelEntry> {
+    return await this.indexer.getChannel(generateChannelId(this.publicKey.toAddress(), dest.toAddress()))
   }
 
   async announce(multiaddr: Multiaddr): Promise<string> {
@@ -198,6 +200,24 @@ export default class HoprEthereum extends EventEmitter {
 
   public getPrivateKey(): Uint8Array {
     return this.privateKey
+  }
+
+
+  async initializeClosure(dest: PublicKey): Promise<string> { 
+    const c = await this.getChannelTo(dest)
+    if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
+      throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
+    }
+    const tx = await this.chain.initiateChannelClosure(dest.toAddress())
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+  }
+
+  public async finalizeClosure(dest: PublicKey): Promise<string> {
+    const c = await this.getChannelTo(dest)
+    if (c.status !== ChannelStatus.PendingToClose) {
+      throw Error('Channel status is not PENDING_TO_CLOSE')
+    }
+    return await this.chain.finalizeChannelClosure(dest.toAddress())
   }
 }
 
