@@ -1,7 +1,6 @@
 steps:
   - id: 'install-yarn'
     name: node:16
-    waitFor: ['download-cached-yarn-dependencies']
     entrypoint: yarn
     args: ['install']
 
