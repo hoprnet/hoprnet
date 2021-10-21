@@ -129,7 +129,7 @@ export async function libp2pSendMessageAndExpectResponse(
     throw new Error(r.status)
   }
 
-  let result: Uint8Array[] = []
+  let result: Uint8Array[]
 
   try {
     result = await pipe([message], r.resp.stream, async function collect(source: AsyncIterable<any>) {
@@ -145,7 +145,7 @@ export async function libp2pSendMessageAndExpectResponse(
     return []
   }
 
-  return result
+  return result ?? []
 }
 
 /*
