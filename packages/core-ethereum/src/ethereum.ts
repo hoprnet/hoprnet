@@ -126,7 +126,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       value: BigNumber.from(populatedTx.value ?? 0)
     }
     log('essentialTxPayload %o', essentialTxPayload)
-    
+
     if (checkDuplicate) {
       const [checkedDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
       // check duplicated pending/mined transaction against transaction manager
@@ -139,7 +139,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       }
       // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
     }
-    
+
     try {
       // send transaction to our ethereum provider
       // TODO: better type this, make it less hacky
@@ -195,7 +195,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   async function announce(multiaddr: Multiaddr): Promise<string> {
-  // async function announce<T extends (tx: string) => Promise<string>>(multiaddr: Multiaddr, resolver: (...a: Parameters<T>) => Promise<string>): Promise<string> {
+    // async function announce<T extends (tx: string) => Promise<string>>(multiaddr: Multiaddr, resolver: (...a: Parameters<T>) => Promise<string>): Promise<string> {
     const populatedTx = await channels.populateTransaction.announce(
       publicKey.toUncompressedPubKeyHex(),
       multiaddr.bytes
