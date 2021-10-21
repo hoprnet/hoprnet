@@ -84,6 +84,19 @@ describe('test PublicKey primitive', function () {
   it('should be equal', function () {
     assert(PublicKey.fromString(publicKey).eq(PublicKey.fromString(publicKey)), 'public keys not equal')
   })
+
+  it('should recover public key', function () {
+    // As taken from an Ethereum transaction
+    const address = Address.fromString('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
+
+    const r = '0xbcae4d37e3a1cd869984d1d68f9242291773cd33d26f1e754ecc1a9bfaee7d17'
+    const s = '0x0b755ab5f6375595fc7fc245c45f6598cc873719183733f4c464d63eefd8579b'
+    const v = 1
+
+    const hash = '0xfac7acad27047640b069e8157b61623e3cb6bb86e6adf97151f93817c291f3cf'
+
+    assert(PublicKey.fromSignature(hash, r, s, v).toAddress().eq(address))
+  })
 })
 
 describe('test Hash primitive', function () {
