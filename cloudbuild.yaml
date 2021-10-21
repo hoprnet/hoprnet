@@ -1,14 +1,4 @@
 steps:
-  - id: 'download-cached-yarn-dependencies'
-    waitFor: ['-']
-    name: gcr.io/cloud-builders/gsutil
-    entrypoint: bash
-    args:
-      - '-c'
-      - |
-        gsutil cp gs://${PROJECT_ID}_cloudbuild/cache/yarn-dependencies.tgz yarn-dependencies.tgz || exit 0
-        tar -zxf yarn-dependencies.tgz || exit 0
-
   - id: 'install-yarn'
     name: node:16
     waitFor: ['download-cached-yarn-dependencies']
@@ -20,17 +10,6 @@ steps:
     name: node:16
     entrypoint: yarn
     args: ['build']
-
-  - id: 'upload-cached-yarn-dependencies'
-    waitFor: ['build']
-    name: gcr.io/cloud-builders/gsutil
-    entrypoint: bash
-    dir: cloudcmr-front
-    args:
-      - '-c'
-      - |
-        tar -zcf yarn-dependencies.tgz ./node_modules
-        gsutil cp yarn-dependencies.tgz gs://${PROJECT_ID}_cloudbuild/cache/yarn-dependencies.tgz
 
   - name: 'gcr.io/kaniko-project/executor:latest'
     waitFor: ['build']
