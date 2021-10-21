@@ -11,7 +11,7 @@ import {
   AcknowledgedTicket,
   Response,
   generateChannelId,
-  HalfKey 
+  HalfKey
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
