@@ -51,7 +51,9 @@ export class PacketForwardInteraction {
       }
       sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
     } catch (e) {
+      // Dropping the packet here as we can't do anything about it failing.
       // Errors include:
+      // - rejected unacknowledged ticket
       // - not knowing about the channel in our db, because the
       //   indexer is not caught up yet.
       log('error while transforming packet, packet is dropped', e)

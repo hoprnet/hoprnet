@@ -107,7 +107,7 @@ export async function validateUnacknowledgedTicket(
     )
   }
 
-  // ticket's index MUST be higher than our account nonce
+  // ticket's index MUST be higher than the channel's ticket index
   // TODO: keep track of uncommited tickets
   if (!ticket.index.toBN().gt(channelState.ticketIndex.toBN())) {
     throw Error(
