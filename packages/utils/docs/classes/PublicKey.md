@@ -26,6 +26,7 @@
 - [deserialize](PublicKey.md#deserialize)
 - [fromPeerId](PublicKey.md#frompeerid)
 - [fromPrivKey](PublicKey.md#fromprivkey)
+- [fromSignature](PublicKey.md#fromsignature)
 - [fromString](PublicKey.md#fromstring)
 - [fromUncompressedPubKey](PublicKey.md#fromuncompressedpubkey)
 
@@ -57,7 +58,7 @@
 
 #### Defined in
 
-[types/primitives.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L58)
+[types/primitives.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L64)
 
 ## Methods
 
@@ -77,7 +78,7 @@
 
 #### Defined in
 
-[types/primitives.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L78)
+[types/primitives.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L84)
 
 ___
 
@@ -91,7 +92,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L62)
+[types/primitives.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L68)
 
 ___
 
@@ -105,7 +106,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L38)
+[types/primitives.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L44)
 
 ___
 
@@ -119,7 +120,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L74)
+[types/primitives.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L80)
 
 ___
 
@@ -133,7 +134,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L66)
+[types/primitives.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L72)
 
 ___
 
@@ -147,7 +148,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L47)
+[types/primitives.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L53)
 
 ___
 
@@ -161,7 +162,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L70)
+[types/primitives.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L76)
 
 ___
 
@@ -175,7 +176,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L42)
+[types/primitives.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L48)
 
 ___
 
@@ -189,7 +190,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L86)
+[types/primitives.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L92)
 
 ___
 
@@ -209,7 +210,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L82)
+[types/primitives.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L88)
 
 ___
 
@@ -253,6 +254,29 @@ ___
 
 ___
 
+### fromSignature
+
+▸ `Static` **fromSignature**(`hash`, `r`, `s`, `v`): [`PublicKey`](PublicKey.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `hash` | `string` |
+| `r` | `string` |
+| `s` | `string` |
+| `v` | `number` |
+
+#### Returns
+
+[`PublicKey`](PublicKey.md)
+
+#### Defined in
+
+[types/primitives.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L38)
+
+___
+
 ### fromString
 
 ▸ `Static` **fromString**(`str`): [`PublicKey`](PublicKey.md)
@@ -269,7 +293,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L51)
+[types/primitives.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L57)
 
 ___
 

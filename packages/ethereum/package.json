@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.82.3",
+  "version": "1.83.0-next.2",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -36,7 +36,7 @@
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
   },
   "devDependencies": {
-    "@ethersproject/wallet": "5.4.0",
+    "@ethersproject/wallet": "5.5.0",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@nomiclabs/hardhat-ethers": "2.0.2",
     "@nomiclabs/hardhat-etherscan": "2.1.6",
@@ -48,7 +48,7 @@
     "chai": "4.3.4",
     "dotenv": "10.0.0",
     "ethereum-waffle": "3.4.0",
-    "ethers": "5.4.7",
+    "ethers": "5.5.1",
     "hardhat": "2.6.6",
     "hardhat-deploy": "0.9.4",
     "hardhat-gas-reporter": "1.0.4",
