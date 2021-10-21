@@ -102,11 +102,16 @@ export async function libp2pSendMessage(
   opts?: DialOpts
 ) {
   const r = await dial(libp2p, destination, protocol, opts)
-  if (r.status === 'SUCCESS') {
-    pipe([message], r.resp.stream)
-  } else {
+
+  if (r.status !== 'SUCCESS') {
     logError(r)
     throw new Error(r.status)
+  }
+
+  try {
+    await pipe([message], r.resp.stream)
+  } catch (err) {
+    logError(`send failed`, err)
   }
 }
 
@@ -118,8 +123,16 @@ export async function libp2pSendMessageAndExpectResponse(
   opts?: DialOpts
 ): Promise<Uint8Array[]> {
   const r = await dial(libp2p, destination, protocol, opts)
-  if (r.status === 'SUCCESS') {
-    return await pipe([message], r.resp.stream, async function collect(source: AsyncIterable<any>) {
+
+  if (r.status !== 'SUCCESS') {
+    logError('libp2p error', r)
+    throw new Error(r.status)
+  }
+
+  let result: Uint8Array[] = []
+
+  try {
+    result = await pipe([message], r.resp.stream, async function collect(source: AsyncIterable<any>) {
       const vals = []
       for await (const val of source) {
         // Convert from BufferList to Uint8Array
@@ -127,9 +140,12 @@ export async function libp2pSendMessageAndExpectResponse(
       }
       return vals
     })
+  } catch (err) {
+    logError(`libp2p err`, err)
+    return []
   }
-  logError('libp2p error', r)
-  throw new Error(r.status)
+
+  return result
 }
 
 /*
@@ -142,22 +158,27 @@ export type LibP2PHandlerFunction = (msg: Uint8Array, remotePeer: PeerId) => any
 
 function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = false) {
   // Return a function to be consumed by Libp2p.handle()
-  return function libP2PHandler(args: LibP2PHandlerArgs): void {
-    // Create the async iterable that we will use in the pipeline
 
-    if (includeReply) {
-      pipe(
-        // prettier-ignore
-        args.stream,
-        async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
-          for await (const msg of source) {
-            // Convert from BufferList to Uint8Array
-            yield await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
-          }
-        },
-        args.stream
-      )
-    } else {
+  if (includeReply) {
+    return async function libP2PHandler(args: LibP2PHandlerArgs): Promise<void> {
+      try {
+        await pipe(
+          // prettier-ignore
+          args.stream,
+          async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
+            for await (const msg of source) {
+              // Convert from BufferList to Uint8Array
+              yield await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
+            }
+          },
+          args.stream
+        )
+      } catch (err) {
+        logError(`libp2p error`, err)
+      }
+    }
+  } else {
+    return function libP2PHandler(args: LibP2PHandlerArgs): void {
       pipe(
         // prettier-ignore
         args.stream,
