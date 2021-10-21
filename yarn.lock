@@ -1471,7 +1471,7 @@ __metadata:
     dotenv: 10.0.0
     ethereum-waffle: 3.4.0
     ethers: 5.5.1
-    hardhat: 2.6.6
+    hardhat: 2.6.7
     hardhat-deploy: 0.9.4
     hardhat-gas-reporter: 1.0.4
     multiaddr: 10.0.1
@@ -2100,13 +2100,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solidity-parser/parser@npm:^0.11.0":
-  version: 0.11.1
-  resolution: "@solidity-parser/parser@npm:0.11.1"
-  checksum: eee5a7aea63e245df3745396bf84ea04f9763647f94d9d3e0c496833198ab881db177fcea818274ea8c3f0b18fdf76d6bca2afcea427f9ed9702210b3588a225
-  languageName: node
-  linkType: hard
-
 "@solidity-parser/parser@npm:^0.12.0":
   version: 0.12.2
   resolution: "@solidity-parser/parser@npm:0.12.2"
@@ -2120,6 +2113,15 @@ __metadata:
   dependencies:
     antlr4ts: ^0.5.0-alpha.4
   checksum: bfdd8ec7f7b88f3cc75e333e03202cde5e5dacbec7f00612f22dec5e22b0995713637872ce202064d182bae56a274fcb2ca8715ad5482af5e8b38728a0216cf7
+  languageName: node
+  linkType: hard
+
+"@solidity-parser/parser@npm:^0.14.0":
+  version: 0.14.0
+  resolution: "@solidity-parser/parser@npm:0.14.0"
+  dependencies:
+    antlr4ts: ^0.5.0-alpha.4
+  checksum: fe92710e53b2bb9e8423129ca2984c08723f575eda2e4f83a8e883a741436e5ca0bd36826c10ec553bd72d6fe6abd5178ee291baafdf0bb71eb56ca91e383804
   languageName: node
   linkType: hard
 
@@ -8640,9 +8642,9 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"hardhat@npm:2.6.6":
-  version: 2.6.6
-  resolution: "hardhat@npm:2.6.6"
+"hardhat@npm:2.6.7":
+  version: 2.6.7
+  resolution: "hardhat@npm:2.6.7"
   dependencies:
     "@ethereumjs/block": ^3.4.0
     "@ethereumjs/blockchain": ^5.4.0
@@ -8651,7 +8653,7 @@ fsevents@~2.1.1:
     "@ethereumjs/vm": ^5.5.2
     "@ethersproject/abi": ^5.1.2
     "@sentry/node": ^5.18.1
-    "@solidity-parser/parser": ^0.11.0
+    "@solidity-parser/parser": ^0.14.0
     "@types/bn.js": ^5.1.0
     "@types/lru-cache": ^5.1.0
     abort-controller: ^3.0.0
@@ -8693,7 +8695,7 @@ fsevents@~2.1.1:
     ws: ^7.4.6
   bin:
     hardhat: internal/cli/cli.js
-  checksum: 845c0fa6d03ff7d1bf4b9b6906f1d9137b117b4f84f7b63361c5a0ee7bde2b2c4fd5188f1b3d7cd85852514e1b1935413a2e080b9816669eb3677a74fe976c6e
+  checksum: d48dd07d45a9184d962dccb352d7733e54bd272ed675b8c806ab6f0c60730cfbac5e60d5c7a33c9da3e04c487ff0b564ee7b3eeec9e880863fe24a677ff1ce02
   languageName: node
   linkType: hard
 
