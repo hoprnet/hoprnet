@@ -1,6 +1,6 @@
 import { utils, ethers } from 'ethers'
 import BN from 'bn.js'
-import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
+import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify, ecdsaRecover } from 'secp256k1'
 import { moveDecimalPoint } from '../math'
 import { u8aToHex, u8aEquals, stringToU8a, u8aConcat, serializeToU8a, u8aToNumber, u8aSplit } from '../u8a'
 import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
@@ -23,7 +23,7 @@ export class PublicKey {
     return new PublicKey(publicKeyCreate(privKey, true))
   }
 
-  static fromUncompressedPubKey(arr: Uint8Array) {
+  static fromUncompressedPubKey(arr: Uint8Array): PublicKey {
     if (arr.length !== 65) {
       throw new Error('Incorrect size Uint8Array for uncompressed public key')
     }
@@ -31,8 +31,14 @@ export class PublicKey {
     return new PublicKey(publicKeyConvert(arr, true))
   }
 
-  static fromPeerId(peerId: PeerId) {
+  static fromPeerId(peerId: PeerId): PublicKey {
     return new PublicKey(peerId.pubKey.marshal())
+  }
+
+  static fromSignature(hash: string, r: string, s: string, v: number): PublicKey {
+    return PublicKey.fromUncompressedPubKey(
+      ecdsaRecover(Uint8Array.from([...stringToU8a(r), ...stringToU8a(s)]), v, stringToU8a(hash), false)
+    )
   }
 
   toAddress(): Address {
