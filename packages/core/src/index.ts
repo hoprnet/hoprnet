@@ -520,11 +520,10 @@ class Hopr extends EventEmitter {
           ticketReceiver = intermediatePath[i]
         }
 
-        const channel = ethereum.getChannel(ticketIssuer, ticketReceiver)
-        const channelState = await channel.usToThem()
+        const channel = await ethereum.getChannelX(ticketIssuer, ticketReceiver)
 
-        if (channelState.status !== ChannelStatus.Open) {
-          throw Error(`Channel ${channelState.getId().toHex()} is not open`)
+        if (channel.status !== ChannelStatus.Open) {
+          throw Error(`Channel ${channel.getId().toHex()} is not open`)
         }
       }
     }
@@ -728,18 +727,13 @@ class Hopr extends EventEmitter {
       )
     }
 
-    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
-    let channelId: Hash
-
     try {
-      channelId = await channel.open(new Balance(amountToFund))
+      return {
+        channelId: await ethereum.openChannel(counterpartyPubKey, new Balance(amountToFund))
+      }
     } catch (err) {
       await this.isOutOfFunds(err)
       throw new Error(`Failed to openChannel: ${err}`)
-    }
-
-    return {
-      channelId
     }
   }
 
@@ -774,17 +768,11 @@ class Hopr extends EventEmitter {
       )
     }
 
-    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
-
     try {
-      await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
+      return await ethereum.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
     } catch (err) {
       await this.isOutOfFunds(err)
       throw new Error(`Failed to fundChannel: ${err}`)
-    }
-
-    return {
-      channelId: channel.getUsToThemId()
     }
   }
 
@@ -792,22 +780,21 @@ class Hopr extends EventEmitter {
     const ethereum = await this.startedPaymentChannels()
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
-    const channelState = await channel.usToThem()
+    const channel = await ethereum.getChannelX(selfPubKey, counterpartyPubKey)
 
     // TODO: should we wait for confirmation?
-    if (channelState.status === ChannelStatus.Closed) {
+    if (channel.status === ChannelStatus.Closed) {
       throw new Error('Channel is already closed')
     }
 
-    if (channelState.status === ChannelStatus.Open) {
-      await this.strategy.onChannelWillClose(channelState, ethereum)
+    if (channel.status === ChannelStatus.Open) {
+      await this.strategy.onChannelWillClose(channel, ethereum)
     }
 
-    log('closing channel', channelState.getId())
+    log('closing channel', channel.getId())
     let txHash: string
     try {
-      if (channelState.status === ChannelStatus.Open || channelState.status == ChannelStatus.WaitingForCommitment) {
+      if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
         log('initiating closure')
         txHash = await ethereum.initializeClosure(counterpartyPubKey)
       } else {
@@ -820,8 +807,8 @@ class Hopr extends EventEmitter {
       throw new Error(`Failed to closeChannel: ${err}`)
     }
 
-    log(`closed channel, ${channelState.getId()}`)
-    return { receipt: txHash, status: channelState.status }
+    log(`closed channel, ${channel.getId()}`)
+    return { receipt: txHash, status: channel.status }
   }
 
   public async getTicketStatistics() {

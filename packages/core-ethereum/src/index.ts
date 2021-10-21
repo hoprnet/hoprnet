@@ -18,7 +18,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
-import { Channel, redeemTickets } from './channel'
+import { redeemTickets } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
@@ -90,6 +90,10 @@ export default class HoprEthereum extends EventEmitter {
   async stop(): Promise<void> {
     log('Stopping connector...')
     await this.indexer.stop()
+  }
+
+  public async getChannelX(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
+    return await this.indexer.getChannel(generateChannelId(src.toAddress(), dest.toAddress()))
   }
 
   public async getChannelTo(dest: PublicKey): Promise<ChannelEntry> {
@@ -221,4 +225,4 @@ export default class HoprEthereum extends EventEmitter {
   }
 }
 
-export { ChannelEntry, Channel, Indexer, createChainWrapper, INDEXER_BLOCK_RANGE, CONFIRMATIONS }
+export { ChannelEntry, Indexer, createChainWrapper, INDEXER_BLOCK_RANGE, CONFIRMATIONS }
