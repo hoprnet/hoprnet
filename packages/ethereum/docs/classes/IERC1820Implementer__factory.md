@@ -27,7 +27,7 @@
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: { `inputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = "interfaceHash"; `type`: `string` = "bytes32" }[] ; `name`: `string` = "canImplementInterfaceForAddress"; `outputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = ""; `type`: `string` = "bytes32" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" }[]
+▪ `Static` `Readonly` **abi**: { `inputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = "interfaceHash"; `type`: `string` = "bytes32" }[] ; `name`: `string` = "canImplementInterfaceForAddress"; `outputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = ""; `type`: `string` = "bytes32" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" }[] = `_abi`
 
 #### Defined in
 

@@ -58,7 +58,7 @@ ___
 
 ### tickInterval
 
-• **tickInterval**: `number`
+• **tickInterval**: `number` = `CHECK_TIMEOUT`
 
 #### Implementation of
 

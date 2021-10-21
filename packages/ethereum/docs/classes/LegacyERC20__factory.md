@@ -27,7 +27,7 @@
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: { `constant`: `boolean` = false; `inputs`: { `name`: `string` = "\_owner"; `type`: `string` = "address" }[] ; `name`: `string` = "transferFrom"; `outputs`: `any`[] = []; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" }[]
+▪ `Static` `Readonly` **abi**: { `constant`: `boolean` = false; `inputs`: { `name`: `string` = "\_owner"; `type`: `string` = "address" }[] ; `name`: `string` = "transferFrom"; `outputs`: `any`[] = []; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" }[] = `_abi`
 
 #### Defined in
 

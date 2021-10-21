@@ -111,7 +111,7 @@ EventEmitter.constructor
 | `getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
 | `getChannels` | () => `HoprChannels` |
 | `getGenesisBlock` | () => `number` |
-| `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `Networks`  } |
+| `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `Networks`  } |
 | `getLatestBlockNumber` | () => `Promise`<`number`\> |
 | `getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
@@ -1276,7 +1276,7 @@ Starts indexing.
 | `chain.getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
 | `chain.getChannels` | () => `HoprChannels` |
 | `chain.getGenesisBlock` | () => `number` |
-| `chain.getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `Networks`  } |
+| `chain.getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `Networks`  } |
 | `chain.getLatestBlockNumber` | () => `Promise`<`number`\> |
 | `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `chain.getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
