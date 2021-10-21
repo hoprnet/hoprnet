@@ -70,6 +70,18 @@ faucet_address_ether() {
   --data-raw "{\"secret\": \"$secret\"}"
 }
 
+# $1 = IP
+store_git_commit_per_ip() {
+  local ip=${1}
+  local commit=$(git rev-parse --short HEAD | cut -c1-7)
+  local secret="${FAUCET_SECRET_API_KEY}"
+
+  curl --silent --request POST \
+  "https://api.hoprnet.org/api/ceramic/ip/$commit/post" \
+  --header 'Content-Type: application/json' \
+  --data-raw "{\"secret\": \"$secret\", \"ip\": \"$ip\"}"
+}
+
 # $1 = account (hex)
 # $2 = chain provider
 # $3 = optional: hopr token contract
@@ -217,6 +229,7 @@ start_testnode() {
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
   wait_until_node_is_ready $ip
+  store_git_commit_per_ip $ip
   eth_address=$(get_eth_address "${ip}")
   fund_if_empty "${eth_address}" "${4}"
 }
