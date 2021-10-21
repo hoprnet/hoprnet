@@ -148,11 +148,6 @@ describe('packet interaction', function () {
       Array.from({ length: 5 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const chainSender = createFakeChain(sender)
-    const chainRelay0 = createFakeChain(relay0)
-    const chainRelay1 = createFakeChain(relay1)
-    const chainRelay2 = createFakeChain(relay2)
-    const chainReceiver = createFakeChain(receiver)
 
     const libp2pSender = createFakeSendReceive(events, sender)
     const libp2pRelay0 = createFakeSendReceive(events, relay0)
@@ -161,7 +156,7 @@ describe('packet interaction', function () {
     const libp2pReceiver = createFakeSendReceive(events, receiver)
 
     const testMsg = new TextEncoder().encode('testMsg')
-    const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, db, chainSender as any)
+    const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, db)
 
     const msgDefer = defer<void>()
 
@@ -169,20 +164,18 @@ describe('packet interaction', function () {
       libp2pSender.subscribe,
       libp2pSender.send,
       sender,
-      chainSender as any,
       console.log,
       db
     )
 
     // TODO: improve
-    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, chainRelay0 as any, console.log, db)
-    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, chainRelay1 as any, console.log, db)
-    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, chainRelay2 as any, console.log, db)
+    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, console.log, db)
+    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, console.log, db)
+    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, console.log, db)
     new PacketForwardInteraction(
       libp2pReceiver.subscribe,
       libp2pReceiver.send,
       receiver,
-      chainReceiver as any,
       (msg: Uint8Array) => {
         if (u8aEquals(msg, testMsg)) {
           msgDefer.resolve()

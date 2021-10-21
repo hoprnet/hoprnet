@@ -1,21 +1,16 @@
 import { Packet, INTERMEDIATE_HOPS } from './packet'
 import {
   HoprDB,
-  Ticket,
-  UINT256,
-  Balance,
-  PublicKey,
-  u8aEquals,
-  Challenge,
-  PRICE_PER_PACKET
+  u8aEquals
 } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import BN from 'bn.js'
 import assert from 'assert'
 
-function createMockTickets(privKey: Uint8Array) {
+function createMockTickets(_privKey: Uint8Array) {
+  /*
   const acknowledge = () => {}
 
+  
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
     createTicket: async (pathLength: number, challenge: Challenge) => {
@@ -44,8 +39,11 @@ function createMockTickets(privKey: Uint8Array) {
         privKey
       )
   })
+  */
 
-  return { getChannel }
+  const chain = {}
+  const db = HoprDB.createMock()
+  return { chain, db }
 }
 
 describe('packet creation and transformation', function () {
@@ -55,25 +53,18 @@ describe('packet creation and transformation', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const chain = createMockTickets(self.privKey.marshal())
-    const db = HoprDB.createMock()
+    const { db } = createMockTickets(self.privKey.marshal())
 
     const testMsg = new TextEncoder().encode('test')
-
-    let packet = await Packet.create(testMsg, path, self, db, chain as any)
-
+    let packet = await Packet.create(testMsg, path, self, db)
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
 
-      const db = HoprDB.createMock()
-
+      const { db } = createMockTickets(self.privKey.marshal())
       await packet.checkPacketTag(db)
-
       assert.rejects(packet.checkPacketTag(db))
-
-      const chain = createMockTickets(node.privKey.marshal())
 
       if (packet.isReceiver) {
         assert(index == path.length - 1)
@@ -82,7 +73,7 @@ describe('packet creation and transformation', function () {
       } else {
         await packet.storeUnacknowledgedTicket(db)
 
-        await packet.forwardTransform(node, chain as any, db)
+        await packet.forwardTransform(node, db)
       }
     }
   })
@@ -93,25 +84,23 @@ describe('packet creation and transformation', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const chain = createMockTickets(self.privKey.marshal())
+    const { db } = createMockTickets(self.privKey.marshal())
 
     const testMsg = new TextEncoder().encode('test')
 
-    const db = HoprDB.createMock()
-    let packet = await Packet.create(testMsg, path, self, db, chain as any)
+    let packet = await Packet.create(testMsg, path, self, db)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
 
-      const db = HoprDB.createMock()
+      const { db } = createMockTickets(self.privKey.marshal())
 
       await packet.checkPacketTag(db)
 
       assert.rejects(packet.checkPacketTag(db))
 
-      const chain = createMockTickets(node.privKey.marshal())
 
       if (packet.isReceiver) {
         assert(index == path.length - 1)
@@ -120,7 +109,7 @@ describe('packet creation and transformation', function () {
       } else {
         await packet.storeUnacknowledgedTicket(db)
 
-        await packet.forwardTransform(node, chain as any, db)
+        await packet.forwardTransform(node, db)
       }
     }
   })
@@ -131,25 +120,20 @@ describe('packet creation and transformation', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const chain = createMockTickets(self.privKey.marshal())
-    const db = HoprDB.createMock()
+    const { db }= createMockTickets(self.privKey.marshal())
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, db, chain as any)
+    let packet = await Packet.create(testMsg, path, self, db)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
 
-      const db = HoprDB.createMock()
-
+      const { db } = createMockTickets(self.privKey.marshal())
       await packet.checkPacketTag(db)
-
       assert.rejects(packet.checkPacketTag(db))
-
-      const chain = createMockTickets(node.privKey.marshal())
 
       if (packet.isReceiver) {
         assert(index == path.length - 1)
@@ -158,7 +142,7 @@ describe('packet creation and transformation', function () {
       } else {
         await packet.storeUnacknowledgedTicket(db)
 
-        await packet.forwardTransform(node, chain as any, db)
+        await packet.forwardTransform(node, db)
       }
     }
   })
@@ -169,16 +153,15 @@ describe('packet creation and transformation', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const chain = createMockTickets(self.privKey.marshal())
-    const db = HoprDB.createMock()
+    const { db } = createMockTickets(self.privKey.marshal())
 
     const testMsg = new TextEncoder().encode('test')
 
-    const packet = await Packet.create(testMsg, path, self, db, chain as any)
+    const packet = await Packet.create(testMsg, path, self, db)
 
     const transformedPacket = Packet.deserialize(packet.serialize(), path[0], self)
 
-    await transformedPacket.forwardTransform(path[0], chain as any, db)
+    await transformedPacket.forwardTransform(path[0],  db)
 
     assert.throws(() => Packet.deserialize(transformedPacket.serialize(), path[0], self))
   })

@@ -272,7 +272,7 @@ class Hopr extends EventEmitter {
     })
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
+    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), onMessage, this.db)
 
     await this.announce(this.options.announce)
     log('announcing done, starting heartbeat')
@@ -549,8 +549,7 @@ class Hopr extends EventEmitter {
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
               path.map((x) => x.toPeerId()),
               this.getId(),
-              this.db,
-              this.paymentChannels
+              this.db
             )
           } catch (err) {
             return reject(err)

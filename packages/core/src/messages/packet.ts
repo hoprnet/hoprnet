@@ -25,7 +25,6 @@ import {
   PRICE_PER_PACKET,
   INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
-import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import type PeerId from 'peer-id'
 import BN from 'bn.js'
@@ -67,7 +66,7 @@ export async function createTicket(
   pathLength: number,
   challenge: Challenge,
   db: HoprDB,
-  chain: HoprCoreEthereum,
+  privKey: Uint8Array,
 ) {
   const channel = await db.getChannelTo(dest)
   const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
@@ -82,7 +81,7 @@ export async function createTicket(
     amount,
     UINT256.fromInverseProbability(winProb),
     channel.channelEpoch,
-    chain.getPrivateKey()
+    privKey
   )
   await db.markPending(ticket)
 
@@ -272,7 +271,7 @@ export class Packet {
     return this
   }
 
-  static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, db: HoprDB, chain: HoprCoreEthereum): Promise<Packet> {
+  static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, db: HoprDB): Promise<Packet> {
     const isDirectMessage = path.length == 1
     const { alpha, secrets } = generateKeyShares(path)
     const { ackChallenge, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
@@ -297,10 +296,10 @@ export class Packet {
         new Balance(new BN(0)),
         UINT256.DUMMY_INVERSE_PROBABILITY,
         UINT256.fromString('0'),
-        chain.getPrivateKey()
+        privKey.privKey.marshal()
       )
     } else {
-      ticket = await createTicket(nextPeer, path.length, ticketChallenge, db, chain)
+      ticket = await createTicket(nextPeer, path.length, ticketChallenge, db, privKey.privKey.marshal())
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -421,7 +420,7 @@ export class Packet {
     return Acknowledgement.create(this.oldChallenge ?? this.challenge, this.ackKey, privKey)
   }
 
-  async forwardTransform(privKey: PeerId, chain: HoprCoreEthereum, db: HoprDB): Promise<void> {
+  async forwardTransform(privKey: PeerId, db: HoprDB): Promise<void> {
     if (privKey.privKey == null) {
       throw Error(`Invalid arguments`)
     }
@@ -443,10 +442,10 @@ export class Packet {
         new Balance(new BN(0)),
         UINT256.DUMMY_INVERSE_PROBABILITY,
         UINT256.fromString('0'),
-        chain.getPrivateKey()
+        privKey.privKey.marshal() 
       )
     } else {
-      this.ticket = await createTicket(nextPeer, pathPosition, this.nextChallenge, db, chain)
+      this.ticket = await createTicket(nextPeer, pathPosition, this.nextChallenge, db, privKey.privKey.marshal())
     }
     this.oldChallenge = this.challenge.clone()
     this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)

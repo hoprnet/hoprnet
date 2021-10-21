@@ -1,6 +1,5 @@
 import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages'
-import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import type PeerId from 'peer-id'
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
@@ -18,7 +17,6 @@ export class PacketForwardInteraction {
     private subscribe: any,
     private sendMessage: any,
     private privKey: PeerId,
-    private chain: HoprCoreEthereum,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB
   ) {
@@ -46,7 +44,7 @@ export class PacketForwardInteraction {
     } else {
       await packet.storeUnacknowledgedTicket(this.db)
       try {
-        await packet.forwardTransform(this.privKey, this.chain, this.db)
+        await packet.forwardTransform(this.privKey, this.db)
         await this.interact(pubKeyToPeerId(packet.nextHop), packet)
       } catch (e) {
         // Errors include:

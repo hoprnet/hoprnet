@@ -398,7 +398,7 @@ export class HoprDB {
 
   static createMock(): HoprDB {
     const mock: HoprDB = {
-      id: Address.createMock(),
+      id: PublicKey.createMock(),
       db: new levelup(MemDown())
     } as any
     Object.setPrototypeOf(mock, HoprDB.prototype)
@@ -411,6 +411,7 @@ export class HoprDB {
   }
 
   public async getChannelTo(dest: PublicKey): Promise<ChannelEntry> {
+    log(">>>", this.id)
     return await this.getChannel(generateChannelId(this.id.toAddress(), dest.toAddress()))
   }
 
