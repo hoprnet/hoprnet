@@ -149,10 +149,9 @@ particular branch to deploy on every change.
    this particular release, which requires to insert name and release version of the new milestone
    in the files:
 
-   - `scripts/environment.sh`
-   - `packages/avado/Dockerfile`
+   - create new environment in `scripts/environment.sh`
+   - update image to point to `latest-<release>` in `packages/avado/Dockerfile`
    - `packages/avado/docker-compose.yml`
-   - `packages/avado/Dockerfile`
    - add an entry to `CHANGELOG.md`
 
 2. The information about the release, how to test and what commands to run, are
@@ -167,6 +166,10 @@ particular branch to deploy on every change.
 - locally create a merge-back branch based on the release branch
 - merge the latest `master` branch into the merge-back branch, in case of conflicts changes
   from `master` have preference
+- revert changes in `packages/avado/Dockerfile`
+- revert changes in `packages/avado/docker-compose.yml`
+- revert any other changes related to the chain
+- add an entry to `CHANGELOG.md`
 - bump the package versions to the next preminor version:
   `yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version preminor --preid=next`
 - revert changes made to Avado configuration files as part of the initial release creation
