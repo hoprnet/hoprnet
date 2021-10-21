@@ -279,6 +279,16 @@ class Channel {
     const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
     const winProb = new BN(INVERSE_TICKET_WIN_PROB)
 
+    // check if there is enough balance
+    const { minimum } = await this.balanceToThem()
+    if (amount.toBN().lt(minimum)) {
+      throw Error(
+        `We don't have enough funds in channel ${channelState
+          .getId()
+          .toHex()} with counterparty ${this.counterparty.toB58String()} to create ticket`
+      )
+    }
+
     const ticket = Ticket.create(
       counterpartyAddress,
       challenge,

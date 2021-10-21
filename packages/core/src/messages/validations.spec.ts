@@ -7,7 +7,7 @@ import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { Channel } from '@hoprnet/hopr-core-ethereum'
 import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
-import { validateUnacknowledgedTicket, validateCreatedTicket } from '.'
+import { validateUnacknowledgedTicket } from '.'
 
 chai.use(chaiAsPromised)
 
@@ -313,12 +313,5 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         async () => ticketsInDb
       )
     ).to.eventually.rejectedWith('Payment channel does not have enough funds when you include unredeemed tickets')
-  })
-})
-
-describe('messages/validations.spec.ts unit test validateCreatedTicket', function () {
-  it('should pass if ticket is okay', async function () {
-    const ticket = createMockTicket({})
-    validateCreatedTicket(new BN(1), ticket)
   })
 })

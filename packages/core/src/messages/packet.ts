@@ -38,18 +38,6 @@ const PACKET_LENGTH = getPacketLength(INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, 
 
 const log = debug('hopr-core:message:packet')
 
-/**
- * Validate newly created tickets
- * @param ops
- */
-export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
-  if (myBalance.lt(ticket.amount.toBN())) {
-    throw Error(
-      `Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toBN().toString()}`
-    )
-  }
-}
-
 // Precompute the base unit that is used for issuing and validating
 // the embedded value in tickets.
 // Having this as a constant allows to channel rounding error when
