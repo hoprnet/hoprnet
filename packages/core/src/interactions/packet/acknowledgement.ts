@@ -1,13 +1,62 @@
 import { debug } from '@hoprnet/hopr-utils'
-import { PublicKey, durations, oneAtATime } from '@hoprnet/hopr-utils'
+import {
+  HalfKey,
+  durations,
+  oneAtATime,
+  AcknowledgedTicket,
+  UnacknowledgedTicket,
+} from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { Acknowledgement, Packet } from '../../messages'
 import { HoprDB } from '@hoprnet/hopr-utils'
 const log = debug('hopr-core:acknowledgement')
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
+
+/**
+ * Reserve a preImage for the given ticket if it is a winning ticket.
+ * @param ticket the acknowledged ticket
+ */
+async function acknowledge(
+  unacknowledgedTicket: UnacknowledgedTicket,
+  acknowledgement: HalfKey,
+  db: HoprDB, 
+  chain: HoprCoreEthereum
+): Promise<AcknowledgedTicket | null> {
+  if (!unacknowledgedTicket.verifyChallenge(acknowledgement)) {
+    throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
+  }
+
+  const channelId = chain.getChannelFrom(unacknowledgedTicket.signer).getId()
+  const response = unacknowledgedTicket.getResponse(acknowledgement)
+
+  const ticket = unacknowledgedTicket.ticket
+  const opening = await findCommitmentPreImage(db, channelId)
+
+  if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
+    const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
+
+    log(
+      `Acknowledging ticket. Using opening ${opening.toHex()} and response ${response.toHex()}`
+    )
+
+    try {
+      await bumpCommitment(db, channelId)
+      chain.emit('ticket:win', ack)
+      return ack
+    } catch (e) {
+      log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
+      return null
+    }
+  } else {
+    log(`Got a ticket that is not a win. Dropping ticket.`)
+    await db.markLosing(unacknowledgedTicket)
+    return null
+  }
+}
+
 
 export function subscribeToAcknowledgements(
   subscribe: any,
@@ -21,8 +70,7 @@ export function subscribeToAcknowledgements(
 
     try {
       let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
-      const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), unacknowledgedTicket.signer)
-      const ackedTicket = await channel.acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare)
+      const ackedTicket = await acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare, db, chain)
       if (ackedTicket) {
         log(`Storing winning ticket`)
         await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
