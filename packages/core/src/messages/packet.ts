@@ -78,7 +78,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket MUST have at least X amount
-  if (ticket.amount.toBN().lt(minTicketAmount)) {
+  if (ticket.amount.toBN().gte(minTicketAmount)) {
     throw Error(`Ticket amount '${ticket.amount.toBN().toString()}' is lower than '${minTicketAmount.toString()}'`)
   }
 
