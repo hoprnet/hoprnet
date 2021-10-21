@@ -40,7 +40,6 @@ const PACKET_LENGTH = getPacketLength(INTERMEDIATE_HOPS + 1, POR_STRING_LENGTH, 
 
 const log = debug('hopr-core:message:packet')
 
-
 async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<UINT256> {
   let currentTicketIndex = await db.getCurrentTicketIndex(channelId)
 
@@ -64,7 +63,13 @@ async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<UINT256> {
  * @param winProb the winning probability to use
  * @returns a signed ticket
  */
-export async function createTicket(channel: ChannelEntry, pathLength: number, privateKey: Uint8Array, challenge: Challenge, db: HoprDB) {
+export async function createTicket(
+  channel: ChannelEntry,
+  pathLength: number,
+  privateKey: Uint8Array,
+  challenge: Challenge,
+  db: HoprDB
+) {
   const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
   const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
   const winProb = new BN(INVERSE_TICKET_WIN_PROB)

@@ -8,7 +8,7 @@ import {
   ChannelEntry,
   UnacknowledgedTicket,
   generateChannelId,
-  ChannelStatus,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 import type { RedeemTicketResponse } from '.'
@@ -241,8 +241,6 @@ class Channel {
     const tx = await this.chain.finalizeChannelClosure(counterpartyAddress)
     return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
-
-
 }
 
 export { Channel }
