@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprForwarder__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprForwarder\_\_factory
 
 # Class: HoprForwarder\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new HoprForwarder__factory**(`signer?`)
+• **new HoprForwarder__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -67,7 +67,7 @@ ContractFactory.bytecode
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:135
+node_modules/@ethersproject/contracts/lib/index.d.ts:137
 
 ___
 
@@ -81,7 +81,7 @@ ContractFactory.interface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:134
+node_modules/@ethersproject/contracts/lib/index.d.ts:136
 
 ___
 
@@ -95,17 +95,17 @@ ContractFactory.signer
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:136
+node_modules/@ethersproject/contracts/lib/index.d.ts:138
 
 ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `inputs`: `any`[] = []; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `inputs`: `any`[] = []; `name`: `string` = "ERC1820\_REGISTRY"; `outputs`: { `internalType`: `string` = "contract IERC1820Registry"; `name`: `string` = ""; `type`: `string` = "address" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" } \| { `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "token"; `type`: `string` = "address" }[] ; `name`: `string` = "recoverTokens"; `outputs`: `any`[] = []; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" })[]
+▪ `Static` `Readonly` **abi**: ({ `inputs`: `any`[] = []; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `inputs`: `any`[] = []; `name`: `string` = "ERC1820\_REGISTRY"; `outputs`: { `internalType`: `string` = "contract IERC1820Registry"; `name`: `string` = ""; `type`: `string` = "address" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" } \| { `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "token"; `type`: `string` = "address" }[] ; `name`: `string` = "recoverTokens"; `outputs`: `any`[] = []; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" })[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:145
+packages/ethereum/types/factories/HoprForwarder__factory.ts:151
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:144
+packages/ethereum/types/factories/HoprForwarder__factory.ts:150
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:138
+packages/ethereum/types/factories/HoprForwarder__factory.ts:144
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:141
+packages/ethereum/types/factories/HoprForwarder__factory.ts:147
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:128
+packages/ethereum/types/factories/HoprForwarder__factory.ts:134
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:133
+packages/ethereum/types/factories/HoprForwarder__factory.ts:139
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:149
+packages/ethereum/types/factories/HoprForwarder__factory.ts:155
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprForwarder__factory.ts:146
+packages/ethereum/types/factories/HoprForwarder__factory.ts:152
 
 ___
 
@@ -271,7 +271,7 @@ ContractFactory.fromSolidity
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:144
+node_modules/@ethersproject/contracts/lib/index.d.ts:146
 
 ___
 
@@ -297,7 +297,7 @@ ContractFactory.getContract
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:150
+node_modules/@ethersproject/contracts/lib/index.d.ts:152
 
 ___
 
@@ -323,7 +323,7 @@ ContractFactory.getContractAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:146
+node_modules/@ethersproject/contracts/lib/index.d.ts:148
 
 ___
 
@@ -347,4 +347,4 @@ ContractFactory.getInterface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:145
+node_modules/@ethersproject/contracts/lib/index.d.ts:147

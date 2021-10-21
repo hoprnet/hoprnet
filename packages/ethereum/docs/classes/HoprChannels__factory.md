@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprChannels__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / HoprChannels\_\_factory
 
 # Class: HoprChannels\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new HoprChannels__factory**(`signer?`)
+• **new HoprChannels__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -67,7 +67,7 @@ ContractFactory.bytecode
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:135
+node_modules/@ethersproject/contracts/lib/index.d.ts:137
 
 ___
 
@@ -81,7 +81,7 @@ ContractFactory.interface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:134
+node_modules/@ethersproject/contracts/lib/index.d.ts:136
 
 ___
 
@@ -95,17 +95,17 @@ ContractFactory.signer
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:136
+node_modules/@ethersproject/contracts/lib/index.d.ts:138
 
 ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "\_token"; `type`: `string` = "address" }[] ; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `inputs`: ({ `components`: `undefined` ; `indexed`: `boolean` = true; `internalType`: `string` = "address"; `name`: `string` = "source"; `type`: `string` = "address" } \| { `components`: { `internalType`: `string` = "uint256"; `name`: `string` = "balance"; `type`: `string` = "uint256" }[] ; `indexed`: `boolean` = false; `internalType`: `string` = "struct HoprChannels.Channel"; `name`: `string` = "newState"; `type`: `string` = "tuple" })[] ; `name`: `string` = "ChannelUpdated"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = "interfaceHash"; `type`: `string` = "bytes32" }[] ; `name`: `string` = "canImplementInterfaceForAddress"; `outputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = ""; `type`: `string` = "bytes32" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" })[]
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = "\_token"; `type`: `string` = "address" }[] ; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `inputs`: ({ `components`: `undefined` ; `indexed`: `boolean` = true; `internalType`: `string` = "address"; `name`: `string` = "source"; `type`: `string` = "address" } \| { `components`: { `internalType`: `string` = "uint256"; `name`: `string` = "balance"; `type`: `string` = "uint256" }[] ; `indexed`: `boolean` = false; `internalType`: `string` = "struct HoprChannels.Channel"; `name`: `string` = "newState"; `type`: `string` = "tuple" })[] ; `name`: `string` = "ChannelUpdated"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = "interfaceHash"; `type`: `string` = "bytes32" }[] ; `name`: `string` = "canImplementInterfaceForAddress"; `outputs`: { `internalType`: `string` = "bytes32"; `name`: `string` = ""; `type`: `string` = "bytes32" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" })[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:698
+packages/ethereum/types/factories/HoprChannels__factory.ts:704
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:697
+packages/ethereum/types/factories/HoprChannels__factory.ts:703
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:691
+packages/ethereum/types/factories/HoprChannels__factory.ts:697
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:694
+packages/ethereum/types/factories/HoprChannels__factory.ts:700
 
 ___
 
@@ -189,7 +189,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:673
+packages/ethereum/types/factories/HoprChannels__factory.ts:679
 
 ___
 
@@ -215,7 +215,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:684
+packages/ethereum/types/factories/HoprChannels__factory.ts:690
 
 ___
 
@@ -236,7 +236,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:702
+packages/ethereum/types/factories/HoprChannels__factory.ts:708
 
 ___
 
@@ -250,7 +250,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:699
+packages/ethereum/types/factories/HoprChannels__factory.ts:705
 
 ___
 
@@ -275,7 +275,7 @@ ContractFactory.fromSolidity
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:144
+node_modules/@ethersproject/contracts/lib/index.d.ts:146
 
 ___
 
@@ -301,7 +301,7 @@ ContractFactory.getContract
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:150
+node_modules/@ethersproject/contracts/lib/index.d.ts:152
 
 ___
 
@@ -327,7 +327,7 @@ ContractFactory.getContractAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:146
+node_modules/@ethersproject/contracts/lib/index.d.ts:148
 
 ___
 
@@ -351,4 +351,4 @@ ContractFactory.getInterface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:145
+node_modules/@ethersproject/contracts/lib/index.d.ts:147

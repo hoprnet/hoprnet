@@ -25,7 +25,7 @@ import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager, { TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
-import { CONFIRMATIONS } from './constants'
+import { TX_CONFIRMATION_WAIT } from './constants'
 
 const log = debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
@@ -73,25 +73,21 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   // is fixed
   async function waitForConfirmations(
     transactionHash: string,
-    confimations: number,
     timeout: number,
-    onMined: (nonce: number, hash: string) => void,
-    onConfirmed: (nonce: number, hash: string) => void
+    onMined: (nonce: number, hash: string) => void
   ): Promise<providers.TransactionResponse> {
-    const wait = 1e3
     let started = 0
     let response: providers.TransactionResponse
 
     while (started < timeout) {
       response = await provider.getTransaction(transactionHash)
-      if (response && response.confirmations == 0) onMined(response.nonce, response.hash)
-      if (response && response.confirmations >= confimations) {
-        onConfirmed(response.nonce, response.hash)
+      if (response && response.confirmations >= 0) {
+        onMined(response.nonce, response.hash)
         break
       }
       // wait 1 sec
-      await new Promise((resolve) => setTimeout(resolve, wait))
-      started += wait
+      await new Promise((resolve) => setTimeout(resolve, TX_CONFIRMATION_WAIT))
+      started += TX_CONFIRMATION_WAIT
     }
 
     if (!response) throw Error(errors.TIMEOUT)
@@ -170,19 +166,10 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     nonceLock.releaseLock()
 
     try {
-      await waitForConfirmations(
-        transaction.hash,
-        CONFIRMATIONS,
-        30e3,
-        (nonce: number, hash: string) => {
-          log('Transaction with nonce %d and hash %s mined', nonce, hash)
-          transactions.moveToMined(hash)
-        },
-        (nonce: number, hash: string) => {
-          log('Transaction with nonce %d and hash %s confirmed', nonce, hash)
-          transactions.moveToConfirmed(hash)
-        }
-      )
+      await waitForConfirmations(transaction.hash, 30e3, (nonce: number, hash: string) => {
+        log('Transaction with nonce %d and hash %s mined', nonce, hash)
+        transactions.moveFromPendingToMined(hash)
+      })
     } catch (error) {
       const isRevertedErr = [error?.code, String(error)].includes(errors.CALL_EXCEPTION)
       const isAlreadyKnownErr =
@@ -193,7 +180,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
 
         // this transaction failed but was confirmed as reverted
-        transactions.moveToConfirmed(transaction.hash)
+        transactions.moveFromMinedToConfirmed(transaction.hash)
       } else {
         log('Transaction with nonce %d failed to sent: %s', nonce, error)
 
@@ -383,11 +370,24 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     return transaction.hash
   }
 
+  async function getNativeTokenTransactionInBlock(
+    blockNumber: number,
+    isOutgoing: boolean = true
+  ): Promise<Array<string>> {
+    const blockWithTx = await provider.getBlockWithTransactions(blockNumber)
+    const txs = blockWithTx.transactions.filter(
+      (tx) => tx.value.gt(BigNumber.from(0)) && (isOutgoing ? tx.from : tx.to) === wallet.address
+    )
+    return txs.length === 0 ? [] : txs.map((tx) => tx.hash)
+  }
+
   const api = {
     getBalance: (address: Address) =>
       token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
     getNativeBalance: (address: Address) =>
       provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
+    getNativeTokenTransactionInBlock: (blockNumber: number, isOutgoing: boolean = true) =>
+      getNativeTokenTransactionInBlock(blockNumber, isOutgoing),
     announce,
     withdraw: (currency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => withdraw(currency, recipient, amount),
     fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance) =>
@@ -407,11 +407,15 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     subscribeError: (cb) => {
       provider.on('error', cb)
       channels.on('error', cb)
+      token.on('error', cb)
     },
     subscribeChannelEvents: (cb) => channels.on('*', cb),
+    // Cannot directly apply filters here because it does not return a full event object
+    subscribeTokenEvents: (cb) => token.on('*', cb), // subscribe all the Transfer events from current nodes in HoprToken.
     unsubscribe: () => {
       provider.removeAllListeners()
       channels.removeAllListeners()
+      token.removeAllListeners()
     },
     getChannels: () => channels,
     getPrivateKey: () => utils.arrayify(wallet.privateKey),
@@ -421,7 +425,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       hoprTokenAddress: hoprTokenDeployment.address,
       hoprChannelsAddress: hoprChannelsDeployment.address,
       channelClosureSecs
-    })
+    }),
+    updateConfirmedTransaction: (hash: string) => transactions.moveToConfirmed(hash)
   }
 
   return api

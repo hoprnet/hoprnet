@@ -17,9 +17,10 @@ import {
 import assert from 'assert'
 import BN from 'bn.js'
 import { utils } from 'ethers'
-import { Channel } from './channel'
+import { Channel, _redeemTicket } from './channel'
 import * as fixtures from './fixtures'
 import { EventEmitter } from 'events'
+import { IndexerEvents } from './indexer/types'
 
 const createChainMock = (): ChainWrapper => {
   return {
@@ -37,6 +38,9 @@ const createIndexerMock = (channelUsThem: ChannelEntry, channelThemUs: ChannelEn
   return {
     async getChannel(id: Hash) {
       return id.eq(channelUsThem.getId()) ? channelUsThem : channelThemUs
+    },
+    async resolvePendingTransaction(_eventType: IndexerEvents, tx: string) {
+      return tx
     }
   } as Indexer
 }
@@ -98,7 +102,8 @@ const createMocks = (from: string, to: string) => {
     nextCommitmentPartyB,
     secret1,
     secret2,
-    channel
+    channel,
+    events: ev
   }
 }
 
@@ -143,10 +148,24 @@ describe('test channel', function () {
       aliceMocks.self
     )
 
-    const goodResponse = await bobMocks.channel.redeemTicket(goodAck)
+    const goodResponse = await _redeemTicket(
+      aliceMocks.self,
+      goodAck,
+      bobMocks.db,
+      bobMocks.chain,
+      bobMocks.indexer,
+      bobMocks.events
+    )
     assert(goodResponse.status === 'SUCCESS')
 
-    const badResponse = await bobMocks.channel.redeemTicket(badAck)
+    const badResponse = await _redeemTicket(
+      aliceMocks.self,
+      badAck,
+      bobMocks.db,
+      bobMocks.chain,
+      bobMocks.indexer,
+      bobMocks.events
+    )
     assert(badResponse.status === 'FAILURE' && badResponse.message === 'Invalid response to acknowledgement')
 
     const aBalances = await aliceMocks.channel.balanceToThem()
@@ -163,7 +182,14 @@ describe('test channel', function () {
       aliceMocks.self
     )
 
-    const response = await bobMocks.channel.redeemTicket(acknowledgement)
+    const response = await _redeemTicket(
+      aliceMocks.self,
+      acknowledgement,
+      bobMocks.db,
+      bobMocks.chain,
+      bobMocks.indexer,
+      bobMocks.events
+    )
     assert(response.status === 'FAILURE' && response.message === 'PreImage is empty.')
   })
 })

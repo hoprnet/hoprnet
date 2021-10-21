@@ -32,6 +32,7 @@
 - [HEARTBEAT\_INTERVAL\_VARIANCE](modules.md#heartbeat_interval_variance)
 - [HEARTBEAT\_TIMEOUT](modules.md#heartbeat_timeout)
 - [INTERMEDIATE\_HOPS](modules.md#intermediate_hops)
+- [MAX\_HOPS](modules.md#max_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
 - [MAX\_PACKET\_DELAY](modules.md#max_packet_delay)
 - [MAX\_PARALLEL\_CONNECTIONS](modules.md#max_parallel_connections)
@@ -58,7 +59,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
+[packages/core/src/channel-strategy.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L17)
 
 ___
 
@@ -68,7 +69,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L15)
+[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
 
 ___
 
@@ -112,17 +113,17 @@ ___
 
 ### CHECK\_TIMEOUT
 
-• `Const` **CHECK\_TIMEOUT**: ``60000``
+• **CHECK\_TIMEOUT**: ``60000``
 
 #### Defined in
 
-[packages/core/src/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L34)
+[packages/core/src/constants.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L35)
 
 ___
 
 ### DEFAULT\_STUN\_PORT
 
-• `Const` **DEFAULT\_STUN\_PORT**: ``3478``
+• **DEFAULT\_STUN\_PORT**: ``3478``
 
 #### Defined in
 
@@ -132,7 +133,7 @@ ___
 
 ### FULL\_VERSION
 
-• `Const` **FULL\_VERSION**: `any`
+• **FULL\_VERSION**: `any` = `pkg.version`
 
 #### Defined in
 
@@ -142,7 +143,7 @@ ___
 
 ### HEARTBEAT\_INTERVAL
 
-• `Const` **HEARTBEAT\_INTERVAL**: ``3000``
+• **HEARTBEAT\_INTERVAL**: ``3000``
 
 #### Defined in
 
@@ -152,7 +153,7 @@ ___
 
 ### HEARTBEAT\_INTERVAL\_VARIANCE
 
-• `Const` **HEARTBEAT\_INTERVAL\_VARIANCE**: ``2000``
+• **HEARTBEAT\_INTERVAL\_VARIANCE**: ``2000``
 
 #### Defined in
 
@@ -162,7 +163,7 @@ ___
 
 ### HEARTBEAT\_TIMEOUT
 
-• `Const` **HEARTBEAT\_TIMEOUT**: ``4000``
+• **HEARTBEAT\_TIMEOUT**: ``4000``
 
 #### Defined in
 
@@ -172,7 +173,7 @@ ___
 
 ### INTERMEDIATE\_HOPS
 
-• `Const` **INTERMEDIATE\_HOPS**: ``3``
+• **INTERMEDIATE\_HOPS**: ``3``
 
 #### Defined in
 
@@ -180,9 +181,19 @@ ___
 
 ___
 
+### MAX\_HOPS
+
+• **MAX\_HOPS**: ``3``
+
+#### Defined in
+
+[packages/core/src/constants.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L33)
+
+___
+
 ### MAX\_NEW\_CHANNELS\_PER\_TICK
 
-• `Const` **MAX\_NEW\_CHANNELS\_PER\_TICK**: ``5``
+• **MAX\_NEW\_CHANNELS\_PER\_TICK**: ``5``
 
 #### Defined in
 
@@ -192,7 +203,7 @@ ___
 
 ### MAX\_PACKET\_DELAY
 
-• `Const` **MAX\_PACKET\_DELAY**: ``200``
+• **MAX\_PACKET\_DELAY**: ``200``
 
 #### Defined in
 
@@ -202,7 +213,7 @@ ___
 
 ### MAX\_PARALLEL\_CONNECTIONS
 
-• `Const` **MAX\_PARALLEL\_CONNECTIONS**: ``5``
+• **MAX\_PARALLEL\_CONNECTIONS**: ``5``
 
 #### Defined in
 
@@ -212,7 +223,7 @@ ___
 
 ### MAX\_PATH\_ITERATIONS
 
-• `Const` **MAX\_PATH\_ITERATIONS**: ``100``
+• **MAX\_PATH\_ITERATIONS**: ``100``
 
 #### Defined in
 
@@ -222,7 +233,7 @@ ___
 
 ### NETWORK\_QUALITY\_THRESHOLD
 
-• `Const` **NETWORK\_QUALITY\_THRESHOLD**: ``0.5``
+• **NETWORK\_QUALITY\_THRESHOLD**: ``0.5``
 
 #### Defined in
 
@@ -232,7 +243,7 @@ ___
 
 ### PACKET\_SIZE
 
-• `Const` **PACKET\_SIZE**: ``500``
+• **PACKET\_SIZE**: ``500``
 
 #### Defined in
 
@@ -242,7 +253,7 @@ ___
 
 ### PATH\_RANDOMNESS
 
-• `Const` **PATH\_RANDOMNESS**: ``0.1``
+• **PATH\_RANDOMNESS**: ``0.1``
 
 #### Defined in
 
@@ -252,7 +263,7 @@ ___
 
 ### PROTOCOL\_ACKNOWLEDGEMENT
 
-• `Const` **PROTOCOL\_ACKNOWLEDGEMENT**: `string`
+• **PROTOCOL\_ACKNOWLEDGEMENT**: `string`
 
 #### Defined in
 
@@ -262,7 +273,7 @@ ___
 
 ### PROTOCOL\_HEARTBEAT
 
-• `Const` **PROTOCOL\_HEARTBEAT**: `string`
+• **PROTOCOL\_HEARTBEAT**: `string`
 
 #### Defined in
 
@@ -272,7 +283,7 @@ ___
 
 ### PROTOCOL\_ONCHAIN\_KEY
 
-• `Const` **PROTOCOL\_ONCHAIN\_KEY**: `string`
+• **PROTOCOL\_ONCHAIN\_KEY**: `string`
 
 #### Defined in
 
@@ -282,7 +293,7 @@ ___
 
 ### PROTOCOL\_PAYMENT\_CHANNEL
 
-• `Const` **PROTOCOL\_PAYMENT\_CHANNEL**: `string`
+• **PROTOCOL\_PAYMENT\_CHANNEL**: `string`
 
 #### Defined in
 
@@ -292,7 +303,7 @@ ___
 
 ### PROTOCOL\_STRING
 
-• `Const` **PROTOCOL\_STRING**: `string`
+• **PROTOCOL\_STRING**: `string`
 
 #### Defined in
 
@@ -302,7 +313,7 @@ ___
 
 ### VERSION
 
-• `Const` **VERSION**: `string`
+• **VERSION**: `string`
 
 #### Defined in
 
@@ -320,14 +331,14 @@ Depth first search through potential paths based on weight
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `start` | `PublicKey` |
-| `destination` | `PublicKey` |
-| `hops` | `number` |
-| `networkQualityOf` | (`p`: `PublicKey`) => `number` |
-| `getOpenChannelsFromPeer` | (`p`: `PublicKey`) => `Promise`<`ChannelEntry`[]\> |
-| `weight` | (`edge`: `ChannelEntry`) => `Promise`<`BN`\> |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `start` | `PublicKey` | `undefined` |
+| `destination` | `PublicKey` | `undefined` |
+| `hops` | `number` | `undefined` |
+| `networkQualityOf` | (`p`: `PublicKey`) => `number` | `undefined` |
+| `getOpenChannelsFromPeer` | (`p`: `PublicKey`) => `Promise`<`ChannelEntry`[]\> | `undefined` |
+| `weight` | (`edge`: `ChannelEntry`) => `Promise`<`BN`\> | `defaultWeight` |
 
 #### Returns
 

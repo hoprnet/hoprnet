@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC777SnapshotMock__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / ERC777SnapshotMock\_\_factory
 
 # Class: ERC777SnapshotMock\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new ERC777SnapshotMock__factory**(`signer?`)
+• **new ERC777SnapshotMock__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -67,7 +67,7 @@ ContractFactory.bytecode
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:135
+node_modules/@ethersproject/contracts/lib/index.d.ts:137
 
 ___
 
@@ -81,7 +81,7 @@ ContractFactory.interface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:134
+node_modules/@ethersproject/contracts/lib/index.d.ts:136
 
 ___
 
@@ -95,17 +95,17 @@ ContractFactory.signer
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:136
+node_modules/@ethersproject/contracts/lib/index.d.ts:138
 
 ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "string"; `name`: `string` = "name"; `type`: `string` = "string" }[] ; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `inputs`: { `indexed`: `boolean` = true; `internalType`: `string` = "address"; `name`: `string` = "owner"; `type`: `string` = "address" }[] ; `name`: `string` = "Approval"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = ""; `type`: `string` = "address" }[] ; `name`: `string` = "accountSnapshots"; `outputs`: { `internalType`: `string` = "uint128"; `name`: `string` = "fromBlock"; `type`: `string` = "uint128" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" })[]
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "string"; `name`: `string` = "name"; `type`: `string` = "string" }[] ; `name`: `undefined` = "allowance"; `outputs`: `undefined` ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "constructor" } \| { `anonymous`: `boolean` = false; `inputs`: { `indexed`: `boolean` = true; `internalType`: `string` = "address"; `name`: `string` = "owner"; `type`: `string` = "address" }[] ; `name`: `string` = "Approval"; `outputs`: `undefined` ; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" } \| { `anonymous`: `undefined` = false; `inputs`: { `internalType`: `string` = "address"; `name`: `string` = ""; `type`: `string` = "address" }[] ; `name`: `string` = "accountSnapshots"; `outputs`: { `internalType`: `string` = "uint128"; `name`: `string` = "fromBlock"; `type`: `string` = "uint128" }[] ; `stateMutability`: `string` = "view"; `type`: `string` = "function" })[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:861
+packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:867
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:860
+packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:866
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:854
+packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:860
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:857
+packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:863
 
 ___
 
@@ -191,7 +191,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:824
+packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:830
 
 ___
 
@@ -219,7 +219,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:839
+packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:845
 
 ___
 
@@ -240,7 +240,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:865
+packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:871
 
 ___
 
@@ -254,7 +254,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:862
+packages/ethereum/types/factories/ERC777SnapshotMock__factory.ts:868
 
 ___
 
@@ -279,7 +279,7 @@ ContractFactory.fromSolidity
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:144
+node_modules/@ethersproject/contracts/lib/index.d.ts:146
 
 ___
 
@@ -305,7 +305,7 @@ ContractFactory.getContract
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:150
+node_modules/@ethersproject/contracts/lib/index.d.ts:152
 
 ___
 
@@ -331,7 +331,7 @@ ContractFactory.getContractAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:146
+node_modules/@ethersproject/contracts/lib/index.d.ts:148
 
 ___
 
@@ -355,4 +355,4 @@ ContractFactory.getInterface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:145
+node_modules/@ethersproject/contracts/lib/index.d.ts:147
