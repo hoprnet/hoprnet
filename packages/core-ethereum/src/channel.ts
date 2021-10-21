@@ -202,8 +202,12 @@ class Channel {
     if (totalFund.gt(new BN(myBalance.toBN().toString()))) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    const tx = await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
-    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    try {
+      const tx = await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
+      return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    } catch (error) {
+      log(error)
+    }
   }
 
   async open(fundAmount: Balance) {
@@ -222,8 +226,12 @@ class Channel {
     if (new BN(myBalance.toBN().toString()).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')
     }
-    const tx = await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
-    await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    try {
+      const tx = await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
+      await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    } catch (error) {
+      log(error)
+    }
     return generateChannelId(myAddress, counterpartyAddress)
   }
 
@@ -233,8 +241,12 @@ class Channel {
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    const tx = await this.chain.initiateChannelClosure(counterpartyAddress)
-    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    try {
+      const tx = await this.chain.initiateChannelClosure(counterpartyAddress)
+      return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    } catch (error) {
+      log(error)
+    }
   }
 
   async finalizeClosure() {
@@ -244,8 +256,12 @@ class Channel {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    const tx = await this.chain.finalizeChannelClosure(counterpartyAddress)
-    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    try {
+      const tx = await this.chain.finalizeChannelClosure(counterpartyAddress)
+      return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    } catch (error) {
+      log(error)
+    }
   }
 
   private async bumpTicketIndex(channelId: Hash): Promise<UINT256> {

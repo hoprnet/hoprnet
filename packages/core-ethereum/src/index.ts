@@ -95,16 +95,24 @@ export default class HoprEthereum extends EventEmitter {
 
   async announce(multiaddr: Multiaddr): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
-    const tx = await this.chain.announce(multiaddr)
-    // event emitted by the indexer
-    return this.indexer.resolvePendingTransaction('announce', tx)
+    try {
+      const tx = await this.chain.announce(multiaddr)
+      // event emitted by the indexer
+      return this.indexer.resolvePendingTransaction('announce', tx)
+    } catch (error) {
+      log(error)
+    }
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
-    // promise of tx hash gets resolved when the tx is mined.
-    const tx = await this.chain.withdraw(currency, recipient, amount)
-    // event emitted by the indexer
-    return this.indexer.resolvePendingTransaction(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx)
+    try {
+      // promise of tx hash gets resolved when the tx is mined.
+      const tx = await this.chain.withdraw(currency, recipient, amount)
+      // event emitted by the indexer
+      return this.indexer.resolvePendingTransaction(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx)
+    } catch (error) {
+      log(error)
+    }
   }
 
   public getOpenChannelsFrom(p: PublicKey) {
@@ -174,8 +182,12 @@ export default class HoprEthereum extends EventEmitter {
   public async commitToChannel(c: ChannelEntry): Promise<void> {
     log('committing to channel', c)
     const setCommitment = async (commitment: Hash) => {
-      const tx = await this.chain.setCommitment(c.source.toAddress(), commitment)
-      return this.indexer.resolvePendingTransaction('channel-updated', tx)
+      try {
+        const tx = await this.chain.setCommitment(c.source.toAddress(), commitment)
+        return this.indexer.resolvePendingTransaction('channel-updated', tx)
+      } catch (error) {
+        log(error)
+      }
     }
     const getCommitment = async () => (await this.indexer.getChannel(c.getId())).commitment
     initializeCommitment(this.db, c.getId(), getCommitment, setCommitment)
