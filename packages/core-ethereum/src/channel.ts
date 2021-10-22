@@ -275,7 +275,6 @@ class Channel {
     const counterpartyAddress = this.counterparty.toAddress()
     const channelState = await this.usToThem()
     const id = generateChannelId(this.self.toAddress(), this.counterparty.toAddress())
-    const currentTicketIndex = await this.bumpTicketIndex(id)
     const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
     const winProb = new BN(INVERSE_TICKET_WIN_PROB)
 
@@ -288,6 +287,8 @@ class Channel {
           .toHex()} with counterparty ${this.counterparty.toB58String()} to create ticket`
       )
     }
+
+    const currentTicketIndex = await this.bumpTicketIndex(id)
 
     const ticket = Ticket.create(
       counterpartyAddress,
