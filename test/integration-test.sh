@@ -188,8 +188,8 @@ log "Node 4 open channel to Node 5"
 result=$(run_command "${api4}" "open ${addr5} 1" "Successfully opened channel" 600)
 log "-- ${result}"
 
-log "Node 5 open channel to Node 4"
-result=$(run_command "${api4}" "open ${addr5} 0.01" "Successfully opened channel" 600)
+log "Node 5 open channel to Node 1"
+result=$(run_command "${api5}" "open ${addr1} 0.01" "Successfully opened channel" 600)
 log "-- ${result}"
 
 for i in `seq 1 10`; do
@@ -205,9 +205,13 @@ for i in `seq 1 10`; do
   log "Node 4 send 1 hop message to self via node 5"
   run_command "${api4}" "send ${addr5},${addr4} 'hello, world'" "Message sent" 600
 
-  log "Node 5 send 1 hop message to self via node 4"
-  run_command "${api5}" "send ${addr4},${addr5} 'hello, world'" "Message sent" 600
+  log "Node 5 send 1 hop message to self via node 1"
+  run_command "${api5}" "send ${addr1},${addr5} 'hello, world'" "Message sent" 600
 done
+
+log "Node 1 should now have a ticket"
+result=$(run_command ${api1} "tickets" "Win Proportion:   100%" 600)
+log "-- ${result}"
 
 log "Node 2 should now have a ticket"
 result=$(run_command ${api2} "tickets" "Win Proportion:   100%" 600)
@@ -235,8 +239,8 @@ for i in `seq 1 10`; do
   log "Node 3 send 1 hop message to node 5 via node 4"
   run_command "${api3}" "send ${addr4},${addr5} 'hello, world'" "Message sent" 600
 
-  log "Node 5 send 1 hop message to node 3 via node 4"
-  run_command "${api5}" "send ${addr4},${addr3} 'hello, world'" "does not have enough funds" 600
+  log "Node 5 send 1 hop message to node 2 via node 1"
+  run_command "${api5}" "send ${addr1},${addr2} 'hello, world'" "does not have enough funds" 600
 done
 
 for i in `seq 1 10`; do
