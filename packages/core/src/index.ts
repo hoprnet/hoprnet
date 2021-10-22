@@ -407,6 +407,7 @@ class Hopr extends EventEmitter {
         verbose(`closed channel to ${toClose.toString()}`)
         this.emit('hopr:channel:closed', toClose.toPeerId())
       } catch (e) {
+        this.emit('hopr:error', `Error in closing strategy channels ${e}`)
         log('error when trying to close strategy channels', e)
       }
     }
@@ -419,6 +420,7 @@ class Hopr extends EventEmitter {
         verbose('- opened', channelToOpen, hash)
         this.emit('hopr:channel:opened', channelToOpen)
       } catch (e) {
+        this.emit('hopr:error', `Error in opening strategy channels ${e}`)
         log('error when trying to open strategy channels', e)
       }
     }
@@ -661,6 +663,7 @@ class Hopr extends EventEmitter {
       await chain.announce(addrToAnnounce)
     } catch (err) {
       log('announce failed')
+      this.emit('hopr:error', `Error in announcing node ${err}`)
       await this.isOutOfFunds(err)
       throw new Error(`Failed to announce: ${err}`)
     }
@@ -814,6 +817,7 @@ class Hopr extends EventEmitter {
         txHash = await channel.finalizeClosure()
       }
     } catch (err) {
+      this.emit('hopr:error', `Error in closingChannel ${err}`)
       log('failed to close channel', err)
       await this.isOutOfFunds(err)
       throw new Error(`Failed to closeChannel: ${err}`)

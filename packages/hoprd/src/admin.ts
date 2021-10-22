@@ -168,6 +168,10 @@ export class AdminServer {
       )
     })
 
+    this.node.on('hopr:error', (msg) => 
+      this.logs.log(`Hopr node ran into error: ${msg}`
+    ))
+
     this.logs.logStatus(this.node.status === 'RUNNING' ? 'READY' : 'PENDING')
 
     // Setup some noise

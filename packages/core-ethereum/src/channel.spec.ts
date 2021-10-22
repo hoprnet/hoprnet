@@ -27,7 +27,10 @@ const createChainMock = (): ChainWrapper => {
     async setCommitment() {},
     async getBalance() {},
     async fundChannel() {},
-    async openChannel() {},
+    async openChannel() {
+      // throw error by default
+        throw new Error('cannot open channel')
+    },
     async initiateChannelClosure() {},
     async finalizeChannelClosure() {},
     async redeemTicket() {}
@@ -129,6 +132,11 @@ describe('test channel', function () {
       utils.hexlify((await aliceMocks.channel.usToThem()).serialize()),
       utils.hexlify(aliceMocks.channelUsThem.serialize())
     )
+  })
+
+  it('should throw error when opening channel', async function () {
+    // try to create a channel 
+    assert.rejects(aliceMocks.chain.openChannel(aliceMocks.self.toAddress(), bobMocks.self.toAddress(),new Balance(new BN(1))), 'can open a channel')
   })
 
   it("should validate ticket's response", async function () {

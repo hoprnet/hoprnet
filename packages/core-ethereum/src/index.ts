@@ -101,6 +101,9 @@ export default class HoprEthereum extends EventEmitter {
       return this.indexer.resolvePendingTransaction('announce', tx)
     } catch (error) {
       log(error)
+      // bubble up error encountered in sendTransaction.
+      // Announce exception has been handled in hopr-core
+      throw error;
     }
   }
 
@@ -112,6 +115,7 @@ export default class HoprEthereum extends EventEmitter {
       return this.indexer.resolvePendingTransaction(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx)
     } catch (error) {
       log(error)
+      throw error
     }
   }
 

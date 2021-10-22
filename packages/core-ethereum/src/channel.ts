@@ -111,6 +111,7 @@ async function redeemTicket(
   } catch (err) {
     // TODO delete ackTicket -- check if it's due to gas!
     log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
+    this.emit('hopr:error', `Error in redeeming ticket ${err}`)
     return {
       status: 'ERROR',
       error: err
@@ -207,6 +208,7 @@ class Channel {
       return await this.indexer.resolvePendingTransaction('channel-updated', tx)
     } catch (error) {
       log(error)
+      throw error
     }
   }
 
@@ -231,6 +233,7 @@ class Channel {
       await this.indexer.resolvePendingTransaction('channel-updated', tx)
     } catch (error) {
       log(error)
+      throw error
     }
     return generateChannelId(myAddress, counterpartyAddress)
   }
@@ -246,6 +249,7 @@ class Channel {
       return await this.indexer.resolvePendingTransaction('channel-updated', tx)
     } catch (error) {
       log(error)
+      throw error
     }
   }
 
@@ -261,6 +265,7 @@ class Channel {
       return await this.indexer.resolvePendingTransaction('channel-updated', tx)
     } catch (error) {
       log(error)
+      throw error
     }
   }
 
