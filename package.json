@@ -41,7 +41,7 @@
   "devDependencies": {
     "@ethersproject/cli": "5.5.0",
     "rimraf": "3.0.2",
-    "ts-node": "10.3.1",
+    "ts-node": "10.4.0",
     "yargs": "17.2.1"
   },
   "prettier": {
