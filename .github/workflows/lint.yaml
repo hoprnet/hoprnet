@@ -14,6 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
       - name: Use Node.js
         uses: actions/setup-node@v2
         with:
@@ -22,20 +25,9 @@ jobs:
           cache: yarn
 
       - name: Run linter
-        run: |
-          yarn
-          yarn lint:fix
+        run: yarn && yarn lint:fix
 
-      - name: Check if changed
-        id: check-changed
-        run: |
-          echo "::set-output name=changed::$(git status --porcelain)"
-
-      - name: Commit changes
-        if: steps.check-changed.outputs.changed != ''
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR CI robot"
-          git commit -a -m "chore(build): apply linter changes" || true
-          git pull origin ${{ github.ref }}
-          git push origin ${{ github.ref }}
+      - name: Commit and push changes
+        run: ./scripts/commit-and-push-all-changes.sh
+        env:
+          HOPR_GIT_MSG: "chore(build): apply linter changes"
