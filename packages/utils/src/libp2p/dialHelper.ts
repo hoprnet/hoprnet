@@ -5,8 +5,11 @@ import type PeerId from 'peer-id'
 import type LibP2P from 'libp2p'
 import type { PromiseValue } from '../typescript'
 import type { Address } from 'libp2p/src/peer-store/address-book'
+import type { TimeoutOpts } from '../async'
+import type AbortController from 'abort-controller'
 
-import AbortController from 'abort-controller'
+import { abortableTimeout } from '../async'
+
 import { debug } from '../debug'
 import { green } from 'chalk'
 
@@ -51,7 +54,7 @@ async function doDial(
   destination: PeerId,
   protocol: string,
   opts: {
-    timeout: NodeJS.Timeout
+    timeout: number
     abort: AbortController
   }
 ): Promise<DialResponse> {
@@ -70,7 +73,6 @@ async function doDial(
   }
 
   if (struct != null) {
-    clearTimeout(opts.timeout)
     return { status: 'SUCCESS', resp: struct }
   }
 
@@ -80,7 +82,6 @@ async function doDial(
 
   if ((err != null || struct == null) && libp2p.peerRouting._routers.length > 0) {
     logError(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
-    clearTimeout(opts.timeout)
     return { status: 'E_DIAL', error: err.message, dhtContacted: false }
   }
 
@@ -106,7 +107,6 @@ async function doDial(
 
   // Only start a dial attempt if we have received new addresses
   if (newAddresses.length == 0) {
-    clearTimeout(opts.timeout)
     return { status: 'E_DIAL', error: 'No new addresses after contacting the DHT', dhtContacted: true }
   }
 
@@ -122,7 +122,6 @@ async function doDial(
         `${err.message}`
     )
 
-    clearTimeout(opts.timeout)
     return { status: 'E_DIAL', error: err.message, dhtContacted: true }
   }
 
@@ -131,7 +130,6 @@ async function doDial(
   }
 
   if (struct != null) {
-    clearTimeout(opts.timeout)
     return { status: 'SUCCESS', resp: struct }
   }
 
@@ -153,33 +151,13 @@ export async function dial(
   protocol: string,
   opts?: DialOpts
 ): Promise<DialResponse> {
-  let timeout: NodeJS.Timeout
-  const abort = opts.abort ?? new AbortController()
-
-  let onAbort: () => void
-
-  let timeoutPromise = new Promise<DialResponse>((resolve) => {
-    timeout = setTimeout(() => {
-      abort.signal.removeEventListener('abort', onAbort)
-      abort.abort()
-      verbose(`timeout while trying to dial ${destination.toB58String()}`)
-      resolve({ status: 'E_TIMEOUT' })
-    }, opts.timeout ?? DEFAULT_DHT_QUERY_TIMEOUT)
-
-    onAbort = () => {
-      clearTimeout(timeout)
-      abort.signal.removeEventListener('abort', onAbort)
-      resolve({ status: 'E_ABORTED' })
+  return abortableTimeout(
+    (opts: TimeoutOpts) => doDial(libp2p, destination, protocol, opts as any),
+    { status: 'E_ABORTED' },
+    { status: 'E_TIMEOUT' },
+    {
+      timeout: opts.timeout ?? DEFAULT_DHT_QUERY_TIMEOUT,
+      abort: opts.abort
     }
-    abort.signal.addEventListener('abort', onAbort)
-  })
-
-  // You may be wondering why we race the timeout promise here rather than just
-  // relying on the Abort signal.
-  // As of #2611, we noticed that the E_TIMEOUT was not being returned until
-  // after the request came back, thus the timeout signal was not functioning
-  // correctly in this version of libp2p. This is a compromise that means we
-  // regain control flow after the timeout, but at the expense of a timed out
-  // dial potentially succeeding and being discarded.
-  return Promise.race([timeoutPromise, doDial(libp2p, destination, protocol, { timeout, abort })])
+  )
 }
