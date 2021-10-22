@@ -66,9 +66,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ignore dummy tickets
-  if (UINT256.DUMMY_INVERSE_PROBABILITY.toBN().eq(requiredInverseTicketWinProb) && ticket.amount.toBN().eqn(0)) {
-    return
-  }
+  if (ticket.isDummy()) return
 
   let channelState: ChannelEntry
   try {
@@ -344,11 +342,15 @@ export class Packet {
           })
       )
     } catch (e) {
-      await db.markRejected(this.ticket)
+      if (!this.ticket.isDummy()) {
+        await db.markRejected(this.ticket)
+      }
       throw e
     }
 
-    await db.setCurrentTicketIndex(channel.getThemToUsId().hash(), this.ticket.index)
+    if (!this.ticket.isDummy()) {
+      await db.setCurrentTicketIndex(channel.getThemToUsId().hash(), this.ticket.index)
+    }
   }
 
   createAcknowledgement(privKey: PeerId) {

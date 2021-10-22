@@ -191,4 +191,9 @@ export class Ticket {
 
     return this.amount.toBN().div(baseUnit).toNumber()
   }
+
+  isDummy(): boolean {
+    const DUMMY_WINPROB = UINT256.fromInverseProbability(UINT256.DUMMY_INVERSE_PROBABILITY.toBN())
+    return DUMMY_WINPROB.toBN().eq(this.winProb.toBN()) && this.amount.toBN().eqn(0)
+  }
 }
