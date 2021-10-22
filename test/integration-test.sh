@@ -206,10 +206,6 @@ for i in `seq 1 10`; do
   run_command "${api4}" "send ${addr5},${addr4} 'hello, world'" "Message sent" 600
 done
 
-log "Node 1 should now have a ticket"
-result=$(run_command ${api1} "tickets" "Win Proportion:   100%" 600)
-log "-- ${result}"
-
 log "Node 2 should now have a ticket"
 result=$(run_command ${api2} "tickets" "Win Proportion:   100%" 600)
 log "-- ${result}"
