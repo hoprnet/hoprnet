@@ -108,7 +108,6 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket's index MUST be higher than the channel's ticket index
-  // TODO: keep track of uncommited tickets
   if (!ticket.index.toBN().gt(channelState.ticketIndex.toBN())) {
     throw Error(
       `Ticket index '${ticket.index.toBN().toString()}' must be higher than last ticket index ${channelState.ticketIndex
@@ -348,6 +347,8 @@ export class Packet {
       await db.markRejected(this.ticket)
       throw e
     }
+
+    await db.setCurrentTicketIndex(channel.getThemToUsId().hash(), this.ticket.index)
   }
 
   createAcknowledgement(privKey: PeerId) {
