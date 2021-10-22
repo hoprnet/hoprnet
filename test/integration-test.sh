@@ -189,7 +189,7 @@ result=$(run_command "${api4}" "open ${addr5} 1" "Successfully opened channel" 6
 log "-- ${result}"
 
 log "Node 5 open channel to Node 1"
-result=$(run_command "${api5}" "open ${addr1} 0.01" "Successfully opened channel" 600)
+result=$(run_command "${api5}" "open ${addr1} 0.001" "Successfully opened channel" 600)
 log "-- ${result}"
 
 for i in `seq 1 10`; do
@@ -204,9 +204,6 @@ for i in `seq 1 10`; do
 
   log "Node 4 send 1 hop message to self via node 5"
   run_command "${api4}" "send ${addr5},${addr4} 'hello, world'" "Message sent" 600
-
-  log "Node 5 send 1 hop message to self via node 1"
-  run_command "${api5}" "send ${addr1},${addr5} 'hello, world'" "Message sent" 600
 done
 
 log "Node 1 should now have a ticket"
