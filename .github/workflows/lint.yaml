@@ -1,5 +1,8 @@
 name: HOPR Lint fix
 
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
+
 on:
   push:
     branches: ['**']
