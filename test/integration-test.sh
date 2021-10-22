@@ -233,7 +233,7 @@ for i in `seq 1 10`; do
   run_command "${api3}" "send ${addr4},${addr5} 'hello, world'" "Message sent" 600
 
   log "Node 5 send 1 hop message to node 2 via node 1"
-  run_command "${api5}" "send ${addr1},${addr2} 'hello, world'" "does not have enough funds" 600
+  run_command "${api5}" "send ${addr1},${addr2} 'hello, world'" "Could not send message" 600
 done
 
 for i in `seq 1 10`; do
