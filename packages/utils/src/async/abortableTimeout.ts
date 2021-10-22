@@ -1,4 +1,3 @@
-import AbortController from 'abort-controller'
 import { defer } from './defer'
 import { debug } from '../debug'
 
@@ -6,7 +5,7 @@ const logError = debug('hopr:lateTimeout')
 
 export type TimeoutOpts = {
   timeout: number
-  abort?: AbortController
+  signal?: AbortSignal
 }
 
 export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
@@ -15,7 +14,14 @@ export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
   timeoutMsg: TimeoutMsg,
   opts: TimeoutOpts
 ): Promise<Result | AbortMsg | TimeoutMsg> {
-  const abort = opts.abort ?? new AbortController()
+  const abort = new AbortController()
+
+  // forward abort request
+  const onOuterAbort = () => abort.abort()
+  opts.signal?.addEventListener('abort', () => {
+    onOuterAbort()
+    opts.signal?.removeEventListener('abort', onOuterAbort)
+  })
 
   let done = false
 
@@ -48,7 +54,7 @@ export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
     try {
       const result = await fn({
         timeout: opts.timeout,
-        abort
+        signal: abort.signal
       })
       cleanUp()
       return result

@@ -6,7 +6,6 @@ import type LibP2P from 'libp2p'
 import type { PromiseValue } from '../typescript'
 import type { Address } from 'libp2p/src/peer-store/address-book'
 import type { TimeoutOpts } from '../async'
-import type AbortController from 'abort-controller'
 
 import { abortableTimeout } from '../async'
 
@@ -20,7 +19,7 @@ const DEFAULT_DHT_QUERY_TIMEOUT = 10000
 
 export type DialOpts = {
   timeout?: number
-  abort?: AbortController
+  signal?: AbortSignal
 }
 
 export type DialResponse =
@@ -55,7 +54,7 @@ async function doDial(
   protocol: string,
   opts: {
     timeout: number
-    abort: AbortController
+    signal: AbortSignal
   }
 ): Promise<DialResponse> {
   let err: any
@@ -66,7 +65,7 @@ async function doDial(
   // Try to use known addresses
   if (addresses.length > 0) {
     try {
-      struct = await libp2p.dialProtocol(destination, protocol, { signal: opts.abort.signal })
+      struct = await libp2p.dialProtocol(destination, protocol, { signal: opts.signal })
     } catch (_err) {
       err = _err
     }
@@ -76,7 +75,7 @@ async function doDial(
     return { status: 'SUCCESS', resp: struct }
   }
 
-  if (opts.abort.signal.aborted) {
+  if (opts.signal.aborted) {
     return { status: 'E_TIMEOUT' }
   }
 
@@ -101,7 +100,7 @@ async function doDial(
 
   const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
 
-  if (opts.abort.signal.aborted) {
+  if (opts.signal.aborted) {
     return { status: 'E_TIMEOUT' }
   }
 
@@ -111,7 +110,7 @@ async function doDial(
   }
 
   try {
-    struct = await libp2p.dialProtocol(destination, protocol, { signal: opts.abort.signal })
+    struct = await libp2p.dialProtocol(destination, protocol, { signal: opts.signal })
     verbose(`Dial after DHT request successful`, struct)
   } catch (err) {
     logError(
@@ -125,7 +124,7 @@ async function doDial(
     return { status: 'E_DIAL', error: err.message, dhtContacted: true }
   }
 
-  if (opts.abort.signal.aborted) {
+  if (opts.signal.aborted) {
     return { status: 'E_TIMEOUT' }
   }
 
@@ -157,7 +156,7 @@ export async function dial(
     { status: 'E_TIMEOUT' },
     {
       timeout: opts.timeout ?? DEFAULT_DHT_QUERY_TIMEOUT,
-      abort: opts.abort
+      signal: opts.signal
     }
   )
 }

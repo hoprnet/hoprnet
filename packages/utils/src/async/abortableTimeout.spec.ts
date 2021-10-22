@@ -37,7 +37,7 @@ describe('abortable timeout', function () {
       Messages.TIMEOUT_MSG,
       {
         timeout: 100,
-        abort: abort
+        signal: abort.signal
       }
     )
 
@@ -61,7 +61,7 @@ describe('abortable timeout', function () {
 
     const resultFunction = async (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> => {
       return new Promise<Messages.RESULT_MSG>((resolve) => {
-        opts.abort.signal.addEventListener('abort', () => abortCalled.resolve())
+        opts.signal.addEventListener('abort', () => abortCalled.resolve())
 
         setTimeout(() => {
           resolve(Messages.RESULT_MSG)
@@ -83,7 +83,7 @@ describe('abortable timeout', function () {
 
     const resultFunction = async (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
       new Promise<Messages.RESULT_MSG>((resolve) => {
-        opts.abort.signal.addEventListener('abort', () => abortCalled.resolve())
+        opts.signal.addEventListener('abort', () => abortCalled.resolve())
 
         setTimeout(() => {
           resolve(Messages.RESULT_MSG)
@@ -94,7 +94,7 @@ describe('abortable timeout', function () {
 
     const result = abortableTimeout(resultFunction, Messages.ABORT_MSG, Messages.TIMEOUT_MSG, {
       timeout: 100,
-      abort
+      signal: abort.signal
     })
 
     setTimeout(() => abort.abort(), 50)
@@ -122,7 +122,7 @@ describe('abortable timeout', function () {
 
     const result = abortableTimeout(resultFunction, Messages.ABORT_MSG, Messages.TIMEOUT_MSG, {
       timeout: 100,
-      abort
+      signal: abort.signal
     })
 
     assert((await result) === Messages.RESULT_MSG)
@@ -133,11 +133,10 @@ describe('abortable timeout', function () {
   })
 
   it('abort after result', async function () {
-    let abort: AbortController
+    let abort = new AbortController()
 
-    const resultFunction = (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
+    const resultFunction = (_opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
       new Promise<Messages.RESULT_MSG>((resolve) => {
-        abort = opts.abort
         setTimeout(() => {
           resolve(Messages.RESULT_MSG)
         }, 50)
@@ -147,7 +146,7 @@ describe('abortable timeout', function () {
 
     const result = abortableTimeout(resultFunction, Messages.ABORT_MSG, Messages.TIMEOUT_MSG, {
       timeout: 100,
-      abort
+      signal: abort.signal
     })
 
     assert((await result) === Messages.RESULT_MSG)
