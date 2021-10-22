@@ -101,7 +101,7 @@ function createFakeChain(privKey: PeerId) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0))
       )
-    },
+    }
   })
 
   return { getChannel }
