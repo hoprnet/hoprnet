@@ -23,7 +23,8 @@ import {
   deriveAckKeyShare,
   u8aEquals,
   ChannelEntry,
-  ChannelStatus
+  ChannelStatus,
+  generateChannelId
 } from '@hoprnet/hopr-utils'
 
 import { AcknowledgementChallenge, Packet } from '../../messages'
@@ -85,6 +86,9 @@ function createFakeChain(privKey: PeerId) {
         privKey.privKey.marshal()
       )
     },
+    getThemToUsId() {
+      return generateChannelId(counterparty.toAddress(), _self.toAddress())
+    },
     async themToUs(): Promise<ChannelEntry> {
       return new ChannelEntry(
         counterparty,
@@ -97,7 +101,7 @@ function createFakeChain(privKey: PeerId) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0))
       )
-    }
+    },
   })
 
   return { getChannel }

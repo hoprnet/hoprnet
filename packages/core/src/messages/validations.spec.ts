@@ -43,7 +43,8 @@ const createMockTicket = ({
     epoch,
     index,
     channelIteration,
-    verify: (pubKey: PublicKey) => pubKey.eq(new PublicKey(sender.pubKey.marshal()))
+    verify: (pubKey: PublicKey) => pubKey.eq(new PublicKey(sender.pubKey.marshal())),
+    isDummy: () => false
   } as unknown as Ticket
 }
 

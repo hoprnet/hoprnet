@@ -342,9 +342,7 @@ export class Packet {
           })
       )
     } catch (e) {
-      if (!this.ticket.isDummy()) {
-        await db.markRejected(this.ticket)
-      }
+      await db.markRejected(this.ticket)
       throw e
     }
 
