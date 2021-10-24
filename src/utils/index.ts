@@ -14,6 +14,8 @@ const verbose = Debug('hopr-connect:dialer:verbose')
 const error = Debug('hopr-connect:dialer:error')
 
 export * from './network'
+export { parseAddress } from './addrs'
+export type { ValidAddress } from './addrs'
 export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 2000 // ms

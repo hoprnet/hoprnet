@@ -22,12 +22,12 @@
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "clean": "rm -Rf ./lib",
-    "build": "yarn clean && tsc -p .",
+    "build": "yarn clean && tsc -p . && tsc -p ./tests",
     "test": "yarn node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --parallel --full-trace",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "yarn clean && tsc -p ./tsconfig.npm.json"
   },
   "dependencies": {
-    "@hoprnet/hopr-utils": "1.82.0-next.4",
+    "@hoprnet/hopr-utils": "1.83.0-next.8",
     "abortable-iterator": "^3.0.0",
     "bl": "^5.0",
     "debug": "^4.3.2",
@@ -62,7 +62,8 @@
     "libp2p-interfaces": "1.0.1",
     "libp2p-mplex": "0.10.4",
     "mocha": "9.1.3",
-    "prettier": "2.4.1",
+    "prettier": "^2.4.1",
+    "prettier-plugin-sh": "^0.7.1",
     "ts-node": "10.3.1",
     "typescript": "4.4.4",
     "yargs": "17.2.1"

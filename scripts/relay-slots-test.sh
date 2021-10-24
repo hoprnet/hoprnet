@@ -1,5 +1,5 @@
-# prevent souring of this script, only allow execution
-$(return >/dev/null 2>&1)
+# prevent sourcing of this script, only allow execution
+$(return > /dev/null 2>&1)
 test "$?" -eq "0" && {
   echo "This script should only be executed." >&2
   exit 1
@@ -7,7 +7,7 @@ test "$?" -eq "0" && {
 
 # set log id and use shared log function for readable logs
 declare mydir
-mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)
 declare HOPR_LOG_ID="hopr-connect-test"
 source "${mydir}/utils.sh"
 
@@ -54,7 +54,8 @@ start_node tests/node.ts \
   --bootstrapPort ${charly_port} \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
-  --noWebRTCUpgrade false
+  --noWebRTCUpgrade false \
+  --useLocalAddress true
 
 # run bob (client)
 # should be able to receive 'test' from alice through charly
@@ -76,7 +77,8 @@ start_node tests/node.ts "${bob_log}" \
   --bootstrapPort ${charly_port} \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
-  --noWebRTCUpgrade false \ 
+  --noWebRTCUpgrade false \
+  --useLocalAddress true
 
 # run charly
 # should able to serve as a bootstrap
@@ -88,6 +90,7 @@ start_node tests/node.ts "${charly_log}" \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
   --maxRelayedConnections 1 \
+  --useLocalAddress true \
   --relayFreeTimeout 2000 # to simulate relay being busy
 
 # run dave (client)
@@ -114,7 +117,8 @@ start_node tests/node.ts "${dave_log}" \
   --bootstrapPort ${charly_port} \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
-  --noWebRTCUpgrade false
+  --noWebRTCUpgrade false \
+  --useLocalAddress true
 
 # run ed (client)
 # should try connecting to bob through relay charly after alice finishes talking to bob and succeed
@@ -140,7 +144,8 @@ start_node tests/node.ts "${ed_log}" \
   --bootstrapPort ${charly_port} \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
-  --noWebRTCUpgrade false
+  --noWebRTCUpgrade false \
+  --useLocalAddress true
 
 # wait till nodes finish communicating
 wait_for_regex_in_file "${alice_log}" "all tasks executed"
@@ -154,10 +159,10 @@ wait_for_regex_in_file "${dave_log}" "dialProtocol to bob failed"
 
 # create global flow log
 rm -Rf "${flow_log}"
-cat "${alice_log}" | sed -En 's/hopr-connect.*FLOW: /alice: /p' >>"${flow_log}"
-cat "${bob_log}" | sed -En 's/hopr-connect.*FLOW: /bob: /p' >>"${flow_log}"
-cat "${charly_log}" | sed -En 's/hopr-connect.*FLOW: /charly: /p' >>"${flow_log}"
-cat "${dave_log}" | sed -En 's/hopr-connect.*FLOW: /dave: /p' >>"${flow_log}"
+cat "${alice_log}" | sed -En 's/hopr-connect.*FLOW: /alice: /p' >> "${flow_log}"
+cat "${bob_log}" | sed -En 's/hopr-connect.*FLOW: /bob: /p' >> "${flow_log}"
+cat "${charly_log}" | sed -En 's/hopr-connect.*FLOW: /charly: /p' >> "${flow_log}"
+cat "${dave_log}" | sed -En 's/hopr-connect.*FLOW: /dave: /p' >> "${flow_log}"
 sort -k1,1 --stable --output "${flow_log}" "${flow_log}"
 
 expect_file_content "${alice_pipe}" \

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # prevent execution of this script, only allow sourcing
-$(return >/dev/null 2>&1)
+$(return > /dev/null 2>&1)
 test "$?" -eq "0" || {
   echo "This script should only be sourced." >&2
   exit 1
@@ -23,7 +23,7 @@ function ensure_port_is_free() {
 
 # $1 = filename
 # $2 = expected content
-function expect_file_content {
+function expect_file_content() {
   local filename="${1}"
   local expected="${2}"
   local actual="$(cat "${filename}")"

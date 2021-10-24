@@ -1,6 +1,7 @@
 {
   "ts-node": {
-    "files": true
+    // Type-checking is already done by 'yarn build'
+    "transpileOnly": true
   },
   "compilerOptions": {
     "lib": ["es2021", "dom"],

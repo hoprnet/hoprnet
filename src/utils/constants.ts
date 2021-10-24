@@ -58,7 +58,7 @@ export const LOCALHOST_ADDRS: Network[] = [
     family: 'IPv4'
   },
   {
-    subnet: Uint8Array.from([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 254]),
+    subnet: Uint8Array.from([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]),
     networkPrefix: Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
     family: 'IPv6'
   }
