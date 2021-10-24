@@ -1,5 +1,8 @@
 name: HOPR Lint fix
 
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
+
 on:
   push:
     branches: ['**']
@@ -8,36 +11,23 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [16]
     steps:
       - uses: actions/checkout@v2
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2.4.1
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
+      - name: Use Node.js
+        uses: actions/setup-node@v2
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 16
+          registry-url: https://registry.npmjs.org/
           cache: yarn
 
-      - name: Install dependencies
-        run: |
-          yarn install
-
       - name: Run linter
-        run: |
-          yarn lint:fix
+        run: yarn && yarn lint:fix
 
-      - name: Check if changed
-        id: check-changed
-        run: |
-          echo "::set-output name=changed::$(git status --porcelain)"
-
-      - name: Commit changes
-        if: steps.check-changed.outputs.changed != ''
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Linting robot"
-          git commit -a -m "Fix linting" || true
-          git pull origin ${{ github.ref }}
-          git push origin ${{ github.ref }}
+      - name: Commit and push changes
+        run: ./scripts/commit-and-push-all-changes.sh
+        env:
+          HOPR_GIT_MSG: "chore(build): apply linter changes"

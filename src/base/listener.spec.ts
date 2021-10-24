@@ -114,7 +114,8 @@ async function startNode(
   expectedMessage?: Uint8Array,
   peerId?: PeerId,
   upgrader?: Upgrader,
-  handler?: (conn: any) => any | Promise<any>
+  handler?: (conn: any) => any | Promise<any>,
+  runningLocally?: boolean
 ) {
   peerId = peerId ?? (await PeerId.create({ keyType: 'secp256k1' }))
   const publicNodesEmitter = new EventEmitter() as PublicNodesEmitter
@@ -140,7 +141,8 @@ async function startNode(
     publicNodesEmitter,
     initialNodes,
     peerId,
-    undefined
+    undefined,
+    runningLocally ?? false
   )
 
   process.nextTick(() =>
@@ -193,7 +195,8 @@ describe('check listening to sockets', function () {
         undefined,
         await Promise.all(stunServers.map((s: Socket) => getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${s.address().port}`))),
         peerId,
-        undefined
+        undefined,
+        false
       )
 
       await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
@@ -294,7 +297,8 @@ describe('check listening to sockets', function () {
       undefined,
       [await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
       peerId,
-      validInterfaces[0]
+      validInterfaces[0],
+      false
     )
 
     await assert.rejects(async () => {

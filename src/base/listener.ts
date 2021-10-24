@@ -92,13 +92,23 @@ class Listener extends EventEmitter implements InterfaceListener {
     relays: Multiaddr[]
   }
 
+  /**
+   * @param handler called on incoming connection
+   * @param upgrader inform libp2p about incoming connections
+   * @param publicNodes emits on new and dead entry nodes
+   * @param initialNodes array of entry nodes that is know at startup
+   * @param peerId own id
+   * @param _interface interface to listen on, e.g. eth0
+   * @param __runningLocally [testing] treat local addresses as public addresses
+   */
   constructor(
     private handler: ((conn: Connection) => void) | undefined,
     private upgrader: Upgrader,
     publicNodes: PublicNodesEmitter | undefined,
     private initialNodes: PeerStoreType[] = [],
     private peerId: PeerId,
-    private _interface: string | undefined
+    private _interface: string | undefined,
+    private __runningLocally: boolean
   ) {
     super()
 
@@ -591,7 +601,7 @@ class Listener extends EventEmitter implements InterfaceListener {
   private async determinePublicIpAddress(usableStunServers: Multiaddr[]): Promise<void> {
     let externalAddress: Address | undefined
     try {
-      externalAddress = await getExternalIp(usableStunServers, this.udpSocket)
+      externalAddress = await getExternalIp(usableStunServers, this.udpSocket, this.__runningLocally)
     } catch (err) {
       error(`Determining public IP failed`)
 

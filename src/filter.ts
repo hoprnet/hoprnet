@@ -1,97 +1,42 @@
 import type { Multiaddr } from 'multiaddr'
-// to be uncommented on hopr-utils upgraded
-// import type { Network } from '@hoprnet/hopr-utils'
-import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from './constants'
-import Multihash from 'multihashes'
+import type { ValidAddress } from './utils'
 import type { NetworkInterfaceInfo } from 'os'
 import type PeerId from 'peer-id'
+import type { Network } from '@hoprnet/hopr-utils'
+
 import {
   u8aEquals,
-  u8aToNumber,
-  getLocalAddresses,
   isPrivateAddress,
   checkNetworks,
-  isLinkLocaleAddress
+  isLinkLocaleAddress,
+  u8aAddrToString,
+  getPrivateAddresses
 } from '@hoprnet/hopr-utils'
+import { parseAddress } from './utils'
+
 import Debug from 'debug'
 import { green } from 'chalk'
+import assert from 'assert'
 
-// to be removed once hopr-utils is upgraded
-type Network = {
-  subnet: Uint8Array
-  networkPrefix: Uint8Array
-  family: NetworkInterfaceInfo['family']
-}
 const log = Debug('hopr-connect:filter')
 
 const INVALID_PORTS = [0]
 
-function checkCircuitAddress(maTuples: [code: number, addr: Uint8Array][], peerId: PeerId): boolean {
-  if (
-    maTuples.length != 3 ||
-    maTuples[0][0] != CODE_P2P ||
-    maTuples[1][0] != CODE_CIRCUIT ||
-    maTuples[2][0] != CODE_P2P
-  ) {
-    return false
-  }
-
-  // first address and second address WITHOUT length prefix
-  const [firstAddress, secondAddress] = [maTuples[0][1].slice(1), maTuples[2][1].slice(1)]
-
-  try {
-    // Try to decode first node address
-    Multihash.validate(firstAddress) // throws if invalid
-  } catch (err) {
-    // Could not decode address
-    log(`first address not valid`, err)
-    return false
-  }
-
-  if (u8aEquals(firstAddress, peerId.toBytes())) {
-    // Cannot use ourself to relay traffic
-    return false
-  }
-
-  try {
-    // Try to decode second node address
-    Multihash.validate(secondAddress) // throws if invalid
-  } catch (err) {
-    return false
-  }
-
-  if (u8aEquals(firstAddress, secondAddress)) {
-    // Relay and recipient must be different
-    return false
-  }
-
-  return true
-}
-
 export class Filter {
-  private announcedAddrs?: Multiaddr[]
-  private listenFamilies?: number[]
+  private announcedAddrs?: ValidAddress[]
+  private listeningFamilies?: NetworkInterfaceInfo['family'][]
 
-  private myLocalAddresses: Network[]
+  protected myPrivateNetworks: Network[]
 
   constructor(private peerId: PeerId) {
-    this.myLocalAddresses = getLocalAddresses()
+    this.myPrivateNetworks = getPrivateAddresses()
   }
 
   /**
    * Used to check whether addresses have already been attached
    */
   get addrsSet(): boolean {
-    return this.announcedAddrs != undefined && this.listenFamilies != undefined
-  }
-
-  /**
-   * THIS METHOD IS USED FOR TESTING
-   * @dev Used to set falsy local network
-   * @param mAddrs new local addresses
-   */
-  _setLocalAddressesForTesting(networks: Network[]): void {
-    this.myLocalAddresses = networks
+    return this.announcedAddrs != undefined && this.listeningFamilies != undefined
   }
 
   /**
@@ -101,93 +46,150 @@ export class Filter {
    * @param listeningAddrs Addresses to which we are listening
    */
   setAddrs(announcedAddrs: Multiaddr[], listeningAddrs: Multiaddr[]): void {
-    log(
-      `announcedAddrs`,
-      announcedAddrs.map((ma: Multiaddr) => green(ma.toString())).join(','),
-      `listeningAddrs`,
-      listeningAddrs.map((ma: Multiaddr) => green(ma.toString())).join(',')
-    )
-    this.announcedAddrs = announcedAddrs
-    this.listenFamilies = []
+    log(`announcedAddrs:`)
+    announcedAddrs.forEach((ma: Multiaddr) => log(` ${green(ma.toString())}`))
+    log(`listeningAddrs:`)
+    listeningAddrs.forEach((ma: Multiaddr) => log(` ${green(ma.toString())}`))
 
+    this.announcedAddrs = []
+    for (const announcedAddr of announcedAddrs) {
+      const parsed = parseAddress(announcedAddr)
+
+      if (parsed.valid) {
+        this.announcedAddrs.push(parsed.address)
+      }
+    }
+
+    this.listeningFamilies = []
     for (const listenAddr of listeningAddrs) {
-      const listenTuples = listenAddr.tuples()
+      const parsed = parseAddress(listenAddr)
 
-      switch (listenTuples[0][0]) {
-        case CODE_IP4:
-          if (!this.listenFamilies.includes(CODE_IP4)) {
-            this.listenFamilies.push(CODE_IP4)
+      assert(parsed.valid)
+      switch (parsed.address.type) {
+        case 'IPv4':
+        case 'IPv6':
+          if (!this.listeningFamilies.includes(parsed.address.type)) {
+            this.listeningFamilies.push(parsed.address.type)
           }
-          break
-        case CODE_IP6:
-          if (!this.listenFamilies.includes(CODE_IP6)) {
-            this.listenFamilies.push(CODE_IP6)
-          }
-          break
-        default:
-          throw new Error(`Invalid address found. ${listenAddr.toString()}`)
+        case 'p2p':
+          continue
       }
     }
   }
 
+  public filter(ma: Multiaddr) {
+    if (this.addrsSet) {
+      return this.filterDial(ma)
+    } else {
+      return this.filterListening(ma)
+    }
+  }
+
   /**
-   * Used to check whether we can listen to addresses and
-   * if we can dial these addresses
-   * @param ma Address to check
+   * Check whether we can listen to the given Multiaddr
+   * @param ma Multiaddr to check
+   * @returns true if address is usable
    */
-  public filter(ma: Multiaddr): boolean {
-    const tuples = ma.tuples()
-    let family: NetworkInterfaceInfo['family']
+  public filterListening(ma: Multiaddr): boolean {
+    const parsed = parseAddress(ma)
 
-    switch (tuples[0][0]) {
-      case CODE_IP4:
-        family = 'IPv4'
-        break
-      case CODE_IP6:
-        family = 'IPv6'
-        break
-      case CODE_P2P:
-        return checkCircuitAddress(tuples as [number, Uint8Array][], this.peerId)
-      default:
+    if (!parsed.valid || !['IPv4', 'IPv6'].includes(parsed.address.type)) {
+      log(`Can only listen to valid IP addresses. Given addr: ${ma.toString()}`)
+      return false
+    }
+
+    if (parsed.address.node != undefined && !u8aEquals(parsed.address.node, this.peerId.marshalPubKey())) {
+      log(`Cannot listen to multiaddrs with other peerId than our own. Given addr: ${ma.toString()}`)
+      return false
+    }
+
+    return true
+  }
+
+  /**
+   * Check whether it makes sense to dial the given address
+   * @param ma Multiaddress to check
+   * @returns true if considered dialable
+   */
+  public filterDial(ma: Multiaddr): boolean {
+    const parsed = parseAddress(ma)
+
+    if (!parsed.valid) {
+      return false
+    }
+
+    if (parsed.address.type === 'p2p') {
+      const address = parsed.address
+
+      if (u8aEquals(address.node, this.peerId.marshalPubKey())) {
+        log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
         return false
-    }
+      }
 
-    if (tuples[1][0] != CODE_TCP) {
-      // We are not listening to anything else than TCP
-      return false
-    }
+      if (u8aEquals(address.relayer, this.peerId.marshalPubKey())) {
+        log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
+        return false
+      }
 
-    const [ipFamily, ipAddr, tcpPort] = [...tuples[0], tuples[1][1]] as [number, Uint8Array, Uint8Array]
-
-    if (isLinkLocaleAddress(ipAddr, family)) {
-      // Cannot bind or listen to link-locale addresses
-      return false
-    }
-
-    if (this.listenFamilies == undefined || this.announcedAddrs == undefined) {
-      // Libp2p has not been initialized
       return true
     }
 
-    // Only check for invalid Ports if libp2p is initialized
-    if (INVALID_PORTS.includes(u8aToNumber(tcpPort) as number)) {
+    const address = parsed.address
+
+    if (address.node != undefined && u8aEquals(address.node, this.peerId.marshalPubKey())) {
+      log(`Prevented self-dial. Used addr: ${ma.toString()}`)
       return false
     }
 
-    if (!this.listenFamilies.includes(ipFamily)) {
-      // It seems that we are not listening to this address family
+    assert(this.announcedAddrs != undefined && this.listeningFamilies != undefined)
+
+    if (!this.listeningFamilies.includes(address.type)) {
+      // Prevent dialing IPv6 addresses when only listening to IPv4 and vice versa
+      log(`Tried to dial ${parsed.address.type} address but listening to ${this.listeningFamilies.join(', ')}`)
       return false
     }
 
+    if (INVALID_PORTS.includes(address.port)) {
+      log(`Tried to dial invalid port ${address.port}`)
+      return false
+    }
+
+    // Allow multiple nodes on same host - independent of address type
     for (const announcedAddr of this.announcedAddrs) {
-      if (ma.decapsulateCode(CODE_P2P).equals(announcedAddr.decapsulateCode(CODE_P2P))) {
-        // Address is our own address, reject
-        return false
+      if (announcedAddr.type === 'p2p') {
+        continue
+      }
+
+      if (announcedAddr.type === address.type && u8aEquals(announcedAddr.address, address.address)) {
+        // Always allow dials to own address whenever port is different
+        // and block if port is identical
+        if (address.port == announcedAddr.port) {
+          log(
+            `Prevented dialing ${u8aAddrToString(address.address, address.type)}:${
+              address.port
+            } because self listening on ${u8aAddrToString(announcedAddr.address, announcedAddr.type)}:${
+              announcedAddr.port
+            }`
+          )
+        }
+        return address.port != announcedAddr.port
       }
     }
 
-    if (isPrivateAddress(ipAddr, family)) {
-      if (!checkNetworks(this.myLocalAddresses, ipAddr, family)) {
+    if (isLinkLocaleAddress(address.address, address.type)) {
+      log(`Cannot dial link-locale addresses. Used address ${u8aAddrToString(address.address, address.type)}`)
+      return false
+    }
+
+    if (isPrivateAddress(address.address, address.type)) {
+      if (!checkNetworks(this.myPrivateNetworks, address.address, address.type)) {
+        log(
+          `Prevented dialing private address ${u8aAddrToString(address.address, address.type)}:${
+            address.port
+          } because not in our network(s): ${this.myPrivateNetworks
+            .map((network) => `${u8aAddrToString(network.networkPrefix, network.family)}`)
+            .join(', ')}`
+        )
         return false
       }
     }

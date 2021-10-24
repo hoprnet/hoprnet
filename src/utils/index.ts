@@ -2,6 +2,8 @@ import type { Stream, StreamType } from '../types'
 import type { Multiaddr } from 'multiaddr'
 import type { AddressInfo } from 'net'
 
+export { parseAddress } from './addrs'
+export type { ValidAddress } from './addrs'
 export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
 
 /**

@@ -1,3 +1,4 @@
+#!/usr/bin/env -S ./node_modules/.bin/ts-node
 import libp2p from 'libp2p'
 import type { Connection, HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
@@ -69,7 +70,8 @@ async function startNode({
   noWebRTCUpgrade,
   pipeFileStream,
   maxRelayedConnections,
-  relayFreeTimeout
+  relayFreeTimeout,
+  useLocalAddresses
 }: {
   peerId: PeerId
   port: number
@@ -79,14 +81,16 @@ async function startNode({
   pipeFileStream?: WriteStream
   maxRelayedConnections?: number
   relayFreeTimeout?: number
+  useLocalAddresses?: boolean
 }) {
-  console.log(`starting node, bootstrap address ${bootstrapAddress}`)
+  console.log(`starting node, bootstrap address ${bootstrapAddress ? bootstrapAddress.id.toB58String() : 'undefined'}`)
   const connectOpts: HoprConnectOptions = {
     initialNodes: bootstrapAddress ? [bootstrapAddress] : [],
     __noDirectConnections: noDirectConnections,
     __noWebRTCUpgrade: noWebRTCUpgrade,
     maxRelayedConnections,
-    __relayFreeTimeout: relayFreeTimeout
+    __relayFreeTimeout: relayFreeTimeout,
+    __useLocalAddresses: useLocalAddresses
   }
 
   const node = await libp2p.create({
@@ -220,8 +224,8 @@ async function executeCommands({
   }
 }
 
-async function main() {
-  const argv = yargs(process.argv.slice(2))
+function parseCLIOptions() {
+  return yargs(process.argv.slice(2))
     .option('port', {
       describe: 'node port',
       type: 'number',
@@ -241,10 +245,17 @@ async function main() {
       choices: ['alice', 'bob', 'charly', 'dave', 'ed']
     })
     .option('noDirectConnections', {
+      describe: '[testing] enforce relayed connection, used to NAT behavior',
       type: 'boolean',
       demandOption: true
     })
     .option('noWebRTCUpgrade', {
+      describe: '[testing] stick to relayed connection even if WebRTC is available',
+      type: 'boolean',
+      demandOption: true
+    })
+    .option('useLocalAddress', {
+      describe: '[testing] treat local address as public IP addresses',
       type: 'boolean',
       demandOption: true
     })
@@ -269,36 +280,41 @@ async function main() {
       script: (input) => JSON.parse(input.replace(/'/g, '"'))
     })
     .parseSync()
+}
+
+async function main() {
+  const parsedOpts = parseCLIOptions()
 
   let bootstrapAddress: PeerStoreType | undefined
 
-  if (argv.bootstrapPort != null && argv.bootstrapIdentityName != null) {
-    const bootstrapPeerId = await peerIdForIdentity(argv.bootstrapIdentityName)
+  if (parsedOpts.bootstrapPort != null && parsedOpts.bootstrapIdentityName != null) {
+    const bootstrapPeerId = await peerIdForIdentity(parsedOpts.bootstrapIdentityName)
     bootstrapAddress = {
       id: bootstrapPeerId,
-      multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${argv.bootstrapPort}/p2p/${bootstrapPeerId.toB58String()}`)]
+      multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${parsedOpts.bootstrapPort}/p2p/${bootstrapPeerId.toB58String()}`)]
     }
   }
-  const peerId = await peerIdForIdentity(argv.identityName)
+  const peerId = await peerIdForIdentity(parsedOpts.identityName)
 
   let pipeFileStream: WriteStream | undefined
-  if (argv.pipeFile) {
-    pipeFileStream = fs.createWriteStream(argv.pipeFile)
+  if (parsedOpts.pipeFile) {
+    pipeFileStream = fs.createWriteStream(parsedOpts.pipeFile)
   }
 
-  console.log(`running node ${argv.identityName} on port ${argv.port}`)
+  console.log(`running node ${parsedOpts.identityName} on port ${parsedOpts.port}`)
   const node = await startNode({
     peerId,
-    port: argv.port,
+    port: parsedOpts.port,
     bootstrapAddress,
-    noDirectConnections: argv.noDirectConnections,
-    noWebRTCUpgrade: argv.noWebRTCUpgrade,
+    noDirectConnections: parsedOpts.noDirectConnections,
+    noWebRTCUpgrade: parsedOpts.noWebRTCUpgrade,
     pipeFileStream,
-    maxRelayedConnections: argv.maxRelayedConnections,
-    relayFreeTimeout: argv.relayFreeTimeout
+    maxRelayedConnections: parsedOpts.maxRelayedConnections,
+    relayFreeTimeout: parsedOpts.relayFreeTimeout,
+    useLocalAddresses: parsedOpts.useLocalAddress
   })
 
-  await executeCommands({ node, cmds: argv.script, pipeFileStream })
+  await executeCommands({ node, cmds: parsedOpts.script, pipeFileStream })
 
   console.log(`all tasks executed`)
 }

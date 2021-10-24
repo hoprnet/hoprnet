@@ -11,7 +11,6 @@ import { WebRTCUpgrader } from './webrtc'
 import { Relay } from './relay'
 import { Discovery } from './discovery'
 import { Filter } from './filter'
-import { dial as dialHelper } from '@hoprnet/hopr-utils'
 
 import type { PublicNodesEmitter, PeerStoreType, DialOptions } from './types'
 
@@ -26,6 +25,7 @@ export type HoprConnectOptions = {
   __noWebRTCUpgrade?: boolean
   maxRelayedConnections?: number
   __relayFreeTimeout?: number
+  __useLocalAddresses?: boolean
 }
 
 /**
@@ -43,8 +43,9 @@ class HoprConnect implements Transport<DialOptions, any> {
 
   private relayPeerIds?: Set<string>
 
-  private __noDirectConnections?: boolean
-  private __noWebRTCUpgrade?: boolean
+  private __noDirectConnections: boolean
+  private __noWebRTCUpgrade: boolean
+  private __useLocalAddress: boolean
   private _upgrader: Upgrader
   private _peerId: PeerId
   private relay: Relay
@@ -89,13 +90,7 @@ class HoprConnect implements Transport<DialOptions, any> {
     this.discovery = new Discovery()
 
     this.relay = new Relay(
-      (peer: PeerId, protocol: string, options: { timeout: number } | DialOptions) =>
-        dialHelper(opts.libp2p, peer, protocol, options as any) as any,
-      opts.libp2p.dialer,
-      opts.libp2p.connectionManager,
-      opts.libp2p.handle.bind(opts.libp2p),
-      this._peerId,
-      this._upgrader,
+      this._libp2p,
       this.connHandler,
       this._webRTCUpgrader,
       opts.__noWebRTCUpgrade,
@@ -104,8 +99,9 @@ class HoprConnect implements Transport<DialOptions, any> {
     )
 
     // Used for testing
-    this.__noDirectConnections = opts.__noDirectConnections
-    this.__noWebRTCUpgrade = opts.__noWebRTCUpgrade
+    this.__noDirectConnections = opts.__noDirectConnections ?? false
+    this.__noWebRTCUpgrade = opts.__noWebRTCUpgrade ?? false
+    this.__useLocalAddress = opts.__useLocalAddresses ?? false
 
     try {
       const { version } = require('../package.json')
@@ -137,6 +133,10 @@ class HoprConnect implements Transport<DialOptions, any> {
 
     if (this.__noWebRTCUpgrade) {
       verbose(`DEBUG mode: no WebRTC upgrade`)
+    }
+
+    if (this.__useLocalAddress) {
+      verbose(`DEBUG mode: treat local addresses as public addresses.`)
     }
   }
 
@@ -202,7 +202,8 @@ class HoprConnect implements Transport<DialOptions, any> {
       this.publicNodes,
       this.initialNodes,
       this._peerId,
-      this._interface
+      this._interface,
+      this.__useLocalAddress
     )
   }
 
