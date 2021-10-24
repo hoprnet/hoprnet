@@ -475,8 +475,8 @@ __metadata:
     multiaddr: ^10.0.0
     multihashes: ^4.0.3
     peer-id: ~0.15.3
-    prettier: 2.4.1
-    prettier-plugin-sh: ~0.7.1
+    prettier: ^2.4.1
+    prettier-plugin-sh: ^0.7.1
     simple-peer: 9.11
     stream-to-it: ^0.2.4
     ts-node: 10.3.0
@@ -3714,7 +3714,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"prettier-plugin-sh@npm:~0.7.1":
+"prettier-plugin-sh@npm:^0.7.1":
   version: 0.7.1
   resolution: "prettier-plugin-sh@npm:0.7.1"
   dependencies:
@@ -3725,7 +3725,7 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"prettier@npm:2.4.1":
+"prettier@npm:^2.4.1":
   version: 2.4.1
   resolution: "prettier@npm:2.4.1"
   bin:

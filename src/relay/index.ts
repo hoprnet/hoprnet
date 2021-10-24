@@ -80,7 +80,6 @@ class Relay {
     destination: PeerId,
     options?: DialOptions
   ): Promise<RelayConnection | WebRTCConnection | undefined> {
-
     options?.signal
     const baseConnection = await dialHelper(this.libp2p, relay, RELAY, {
       timeout: RELAY_CIRCUIT_TIMEOUT,
@@ -91,7 +90,8 @@ class Relay {
       error(
         `Could not establish relayed conntection over ${green(relay.toB58String())} to ${green(
           destination.toB58String()
-        )}`, baseConnection.status
+        )}`,
+        baseConnection.status
       )
       return
     }
