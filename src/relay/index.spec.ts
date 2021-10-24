@@ -1,13 +1,14 @@
+import type { Stream, StreamType } from '../types'
+import type { HandlerProps } from 'libp2p'
+import type Libp2p from 'libp2p'
+
 import { Relay } from './index'
 import PeerId from 'peer-id'
-import Libp2p from 'libp2p'
-import type { HandlerProps } from 'libp2p'
 import EventEmitter from 'events'
 import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import handshake from 'it-handshake'
 import { RelayConnection } from './connection'
 import assert from 'assert'
-import type { Stream, StreamType } from '../types'
 import Pair from 'it-pair'
 import { Multiaddr } from 'multiaddr'
 

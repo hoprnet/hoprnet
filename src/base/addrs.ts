@@ -1,10 +1,11 @@
-import { networkInterfaces, NetworkInterfaceInfo } from 'os'
-import { isLinkLocaleAddress, nodeToMultiaddr } from '../utils'
+import { networkInterfaces } from 'os'
+import type { NetworkInterfaceInfo } from 'os'
+import { isLocalhost, ipToU8aAddress, isPrivateAddress, isLinkLocaleAddress } from '@hoprnet/hopr-utils'
+
+import { nodeToMultiaddr } from '../utils'
 import { Multiaddr } from 'multiaddr'
 import Debug from 'debug'
 const log = Debug('hopr-connect')
-
-import { isLocalhost, ipToU8aAddress, isPrivateAddress } from '../utils'
 
 type AddrOptions = {
   interface?: string

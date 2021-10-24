@@ -1,4 +1,6 @@
-import { createServer, Socket } from 'net'
+import { createServer } from 'net'
+import { Socket } from 'net'
+
 import type { AddressInfo } from 'net'
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'
 import { once } from 'events'

@@ -2,7 +2,6 @@ import { u8aToHex, defer } from '@hoprnet/hopr-utils'
 import type { DeferType } from '@hoprnet/hopr-utils'
 
 import { randomBytes } from 'crypto'
-
 import EventEmitter from 'events'
 
 import type { Stream, StreamResult } from '../types'

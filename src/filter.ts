@@ -1,18 +1,19 @@
 import type { Multiaddr } from 'multiaddr'
-import type { Network } from './utils/constants'
+import type { ValidAddress } from './utils'
+import type { NetworkInterfaceInfo } from 'os'
+import type PeerId from 'peer-id'
+import type { Network } from '@hoprnet/hopr-utils'
+
 import {
-  getPrivateAddresses,
+  u8aEquals,
   isPrivateAddress,
   checkNetworks,
   isLinkLocaleAddress,
-  parseAddress,
-  u8aAddrToString
-} from './utils'
-import type { ValidAddress } from './utils'
+  u8aAddrToString,
+  getPrivateAddresses
+} from '@hoprnet/hopr-utils'
+import { parseAddress } from './utils'
 
-import type { NetworkInterfaceInfo } from 'os'
-import type PeerId from 'peer-id'
-import { u8aEquals } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import { green } from 'chalk'
 import assert from 'assert'
