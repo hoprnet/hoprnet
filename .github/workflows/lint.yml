@@ -23,11 +23,9 @@ jobs:
           node-version: 16
           registry-url: https://registry.npmjs.org/
           cache: yarn
-
-      - name: Install linter
-        run: yarn add prettier prettier-plugin-sh
+          
       - name: Run linter
-        run: yarn lint:fix
+        run: yarn & yarn lint:fix
 
       - name: Commit and push changes
         run: ./scripts/commit-and-push-all-changes.sh
