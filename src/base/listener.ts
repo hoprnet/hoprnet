@@ -91,6 +91,15 @@ class Listener extends EventEmitter implements InterfaceListener {
     relays: Multiaddr[]
   }
 
+  /**
+   * @param handler called on incoming connection
+   * @param upgrader inform libp2p about incoming connections
+   * @param publicNodes emits on new and dead entry nodes
+   * @param initialNodes array of entry nodes that is know at startup
+   * @param peerId own id
+   * @param _interface interface to listen on, e.g. eth0
+   * @param __runningLocally [testing] treat local addresses as public addresses
+   */
   constructor(
     private handler: ((conn: Connection) => void) | undefined,
     private upgrader: Upgrader,
