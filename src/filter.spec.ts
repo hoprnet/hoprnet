@@ -1,9 +1,10 @@
+import type { Network } from '@hoprnet/hopr-utils'
+
 import { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import { Filter } from './filter'
 import assert from 'assert'
-import type { Network } from './utils/constants'
-import { toNetworkPrefix } from './utils'
+import { toNetworkPrefix } from '@hoprnet/hopr-utils'
 
 class TestFilter extends Filter {
   /**
