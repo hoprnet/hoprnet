@@ -7,10 +7,11 @@ import {
   UnacknowledgedTicket,
 } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import HoprCoreEthereum, { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
+import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { Acknowledgement, Packet } from '../../messages'
 import { HoprDB } from '@hoprnet/hopr-utils'
+import { EventEmitter } from 'events'
 const log = debug('hopr-core:acknowledgement')
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
@@ -23,7 +24,7 @@ async function acknowledge(
   unacknowledgedTicket: UnacknowledgedTicket,
   acknowledgement: HalfKey,
   db: HoprDB, 
-  chain: HoprCoreEthereum
+  events: EventEmitter
 ): Promise<AcknowledgedTicket | null> {
   if (!unacknowledgedTicket.verifyChallenge(acknowledgement)) {
     throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
@@ -44,7 +45,7 @@ async function acknowledge(
 
     try {
       await bumpCommitment(db, channelId)
-      chain.emit('ticket:win', ack)
+      events.emit('ticket:win', ack)
       return ack
     } catch (e) {
       log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
@@ -61,7 +62,7 @@ async function acknowledge(
 export function subscribeToAcknowledgements(
   subscribe: any,
   db: HoprDB,
-  chain: HoprCoreEthereum,
+  events: EventEmitter,
   pubKey: PeerId,
   onMessage: (ackMessage: Acknowledgement) => void
 ) {
@@ -70,7 +71,7 @@ export function subscribeToAcknowledgements(
 
     try {
       let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
-      const ackedTicket = await acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare, db, chain)
+      const ackedTicket = await acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare, db, events)
       if (ackedTicket) {
         log(`Storing winning ticket`)
         await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)

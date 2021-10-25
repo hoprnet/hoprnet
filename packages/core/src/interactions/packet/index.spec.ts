@@ -5,22 +5,17 @@ import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
 import {
-  AcknowledgedTicket,
   Address,
   Balance,
   Challenge,
   defer,
-  HalfKey,
-  Hash,
   HoprDB,
-  PRICE_PER_PACKET,
   PublicKey,
-  Response,
   Ticket,
   UINT256,
-  UnacknowledgedTicket,
   createPoRValuesForSender,
   deriveAckKeyShare,
+  UnacknowledgedTicket,
   u8aEquals
 } from '@hoprnet/hopr-utils'
 
@@ -40,39 +35,6 @@ function createFakeTicket(privKey: PeerId, challenge: Challenge, counterparty: A
     new UINT256(new BN(0)),
     privKey.privKey.marshal()
   )
-}
-
-function createFakeChain(privKey: PeerId) {
-  const acknowledge = (unacknowledgedTicket: UnacknowledgedTicket, _ackKeyShare: HalfKey) => {
-    return new AcknowledgedTicket(
-      unacknowledgedTicket.ticket,
-      Response.createMock(),
-      new Hash(new Uint8Array({ length: Hash.SIZE })),
-      unacknowledgedTicket.signer
-    )
-  }
-
-  const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
-    acknowledge,
-    createTicket: (pathLength: number, challenge: Challenge) => {
-      return Promise.resolve(
-        createFakeTicket(privKey, challenge, counterparty.toAddress(), new Balance(PRICE_PER_PACKET.muln(pathLength)))
-      )
-    },
-    createDummyTicket: (challenge: Challenge) =>
-      Ticket.create(
-        counterparty.toAddress(),
-        challenge,
-        new UINT256(new BN(0)),
-        new UINT256(new BN(0)),
-        new Balance(new BN(0)),
-        UINT256.DUMMY_INVERSE_PROBABILITY,
-        new UINT256(new BN(0)),
-        privKey.privKey.marshal()
-      )
-  })
-
-  return { getChannel }
 }
 
 function createFakeSendReceive(events: EventEmitter, self: PeerId) {
@@ -95,7 +57,6 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
 }
 
 describe('packet interaction', function () {
-  const db = HoprDB.createMock()
 
   let events = new EventEmitter()
 
@@ -107,21 +68,22 @@ describe('packet interaction', function () {
     const [self, counterparty] = await Promise.all(
       Array.from({ length: 2 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
     )
+    const db = HoprDB.createMock()
+    const secrets = Array.from({ length: 2 }, (_) => randomBytes(SECRET_LENGTH))
+    const { ackChallenge, ownKey, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
+    const ticket = createFakeTicket(self, ticketChallenge, PublicKey.fromPeerId(counterparty).toAddress(), new Balance(new BN(1)))
+    const challenge = AcknowledgementChallenge.create(ackChallenge, self)
+    const unack = new UnacknowledgedTicket(ticket, halfKey, self) 
+    await db.storeUnacknowledgedTicket(ackChallenge, unack)
 
-    const chainSelf = createFakeChain(self)
     const libp2pSelf = createFakeSendReceive(events, self)
     const libp2pCounterparty = createFakeSendReceive(events, counterparty)
 
-    const secrets = Array.from({ length: 2 }, (_) => randomBytes(SECRET_LENGTH))
-
-    const { ackChallenge, ownKey, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
-
-    const challenge = AcknowledgementChallenge.create(ackChallenge, self)
 
     const fakePacket = new Packet(
       new Uint8Array(),
       challenge,
-      createFakeTicket(self, ticketChallenge, PublicKey.fromPeerId(counterparty).toAddress(), new Balance(new BN(1)))
+      ticket 
     )
 
     fakePacket.ownKey = ownKey
@@ -133,8 +95,9 @@ describe('packet interaction', function () {
     fakePacket.storeUnacknowledgedTicket(db)
 
     const ackReceived = defer<void>()
+    const ev = new EventEmitter()
 
-    subscribeToAcknowledgements(libp2pSelf.subscribe, db, chainSelf as any, self, () => {
+    subscribeToAcknowledgements(libp2pSelf.subscribe, db, ev, self, () => {
       ackReceived.resolve()
     })
 
@@ -147,6 +110,7 @@ describe('packet interaction', function () {
     const [sender, relay0, relay1, relay2, receiver] = await Promise.all(
       Array.from({ length: 5 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
     )
+    const db = HoprDB.createMock()
 
 
     const libp2pSender = createFakeSendReceive(events, sender)
