@@ -51,6 +51,7 @@
 - [PRGParameters](modules.md#prgparameters)
 - [PRPParameters](modules.md#prpparameters)
 - [PromiseValue](modules.md#promisevalue)
+- [TimeoutOpts](modules.md#timeoutopts)
 - [U8aAndSize](modules.md#u8aandsize)
 
 ### Variables
@@ -91,6 +92,7 @@
 
 ### Functions
 
+- [abortableTimeout](modules.md#abortabletimeout)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [checkNetworks](modules.md#checknetworks)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
@@ -244,11 +246,11 @@ ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
+Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `status`: ``"E_ABORTED"``  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
 
 #### Defined in
 
-[libp2p/dialHelper.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L22)
+[libp2p/dialHelper.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L25)
 
 ___
 
@@ -379,6 +381,23 @@ Infer the return value of a promise
 #### Defined in
 
 [typescript/index.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/typescript/index.ts#L4)
+
+___
+
+### TimeoutOpts
+
+Ƭ **TimeoutOpts**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `signal?` | `AbortSignal` |
+| `timeout` | `number` |
+
+#### Defined in
+
+[async/abortableTimeout.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L6)
 
 ___
 
@@ -745,6 +764,37 @@ ___
 
 ## Functions
 
+### abortableTimeout
+
+▸ **abortableTimeout**<`Result`, `AbortMsg`, `TimeoutMsg`\>(`fn`, `abortMsg`, `timeoutMsg`, `opts`): `Promise`<`Result` \| `AbortMsg` \| `TimeoutMsg`\>
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `Result` |
+| `AbortMsg` |
+| `TimeoutMsg` |
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`opts`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Result`\> |
+| `abortMsg` | `AbortMsg` |
+| `timeoutMsg` | `TimeoutMsg` |
+| `opts` | [`TimeoutOpts`](modules.md#timeoutopts) |
+
+#### Returns
+
+`Promise`<`Result` \| `AbortMsg` \| `TimeoutMsg`\>
+
+#### Defined in
+
+[async/abortableTimeout.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L11)
+
+___
+
 ### cacheNoArgAsyncFunction
 
 ▸ **cacheNoArgAsyncFunction**<`T`\>(`func`, `expiry`): () => `Promise`<`T`\>
@@ -1067,7 +1117,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L53)
+[libp2p/dialHelper.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L147)
 
 ___
 
