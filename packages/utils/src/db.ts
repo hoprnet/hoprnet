@@ -4,7 +4,7 @@ import MemDown from 'memdown'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import { debug } from './debug'
-import { Hash, u8aConcat, Address, Intermediate, Ticket, generateChannelId} from '.'
+import { Hash, u8aConcat, Address, Intermediate, Ticket, generateChannelId } from '.'
 import {
   AcknowledgedTicket,
   UnacknowledgedTicket,

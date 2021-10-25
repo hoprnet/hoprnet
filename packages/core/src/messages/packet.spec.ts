@@ -7,9 +7,9 @@ import BN from 'bn.js'
 function createMockTickets() {
   const db = {
     getChannelTo: () => ({
-      getId: () => ({ toHex: () => '0xdeadbeef'}),
+      getId: () => ({ toHex: () => '0xdeadbeef' }),
       ticketEpoch: new UINT256(new BN(0)),
-      channelEpoch: new UINT256(new BN(0)),
+      channelEpoch: new UINT256(new BN(0))
     }),
     getCurrentTicketIndex: () => {},
     setCurrentTicketIndex: () => {},
@@ -77,7 +77,7 @@ describe('packet creation and transformation', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const { db }= createMockTickets()
+    const { db } = createMockTickets()
     const testMsg = new TextEncoder().encode('test')
     let packet = await Packet.create(testMsg, path, self, db)
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
@@ -106,7 +106,7 @@ describe('packet creation and transformation', function () {
     const testMsg = new TextEncoder().encode('test')
     const packet = await Packet.create(testMsg, path, self, db)
     const transformedPacket = Packet.deserialize(packet.serialize(), path[0], self)
-    await transformedPacket.forwardTransform(path[0],  db)
+    await transformedPacket.forwardTransform(path[0], db)
     assert.throws(() => Packet.deserialize(transformedPacket.serialize(), path[0], self))
   })
 })

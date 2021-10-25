@@ -364,7 +364,6 @@ class Indexer extends EventEmitter {
     return this.db.getAccount(address)
   }
 
-
   public async getPublicKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.db.getAccount(address)
     if (account) {
@@ -409,9 +408,9 @@ class Indexer extends EventEmitter {
    * @returns peer's open channels
    */
   public async getOpenChannelsFrom(source: PublicKey): Promise<ChannelEntry[]> {
-    return await this.db.getChannelsFrom(source.toAddress()).then((channels) =>
-      channels.filter((channel) => channel.status === ChannelStatus.Open)
-    )
+    return await this.db
+      .getChannelsFrom(source.toAddress())
+      .then((channels) => channels.filter((channel) => channel.status === ChannelStatus.Open))
   }
 
   public async resolvePendingTransaction(eventType: IndexerEvents, tx: string): Promise<string> {

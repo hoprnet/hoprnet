@@ -1,11 +1,5 @@
 import { debug } from '@hoprnet/hopr-utils'
-import {
-  HalfKey,
-  durations,
-  oneAtATime,
-  AcknowledgedTicket,
-  UnacknowledgedTicket,
-} from '@hoprnet/hopr-utils'
+import { HalfKey, durations, oneAtATime, AcknowledgedTicket, UnacknowledgedTicket } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
@@ -23,7 +17,7 @@ const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 async function acknowledge(
   unacknowledgedTicket: UnacknowledgedTicket,
   acknowledgement: HalfKey,
-  db: HoprDB, 
+  db: HoprDB,
   events: EventEmitter
 ): Promise<AcknowledgedTicket | null> {
   if (!unacknowledgedTicket.verifyChallenge(acknowledgement)) {
@@ -39,9 +33,7 @@ async function acknowledge(
   if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
     const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
 
-    log(
-      `Acknowledging ticket. Using opening ${opening.toHex()} and response ${response.toHex()}`
-    )
+    log(`Acknowledging ticket. Using opening ${opening.toHex()} and response ${response.toHex()}`)
 
     try {
       await bumpCommitment(db, channelId)
@@ -57,7 +49,6 @@ async function acknowledge(
     return null
   }
 }
-
 
 export function subscribeToAcknowledgements(
   subscribe: any,

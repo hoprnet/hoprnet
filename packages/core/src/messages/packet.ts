@@ -66,7 +66,7 @@ export async function createTicket(
   pathLength: number,
   challenge: Challenge,
   db: HoprDB,
-  privKey: Uint8Array,
+  privKey: Uint8Array
 ) {
   const channel = await db.getChannelTo(dest)
   const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
@@ -442,7 +442,7 @@ export class Packet {
         new Balance(new BN(0)),
         UINT256.DUMMY_INVERSE_PROBABILITY,
         UINT256.fromString('0'),
-        privKey.privKey.marshal() 
+        privKey.privKey.marshal()
       )
     } else {
       this.ticket = await createTicket(nextPeer, pathPosition, this.nextChallenge, db, privKey.privKey.marshal())

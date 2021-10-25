@@ -743,11 +743,7 @@ class Hopr extends EventEmitter {
    * @param myFund the amount to fund the channel in my favor HOPR(wei)
    * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
    */
-  public async fundChannel(
-    counterparty: PeerId,
-    myFund: BN,
-    counterpartyFund: BN
-  ): Promise<void> {
+  public async fundChannel(counterparty: PeerId, myFund: BN, counterpartyFund: BN): Promise<void> {
     const ethereum = await this.startedPaymentChannels()
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())

@@ -194,7 +194,12 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
   it('should throw if ticket index must be higher than last ticket index', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({})
-    const mockChannel = await mockChannelEntry(true, new Balance(new BN(100)), new UINT256(new BN(1)), new UINT256(new BN(1)))
+    const mockChannel = await mockChannelEntry(
+      true,
+      new Balance(new BN(100)),
+      new UINT256(new BN(1)),
+      new UINT256(new BN(1))
+    )
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
