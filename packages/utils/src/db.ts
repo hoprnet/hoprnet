@@ -335,7 +335,6 @@ export class HoprDB {
   }
 
   async getChannel(channelId: Hash): Promise<ChannelEntry> {
-    console.log(new TextDecoder().decode(createChannelKey(channelId)))
     return await this.getCoerced(createChannelKey(channelId), ChannelEntry.deserialize)
   }
 
@@ -345,7 +344,6 @@ export class HoprDB {
   }
 
   async updateChannel(channelId: Hash, channel: ChannelEntry): Promise<void> {
-    console.log(new TextDecoder().decode(createChannelKey(channelId)))
     await this.put(createChannelKey(channelId), channel.serialize())
   }
 

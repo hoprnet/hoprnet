@@ -168,7 +168,7 @@ describe('packet interaction', function () {
         receive = console.log
       }
 
-      const interaction = new PacketForwardInteraction(subscribe, send, RELAY0, receive, dbs[index])
+      const interaction = new PacketForwardInteraction(subscribe, send, pId, receive, dbs[index])
 
       if (pId.equals(SELF)) {
         senderInteraction = interaction
@@ -177,7 +177,8 @@ describe('packet interaction', function () {
 
     const packet = await Packet.create(TEST_MESSAGE, [RELAY0, RELAY1, RELAY2, COUNTERPARTY], SELF, dbs[0])
 
-    senderInteraction.interact(RELAY0, packet)
+    // Wait for acknowledgement
+    await senderInteraction.interact(RELAY0, packet)
 
     await msgDefer.promise
   })
