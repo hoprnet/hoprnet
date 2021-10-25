@@ -1,4 +1,5 @@
-import levelup, { LevelUp } from 'levelup'
+import levelup from 'levelup'
+import type { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { existsSync, mkdirSync, rmSync } from 'fs'
@@ -334,6 +335,7 @@ export class HoprDB {
   }
 
   async getChannel(channelId: Hash): Promise<ChannelEntry> {
+    console.log(new TextDecoder().decode(createChannelKey(channelId)))
     return await this.getCoerced(createChannelKey(channelId), ChannelEntry.deserialize)
   }
 
@@ -343,6 +345,7 @@ export class HoprDB {
   }
 
   async updateChannel(channelId: Hash, channel: ChannelEntry): Promise<void> {
+    console.log(new TextDecoder().decode(createChannelKey(channelId)))
     await this.put(createChannelKey(channelId), channel.serialize())
   }
 
@@ -396,9 +399,9 @@ export class HoprDB {
     // sub pending_tickets_value
   }
 
-  static createMock(): HoprDB {
+  static createMock(id?: PublicKey): HoprDB {
     const mock: HoprDB = {
-      id: PublicKey.createMock(),
+      id: id ?? PublicKey.createMock(),
       db: new levelup(MemDown())
     } as any
     Object.setPrototypeOf(mock, HoprDB.prototype)
