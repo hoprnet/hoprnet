@@ -1538,7 +1538,7 @@ __metadata:
     libp2p: 0.33.0
     libp2p-crypto: 0.19.7
     libp2p-kad-dht: 0.25.0
-    libp2p-mplex: ^0.10.4
+    libp2p-mplex: 0.10.4
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.1.3
@@ -10914,7 +10914,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"libp2p-mplex@npm:0.10.4, libp2p-mplex@npm:^0.10.4":
+"libp2p-mplex@npm:0.10.4":
   version: 0.10.4
   resolution: "libp2p-mplex@npm:0.10.4"
   dependencies:
