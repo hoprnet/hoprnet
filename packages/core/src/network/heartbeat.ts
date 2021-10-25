@@ -17,7 +17,7 @@ export default class Heartbeat {
   constructor(
     private networkPeers: NetworkPeerStore,
     subscribe: Subscribe,
-    private sendMessage: SendMessage,
+    protected sendMessage: SendMessage,
     private hangUp: (addr: PeerId) => Promise<void>
   ) {
     const errHandler = (err: any) => {
