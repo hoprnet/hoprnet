@@ -79,12 +79,12 @@ async function doDial(
     return { status: 'E_TIMEOUT' }
   }
 
-  if ((err != null || struct == null) && libp2p.peerRouting._routers.length > 0) {
+  if ((err != null || struct == null) && libp2p.peerRouting._routers.length == 0) {
     logError(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
-    return { status: 'E_DIAL', error: err.message, dhtContacted: false }
+    return { status: 'E_DIAL', error: err?.message, dhtContacted: false }
   }
 
-  verbose(`could not dial directly (${err.message}), looking in the DHT`)
+  verbose(`could not dial directly${err ? ` (${err.message})` : ''}, looking in the DHT`)
 
   // Try to get some fresh addresses from the DHT
   let dhtResponse: PromiseValue<ReturnType<LibP2P.PeerRoutingModule['findPeer']>>
@@ -92,13 +92,16 @@ async function doDial(
     // Let libp2p populate its internal peerStore with fresh addresses
     dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
+    const knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
+
     logError(
       `Querying the DHT for ${green(destination.toB58String())} failed. Known addresses:\n` +
-        `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}.\n`
+        `  ${knownAddresses.length > 0 ? renderPeerStoreAddresses(knownAddresses) : 'No addresses known'}.\n`,
+      err
     )
   }
 
-  const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
+  const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => !addresses.includes(addr.toString()))
 
   if (opts.signal.aborted) {
     return { status: 'E_TIMEOUT' }
@@ -113,11 +116,12 @@ async function doDial(
     struct = await libp2p.dialProtocol(destination, protocol, { signal: opts.signal })
     verbose(`Dial after DHT request successful`, struct)
   } catch (err) {
+    const knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
     logError(
       `Cannot connect to ${green(
         destination.toB58String()
       )}. New addresses after DHT request did not lead to a connection. Used addresses:\n` +
-        `  ${renderPeerStoreAddresses(libp2p.peerStore.get(destination)?.addresses ?? [])}\n` +
+        `  ${knownAddresses.length > 0 ? renderPeerStoreAddresses(knownAddresses) : 'No addresses known'}\n` +
         `${err.message}`
     )
 
@@ -155,8 +159,8 @@ export async function dial(
     { status: 'E_ABORTED' },
     { status: 'E_TIMEOUT' },
     {
-      timeout: opts.timeout ?? DEFAULT_DHT_QUERY_TIMEOUT,
-      signal: opts.signal
+      timeout: opts?.timeout ?? DEFAULT_DHT_QUERY_TIMEOUT,
+      signal: opts?.signal
     }
   )
 }
