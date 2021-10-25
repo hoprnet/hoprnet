@@ -1,4 +1,7 @@
 /*
+ * This test is temporarily disabled until
+ * https://github.com/hoprnet/hoprnet/issues/2797
+ *
 import PeerId from 'peer-id'
 import { randomBytes } from 'crypto'
 import { EventEmitter } from 'events'
