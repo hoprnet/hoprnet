@@ -64,6 +64,10 @@
 
 `number`
 
+#### Inherited from
+
+CurvePoint.SIZE
+
 #### Defined in
 
 [types/curvePoint.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L54)
