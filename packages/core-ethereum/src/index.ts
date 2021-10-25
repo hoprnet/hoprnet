@@ -266,12 +266,6 @@ export default class HoprEthereum extends EventEmitter {
     }
   }
 
-
-  public getPrivateKey(): Uint8Array {
-    return this.privateKey
-  }
-
-
   async initializeClosure(dest: PublicKey): Promise<string> { 
     const c = await this.db.getChannelTo(dest)
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
