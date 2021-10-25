@@ -74,7 +74,7 @@ export async function createTicket(
   const winProb = new BN(INVERSE_TICKET_WIN_PROB)
 
   const ticket = Ticket.create(
-    channel.destination.toAddress(),
+    dest.toAddress(),
     challenge,
     channel.ticketEpoch,
     currentTicketIndex,

@@ -411,7 +411,6 @@ export class HoprDB {
   }
 
   public async getChannelTo(dest: PublicKey): Promise<ChannelEntry> {
-    log(">>>", this.id)
     return await this.getChannel(generateChannelId(this.id.toAddress(), dest.toAddress()))
   }
 
