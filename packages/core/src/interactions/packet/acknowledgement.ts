@@ -1,6 +1,6 @@
 import { debug } from '@hoprnet/hopr-utils'
 import { PublicKey, durations, oneAtATime } from '@hoprnet/hopr-utils'
-import type { LibP2PHandlerFunction, DialOpts } from '@hoprnet/hopr-utils'
+import type { SendMessage, Subscribe } from '../../index'
 import type PeerId from 'peer-id'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
@@ -12,12 +12,7 @@ const error = debug('hopr-core:acknowledgement:error')
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
 export function subscribeToAcknowledgements(
-  subscribe: (
-    protocol: string,
-    handler: LibP2PHandlerFunction,
-    includeReply?: boolean,
-    errHandler?: (err: any) => void
-  ) => void,
+  subscribe: Subscribe,
   db: HoprDB,
   chain: HoprCoreEthereum,
   pubKey: PeerId,
@@ -43,22 +38,27 @@ export function subscribeToAcknowledgements(
   }
 
   const limitConcurrency = oneAtATime()
-  subscribe(PROTOCOL_ACKNOWLEDGEMENT, (msg: Uint8Array, remotePeer: PeerId) =>
-    limitConcurrency(() => handleAcknowledgement(msg, remotePeer))
+  subscribe(
+    PROTOCOL_ACKNOWLEDGEMENT,
+    (msg: Uint8Array, remotePeer: PeerId) => limitConcurrency(() => handleAcknowledgement(msg, remotePeer)),
+    false,
+    (err: any) => {
+      error(`Error while receiving acknowledgement`, err)
+    }
   )
 }
 
 export function sendAcknowledgement(
   packet: Packet,
   destination: PeerId,
-  sendMessage: (destination: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) => Promise<void>,
+  sendMessage: SendMessage,
   privKey: PeerId
 ): void {
   ;(async () => {
     const ack = packet.createAcknowledgement(privKey)
 
     try {
-      await sendMessage(destination, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), {
+      await sendMessage(destination, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), false, {
         timeout: ACKNOWLEDGEMENT_TIMEOUT
       })
     } catch (err) {

@@ -2,11 +2,11 @@ import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import type PeerId from 'peer-id'
-import type { DialOpts } from '@hoprnet/hopr-utils'
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
 import { debug } from '@hoprnet/hopr-utils'
+import type { SendMessage } from '../../index'
 
 const log = debug('hopr-core:packet:forward')
 
@@ -17,7 +17,7 @@ export class PacketForwardInteraction {
 
   constructor(
     private subscribe: any,
-    private sendMessage: (destination: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) => Promise<void>,
+    private sendMessage: SendMessage,
     private privKey: PeerId,
     private chain: HoprCoreEthereum,
     private emitMessage: (msg: Uint8Array) => void,
@@ -28,7 +28,7 @@ export class PacketForwardInteraction {
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
-    await this.sendMessage(counterparty, PROTOCOL_STRING, packet.serialize(), {
+    await this.sendMessage(counterparty, PROTOCOL_STRING, packet.serialize(), false, {
       timeout: FORWARD_TIMEOUT
     })
   }
@@ -44,19 +44,23 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
-    } else {
-      await packet.storeUnacknowledgedTicket(this.db)
-      try {
-        await packet.forwardTransform(this.privKey, this.chain)
-      } catch (err) {
-        log(`Packet transformation failed. Dropping packet`, err)
-      }
+      sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
+      return
+    }
 
-      try {
-        await this.interact(pubKeyToPeerId(packet.nextHop), packet)
-      } catch (err) {
-        log(`Forwarding transformed packet failed.`, err)
-      }
+    await packet.storeUnacknowledgedTicket(this.db)
+    try {
+      await packet.forwardTransform(this.privKey, this.chain)
+    } catch (err) {
+      log(`Packet transformation failed. Dropping packet`, err)
+      // Don't forward packet if transformation failed.
+      return
+    }
+
+    try {
+      await this.interact(pubKeyToPeerId(packet.nextHop), packet)
+    } catch (err) {
+      log(`Forwarding transformed packet failed.`, err)
     }
 
     sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
