@@ -83,19 +83,19 @@ $0\le i < v-1$
                     \fi
                 \end{scope}
                 \ifnum\i<3
-                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black] {$y_{\name}$};
+                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$y_{\name}$};
                     \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
-                    \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black] {$\gamma_{\name}$};
+                    \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$\gamma_{\name}$};
                     \draw (\i*2*\nodeWidth+\nodeWidth,0) -- (\i*2*\nodeWidth+\nodeWidth,\one);
                 \else
-                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black] {$end$};
+                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black,fill=white,inner sep=1.5pt] {$end$};
                     \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
                 \fi
             }
 
         \draw (0,0) rectangle (\width,\one);
     \end{tikzpicture}
-    \caption{Routing information}
+    \caption{Blinded routing information sent to first relayer $B$.}
 \end{figure}
 
 such that $y_Z$ is the destination's public key in compressed form (since this is only the $x$-coordinate, it is 33 bytes instead of 64) and $|y_Z|$ is its length. $\rho$ is a pseudorandom generator (PRG) and $h_{\rho}$ is the hash function used to key $\rho$.
