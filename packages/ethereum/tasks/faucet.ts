@@ -61,6 +61,8 @@ async function getIdentities(directory: string, password: string, prefix?: strin
 
     if (decoded.success) {
       identites.push(PublicKey.fromPeerId(decoded.identity).toAddress().toHex())
+    } else {
+      console.log(`Could not decrypt private key from file ${file} using "${password}" as password (without ")`)
     }
   }
 

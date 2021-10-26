@@ -1,5 +1,5 @@
 import { serializeKeyPair, deserializeKeyPair } from './keyPair'
-import { privKeyToPeerId, stringToU8a, u8aEquals, u8aToHex } from '..'
+import { privKeyToPeerId, stringToU8a, u8aEquals } from '..'
 import assert from 'assert'
 
 describe('Identity', function () {
@@ -25,7 +25,6 @@ describe('Identity', function () {
         TESTING_UUID
       )
 
-      console.log(u8aToHex(serialized))
       assert(u8aEquals(serialized, stringToU8a(ENCODED_STRING)))
     })
 

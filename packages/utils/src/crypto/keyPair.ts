@@ -48,11 +48,15 @@ export async function serializeKeyPair(
   // not include the Ethereum address
   delete decoded.address
 
+  // Following the Ethereum specification,
+  // the crypto property in keystore is lowercase
   Object.assign(decoded, {
     crypto: decoded.Crypto
   })
 
+  // Removing property to follow Ethereum standard
   delete decoded.Crypto
+
   return new TextEncoder().encode(JSON.stringify(decoded))
 }
 
@@ -86,6 +90,11 @@ export async function deserializeKeyPair(
 
   const decoded = JSON.parse(encodedString)
 
+  // Ethereum key are protected by iterating a hash function that is
+  // hard in memory and computation very often which results in delays
+  // of multiple seconds at startup and in unit tests.
+  // Production keyStore must use strictly more than `1` iteration, hence
+  // deserialization must fail when using low iterations in production
   if ((decoded.crypto.kdfparams.n == 1) != useWeakCrypto) {
     logError(
       `Either tried to deserialize a key file using weak crypto or to deserialize a weak crypto key file without using weak crypto.`
