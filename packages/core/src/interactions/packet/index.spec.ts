@@ -138,7 +138,7 @@ describe('packet interaction', function () {
       ackReceived.resolve()
     })
 
-    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send, counterparty)
+    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send as any, counterparty)
 
     await ackReceived.promise
   })
@@ -167,7 +167,7 @@ describe('packet interaction', function () {
 
     const senderInteraction = new PacketForwardInteraction(
       libp2pSender.subscribe,
-      libp2pSender.send,
+      libp2pSender.send as any,
       sender,
       chainSender as any,
       console.log,
@@ -175,12 +175,33 @@ describe('packet interaction', function () {
     )
 
     // TODO: improve
-    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, chainRelay0 as any, console.log, db)
-    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, chainRelay1 as any, console.log, db)
-    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, chainRelay2 as any, console.log, db)
+    new PacketForwardInteraction(
+      libp2pRelay0.subscribe,
+      libp2pRelay0.send as any,
+      relay0,
+      chainRelay0 as any,
+      console.log,
+      db
+    )
+    new PacketForwardInteraction(
+      libp2pRelay1.subscribe,
+      libp2pRelay1.send as any,
+      relay1,
+      chainRelay1 as any,
+      console.log,
+      db
+    )
+    new PacketForwardInteraction(
+      libp2pRelay2.subscribe,
+      libp2pRelay2.send as any,
+      relay2,
+      chainRelay2 as any,
+      console.log,
+      db
+    )
     new PacketForwardInteraction(
       libp2pReceiver.subscribe,
-      libp2pReceiver.send,
+      libp2pReceiver.send as any,
       receiver,
       chainReceiver as any,
       (msg: Uint8Array) => {
