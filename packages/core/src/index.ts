@@ -27,17 +27,17 @@ import {
   Hash,
   DialOpts,
   HoprDB,
-  libp2pSendMessageAndExpectResponse,
   libp2pSubscribe,
   libp2pSendMessage,
-  LibP2PHandlerFunction,
   isSecp256k1PeerId,
   AcknowledgedTicket,
   ChannelStatus,
   MIN_NATIVE_BALANCE,
   u8aConcat
 } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
+import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import type { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { getAddrs } from './identity'
 
@@ -94,6 +94,28 @@ export type HoprOptions = {
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
+
+export type Subscribe = ((
+  protocol: string,
+  handler: LibP2PHandlerFunction<Promise<void>>,
+  includeReply: false,
+  errHandler: (err: any) => void
+) => void) &
+  ((
+    protocol: string,
+    handler: LibP2PHandlerFunction<Promise<Uint8Array>>,
+    includeReply: true,
+    errHandler: (err: any) => void
+  ) => void)
+
+export type SendMessage = ((
+  dest: PeerId,
+  protocol: string,
+  msg: Uint8Array,
+  includeReply: false,
+  opts: DialOpts
+) => Promise<void>) &
+  ((dest: PeerId, protocol: string, msg: Uint8Array, includeReply: true, opts: DialOpts) => Promise<Uint8Array[]>)
 
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
@@ -251,15 +273,24 @@ class Hopr extends EventEmitter {
     )
 
     // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
-    const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
-      libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
-    const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
-      libp2pSendMessageAndExpectResponse(this.libp2p, dest, protocol, msg, opts)
-    const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
-      libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
+    const subscribe: Subscribe = (
+      protocol: string,
+      handler: LibP2PHandlerFunction<Promise<void | Uint8Array>>,
+      includeReply: boolean,
+      errHandler: (err: any) => void
+    ) => libp2pSubscribe(this.libp2p, protocol, handler, errHandler, includeReply)
+
+    const sendMessage: SendMessage = (
+      dest: PeerId,
+      protocol: string,
+      msg: Uint8Array,
+      includeReply: boolean,
+      opts: DialOpts
+    ) => libp2pSendMessage(this.libp2p, dest, protocol, msg, includeReply, opts) as any
+
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup)
 
     const ethereum = await this.startedPaymentChannels()
 

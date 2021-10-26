@@ -118,7 +118,7 @@ describe('packet interaction', function () {
         }
       } as any,
       SELF,
-      libp2pCounterparty.send,
+      libp2pCounterparty.send as any,
       COUNTERPARTY
     )
 
@@ -140,7 +140,7 @@ describe('packet interaction', function () {
 
     const interaction = new PacketForwardInteraction(
       libp2pRelay0.subscribe,
-      libp2pRelay0.send,
+      libp2pRelay0.send as any,
       RELAY0,
       () => {
         throw Error(`Node is not supposed to receive message`)

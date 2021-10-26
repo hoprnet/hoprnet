@@ -1,12 +1,15 @@
-import { debug } from '@hoprnet/hopr-utils'
-import { HalfKey, durations, oneAtATime, AcknowledgedTicket, UnacknowledgedTicket } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
+import { durations, oneAtATime, debug, AcknowledgedTicket } from '@hoprnet/hopr-utils'
+import type { HalfKey, UnacknowledgedTicket } from '@hoprnet/hopr-utils'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
+
+import type { SendMessage, Subscribe } from '../../index'
+import type PeerId from 'peer-id'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { Acknowledgement, Packet } from '../../messages'
 import { HoprDB } from '@hoprnet/hopr-utils'
 import { EventEmitter } from 'events'
 const log = debug('hopr-core:acknowledgement')
+const error = debug('hopr-core:acknowledgement:error')
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
@@ -51,7 +54,7 @@ async function acknowledge(
 }
 
 export function subscribeToAcknowledgements(
-  subscribe: any,
+  subscribe: Subscribe,
   db: HoprDB,
   events: EventEmitter,
   pubKey: PeerId,
@@ -76,17 +79,33 @@ export function subscribeToAcknowledgements(
   }
 
   const limitConcurrency = oneAtATime()
-  subscribe(PROTOCOL_ACKNOWLEDGEMENT, (msg: Uint8Array, remotePeer: PeerId) =>
-    limitConcurrency(() => handleAcknowledgement(msg, remotePeer))
+  subscribe(
+    PROTOCOL_ACKNOWLEDGEMENT,
+    (msg: Uint8Array, remotePeer: PeerId) => limitConcurrency(() => handleAcknowledgement(msg, remotePeer)),
+    false,
+    (err: any) => {
+      error(`Error while receiving acknowledgement`, err)
+    }
   )
 }
 
-export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMessage: any, privKey: PeerId): void {
-  setImmediate(async () => {
+export function sendAcknowledgement(
+  packet: Packet,
+  destination: PeerId,
+  sendMessage: SendMessage,
+  privKey: PeerId
+): void {
+  ;(async () => {
     const ack = packet.createAcknowledgement(privKey)
 
-    sendMessage(destination, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), {
-      timeout: ACKNOWLEDGEMENT_TIMEOUT
-    })
-  })
+    try {
+      await sendMessage(destination, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), false, {
+        timeout: ACKNOWLEDGEMENT_TIMEOUT
+      })
+    } catch (err) {
+      // Currently unclear how to proceed if sending acknowledgements
+      // fails
+      error(`could not send acknowledgement`, err)
+    }
+  })()
 }

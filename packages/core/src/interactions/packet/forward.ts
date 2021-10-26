@@ -5,6 +5,7 @@ import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
 import { debug } from '@hoprnet/hopr-utils'
+import type { SendMessage } from '../../index'
 
 const log = debug('hopr-core:packet:forward')
 
@@ -15,7 +16,7 @@ export class PacketForwardInteraction {
 
   constructor(
     private subscribe: any,
-    private sendMessage: any,
+    private sendMessage: SendMessage,
     private privKey: PeerId,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB
@@ -25,7 +26,7 @@ export class PacketForwardInteraction {
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
-    await this.sendMessage(counterparty, PROTOCOL_STRING, packet.serialize(), {
+    await this.sendMessage(counterparty, PROTOCOL_STRING, packet.serialize(), false, {
       timeout: FORWARD_TIMEOUT
     })
   }
@@ -41,17 +42,23 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
-    } else {
-      await packet.storeUnacknowledgedTicket(this.db)
-      try {
-        await packet.forwardTransform(this.privKey, this.db)
-        await this.interact(pubKeyToPeerId(packet.nextHop), packet)
-      } catch (e) {
-        // Errors include:
-        // - not knowing about the channel in our db, because the
-        //   indexer is not caught up yet.
-        log('error while transforming packet, packet is dropped', e)
-      }
+      sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
+      return
+    }
+
+    await packet.storeUnacknowledgedTicket(this.db)
+    try {
+      await packet.forwardTransform(this.privKey, this.db)
+    } catch (err) {
+      log(`Packet transformation failed. Dropping packet`, err)
+      // Don't forward packet if transformation failed.
+      return
+    }
+
+    try {
+      await this.interact(pubKeyToPeerId(packet.nextHop), packet)
+    } catch (err) {
+      log(`Forwarding transformed packet failed.`, err)
     }
 
     sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
