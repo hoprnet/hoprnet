@@ -62,8 +62,8 @@
     "libp2p-interfaces": "1.0.1",
     "libp2p-mplex": "0.10.4",
     "mocha": "9.1.3",
-    "prettier": "^2.4.1",
-    "prettier-plugin-sh": "^0.7.1",
+    "prettier": "2.4.1",
+    "prettier-plugin-sh": "0.7.1",
     "ts-node": "10.4.0",
     "typescript": "4.4.4",
     "yargs": "17.2.1"
