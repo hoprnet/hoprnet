@@ -86,7 +86,8 @@ describe('packet creation and transformation', function () {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
       const { db } = createMockTickets()
       await packet.checkPacketTag(db)
-
+// Checks that packet tag is set and cannot set twice
+await assert.rejects(packet.checkPacketTag(db))
       if (packet.isReceiver) {
         assert(index == path.length - 1)
         assert(u8aEquals(packet.plaintext, testMsg))
