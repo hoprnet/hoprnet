@@ -1,16 +1,18 @@
 import { debug } from '@hoprnet/hopr-utils'
 import { PublicKey, durations, oneAtATime } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import type { SendMessage, Subscribe } from '../../index'
+import type PeerId from 'peer-id'
+import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { Acknowledgement, Packet } from '../../messages'
 import { HoprDB } from '@hoprnet/hopr-utils'
 const log = debug('hopr-core:acknowledgement')
+const error = debug('hopr-core:acknowledgement:error')
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
 export function subscribeToAcknowledgements(
-  subscribe: any,
+  subscribe: Subscribe,
   db: HoprDB,
   chain: HoprCoreEthereum,
   pubKey: PeerId,
@@ -36,17 +38,33 @@ export function subscribeToAcknowledgements(
   }
 
   const limitConcurrency = oneAtATime()
-  subscribe(PROTOCOL_ACKNOWLEDGEMENT, (msg: Uint8Array, remotePeer: PeerId) =>
-    limitConcurrency(() => handleAcknowledgement(msg, remotePeer))
+  subscribe(
+    PROTOCOL_ACKNOWLEDGEMENT,
+    (msg: Uint8Array, remotePeer: PeerId) => limitConcurrency(() => handleAcknowledgement(msg, remotePeer)),
+    false,
+    (err: any) => {
+      error(`Error while receiving acknowledgement`, err)
+    }
   )
 }
 
-export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMessage: any, privKey: PeerId): void {
-  setImmediate(async () => {
+export function sendAcknowledgement(
+  packet: Packet,
+  destination: PeerId,
+  sendMessage: SendMessage,
+  privKey: PeerId
+): void {
+  ;(async () => {
     const ack = packet.createAcknowledgement(privKey)
 
-    sendMessage(destination, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), {
-      timeout: ACKNOWLEDGEMENT_TIMEOUT
-    })
-  })
+    try {
+      await sendMessage(destination, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), false, {
+        timeout: ACKNOWLEDGEMENT_TIMEOUT
+      })
+    } catch (err) {
+      // Currently unclear how to proceed if sending acknowledgements
+      // fails
+      error(`could not send acknowledgement`, err)
+    }
+  })()
 }

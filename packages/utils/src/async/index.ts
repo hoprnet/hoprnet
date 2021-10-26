@@ -1,3 +1,4 @@
+export * from './abortableTimeout'
 export * from './backoff'
 export * from './cache'
 export * from './defer'
