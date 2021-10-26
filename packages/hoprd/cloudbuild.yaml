@@ -3,8 +3,8 @@ steps:
     args:
       - 'build'
       - '.'
-      - '--tag=$_DOCKER_IMAGE:$_HOPR_IMAGE_VERSION'
-      - '--build-arg=HOPRD_VERSION=$_HOPR_PACKAGE_VERSION'
+      - '--tag=$_DOCKER_IMAGE:$_IMAGE_VERSION'
+      - '--build-arg=PACKAGE_VERSION=$_PACKAGE_VERSION'
 options:
   logStreamingOption: STREAM_ON
 images:

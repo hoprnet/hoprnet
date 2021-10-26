@@ -34,10 +34,10 @@ while (( "$#" )); do
       exit 0
       ;;
     -v|--package-version)
-      npm_package_version="$1"
+      npm_package_version="$2"
       # remove prefix 'v' if it exists
       npm_package_version=${npm_package_version#v}
-      shift
+      shift 2
       ;;
     -s|--skip-cleanup)
       skip_cleanup="true"

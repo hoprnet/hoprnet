@@ -182,8 +182,7 @@ jobs:
           git pull origin "${branch}" --rebase
 
       - name: Build Docker image
-        run: |
-          ./scripts/build-docker.sh
+        run: ./scripts/build-docker.sh -p hoprd
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
@@ -218,81 +217,8 @@ jobs:
           branch=$(git rev-parse --abbrev-ref HEAD)
           git pull origin "${branch}" --rebase
 
-      - name: Set image version
-        id: set-image-version
-        run: echo "::set-output name=vsn::$(date +%s)"
-
-      - name: Set package version
-        id: set-package-version
-        run: echo "::set-output name=vsn::$(./scripts/get-package-version.sh)"
-        env:
-          HOPR_PACKAGE: hopr-cover-traffic-daemon
-
-      - name: Set latest release tag
-        id: set-latest-release-tag
-        run: |
-          # we must set the tag specific to the release to prevent overrides
-          # from other release branches
-          declare release_name=${HOPR_GITHUB_REF##refs/heads/release/}
-          declare tag="latest-${release_name}"
-          echo "::set-output name=tag::${tag}"
-
-      - name: Building Docker image using Google Cloud Build
-        working-directory: packages/cover-traffic-daemon
-        run: |
-          gcloud builds submit --config cloudbuild.yaml \
-            --substitutions=_PACKAGE_VERSION=${PACKAGE_VERSION},_IMAGE_VERSION=${IMAGE_VERSION}
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
-
-      - name: Verify the correct package version has been bundled
-        run: |
-          declare v=$(docker run --pull always ${DOCKER_IMAGE}:${IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
-          [ "${v}" = "${PACKAGE_VERSION}" ]
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
-
-      - name: Add additional tags to new Docker image (on master and release branches)
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
-        run: |
-          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:${PACKAGE_VERSION}
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
-
-      - name: Add tag latest to new Docker image on master
-        if: ${{ !env.ACT }} && ${{ github.ref == 'refs/heads/master' }}
-        run: |
-          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:latest
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-
-      - name: Add tag for latest release to new Docker image on release branches
-        if: ${{ !env.ACT &&  startsWith(github.ref, 'refs/heads/release/') }}
-        run: |
-          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:${TAG}
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          TAG: ${{ steps.set-latest-release-tag.outputs.tag }}
-
-      - name: Add debug tags to new Docker image (on debug-deploy branches)
-        if: ${{ startsWith(github.ref, 'refs/heads/debug-deploy/') && !env.ACT }}
-        run: |
-          declare last_git_tag="$(git describe --tags --abbrev=0)"
-          declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
-          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
-          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:${tag}
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+      - name: Build Docker image
+        run: ./scripts/build-docker.sh -p cover-traffic-daemon
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
