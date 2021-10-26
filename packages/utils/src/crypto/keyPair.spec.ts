@@ -43,7 +43,7 @@ describe('Identity', function () {
       const deserialized = await deserializeKeyPair(serialized, WRONG_DUMMY_PASSWORD, true)
       assert(deserialized.success == false, `Deserialization must not work`)
 
-      assert(deserialized.error === 'Invalid password', `Deserialized peerId must match original peerId`)
+      assert(deserialized.error === 'Invalid password', `Deserialization must fail with invalid password`)
     })
   })
 })
