@@ -38,7 +38,7 @@ get_rpc() {
   local environment_id="${1}"
   local network_id=$(cat packages/core/protocol-config.json | jq -r ".environments[] | select(.id==\"${environment_id}\") | .network_id")
   local unresolved_rpc=$(cat packages/core/protocol-config.json | jq -r ".networks[] | select(.id==\"${network_id}\") | .default_provider")
-  echo "${unresolved_rpc}" | envsubst  
+  echo "${unresolved_rpc}" | envsubst
 }
 
 # $1=account (hex)

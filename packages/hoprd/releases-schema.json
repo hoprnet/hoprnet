@@ -25,14 +25,16 @@
       },
       "deprecated": {
         "type": "boolean",
-        "description": "if true, this release is kept for historical purposes and not re-deployed"
+        "description": "if true, this release is kept for historical purposes and not re-deployed",
+        "default": false
       },
-      "docker_image": {
-        "type": "string",
-        "description": "FQ docker image name"
+      "default": {
+        "type": "boolean",
+        "description": "if true, this release's environment is used as the default for packaged releases",
+        "default": false
       }
     },
-    "required": ["id", "git_ref", "environment_id", "deprecated", "docker_image"],
+    "required": ["id", "git_ref", "environment_id", "deprecated"],
     "additionalProperties": false
   }
 }

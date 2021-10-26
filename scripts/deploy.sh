@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
 
-set -e #u
-shopt -s expand_aliases
-#set -o xtrace
+# prevent sourcing of this script, only allow execution
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
-set -x
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -Eeuo pipefail
 
-source scripts/environments.sh
-source scripts/testnet.sh
-source scripts/cleanup.sh
+# set log id and use shared log function for readable logs
+declare mydir
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+declare -x HOPR_LOG_ID="deploy"
+source "${mydir}/utils.sh"
+source "${mydir}/testnet.sh"
+
+declare branch cluster_size package_version docker_image
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+cluster_size=3
+package_version=$(${mydir}/get-package-version.sh)
+docker_image="gcr.io/hoprassociation/hoprd"
 
 # ---- On Deployment -----
 #
 # This finds matching entries in packages/hoprd/releases.json and deploys accordingly
 #
 # ENV Variables:
-# - GITHUB_REF: ie. `/refs/heads/mybranch`
 # - FUNDING_PRIV_KEY: funding private key, raw
 # - BS_PASSWORD: database password
 
@@ -23,39 +33,64 @@ _jq() {
   echo "$1" | base64 --decode | jq -r "$2"
 }
 
-echo "Looking for releases to deploy (GITHUB_REF == ${GITHUB_REF})"
+echo "Looking for releases to deploy from branch ${branch}"
 
 # iterate through releases with git_ref == $GITHUB_REF
-for row in $(cat packages/hoprd/releases.json | jq -r ".[] | select(.git_ref==\"${GITHUB_REF}\") | @base64"); do
-  declare release_id=$(_jq "${row}" ".id")
-  declare deprecated=$(_jq "${row}" ".deprecated")
-  declare environment_id=$(_jq "${row}" ".environment_id")
-  declare version_major=$(_jq "${row}" ".version_major")
-  declare version_minor=$(_jq "${row}" ".version_minor")
-  declare docker_image=$(_jq "${row}" ".docker_image")
+for row in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r ".[] | select(.git_ref==\"refs/heads/${branch}\") | @base64"); do
+  declare release_id deprecated environment_id version_major version_minor docker_image_full token_contract_address
+
+  release_id=$(_jq "${row}" ".id")
+  deprecated=$(_jq "${row}" ".deprecated")
+  environment_id=$(_jq "${row}" ".environment_id")
+  version_major=$(_jq "${row}" ".version_major")
+  version_minor=$(_jq "${row}" ".version_minor")
+  docker_image_full="${docker_image}:${release_id}"
+
+  token_contract_address=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments[] | select(.id==\"${environment_id}\") | .token_contract_address")
 
   if [ "${deprecated}" == "true" ]; then
-    echo "${release_id} deprecated, skipping"
+    log "${release_id} deprecated, skipping deployment"
     continue
   fi
 
-  declare version_maj_min
+  declare version_maj_min cluster_name
+  cluster_name="${release_id}"
   if [ "${version_major}" != "null" ] && [ "${version_minor}" != "null" ]; then
     version_maj_min="${version_major}.${version_minor}"
+    cluster_name="${cluster_name}-${version_maj_min//./-}"
   else
-    version_maj_min="unversioned"
+    version_maj_min=""
   fi
-  declare testnet_name="$release_id-$(echo "$version_maj_min" | sed 's/\./-/g')"
-  declare testnet_size=3
 
-  echo "Deploying release ${release_id}"
-  echo " version: ${version_maj_min}"
-  echo " environment ${environment_id}"
-  echo " docker image: ${docker_image}"
-  echo " testnet name: ${testnet_name}"
+  cluster_template_name="${cluster_name}-${package_version//./-}"
 
-  echo "Cleaning up testnet"
-  cleanup_instance "${testnet_name}"
-  echo "Starting testnet"
-  start_testnet $testnet_name $testnet_size $docker_image $environment_id
+  log "deploying release ${release_id}"
+  log "\tversion: ${version_maj_min}"
+  log "\tenvironment ${environment_id}"
+  log "\tdocker image: ${docker_image_full}"
+  log "\tcluster name: ${cluster_name}"
+  log "\tcluster template name: ${cluster_template_name}"
+
+  gcloud_create_or_update_instance_template "${cluster_template_name}" \
+    "${docker_image_full}" \
+    "${environment}" \
+    "${api_token}" \
+    "${password}"
+
+  gcloud_create_or_update_managed_instance_group "${cluster_name}" \
+    ${cluster_size} \
+    "${cluster_template_name}"
+
+  # get IPs of VMs which run hoprd
+  declare node_ips
+  node_ips=$(gcloud_get_managed_instance_group_instances_ips "${cluster_name}")
+  declare node_ips_arr=( ${node_ips} )
+
+  # fund nodes
+  declare eth_address
+  for ip in ${node_ips}; do
+    wait_until_node_is_ready "${ip}"
+    eth_address=$(get_eth_address "${ip}")
+    fund_if_empty "${eth_address}" "${environment_id}" "${token_contract_address}"
+  done
 done
