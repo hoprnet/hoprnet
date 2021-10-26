@@ -54,8 +54,8 @@ export function resolveEnvironment(environment_id: string): ResolvedEnvironment 
       }
     }
   }
-  const supportedEnvsString: string = supportedEnvironments().map((env) => env.id).join(', ')
-  throw new Error(
-    `environment '${environment_id}' is not supported, supported environments: ${supportedEnvsString}`
-  )
+  const supportedEnvsString: string = supportedEnvironments()
+    .map((env) => env.id)
+    .join(', ')
+  throw new Error(`environment '${environment_id}' is not supported, supported environments: ${supportedEnvsString}`)
 }

@@ -27,14 +27,13 @@ export type DefaultEnvironment = {
 
 function defaultEnvironment(): string {
   try {
-  const config = require("../default-environment.json") as DefaultEnvironment
-  return config?.id || ""
-  } catch(error) {
+    const config = require('../default-environment.json') as DefaultEnvironment
+    return config?.id || ''
+  } catch (error) {
     // its ok if the file isn't there or cannot be read
-    return ""
+    return ''
   }
 }
-
 
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
