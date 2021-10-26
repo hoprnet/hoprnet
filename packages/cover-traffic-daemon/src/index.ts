@@ -11,7 +11,7 @@ import type PeerId from 'peer-id'
 import BN from 'bn.js'
 import { debug } from '@hoprnet/hopr-utils'
 
-const log = debug('cover-traffic')
+const log = debug('hopr:cover-traffic')
 
 function stopGracefully(signal: number) {
   console.log(`Process exiting with signal ${signal}`)
@@ -73,18 +73,36 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   log('starting node ...')
   await node.start()
   log('node is running')
+
+  console.log(node.getVersion())
+  console.log(node.smartContractInfo())
+
   const channels = await node.getChannelsFrom(selfAddr)
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))
   node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))
+
+  setInterval(async () => {
+    // CT stats
+    console.log('-- CT Stats --')
+    console.log(await node.connectionReport())
+  }, 5000)
 }
 
 if (require.main === module) {
   process.once('exit', stopGracefully)
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)
-  process.on('uncaughtException', stopGracefully)
 
-  main((_state: State) => {
-    console.log('CT: State update')
+  process.on('uncaughtExceptionMonitor', (err, origin) => {
+    // Make sure we get a log.
+    log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
+  })
+
+  main((state: State) => {
+    console.log(
+      `CT: State update:` +
+        `${Object.keys(state.nodes).length} nodes, ` +
+        `${Object.keys(state.channels).length} channels`
+    )
   })
 }

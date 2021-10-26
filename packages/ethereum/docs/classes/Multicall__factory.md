@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / Multicall__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / Multicall\_\_factory
 
 # Class: Multicall\_\_factory
 
@@ -27,7 +27,7 @@
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: { `inputs`: { `internalType`: `string` = "bytes[]"; `name`: `string` = "data"; `type`: `string` = "bytes[]" }[] ; `name`: `string` = "multicall"; `outputs`: { `internalType`: `string` = "bytes[]"; `name`: `string` = "results"; `type`: `string` = "bytes[]" }[] ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" }[]
+▪ `Static` `Readonly` **abi**: { `inputs`: { `internalType`: `string` = "bytes[]"; `name`: `string` = "data"; `type`: `string` = "bytes[]" }[] ; `name`: `string` = "multicall"; `outputs`: { `internalType`: `string` = "bytes[]"; `name`: `string` = "results"; `type`: `string` = "bytes[]" }[] ; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" }[] = `_abi`
 
 #### Defined in
 

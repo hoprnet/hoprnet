@@ -9,7 +9,7 @@ import {
   Address,
   Balance,
   Challenge,
-  Defer,
+  defer,
   HalfKey,
   Hash,
   HoprDB,
@@ -132,15 +132,15 @@ describe('packet interaction', function () {
 
     fakePacket.storeUnacknowledgedTicket(db)
 
-    const defer = new Defer()
+    const ackReceived = defer<void>()
 
     subscribeToAcknowledgements(libp2pSelf.subscribe, db, chainSelf as any, self, () => {
-      defer.resolve()
+      ackReceived.resolve()
     })
 
-    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send, counterparty)
+    sendAcknowledgement(fakePacket, self, libp2pCounterparty.send as any, counterparty)
 
-    await defer.promise
+    await ackReceived.promise
   })
 
   it('packet-acknowledgement workflow', async function () {
@@ -163,11 +163,11 @@ describe('packet interaction', function () {
     const testMsg = new TextEncoder().encode('testMsg')
     const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any)
 
-    const msgDefer = new Defer()
+    const msgDefer = defer<void>()
 
     const senderInteraction = new PacketForwardInteraction(
       libp2pSender.subscribe,
-      libp2pSender.send,
+      libp2pSender.send as any,
       sender,
       chainSender as any,
       console.log,
@@ -175,12 +175,33 @@ describe('packet interaction', function () {
     )
 
     // TODO: improve
-    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, chainRelay0 as any, console.log, db)
-    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, chainRelay1 as any, console.log, db)
-    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, chainRelay2 as any, console.log, db)
+    new PacketForwardInteraction(
+      libp2pRelay0.subscribe,
+      libp2pRelay0.send as any,
+      relay0,
+      chainRelay0 as any,
+      console.log,
+      db
+    )
+    new PacketForwardInteraction(
+      libp2pRelay1.subscribe,
+      libp2pRelay1.send as any,
+      relay1,
+      chainRelay1 as any,
+      console.log,
+      db
+    )
+    new PacketForwardInteraction(
+      libp2pRelay2.subscribe,
+      libp2pRelay2.send as any,
+      relay2,
+      chainRelay2 as any,
+      console.log,
+      db
+    )
     new PacketForwardInteraction(
       libp2pReceiver.subscribe,
-      libp2pReceiver.send,
+      libp2pReceiver.send as any,
       receiver,
       chainReceiver as any,
       (msg: Uint8Array) => {

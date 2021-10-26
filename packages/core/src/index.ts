@@ -27,17 +27,17 @@ import {
   Hash,
   DialOpts,
   HoprDB,
-  libp2pSendMessageAndExpectResponse,
   libp2pSubscribe,
   libp2pSendMessage,
-  LibP2PHandlerFunction,
   isSecp256k1PeerId,
   AcknowledgedTicket,
   ChannelStatus,
   MIN_NATIVE_BALANCE,
   u8aConcat
 } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
+import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import type { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { getAddrs } from './identity'
 
@@ -94,6 +94,28 @@ export type HoprOptions = {
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
+
+export type Subscribe = ((
+  protocol: string,
+  handler: LibP2PHandlerFunction<Promise<void>>,
+  includeReply: false,
+  errHandler: (err: any) => void
+) => void) &
+  ((
+    protocol: string,
+    handler: LibP2PHandlerFunction<Promise<Uint8Array>>,
+    includeReply: true,
+    errHandler: (err: any) => void
+  ) => void)
+
+export type SendMessage = ((
+  dest: PeerId,
+  protocol: string,
+  msg: Uint8Array,
+  includeReply: false,
+  opts: DialOpts
+) => Promise<void>) &
+  ((dest: PeerId, protocol: string, msg: Uint8Array, includeReply: true, opts: DialOpts) => Promise<Uint8Array[]>)
 
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
@@ -251,15 +273,24 @@ class Hopr extends EventEmitter {
     )
 
     // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
-    const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
-      libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
-    const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
-      libp2pSendMessageAndExpectResponse(this.libp2p, dest, protocol, msg, opts)
-    const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
-      libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
+    const subscribe: Subscribe = (
+      protocol: string,
+      handler: LibP2PHandlerFunction<Promise<void | Uint8Array>>,
+      includeReply: boolean,
+      errHandler: (err: any) => void
+    ) => libp2pSubscribe(this.libp2p, protocol, handler, errHandler, includeReply)
+
+    const sendMessage: SendMessage = (
+      dest: PeerId,
+      protocol: string,
+      msg: Uint8Array,
+      includeReply: boolean,
+      opts: DialOpts
+    ) => libp2pSendMessage(this.libp2p, dest, protocol, msg, includeReply, opts) as any
+
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup)
 
     const ethereum = await this.startedPaymentChannels()
 
@@ -267,18 +298,23 @@ class Hopr extends EventEmitter {
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     )
 
+    ethereum.on('ticket:win', (ack) => {
+      this.onWinningTicket(ack)
+    })
+
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
     await this.announce(this.options.announce)
     log('announcing done, starting heartbeat')
-
     this.heartbeat.start()
+
     this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
     this.status = 'RUNNING'
-    this.emit('running')
+    this.emit('running with strategy', this.strategy.name)
 
     // Log information
+    // Debug log used in e2e integration tests, please don't change
     log('# STARTED NODE')
     log('ID', this.getId().toB58String())
     log('Protocol version', VERSION)
@@ -363,7 +399,7 @@ class Hopr extends EventEmitter {
   // On the strategy interval, poll the strategy to see what channel changes
   // need to be made.
   private async tickChannelStrategy() {
-    verbose('strategy tick', this.status)
+    verbose('strategy tick', this.status, this.strategy.name)
     if (this.status != 'RUNNING') {
       return
     }
@@ -520,12 +556,6 @@ class Hopr extends EventEmitter {
 
         if (channelState.status !== ChannelStatus.Open) {
           throw Error(`Channel ${channelState.getId().toHex()} is not open`)
-        } else if (channelState.ticketEpoch.toBN().isZero()) {
-          throw Error(
-            `Cannot use manually set path because apparently there is no commitment set for the channel between ${ticketIssuer
-              .toPeerId()
-              .toB58String()} and ${ticketReceiver.toPeerId().toB58String()}`
-          )
         }
       }
     }
@@ -625,11 +655,16 @@ class Hopr extends EventEmitter {
     if (this.status != 'RUNNING') {
       return
     }
+    const logTimeout = setTimeout(() => {
+      log('strategy tick took longer than 10 secs')
+    }, 10000)
     try {
       await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
     }
+    clearTimeout(logTimeout)
+
     this.checkTimeout = setTimeout(() => this.periodicCheck(), this.strategy.tickInterval)
   }
 
@@ -664,12 +699,12 @@ class Hopr extends EventEmitter {
   }
 
   public async setChannelStrategy(strategy: ChannelStrategy) {
+    log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
-    const ethereum = this.paymentChannels
-    ethereum.on('ticket:win', (ack, channel) => {
-      // TODO - don't double bind here
-      this.strategy.onWinningTicket(ack, channel)
-    })
+  }
+
+  private async onWinningTicket(ack) {
+    this.strategy.onWinningTicket(ack, await this.startedPaymentChannels())
   }
 
   public getChannelStrategy(): string {
@@ -717,7 +752,11 @@ class Hopr extends EventEmitter {
     if (amountToFund.lten(0)) {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
     } else if (amountToFund.gt(myAvailableTokens.toBN())) {
-      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
+      throw Error(
+        `You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens
+          .toBN()
+          .toString(10)} at address ${selfPubKey.toAddress().toHex()}`
+      )
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
@@ -759,7 +798,11 @@ class Hopr extends EventEmitter {
     if (totalFund.lten(0)) {
       throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
     } else if (totalFund.gt(myBalance.toBN())) {
-      throw Error(`You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.toBN().toString(10)}`)
+      throw Error(
+        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance
+          .toBN()
+          .toString(10)} at address ${selfPubKey.toAddress().toHex()}`
+      )
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
@@ -789,30 +832,31 @@ class Hopr extends EventEmitter {
     }
 
     if (channelState.status === ChannelStatus.Open) {
-      await this.strategy.onChannelWillClose(channel)
+      await this.strategy.onChannelWillClose(channelState, ethereum)
     }
 
+    log('closing channel', channelState.getId())
     let txHash: string
     try {
       if (channelState.status === ChannelStatus.Open || channelState.status == ChannelStatus.WaitingForCommitment) {
+        log('initiating closure')
         txHash = await channel.initializeClosure()
       } else {
+        log('finalizing closure')
         txHash = await channel.finalizeClosure()
       }
     } catch (err) {
+      log('failed to close channel', err)
       await this.isOutOfFunds(err)
       throw new Error(`Failed to closeChannel: ${err}`)
     }
 
+    log(`closed channel, ${channelState.getId()}`)
     return { receipt: txHash, status: channelState.status }
   }
 
-  public async getAcknowledgedTickets() {
-    return this.db.getAcknowledgedTickets()
-  }
-
   public async getTicketStatistics() {
-    const ack = await this.getAcknowledgedTickets()
+    const ack = await this.db.getAcknowledgedTickets()
     const pending = await this.db.getPendingTicketCount()
     const losing = await this.db.getLosingTicketCount()
     const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
@@ -830,39 +874,8 @@ class Hopr extends EventEmitter {
   }
 
   public async redeemAllTickets() {
-    let count = 0,
-      redeemed = 0,
-      total = new BN(0)
-
-    for (const ackTicket of await this.getAcknowledgedTickets()) {
-      count++
-      const result = await this.redeemAcknowledgedTicket(ackTicket)
-
-      if (result.status === 'SUCCESS') {
-        redeemed++
-        total.iadd(ackTicket.ticket.amount.toBN())
-        console.log(`Redeemed ticket ${count}`)
-      } else {
-        console.log(`Failed to redeem ticket ${count}`)
-      }
-    }
-    return {
-      count,
-      redeemed,
-      total: new Balance(total)
-    }
-  }
-
-  public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
     const ethereum = await this.startedPaymentChannels()
-    const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.signer)
-
-    try {
-      return await channel.redeemTicket(ackTicket)
-    } catch (err) {
-      await this.isOutOfFunds(err)
-      throw new Error(`Failed to redeemAcknowledgedTicket: ${err}`)
-    }
+    await ethereum.redeemAllTickets()
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {

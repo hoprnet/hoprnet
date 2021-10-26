@@ -158,7 +158,7 @@ gcloud_create_or_update_instance_template() {
   # if set no additional arguments are used to start the container
   no_args="${7:-}"
 
-  args="--container-arg=\"--provider\" --container-arg=\"${rpc}\""
+  args="--container-arg=--provider --container-arg=\"${rpc}\""
 
   if [ -n "${api_token}" ]; then
     extra_args="${extra_args} --container-arg=\"--apiToken\" --container-arg=\"${api_token}\""
@@ -194,9 +194,10 @@ gcloud_create_or_update_instance_template() {
       --image-family=cos-stable \
       --image-project=cos-cloud \
       --container-image="${image}" \
-      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
+      --container-env=^,@^DEBUG=hopr\*,-hopr-connect\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
       --container-restart-policy=always \
+      ${args} \
       ${extra_args}
   else
     gcloud compute instance-templates create-with-container "${name}" \
@@ -212,6 +213,7 @@ gcloud_create_or_update_instance_template() {
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
       --container-restart-policy=always \
+      ${args} \
       ${extra_args} \
       --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \

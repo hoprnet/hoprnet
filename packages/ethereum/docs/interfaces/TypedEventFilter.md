@@ -34,7 +34,7 @@ EventFilter.address
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:38
+node_modules/@ethersproject/contracts/lib/index.d.ts:40
 
 ___
 
@@ -48,4 +48,4 @@ EventFilter.topics
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:39
+node_modules/@ethersproject/contracts/lib/index.d.ts:41

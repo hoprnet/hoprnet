@@ -13,12 +13,11 @@ import {
   generateChannelId,
   ChannelStatus,
   PRICE_PER_PACKET,
-  INVERSE_TICKET_WIN_PROB,
-  retryWithBackoff
+  INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 import type { RedeemTicketResponse } from '.'
-import { Commitment } from './commitment'
+import { findCommitmentPreImage, bumpCommitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
 import type { HoprDB } from '@hoprnet/hopr-utils'
@@ -26,6 +25,100 @@ import chalk from 'chalk'
 import { EventEmitter } from 'events'
 
 const log = debug('hopr-core-ethereum:channel')
+
+export async function redeemTickets(
+  source: PublicKey,
+  db: HoprDB,
+  chain: ChainWrapper,
+  indexer: Indexer,
+  events: EventEmitter
+): Promise<void> {
+  // Because tickets are ordered and require the previous redemption to
+  // have succeeded before we can redeem the next, we need to do this
+  // sequentially.
+  const tickets = await db.getAcknowledgedTickets({ signer: source })
+  log(`redeeming ${tickets.length} tickets from ${source.toB58String()}`)
+  try {
+    for (const ticket of tickets) {
+      log('redeeming ticket', ticket)
+      const result = await redeemTicket(source, ticket, db, chain, indexer, events)
+      if (result.status !== 'SUCCESS') {
+        log('Error redeeming ticket', result)
+        // We need to abort as tickets require ordered redemption.
+        return
+      }
+      log('ticket was redeemed')
+    }
+  } catch (e) {
+    // We are going to swallow the error here, as more than one consumer may
+    // be inspecting this same promise.
+    log('Error when redeeming tickets, aborting', e)
+  }
+  log(`redemption of tickets from ${source.toB58String()} is complete`)
+}
+
+// Private as out of order redemption will break things - redeem all at once.
+async function redeemTicket(
+  counterparty: PublicKey,
+  ackTicket: AcknowledgedTicket,
+  db: HoprDB,
+  chain: ChainWrapper,
+  indexer: Indexer,
+  events: EventEmitter
+): Promise<RedeemTicketResponse> {
+  if (!ackTicket.verify(counterparty)) {
+    return {
+      status: 'FAILURE',
+      message: 'Invalid response to acknowledgement'
+    }
+  }
+
+  try {
+    const ticket = ackTicket.ticket
+
+    log('Submitting ticket', ackTicket.response.toHex())
+    const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
+    const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
+    if (!hasPreImage) {
+      log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'PreImage is empty.'`)
+      return {
+        status: 'FAILURE',
+        message: 'PreImage is empty.'
+      }
+    }
+
+    const isWinning = ticket.isWinningTicket(ackTicket.preImage, ackTicket.response, ticket.winProb)
+
+    if (!isWinning) {
+      log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
+      return {
+        status: 'FAILURE',
+        message: 'Not a winning ticket.'
+      }
+    }
+
+    const receipt = await chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket)
+    await indexer.resolvePendingTransaction('channel-updated', receipt)
+
+    log('Successfully submitted ticket', ackTicket.response.toHex())
+    await db.markRedeemeed(ackTicket)
+    events.emit('ticket:redeemed', ackTicket)
+    return {
+      status: 'SUCCESS',
+      receipt,
+      ackTicket
+    }
+  } catch (err) {
+    // TODO delete ackTicket -- check if it's due to gas!
+    log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
+    return {
+      status: 'ERROR',
+      error: err
+    }
+  }
+}
+
+export const _redeemTicket = redeemTicket // For tests
 
 // TODO - legacy, models bidirectional channel.
 class Channel {
@@ -54,23 +147,8 @@ class Channel {
     const response = unacknowledgedTicket.getResponse(acknowledgement)
 
     const ticket = unacknowledgedTicket.ticket
-
-    const setCommitment = (commitment: Hash): Promise<string> => {
-      // NB: We do not catch any error here, as we want it to propagate
-      // to the place where the commitment was triggered, namely the bump
-      // commitment
-      return this.chain.setCommitment(this.counterparty.toAddress(), commitment)
-    }
-
-    const commitment = new Commitment(
-      setCommitment,
-      () => this.getChainCommitment(),
-      this.db,
-      generateChannelId(this.counterparty.toAddress(), this.self.toAddress()), // Counterparty to us
-      this.indexer
-    )
-
-    const opening = await commitment.findPreImage(await commitment.getCurrentCommitment())
+    const channelId = this.getThemToUsId()
+    const opening = await findCommitmentPreImage(this.db, channelId)
 
     if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
       const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
@@ -82,7 +160,7 @@ class Channel {
       )
 
       try {
-        await retryWithBackoff(() => commitment.bumpCommitment())
+        await bumpCommitment(this.db, channelId)
         this.events.emit('ticket:win', ack, this)
         return ack
       } catch (e) {
@@ -124,7 +202,8 @@ class Channel {
     if (totalFund.gt(new BN(myBalance.toBN().toString()))) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
+    const tx = await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   async open(fundAmount: Balance) {
@@ -143,7 +222,8 @@ class Channel {
     if (new BN(myBalance.toBN().toString()).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')
     }
-    await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
+    const tx = await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
+    await this.indexer.resolvePendingTransaction('channel-updated', tx)
     return generateChannelId(myAddress, counterpartyAddress)
   }
 
@@ -153,7 +233,8 @@ class Channel {
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return await this.chain.initiateChannelClosure(counterpartyAddress)
+    const tx = await this.chain.initiateChannelClosure(counterpartyAddress)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   async finalizeClosure() {
@@ -163,7 +244,8 @@ class Channel {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(counterpartyAddress)
+    const tx = await this.chain.finalizeChannelClosure(counterpartyAddress)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
   }
 
   private async bumpTicketIndex(channelId: Hash): Promise<UINT256> {
@@ -246,67 +328,6 @@ class Channel {
     return {
       minimum: stake.toBN().sub(outstandingTicketBalance.toBN()),
       maximum: stake.toBN()
-    }
-  }
-
-  async getAcknowledgedTickets(): Promise<AcknowledgedTicket[]> {
-    return await this.db.getAcknowledgedTickets({ signer: this.counterparty })
-  }
-
-  async redeemAllTickets(): Promise<RedeemTicketResponse[]> {
-    return await Promise.all((await this.getAcknowledgedTickets()).map((a) => this.redeemTicket(a)))
-  }
-
-  async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
-    if (!ackTicket.verify(this.counterparty)) {
-      return {
-        status: 'FAILURE',
-        message: 'Invalid response to acknowledgement'
-      }
-    }
-
-    try {
-      const ticket = ackTicket.ticket
-
-      log('Submitting ticket', ackTicket.response.toHex())
-      const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
-      const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
-      if (!hasPreImage) {
-        log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'PreImage is empty.'`)
-        return {
-          status: 'FAILURE',
-          message: 'PreImage is empty.'
-        }
-      }
-
-      const isWinning = ticket.isWinningTicket(ackTicket.preImage, ackTicket.response, ticket.winProb)
-
-      if (!isWinning) {
-        log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
-        return {
-          status: 'FAILURE',
-          message: 'Not a winning ticket.'
-        }
-      }
-
-      const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
-
-      //this.commitment.updateChainState(ackTicket.preImage)
-      log('Successfully submitted ticket', ackTicket.response.toHex())
-      await this.db.markRedeemeed(ackTicket)
-      this.events.emit('ticket:redeemed', ackTicket)
-      return {
-        status: 'SUCCESS',
-        receipt,
-        ackTicket
-      }
-    } catch (err) {
-      // TODO delete ackTicket -- check if it's due to gas!
-      log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
-      return {
-        status: 'ERROR',
-        error: err
-      }
     }
   }
 }

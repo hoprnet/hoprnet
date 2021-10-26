@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / Sacrifice__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / Sacrifice\_\_factory
 
 # Class: Sacrifice\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new Sacrifice__factory**(`signer?`)
+• **new Sacrifice__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -67,7 +67,7 @@ ContractFactory.bytecode
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:135
+node_modules/@ethersproject/contracts/lib/index.d.ts:137
 
 ___
 
@@ -81,7 +81,7 @@ ContractFactory.interface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:134
+node_modules/@ethersproject/contracts/lib/index.d.ts:136
 
 ___
 
@@ -95,17 +95,17 @@ ContractFactory.signer
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:136
+node_modules/@ethersproject/contracts/lib/index.d.ts:138
 
 ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: { `inputs`: { `name`: `string` = "\_recipient"; `type`: `string` = "address" }[] ; `payable`: `boolean` = true; `stateMutability`: `string` = "payable"; `type`: `string` = "constructor" }[]
+▪ `Static` `Readonly` **abi**: { `inputs`: { `name`: `string` = "\_recipient"; `type`: `string` = "address" }[] ; `payable`: `boolean` = true; `stateMutability`: `string` = "payable"; `type`: `string` = "constructor" }[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:56
+packages/ethereum/types/factories/Sacrifice__factory.ts:62
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:55
+packages/ethereum/types/factories/Sacrifice__factory.ts:61
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:49
+packages/ethereum/types/factories/Sacrifice__factory.ts:55
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:52
+packages/ethereum/types/factories/Sacrifice__factory.ts:58
 
 ___
 
@@ -188,7 +188,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:37
+packages/ethereum/types/factories/Sacrifice__factory.ts:43
 
 ___
 
@@ -213,7 +213,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:43
+packages/ethereum/types/factories/Sacrifice__factory.ts:49
 
 ___
 
@@ -234,7 +234,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:60
+packages/ethereum/types/factories/Sacrifice__factory.ts:66
 
 ___
 
@@ -248,7 +248,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:57
+packages/ethereum/types/factories/Sacrifice__factory.ts:63
 
 ___
 
@@ -273,7 +273,7 @@ ContractFactory.fromSolidity
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:144
+node_modules/@ethersproject/contracts/lib/index.d.ts:146
 
 ___
 
@@ -299,7 +299,7 @@ ContractFactory.getContract
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:150
+node_modules/@ethersproject/contracts/lib/index.d.ts:152
 
 ___
 
@@ -325,7 +325,7 @@ ContractFactory.getContractAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:146
+node_modules/@ethersproject/contracts/lib/index.d.ts:148
 
 ___
 
@@ -349,4 +349,4 @@ ContractFactory.getInterface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:145
+node_modules/@ethersproject/contracts/lib/index.d.ts:147

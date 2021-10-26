@@ -1,14 +1,16 @@
 {
+  "ts-node": {
+    // No need to check types again after running 'yarn build'
+    "transpileOnly": true
+  },
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "lib"
+    "outDir": "./lib"
   },
   "include": ["type-extension.ts", "hardhat.config.ts", "constants.ts", "index.ts", "test", "tasks", "deploy"],
-  "files": ["./hardhat.config.ts"],
-  "exclude": ["lib", "types"],
+  "exclude": ["types"],
   "typedocOptions": {
     "entryPoints": ["index.ts"],
-    "disableOutputCheck": true,
     "out": "docs",
     // by default we don't want links to source code to change on every change
     // when building docs for releases we can fix the revision on the cmdline

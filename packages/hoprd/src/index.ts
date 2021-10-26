@@ -335,6 +335,11 @@ async function main() {
     process.exit()
   }
 
+  process.on('uncaughtExceptionMonitor', (err, origin) => {
+    // Make sure we get a log.
+    logs.log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
+  })
+
   process.once('exit', stopGracefully)
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)

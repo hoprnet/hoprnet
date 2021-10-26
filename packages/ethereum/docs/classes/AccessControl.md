@@ -81,7 +81,7 @@ BaseContract.constructor
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:103
+node_modules/@ethersproject/contracts/lib/index.d.ts:105
 
 ## Properties
 
@@ -95,7 +95,7 @@ BaseContract.\_deployedPromise
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:96
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ___
 
@@ -113,7 +113,7 @@ BaseContract.\_runningEvents
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:97
+node_modules/@ethersproject/contracts/lib/index.d.ts:99
 
 ___
 
@@ -131,7 +131,7 @@ BaseContract.\_wrappedEmits
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:100
+node_modules/@ethersproject/contracts/lib/index.d.ts:102
 
 ___
 
@@ -145,7 +145,7 @@ BaseContract.address
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:75
+node_modules/@ethersproject/contracts/lib/index.d.ts:77
 
 ___
 
@@ -186,7 +186,7 @@ BaseContract.deployTransaction
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:95
+node_modules/@ethersproject/contracts/lib/index.d.ts:97
 
 ___
 
@@ -320,7 +320,7 @@ BaseContract.provider
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:78
+node_modules/@ethersproject/contracts/lib/index.d.ts:80
 
 ___
 
@@ -334,7 +334,7 @@ BaseContract.resolvedAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:94
+node_modules/@ethersproject/contracts/lib/index.d.ts:96
 
 ___
 
@@ -348,7 +348,7 @@ BaseContract.signer
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:77
+node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 ## Methods
 
@@ -392,7 +392,7 @@ BaseContract.\_checkRunningEvents
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:117
+node_modules/@ethersproject/contracts/lib/index.d.ts:119
 
 ___
 
@@ -416,7 +416,7 @@ BaseContract.\_deployed
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:110
+node_modules/@ethersproject/contracts/lib/index.d.ts:112
 
 ___
 
@@ -442,7 +442,7 @@ BaseContract.\_wrapEvent
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:118
+node_modules/@ethersproject/contracts/lib/index.d.ts:120
 
 ___
 
@@ -533,7 +533,7 @@ BaseContract.emit
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:123
+node_modules/@ethersproject/contracts/lib/index.d.ts:125
 
 ___
 
@@ -557,7 +557,7 @@ BaseContract.fallback
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:111
+node_modules/@ethersproject/contracts/lib/index.d.ts:113
 
 ___
 
@@ -689,13 +689,13 @@ BaseContract.listenerCount
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:124
+node_modules/@ethersproject/contracts/lib/index.d.ts:126
 
 ___
 
 ### listeners
 
-▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
+▸ **listeners**<`EventArgsArray`, `EventArgsObject`\>(`eventFilter?`): `TypedListener`<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Type parameters
 
@@ -712,7 +712,7 @@ ___
 
 #### Returns
 
-[`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\>[]
+`TypedListener`<`EventArgsArray`, `EventArgsObject`\>[]
 
 #### Overrides
 
@@ -760,7 +760,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `eventFilter` | [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<`EventArgsArray`, `EventArgsObject`\> |
-| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | `TypedListener`<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
@@ -813,7 +813,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `eventFilter` | [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<`EventArgsArray`, `EventArgsObject`\> |
-| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | `TypedListener`<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
@@ -866,7 +866,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `eventFilter` | [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<`EventArgsArray`, `EventArgsObject`\> |
-| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | `TypedListener`<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
@@ -1003,7 +1003,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `eventFilter` | [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<`EventArgsArray`, `EventArgsObject`\> |
-| `listener` | [`TypedListener`](../modules.md#typedlistener)<`EventArgsArray`, `EventArgsObject`\> |
+| `listener` | `TypedListener`<`EventArgsArray`, `EventArgsObject`\> |
 
 #### Returns
 
@@ -1106,7 +1106,7 @@ BaseContract.getContractAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:104
+node_modules/@ethersproject/contracts/lib/index.d.ts:106
 
 ___
 
@@ -1130,7 +1130,7 @@ BaseContract.getInterface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:108
+node_modules/@ethersproject/contracts/lib/index.d.ts:110
 
 ___
 
@@ -1154,4 +1154,4 @@ BaseContract.isIndexed
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:114
+node_modules/@ethersproject/contracts/lib/index.d.ts:116

@@ -2,7 +2,7 @@ import Heap from 'heap-js'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
 import { debug } from '@hoprnet/hopr-utils'
 import type { ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
-import { PATH_RANDOMNESS } from '../constants'
+import { PATH_RANDOMNESS, MAX_HOPS } from '../constants'
 
 import BN from 'bn.js'
 const log = debug('hopr-core:pathfinder')
@@ -16,7 +16,7 @@ const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => !pathFrom(p).
 const rand = () => Math.random() // TODO - swap for something crypto safe
 const debugPath = (p: ChannelPath) =>
   pathFrom(p)
-    .map((x) => x.toString())
+    .map((x) => x.toB58String())
     .join(',')
 
 // Weight a node based on stake, and a random component.
@@ -43,7 +43,7 @@ export async function findPath(
   getOpenChannelsFromPeer: (p: PublicKey) => Promise<ChannelEntry[]>,
   weight = defaultWeight
 ): Promise<Path> {
-  log('find path from', start.toString(), 'to ', destination.toString(), 'length', hops)
+  log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
 
   // Weight the path with the sum of its' edges weight
   const pathWeight = async (a: ChannelEntry[]): Promise<BN> => (await Promise.all(a.map(weight))).reduce(sum, new BN(0))
@@ -60,7 +60,8 @@ export async function findPath(
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath: ChannelPath = queue.peek()
-    if (pathFrom(currentPath).length == hops) {
+    const currPathLen = pathFrom(currentPath).length
+    if (currPathLen >= hops && currPathLen <= MAX_HOPS) {
       log('Path of correct length found', debugPath(currentPath), ':', currentPath.weight.toString())
       return pathFrom(currentPath)
     }

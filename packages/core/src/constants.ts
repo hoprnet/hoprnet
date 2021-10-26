@@ -1,10 +1,11 @@
+import { pickVersion } from '@hoprnet/hopr-utils'
+
 const pkg = require('../package.json')
 
 export const PACKET_SIZE = 500
 export const FULL_VERSION = pkg.version
 
-const packageVersion = pkg.version.split('.')
-export const VERSION = packageVersion[0] + '.' + packageVersion[1] + '.0' // Version on major versions only
+export const VERSION = pickVersion(pkg.version)
 
 const PROTOCOL_NAME = 'hopr'
 
@@ -29,5 +30,6 @@ export const PATH_RANDOMNESS = 0.1
 export const MAX_PATH_ITERATIONS = 100
 export const NETWORK_QUALITY_THRESHOLD = 0.5
 export const MAX_NEW_CHANNELS_PER_TICK = 5
+export const MAX_HOPS = 3 //3 intermediate hops and one recipient
 
 export const CHECK_TIMEOUT = 60000

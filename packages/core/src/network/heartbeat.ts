@@ -1,35 +1,41 @@
 import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
-import { debug } from '@hoprnet/hopr-utils'
-import { Hash } from '@hoprnet/hopr-utils'
-import { randomInteger, limitConcurrency, LibP2PHandlerFunction, u8aEquals, DialOpts } from '@hoprnet/hopr-utils'
+import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
+import { randomInteger, limitConcurrency, u8aEquals, Hash, debug } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'
 import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../constants'
 import { randomBytes } from 'crypto'
 
+import type { Subscribe, SendMessage } from '../index'
+
 const log = debug('hopr-core:heartbeat')
+const error = debug('hopr-core:heartbeat:error')
 
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
 
   constructor(
     private networkPeers: NetworkPeerStore,
-    subscribe: (protocol: string, handler: LibP2PHandlerFunction, includeReply: boolean) => void,
-    private sendMessageAndExpectResponse: (
-      dst: PeerId,
-      proto: string,
-      msg: Uint8Array,
-      opts: DialOpts
-    ) => Promise<Uint8Array[]>,
+    subscribe: Subscribe,
+    protected sendMessage: SendMessage,
     private hangUp: (addr: PeerId) => Promise<void>
   ) {
-    subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true)
+    const errHandler = (err: any) => {
+      error(`Error while processing heartbeat request`, err)
+    }
+
+    subscribe(
+      PROTOCOL_HEARTBEAT,
+      this.handleHeartbeatRequest.bind(this) as LibP2PHandlerFunction<Promise<Uint8Array>>,
+      true,
+      errHandler
+    )
   }
 
-  public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array {
+  public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
     this.networkPeers.register(remotePeer)
     log('beat')
-    return Hash.create(msg).serialize()
+    return Promise.resolve(Hash.create(msg).serialize())
   }
 
   public async pingNode(id: PeerId): Promise<boolean> {
@@ -39,7 +45,7 @@ export default class Heartbeat {
     const expectedResponse = Hash.create(challenge).serialize()
 
     try {
-      const pingResponse = await this.sendMessageAndExpectResponse(id, PROTOCOL_HEARTBEAT, challenge, {
+      const pingResponse = await this.sendMessage(id, PROTOCOL_HEARTBEAT, challenge, true, {
         timeout: HEARTBEAT_TIMEOUT
       })
 
@@ -52,7 +58,7 @@ export default class Heartbeat {
       log('ping success to', id.toB58String())
       return true
     } catch (e) {
-      log(`Connection to ${id.toB58String()} failed: ${e}`)
+      log(`Connection to ${id.toB58String()} failed: ${JSON.stringify(e)}`)
       return false
     }
   }
@@ -68,12 +74,17 @@ export default class Heartbeat {
     }
 
     await limitConcurrency<void>(MAX_PARALLEL_CONNECTIONS, () => toPing.length <= 0, doPing)
+    log(`finished checking nodes since ${thresholdTime} ${this.networkPeers.length()} nodes`)
     log(this.networkPeers.debugLog())
   }
 
   private tick() {
     this.timeout = setTimeout(async () => {
-      await this.checkNodes()
+      try {
+        await this.checkNodes()
+      } catch (e) {
+        log('FATAL ERROR IN HEARTBEAT', e)
+      }
       this.tick()
     }, randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE))
   }
