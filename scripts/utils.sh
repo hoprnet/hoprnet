@@ -148,20 +148,20 @@ try_cmd() {
 
 # $1 = file to monitor
 # $2 = regexp to look for
+# $3 = delay, defaults to 1.0 (seconds)
 function wait_for_regex {
-  local file=${1}
-  local regex=${2}
-
-  local delay=0.1
+  local file="${1}"
+  local regex="${2}"
+  local delay="${delay:-1.0}"
 
   while true; do
-    sleep ${delay}
-    if [ -f ${file} ]; then 
+    if [ -f ${file} ]; then
       local res=$(grep -E "${regex}" "${file}" || echo "")
       if [[ "${res}" != "" ]]; then
         return 0
       fi
     fi
+    sleep ${delay}
   done
 }
 

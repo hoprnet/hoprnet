@@ -1026,4 +1026,4 @@ export * from './constants'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
 export type { ProtocolConfig, Network, ResolvedEnvironment } from './environment'
-export { resolveEnvironment, supportedEnvironments, defaultEnvironment } from './environment'
+export { resolveEnvironment, supportedEnvironments } from './environment'

@@ -4,7 +4,7 @@ import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import Hopr, { resolveEnvironment, supportedEnvironments, defaultEnvironment } from '@hoprnet/hopr-core'
+import Hopr, { resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
 import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
@@ -21,10 +21,27 @@ function stopGracefully(signal: number) {
   process.exit()
 }
 
+export type DefaultEnvironment = {
+  id?: string
+}
+
+function defaultEnvironment(): string {
+  try {
+  const config = require("../default-environment.json") as DefaultEnvironment
+  return config?.id || ""
+  } catch(error) {
+    // its ok if the file isn't there or cannot be read
+    return ""
+  }
+}
+
+
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
     string: true,
-    describe: 'Environment id, one of the ids defined in protocol-config.json'
+    describe: 'Environment id which the node shall run on',
+    choices: supportedEnvironments().map((env) => env.id),
+    default: defaultEnvironment()
   })
   .option('privateKey', {
     describe: 'A private key to be used for the node',
@@ -38,7 +55,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
   const options: HoprOptions = {
     announce: false,
     createDbIfNotExist: true,
-    environment: environment,
+    environment,
     forceCreateDB: true,
     password: ''
   }
@@ -47,16 +64,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
-  // We require the environment to be set either on the command-line or as a
-  // de<Plug>_failt setting (used in releases npm/docker).
-  const environment_id = argv.environment || defaultEnvironment()
-  if (!environment_id) {
-    throw new Error(
-      `please specify --environment <environment id>, supported environments:\n\n${supportedEnvironments().join('\n')}`
-    )
-  }
-  const environment = resolveEnvironment(environment_id)
-
+  const environment = resolveEnvironment(argv.environment)
   const options = await generateNodeOptions(environment)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)

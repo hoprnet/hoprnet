@@ -24,7 +24,8 @@
     "node": "16"
   },
   "files": [
-    "lib"
+    "lib",
+    "default-environment.json"
   ],
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",

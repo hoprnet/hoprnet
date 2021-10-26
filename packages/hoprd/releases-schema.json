@@ -4,25 +4,32 @@
     "type": "object",
     "properties": {
       "id": {
-        "type": "string"
+        "type": "string",
+        "description": "the release id used for VM naming"
       },
       "version_major": {
-        "type": "integer"
+        "type": "integer",
+        "description": "major semver for the release"
       },
       "version_minor": {
-        "type": "integer"
+        "type": "integer",
+        "description": "minor semver for the release"
       },
       "git_ref": {
-        "type": "string"
+        "type": "string",
+        "description": "every time this git ref is updated, the release is deployed"
       },
       "environment_id": {
-        "type": "string"
+        "type": "string",
+        "description": "the environment id to run release nodes in, see protocol-config.json"
       },
       "deprecated": {
-        "type": "boolean"
+        "type": "boolean",
+        "description": "if true, this release is kept for historical purposes and not re-deployed"
       },
       "docker_image": {
-        "type": "string"
+        "type": "string",
+        "description": "FQ docker image name"
       }
     },
     "required": ["id", "git_ref", "environment_id", "deprecated", "docker_image"],

@@ -1,26 +1,25 @@
 [
   {
-    "id": "master-goerli", // the release id used for VM naming
-    "git_ref": "refs/heads/master", // every time this git ref is updated, the release is deployed
-    "environment_id": "master-goerli", // the environment id to run release nodes in, see protocol-config.json
-    "deprecated": false, // if true, this release is kept for historical purposes and not re-deployed
-    "version_major": 0, // optional: major semver for the release
-    "version_minor": 0, // optional: minor semver for the release
-    "docker_image": "gcr.io/hoprassociation/hoprd:latest" // FQ docker image name
+    "id": "master-goerli",
+    "git_ref": "refs/heads/master",
+    "environment_id": "master-goerli",
+    "deprecated": false,
+    "docker_image": "gcr.io/hoprassociation/hoprd:master-goerli",
+    "default": true
   },
   {
     "id": "master-xdai",
     "git_ref": "refs/heads/master",
     "environment_id": "master-xdai",
     "deprecated": false,
-    "docker_image": "gcr.io/hoprassociation/hoprd:latest"
+    "docker_image": "gcr.io/hoprassociation/hoprd:master-xdai"
   },
   {
     "id": "integration-test",
     "git_ref": "refs/heads/integration/release-environment",
-    "environment_id": "master-xdai",
+    "environment_id": "master-goerli",
     "deprecated": false,
-    "docker_image": "gcr.io/hoprassociation/hoprd:latest"
+    "docker_image": "gcr.io/hoprassociation/hoprd:integration-test"
   },
   {
     "id": "wildhorn",
@@ -29,7 +28,7 @@
     "git_ref": "refs/heads/release/wildhorn",
     "environment_id": "wildhorn-matic-polygon",
     "deprecated": false,
-    "docker_image": "gcr.io/hoprassociation/hoprd:latest-wildhorn"
+    "docker_image": "gcr.io/hoprassociation/hoprd:wildhorn"
   },
   {
     "id": "constantine",
@@ -38,6 +37,6 @@
     "git_ref": "refs/heads/release/constantine",
     "environment_id": "constantine-xdai",
     "deprecated": true,
-    "docker_image": "gcr.io/hoprassociation/hoprd:latest-constantine"
+    "docker_image": "gcr.io/hoprassociation/hoprd:constantine"
   }
 ]

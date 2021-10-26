@@ -24,10 +24,6 @@ export type ProtocolConfig = {
   networks: Network[]
 }
 
-export type DefaultEnvironment = {
-  id?: string
-}
-
 export type ResolvedEnvironment = {
   id: string
   network: Network
@@ -58,14 +54,8 @@ export function resolveEnvironment(environment_id: string): ResolvedEnvironment 
       }
     }
   }
-  const supportedEnvs: Environment[] = supportedEnvironments()
-  const supportedEnvsString: string = supportedEnvs.map((env) => env.id).join(', ')
+  const supportedEnvsString: string = supportedEnvironments().map((env) => env.id).join(', ')
   throw new Error(
-    `environment '${environment_id}' is not supported, supported environments:\n\n ${supportedEnvsString}`
+    `environment '${environment_id}' is not supported, supported environments: ${supportedEnvsString}`
   )
-}
-
-export function defaultEnvironment(): string {
-  const config = require('../default-environment.json') as DefaultEnvironment
-  return config?.id
 }

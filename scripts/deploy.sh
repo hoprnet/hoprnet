@@ -26,7 +26,7 @@ _jq() {
 echo "Looking for releases to deploy (GITHUB_REF == ${GITHUB_REF})"
 
 # iterate through releases with git_ref == $GITHUB_REF
-for row in $(cat packages/hoprd/releases.json | ./node_modules/.bin/strip-json-comments | jq -r ".[] | select(.git_ref==\"${GITHUB_REF}\") | @base64"); do
+for row in $(cat packages/hoprd/releases.json | jq -r ".[] | select(.git_ref==\"${GITHUB_REF}\") | @base64"); do
   declare release_id=$(_jq "${row}" ".id")
   declare deprecated=$(_jq "${row}" ".deprecated")
   declare environment_id=$(_jq "${row}" ".environment_id")

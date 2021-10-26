@@ -27,6 +27,3 @@ log.txt
 
 # Exclude built npm packages
 *.tgz
-
-# used only in release and should not be tracked
-/default-environment.json

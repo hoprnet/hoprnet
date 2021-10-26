@@ -11,7 +11,8 @@
     "lib",
     "hopr-admin/.next/**",
     "hoprd-default.sh",
-    "releases.json"
+    "releases.json",
+    "default-environment.json"
   ],
   "engines": {
     "node": "16"

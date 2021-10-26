@@ -114,6 +114,10 @@ function setup_node() {
     log "Additional args: \"${additional_args}\""
   fi
 
+  if [[ "${additional_args}" != *"--environment "* ]]; then
+    additional_args="--environment hardhat-localhost ${additional_args}"
+  fi
+
   DEBUG="hopr*" node packages/hoprd/lib/index.js \
     --admin \
     --adminHost "127.0.0.1" \
@@ -197,7 +201,7 @@ DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server" 
+wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
 # }}}
 

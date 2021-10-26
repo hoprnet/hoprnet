@@ -6,7 +6,7 @@ import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import Hopr, { resolveEnvironment, supportedEnvironments, defaultEnvironment } from '@hoprnet/hopr-core'
+import Hopr, { resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 
 import setupAPI from './api'
@@ -19,10 +19,26 @@ import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
+export type DefaultEnvironment = {
+  id?: string
+}
+
+function defaultEnvironment(): string {
+  try {
+  const config = require("../default-environment.json") as DefaultEnvironment
+  return config?.id || ""
+  } catch(error) {
+    // its ok if the file isn't there or cannot be read
+    return ""
+  }
+}
+
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
     string: true,
-    describe: 'Environment id, one of the ids defined in protocol-config.json'
+    describe: 'Environment id which the node shall run on',
+    choices: supportedEnvironments().map((env) => env.id),
+    default: defaultEnvironment()
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -164,7 +180,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
     hosts: parseHosts(),
     announceLocalAddresses: argv.testAnnounceLocalAddresses,
     preferLocalAddresses: argv.testPreferLocalAddresses,
-    environment: environment
+    environment
   }
 
   if (argv.password !== undefined) {
@@ -230,17 +246,6 @@ async function main() {
     }
   }
 
-  // We require the environment to be set either on the command-line or as a
-  // de<Plug>_failt setting (used in releases npm/docker).
-  const environment_id = argv.environment || defaultEnvironment()
-  if (!environment_id) {
-    throw new Error(
-      `please specify --environment <environment id>, supported environments:\n\n${supportedEnvironments().join('\n')}`
-    )
-  }
-
-  const environment = resolveEnvironment(environment_id)
-
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
     // as if the HOPR node fails, we need to put an error message up.
@@ -252,6 +257,7 @@ async function main() {
     await adminServer.setup()
   }
 
+  const environment = resolveEnvironment(argv.environment)
   let options = await generateNodeOptions(environment)
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
