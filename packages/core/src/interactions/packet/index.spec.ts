@@ -20,7 +20,7 @@ import {
   ChannelStatus
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import { PROTOCOL_STRING, PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
+import { PROTOCOL_STRING } from '../../constants'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 
