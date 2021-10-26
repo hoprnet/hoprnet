@@ -2839,7 +2839,7 @@ ___
 
 #### Defined in
 
-[db.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L29)
+[db.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L30)
 
 ___
 
