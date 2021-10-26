@@ -1566,6 +1566,7 @@ __metadata:
     "@ceramicnetwork/stream-tile": ^1.2.0
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@types/body-parser": 1.19.1
     "@types/yargs": 17.0.4
     bn.js: 5.2.0
     body-parser: ^1.19.0
@@ -1575,7 +1576,6 @@ __metadata:
     cookie: ^0.4.1
     debug: ^4.3.2
     dids: ^2.4.0
-    ethereumjs-wallet: 1.0.2
     jazzicon: ^1.5.0
     js-cookie: ^3.0.0
     key-did-provider-ed25519: ^1.1.0
@@ -2472,6 +2472,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/body-parser@npm:1.19.1":
+  version: 1.19.1
+  resolution: "@types/body-parser@npm:1.19.1"
+  dependencies:
+    "@types/connect": "*"
+    "@types/node": "*"
+  checksum: 2990656ea2de81f3529a3359a79a13b67feb4c627caf7a367fdc0017a178e567b0cc410546bdd219104ad7197c5ee5a90b70193f5253839ea43d9cdb2d2dacee
+  languageName: node
+  linkType: hard
+
 "@types/chai-as-promised@npm:7.1.4":
   version: 7.1.4
   resolution: "@types/chai-as-promised@npm:7.1.4"
@@ -2494,6 +2504,15 @@ __metadata:
   dependencies:
     "@types/node": "*"
   checksum: 7d211e74331affd3578b5469244f5cef84a93775f38332adb3ef12413559a23862bc682c6873d0a404b01c9d5d5f7d3ae091fe835b435b633eb420e3055b3e56
+  languageName: node
+  linkType: hard
+
+"@types/connect@npm:*":
+  version: 3.4.35
+  resolution: "@types/connect@npm:3.4.35"
+  dependencies:
+    "@types/node": "*"
+  checksum: fe81351470f2d3165e8b12ce33542eef89ea893e36dd62e8f7d72566dfb7e448376ae962f9f3ea888547ce8b55a40020ca0e01d637fab5d99567673084542641
   languageName: node
   linkType: hard
 
@@ -2982,7 +3001,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"aes-js@npm:^3.1.1, aes-js@npm:^3.1.2":
+"aes-js@npm:^3.1.1":
   version: 3.1.2
   resolution: "aes-js@npm:3.1.2"
   checksum: 062154d50b1e433cc8c3b8ca7879f3a6375d5e79c2a507b2b6c4ec920b4cd851bf2afa7f65c98761a9da89c0ab618cbe6529e8e9a1c71f93290b53128fb8f712
@@ -7069,7 +7088,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ethereumjs-util@npm:^7.0.10, ethereumjs-util@npm:^7.0.2, ethereumjs-util@npm:^7.0.7, ethereumjs-util@npm:^7.1.0, ethereumjs-util@npm:^7.1.2":
+"ethereumjs-util@npm:^7.0.10, ethereumjs-util@npm:^7.0.2, ethereumjs-util@npm:^7.0.7, ethereumjs-util@npm:^7.1.0":
   version: 7.1.2
   resolution: "ethereumjs-util@npm:7.1.2"
   dependencies:
@@ -7139,22 +7158,6 @@ __metadata:
     utf8: ^3.0.0
     uuid: ^3.3.2
   checksum: 54a9cc8beb8ea55e9be9b024b6ed09349423145fd8c49b8662d60d9258039330163c830fec055f92becc71ea54b430d2ef29f6bd73fa49d93ea854af01d13e58
-  languageName: node
-  linkType: hard
-
-"ethereumjs-wallet@npm:1.0.2":
-  version: 1.0.2
-  resolution: "ethereumjs-wallet@npm:1.0.2"
-  dependencies:
-    aes-js: ^3.1.2
-    bs58check: ^2.1.2
-    ethereum-cryptography: ^0.1.3
-    ethereumjs-util: ^7.1.2
-    randombytes: ^2.1.0
-    scrypt-js: ^3.0.1
-    utf8: ^3.0.0
-    uuid: ^8.3.2
-  checksum: 555effe571c633ca9189e08639928e7bfcb601474f5a37653a3d028b06a10fb8577408c32d425ccecb3ac25d7165322cb9786239fa09ce276532d262206feb8c
   languageName: node
   linkType: hard
 
@@ -10445,14 +10448,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"keypair@npm:^1.0.1":
-  version: 1.0.3
-  resolution: "keypair@npm:1.0.3"
-  checksum: c7723a75f72d287fa1552a053a07129eb72f42b300762ea97593127156cc6569a9c6234e1940f226f447477f56b0dc7a2a5eed60f1fa98843beceba47d952eec
-  languageName: node
-  linkType: hard
-
-"keypair@npm:^1.0.4":
+"keypair@npm:^1.0.1, keypair@npm:^1.0.4":
   version: 1.0.4
   resolution: "keypair@npm:1.0.4"
   checksum: 7c91627416ac43ce81013310cdf8a8f92b17a22b64066b21db96446da62414563783ebbfa822ead74de380ee9e7885d267f5f8c31528127ca8437ef690a5cdba
@@ -17253,7 +17249,7 @@ typescript@4.4.4:
   languageName: node
   linkType: hard
 
-"uuid@npm:^8.0.0, uuid@npm:^8.3.2":
+"uuid@npm:^8.0.0":
   version: 8.3.2
   resolution: "uuid@npm:8.3.2"
   bin:

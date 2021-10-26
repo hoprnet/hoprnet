@@ -52,12 +52,14 @@ declare tmp="/tmp"
 
 declare npm_install_dir="${tmp}/hopr-npm"
 
-declare node1_dir="${tmp}/hopr-npm-node-1"
-declare node2_dir="${tmp}/hopr-npm-node-2"
-declare node3_dir="${tmp}/hopr-npm-node-3"
-declare node4_dir="${tmp}/hopr-npm-node-4"
-declare node5_dir="${tmp}/hopr-npm-node-5"
-declare node6_dir="${tmp}/hopr-npm-node-6"
+declare node_prefix="hopr-npm"
+
+declare node1_dir="${tmp}/${node_prefix}-1"
+declare node2_dir="${tmp}/${node_prefix}-2"
+declare node3_dir="${tmp}/${node_prefix}-3"
+declare node4_dir="${tmp}/${node_prefix}-4"
+declare node5_dir="${tmp}/${node_prefix}-5"
+declare node6_dir="${tmp}/${node_prefix}-6"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -72,6 +74,8 @@ declare node3_id="${node3_dir}.id"
 declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
+
+declare password="e2e-test"
 
 declare hardhat_rpc_log="${tmp}/hopr-npm-hardhat-rpc.log"
 
@@ -143,7 +147,7 @@ function setup_node() {
     --host="127.0.0.1:${node_port}" \
     --identity="${id}" \
     --init \
-    --password="e2e-test" \
+    --password="${password}" \
     --provider=http://127.0.0.1:8545/ \
     --rest \
     --restPort "${rest_port}" \
@@ -155,26 +159,6 @@ function setup_node() {
 
   # back to our original directory
   cd "${cwd}"
-}
-
-# $1 = port
-# $2 = node log file
-function fund_node() {
-  local port=${1}
-  local log=${2}
-  local api="127.0.0.1:${port}"
-
-  local eth_address
-  eth_address="$(curl --silent "${api}/api/v1/address/hopr")"
-
-  if [ -z "${eth_address}" ]; then
-    log "Can't fund node - couldn't load ETH address"
-    exit 1
-  fi
-
-  log "Funding 1 ETH and 10 HOPR to ${eth_address}"
-  yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-    --address "${eth_address}" --network localhost --ishopraddress true --amount 10
 }
 
 # --- Log test info {{{
@@ -261,12 +245,12 @@ wait_for_regex ${node6_log} "using blockchain address"
 # }}}
 
 #  --- Fund nodes --- {{{
-fund_node 13301 "${node1_log}"
-fund_node 13302 "${node2_log}"
-fund_node 13303 "${node3_log}"
-fund_node 13304 "${node4_log}"
-fund_node 13305 "${node5_log}"
-fund_node 13306 "${node6_log}"
+yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+  --identity-prefix "${node_prefix}" \
+  --identity-directory "${tmp}" \
+  --use-local-identities \
+  --network localhost \
+  --password "${password}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
