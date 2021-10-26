@@ -151,7 +151,12 @@ describe('packet interaction', function () {
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
     libp2pCounterparty.subscribe(PROTOCOL_STRING, (msg: Uint8Array) => {
-      sendAcknowledgement(Packet.deserialize(msg, COUNTERPARTY, RELAY0), RELAY0, libp2pCounterparty.send, COUNTERPARTY)
+      sendAcknowledgement(
+        Packet.deserialize(msg, COUNTERPARTY, RELAY0),
+        RELAY0,
+        libp2pCounterparty.send as any,
+        COUNTERPARTY
+      )
     })
 
     interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0, SELF))
@@ -186,7 +191,7 @@ describe('packet interaction', function () {
         receive = console.log
       }
 
-      const interaction = new PacketForwardInteraction(subscribe, send, pId, receive, dbs[index])
+      const interaction = new PacketForwardInteraction(subscribe, send as any, pId, receive, dbs[index])
 
       if (pId.equals(SELF)) {
         senderInteraction = interaction
