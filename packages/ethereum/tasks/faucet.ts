@@ -96,8 +96,8 @@ async function createTransaction(
     }
   ]
 
-  console.log(`💧💰 Sending ${amountEth.toString()} ETH to ${address} on network ${networkName}`)
-  console.log(`💧🟡 Sending ${amountHopr.toString()} HOPR to ${address} on network ${networkName}`)
+  console.log(`💧💰 Sending ${utils.formatEther(amountEth)} ETH to ${address} on network ${networkName}`)
+  console.log(`💧🟡 Sending ${utils.formatEther(amountHopr)} HOPR to ${address} on network ${networkName}`)
 
   return txs
 }
