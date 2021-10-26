@@ -71,7 +71,7 @@ type DeserializationResponse =
 /**
  * Deserializes an encoded key pair
  * @dev This method uses a computation and memory intensive hash function,
- *      for testing set `useWeaKCrytpo = true`
+ *      for testing set `useWeakCrypto = true`
  * @param serialized encoded key pair
  * @param password password to use for decryption
  * @param useWeakCrypto [optional] use faster but weaker crypto to reconstruct key pair
