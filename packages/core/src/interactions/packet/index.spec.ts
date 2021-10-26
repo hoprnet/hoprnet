@@ -5,17 +5,13 @@ import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
 import {
-  Address,
   Balance,
-  Challenge,
   defer,
   HoprDB,
   PublicKey,
-  Ticket,
   UINT256,
   createPoRValuesForSender,
   deriveAckKeyShare,
-  UnacknowledgedTicket,
   u8aEquals,
   privKeyToPeerId,
   stringToU8a,
@@ -23,8 +19,9 @@ import {
   Hash,
   ChannelStatus
 } from '@hoprnet/hopr-utils'
-
-import { AcknowledgementChallenge, Packet } from '../../messages'
+import assert from 'assert'
+import { PROTOCOL_STRING, PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
+import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 
 const SECRET_LENGTH = 32
@@ -45,19 +42,6 @@ const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195
 
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
-function createFakeTicket(privKey: PeerId, challenge: Challenge, counterparty: Address, amount: Balance) {
-  return Ticket.create(
-    counterparty,
-    challenge,
-    new UINT256(new BN(0)),
-    new UINT256(new BN(0)),
-    amount,
-    UINT256.fromInverseProbability(new BN(1)),
-    new UINT256(new BN(0)),
-    privKey.privKey.marshal()
-  )
-}
-
 function createFakeSendReceive(events: EventEmitter, self: PeerId) {
   const send = (destination: PeerId, protocol: any, msg: Uint8Array) => {
     events.emit('msg', msg, self, destination, protocol)
@@ -77,9 +61,23 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
   }
 }
 
+function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
+  return new ChannelEntry(
+    PublicKey.fromPeerId(from),
+    PublicKey.fromPeerId(to),
+    DEFAULT_FUNDING,
+    new Hash(Uint8Array.from(randomBytes(32))),
+    DEFAULT_TICKET_EPOCH,
+    DEFAULT_INDEX,
+    ChannelStatus.Open,
+    DEFAULT_CHANNEL_EPOCH,
+    DEFAULT_CLOSURE_TIME
+  )
+}
+
 describe('packet interaction', function () {
   const events = new EventEmitter()
-  let dbs: HoprDB[] = []
+  let dbs: HoprDB[] = Array.from({ length: nodes.length })
 
   afterEach(async function () {
     events.removeAllListeners()
@@ -93,45 +91,75 @@ describe('packet interaction', function () {
     }
   })
 
-  // it('acknowledgement workflow', async function () {
-  //   const secrets = Array.from({ length: 2 }, () => randomBytes(SECRET_LENGTH))
-  //   const { ackChallenge, ownKey, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
-  //   const ticket = createFakeTicket(
-  //     SELF,
-  //     ticketChallenge,
-  //     PublicKey.fromPeerId(COUNTERPARTY).toAddress(),
-  //     new Balance(new BN(1))
-  //   )
-  //   const challenge = AcknowledgementChallenge.create(ackChallenge, SELF)
-  //   const unack = new UnacknowledgedTicket(ticket, halfKey, SELF)
-  //   await db.storeUnacknowledgedTicket(ackChallenge, unack)
+  it('acknowledgement workflow as sender', async function () {
+    const secrets: Uint8Array[] = Array.from({ length: 2 }, () => Uint8Array.from(randomBytes(SECRET_LENGTH)))
 
-  //   const libp2pSelf = createFakeSendReceive(events, SELF)
-  //   const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
+    const { ackChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
 
-  //   const fakePacket = new Packet(TEST_MESSAGE, challenge, ticket)
+    const libp2pSelf = createFakeSendReceive(events, SELF)
+    const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
-  //   fakePacket.ownKey = ownKey
-  //   fakePacket.ackKey = deriveAckKeyShare(secrets[0])
-  //   fakePacket.nextHop = COUNTERPARTY.pubKey.marshal()
-  //   fakePacket.ackChallenge = ackChallenge
-  //   fakePacket.previousHop = PublicKey.fromPeerId(SELF)
+    const ackReceived = defer<void>()
 
-  //   fakePacket.storeUnacknowledgedTicket(db)
+    subscribeToAcknowledgements(libp2pSelf.subscribe, dbs[0], new EventEmitter(), SELF, () => ackReceived.resolve())
 
-  //   const ackReceived = defer<void>()
-  //   const ev = new EventEmitter()
+    const ackKey = deriveAckKeyShare(secrets[0])
+    const ackMessage = AcknowledgementChallenge.create(ackChallenge, SELF)
 
-  //   subscribeToAcknowledgements(libp2pSelf.subscribe, db, ev, SELF, () => {
-  //     ackReceived.resolve()
-  //   })
+    assert(
+      ackMessage.solve(ackKey.serialize()),
+      `acknowledgement key must be sufficient to solve acknowledgement challenge`
+    )
 
-  //   sendAcknowledgement(fakePacket, SELF, libp2pCounterparty.send, COUNTERPARTY)
+    sendAcknowledgement(
+      {
+        createAcknowledgement: (privKey: PeerId) => {
+          return Acknowledgement.create(ackMessage, ackKey, privKey)
+        }
+      } as any,
+      SELF,
+      libp2pCounterparty.send,
+      COUNTERPARTY
+    )
 
-  //   await ackReceived.promise
-  // })
+    await ackReceived.promise
+  })
 
-  it('packet-acknowledgement workflow', async function () {
+  it('acknowledgement workflow as relayer', async function () {
+    // Open a dummy channel to create first packet
+    const firstChannel = getDummyChannel(SELF, RELAY0)
+    await dbs[0].updateChannel(firstChannel.getId(), firstChannel)
+
+    const packet = await Packet.create(TEST_MESSAGE, [RELAY0, COUNTERPARTY], SELF, dbs[0])
+
+    const libp2pRelay0 = createFakeSendReceive(events, RELAY0)
+
+    const ackReceived = defer<void>()
+
+    subscribeToAcknowledgements(libp2pRelay0.subscribe, dbs[1], new EventEmitter(), RELAY0, () => ackReceived.resolve())
+
+    const interaction = new PacketForwardInteraction(
+      libp2pRelay0.subscribe,
+      libp2pRelay0.send,
+      RELAY0,
+      () => {
+        throw Error(`Node is not supposed to receive message`)
+      },
+      dbs[1]
+    )
+
+    const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
+
+    libp2pCounterparty.subscribe(PROTOCOL_STRING, (msg: Uint8Array) => {
+      sendAcknowledgement(Packet.deserialize(msg, COUNTERPARTY, RELAY0), RELAY0, libp2pCounterparty.send, COUNTERPARTY)
+    })
+
+    interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0, SELF))
+
+    await ackReceived.promise
+  })
+
+  it('packet-acknowledgement multi-relay workflow', async function () {
     const msgDefer = defer<void>()
     const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
@@ -141,18 +169,8 @@ describe('packet interaction', function () {
       const { subscribe, send } = createFakeSendReceive(events, pId)
 
       if (!pId.equals(RELAY2) && !pId.equals(COUNTERPARTY)) {
-        const channel = new ChannelEntry(
-          PublicKey.fromPeerId(pId),
-          PublicKey.fromPeerId(nodes[index + 1]),
-          DEFAULT_FUNDING,
-          new Hash(Uint8Array.from(randomBytes(32))),
-          DEFAULT_TICKET_EPOCH,
-          DEFAULT_INDEX,
-          ChannelStatus.Open,
-          DEFAULT_CHANNEL_EPOCH,
-          DEFAULT_CLOSURE_TIME
-        )
-
+        // Open dummy channels to issue tickets
+        const channel = getDummyChannel(pId, nodes[index + 1])
         await dbs[index].updateChannel(channel.getId(), channel)
       }
 
