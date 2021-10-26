@@ -5,6 +5,8 @@ on:
     branches: ['master', 'yellowpaper/**']
     paths:
       - 'docs/yellowpaper/**'
+      - '.github/workflows/latexcompile.yml'
+      - '!.github/workflows/*.yml'
       - '!docs/yellowpaper/yellowpaper.pdf'
       - '!docs/yellowpaper/*.md'
 
