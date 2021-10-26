@@ -9,7 +9,7 @@ const logError = debug('hopr:keypair')
  * Serializes a peerId using geth's KeyStore format
  * see https://medium.com/@julien.maffre/what-is-an-ethereum-keystore-file-86c8c5917b97
  * @dev This method uses a computation and memory intensive hash function,
- *      for testing set `useWeaKCrytpo = true`
+ *      for testing set `useWeakCrypto = true`
  * @param peerId id to store
  * @param password password used for encryption
  * @param useWeakCrypto [optional] weak parameter for fast serialization
@@ -75,7 +75,7 @@ type DeserializationResponse =
 /**
  * Deserializes an encoded key pair
  * @dev This method uses a computation and memory intensive hash function,
- *      for testing set `useWeaKCrytpo = true`
+ *      for testing set `useWeakCrypto = true`
  * @param serialized encoded key pair
  * @param password password to use for decryption
  * @param useWeakCrypto [optional] use faster but weaker crypto to reconstruct key pair
