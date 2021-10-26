@@ -1,10 +1,11 @@
 import { Packet, INTERMEDIATE_HOPS } from './packet'
-import { HoprDB, UINT256, u8aEquals } from '@hoprnet/hopr-utils'
+import { HoprDB, UINT256, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import assert from 'assert'
 import BN from 'bn.js'
 
 function createMockTickets() {
+  const tags = new Set<string>()
   const db = {
     getChannelTo: () => ({
       getId: () => ({ toHex: () => '0xdeadbeef' }),
@@ -13,7 +14,16 @@ function createMockTickets() {
     }),
     getCurrentTicketIndex: () => {},
     setCurrentTicketIndex: () => {},
-    checkAndSetPacketTag: () => Promise.resolve(false),
+    checkAndSetPacketTag: async (tag: Uint8Array) => {
+      const tagString = u8aToHex(tag)
+      if (tags.has(tagString)) {
+        return true
+      }
+
+      tags.add(tagString)
+
+      return false
+    },
     storeUnacknowledgedTicket: () => Promise.resolve(),
     markPending: () => Promise.resolve()
   }
@@ -61,6 +71,9 @@ describe('packet creation and transformation', function () {
       const { db } = createMockTickets()
       await packet.checkPacketTag(db)
 
+      // Checks that packet tag is set and cannot set twice
+      await assert.rejects(packet.checkPacketTag(db))
+
       if (packet.isReceiver) {
         assert(index == path.length - 1)
         assert(u8aEquals(packet.plaintext, testMsg))
@@ -86,6 +99,10 @@ describe('packet creation and transformation', function () {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
       const { db } = createMockTickets()
       await packet.checkPacketTag(db)
+
+      // Checks that packet tag is set and cannot set twice
+      await assert.rejects(packet.checkPacketTag(db))
+
       if (packet.isReceiver) {
         assert(index == path.length - 1)
         assert(u8aEquals(packet.plaintext, testMsg))

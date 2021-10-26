@@ -263,6 +263,13 @@ export class HoprDB {
     )
   }
 
+  /**
+   * Checks whether the given packet tag is present in the database.
+   * If not, sets the packet tag and return false, otherwise return
+   * true.
+   * @param packetTag packet tag to check for
+   * @returns a Promise that resolves to true if packet tag is present in db
+   */
   async checkAndSetPacketTag(packetTag: Uint8Array) {
     let present = await this.has(this.keyOf(PACKET_TAG_PREFIX, packetTag))
 
