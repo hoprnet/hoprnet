@@ -1,4 +1,6 @@
 \subsubsection{Unblinding}
+\label{sec:sphinx:unblinding}
+
 The unblinding works as follows: $B$ decrypts the attached $\beta_0$ in order to extract the routing instructions. First, $B$ appends a zero-byte padding at the end of $\beta_0$ and decrypts the padded block of routing information $\beta$ by XORing it with $PRG(s_{0})$ as follows:
 \begin{align}
     (\beta_0\|0_{2\kappa}) & \oplus \rho(h_{\rho}(s_{0}))
