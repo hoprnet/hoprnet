@@ -106,6 +106,7 @@
 - [decodePoRBytes](modules.md#decodeporbytes)
 - [defer](modules.md#defer)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
+- [deserializeKeyPair](modules.md#deserializekeypair)
 - [dial](modules.md#dial)
 - [forwardTransform](modules.md#forwardtransform)
 - [gcd](modules.md#gcd)
@@ -155,6 +156,7 @@
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
 - [retryWithBackoff](modules.md#retrywithbackoff)
 - [sampleGroupElement](modules.md#samplegroupelement)
+- [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
 - [stringToU8a](modules.md#stringtou8a)
 - [timeoutAfter](modules.md#timeoutafter)
@@ -1146,6 +1148,35 @@ relayer for transforming and delivering the packet
 #### Defined in
 
 [crypto/por/keyDerivation.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/keyDerivation.ts#L31)
+
+___
+
+### deserializeKeyPair
+
+▸ **deserializeKeyPair**(`serialized`, `password`, `useWeakCrypto?`): `Promise`<`DeserializationResponse`\>
+
+Deserializes an encoded key pair
+
+**`dev`** This method uses a computation and memory intensive hash function,
+     for testing set `useWeakCrypto = true`
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `serialized` | `Uint8Array` | `undefined` | encoded key pair |
+| `password` | `string` | `undefined` | password to use for decryption |
+| `useWeakCrypto` | `boolean` | `false` | use faster but weaker crypto to reconstruct key pair |
+
+#### Returns
+
+`Promise`<`DeserializationResponse`\>
+
+reconstructed key pair
+
+#### Defined in
+
+[crypto/keyPair.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L84)
 
 ___
 
@@ -2344,6 +2375,39 @@ and the product of exponent and base-point.
 #### Defined in
 
 [crypto/sampleGroupElement.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/sampleGroupElement.ts#L11)
+
+___
+
+### serializeKeyPair
+
+▸ **serializeKeyPair**(`peerId`, `password`, `useWeakCrypto?`, `__iv?`, `__salt?`, `__uuidSalt?`): `Promise`<`Uint8Array`\>
+
+Serializes a peerId using geth's KeyStore format
+see https://medium.com/@julien.maffre/what-is-an-ethereum-keystore-file-86c8c5917b97
+
+**`dev`** This method uses a computation and memory intensive hash function,
+     for testing set `useWeakCrypto = true`
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `peerId` | `PeerId` | `undefined` | id to store |
+| `password` | `string` | `undefined` | password used for encryption |
+| `useWeakCrypto` | `boolean` | `false` | weak parameter for fast serialization |
+| `__iv?` | `string` | `undefined` | - |
+| `__salt?` | `string` | `undefined` | - |
+| `__uuidSalt?` | `string` | `undefined` | - |
+
+#### Returns
+
+`Promise`<`Uint8Array`\>
+
+Uint8Array representation
+
+#### Defined in
+
+[crypto/keyPair.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L18)
 
 ___
 
