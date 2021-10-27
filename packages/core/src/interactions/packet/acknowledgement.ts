@@ -17,7 +17,14 @@ async function handleAcknowledgement(
   onMessage: (ackMessage: Acknowledgement) => void
 ) {
   const acknowledgement = Acknowledgement.deserialize(msg, pubKey, remotePeer)
-  const unacknowledgedTicket = await db.getUnacknowledgedTicket(acknowledgement.ackChallenge)
+  let unacknowledgedTicket
+  try {
+     unacknowledgedTicket = await db.getUnacknowledgedTicket(acknowledgement.ackChallenge)
+  } catch (e) {
+    // We need to find the cause of this.
+    log('Error, acknowledgement received for ticket that does not exist')
+    return
+  }
   if (!unacknowledgedTicket.verifyChallenge(acknowledgement.ackKeyShare)) {
     throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
   }
