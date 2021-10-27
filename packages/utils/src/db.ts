@@ -49,6 +49,7 @@ const REDEEMED_TICKETS_VALUE = encoder.encode('statistics:redeemed:value')
 const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 const PENDING_TICKETS_VALUE = (address: Address) =>
   u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
+const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 
 export class HoprDB {
   private db: LevelUp
@@ -228,6 +229,7 @@ export class HoprDB {
   public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
     const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
     Promise.all(tickets.map((ticket) => this.delAcknowledgedTicket(ticket)))
+    await this.increment(NEGLECTED_TICKET_COUNT)
   }
 
   /**
@@ -368,6 +370,10 @@ export class HoprDB {
   }
   public async getRedeemedTicketsCount(): Promise<number> {
     return this.getCoercedOrDefault(REDEEMED_TICKETS_COUNT, u8aToNumber, 0)
+  }
+
+  public async getNeglectedTicketsCount(): Promise<number> {
+    return this.getCoercedOrDefault(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
   }
 
   public async getPendingTicketCount(): Promise<number> {
