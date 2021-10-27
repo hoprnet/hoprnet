@@ -49,6 +49,11 @@ const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 const PENDING_TICKETS_VALUE = (address: Address) =>
   u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
 
+enum UnacknowledgedTicketPrefix {
+  Ticket = 0,
+  Dummy = 1
+}
+
 export class HoprDB {
   private db: LevelUp
 
@@ -196,15 +201,42 @@ export class HoprDB {
     )
   }
 
-  public async getUnacknowledgedTicket(halfKeyChallenge: HalfKeyChallenge): Promise<UnacknowledgedTicket> {
-    return UnacknowledgedTicket.deserialize(await this.get(unacknowledgedTicketKey(halfKeyChallenge)))
+  public async getUnacknowledgedTicket(halfKeyChallenge: HalfKeyChallenge): Promise<
+    | {
+        isDummy: true
+      }
+    | {
+        isDummy: false
+        ticket: UnacknowledgedTicket
+      }
+  > {
+    const data = await this.get(unacknowledgedTicketKey(halfKeyChallenge))
+
+    switch (data[0]) {
+      case UnacknowledgedTicketPrefix.Dummy:
+        return {
+          isDummy: true
+        }
+      case UnacknowledgedTicketPrefix.Ticket:
+        return {
+          isDummy: false,
+          ticket: UnacknowledgedTicket.deserialize(data.slice(1))
+        }
+    }
   }
 
   public async storeUnacknowledgedTicket(
     halfKeyChallenge: HalfKeyChallenge,
     unackTicket: UnacknowledgedTicket
   ): Promise<void> {
-    await this.put(unacknowledgedTicketKey(halfKeyChallenge), unackTicket.serialize())
+    await this.put(
+      unacknowledgedTicketKey(halfKeyChallenge),
+      Uint8Array.from([UnacknowledgedTicketPrefix.Ticket, ...unackTicket.serialize()])
+    )
+  }
+
+  public async storeUnacknowledgedTicketDummy(halfKeyChallenge: HalfKeyChallenge): Promise<void> {
+    await this.put(unacknowledgedTicketKey(halfKeyChallenge), Uint8Array.from([UnacknowledgedTicketPrefix.Dummy]))
   }
 
   /**
