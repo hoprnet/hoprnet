@@ -233,7 +233,11 @@ export class HoprDB {
     await this.del(acknowledgedTicketKey(ack.ticket.challenge, channelEpoch))
   }
 
-  public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket, channelEpoch: UINT256): Promise<void> {
+  public async replaceUnAckWithAck(
+    halfKeyChallenge: HalfKeyChallenge,
+    ackTicket: AcknowledgedTicket,
+    channelEpoch: UINT256
+  ): Promise<void> {
     const unAcknowledgedDbKey = unacknowledgedTicketKey(halfKeyChallenge)
     const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge, channelEpoch)
 
