@@ -229,8 +229,8 @@ export class HoprDB {
    * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
-  public async delAcknowledgedTicket(ack: AcknowledgedTicket, channelEpoch: UINT256): Promise<void> {
-    await this.del(acknowledgedTicketKey(ack.ticket.challenge, channelEpoch))
+  public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
+    await this.del(acknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
@@ -383,7 +383,7 @@ export class HoprDB {
 
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
     await this.increment(REDEEMED_TICKETS_COUNT)
-    await this.delAcknowledgedTicket(a, a.ticket.channelEpoch)
+    await this.delAcknowledgedTicket(a)
     await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
     await this.subBalance(PENDING_TICKETS_VALUE(a.ticket.counterparty), a.ticket.amount)
   }
@@ -391,7 +391,7 @@ export class HoprDB {
   public async markLosing(t: UnacknowledgedTicket): Promise<void> {
     await this.increment(LOSING_TICKET_COUNT)
     await this.del(unacknowledgedTicketKey(t.getChallenge()))
-    // sub pending_tickets_value
+    await this.subBalance(PENDING_TICKETS_VALUE(t.ticket.counterparty), t.ticket.amount)
   }
 
   static createMock(id?: PublicKey): HoprDB {
