@@ -235,7 +235,7 @@ export class HoprDB {
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
     const unAcknowledgedDbKey = unacknowledgedTicketKey(halfKeyChallenge)
-    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelIteration)
+    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
 
     await this.db
       .batch()
@@ -383,7 +383,7 @@ export class HoprDB {
 
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
     await this.increment(REDEEMED_TICKETS_COUNT)
-    await this.delAcknowledgedTicket(a, a.ticket.channelIteration)
+    await this.delAcknowledgedTicket(a, a.ticket.channelEpoch)
     await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
     await this.subBalance(PENDING_TICKETS_VALUE(a.ticket.counterparty), a.ticket.amount)
   }

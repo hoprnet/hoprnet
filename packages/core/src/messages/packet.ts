@@ -173,9 +173,9 @@ export async function validateUnacknowledgedTicket(
     )
   }
 
-  // ticket's channelIteration MUST match the current channelIteration
+  // ticket's channelEpoch MUST match the current channelEpoch
   const currentChannelIteration = channelState.channelEpoch
-  const ticketChannelIteration = ticket.channelIteration.toBN()
+  const ticketChannelIteration = ticket.channelEpoch.toBN()
   if (!ticketChannelIteration.eq(currentChannelIteration.toBN())) {
     throw Error(
       `Ticket was created for a different channel iteration ${ticketChannelIteration.toString()} != ${currentChannelIteration.toString()}`
@@ -196,7 +196,7 @@ export async function validateUnacknowledgedTicket(
     (signedTicket) =>
       signedTicket.counterparty.eq(selfAddress) &&
       signedTicket.epoch.toBN().eq(channelTicketEpoch) &&
-      ticket.channelIteration.toBN().eq(currentChannelIteration.toBN())
+      ticket.channelEpoch.toBN().eq(currentChannelIteration.toBN())
   )
 
   // calculate total unredeemed balance

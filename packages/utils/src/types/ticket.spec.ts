@@ -23,16 +23,16 @@ describe('test ticket construction', function () {
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
     const winProb = UINT256.fromInverseProbability(new BN(1))
-    const channelIteration = UINT256.fromString('1')
+    const channelEpoch = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
-    const ticket = new Ticket(userA, challenge, epoch, index, amount, winProb, channelIteration, signature)
+    const ticket = new Ticket(userA, challenge, epoch, index, amount, winProb, channelEpoch, signature)
 
     assert(ticket.counterparty.eq(userA), 'wrong counterparty')
     assert(ticket.challenge.eq(challenge), 'wrong challenge')
     assert(ticket.epoch.toBN().eq(epoch.toBN()), 'wrong epoch')
     assert(ticket.amount.toBN().eq(amount.toBN()), 'wrong amount')
     assert(ticket.winProb.toBN().eq(winProb.toBN()), 'wrong winProb')
-    assert(ticket.channelIteration.toBN().eq(channelIteration.toBN()), 'wrong channelIteration')
+    assert(ticket.channelEpoch.toBN().eq(channelEpoch.toBN()), 'wrong channelEpoch')
   })
 
   it('should generate the hash correctly #1', async function () {
@@ -45,10 +45,10 @@ describe('test ticket construction', function () {
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
     const winProb = UINT256.fromInverseProbability(new BN(1))
-    const channelIteration = UINT256.fromString('1')
+    const channelEpoch = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
-    const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
+    const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelEpoch, signature)
 
     expect(expectedHash.toHex()).to.eq(ticketA.getHash().toHex(), 'ticket hash does not match the expected value')
 
@@ -59,7 +59,7 @@ describe('test ticket construction', function () {
       UINT256.fromString('1'),
       amount,
       winProb,
-      channelIteration,
+      channelEpoch,
       signature
     )
 
@@ -76,10 +76,10 @@ describe('test ticket construction', function () {
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
     const winProb = UINT256.fromInverseProbability(new BN(1))
-    const channelIteration = UINT256.fromString('1')
+    const channelEpoch = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
-    const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
+    const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelEpoch, signature)
 
     expect(expectedHash.toHex()).to.eq(ticketA.getHash().toHex(), 'ticket hash does not match the expected value')
 
@@ -90,7 +90,7 @@ describe('test ticket construction', function () {
       UINT256.fromString('1'),
       amount,
       winProb,
-      channelIteration,
+      channelEpoch,
       signature
     )
 
