@@ -21,7 +21,10 @@ async function handleAcknowledgement(
   try {
      unacknowledgedTicket = await db.getUnacknowledgedTicket(acknowledgement.ackChallenge)
   } catch (e) {
-    // We need to find the cause of this.
+    // We need to find the cause of this,
+    // Nonetheless, there is nothing we can do here, so rather than killing the 
+    // node, let's swallow for now.
+    // NB. this is a bug..
     log('Error, acknowledgement received for ticket that does not exist')
     return
   }
