@@ -30,9 +30,9 @@ const SECRET_LENGTH = 32
 const TEST_MESSAGE = new TextEncoder().encode('test message')
 
 const DEFAULT_FUNDING = new Balance(new BN(1234).mul(PRICE_PER_PACKET))
-const DEFAULT_TICKET_EPOCH = new UINT256(new BN(1))
-const DEFAULT_INDEX = new UINT256(new BN(1))
-const DEFAULT_CHANNEL_EPOCH = new UINT256(new BN(1))
+const DEFAULT_TICKET_EPOCH = new UINT256(new BN(0))
+const DEFAULT_INDEX = new UINT256(new BN(0))
+const DEFAULT_CHANNEL_EPOCH = new UINT256(new BN(0))
 const DEFAULT_CLOSURE_TIME = new UINT256(new BN(0))
 
 const SELF = privKeyToPeerId(stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775'))
@@ -86,9 +86,26 @@ describe('packet interaction', function () {
     await Promise.all(dbs.map((db: HoprDB) => db.close))
   })
 
-  beforeEach(function () {
+  beforeEach(async function () {
     for (const [index, peerId] of nodes.entries()) {
       dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
+    }
+
+    // create channels between nodes and update their DBs
+    const channels: ChannelEntry[] = nodes.reduce((result, src, index) => {
+      const dest = nodes[index + 1]
+
+      if (dest) {
+        result.push(getDummyChannel(src, dest))
+      }
+
+      return result
+    }, [])
+
+    for (const channel of channels) {
+      for (const db of dbs) {
+        await db.updateChannel(channel.getId(), channel)
+      }
     }
   })
 
@@ -127,10 +144,6 @@ describe('packet interaction', function () {
   })
 
   it('acknowledgement workflow as relayer', async function () {
-    // Open a dummy channel to create first packet
-    const firstChannel = getDummyChannel(SELF, RELAY0)
-    await dbs[0].updateChannel(firstChannel.getId(), firstChannel)
-
     const packet = await Packet.create(TEST_MESSAGE, [RELAY0, COUNTERPARTY], SELF, dbs[0])
 
     const libp2pRelay0 = createFakeSendReceive(events, RELAY0)
