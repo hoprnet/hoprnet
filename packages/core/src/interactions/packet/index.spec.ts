@@ -187,12 +187,6 @@ describe('packet interaction', function () {
     for (const [index, pId] of nodes.entries()) {
       const { subscribe, send } = createFakeSendReceive(events, pId)
 
-      if (!pId.equals(RELAY2) && !pId.equals(COUNTERPARTY)) {
-        // Open dummy channels to issue tickets
-        const channel = getDummyChannel(pId, nodes[index + 1])
-        await dbs[index].updateChannel(channel.getId(), channel)
-      }
-
       let receive: (msg: Uint8Array) => void
 
       if (pId.equals(COUNTERPARTY)) {
