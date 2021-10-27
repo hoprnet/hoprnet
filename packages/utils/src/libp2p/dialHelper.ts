@@ -17,6 +17,8 @@ const logError = debug(`hopr-core:libp2p:error`)
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 10000
 
+type DHTResponse = PromiseValue<ReturnType<LibP2P.PeerRoutingModule['findPeer']>>
+
 export type DialOpts = {
   timeout?: number
   signal?: AbortSignal
@@ -95,7 +97,7 @@ async function doDial(
   verbose(`could not dial directly${err ? ` (${err.message})` : ''}, looking in the DHT`)
 
   // Try to get some fresh addresses from the DHT
-  let dhtResponse: PromiseValue<ReturnType<LibP2P.PeerRoutingModule['findPeer']>>
+  let dhtResponse: DHTResponse
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
     dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
