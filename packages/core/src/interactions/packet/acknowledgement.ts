@@ -1,15 +1,10 @@
-import { durations, oneAtATime, debug, AcknowledgedTicket } from '@hoprnet/hopr-utils'
+import { oneAtATime, debug, AcknowledgedTicket, HoprDB } from '@hoprnet/hopr-utils'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
-
 import type { SendMessage, Subscribe } from '../../index'
 import type PeerId from 'peer-id'
-import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
+import { PROTOCOL_ACKNOWLEDGEMENT, ACKNOWLEDGEMENT_TIMEOUT } from '../../constants'
 import { Acknowledgement, Packet } from '../../messages'
-import { HoprDB } from '@hoprnet/hopr-utils'
 const log = debug('hopr-core:acknowledgement')
-const error = debug('hopr-core:acknowledgement:error')
-
-const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
 /**
  * Reserve a preImage for the given ticket if it is a winning ticket.
@@ -62,7 +57,7 @@ export function subscribeToAcknowledgements(
     (msg: Uint8Array, remotePeer: PeerId) => limitConcurrency(() => handleAcknowledgement(msg, remotePeer, pubKey, db, onMessage)),
     false,
     (err: any) => {
-      error(`Error while receiving acknowledgement`, err)
+      log(`Error while receiving acknowledgement`, err)
     }
   )
 }
@@ -83,7 +78,7 @@ export function sendAcknowledgement(
     } catch (err) {
       // Currently unclear how to proceed if sending acknowledgements
       // fails
-      error(`could not send acknowledgement`, err)
+      log(`Error: could not send acknowledgement`, err)
     }
   })()
 }

@@ -33,3 +33,4 @@ export const MAX_NEW_CHANNELS_PER_TICK = 5
 export const MAX_HOPS = 3 //3 intermediate hops and one recipient
 
 export const CHECK_TIMEOUT = 60000
+export const ACKNOWLEDGEMENT_TIMEOUT = 2000 
