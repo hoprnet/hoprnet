@@ -7,7 +7,6 @@ import type PeerId from 'peer-id'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { Acknowledgement, Packet } from '../../messages'
 import { HoprDB } from '@hoprnet/hopr-utils'
-import { EventEmitter } from 'events'
 const log = debug('hopr-core:acknowledgement')
 const error = debug('hopr-core:acknowledgement:error')
 
@@ -20,8 +19,7 @@ const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 async function acknowledge(
   unacknowledgedTicket: UnacknowledgedTicket,
   acknowledgement: HalfKey,
-  db: HoprDB,
-  events: EventEmitter
+  db: HoprDB
 ): Promise<AcknowledgedTicket | null> {
   if (!unacknowledgedTicket.verifyChallenge(acknowledgement)) {
     throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
@@ -40,7 +38,6 @@ async function acknowledge(
 
     try {
       await bumpCommitment(db, channelId)
-      events.emit('ticket:win', ack)
       return ack
     } catch (e) {
       log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
@@ -56,24 +53,17 @@ async function acknowledge(
 export function subscribeToAcknowledgements(
   subscribe: Subscribe,
   db: HoprDB,
-  events: EventEmitter,
   pubKey: PeerId,
   onMessage: (ackMessage: Acknowledgement) => void
 ) {
   async function handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
-    try {
-      let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
-      const ackedTicket = await acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare, db, events)
-      if (ackedTicket) {
-        log(`Storing winning ticket`)
-        await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
-      }
-    } catch (err) {
-      if (!err.notFound) {
-        throw err
-      }
+    let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
+    const ackedTicket = await acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare, db)
+    if (ackedTicket) {
+      log(`Storing winning ticket`)
+      await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
     }
     onMessage(ackMsg)
   }
