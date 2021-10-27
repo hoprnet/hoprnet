@@ -42,11 +42,11 @@ function networkToHardhatNetwork(input: any): any {
     res.gas = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
   }
 
-    try {
-      res.url = expandVars(input.default_provider, process.env)
-    } catch (_) {
-      res.url = 'invalid_url'
-    }
+  try {
+    res.url = expandVars(input.default_provider, process.env)
+  } catch (_) {
+    res.url = 'invalid_url'
+  }
 
   if (input.live) {
     res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []

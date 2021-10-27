@@ -32,7 +32,11 @@ const abiCoder = new utils.AbiCoder()
 export type Receipt = string
 export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>
 
-export async function createChainWrapper(environment: ResolvedEnvironment, privateKey: Uint8Array, checkDuplicate: Boolean = true) {
+export async function createChainWrapper(
+  environment: ResolvedEnvironment,
+  privateKey: Uint8Array,
+  checkDuplicate: Boolean = true
+) {
   const providerURI = expandVars(environment.network.default_provider, process.env)
   const provider = providerURI.startsWith('http')
     ? new providers.StaticJsonRpcProvider(providerURI)
@@ -45,7 +49,7 @@ export async function createChainWrapper(environment: ResolvedEnvironment, priva
 
   // ensure chain id matches our expectation
   if (chainId !== networkInfo.chain_id) {
-  throw Error(`Providers chain id ${chainId} does not match our environment`)
+    throw Error(`Providers chain id ${chainId} does not match our environment`)
   }
 
   const hoprTokenDeployment = getContractData(environment.id, 'HoprToken')
