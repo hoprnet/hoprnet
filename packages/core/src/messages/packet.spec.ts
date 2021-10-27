@@ -1,5 +1,6 @@
+import { HoprDB, UINT256, u8aEquals, u8aToHex, Balance } from '@hoprnet/hopr-utils'
+import { PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
 import { Packet, INTERMEDIATE_HOPS } from './packet'
-import { HoprDB, UINT256, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import assert from 'assert'
 import BN from 'bn.js'
@@ -10,7 +11,8 @@ function createMockTickets() {
     getChannelTo: () => ({
       getId: () => ({ toHex: () => '0xdeadbeef' }),
       ticketEpoch: new UINT256(new BN(0)),
-      channelEpoch: new UINT256(new BN(0))
+      channelEpoch: new UINT256(new BN(0)),
+      balance: new Balance(new BN(100).mul(PRICE_PER_PACKET))
     }),
     getCurrentTicketIndex: () => {},
     setCurrentTicketIndex: () => {},
@@ -25,7 +27,8 @@ function createMockTickets() {
       return false
     },
     storeUnacknowledgedTicket: () => Promise.resolve(),
-    markPending: () => Promise.resolve()
+    markPending: () => Promise.resolve(),
+    getPendingBalanceTo: async () => new Balance(new BN(0))
   }
   return { db: db as any as HoprDB }
 }

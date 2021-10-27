@@ -17,7 +17,8 @@ import {
   ChannelStatus,
   privKeyToPeerId,
   stringToU8a,
-  Hash
+  Hash,
+  PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import { PROTOCOL_STRING } from '../../constants'
@@ -28,7 +29,7 @@ const SECRET_LENGTH = 32
 
 const TEST_MESSAGE = new TextEncoder().encode('test message')
 
-const DEFAULT_FUNDING = new Balance(new BN(1234))
+const DEFAULT_FUNDING = new Balance(new BN(1234).mul(PRICE_PER_PACKET))
 const DEFAULT_TICKET_EPOCH = new UINT256(new BN(1))
 const DEFAULT_INDEX = new UINT256(new BN(1))
 const DEFAULT_CHANNEL_EPOCH = new UINT256(new BN(1))
@@ -86,8 +87,8 @@ describe('packet interaction', function () {
   })
 
   beforeEach(function () {
-    for (const [index] of nodes.entries()) {
-      dbs[index] = HoprDB.createMock()
+    for (const [index, peerId] of nodes.entries()) {
+      dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
     }
   })
 
