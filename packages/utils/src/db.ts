@@ -51,7 +51,7 @@ const PENDING_TICKETS_VALUE = (address: Address) =>
 
 enum UnacknowledgedTicketPrefix {
   Ticket = 0,
-  Dummy = 1
+  Sender = 1
 }
 
 export class HoprDB {
@@ -203,23 +203,23 @@ export class HoprDB {
 
   public async getUnacknowledgedTicket(halfKeyChallenge: HalfKeyChallenge): Promise<
     | {
-        isDummy: true
+        sender: true
       }
     | {
-        isDummy: false
+        sender: false
         ticket: UnacknowledgedTicket
       }
   > {
     const data = await this.get(unacknowledgedTicketKey(halfKeyChallenge))
 
     switch (data[0]) {
-      case UnacknowledgedTicketPrefix.Dummy:
+      case UnacknowledgedTicketPrefix.Sender:
         return {
-          isDummy: true
+          sender: true
         }
       case UnacknowledgedTicketPrefix.Ticket:
         return {
-          isDummy: false,
+          sender: false,
           ticket: UnacknowledgedTicket.deserialize(data.slice(1))
         }
     }
@@ -235,8 +235,8 @@ export class HoprDB {
     )
   }
 
-  public async storeUnacknowledgedTicketDummy(halfKeyChallenge: HalfKeyChallenge): Promise<void> {
-    await this.put(unacknowledgedTicketKey(halfKeyChallenge), Uint8Array.from([UnacknowledgedTicketPrefix.Dummy]))
+  public async storeUnacknowledgedTicketSender(halfKeyChallenge: HalfKeyChallenge): Promise<void> {
+    await this.put(unacknowledgedTicketKey(halfKeyChallenge), Uint8Array.from([UnacknowledgedTicketPrefix.Sender]))
   }
 
   /**
