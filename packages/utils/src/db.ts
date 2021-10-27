@@ -227,9 +227,7 @@ export class HoprDB {
 
   public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
     const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
-    Promise.all(
-      tickets.map((ticket) => this.delAcknowledgedTicket(ticket))
-    )
+    Promise.all(tickets.map((ticket) => this.delAcknowledgedTicket(ticket)))
   }
 
   /**
