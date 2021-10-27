@@ -294,7 +294,7 @@ class Hopr extends EventEmitter {
 
     const ethereum = await this.startedPaymentChannels()
 
-    subscribeToAcknowledgements(subscribe, this.db,  this.getId(), (ack) => {
+    subscribeToAcknowledgements(subscribe, this.db, this.getId(), (ack) => {
       ethereum.emit('ticket:win', ack)
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     })
