@@ -101,7 +101,11 @@ async function doDial(
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
     dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
-  } catch (err) {
+  } catch (_err) {
+    err = _err
+  }
+
+  if (dhtResponse == null || err != null) {
     const knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
 
     logError(

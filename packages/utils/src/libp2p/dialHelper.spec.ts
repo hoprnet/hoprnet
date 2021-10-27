@@ -166,7 +166,7 @@ describe('test dialHelper', function () {
 
     peerStore.add(new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`))
 
-    const result = await dialHelper(peerA, undefined, TEST_PROTOCOL)
+    const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
     assert(result.status === 'E_DIAL')
     assert(result.error === 'No new addresses after contacting the DHT')
