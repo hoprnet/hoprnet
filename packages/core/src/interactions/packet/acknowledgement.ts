@@ -1,5 +1,4 @@
 import { durations, oneAtATime, debug, AcknowledgedTicket } from '@hoprnet/hopr-utils'
-import type { UnacknowledgedTicket } from '@hoprnet/hopr-utils'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
 
 import type { SendMessage, Subscribe } from '../../index'
@@ -11,42 +10,6 @@ const log = debug('hopr-core:acknowledgement')
 const error = debug('hopr-core:acknowledgement:error')
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
-
-async function acknowledge(
-  unacknowledgedTicket: UnacknowledgedTicket,
-  acknowledgement: Acknowledgement,
-  db: HoprDB
-): Promise<AcknowledgedTicket | null> {
-  if (!unacknowledgedTicket.verifyChallenge(acknowledgement.ackKeyShare)) {
-    throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
-  }
-
-  const channelId = (await db.getChannelFrom(unacknowledgedTicket.signer)).getId()
-  const response = unacknowledgedTicket.getResponse(acknowledgement.ackKeyShare)
-
-  const ticket = unacknowledgedTicket.ticket
-  const opening = await findCommitmentPreImage(db, channelId)
-
-  if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
-    const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
-
-    log(`Acknowledging ticket. Using opening ${opening.toHex()} and response ${response.toHex()}`)
-
-    try {
-      await bumpCommitment(db, channelId)
-      await db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
-      log(`Stored winning ticket`)
-      return ack
-    } catch (e) {
-      log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
-      return null
-    }
-  } else {
-    log(`Got a ticket that is not a win. Dropping ticket.`)
-    await db.markLosing(unacknowledgedTicket)
-    return null
-  }
-}
 
 /**
  * Reserve a preImage for the given ticket if it is a winning ticket.
@@ -60,7 +23,29 @@ async function handleAcknowledgement(
 ) {
   const acknowledgement = Acknowledgement.deserialize(msg, pubKey, remotePeer)
   const unacknowledgedTicket = await db.getUnacknowledgedTicket(acknowledgement.ackChallenge)
-  await acknowledge(unacknowledgedTicket, acknowledgement, db)
+  if (!unacknowledgedTicket.verifyChallenge(acknowledgement.ackKeyShare)) {
+    throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
+  }
+
+  const channelId = (await db.getChannelFrom(unacknowledgedTicket.signer)).getId()
+  const response = unacknowledgedTicket.getResponse(acknowledgement.ackKeyShare)
+  const ticket = unacknowledgedTicket.ticket
+  const opening = await findCommitmentPreImage(db, channelId)
+
+  if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
+    const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
+    log(`Acknowledging ticket. Using opening ${opening.toHex()} and response ${response.toHex()}`)
+    try {
+      await bumpCommitment(db, channelId)
+      await db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
+      log(`Stored winning ticket`)
+    } catch (e) {
+      log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
+    }
+  } else {
+    log(`Got a ticket that is not a win. Dropping ticket.`)
+    await db.markLosing(unacknowledgedTicket)
+  }
   onMessage(acknowledgement)
 }
 
