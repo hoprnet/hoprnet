@@ -337,14 +337,19 @@ class Indexer extends EventEmitter {
     this.indexEvent('channel-updated', [event.transactionHash])
     log('channel-updated for hash %s', event.transactionHash)
     const channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
-    const prevState = await this.db.getChannel(channel.getId())
 
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
 
-    if (channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
-      log('channel was closed')
-      this.onChannelClosed(channel)
+    try {
+      const prevState = await this.db.getChannel(channel.getId())
+
+      if (channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
+        log('channel was closed')
+        this.onChannelClosed(channel)
+      }
+    } catch (e) {
+      // Channel is new
     }
 
     this.emit('channel-update', channel)
