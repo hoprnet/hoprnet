@@ -225,6 +225,13 @@ export class HoprDB {
     return this.getAll<AcknowledgedTicket>(ACKNOWLEDGED_TICKETS_PREFIX, AcknowledgedTicket.deserialize, filterFunc)
   }
 
+  public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
+    const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
+    Promise.all(
+      tickets.map((ticket) => this.delAcknowledgedTicket(ticket))
+    )
+  }
+
   /**
    * Delete acknowledged ticket in database
    * @param index Uint8Array
