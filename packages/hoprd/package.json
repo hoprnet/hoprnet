@@ -43,7 +43,7 @@
     "js-cookie": "^3.0.0",
     "key-did-provider-ed25519": "^1.1.0",
     "key-did-resolver": "^1.2.1",
-    "next": "11.1.2",
+    "next": "12.0.1",
     "peer-id": "0.15.3",
     "prop-types": "^15.7.2",
     "react": "17.0.2",
