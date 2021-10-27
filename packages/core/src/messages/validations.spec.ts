@@ -1,10 +1,8 @@
-import type Hopr from '..'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
-import sinon from 'sinon'
 import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import { validateUnacknowledgedTicket } from '.'
 
@@ -66,103 +64,48 @@ const mockChannelEntry = (
     )
   )
 
-const createMockNode = ({
-  // sender = SENDER,
-  // senderAddress = SENDER_ADDRESS,
-  target = TARGET
-}: {
-  sender?: PeerId
-  senderAddress?: Address
-  target?: PeerId
-}) => {
-  return {
-    getId: sinon.stub().returns(target),
-    paymentChannels: {
-      types: { PublicKey }
-    }
-  } as unknown as Hopr
-}
-
 const getTicketsMock = async (): Promise<Ticket[]> => []
 
 describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {
-    const node = createMockNode({})
     const signedTicket = createMockTicket({})
 
     return expect(
-      validateUnacknowledgedTicket(
-        node.getId(),
-        SENDER,
-        new BN(1),
-        new BN(1),
-        signedTicket,
-        await mockChannelEntry(),
-        getTicketsMock
-      )
+      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock)
     ).to.not.eventually.rejected
   })
 
   it('should throw when signer is not sender', async function () {
-    const node = createMockNode({})
     const signedTicket = createMockTicket({})
 
     return expect(
-      validateUnacknowledgedTicket(
-        node.getId(),
-        TARGET,
-        new BN(2),
-        new BN(1),
-        signedTicket,
-        await mockChannelEntry(),
-        getTicketsMock
-      )
+      validateUnacknowledgedTicket(TARGET, new BN(2), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock)
     ).to.eventually.rejectedWith('The signer of the ticket does not match the sender')
   })
 
   it('should throw when ticket amount is low', async function () {
-    const node = createMockNode({})
     const signedTicket = createMockTicket({})
 
     return expect(
-      validateUnacknowledgedTicket(
-        node.getId(),
-        SENDER,
-        new BN(2),
-        new BN(1),
-        signedTicket,
-        await mockChannelEntry(),
-        getTicketsMock
-      )
+      validateUnacknowledgedTicket(SENDER, new BN(2), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock)
     ).to.eventually.rejectedWith('Ticket amount')
   })
 
   it('should throw when ticket chance is low', async function () {
-    const node = createMockNode({})
     const signedTicket = createMockTicket({
       winProb: UINT256.fromInverseProbability(new BN(2))
     })
 
     return expect(
-      validateUnacknowledgedTicket(
-        node.getId(),
-        SENDER,
-        new BN(1),
-        new BN(1),
-        signedTicket,
-        await mockChannelEntry(),
-        getTicketsMock
-      )
+      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock)
     ).to.eventually.rejectedWith('Ticket winning probability')
   })
 
   it('should throw if there no channel open', async function () {
-    const node = createMockNode({})
     const signedTicket = createMockTicket({})
 
     return expect(
       validateUnacknowledgedTicket(
-        node.getId(),
         SENDER,
         new BN(1),
         new BN(1),
@@ -174,25 +117,39 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
   })
 
   it('should throw if ticket epoch does not match our account epoch', async function () {
-    const node = createMockNode({})
     const signedTicket = createMockTicket({})
     const mockChannel = await mockChannelEntry(true, new Balance(new BN(100)), new UINT256(new BN(2)))
 
     return expect(
-      validateUnacknowledgedTicket(
-        node.getId(),
-        SENDER,
-        new BN(1),
-        new BN(1),
-        signedTicket,
-        mockChannel,
-        getTicketsMock
-      )
+      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock)
     ).to.eventually.rejectedWith('does not match our account epoch')
   })
 
-  it('should throw if ticket index must be higher than last ticket index', async function () {
-    const node = createMockNode({})
+  it("should throw if ticket's channel iteration does not match the current channel iteration", async function () {
+    const signedTicket = createMockTicket({
+      channelIteration: new UINT256(new BN(2))
+    })
+
+    return expect(
+      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock)
+    ).to.eventually.rejectedWith('Ticket was created for a different channel iteration')
+  })
+
+  it("should throw if ticket's index is smaller than the last ticket index", async function () {
+    const signedTicket = createMockTicket({})
+    const mockChannel = await mockChannelEntry(
+      true,
+      new Balance(new BN(100)),
+      new UINT256(new BN(1)),
+      new UINT256(new BN(2))
+    )
+
+    return expect(
+      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock)
+    ).to.eventually.rejectedWith('must be higher than last ticket index')
+  })
+
+  it("should throw if ticket's index is smaller than the last ticket index when you include unredeemed tickets", async function () {
     const signedTicket = createMockTicket({})
     const mockChannel = await mockChannelEntry(
       true,
@@ -200,45 +157,23 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
       new UINT256(new BN(1)),
       new UINT256(new BN(1))
     )
+    const ticketsInDb = [
+      createMockTicket({
+        amount: new Balance(new BN(100)),
+        index: new UINT256(new BN(2))
+      })
+    ]
+
     return expect(
-      validateUnacknowledgedTicket(
-        node.getId(),
-        SENDER,
-        new BN(1),
-        new BN(1),
-        signedTicket,
-        mockChannel,
-        getTicketsMock
-      )
+      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, async () => ticketsInDb)
     ).to.eventually.rejectedWith('must be higher than last ticket index')
   })
 
-  it("should throw if ticket's channel iteration does not match the current channel iteration", async function () {
-    const node = createMockNode({})
-    const signedTicket = createMockTicket({
-      channelIteration: new UINT256(new BN(2))
-    })
-
-    return expect(
-      validateUnacknowledgedTicket(
-        node.getId(),
-        SENDER,
-        new BN(1),
-        new BN(1),
-        signedTicket,
-        await mockChannelEntry(),
-        getTicketsMock
-      )
-    ).to.eventually.rejectedWith('Ticket was created for a different channel iteration')
-  })
-
   it('should throw if channel does not have enough funds', async function () {
-    const node = createMockNode({})
     const signedTicket = createMockTicket({})
 
     return expect(
       validateUnacknowledgedTicket(
-        node.getId(),
         SENDER,
         new BN(1),
         new BN(1),
@@ -250,7 +185,6 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
   })
 
   it('should throw if channel does not have enough funds when you include unredeemed tickets', async function () {
-    const node = createMockNode({})
     const signedTicket = createMockTicket({})
     const ticketsInDb = [
       createMockTicket({
@@ -260,7 +194,6 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        node.getId(),
         SENDER,
         new BN(1),
         new BN(1),
@@ -268,6 +201,6 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         await mockChannelEntry(),
         async () => ticketsInDb
       )
-    ).to.eventually.rejectedWith('Payment channel does not have enough funds when you include unredeemed tickets')
+    ).to.eventually.rejectedWith('Payment channel does not have enough funds')
   })
 })

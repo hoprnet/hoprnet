@@ -47,7 +47,7 @@ export class PacketForwardInteraction {
     }
 
     try {
-      await packet.validateUnacknowledgedTicket(this.db, this.privKey)
+      await packet.validateUnacknowledgedTicket(this.db)
     } catch (err) {
       log(`Ticket validation failed. Dropping packet`, err)
       // Don't forward packet if validation failed.

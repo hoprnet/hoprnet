@@ -115,7 +115,6 @@ export async function createTicket(
  * Validate unacknowledged tickets as we receive them
  */
 export async function validateUnacknowledgedTicket(
-  usPeerId: PeerId,
   themPeerId: PeerId,
   minTicketAmount: BN,
   reqInverseTicketWinProb: BN,
@@ -123,18 +122,12 @@ export async function validateUnacknowledgedTicket(
   channel: ChannelEntry,
   getTickets: () => Promise<Ticket[]>
 ): Promise<void> {
-  const us = new PublicKey(usPeerId.pubKey.marshal())
   const them = new PublicKey(themPeerId.pubKey.marshal())
   const requiredTicketWinProb = UINT256.fromInverseProbability(reqInverseTicketWinProb).toBN()
 
   // ticket signer MUST be the sender
   if (!ticket.verify(them)) {
     throw Error(`The signer of the ticket does not match the sender`)
-  }
-
-  // ticket amount MUST be greater or equal to minTicketAmount
-  if (!ticket.amount.toBN().gte(minTicketAmount)) {
-    throw Error(`Ticket amount '${ticket.amount.toBN().toString()}' is not equal to '${minTicketAmount.toString()}'`)
   }
 
   // ticket amount MUST be greater or equal to minTicketAmount
@@ -156,7 +149,7 @@ export async function validateUnacknowledgedTicket(
     throw Error(`Payment channel with '${them.toB58String()}' is not open or pending to close`)
   }
 
-  // ticket's epoch MUST match our account nonce
+  // ticket's epoch MUST match our channel's epoch
   if (!ticket.epoch.toBN().eq(channel.ticketEpoch.toBN())) {
     throw Error(
       `Ticket epoch '${ticket.epoch.toBN().toString()}' does not match our account epoch ${channel.ticketEpoch
@@ -165,16 +158,7 @@ export async function validateUnacknowledgedTicket(
     )
   }
 
-  // ticket's index MUST be higher than the channel's ticket index
-  if (!ticket.index.toBN().gt(channel.ticketIndex.toBN())) {
-    throw Error(
-      `Ticket index '${ticket.index.toBN().toString()}' must be higher than last ticket index ${channel.ticketIndex
-        .toBN()
-        .toString()}`
-    )
-  }
-
-  // ticket's channelIteration MUST match the current channelIteration
+  // ticket's channelIteration MUST match the current channel's epoch
   if (!ticket.channelIteration.toBN().eq(channel.channelEpoch.toBN())) {
     throw Error(
       `Ticket was created for a different channel iteration ${ticket.channelIteration
@@ -183,29 +167,46 @@ export async function validateUnacknowledgedTicket(
     )
   }
 
-  // channel MUST have enough funds
-  if (channel.balance.toBN().lt(ticket.amount.toBN())) {
-    throw Error(`Payment channel does not have enough funds`)
-  }
+  // find out latest index and pending balance
+  // from unredeemed tickets
 
-  // channel MUST have enough funds
-  // (performance) tickets are stored by key, we can't query sender's tickets efficiently
-  // we retrieve all signed tickets and filter the ones between sender and target
-  let signedTickets = (await getTickets()).filter(
-    (signedTicket) =>
-      signedTicket.counterparty.eq(us.toAddress()) &&
-      signedTicket.epoch.toBN().eq(channel.ticketEpoch.toBN()) &&
-      ticket.channelIteration.toBN().eq(channel.channelEpoch.toBN())
+  // all tickets from sender
+  const tickets = await getTickets().then((ts) => {
+    return ts.filter((t) => {
+      return t.epoch.toBN().eq(channel.ticketEpoch.toBN()) && t.channelIteration.toBN().eq(channel.channelEpoch.toBN())
+    })
+  })
+
+  const { unrealizedBalance, unrealizedIndex } = tickets.reduce(
+    (result, t) => {
+      // update index
+      if (result.unrealizedIndex.toBN().lt(t.index.toBN())) {
+        result.unrealizedIndex = t.index
+      }
+
+      // update balance
+      result.unrealizedBalance = result.unrealizedBalance.sub(t.amount)
+
+      return result
+    },
+    {
+      unrealizedBalance: channel.balance,
+      unrealizedIndex: channel.ticketIndex
+    }
   )
 
-  // calculate total unredeemed balance
-  const unredeemedBalance = signedTickets.reduce((total, signedTicket) => {
-    return new BN(total.add(signedTicket.amount.toBN()))
-  }, new BN(0))
+  // ticket's index MUST be higher than the channel's ticket index
+  if (ticket.index.toBN().lt(unrealizedIndex.toBN())) {
+    throw Error(
+      `Ticket index ${ticket.index.toBN().toString()} must be higher than last ticket index ${unrealizedIndex
+        .toBN()
+        .toString()}`
+    )
+  }
 
   // ensure sender has enough funds
-  if (unredeemedBalance.add(ticket.amount.toBN()).gt(channel.balance.toBN())) {
-    throw Error(`Payment channel does not have enough funds when you include unredeemed tickets`)
+  if (ticket.amount.toBN().gt(unrealizedBalance.toBN())) {
+    throw Error(`Payment channel does not have enough funds`)
   }
 }
 
@@ -393,12 +394,11 @@ export class Packet {
     await db.storeUnacknowledgedTicket(this.ackChallenge, unacknowledged)
   }
 
-  async validateUnacknowledgedTicket(db: HoprDB, privKey: PeerId) {
+  async validateUnacknowledgedTicket(db: HoprDB) {
     const channel = await db.getChannelFrom(this.previousHop)
 
     try {
       await validateUnacknowledgedTicket(
-        privKey,
         this.previousHop.toPeerId(),
         PRICE_PER_PACKET,
         INVERSE_TICKET_WIN_PROB,
