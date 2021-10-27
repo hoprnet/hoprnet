@@ -25,13 +25,14 @@ const log = debug(`hopr-core:db`)
 const encoder = new TextEncoder()
 
 const TICKET_PREFIX = encoder.encode('tickets-')
+const SEPARATOR = encoder.encode(':')
 const UNACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('unacknowledged-'))
 const ACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
 export const unacknowledgedTicketKey = (halfKey: HalfKeyChallenge) => {
   return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, halfKey.serialize())
 }
-const acknowledgedTicketKey = (challenge: EthereumChallenge) => {
-  return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, challenge.serialize())
+const acknowledgedTicketKey = (challenge: EthereumChallenge, channelEpoch: UINT256) => {
+  return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, channelEpoch.serialize(), SEPARATOR, challenge.serialize())
 }
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
@@ -228,23 +229,19 @@ export class HoprDB {
    * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
-  public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
-    await this.del(acknowledgedTicketKey(ack.ticket.challenge))
+  public async delAcknowledgedTicket(ack: AcknowledgedTicket, channelEpoch: UINT256): Promise<void> {
+    await this.del(acknowledgedTicketKey(ack.ticket.challenge, channelEpoch))
   }
 
-  public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
+  public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket, channelEpoch: UINT256): Promise<void> {
     const unAcknowledgedDbKey = unacknowledgedTicketKey(halfKeyChallenge)
-    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge)
+    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge, channelEpoch)
 
-    try {
-      await this.db
-        .batch()
-        .del(Buffer.from(this.keyOf(unAcknowledgedDbKey)))
-        .put(Buffer.from(this.keyOf(acknowledgedDbKey)), Buffer.from(ackTicket.serialize()))
-        .write()
-    } catch (err) {
-      log(`ERROR: Error while writing to database. Error was ${err.message}.`)
-    }
+    await this.db
+      .batch()
+      .del(Buffer.from(this.keyOf(unAcknowledgedDbKey)))
+      .put(Buffer.from(this.keyOf(acknowledgedDbKey)), Buffer.from(ackTicket.serialize()))
+      .write()
   }
 
   /**
@@ -386,7 +383,7 @@ export class HoprDB {
 
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
     await this.increment(REDEEMED_TICKETS_COUNT)
-    await this.delAcknowledgedTicket(a)
+    await this.delAcknowledgedTicket(a, a.ticket.channelIteration)
     await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
     await this.subBalance(PENDING_TICKETS_VALUE(a.ticket.counterparty), a.ticket.amount)
   }
