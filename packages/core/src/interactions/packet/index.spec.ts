@@ -129,6 +129,7 @@ describe('packet interaction', function () {
     // Open a dummy channel to create first packet
     const firstChannel = getDummyChannel(SELF, RELAY0)
     await dbs[0].updateChannel(firstChannel.getId(), firstChannel)
+    await dbs[1].updateChannel(firstChannel.getId(), firstChannel)
 
     const packet = await Packet.create(TEST_MESSAGE, [RELAY0, COUNTERPARTY], SELF, dbs[0])
 

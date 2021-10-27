@@ -32,7 +32,17 @@ async function handleAcknowledgement(
     throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
   }
 
-  const channelId = (await db.getChannelFrom(unacknowledgedTicket.signer)).getId()
+  let channelId
+  try {
+    channelId = (await db.getChannelFrom(unacknowledgedTicket.signer)).getId()
+  } catch (e) {
+    // We are acknowledging a ticket for a channel we do not think exists?
+    // Also we know about the unacknowledged ticket? This should never happen.
+    // Something clearly screwy here. This is bad enough to be a fatal error
+    // we should kill the node and debug.
+    log('Error, acknowledgement received for channel that does not exist')
+    throw e
+  }
   const response = unacknowledgedTicket.getResponse(acknowledgement.ackKeyShare)
   const ticket = unacknowledgedTicket.ticket
   const opening = await findCommitmentPreImage(db, channelId)
