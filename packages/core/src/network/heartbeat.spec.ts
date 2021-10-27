@@ -7,8 +7,14 @@ import { fakePeerId } from '../test-utils'
 import PeerId from 'peer-id'
 import { Hash } from '@hoprnet/hopr-utils'
 
+class TestingHeartbeat extends Heartbeat {
+  public setSendMessage(sendMessage: Heartbeat['sendMessage']) {
+    this.sendMessage = sendMessage
+  }
+}
+
 describe('unit test heartbeat', async () => {
-  let heartbeat: Heartbeat
+  let heartbeat: TestingHeartbeat
   let hangUp = sinon.fake.resolves(undefined)
   let peers: NetworkPeerStore
   let clock: any
@@ -19,7 +25,7 @@ describe('unit test heartbeat', async () => {
   beforeEach(async () => {
     clock = sinon.useFakeTimers(Date.now())
     peers = new NetworkPeerStore([], [await PeerId.create({ keyType: 'secp256k1' })])
-    heartbeat = new Heartbeat(peers, subscribe, send, hangUp)
+    heartbeat = new TestingHeartbeat(peers, subscribe, send, hangUp)
   })
 
   afterEach(() => {
@@ -51,7 +57,7 @@ describe('unit test heartbeat', async () => {
     let generateMock = (i: string | number) => {
       let id = fakePeerId(i)
       let peers = new NetworkPeerStore([], [id])
-      let heartbeat = new Heartbeat(peers, subscribe, send, hangUp)
+      let heartbeat = new TestingHeartbeat(peers, subscribe, send, hangUp)
       return { peers, id, heartbeat }
     }
 
@@ -86,13 +92,14 @@ describe('unit test heartbeat', async () => {
     assert(alice.peers.qualityOf(chris.id) > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
 
     // Chris dies, alice heartbeats again
-    //@ts-ignore
-    alice.heartbeat.sendMessageAndExpectResponse = sinon.fake((id: PeerId, _proto: any, challenge: Uint8Array) => {
-      if (id.equals(chris.id)) {
-        return Promise.reject()
-      }
-      return [Hash.create(challenge).serialize()]
-    })
+    alice.heartbeat.setSendMessage(
+      sinon.fake((id: PeerId, _proto: any, challenge: Uint8Array) => {
+        if (id.equals(chris.id)) {
+          return Promise.reject()
+        }
+        return [Hash.create(challenge).serialize()]
+      })
+    )
 
     clock.tick(HEARTBEAT_INTERVAL * 2)
     await alice.heartbeat.__forTestOnly_checkNodes()

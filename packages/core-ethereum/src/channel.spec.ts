@@ -34,11 +34,8 @@ const createChainMock = (): ChainWrapper => {
   } as unknown as ChainWrapper
 }
 
-const createIndexerMock = (channelUsThem: ChannelEntry, channelThemUs: ChannelEntry): Indexer => {
+const createIndexerMock = (): Indexer => {
   return {
-    async getChannel(id: Hash) {
-      return id.eq(channelUsThem.getId()) ? channelUsThem : channelThemUs
-    },
     async resolvePendingTransaction(_eventType: IndexerEvents, tx: string) {
       return tx
     }
@@ -83,7 +80,7 @@ const createMocks = (from: string, to: string) => {
   const secret2 = new HalfKey(Hash.create(new Uint8Array([2])).serialize())
   const response = Response.fromHalfKeys(secret1, secret2)
 
-  const indexer = createIndexerMock(channelUsThem, channelThemUs)
+  const indexer = createIndexerMock()
   const chain = createChainMock()
   const ev = new EventEmitter()
   const channel = new Channel(self, counterparty, db, chain, indexer, selfPrivateKey, ev)

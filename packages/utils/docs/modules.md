@@ -51,7 +51,10 @@
 - [PRGParameters](modules.md#prgparameters)
 - [PRPParameters](modules.md#prpparameters)
 - [PromiseValue](modules.md#promisevalue)
+- [TimeoutOpts](modules.md#timeoutopts)
 - [U8aAndSize](modules.md#u8aandsize)
+- [libp2pSendMessage](modules.md#libp2psendmessage)
+- [libp2pSubscribe](modules.md#libp2psubscribe)
 
 ### Variables
 
@@ -91,6 +94,7 @@
 
 ### Functions
 
+- [abortableTimeout](modules.md#abortabletimeout)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [checkNetworks](modules.md#checknetworks)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
@@ -102,6 +106,7 @@
 - [decodePoRBytes](modules.md#decodeporbytes)
 - [defer](modules.md#defer)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
+- [deserializeKeyPair](modules.md#deserializekeypair)
 - [dial](modules.md#dial)
 - [forwardTransform](modules.md#forwardtransform)
 - [gcd](modules.md#gcd)
@@ -132,7 +137,6 @@
 - [iterateHash](modules.md#iteratehash)
 - [lengthPrefixedToU8a](modules.md#lengthprefixedtou8a)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
-- [libp2pSendMessageAndExpectResponse](modules.md#libp2psendmessageandexpectresponse)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 - [limitConcurrency](modules.md#limitconcurrency)
 - [localAddressesFirst](modules.md#localaddressesfirst)
@@ -152,6 +156,7 @@
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
 - [retryWithBackoff](modules.md#retrywithbackoff)
 - [sampleGroupElement](modules.md#samplegroupelement)
+- [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
 - [stringToU8a](modules.md#stringtou8a)
 - [timeoutAfter](modules.md#timeoutafter)
@@ -244,11 +249,11 @@ ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
+Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `status`: ``"E_ABORTED"``  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
 
 #### Defined in
 
-[libp2p/dialHelper.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L22)
+[libp2p/dialHelper.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L25)
 
 ___
 
@@ -283,17 +288,23 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L140)
+[libp2p/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L170)
 
 ___
 
 ### LibP2PHandlerFunction
 
-Ƭ **LibP2PHandlerFunction**: (`msg`: `Uint8Array`, `remotePeer`: `PeerId`) => `any`
+Ƭ **LibP2PHandlerFunction**<`T`\>: (`msg`: `Uint8Array`, `remotePeer`: `PeerId`) => `T`
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
 
 #### Type declaration
 
-▸ (`msg`, `remotePeer`): `any`
+▸ (`msg`, `remotePeer`): `T`
 
 ##### Parameters
 
@@ -304,11 +315,11 @@ ___
 
 ##### Returns
 
-`any`
+`T`
 
 #### Defined in
 
-[libp2p/index.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L141)
+[libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
 
 ___
 
@@ -382,6 +393,23 @@ Infer the return value of a promise
 
 ___
 
+### TimeoutOpts
+
+Ƭ **TimeoutOpts**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `signal?` | `AbortSignal` |
+| `timeout` | `number` |
+
+#### Defined in
+
+[async/abortableTimeout.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L6)
+
+___
+
 ### U8aAndSize
 
 Ƭ **U8aAndSize**: [`Uint8Array`, `number`]
@@ -389,6 +417,54 @@ ___
 #### Defined in
 
 [u8a/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L20)
+
+___
+
+### libp2pSendMessage
+
+Ƭ **libp2pSendMessage**: (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`DialOpts`](modules.md#dialopts)) => `Promise`<`void`\> & (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`DialOpts`](modules.md#dialopts)) => `Promise`<`Uint8Array`[]\>
+
+Asks libp2p to establish a connection to another node and
+send message. If `includeReply` is set, wait for a response
+
+**`param`** libp2p instance
+
+**`param`** peer to connect to
+
+**`param`** protocol to speak
+
+**`param`** message to send
+
+**`param`** try to receive a reply
+
+**`param`** timeout
+
+#### Defined in
+
+[libp2p/index.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L108)
+
+___
+
+### libp2pSubscribe
+
+Ƭ **libp2pSubscribe**: (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
+
+Generates a handler that pulls messages out of a stream
+and feeds them to the given handler.
+
+**`param`** libp2p instance
+
+**`param`** protocol to dial
+
+**`param`** called once another node requests that protocol
+
+**`param`** handle stream pipeline errors
+
+**`param`** try to receive a reply
+
+#### Defined in
+
+[libp2p/index.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L240)
 
 ## Variables
 
@@ -745,6 +821,37 @@ ___
 
 ## Functions
 
+### abortableTimeout
+
+▸ **abortableTimeout**<`Result`, `AbortMsg`, `TimeoutMsg`\>(`fn`, `abortMsg`, `timeoutMsg`, `opts`): `Promise`<`Result` \| `AbortMsg` \| `TimeoutMsg`\>
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `Result` |
+| `AbortMsg` |
+| `TimeoutMsg` |
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`opts`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Result`\> |
+| `abortMsg` | `AbortMsg` |
+| `timeoutMsg` | `TimeoutMsg` |
+| `opts` | [`TimeoutOpts`](modules.md#timeoutopts) |
+
+#### Returns
+
+`Promise`<`Result` \| `AbortMsg` \| `TimeoutMsg`\>
+
+#### Defined in
+
+[async/abortableTimeout.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L11)
+
+___
+
 ### cacheNoArgAsyncFunction
 
 ▸ **cacheNoArgAsyncFunction**<`T`\>(`func`, `expiry`): () => `Promise`<`T`\>
@@ -1044,6 +1151,35 @@ relayer for transforming and delivering the packet
 
 ___
 
+### deserializeKeyPair
+
+▸ **deserializeKeyPair**(`serialized`, `password`, `useWeakCrypto?`): `Promise`<`DeserializationResponse`\>
+
+Deserializes an encoded key pair
+
+**`dev`** This method uses a computation and memory intensive hash function,
+     for testing set `useWeakCrypto = true`
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `serialized` | `Uint8Array` | `undefined` | encoded key pair |
+| `password` | `string` | `undefined` | password to use for decryption |
+| `useWeakCrypto` | `boolean` | `false` | use faster but weaker crypto to reconstruct key pair |
+
+#### Returns
+
+`Promise`<`DeserializationResponse`\>
+
+reconstructed key pair
+
+#### Defined in
+
+[crypto/keyPair.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L84)
+
+___
+
 ### dial
 
 ▸ **dial**(`libp2p`, `destination`, `protocol`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
@@ -1067,7 +1203,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L53)
+[libp2p/dialHelper.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L151)
 
 ___
 
@@ -1723,7 +1859,7 @@ ___
 
 ### libp2pSendMessage
 
-▸ **libp2pSendMessage**(`libp2p`, `destination`, `protocol`, `message`, `opts?`): `Promise`<`void`\>
+▸ **libp2pSendMessage**(`libp2p`, `destination`, `protocol`, `message`, `includeReply`, `opts?`): `Promise`<`void` \| `Uint8Array`[]\>
 
 #### Parameters
 
@@ -1733,45 +1869,22 @@ ___
 | `destination` | `PeerId` |
 | `protocol` | `string` |
 | `message` | `Uint8Array` |
+| `includeReply` | `boolean` |
 | `opts?` | [`DialOpts`](modules.md#dialopts) |
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`<`void` \| `Uint8Array`[]\>
 
 #### Defined in
 
-[libp2p/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L97)
-
-___
-
-### libp2pSendMessageAndExpectResponse
-
-▸ **libp2pSendMessageAndExpectResponse**(`libp2p`, `destination`, `protocol`, `message`, `opts?`): `Promise`<`Uint8Array`[]\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `libp2p` | `Libp2p` |
-| `destination` | `PeerId` |
-| `protocol` | `string` |
-| `message` | `Uint8Array` |
-| `opts?` | [`DialOpts`](modules.md#dialopts) |
-
-#### Returns
-
-`Promise`<`Uint8Array`[]\>
-
-#### Defined in
-
-[libp2p/index.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L113)
+[libp2p/index.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L125)
 
 ___
 
 ### libp2pSubscribe
 
-▸ **libp2pSubscribe**(`libp2p`, `protocol`, `handler`, `includeReply?`): `void`
+▸ **libp2pSubscribe**(`libp2p`, `protocol`, `handler`, `errHandler`, `includeReply?`): `void`
 
 #### Parameters
 
@@ -1779,7 +1892,8 @@ ___
 | :------ | :------ | :------ |
 | `libp2p` | `Libp2p` | `undefined` |
 | `protocol` | `string` | `undefined` |
-| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction) | `undefined` |
+| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void` \| `Uint8Array`\>\> | `undefined` |
+| `errHandler` | `ErrHandler` | `undefined` |
 | `includeReply` | `boolean` | `false` |
 
 #### Returns
@@ -1788,7 +1902,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L176)
+[libp2p/index.ts:255](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L255)
 
 ___
 
@@ -2264,6 +2378,39 @@ and the product of exponent and base-point.
 
 ___
 
+### serializeKeyPair
+
+▸ **serializeKeyPair**(`peerId`, `password`, `useWeakCrypto?`, `__iv?`, `__salt?`, `__uuidSalt?`): `Promise`<`Uint8Array`\>
+
+Serializes a peerId using geth's KeyStore format
+see https://medium.com/@julien.maffre/what-is-an-ethereum-keystore-file-86c8c5917b97
+
+**`dev`** This method uses a computation and memory intensive hash function,
+     for testing set `useWeakCrypto = true`
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `peerId` | `PeerId` | `undefined` | id to store |
+| `password` | `string` | `undefined` | password used for encryption |
+| `useWeakCrypto` | `boolean` | `false` | weak parameter for fast serialization |
+| `__iv?` | `string` | `undefined` | - |
+| `__salt?` | `string` | `undefined` | - |
+| `__uuidSalt?` | `string` | `undefined` | - |
+
+#### Returns
+
+`Promise`<`Uint8Array`\>
+
+Uint8Array representation
+
+#### Defined in
+
+[crypto/keyPair.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L18)
+
+___
+
 ### serializeToU8a
 
 ▸ **serializeToU8a**(`items`): `Uint8Array`
@@ -2692,7 +2839,7 @@ ___
 
 #### Defined in
 
-[db.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L29)
+[db.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L30)
 
 ___
 

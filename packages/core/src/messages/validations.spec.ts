@@ -5,7 +5,6 @@ import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
-import { Channel } from '@hoprnet/hopr-core-ethereum'
 import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import { validateUnacknowledgedTicket } from '.'
 
@@ -48,7 +47,12 @@ const createMockTicket = ({
   } as unknown as Ticket
 }
 
-const mockChannelEntry = (isChannelOpen: boolean, balance: Balance, ticketEpoch: UINT256, ticketIndex: UINT256) =>
+const mockChannelEntry = (
+  isChannelOpen: boolean = true,
+  balance: Balance = new Balance(new BN(100)),
+  ticketEpoch = new UINT256(new BN(1)),
+  ticketIndex = new UINT256(new BN(0))
+) =>
   Promise.resolve(
     new ChannelEntry(
       TARGET_PUBKEY,
@@ -62,34 +66,6 @@ const mockChannelEntry = (isChannelOpen: boolean, balance: Balance, ticketEpoch:
       null
     )
   )
-
-const createMockChannel = ({
-  isChannelOpen = true,
-  isChannelStored = true,
-  self = new Balance(new BN(0)),
-  counterparty = new Balance(new BN(100)),
-  ticketEpoch = new UINT256(new BN(1)),
-  ticketIndex = new UINT256(new BN(0))
-}: {
-  isChannelOpen?: boolean
-  isChannelStored?: boolean
-  self?: Balance
-  counterparty?: Balance
-  ticketEpoch?: UINT256
-  ticketIndex?: UINT256
-}) => {
-  return {
-    usToThem: () => {
-      if (isChannelStored) return mockChannelEntry(isChannelOpen, self, ticketEpoch, ticketIndex)
-      throw new Error('state not found')
-    },
-    themToUs: () => {
-      if (isChannelStored) return mockChannelEntry(isChannelOpen, counterparty, ticketEpoch, ticketIndex)
-      throw new Error('state not found')
-    },
-    channelEpoch: new BN(1)
-  } as unknown as Channel
-}
 
 const createMockNode = ({
   // sender = SENDER,
@@ -122,7 +98,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         new BN(1),
         new BN(1),
         signedTicket,
-        createMockChannel({}),
+        await mockChannelEntry(),
         getTicketsMock
       )
     ).to.not.eventually.rejected
@@ -139,7 +115,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         new BN(2),
         new BN(1),
         signedTicket,
-        createMockChannel({}),
+        await mockChannelEntry(),
         getTicketsMock
       )
     ).to.eventually.rejectedWith('The signer of the ticket does not match the sender')
@@ -156,7 +132,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         new BN(2),
         new BN(1),
         signedTicket,
-        createMockChannel({}),
+        await mockChannelEntry(),
         getTicketsMock
       )
     ).to.eventually.rejectedWith('Ticket amount')
@@ -175,7 +151,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         new BN(1),
         new BN(1),
         signedTicket,
-        createMockChannel({}),
+        await mockChannelEntry(),
         getTicketsMock
       )
     ).to.eventually.rejectedWith('Ticket winning probability')
@@ -192,37 +168,16 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         new BN(1),
         new BN(1),
         signedTicket,
-        createMockChannel({
-          isChannelOpen: false
-        }),
+        await mockChannelEntry(false),
         getTicketsMock
       )
     ).to.eventually.rejectedWith('is not open')
   })
 
-  it('should throw if channel is not stored', async function () {
-    const node = createMockNode({})
-    const signedTicket = createMockTicket({})
-
-    return expect(
-      validateUnacknowledgedTicket(
-        node.getId(),
-        SENDER,
-        new BN(1),
-        new BN(1),
-        signedTicket,
-        createMockChannel({
-          isChannelStored: false
-        }),
-        getTicketsMock
-      )
-    ).to.eventually.rejectedWith('Error while validating unacknowledged ticket, state not found')
-  })
-
   it('should throw if ticket epoch does not match our account epoch', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({})
-    const mockChannel = createMockChannel({ ticketEpoch: new UINT256(new BN(2)) })
+    const mockChannel = await mockChannelEntry(true, new Balance(new BN(100)), new UINT256(new BN(2)))
 
     return expect(
       validateUnacknowledgedTicket(
@@ -240,8 +195,12 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
   it('should throw if ticket index must be higher than last ticket index', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({})
-    const mockChannel = createMockChannel({ ticketIndex: new UINT256(new BN(1)) })
-
+    const mockChannel = await mockChannelEntry(
+      true,
+      new Balance(new BN(100)),
+      new UINT256(new BN(1)),
+      new UINT256(new BN(1))
+    )
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
@@ -268,7 +227,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         new BN(1),
         new BN(1),
         signedTicket,
-        createMockChannel({}),
+        await mockChannelEntry(),
         getTicketsMock
       )
     ).to.eventually.rejectedWith('Ticket was created for a different channel iteration')
@@ -285,10 +244,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         new BN(1),
         new BN(1),
         signedTicket,
-        createMockChannel({
-          self: new Balance(new BN(100)),
-          counterparty: new Balance(new BN(0))
-        }),
+        await mockChannelEntry(true, new Balance(new BN(0))),
         getTicketsMock
       )
     ).to.eventually.rejectedWith('Payment channel does not have enough funds')
@@ -310,7 +266,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         new BN(1),
         new BN(1),
         signedTicket,
-        createMockChannel({}),
+        await mockChannelEntry(),
         async () => ticketsInDb
       )
     ).to.eventually.rejectedWith('Payment channel does not have enough funds when you include unredeemed tickets')

@@ -183,7 +183,7 @@ class Channel {
   }
 
   async usToThem(): Promise<ChannelEntry> {
-    return await this.indexer.getChannel(this.getUsToThemId())
+    return await this.db.getChannel(this.getUsToThemId())
   }
 
   getThemToUsId(): Hash {
@@ -191,7 +191,7 @@ class Channel {
   }
 
   async themToUs(): Promise<ChannelEntry> {
-    return await this.indexer.getChannel(this.getThemToUsId())
+    return await this.db.getChannel(this.getThemToUsId())
   }
 
   async fund(myFund: Balance, counterpartyFund: Balance) {
