@@ -1,5 +1,7 @@
 \subsubsection{Routing information}
-Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message. Whilst the keys for $B$, $C$, and $D$ are given as a compressed elliptic curve points, the $END$ message occurs as a distinguished prefix.
+\label{sec:sphinx:routinginformation}
+
+Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message. Whilst the keys for $B$, $C$, and $D$ are given as a compressed elliptic, the $END$ message occurs as a distinguished prefix.
 
 In general, compression of elliptic curve points given as $(x,y)$ happens by taking the $x$-coordinate and the sign of $y$. If $y$ is above the $x$-axis, \texttt{0x02} is appended, otherwise \texttt{0x03} is used. The $END$ message is given by \texttt{0x04} and is therefore easily distinguishable from public keys.
 
@@ -19,12 +21,176 @@ The routing information is computed as follows:
 \end{align}
 $0\le i < v-1$
 
-such that $y_Z$ is the destination's public key in compressed form (since this is only the $x$-coordinate, it is 33 bytes instead of 64) and $|y_Z|$ is its length. $\rho$ is a pseudorandom generator (PRG) detailed in Appendix \ref{appendix:keyderivation} and $h_{\rho}$ is the hash function used to key $\rho$.
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \def\one{0.6}
+        \def\scale{0.9}
+        \def\nodeWidth{1.95}
+        \def\endWidth{1.2}
+        \def\width{3*2*\nodeWidth+\endWidth}
+        \foreach \i\name in{0/B,1/C,2/D,3/Z} {
+                \begin{scope}[shift={(\i*\nodeWidth*2,0)}]
+                    \ifnum\i=0
+                        \def\a{11.7}
+                        \def\diff{11.1}
+                    \fi
+
+                    \ifnum\i=1
+                        \def\a{7.8}
+                        \def\diff{7.2}
+                    \fi
+
+                    \ifnum\i=2
+                        \def\a{3.9}
+                        \def\diff{3.3}
+
+                    \fi
+
+                    \ifnum\i=3
+                        \def\a{\endWidth}
+                        \def\diff{0.6}
+                    \fi
+
+
+                    \def\b{0.6}
+                    \def\lw{0.2}
+
+                    \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                            \draw [line width=\lw mm](\x,0)--(0,\x) (\a-\b+\x,\b)--(\a,\x);
+                        }
+                    \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                            \draw [line width=\lw mm](\x+\b,0)--(\x,\b);
+                        }
+
+                    \ifnum\i>0
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                                \draw [line width=\lw mm](0,\x)--(\b-\x,\b) (\a-\b+\x,0)--(\a,\b-\x);
+                            }
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                                \draw [line width=\lw mm](\x,0)--(\b+\x,\b);
+                            }
+                    \fi
+
+                    \ifnum\i>1
+                        \foreach \x [count=\i] in{0.15,0.45,...,\a}{
+                                \draw [line width=\lw mm](\x,0)--(\x,\b);
+                            }
+                    \fi
+
+                    \ifnum\i>2
+                        \foreach \x [count=\i] in{0.15,0.45,...,\b}{
+                                \draw [line width=\lw mm](0,\x)--(\a,\x);
+                            }
+                    \fi
+                \end{scope}
+                \ifnum\i<3
+                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$y_{\name}$};
+                    \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
+                    \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$\gamma_{\name}$};
+                    \draw (\i*2*\nodeWidth+\nodeWidth,0) -- (\i*2*\nodeWidth+\nodeWidth,\one);
+                \else
+                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black,fill=white,inner sep=1.5pt] {$end$};
+                    \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
+                \fi
+            }
+
+        \draw (0,0) rectangle (\width,\one);
+    \end{tikzpicture}
+    \caption{Blinded routing information sent to first relayer $B$.}
+\end{figure}
+
+such that $y_Z$ is the destination's public key in compressed form (since this is only the $x$-coordinate, it is 33 bytes instead of 64) and $|y_Z|$ is its length. $\rho$ is a pseudorandom generator (PRG) and $h_{\rho}$ is the hash function used to key $\rho$.
 $v\leq r$ is the length of the path traversed by the packet, where $|y_Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string such that
 \begin{align}
     \phi_i & =\{ \phi_{i-1}\|0_{2\kappa}\}\oplus \rho(h_{\rho}(s_{i-1}))_{[ \,(2(r-i)+3)\kappa..(2r+3)\kappa-1\,]}
 \end{align}
 where $\phi_0=\epsilon$ is an empty string. $\phi_i$ is generated using the shared secret $s_{i-1}$ and used to ensure the header packets remain constant in size as layers of encryption are added or removed. Upon receiving a packet, the processing node extracts the information destined for it from the route information and the per-hop payload. The extraction is performed by deobfuscating and left-shifting the field. Ordinarily, this would make the field shorter at each hop, allowing an attacker to deduce the route length. For this reason, the field is pre-padded before forwarding. Since the padding is part of the HMAC, the origin node will have to pre-generate an identical padding (to that generated at each hop) in order to compute the HMACs correctly for each hop.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}
+        \def\one{0.6}
+        \def\scale{0.9}
+        \def\nodeWidth{1.95}
+        \def\endWidth{1.2}
+        \def\width{3*2*\nodeWidth+\endWidth}
+        \foreach \i\name in{0/B,1/C,2/D,3/Z} {
+                \ifnum\i=3
+                    \def\a{11.7}
+                    \def\diff{11.1}
+                \fi
+
+                \ifnum\i=2
+                    \def\a{7.8}
+                    \def\diff{7.2}
+                \fi
+
+                \ifnum\i=1
+                    \def\a{3.9}
+                    \def\diff{3.3}
+
+                \fi
+
+                \ifnum\i=0
+                    \def\a{\endWidth}
+                    \def\diff{0.6}
+                \fi
+
+
+                \def\b{0.6}
+                \def\lw{0.2}
+
+                \begin{scope}[shift={(\endWidth,0)}]
+                    \ifnum\i=1
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                                \draw [line width=\lw mm](\x,0)--(0,\x) (\a-\b+\x,\b)--(\a,\x);
+                            }
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                                \draw [line width=\lw mm](\x+\b,0)--(\x,\b);
+                            }
+                    \fi
+
+                    \ifnum\i=2
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\b}{
+                                \draw [line width=\lw mm](0,\x)--(\b-\x,\b) (\a-\b+\x,0)--(\a,\b-\x);
+                            }
+                        \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                                \draw [line width=\lw mm](\x,0)--(\b+\x,\b);
+                            }
+                    \fi
+
+                    \ifnum\i=3
+                        \foreach \x [count=\i] in{0.15,0.45,...,\a}{
+                                \draw [line width=\lw mm](\x,0)--(\x,\b);
+                            }
+                    \fi
+                \end{scope}
+
+                \ifnum\i=0
+                    \foreach \x [count=\i] in{0.15,0.45,...,\b}{
+                            \draw [line width=\lw mm](0,\x)--(\a,\x);
+                        }
+                \fi
+                \ifnum\i>0
+                    % \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$y_{\name}$};
+                    \draw (\i*2*\nodeWidth+\endWidth,0) -- (\i*2*\nodeWidth+\endWidth,\one);
+                    % \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$\gamma_{\name}$};
+                    % \draw (\i*2*\nodeWidth+\nodeWidth,0) -- (\i*2*\nodeWidth+\nodeWidth,\one);
+                \else
+                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black,fill=white,inner sep=1.5pt] {$end$};
+                    \draw (\endWidth,0) -- (\endWidth,\one);
+                \fi
+            }
+
+        \draw (0,0) rectangle (\width,\one);
+        \draw[decoration={brace,raise=5pt},decorate] (\endWidth,\one) -- node[above=5pt] {filler string $\phi_3$} (\width,\one);
+        \draw[decoration={brace,mirror,raise=5pt},decorate] (0,0) -- node[below=7pt] {Used for integrity check by $Z$, see section \ref{sec:sphinx:integrity}} (\width,0);
+
+
+    \end{tikzpicture}
+    \caption{Transformed header as seen by $Z$}
+\end{figure}
 
 $\beta_i$ is computed as the concatenation of $y_Z$ and a sequence of padding which is then encrypted by XORing with the output of a PRG seeded with shared key $s_{v-1}$ of node $v-1$. The result is finally concatenated with $\phi$ to ensure the header packets remain constant in size.
 

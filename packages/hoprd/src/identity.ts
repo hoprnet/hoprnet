@@ -1,12 +1,16 @@
 // TODO - replace serialization with a library
 import PeerId from 'peer-id'
-import { privKeyToPeerId, SECP256K1_CONSTANTS, stringToU8a } from '@hoprnet/hopr-utils'
+import {
+  privKeyToPeerId,
+  SECP256K1_CONSTANTS,
+  stringToU8a,
+  serializeKeyPair,
+  deserializeKeyPair
+} from '@hoprnet/hopr-utils'
 import fs from 'fs'
 import { resolve } from 'path'
 import { debug } from '@hoprnet/hopr-utils'
 const log = debug(`hoprd:identity`)
-
-import Wallet from 'ethereumjs-wallet'
 
 export enum IdentityErrors {
   FAIL_TO_LOAD_IDENTITY = 'Could not load identity',
@@ -19,54 +23,6 @@ export enum IdentityErrors {
 
 export enum IdentityLogs {
   USING_WEAK_CRYPTO = 'Using weaker key protection to accelerate node startup'
-}
-
-/**
- * Serializes a given peerId by serializing the included private key and public key.
- *
- * @param peerId the peerId that should be serialized
- */
-export async function serializeKeyPair(peerId: PeerId, password: string, useWeakCrypto = false): Promise<Uint8Array> {
-  const w = new Wallet(peerId.privKey.marshal() as Buffer)
-
-  let serialized: string
-  if (useWeakCrypto) {
-    // Use weak settings during development for quicker
-    // node startup
-    serialized = await w.toV3String(password, {
-      n: 1
-    })
-  } else {
-    serialized = await w.toV3String(password)
-  }
-
-  return new TextEncoder().encode(serialized)
-}
-
-/**
- * Deserializes a serialized key pair and returns a peerId.
- *
- * @notice This method will ask for a password to decrypt the encrypted
- * private key.
- * @notice The decryption of the private key makes use of a memory-hard
- * hash function and consumes therefore a lot of memory.
- *
- * @param encryptedSerializedKeyPair the encoded and encrypted key pair
- */
-export async function deserializeKeyPair(
-  serialized: Uint8Array,
-  password: string,
-  useWeakCrypto = false
-): Promise<PeerId> {
-  const decoded = JSON.parse(new TextDecoder().decode(serialized))
-
-  if (decoded.crypto.kdfparams.n == 1 && useWeakCrypto != true) {
-    throw Error(IdentityErrors.WRONG_USAGE_OF_WEAK_CRYPTO)
-  }
-
-  const w = await Wallet.fromV3(decoded, password)
-
-  return privKeyToPeerId(w.getPrivateKey())
 }
 
 export type IdentityOptions = {
@@ -119,7 +75,19 @@ export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
     log(IdentityLogs.USING_WEAK_CRYPTO)
   }
   if (storedIdentity != undefined) {
-    return await deserializeKeyPair(storedIdentity, options.password, options.useWeakCrypto)
+    const deserialized = await deserializeKeyPair(storedIdentity, options.password, options.useWeakCrypto)
+
+    if (deserialized.success == false) {
+      if (deserialized.error === 'Invalid password') {
+        throw new Error(IdentityErrors.WRONG_PASSPHRASE)
+      } else if (deserialized.error === 'Wrong usage of weak crypto') {
+        throw new Error(IdentityErrors.WRONG_USAGE_OF_WEAK_CRYPTO)
+      } else {
+        throw new Error(`Unknown identity error ${deserialized.error}`)
+      }
+    } else {
+      return deserialized.identity
+    }
   }
 
   if (options.initialize) {

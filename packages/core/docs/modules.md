@@ -22,6 +22,8 @@
 - [ChannelsToOpen](modules.md#channelstoopen)
 - [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
+- [SendMessage](modules.md#sendmessage)
+- [Subscribe](modules.md#subscribe)
 
 ### Variables
 
@@ -32,6 +34,7 @@
 - [HEARTBEAT\_INTERVAL\_VARIANCE](modules.md#heartbeat_interval_variance)
 - [HEARTBEAT\_TIMEOUT](modules.md#heartbeat_timeout)
 - [INTERMEDIATE\_HOPS](modules.md#intermediate_hops)
+- [MAX\_HOPS](modules.md#max_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
 - [MAX\_PACKET\_DELAY](modules.md#max_packet_delay)
 - [MAX\_PARALLEL\_CONNECTIONS](modules.md#max_parallel_connections)
@@ -58,7 +61,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
+[packages/core/src/channel-strategy.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L17)
 
 ___
 
@@ -68,7 +71,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L15)
+[packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
 
 ___
 
@@ -108,6 +111,26 @@ ___
 
 [packages/core/src/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L96)
 
+___
+
+### SendMessage
+
+Ƭ **SendMessage**: (`dest`: `PeerId`, `protocol`: `string`, `msg`: `Uint8Array`, `includeReply`: ``false``, `opts`: `DialOpts`) => `Promise`<`void`\> & (`dest`: `PeerId`, `protocol`: `string`, `msg`: `Uint8Array`, `includeReply`: ``true``, `opts`: `DialOpts`) => `Promise`<`Uint8Array`[]\>
+
+#### Defined in
+
+[packages/core/src/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L111)
+
+___
+
+### Subscribe
+
+Ƭ **Subscribe**: (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`void`\>\>, `includeReply`: ``false``, `errHandler`: (`err`: `any`) => `void`) => `void` & (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`Uint8Array`\>\>, `includeReply`: ``true``, `errHandler`: (`err`: `any`) => `void`) => `void`
+
+#### Defined in
+
+[packages/core/src/index.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L98)
+
 ## Variables
 
 ### CHECK\_TIMEOUT
@@ -116,7 +139,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L34)
+[packages/core/src/constants.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L35)
 
 ___
 
@@ -132,7 +155,7 @@ ___
 
 ### FULL\_VERSION
 
-• **FULL\_VERSION**: `any`
+• **FULL\_VERSION**: `any` = `pkg.version`
 
 #### Defined in
 
@@ -177,6 +200,16 @@ ___
 #### Defined in
 
 [packages/core/src/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L28)
+
+___
+
+### MAX\_HOPS
+
+• **MAX\_HOPS**: ``3``
+
+#### Defined in
+
+[packages/core/src/constants.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L33)
 
 ___
 
@@ -320,14 +353,14 @@ Depth first search through potential paths based on weight
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `start` | `PublicKey` |
-| `destination` | `PublicKey` |
-| `hops` | `number` |
-| `networkQualityOf` | (`p`: `PublicKey`) => `number` |
-| `getOpenChannelsFromPeer` | (`p`: `PublicKey`) => `Promise`<`ChannelEntry`[]\> |
-| `weight` | (`edge`: `ChannelEntry`) => `Promise`<`BN`\> |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `start` | `PublicKey` | `undefined` |
+| `destination` | `PublicKey` | `undefined` |
+| `hops` | `number` | `undefined` |
+| `networkQualityOf` | (`p`: `PublicKey`) => `number` | `undefined` |
+| `getOpenChannelsFromPeer` | (`p`: `PublicKey`) => `Promise`<`ChannelEntry`[]\> | `undefined` |
+| `weight` | (`edge`: `ChannelEntry`) => `Promise`<`BN`\> | `defaultWeight` |
 
 #### Returns
 

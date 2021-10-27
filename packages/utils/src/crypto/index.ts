@@ -1,5 +1,6 @@
 export * from './constants'
 export * from './hashIterator'
+export * from './keyPair'
 export * from './packet'
 export * from './por'
 export * from './prg'

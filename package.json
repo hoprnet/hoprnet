@@ -28,20 +28,17 @@
     "run:hoprd:xdai:protected": "yarn workspace @hoprnet/hoprd exec -- yarn start --host=0.0.0.0:9080 --adminPort=2990 --restPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --apiToken=xD4!-N3+w0rK",
     "run:hoprd:goerli": "yarn workspace @hoprnet/hoprd exec -- yarn start --host=0.0.0.0:9060 --adminPort=2970 --restPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --testNoAuthentication",
     "run:hoprd:goerli:protected": "yarn workspace @hoprnet/hoprd exec -- yarn start --host=0.0.0.0:9060 --adminPort=2970 --restPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --apiToken=g03rL!-N3+w0rK",
-    "run:hoprd:alice": "yarn workspace @hoprnet/hoprd exec -- yarn dev --host=0.0.0.0:9092 --adminPort=3010 --restPort=3011 --provider=http://127.0.0.1:8545/ --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication --data=/tmp/alice --identity=/tmp/alice-identity",
-    "run:hoprd:bob": "yarn workspace @hoprnet/hoprd exec -- yarn dev --host=0.0.0.0:9093 --adminPort=3020 --restPort=3021 --provider=http://127.0.0.1:8545/ --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses  --testPreferLocalAddresses --testNoAuthentication --data=/tmp/bob --identity=/tmp/bob-identity",
-    "run:hoprd:charlie": "yarn workspace @hoprnet/hoprd exec -- yarn dev --host=0.0.0.0:9094 --adminPort=3030 --restPort=3031 --provider=http://127.0.0.1:8545/ --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses  --testPreferLocalAddresses --testNoAuthentication --data=/tmp/charlie --identity=/tmp/charlie-identity",
-    "run:faucet:alice": "curl localhost:3011/api/v1/address/hopr | xargs -IRR yarn workspace @hoprnet/hopr-ethereum exec -- yarn faucet --address RR --network localhost --ishopraddress true",
-    "run:faucet:bob": "curl localhost:3021/api/v1/address/hopr | xargs -IRR yarn workspace @hoprnet/hopr-ethereum exec -- yarn faucet --address RR --network localhost --ishopraddress true",
-    "run:faucet:charlie": "curl localhost:3031/api/v1/address/hopr | xargs -IRR yarn workspace @hoprnet/hopr-ethereum exec -- yarn faucet --address RR --network localhost --ishopraddress true",
-    "run:faucet:all": "yarn run:faucet:alice && yarn run:faucet:bob && yarn run:faucet:charlie",
+    "run:hoprd:alice": "yarn workspace @hoprnet/hoprd exec -- yarn dev --host=0.0.0.0:9092 --adminPort=3010 --restPort=3011 --provider=http://127.0.0.1:8545/ --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication --data=/tmp/alice --identity=/tmp/local-alice.id",
+    "run:hoprd:bob": "yarn workspace @hoprnet/hoprd exec -- yarn dev --host=0.0.0.0:9093 --adminPort=3020 --restPort=3021 --provider=http://127.0.0.1:8545/ --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses  --testPreferLocalAddresses --testNoAuthentication --data=/tmp/bob --identity=/tmp/local-bob.id",
+    "run:hoprd:charlie": "yarn workspace @hoprnet/hoprd exec -- yarn dev --host=0.0.0.0:9094 --adminPort=3030 --restPort=3031 --provider=http://127.0.0.1:8545/ --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses  --testPreferLocalAddresses --testNoAuthentication --data=/tmp/charlie --identity=/tmp/local-charly.id",
+    "run:faucet:all": "yarn workspace @hoprnet/hopr-ethereum faucet --use-local-identities --identity-directory /tmp --identity-prefix local --password local --network localhost",
     "util:clean": "yarn workspaces foreach -pvi --topological-dev --no-private run rimraf node_modules/@hoprnet",
     "docs:generate": "yarn workspaces foreach -pvi --topological-dev --no-private run docs:generate"
   },
   "devDependencies": {
-    "@ethersproject/cli": "5.4.0",
+    "@ethersproject/cli": "5.5.0",
     "rimraf": "3.0.2",
-    "ts-node": "10.3.0",
+    "ts-node": "10.4.0",
     "yargs": "17.2.1"
   },
   "prettier": {
@@ -50,5 +47,6 @@
     "singleQuote": true,
     "printWidth": 120,
     "trailingComma": "none"
-  }
+  },
+  "packageManager": "yarn@3.0.2"
 }

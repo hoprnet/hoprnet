@@ -60,7 +60,7 @@ const hardhatConfig: HardhatUserConfig = {
     xdai: {
       ...networks.xdai,
       live: true,
-      tags: ['production'] as NetworkTag[],
+      tags: ['development'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://provider-proxy.hoprnet.workers.dev/xdai_mainnet`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
@@ -112,21 +112,32 @@ const hardhatConfig: HardhatUserConfig = {
   }
 }
 
-task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) => {
-  return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
-})
-  .addParam<string>('address', 'HoprToken address', undefined, types.string)
-  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', '1', types.string)
-  .addOptionalParam<boolean>(
-    'ishopraddress',
-    'Whether the address passed is a HOPR address or not',
-    false,
-    types.boolean
-  )
+const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
+const DEFAULT_FUND_AMOUNT = '1'
 
-task('accounts', 'View unlocked accounts', async (...args: any[]) => {
-  return (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
-})
+task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) =>
+  (await import('./tasks/faucet')).default(args[0], args[1], args[2])
+)
+  .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
+  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
+  .addFlag('useLocalIdentities', `Fund all identities stored in identity directory`)
+  .addOptionalParam<string>(
+    'password',
+    `Password to decrypt identities stored in identity directory`,
+    undefined,
+    types.string
+  )
+  .addOptionalParam<string>(
+    'identityDirectory',
+    `Overwrite default identity directory, default ['/tmp']`,
+    DEFAULT_IDENTITY_DIRECTORY,
+    types.string
+  )
+  .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
+
+task('accounts', 'View unlocked accounts', async (...args: any[]) =>
+  (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
+)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

@@ -1,5 +1,6 @@
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import { SECP256K1_CONSTANTS, u8aSplit, HalfKey } from '@hoprnet/hopr-utils'
+import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import { ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM } from './constants'
 import { createHash } from 'crypto'
@@ -12,11 +13,11 @@ export class Acknowledgement {
     public ackKeyShare: HalfKey
   ) {}
 
-  static get SIZE() {
+  static get SIZE(): number {
     return SECP256K1_CONSTANTS.SIGNATURE_LENGTH + AcknowledgementChallenge.SIZE + SECRET_LENGTH
   }
 
-  static create(challenge: AcknowledgementChallenge, ackKey: HalfKey, privKey: PeerId) {
+  static create(challenge: AcknowledgementChallenge, ackKey: HalfKey, privKey: PeerId): Acknowledgement {
     const toSign = Uint8Array.from([...challenge.serialize(), ...ackKey.serialize()])
 
     const signature = ecdsaSign(createHash(HASH_ALGORITHM).update(toSign).digest(), privKey.privKey.marshal())
@@ -24,7 +25,7 @@ export class Acknowledgement {
     return new Acknowledgement(signature.signature, challenge.serialize(), ackKey)
   }
 
-  static deserialize(preArray: Uint8Array, ownPubKey: PeerId, senderPubKey: PeerId) {
+  static deserialize(preArray: Uint8Array, ownPubKey: PeerId, senderPubKey: PeerId): Acknowledgement {
     if (preArray.length != Acknowledgement.SIZE) {
       throw Error(`Invalid arguments`)
     }
@@ -38,7 +39,7 @@ export class Acknowledgement {
 
     const [ackSignature, challengeSignature, ackKey] = u8aSplit(arr, [
       SECP256K1_CONSTANTS.SIGNATURE_LENGTH,
-      SECP256K1_CONSTANTS.SIGNATURE_LENGTH,
+      AcknowledgementChallenge.SIZE,
       SECRET_LENGTH
     ])
 
@@ -59,11 +60,11 @@ export class Acknowledgement {
     return new Acknowledgement(ackSignature, challengeSignature, new HalfKey(ackKey))
   }
 
-  get ackChallenge() {
+  get ackChallenge(): HalfKeyChallenge {
     return this.ackKeyShare.toChallenge()
   }
 
-  serialize() {
+  serialize(): Uint8Array {
     return Uint8Array.from([...this.ackSignature, ...this.challengeSignature, ...this.ackKeyShare.serialize()])
   }
 }
