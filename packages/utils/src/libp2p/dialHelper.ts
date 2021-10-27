@@ -110,8 +110,8 @@ async function doDial(
 
     logError(
       `Querying the DHT for ${green(destination.toB58String())} failed. Known addresses:\n` +
-        `  ${knownAddresses.length > 0 ? renderPeerStoreAddresses(knownAddresses) : 'No addresses known'}.\n`,
-      err
+        `  ${knownAddresses.length > 0 ? renderPeerStoreAddresses(knownAddresses) : 'No addresses known'}.\n` +
+        `${err ? `\n${err.message}` : ''}`
     )
   }
 
@@ -145,7 +145,7 @@ async function doDial(
     return { status: DialStatus.DIAL_ERROR, error: err?.message, dhtContacted: true }
   }
 
-  verbose(`Dial after DHT request successful`, struct)
+  verbose(`Dial after DHT request successful`)
 
   if (opts.signal.aborted) {
     return { status: DialStatus.TIMEOUT }
