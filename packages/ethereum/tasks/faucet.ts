@@ -4,7 +4,7 @@ import type { HoprToken } from '../types'
 
 import { utils, constants } from 'ethers'
 import { deserializeKeyPair, PublicKey, hasB58String } from '@hoprnet/hopr-utils'
-import { getContractData, Networks } from '..'
+import { getContractData } from '..'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
 
@@ -115,18 +115,18 @@ type CLIOPts = {
  * Faucets HOPR and ETH tokens to a local account with HOPR
  */
 async function main(opts: CLIOPts, { ethers, network }: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
-  if (network.tags.development) {
-    console.error('🌵 Faucet is only valid in a development network')
-    return
+  if (!network.tags.development) {
+    throw Error('Faucet is only valid in a development network')
   }
 
   let hoprTokenAddress: string
   try {
-    const contract = getContractData(network.name as Networks, 'HoprToken')
+    console.log(network)
+    const contract = getContractData(network.name, 'HoprToken')
     hoprTokenAddress = contract.address
-  } catch {
-    console.error('⛓  You need to ensure the network deployed the contracts')
-    return
+  } catch (error) {
+    console.error('You need to ensure the network deployed the contracts')
+    throw error
   }
 
   const identities: string[] = []

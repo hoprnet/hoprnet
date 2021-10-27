@@ -34,26 +34,23 @@ export type ResolvedEnvironment = {
 
 export function supportedEnvironments(): Environment[] {
   const protocolConfig = require('../protocol-config.json') as ProtocolConfig
-  return protocolConfig.environments
+  const environments = Object.entries(protocolConfig.environments).map(([id, env]) => ({ id, ...env, }))
+  return environments
 }
 
 export function resolveEnvironment(environment_id: string): ResolvedEnvironment {
   const protocolConfig = require('../protocol-config.json') as ProtocolConfig
-  for (const environment of protocolConfig.environments) {
-    if (environment.id === environment_id) {
-      for (const network of protocolConfig.networks) {
-        if (network.id === environment.network_id) {
+  const environment = protocolConfig.environments[environment_id]
+  const network = protocolConfig.networks[environment?.network_id]
+  if (environment && network) {
           return {
-            id: environment.id,
+            id: environment_id,
             network,
             channel_contract_deploy_block: environment.channel_contract_deploy_block,
             token_contract_address: environment.token_contract_address,
             channels_contract_address: environment.channels_contract_address
           }
         }
-      }
-    }
-  }
   const supportedEnvsString: string = supportedEnvironments()
     .map((env) => env.id)
     .join(', ')

@@ -20,18 +20,11 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const hoprToken = await deployments.get('HoprToken')
 
   // salt is used to ensure that a smart contract is re-deployed
-  // on new environments OR a changed version `X.X.0`
+  // on a new combination of environment and version `X.X.0`
   // this is necessary to ensure that all nodes that have announced
   // in HoprChannels can reach each other
-  let salt: string
-  if (hre.environment === 'default') {
-    // version bumping happens AFTER deployments are run
-    // this means that the salt used here always used an outdated version
-    // see https://github.com/hoprnet/hoprnet/issues/2635
-    salt = pickVersion(require('../package.json').version)
-  } else {
-    salt = hre.environment
-  }
+  const version = pickVersion(require('../package.json').version)
+  const salt = `${hre.environment}-${version}`
 
   const result = await deployments.deterministic('HoprChannels', {
     from: deployer.address,

@@ -35,7 +35,8 @@ _jq() {
 
 echo "Looking for releases to deploy from branch ${branch}"
 
-# iterate through releases with git_ref == $GITHUB_REF
+# iterate through releases with git ref == "refs/heads/${branch}"
+
 for row in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r ".[] | select(.git_ref==\"refs/heads/${branch}\") | @base64"); do
   declare release_id deprecated environment_id version_major version_minor docker_image_full token_contract_address
 

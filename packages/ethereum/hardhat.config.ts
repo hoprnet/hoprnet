@@ -42,12 +42,13 @@ function networkToHardhatNetwork(input: any): any {
     res.gas = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
   }
 
-  if (input.live) {
     try {
       res.url = expandVars(input.default_provider, process.env)
     } catch (_) {
       res.url = 'invalid_url'
     }
+
+  if (input.live) {
     res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     res.companionNetworks = {}
     res.mining = undefined
@@ -63,13 +64,15 @@ function networkToHardhatNetwork(input: any): any {
 
 const networks = {}
 
-for (const network of PROTOCOL_CONFIG.networks) {
-  const hardhatNetwork = networkToHardhatNetwork(network)
-  networks[network.id] = hardhatNetwork
+for (const [environmentId, environment] of Object.entries(PROTOCOL_CONFIG.environments)) {
+  const network = PROTOCOL_CONFIG.networks[environment['network_id']]
+  if (!environment['deprecated'] && network) {
+    const hardhatNetwork = networkToHardhatNetwork(network)
+    networks[environmentId] = hardhatNetwork
+  }
 }
 
 const hardhatConfig: HardhatUserConfig = {
-  defaultNetwork: 'hardhat',
   networks,
   namedAccounts: {
     deployer: 0

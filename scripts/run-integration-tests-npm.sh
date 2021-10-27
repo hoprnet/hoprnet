@@ -77,7 +77,7 @@ declare node3_dir="${tmp}/${node_prefix}-3"
 declare node4_dir="${tmp}/${node_prefix}-4"
 declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
-declare node6_dir="${tmp}/${node_prefix}-7"
+declare node7_dir="${tmp}/${node_prefix}-7"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -161,7 +161,6 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="${password}" \
-    --environment hardhat-localhost \
     --rest \
     --restPort "${rest_port}" \
     --testAnnounceLocalAddresses \
@@ -314,7 +313,7 @@ yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \
-  --network hardhat-localhost \
+  --network hardhat \
   --password "${password}"
 # }}}
 
