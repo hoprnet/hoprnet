@@ -21,7 +21,7 @@ import {
 } from '@hoprnet/hopr-utils'
 //import assert from 'assert'
 import { PROTOCOL_STRING } from '../../constants'
-import { /*AcknowledgementChallenge,*/ Packet, /*Acknowledgement*/ } from '../../messages'
+import { /*AcknowledgementChallenge,*/ Packet /*Acknowledgement*/ } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 
 //const SECRET_LENGTH = 32
