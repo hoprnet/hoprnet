@@ -57,7 +57,6 @@ describe(`database tests`, function () {
   it('ticket workflow', async function () {
     const privKey = randomBytes(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH)
     const pubKey = PublicKey.fromPrivKey(privKey)
-    const epoch = new UINT256(new BN('0'))
     // this comes from a Packet
     const halfKeyChallenge = new HalfKeyChallenge(Uint8Array.from(randomBytes(HalfKeyChallenge.SIZE)))
     const unAck = new UnacknowledgedTicket(
@@ -77,7 +76,7 @@ describe(`database tests`, function () {
       new Hash(Uint8Array.from(randomBytes(Hash.SIZE))),
       pubKey
     )
-    await db.replaceUnAckWithAck(halfKeyChallenge, ack, epoch)
+    await db.replaceUnAckWithAck(halfKeyChallenge, ack)
 
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
     assert((await db.getUnacknowledgedTickets()).length === 0, `DB should not contain any unacknowledgedTicket`)
