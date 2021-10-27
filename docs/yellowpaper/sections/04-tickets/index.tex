@@ -5,9 +5,9 @@ In the HOPR protocol, nodes that have staked funds within a payment channel can 
 
 \subsection{Ticket Issuance}
 
-A ticket can be issued when two nodes have established a payment channel with each other. By definition this means at least one of them has staked HOPR tokens. A ticket is issued by a node for the next downstream relay node along the path. In the following, we describe this process between the sender $A$ and the first downstream node $B$ but the same process applies for the ticket that is issued by $B$ for $C$ and following nodes.
+A ticket can be issued once two nodes have established a payment channel with each other. By definition this means at least one of them has staked HOPR tokens. A ticket is issued by a node for the next downstream relay node along the path. In the following, we describe this process between the sender $A$ and the first downstream node $B$ but the same process applies for the ticket that is issued by $B$ for $C$ and following nodes.
 
-The ticket issuer $A$ (who could also be the packet creator) sets a winning probability and relay fee to use and sets the amount to: $$\sigma=\dfrac{L\times F}{P_w}$$ where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee, and $P_w$ is the ticket's winning probability. These are currently static values which apply network wide. 
+The ticket issuer $A$ (who could also be the packet creator) sets a winning probability and relay fee to use and sets the amount to: $$\sigma=\dfrac{L\times F}{P_w}$$ where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee, and $P_w$ is the ticket's winning probability. These are currently static values which apply network wide.
 
 $A$ issues a ticket for the next downstream node. The challenge is given together with the routing information by the packet. $A$ does not know whether the ticket is a winner or not.
 
