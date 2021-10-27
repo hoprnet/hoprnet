@@ -317,10 +317,14 @@ See [Release Processes](./release.md)
 ### Branches
 
 - `master`: In our case, `master` is a **prerelease** branch - tests _must_
-  pass, and code _should_ be stable, but its _acceptable_ to have issues.
+  pass, and code _should_ be stable, but it is _acceptable_ to have issues.
 
 - `release/**`: On every [Milestone](https://github.com/hoprnet/hoprnet/milestones)
   marked with a **PUBLIC RELEASE**, we cut a `release/**`
   branch, using an internal name to identify the release. Official milestones
   use a specific name with the codename of a mountain in Switzerland.
   See [Release Processes](./release.md).
+
+- `<username>/feature-branch`: Work on epics _must_ be done within a feature branch
+  and the name of the feature branch _must_ be prefixed by the team member's Github
+  username (or an abbreviation) who got assigned to the epic.
