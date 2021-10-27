@@ -132,9 +132,6 @@ export async function validateUnacknowledgedTicket(
     throw Error(`The signer of the ticket does not match the sender`)
   }
 
-  // ignore dummy tickets
-  if (ticket.isDummy()) return
-
   // ticket amount MUST be greater or equal to minTicketAmount
   if (!ticket.amount.toBN().gte(minTicketAmount)) {
     throw Error(`Ticket amount '${ticket.amount.toBN().toString()}' is not equal to '${minTicketAmount.toString()}'`)
@@ -417,9 +414,7 @@ export class Packet {
       throw e
     }
 
-    if (!this.ticket.isDummy()) {
-      await db.setCurrentTicketIndex(channel.getId().hash(), this.ticket.index)
-    }
+    await db.setCurrentTicketIndex(channel.getId().hash(), this.ticket.index)
   }
 
   createAcknowledgement(privKey: PeerId) {

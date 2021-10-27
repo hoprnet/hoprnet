@@ -33,26 +33,6 @@ describe('test ticket construction', function () {
     assert(ticket.amount.toBN().eq(amount.toBN()), 'wrong amount')
     assert(ticket.winProb.toBN().eq(winProb.toBN()), 'wrong winProb')
     assert(ticket.channelIteration.toBN().eq(channelIteration.toBN()), 'wrong channelIteration')
-    assert(!ticket.isDummy(), 'should not be a dummy ticket')
-  })
-
-  it('should create new dummy ticket', async function () {
-    const challenge = new Response(Uint8Array.from(randomBytes(32))).toChallenge().toEthereumChallenge()
-    const epoch = UINT256.fromString('0')
-    const index = UINT256.fromString('0')
-    const amount = new Balance(new BN(0))
-    const winProb = UINT256.fromInverseProbability(UINT256.DUMMY_INVERSE_PROBABILITY.toBN())
-    const channelIteration = UINT256.fromString('0')
-    const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
-    const ticket = new Ticket(userA, challenge, epoch, index, amount, winProb, channelIteration, signature)
-
-    assert(ticket.counterparty.eq(userA), 'wrong counterparty')
-    assert(ticket.challenge.eq(challenge), 'wrong challenge')
-    assert(ticket.epoch.toBN().eq(epoch.toBN()), 'wrong epoch')
-    assert(ticket.amount.toBN().eq(amount.toBN()), 'wrong amount')
-    assert(ticket.winProb.toBN().eq(winProb.toBN()), 'wrong winProb')
-    assert(ticket.channelIteration.toBN().eq(channelIteration.toBN()), 'wrong channelIteration')
-    assert(ticket.isDummy(), 'should be a dummy ticket')
   })
 
   it('should generate the hash correctly #1', async function () {
