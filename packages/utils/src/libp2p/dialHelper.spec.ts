@@ -56,7 +56,7 @@ describe('test dialHelper', function () {
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
-    assert(result.status === 'E_DIAL')
+    assert(result.status === DialStatus.DIAL_ERROR)
     assert(result.dhtContacted == false)
 
     // Shutdown node
@@ -88,7 +88,7 @@ describe('test dialHelper', function () {
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
-    assert(result.status === 'E_DIAL', `Should print dial error`)
+    assert(result.status === DialStatus.DIAL_ERROR, `Should print dial error`)
     assert(result.dhtContacted == true, `Should contact DHT`)
 
     // Shutdown node
@@ -113,7 +113,7 @@ describe('test dialHelper', function () {
     let result = await dialHelper(peerA, Chris, TEST_PROTOCOL)
 
     // If DHT failed, wait until Alice has found Chris
-    if (result.status !== 'SUCCESS') {
+    if (result.status !== DialStatus.SUCCESS) {
       const waitUntilDiscovered = defer<void>()
 
       peerA.on('peer:discovery', (peerId: PeerId) => {
@@ -127,7 +127,7 @@ describe('test dialHelper', function () {
       result = await dialHelper(peerA, Chris, TEST_PROTOCOL)
     }
 
-    assert(result.status === 'SUCCESS', `Dial must be successful`)
+    assert(result.status === DialStatus.SUCCESS, `Dial must be successful`)
 
     pipe(TEST_MESSAGE, result.resp.stream.sink)
 
@@ -168,7 +168,7 @@ describe('test dialHelper', function () {
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
-    assert(result.status === 'E_DIAL')
+    assert(result.status === DialStatus.DIAL_ERROR)
     assert(result.error === 'No new addresses after contacting the DHT')
     assert(result.dhtContacted == true)
   })
@@ -203,7 +203,7 @@ describe('test dialHelper', function () {
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
-    assert(result.status === 'E_DIAL')
+    assert(result.status === DialStatus.DIAL_ERROR)
     assert(result.error === 'No new addresses after contacting the DHT')
     assert(result.dhtContacted == true)
   })
@@ -239,7 +239,7 @@ describe('test dialHelper', function () {
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
-    assert(result.status === 'E_DIAL')
+    assert(result.status === DialStatus.DIAL_ERROR)
     assert(result.dhtContacted == true)
   })
 })
