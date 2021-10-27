@@ -55,11 +55,11 @@ export function subscribeToAcknowledgements(
   pubKey: PeerId,
   onMessage: (ackMessage: Acknowledgement) => void
 ) {
-
   const limitConcurrency = oneAtATime()
   subscribe(
     PROTOCOL_ACKNOWLEDGEMENT,
-    (msg: Uint8Array, remotePeer: PeerId) => limitConcurrency(() => handleAcknowledgement(msg, remotePeer, pubKey, db, onMessage)),
+    (msg: Uint8Array, remotePeer: PeerId) =>
+      limitConcurrency(() => handleAcknowledgement(msg, remotePeer, pubKey, db, onMessage)),
     false,
     (err: any) => {
       error(`Error while receiving acknowledgement`, err)
