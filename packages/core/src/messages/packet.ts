@@ -397,11 +397,11 @@ export class Packet {
       )} from ${blue(pubKeyToPeerId(this.nextHop).toB58String())}`
     )
 
-    await db.storePendingAcknowledgement(this.ackChallenge, true, unacknowledged)
+    await db.storePendingAcknowledgement(this.ackChallenge, false, unacknowledged)
   }
 
   async storePendingAcknowledgement(db: HoprDB) {
-    await db.storePendingAcknowledgement(this.ackChallenge, false)
+    await db.storePendingAcknowledgement(this.ackChallenge, true)
   }
 
   async validateUnacknowledgedTicket(db: HoprDB) {

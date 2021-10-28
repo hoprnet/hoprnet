@@ -64,12 +64,12 @@ describe(`database tests`, function () {
       new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE))),
       pubKey
     )
-    await db.storePendingAcknowledgement(halfKeyChallenge, true, unAck)
+    await db.storePendingAcknowledgement(halfKeyChallenge, false, unAck)
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
 
     const pending = await db.getPendingAcknowledgement(halfKeyChallenge)
 
-    assert(pending.waitingForHalfKey)
+    assert(pending.isMessageSender == false)
 
     const ack = new AcknowledgedTicket(
       pending.ticket.ticket,

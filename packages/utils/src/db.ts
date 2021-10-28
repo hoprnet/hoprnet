@@ -52,21 +52,21 @@ const PENDING_TICKETS_VALUE = (address: Address) =>
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
 
-enum UnacknowledgedTicketPrefix {
-  WaitingForHalfKey = 0,
-  NotWaitingForHalfKey = 1
+enum PendingAcknowledgementPrefix {
+  Relayer = 0,
+  MessageSender = 1
 }
 
-type NotWaitingForHalfKey = {
-  waitingForHalfKey: false
+type WaitingAsSender = {
+  isMessageSender: true
 }
 
-type WaitingForHalfKey = {
-  waitingForHalfKey: true
+type WaitingAsRelayer = {
+  isMessageSender: false
   ticket: UnacknowledgedTicket
 }
 
-export type PendingAckowledgement = WaitingForHalfKey | NotWaitingForHalfKey
+export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
 
 export class HoprDB {
   private db: LevelUp
@@ -194,23 +194,23 @@ export class HoprDB {
     await this.put(key, new Balance(val.toBN().sub(amount.toBN())).serialize())
   }
 
-  private serializePendingAcknowledgement(waitingForHalfKey: boolean, unackTicket?: UnacknowledgedTicket) {
-    if (waitingForHalfKey) {
-      return Uint8Array.from([UnacknowledgedTicketPrefix.WaitingForHalfKey, ...unackTicket.serialize()])
+  private serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
+    if (isMessageSender) {
+      return Uint8Array.from([PendingAcknowledgementPrefix.MessageSender])
     } else {
-      return Uint8Array.from([UnacknowledgedTicketPrefix.NotWaitingForHalfKey])
+      return Uint8Array.from([PendingAcknowledgementPrefix.Relayer, ...unackTicket.serialize()])
     }
   }
 
   private deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgement {
-    switch (data[0] as UnacknowledgedTicketPrefix) {
-      case UnacknowledgedTicketPrefix.NotWaitingForHalfKey:
+    switch (data[0] as PendingAcknowledgementPrefix) {
+      case PendingAcknowledgementPrefix.MessageSender:
         return {
-          waitingForHalfKey: false
+          isMessageSender: true
         }
-      case UnacknowledgedTicketPrefix.WaitingForHalfKey:
+      case PendingAcknowledgementPrefix.Relayer:
         return {
-          waitingForHalfKey: true,
+          isMessageSender: false,
           ticket: UnacknowledgedTicket.deserialize(data.slice(1))
         }
     }
@@ -223,7 +223,7 @@ export class HoprDB {
    */
   public async getUnacknowledgedTickets(filter?: { signer: PublicKey }): Promise<UnacknowledgedTicket[]> {
     const filterFunc = (pending: PendingAckowledgement): boolean => {
-      if (!pending.waitingForHalfKey) {
+      if (pending.isMessageSender == true) {
         return false
       }
 
@@ -235,12 +235,12 @@ export class HoprDB {
     }
 
     return (
-      await this.getAll<WaitingForHalfKey>(
+      await this.getAll<WaitingAsRelayer>(
         PENDING_ACKNOWLEDGEMENTS_PREFIX,
         this.deserializePendingAcknowledgement as any,
         filterFunc
       )
-    ).map((pending: WaitingForHalfKey) => pending.ticket)
+    ).map((pending: WaitingAsRelayer) => pending.ticket)
   }
 
   public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAckowledgement> {
@@ -249,21 +249,21 @@ export class HoprDB {
     return this.deserializePendingAcknowledgement(data)
   }
 
-  public async storePendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge, waitingForHalfKey: false): Promise<void>
+  public async storePendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge, isMessageSender: true): Promise<void>
   public async storePendingAcknowledgement(
     halfKeyChallenge: HalfKeyChallenge,
-    waitingForHalfKey: true,
+    isMessageSender: false,
     unackTicket: UnacknowledgedTicket
   ): Promise<void>
 
   public async storePendingAcknowledgement(
     halfKeyChallenge: HalfKeyChallenge,
-    waitingForHalfKey: boolean,
+    isMessageSender: boolean,
     unackTicket?: UnacknowledgedTicket
   ): Promise<void> {
     await this.put(
       pendingAcknowledgement(halfKeyChallenge),
-      this.serializePendingAcknowledgement(waitingForHalfKey, unackTicket)
+      this.serializePendingAcknowledgement(isMessageSender, unackTicket)
     )
   }
 

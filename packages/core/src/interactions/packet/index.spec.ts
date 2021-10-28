@@ -90,7 +90,6 @@ describe('packet interaction', function () {
   })
 
   beforeEach(async function () {
-    console.log(nodes.map((x) => x.toB58String()))
     let previousChannel: ChannelEntry
     for (const [index, peerId] of nodes.entries()) {
       dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
@@ -128,7 +127,7 @@ describe('packet interaction', function () {
 
     const ackReceived = defer<void>()
 
-    await dbs[0].storePendingAcknowledgement(ackChallenge, false)
+    await dbs[0].storePendingAcknowledgement(ackChallenge, true)
 
     subscribeToAcknowledgements(libp2pSelf.subscribe, dbs[0], new EventEmitter(), SELF, () => ackReceived.resolve())
 
