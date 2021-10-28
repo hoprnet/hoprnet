@@ -56,7 +56,7 @@ $ npm install @hoprnet/hoprd@wildhorn-v2
 $ DEBUG="hopr*" npx hoprd --init --admin --rest --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --testNoAuthentication
 
 # add security
-$ DEBUG="hopr*" npx hoprd --init --admin --rest --identity ./.hoprd-id-01 --data ./.hoprd-db-01 --password='hopr-01' --apiToken='<YOU_SECRET_TOKEN>'
+$ DEBUG="hopr*" npx hoprd --init --admin --rest --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --apiToken='<YOU_SECRET_TOKEN>'
 
 Please note that if `--rest` or `--admin` is specificed, you **must** provide an `--apiToken` which is at least 8 symbols, contains a lowercase and an uppercase letter, a number and a special symbol. This ensures the node cannot be accessed by a malicious user residing in the same network.
 ```
