@@ -48,7 +48,7 @@ If everything was done properly, you can run `node --version` to see your curren
 ## Installing HOPRd using NPM
 
 ```bash
-$ mkdir wildhorn-v2
+$ mkdir hopr-wildhorn-v2
 $ cd wildhorn-v2
 $ npm install @hoprnet/hoprd@wildhorn-v2
 
