@@ -216,14 +216,21 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of all acknowledged tickets
    */
-  public async getAcknowledgedTickets(filter?: { signer?: PublicKey, channel?: ChannelEntry }): Promise<AcknowledgedTicket[]> {
+  public async getAcknowledgedTickets(filter?: {
+    signer?: PublicKey
+    channel?: ChannelEntry
+  }): Promise<AcknowledgedTicket[]> {
     const filterFunc = (a: AcknowledgedTicket): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
       if (filter?.signer && !a.signer.eq(filter.signer)) {
         return false
       }
 
-      if (filter?.channel && !a.signer.eq(filter.channel.source) && !a.ticket.channelEpoch.eq(filter.channel.channelEpoch)) {
+      if (
+        filter?.channel &&
+        !a.signer.eq(filter.channel.source) &&
+        !a.ticket.channelEpoch.eq(filter.channel.channelEpoch)
+      ) {
         return false
       }
       return true
