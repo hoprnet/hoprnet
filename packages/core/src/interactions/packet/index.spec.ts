@@ -109,8 +109,8 @@ describe('packet interaction', function () {
         await initializeCommitment(
           dbs[index],
           previousChannel.getId(),
-          () => {},
-          () => {}
+          (): any => {},
+          (): any => {}
         )
       }
 
