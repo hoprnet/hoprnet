@@ -133,6 +133,7 @@ tasks and PRs on Github. This includes but is not limited to:
 - updating and/or closing PRs to ensure only in-progress PRs are active
 - moving tasks on sprint boards to correct columns
 - [responding to issues created by externals](#external-issues)
+- delete stale/old branches which are not attached to a PR
 
 _Who:_ all tech members individually
 
