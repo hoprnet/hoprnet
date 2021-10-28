@@ -1465,7 +1465,7 @@ __metadata:
     "@openzeppelin/contracts": 4.3.2
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
     "@typechain/ethers-v5": 7.2.0
-    "@typechain/hardhat": 2.3.1
+    "@typechain/hardhat": 3.0.0
     bn.js: 5.2.0
     chai: 4.3.4
     dotenv: 10.0.0
@@ -2425,16 +2425,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typechain/hardhat@npm:2.3.1":
-  version: 2.3.1
-  resolution: "@typechain/hardhat@npm:2.3.1"
+"@typechain/hardhat@npm:3.0.0":
+  version: 3.0.0
+  resolution: "@typechain/hardhat@npm:3.0.0"
   dependencies:
     fs-extra: ^9.1.0
   peerDependencies:
     hardhat: ^2.0.10
     lodash: ^4.17.15
-    typechain: ^5.1.2
-  checksum: f6090b80e3c75e47bb02c9b2c669258e976ccf06502c168b851ad7ca20f53cb554dcb8104bc7ca608f2111baa047ee8e52ce6153eb80450edb9736ba5ebfb12f
+    typechain: ^6.0.0
+  checksum: 942a58851abe77691f0c9640e7b007c3822ae652b971a0e9cb1518e16ca6406ca026cec29287386ae06dc5444732c6796d9f4987ee58a79ebc403bb101b12396
   languageName: node
   linkType: hard
 
