@@ -12,7 +12,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
   - [Testing phases](#testing-phases)
     - [Tech team testing](#tech-team-testing)
     - [HOPR team testing](#hopr-team-testing)
-    - [Community Ambassador testing](#community-ambassador-testing)
+    - [Ambassador testing](#ambassador-testing)
   - [Release promotion](#release-promotion)
   - [On a new chain](#on-a-new-chain)
   - [On a new release](#on-a-new-release)
@@ -40,7 +40,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 - Internal releases are more frequent and their goal is to test new features and bug fixes.
 - There should be no public involvement unless the [internal release](#internal-release) is promoted to a [public release](#public-release).
 - All releases start as an [internal release](#internal-release) release and may be promoted to a [public release](#public-release), see [release promotion](#release-promotion).
-- When an internal release is created, one of the [tech ambassadors](./development.md#ambassadors) is assigned to oversee the release cycle, this includes:
+- When an internal release is created, one of the [representatives](./development.md#representatives) is assigned to oversee the release cycle, this includes:
   - notifies the HOPR team that the [internal release](#internal-release) has been created in element channel `releases`
   - [creating release](#release-cycle)
   - [testing release](#testing-phases)
@@ -69,11 +69,11 @@ Testing phases occur only when a release is queued and prioritized during [epic 
 
 For every phase completed, release owner must update the release's PR with the current testing phase status.
 
-| Phase name                   | Description                                                            |
-| ---------------------------- | ---------------------------------------------------------------------- |
-| tech team testing            | First phase, testing by tech team members only                         |
-| HOPR team testing            | Second phase, testing by available HOPR team members                   |
-| community ambassador testing | Third (optional) phase, testing with the help of community ambassadors |
+| Phase name         | Description                                                  |
+| ------------------ | ------------------------------------------------------------ |
+| tech team testing  | First phase, testing by tech team members only               |
+| HOPR team testing  | Second phase, testing by available HOPR team members         |
+| ambassador testing | Third (optional) phase, testing with the help of ambassadors |
 
 ### Tech team testing
 
@@ -86,7 +86,7 @@ For every phase completed, release owner must update the release's PR with the c
 - Occurs after [Tech team testing](#tech-team-testing) is succesful.
 - With the help of a [changelog](#release-cycle), test HOPRd.
 
-### Community Ambassador testing
+### Ambassador testing
 
 A third and final phase of testing is to include ambassadors.
 This is optional in the possibility we want to gather more data points and/or a specific feature requires larger network topology.
