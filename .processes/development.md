@@ -4,7 +4,7 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 
 - [Development Processes](#development-processes)
   - [Legend](#legend)
-    - [Ambassadors](#ambassadors)
+    - [Representantives](#representantives)
     - [Trifecta](#trifecta)
   - [Daily updates](#daily-updates)
     - [Start of work](#start-of-work)
@@ -36,13 +36,13 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Project Owner       | A HOPR member which ensures epics prioritized are in line with both the short and long term vision of HOPR |
 | Process Facilitator | A HOPR member which ensures agreed processes are followed                                                  |
-| Ambassadors         | Two tech members elected to be the bridge between tech team and Project Owner                              |
-| Trifecta            | Ambassadors + Project Owner                                                                                |
+| Representantives    | Two tech members elected to be the bridge between tech team and Project Owner                              |
+| Trifecta            | Representantives + Project Owner                                                                           |
 | Issue tracker       | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
-### Ambassadors
+### Representantives
 
-Elected ambassadors are rotated every `2 months`.
+Elected representantives are rotated every `2 months`.
 
 Responsibilities:
 
@@ -54,7 +54,7 @@ _Expiry:_ 5/11/21
 
 ### Trifecta
 
-Trifecta is made up by the [Ambassadors](#ambassadors) and Project Owner.
+Trifecta is made up by the [Representantives](#representantives) and Project Owner.
 
 Responsibilities:
 
@@ -63,7 +63,7 @@ Responsibilities:
 - [file alarm](#fire-alarm) management
 - [release](./release.md#internal-release) management
 
-_Current:_ [Ambassadors](#ambassadors), [Sebastian](https://github.com/SCBuergel)
+_Current:_ [Representantives](#representantives), [Sebastian](https://github.com/SCBuergel)
 
 ## Daily updates
 
@@ -133,6 +133,7 @@ tasks and PRs on Github. This includes but is not limited to:
 - updating and/or closing PRs to ensure only in-progress PRs are active
 - moving tasks on sprint boards to correct columns
 - [responding to issues created by externals](#external-issues)
+- delete stale/old branches which are not attached to a PR
 
 _Who:_ all tech members individually
 
@@ -140,7 +141,7 @@ _When:_ last day of the sprint or before a vacation
 
 #### External issues
 
-Newly created issues ([labelled as](#labels): `new issue`) may not all have been replied to, the [Ambassadors](#ambassadors) may reply or assign a tech member to follow up on the issue.
+Newly created issues ([labelled as](#labels): `new issue`) may not all have been replied to, the [Representantives](#representantives) may reply or assign a tech member to follow up on the issue.
 
 - closing duplicates
 - issues are properly labelled
@@ -212,7 +213,7 @@ _When:_ first day of the sprint
 
 It's possible that throughout the planned sprint, we encounter a bag of issues that need to be resolved ASAP.
 
-1. As soon issue is detected, an [ambassador](#ambassadors) needs to take up the task of coordinating how the issue is tackled
+1. As soon issue is detected, a [representantive](#representantives) needs to take up the task of coordinating how the issue is tackled
 2. Member appointed then is responsible for finding the right member within the tech team that has the most knowledge on the current issue, let's say that's Alice
 3. Alice investigates issue and may ask other members for help
 4. Alice patches issue
@@ -319,8 +320,6 @@ See [Release Processes](./release.md)
 - `master`: In our case, `master` is a **prerelease** branch - tests _must_
   pass, and code _should_ be stable, but its _acceptable_ to have issues.
 
-- `release/**`: On every [Milestone](https://github.com/hoprnet/hoprnet/milestones)
-  marked with a **PUBLIC RELEASE**, we cut a `release/**`
-  branch, using an internal name to identify the release. Official milestones
-  use a specific name with the codename of a mountain in Switzerland.
-  See [Release Processes](./release.md).
+- `release/**`: On new internal release, we cut a `release/**`
+  branch, using an internal **city** name to identify the release.
+  See [Release Processes](./release.md) for more info.
