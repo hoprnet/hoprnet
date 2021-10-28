@@ -53,7 +53,7 @@ $ cd wildhorn-v2
 $ npm install @hoprnet/hoprd@wildhorn-v2
 
 # run hoprd
-$ DEBUG="hopr*" npx hoprd --init --admin --rest --identity ./.hoprd-id-01 --data ./.hoprd-db-01 --password='hopr-01' --testNoAuthentication
+$ DEBUG="hopr*" npx hoprd --init --admin --rest --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --testNoAuthentication
 
 # add security
 $ DEBUG="hopr*" npx hoprd --init --admin --rest --identity ./.hoprd-id-01 --data ./.hoprd-db-01 --password='hopr-01' --apiToken='<YOU_SECRET_TOKEN>'
