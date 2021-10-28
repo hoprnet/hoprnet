@@ -320,8 +320,6 @@ See [Release Processes](./release.md)
 - `master`: In our case, `master` is a **prerelease** branch - tests _must_
   pass, and code _should_ be stable, but its _acceptable_ to have issues.
 
-- `release/**`: On every [Milestone](https://github.com/hoprnet/hoprnet/milestones)
-  marked with a **PUBLIC RELEASE**, we cut a `release/**`
-  branch, using an internal name to identify the release. Official milestones
-  use a specific name with the codename of a mountain in Switzerland.
-  See [Release Processes](./release.md).
+- `release/**`: On new internal release, we cut a `release/**`
+  branch, using an internal **city** name to identify the release.
+  See [Release Processes](./release.md) for more info.
