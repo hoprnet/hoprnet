@@ -46,8 +46,7 @@ for row in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r ".[] | selec
   version_major=$(_jq "${row}" ".version_major")
   version_minor=$(_jq "${row}" ".version_minor")
   docker_image_full="${docker_image}:${release_id}"
-
-  token_contract_address=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments[] | select(.id==\"${environment_id}\") | .token_contract_address")
+  token_contract_address=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".token_contract_address")
 
   if [ "${deprecated}" == "true" ]; then
     log "${release_id} deprecated, skipping deployment"

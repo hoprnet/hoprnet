@@ -13,8 +13,8 @@ branch=$(git rev-parse --abbrev-ref HEAD)
 
 cd "${mydir}/../"
 
-for environment_id in $(cat packages/hoprd/releases.json | jq -r ".[] | select(.git_ref==\"refs/heads/${branch}\") | .id"); do
-  local network_id=$(cat packages/core/protocol-config.json | jq -r ".environments[] | select(.id==\"${environment_id}\") | .network_id")
+for environment_id in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r ".[] | select(.git_ref==\"refs/heads/${branch}\") | .id"); do
+  local network_id=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".network_id")
 
   # deploy smart contracts
   yarn workspace @hoprnet/hopr-ethereum hardhat deploy --network "${network_id}"
