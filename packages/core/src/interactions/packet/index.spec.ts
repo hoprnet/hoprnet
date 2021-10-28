@@ -22,7 +22,7 @@ import {
 } from '@hoprnet/hopr-utils'
 //import assert from 'assert'
 import { PROTOCOL_STRING } from '../../constants'
-import { /*AcknowledgementChallenge,*/ Packet, /*Acknowledgement*/ } from '../../messages'
+import { /*AcknowledgementChallenge,*/ Packet /*Acknowledgement*/ } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 
@@ -110,7 +110,12 @@ describe('packet interaction', function () {
       for (const db of dbs) {
         await db.updateChannel(channel.getId(), channel)
       }
-      await initializeCommitment(dbFor[channel.getId().toHex()], channel.getId(), ()=>{}, ()=>{})
+      await initializeCommitment(
+        dbFor[channel.getId().toHex()],
+        channel.getId(),
+        () => {},
+        () => {}
+      )
     }
   })
 
