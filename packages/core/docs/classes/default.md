@@ -596,7 +596,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:861](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L861)
+[packages/core/src/index.ts:863](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L863)
 
 ___
 
@@ -616,7 +616,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:865](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L865)
+[packages/core/src/index.ts:867](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L867)
 
 ___
 
@@ -644,7 +644,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:881](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L881)
+[packages/core/src/index.ts:883](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L883)
 
 ___
 
@@ -681,7 +681,7 @@ that will relay that message before it reaches its destination.
 
 #### Defined in
 
-[packages/core/src/index.ts:903](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L903)
+[packages/core/src/index.ts:905](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L905)
 
 ___
 
@@ -776,7 +776,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:869](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L869)
+[packages/core/src/index.ts:871](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L871)
 
 ___
 
@@ -1310,7 +1310,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:856](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L856)
+[packages/core/src/index.ts:858](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L858)
 
 ___
 
@@ -1543,7 +1543,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:877](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L877)
+[packages/core/src/index.ts:879](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L879)
 
 ___
 
@@ -1653,7 +1653,7 @@ MAX_DELAY is reached, this function will reject.
 
 #### Defined in
 
-[packages/core/src/index.ts:919](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L919)
+[packages/core/src/index.ts:921](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L921)
 
 ___
 
@@ -1667,7 +1667,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:951](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L951)
+[packages/core/src/index.ts:953](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L953)
 
 ___
 
@@ -1689,7 +1689,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:886](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L886)
+[packages/core/src/index.ts:888](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L888)
 
 ___
 
