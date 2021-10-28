@@ -151,8 +151,9 @@ particular branch to deploy on every change.
 
    - create new environment in `scripts/environment.sh`
    - update image to point to `latest-<release>` in `packages/avado/Dockerfile`
-   - `packages/avado/docker-compose.yml`
+   - update image to point to new version in `packages/avado/docker-compose.yml`
    - add an entry to `CHANGELOG.md`
+   - add any chain specific changes
 
 2. The information about the release, how to test and what commands to run, are
    then shared within our `#release` channel. On the `#testing` channel, members are expected
@@ -168,8 +169,7 @@ particular branch to deploy on every change.
   from `master` have preference
 - revert changes in `packages/avado/Dockerfile`
 - revert changes in `packages/avado/docker-compose.yml`
-- revert any other changes related to the chain
-- add an entry to `CHANGELOG.md`
+- revert any chain specific changes
 - bump the package versions to the next preminor version:
   `yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version preminor --preid=next`
 - revert changes made to Avado configuration files as part of the initial release creation
