@@ -40,8 +40,8 @@ export async function bumpCommitment(db: HoprDB, channelId: Hash) {
   await db.setCurrentCommitment(channelId, await findCommitmentPreImage(db, channelId))
 }
 
-type GetCommitment = () => Promise<boolean>
-type SetCommitment = (commitment: Hash) => Promise<void>
+type GetCommitment = () => Promise<Hash>
+type SetCommitment = (commitment: Hash) => Promise<string>
 
 async function createCommitmentChain(db: HoprDB, channelId: Hash, setChainCommitment: SetCommitment): Promise<void> {
   const seed = new Hash(Uint8Array.from(randomBytes(Hash.SIZE))) // TODO seed off privKey + channel
