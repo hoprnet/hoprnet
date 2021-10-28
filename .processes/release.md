@@ -212,7 +212,7 @@ The following are a series of manual tasks that are needed to be executed for th
 
 - [ ] Tag a distribution manually $release on npm and on Docker Hub.
 
-  1. `npm login`, `npm dist add @hoprnet/hoprd@$version $mountain/$city`
+  1. `npm login`, `npm dist-tag add @hoprnet/hoprd@$version $mountain/$city`
   2. `docker login`, `docker tag gcr.io/hoprassociation/hoprd:latest hopr/hoprd:$city/$mountain`
 
 - [ ] Create a DNS alias for each node (cloud, cover-traffic, topology), to be accessed via our `hoprnet.link` domain (e.g. ct-1-$release.hoprnet.link)
