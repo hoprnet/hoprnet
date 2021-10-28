@@ -76,14 +76,14 @@ export function subscribeToAcknowledgements(
       throw err
     }
 
-    if (pending.waitingForHalfKey) {
+    if (pending.isMessageSender == true) {
+      log(`Received acknowledgement as sender. First relayer has processed the packet.`)
+    } else {
       const ackedTicket = await acknowledge(pending.ticket, ackMsg.ackKeyShare, db, events)
       if (ackedTicket) {
         log(`Storing winning ticket`)
         await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
       }
-    } else {
-      log(`Received acknowledgement as sender. First relayer has processed the packet.`)
     }
 
     onMessage(ackMsg)
