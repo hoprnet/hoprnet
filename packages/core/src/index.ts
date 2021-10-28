@@ -168,7 +168,11 @@ class Hopr extends EventEmitter {
     log(`using provider URL: ${provider}`)
 
     this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      environment: this.environment
+      chainId: this.environment.network.chain_id,
+      environment: this.environment.id,
+      gasPrice: this.environment.network.gasPrice,
+      network: this.environment.network.id,
+      provider
     })
 
     this.publicNodesEmitter = new EventEmitter()

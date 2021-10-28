@@ -39,7 +39,7 @@ function networkToHardhatNetwork(input: any): any {
 
   if (input.gas) {
     const parsedGas = input.gas.split(' ')
-    res.gas = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
+    res.gasPrice = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
   }
 
   try {

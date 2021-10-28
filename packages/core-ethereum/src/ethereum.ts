@@ -22,9 +22,8 @@ import {
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager, { TransactionPayload } from './transaction-manager'
-import { debug, expandVars } from '@hoprnet/hopr-utils'
+import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants'
-import type { ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 const log = debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
@@ -33,27 +32,25 @@ export type Receipt = string
 export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>
 
 export async function createChainWrapper(
-  environment: ResolvedEnvironment,
+  networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
   privateKey: Uint8Array,
   checkDuplicate: Boolean = true
 ) {
-  const providerURI = expandVars(environment.network.default_provider, process.env)
-  const provider = providerURI.startsWith('http')
-    ? new providers.StaticJsonRpcProvider(providerURI)
-    : new providers.WebSocketProvider(providerURI)
+  const provider = networkInfo.provider.startsWith('http')
+    ? new providers.StaticJsonRpcProvider(networkInfo.provider)
+    : new providers.WebSocketProvider(networkInfo.provider)
   const wallet = new Wallet(privateKey).connect(provider)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()
-  const chainId = await provider.getNetwork().then((res) => res.chainId)
-  const networkInfo = environment.network
+  const providerChainId = await provider.getNetwork().then((res) => res.chainId)
 
   // ensure chain id matches our expectation
-  if (chainId !== networkInfo.chain_id) {
-    throw Error(`Providers chain id ${chainId} does not match our environment`)
+  if (networkInfo.chainId !== providerChainId) {
+    throw Error(`Providers chain id ${providerChainId} does not match ${networkInfo.chainId}`)
   }
 
-  const hoprTokenDeployment = getContractData(environment.id, 'HoprToken')
-  const hoprChannelsDeployment = getContractData(environment.id, 'HoprChannels')
+  const hoprTokenDeployment = getContractData(networkInfo.environment, 'HoprToken')
+  const hoprChannelsDeployment = getContractData(networkInfo.environment, 'HoprChannels')
 
   const token = HoprToken__factory.connect(hoprTokenDeployment.address, wallet)
   const channels = HoprChannels__factory.connect(hoprChannelsDeployment.address, wallet)
@@ -112,7 +109,7 @@ export async function createChainWrapper(
     ...rest: Parameters<T>
   ): Promise<ContractTransaction | { hash: string }> {
     const gasLimit = 400e3
-    const gasPrice = networkInfo.gas ?? (await provider.getGasPrice())
+    const gasPrice = networkInfo.gasPrice ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
@@ -424,7 +421,7 @@ export async function createChainWrapper(
     getPrivateKey: () => utils.arrayify(wallet.privateKey),
     getPublicKey: () => PublicKey.fromString(utils.computePublicKey(wallet.publicKey, true)),
     getInfo: () => ({
-      network: networkInfo.id,
+      network: networkInfo.network,
       hoprTokenAddress: hoprTokenDeployment.address,
       hoprChannelsAddress: hoprChannelsDeployment.address,
       channelClosureSecs

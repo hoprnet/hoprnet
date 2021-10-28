@@ -34,7 +34,9 @@
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
       "hopr_token_name": "wxHOPR",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "xdai": {
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
@@ -42,10 +44,12 @@
       "live": true,
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
-      "default_provider": "https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/",
+      "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
       "hopr_token_name": "wxHOPR",
-      "tags": ["production"]
+      "tags": [
+        "production"
+      ]
     },
     "goerli": {
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
@@ -53,32 +57,12 @@
       "live": true,
       "gas": "1 gwei",
       "gas_multiplier": 1.1,
-      "default_provider": "https://goerli.infura.io/v3/${INFURA_KEY}",
+      "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "native_token_name": "gETH",
       "hopr_token_name": "wxHOPR",
-      "tags": ["staging"]
-    },
-    "mumbai": {
-      "description": "Mumbai Testnet is a testnet for Polygon protocol",
-      "chain_id": 80001,
-      "live": true,
-      "default_provider": "https://polygon-mumbai.infura.io/v3/${INFURA_KEY}",
-      "gas": "1 gwei",
-      "gas_multiplier": 1.1,
-      "native_token_name": "MATIC",
-      "hopr_token_name": "mHOPR",
-      "tags": ["testing"]
-    },
-    "polygon": {
-      "description": "Polygon, previously known as MATIC network, is an interchain scalability solution that gives an infrastructure for creating blockchain networks that can interface with each other",
-      "chain_id": 137,
-      "live": true,
-      "default_provider": "https://polygon-mainnet.infura.io/v3/${INFURA_KEY}",
-      "gas": "1 gwei",
-      "gas_multiplier": 1.1,
-      "native_token_name": "MATIC",
-      "hopr_token_name": "mHOPR",
-      "tags": ["testing"]
+      "tags": [
+        "staging"
+      ]
     }
   }
 }
