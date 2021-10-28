@@ -186,9 +186,9 @@ export default class HoprEthereum extends EventEmitter {
   }
 
   private async redeemTicketsInChannel(channel: ChannelEntry) {
-    if (!channel.destination.eq(this.getPublicKey())){
+    if (!channel.destination.eq(this.getPublicKey())) {
       throw new Error('Cannot redeem ticket in channel that isnt to us')
-    } 
+    }
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
