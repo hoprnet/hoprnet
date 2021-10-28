@@ -40,11 +40,10 @@ export async function bumpCommitment(db: HoprDB, channelId: Hash) {
   await db.setCurrentCommitment(channelId, await findCommitmentPreImage(db, channelId))
 }
 
-async function createCommitmentChain(
-  db: HoprDB,
-  channelId: Hash,
-  setChainCommitment: (commitment: Hash) => Promise<void>
-): Promise<void> {
+type GetCommitment = () => Promise<boolean>
+type SetCommitment = (commitment: Hash) => Promise<void>
+
+async function createCommitmentChain(db: HoprDB, channelId: Hash, setChainCommitment: SetCommitment): Promise<void> {
   const seed = new Hash(Uint8Array.from(randomBytes(Hash.SIZE))) // TODO seed off privKey + channel
   const { intermediates, hash } = await iterateHash(
     seed.serialize(),
@@ -58,7 +57,12 @@ async function createCommitmentChain(
   log('commitment chain initialized')
 }
 
-export async function initializeCommitment(db: HoprDB, channelId, getChainCommitment, setChainCommitment) {
+export async function initializeCommitment(
+  db: HoprDB,
+  channelId: Hash,
+  getChainCommitment: GetCommitment,
+  setChainCommitment: SetCommitment
+) {
   const dbContainsAlready = (await db.getCommitment(channelId, 0)) != undefined
   const chainCommitment = await getChainCommitment()
   if (chainCommitment && dbContainsAlready) {

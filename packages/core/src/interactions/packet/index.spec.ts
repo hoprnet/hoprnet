@@ -24,6 +24,7 @@ import assert from 'assert'
 import { PROTOCOL_STRING } from '../../constants'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
+import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 
 const SECRET_LENGTH = 32
 
@@ -77,6 +78,8 @@ function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
 }
 
 describe('packet interaction', function () {
+  this.timeout(20e3)
+
   const events = new EventEmitter()
   let dbs: HoprDB[] = Array.from({ length: nodes.length })
 
@@ -87,25 +90,31 @@ describe('packet interaction', function () {
   })
 
   beforeEach(async function () {
+    console.log(nodes.map((x) => x.toB58String()))
+    let previousChannel: ChannelEntry
     for (const [index, peerId] of nodes.entries()) {
       dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
-    }
 
-    // create channels between nodes and update their DBs
-    const channels: ChannelEntry[] = nodes.reduce((result, src, index) => {
-      const dest = nodes[index + 1]
+      let channel: ChannelEntry
 
-      if (dest) {
-        result.push(getDummyChannel(src, dest))
+      if (index < nodes.length - 1) {
+        channel = getDummyChannel(peerId, nodes[index + 1])
+
+        await dbs[index].updateChannel(channel.getId(), channel)
       }
 
-      return result
-    }, [])
+      if (index > 0) {
+        await dbs[index].updateChannel(previousChannel.getId(), previousChannel)
 
-    for (const channel of channels) {
-      for (const db of dbs) {
-        await db.updateChannel(channel.getId(), channel)
+        await initializeCommitment(
+          dbs[index],
+          previousChannel.getId(),
+          () => {},
+          () => {}
+        )
       }
+
+      previousChannel = channel
     }
   })
 

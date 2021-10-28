@@ -315,6 +315,7 @@ export {
   ChannelEntry,
   Indexer,
   createChainWrapper,
+  initializeCommitment,
   findCommitmentPreImage,
   bumpCommitment,
   INDEXER_BLOCK_RANGE,
