@@ -127,4 +127,18 @@ describe(`database tests`, function () {
 
     assert(fromDb.eq(DUMMY_COMMITMENT))
   })
+
+  it('should store rejected tickets statistics', async function () {
+    assert.equal(await db.getRejectedTicketsCount(), 0)
+    assert((await db.getRejectedTicketsValue()).toBN().isZero())
+
+    const amount = new BN(1)
+
+    await db.markRejected({
+      amount: new Balance(amount)
+    } as Ticket)
+
+    assert.equal(await db.getRejectedTicketsCount(), 1)
+    assert((await db.getRejectedTicketsValue()).toBN().eq(amount))
+  })
 })

@@ -49,6 +49,9 @@ const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 const PENDING_TICKETS_VALUE = (address: Address) =>
   u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
 
+const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
+const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
+
 enum UnacknowledgedTicketPrefix {
   WaitingForHalfKey = 0,
   NotWaitingForHalfKey = 1
@@ -459,6 +462,17 @@ export class HoprDB {
     await this.increment(LOSING_TICKET_COUNT)
     await this.del(pendingAcknowledgement(t.getChallenge()))
     // sub pending_tickets_value
+  }
+
+  public async getRejectedTicketsValue(): Promise<Balance> {
+    return await this.getCoercedOrDefault(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO())
+  }
+  public async getRejectedTicketsCount(): Promise<number> {
+    return this.getCoercedOrDefault(REJECTED_TICKETS_COUNT, u8aToNumber, 0)
+  }
+  public async markRejected(t: Ticket): Promise<void> {
+    await this.increment(REJECTED_TICKETS_COUNT)
+    await this.addBalance(REJECTED_TICKETS_VALUE, t.amount)
   }
 
   static createMock(id?: PublicKey): HoprDB {

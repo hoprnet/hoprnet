@@ -284,6 +284,10 @@ export class Balance {
     return new Balance(this.bn.add(b.toBN()))
   }
 
+  public sub(b: Balance): Balance {
+    return new Balance(this.bn.sub(b.toBN()))
+  }
+
   public lt(b: Balance): boolean {
     return this.toBN().lt(b.toBN())
   }
