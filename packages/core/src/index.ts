@@ -586,6 +586,8 @@ class Hopr extends EventEmitter {
             return reject(err)
           }
 
+          await packet.storePendingAcknowledgement(this.db)
+
           this.once('message-acknowledged:' + packet.ackChallenge.toHex(), () => {
             resolve()
           })

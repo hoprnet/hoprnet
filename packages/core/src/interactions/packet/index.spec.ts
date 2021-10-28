@@ -101,6 +101,8 @@ describe('packet interaction', function () {
 
     const ackReceived = defer<void>()
 
+    await dbs[0].storePendingAcknowledgement(ackChallenge, false)
+
     subscribeToAcknowledgements(libp2pSelf.subscribe, dbs[0], new EventEmitter(), SELF, () => ackReceived.resolve())
 
     const ackKey = deriveAckKeyShare(secrets[0])
@@ -199,6 +201,8 @@ describe('packet interaction', function () {
     }
 
     const packet = await Packet.create(TEST_MESSAGE, [RELAY0, RELAY1, RELAY2, COUNTERPARTY], SELF, dbs[0])
+
+    await packet.storePendingAcknowledgement(dbs[0])
 
     // Wait for acknowledgement
     await senderInteraction.interact(RELAY0, packet)

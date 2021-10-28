@@ -25,10 +25,10 @@ const log = debug(`hopr-core:db`)
 const encoder = new TextEncoder()
 
 const TICKET_PREFIX = encoder.encode('tickets-')
-const UNACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('unacknowledged-'))
+const PENDING_ACKNOWLEDGEMENTS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('pending-acknowledgement-'))
 const ACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
-export const unacknowledgedTicketKey = (halfKey: HalfKeyChallenge) => {
-  return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, halfKey.serialize())
+export const pendingAcknowledgement = (halfKey: HalfKeyChallenge) => {
+  return u8aConcat(PENDING_ACKNOWLEDGEMENTS_PREFIX, halfKey.serialize())
 }
 const acknowledgedTicketKey = (challenge: EthereumChallenge) => {
   return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, challenge.serialize())
@@ -50,9 +50,20 @@ const PENDING_TICKETS_VALUE = (address: Address) =>
   u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
 
 enum UnacknowledgedTicketPrefix {
-  Ticket = 0,
-  Sender = 1
+  WaitingForHalfKey = 0,
+  NotWaitingForHalfKey = 1
 }
+
+type NotWaitingForHalfKey = {
+  waitingForHalfKey: false
+}
+
+type WaitingForHalfKey = {
+  waitingForHalfKey: true
+  ticket: UnacknowledgedTicket
+}
+
+export type PendingAckowledgement = WaitingForHalfKey | NotWaitingForHalfKey
 
 export class HoprDB {
   private db: LevelUp
@@ -180,63 +191,77 @@ export class HoprDB {
     await this.put(key, new Balance(val.toBN().sub(amount.toBN())).serialize())
   }
 
+  private serializePendingAcknowledgement(waitingForHalfKey: boolean, unackTicket?: UnacknowledgedTicket) {
+    if (waitingForHalfKey) {
+      return Uint8Array.from([UnacknowledgedTicketPrefix.WaitingForHalfKey, ...unackTicket.serialize()])
+    } else {
+      return Uint8Array.from([UnacknowledgedTicketPrefix.NotWaitingForHalfKey])
+    }
+  }
+
+  private deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgement {
+    switch (data[0] as UnacknowledgedTicketPrefix) {
+      case UnacknowledgedTicketPrefix.NotWaitingForHalfKey:
+        return {
+          waitingForHalfKey: false
+        }
+      case UnacknowledgedTicketPrefix.WaitingForHalfKey:
+        return {
+          waitingForHalfKey: true,
+          ticket: UnacknowledgedTicket.deserialize(data.slice(1))
+        }
+    }
+  }
+
   /**
    * Get unacknowledged tickets.
    * @param filter optionally filter by signer
    * @returns an array of all unacknowledged tickets
    */
   public async getUnacknowledgedTickets(filter?: { signer: PublicKey }): Promise<UnacknowledgedTicket[]> {
-    const filterFunc = (u: UnacknowledgedTicket): boolean => {
+    const filterFunc = (pending: PendingAckowledgement): boolean => {
+      if (!pending.waitingForHalfKey) {
+        return false
+      }
+
       // if signer provided doesn't match our ticket's signer dont add it to the list
-      if (filter?.signer && u.signer.eq(filter.signer)) {
+      if (filter?.signer && pending.ticket.signer.eq(filter.signer)) {
         return false
       }
       return true
     }
 
-    return this.getAll<UnacknowledgedTicket>(
-      UNACKNOWLEDGED_TICKETS_PREFIX,
-      UnacknowledgedTicket.deserialize,
-      filterFunc
-    )
+    return (
+      await this.getAll<WaitingForHalfKey>(
+        PENDING_ACKNOWLEDGEMENTS_PREFIX,
+        this.deserializePendingAcknowledgement as any,
+        filterFunc
+      )
+    ).map((pending: WaitingForHalfKey) => pending.ticket)
   }
 
-  public async getUnacknowledgedTicket(halfKeyChallenge: HalfKeyChallenge): Promise<
-    | {
-        sender: true
-      }
-    | {
-        sender: false
-        ticket: UnacknowledgedTicket
-      }
-  > {
-    const data = await this.get(unacknowledgedTicketKey(halfKeyChallenge))
+  public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAckowledgement> {
+    const data = await this.get(pendingAcknowledgement(halfKeyChallenge))
 
-    switch (data[0]) {
-      case UnacknowledgedTicketPrefix.Sender:
-        return {
-          sender: true
-        }
-      case UnacknowledgedTicketPrefix.Ticket:
-        return {
-          sender: false,
-          ticket: UnacknowledgedTicket.deserialize(data.slice(1))
-        }
-    }
+    return this.deserializePendingAcknowledgement(data)
   }
 
-  public async storeUnacknowledgedTicket(
+  public async storePendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge, waitingForHalfKey: false): Promise<void>
+  public async storePendingAcknowledgement(
     halfKeyChallenge: HalfKeyChallenge,
+    waitingForHalfKey: true,
     unackTicket: UnacknowledgedTicket
+  ): Promise<void>
+
+  public async storePendingAcknowledgement(
+    halfKeyChallenge: HalfKeyChallenge,
+    waitingForHalfKey: boolean,
+    unackTicket?: UnacknowledgedTicket
   ): Promise<void> {
     await this.put(
-      unacknowledgedTicketKey(halfKeyChallenge),
-      Uint8Array.from([UnacknowledgedTicketPrefix.Ticket, ...unackTicket.serialize()])
+      pendingAcknowledgement(halfKeyChallenge),
+      this.serializePendingAcknowledgement(waitingForHalfKey, unackTicket)
     )
-  }
-
-  public async storeUnacknowledgedTicketSender(halfKeyChallenge: HalfKeyChallenge): Promise<void> {
-    await this.put(unacknowledgedTicketKey(halfKeyChallenge), Uint8Array.from([UnacknowledgedTicketPrefix.Sender]))
   }
 
   /**
@@ -265,7 +290,7 @@ export class HoprDB {
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
-    const unAcknowledgedDbKey = unacknowledgedTicketKey(halfKeyChallenge)
+    const unAcknowledgedDbKey = pendingAcknowledgement(halfKeyChallenge)
     const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge)
 
     try {
@@ -432,7 +457,7 @@ export class HoprDB {
 
   public async markLosing(t: UnacknowledgedTicket): Promise<void> {
     await this.increment(LOSING_TICKET_COUNT)
-    await this.del(unacknowledgedTicketKey(t.getChallenge()))
+    await this.del(pendingAcknowledgement(t.getChallenge()))
     // sub pending_tickets_value
   }
 
