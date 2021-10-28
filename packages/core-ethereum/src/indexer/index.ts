@@ -341,15 +341,16 @@ class Indexer extends EventEmitter {
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
 
+    let prevState
     try {
-      const prevState = await this.db.getChannel(channel.getId())
-
-      if (channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
-        log('channel was closed')
-        this.onChannelClosed(channel)
-      }
+      prevState = await this.db.getChannel(channel.getId())
     } catch (e) {
       // Channel is new
+    }
+
+    if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
+      log('channel was closed')
+      this.onChannelClosed(channel)
     }
 
     this.emit('channel-update', channel)
