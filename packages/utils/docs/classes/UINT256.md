@@ -50,7 +50,7 @@
 
 #### Defined in
 
-[types/solidity.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L34)
+[types/solidity.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L36)
 
 ___
 
@@ -64,7 +64,7 @@ ___
 
 #### Defined in
 
-[types/solidity.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L38)
+[types/solidity.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L40)
 
 ## Methods
 

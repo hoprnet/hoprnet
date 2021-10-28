@@ -100,8 +100,6 @@ describe('test ticket construction', function () {
 
 describe('test ticket methods', function () {
   it('probability generation - edge case', function () {
-    assert.throws(() => UINT256.fromInverseProbability(new BN(0)))
-
     assert.throws(() => UINT256.fromInverseProbability(new BN(-1)))
 
     const maxUint256 = new BN(new Uint8Array(UINT256.SIZE).fill(0xff))

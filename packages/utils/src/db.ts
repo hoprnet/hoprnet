@@ -50,6 +50,8 @@ const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 const PENDING_TICKETS_VALUE = (address: Address) =>
   u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
 const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
+const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
+const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
 
 export class HoprDB {
   private db: LevelUp
@@ -267,6 +269,13 @@ export class HoprDB {
     )
   }
 
+  /**
+   * Checks whether the given packet tag is present in the database.
+   * If not, sets the packet tag and return false, otherwise return
+   * true.
+   * @param packetTag packet tag to check for
+   * @returns a Promise that resolves to true if packet tag is present in db
+   */
   async checkAndSetPacketTag(packetTag: Uint8Array) {
     let present = await this.has(this.keyOf(PACKET_TAG_PREFIX, packetTag))
 
@@ -403,6 +412,17 @@ export class HoprDB {
     await this.increment(LOSING_TICKET_COUNT)
     await this.del(unacknowledgedTicketKey(t.getChallenge()))
     await this.subBalance(PENDING_TICKETS_VALUE(t.ticket.counterparty), t.ticket.amount)
+  }
+
+  public async getRejectedTicketsValue(): Promise<Balance> {
+    return await this.getCoercedOrDefault(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO())
+  }
+  public async getRejectedTicketsCount(): Promise<number> {
+    return this.getCoercedOrDefault(REJECTED_TICKETS_COUNT, u8aToNumber, 0)
+  }
+  public async markRejected(t: Ticket): Promise<void> {
+    await this.increment(REJECTED_TICKETS_COUNT)
+    await this.addBalance(REJECTED_TICKETS_VALUE, t.amount)
   }
 
   static createMock(id?: PublicKey): HoprDB {
