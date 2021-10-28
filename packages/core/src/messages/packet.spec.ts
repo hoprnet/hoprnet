@@ -28,7 +28,8 @@ function createMockTickets() {
     },
     storeUnacknowledgedTicket: () => Promise.resolve(),
     markPending: () => Promise.resolve(),
-    getPendingBalanceTo: async () => new Balance(new BN(0))
+    getPendingBalanceTo: async () => new Balance(new BN(0)),
+    storePendingAcknowledgement: () => Promise.resolve()
   }
   return { db: db as any as HoprDB }
 }
