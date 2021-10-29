@@ -174,10 +174,10 @@ export async function validateUnacknowledgedTicket(
     )
   }
 
-  // ticket's channelIteration MUST match the current channel's epoch
-  if (!ticket.channelIteration.toBN().eq(channel.channelEpoch.toBN())) {
+  // ticket's channelEpoch MUST match the current channel's epoch
+  if (!ticket.channelEpoch.toBN().eq(channel.channelEpoch.toBN())) {
     throw Error(
-      `Ticket was created for a different channel iteration ${ticket.channelIteration
+      `Ticket was created for a different channel iteration ${ticket.channelEpoch
         .toBN()
         .toString()} != ${channel.channelEpoch.toBN().toString()}`
     )
@@ -189,7 +189,7 @@ export async function validateUnacknowledgedTicket(
   // all tickets from sender
   const tickets = await getTickets().then((ts) => {
     return ts.filter((t) => {
-      return t.epoch.toBN().eq(channel.ticketEpoch.toBN()) && t.channelIteration.toBN().eq(channel.channelEpoch.toBN())
+      return t.epoch.toBN().eq(channel.ticketEpoch.toBN()) && t.channelEpoch.toBN().eq(channel.channelEpoch.toBN())
     })
   })
 

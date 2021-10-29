@@ -294,9 +294,10 @@ class Hopr extends EventEmitter {
 
     const ethereum = await this.startedPaymentChannels()
 
-    subscribeToAcknowledgements(subscribe, this.db, ethereum, this.getId(), (ack) =>
+    subscribeToAcknowledgements(subscribe, this.db, this.getId(), (ack) => {
+      ethereum.emit('ticket:win', ack)
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
-    )
+    })
 
     ethereum.on('ticket:win', (ack) => {
       this.onWinningTicket(ack)
@@ -852,6 +853,7 @@ class Hopr extends EventEmitter {
       unredeemedValue: totalValue(ack),
       redeemed: await this.db.getRedeemedTicketsCount(),
       redeemedValue: await this.db.getRedeemedTicketsValue(),
+      neglected: await this.db.getNeglectedTicketsCount(),
       rejected: await this.db.getRejectedTicketsCount(),
       rejectedValue: await this.db.getRejectedTicketsValue()
     }

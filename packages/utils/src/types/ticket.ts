@@ -24,7 +24,7 @@ function serializeUnsigned({
   index,
   amount,
   winProb,
-  channelIteration
+  channelEpoch
 }: {
   counterparty: Address
   challenge: EthereumChallenge
@@ -32,7 +32,7 @@ function serializeUnsigned({
   index: UINT256
   amount: Balance
   winProb: UINT256
-  channelIteration: UINT256
+  channelEpoch: UINT256
 }): Uint8Array {
   // the order of the items needs to be the same as the one used in the SC
   return serializeToU8a([
@@ -42,7 +42,7 @@ function serializeUnsigned({
     [amount.serialize(), Balance.SIZE],
     [winProb.serialize(), UINT256.SIZE],
     [index.serialize(), UINT256.SIZE],
-    [channelIteration.serialize(), UINT256.SIZE]
+    [channelEpoch.serialize(), UINT256.SIZE]
   ])
 }
 
@@ -54,7 +54,7 @@ export class Ticket {
     readonly index: UINT256,
     readonly amount: Balance,
     readonly winProb: UINT256,
-    readonly channelIteration: UINT256,
+    readonly channelEpoch: UINT256,
     readonly signature: Signature
   ) {}
 
@@ -65,7 +65,7 @@ export class Ticket {
     index: UINT256,
     amount: Balance,
     winProb: UINT256,
-    channelIteration: UINT256,
+    channelEpoch: UINT256,
     signPriv: Uint8Array
   ): Ticket {
     const encodedChallenge = challenge.toEthereumChallenge()
@@ -78,14 +78,14 @@ export class Ticket {
         index,
         amount,
         winProb,
-        channelIteration
+        channelEpoch
       })
     )
 
     const message = toEthSignedMessageHash(hashedTicket)
     const sig = ecdsaSign(message.serialize(), signPriv)
     const signature = new Signature(sig.signature, sig.recid)
-    return new Ticket(counterparty, encodedChallenge, epoch, index, amount, winProb, channelIteration, signature)
+    return new Ticket(counterparty, encodedChallenge, epoch, index, amount, winProb, channelEpoch, signature)
   }
 
   public serialize(): Uint8Array {
@@ -114,9 +114,9 @@ export class Ticket {
     const amount = new Balance(new BN(components[3]))
     const winProb = new UINT256(new BN(components[4]))
     const index = new UINT256(new BN(components[5]))
-    const channelIteration = new UINT256(new BN(components[6]))
+    const channelEpoch = new UINT256(new BN(components[6]))
     const signature = Signature.deserialize(components[7])
-    return new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
+    return new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelEpoch, signature)
   }
 
   toString() {
@@ -129,7 +129,7 @@ export class Ticket {
       `  amount:           ${this.amount.toFormattedString()}\n` +
       `  index:            ${this.index.toBN().toString(10)}\n` +
       `  winProb:          ${this.winProb.toBN().div(new BN(new Uint8Array(UINT256.SIZE).fill(0xff))).muln(100)} %\n` +
-      `  channelIteration: ${this.channelIteration.toBN().toString(10)}`
+      `  channelEpoch:     ${this.channelEpoch.toBN().toString(10)}`
     )
   }
 

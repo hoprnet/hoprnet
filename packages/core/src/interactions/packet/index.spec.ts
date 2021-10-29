@@ -129,7 +129,7 @@ describe('packet interaction', function () {
 
     await dbs[0].storePendingAcknowledgement(ackChallenge, true)
 
-    subscribeToAcknowledgements(libp2pSelf.subscribe, dbs[0], new EventEmitter(), SELF, () => ackReceived.resolve())
+    subscribeToAcknowledgements(libp2pSelf.subscribe, dbs[0], SELF, () => ackReceived.resolve())
 
     const ackKey = deriveAckKeyShare(secrets[0])
     const ackMessage = AcknowledgementChallenge.create(ackChallenge, SELF)
@@ -160,7 +160,7 @@ describe('packet interaction', function () {
 
     const ackReceived = defer<void>()
 
-    subscribeToAcknowledgements(libp2pRelay0.subscribe, dbs[1], new EventEmitter(), RELAY0, () => ackReceived.resolve())
+    subscribeToAcknowledgements(libp2pRelay0.subscribe, dbs[1], RELAY0, () => ackReceived.resolve())
 
     const interaction = new PacketForwardInteraction(
       libp2pRelay0.subscribe,

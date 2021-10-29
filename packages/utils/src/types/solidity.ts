@@ -19,6 +19,10 @@ class UINT256 {
     return `0x${this.bn.toString('hex', 2 * UINT256.SIZE)}`
   }
 
+  public eq(b: UINT256): boolean {
+    return this.toBN().eq(b.toBN())
+  }
+
   static fromString(str: string): UINT256 {
     return new UINT256(new BN(str))
   }
