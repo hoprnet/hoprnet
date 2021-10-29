@@ -51,16 +51,10 @@ You can pull the Docker image like so:
 docker pull gcr.io/hoprassociation/hoprd:wildhorn-v2
 ```
 
-For ease of use you can set up a shell alias to run the latest release as a docker container:
+Then start a container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 hopr/hoprd:wildhorn-v2'
-```
-
-**IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
-
-```sh
-HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
+docker run --pull always -ti -v .hoprd-db-wildhorn-v2:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 hopr/hoprd:wildhorn-v2
 ```
 
 Also all ports are mapped to your local host, assuming you stick to the default port numbers.
