@@ -45,29 +45,33 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
-    } else {
-      try {
-        await packet.validateUnacknowledgedTicket(this.db)
-      } catch (err) {
-        log(`Ticket validation failed. Dropping packet`, err)
-        return
-      }
+      sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
+      // Nothing else to do
+      return
+    }
 
-      await packet.storeUnacknowledgedTicket(this.db)
+    // Packet should be forwarded
+    try {
+      await packet.validateUnacknowledgedTicket(this.db)
+    } catch (err) {
+      log(`Ticket validation failed. Dropping packet`, err)
+      return
+    }
 
-      try {
-        await packet.forwardTransform(this.privKey, this.db)
-      } catch (err) {
-        log(`Packet transformation failed. Dropping packet`, err)
-        return
-      }
+    await packet.storeUnacknowledgedTicket(this.db)
 
-      try {
-        await this.interact(pubKeyToPeerId(packet.nextHop), packet)
-      } catch (err) {
-        log(`Forwarding transformed packet failed.`, err)
-        return
-      }
+    try {
+      await packet.forwardTransform(this.privKey, this.db)
+    } catch (err) {
+      log(`Packet transformation failed. Dropping packet`, err)
+      return
+    }
+
+    try {
+      await this.interact(pubKeyToPeerId(packet.nextHop), packet)
+    } catch (err) {
+      log(`Forwarding transformed packet failed.`, err)
+      return
     }
 
     sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
