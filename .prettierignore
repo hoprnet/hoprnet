@@ -28,6 +28,3 @@ packages/ethereum/deployments
 
 # Breaks github actions with recursive commits
 .github
-
-lerna.json
-
