@@ -11,7 +11,7 @@
     "packages/hoprd"
   ],
   "scripts": {
-    "build": "tsc -p ./scripts && yarn workspaces foreach -pvi --topological-dev --no-private run build",
+    "build": "yarn workspaces foreach -pvi --topological-dev --no-private run build && tsc -p ./scripts",
     "build:core": "yarn workspace @hoprnet/hopr-core run build",
     "build:admin": "yarn workspace @hoprnet/hoprd run buildAdmin",
     "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
