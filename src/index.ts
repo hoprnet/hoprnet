@@ -29,11 +29,12 @@ export type HoprConnectOptions = {
 }
 
 type ConnHandler = (connection: Connection) => void
+type ListeningOptions = undefined
 
 /**
  * @class HoprConnect
  */
-class HoprConnect implements Transport<DialOptions, undefined> {
+class HoprConnect implements Transport<DialOptions, ListeningOptions> {
   get [Symbol.toStringTag]() {
     return 'HoprConnect'
   }
@@ -191,7 +192,7 @@ class HoprConnect implements Transport<DialOptions, undefined> {
    * @param handler
    * @returns A TCP listener
    */
-  createListener(options: undefined, handler: ConnHandler): Listener {
+  createListener(options: ListeningOptions, handler: ConnHandler): Listener {
     if (arguments.length == 1 && typeof options === 'function') {
       this.connHandler = options
     } else {
