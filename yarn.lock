@@ -1373,16 +1373,12 @@ __metadata:
     debug: ^4.3.2
     ethers: 5.5.1
     heap-js: ^2.1.6
-    it-pipe: 1.1.0
-    levelup: 5.1.1
-    memdown: 6.1.1
     mocha: 9.1.3
     multiaddr: ^10.0.0
     peer-id: 0.15.3
     rimraf: 3.0.2
     secp256k1: ^4.0.2
     sinon: 11.1.2
-    ts-generator: 0.1.1
     ts-node: 10.4.0
     typedoc: 0.22.7
     typedoc-plugin-markdown: 3.11.3
@@ -10066,7 +10062,7 @@ fsevents@~2.1.1:
   languageName: node
   linkType: hard
 
-"it-pipe@npm:1.1.0, it-pipe@npm:^1.0.1, it-pipe@npm:^1.1.0":
+"it-pipe@npm:^1.0.1, it-pipe@npm:^1.1.0":
   version: 1.1.0
   resolution: "it-pipe@npm:1.1.0"
   checksum: d653078f1543851f55070e38426dbbebad1303e9adde5238e4192b8b38ac7e4a1dcc149ccf3e4269759d1cbdd00be98b346fc8db81117c81017f09577f050e8e
