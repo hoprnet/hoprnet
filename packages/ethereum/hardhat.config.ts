@@ -15,7 +15,7 @@ import { utils } from 'ethers'
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
 import fs from 'fs'
 
-const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, ENVIRONMENT_ID = 'default' } = process.env
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY } = process.env
 import { expandVars } from '@hoprnet/hopr-utils'
 
 extendConfig((config: HardhatConfig) => {
