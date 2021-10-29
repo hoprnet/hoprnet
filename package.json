@@ -11,10 +11,11 @@
     "packages/hoprd"
   ],
   "scripts": {
-    "build": "yarn workspaces foreach -pvi --topological-dev --no-private run build && tsc -p ./scripts",
+    "build": "yarn workspaces foreach -pvi --topological-dev --no-private run build && run typecheck:scripts",
     "build:core": "yarn workspace @hoprnet/hopr-core run build",
     "build:admin": "yarn workspace @hoprnet/hoprd run buildAdmin",
     "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "lint": "npx prettier --check .",
     "lint:fix": "npx prettier --write .",
     "test": "yarn workspaces foreach -pvi --topological-dev --no-private run test",
