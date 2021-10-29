@@ -5,24 +5,27 @@ import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
 import { debug } from '@hoprnet/hopr-utils'
-import type { SendMessage } from '../../index'
+import type { SendMessage, Subscribe } from '../../index'
 
 const log = debug('hopr-core:packet:forward')
+const error = debug('hopr-core:packet:forward:error')
 
 const FORWARD_TIMEOUT = durations.seconds(6)
 
 export class PacketForwardInteraction {
-  private mixer: Mixer
+  protected mixer: Mixer
 
   constructor(
-    private subscribe: any,
+    private subscribe: Subscribe,
     private sendMessage: SendMessage,
     private privKey: PeerId,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB
   ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
-    this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this))
+    this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this), false, (err: any) => {
+      error(`Error while receiving packet`, err)
+    })
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {

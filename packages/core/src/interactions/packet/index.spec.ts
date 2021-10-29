@@ -44,6 +44,11 @@ const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195
 
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
+/**
+ * Creates a mocked network to send and receive acknowledgements and packets
+ * @param events simulates an Ethernet connection
+ * @param self our own identity to know which messages are destined for us
+ */
 function createFakeSendReceive(events: EventEmitter, self: PeerId) {
   const send = (destination: PeerId, protocol: any, msg: Uint8Array) => {
     events.emit('msg', msg, self, destination, protocol)
@@ -63,6 +68,16 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
   }
 }
 
+/**
+ * Returns a channel entry that allows to issue
+ * at least one ticket
+ *
+ * @dev might require changes if ticket validation changes
+ *
+ * @param from channel source
+ * @param to channel destination
+ * @returns channel representation
+ */
 function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
   return new ChannelEntry(
     PublicKey.fromPeerId(from),
@@ -77,11 +92,69 @@ function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
   )
 }
 
-describe('packet interaction', function () {
+/**
+ * Opens mock channels and stores channel entry at source
+ * and destination. Initializes the commitments for each channel
+ * destination.
+ * @param dbs node storage
+ * @param nodes node identities
+ */
+async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Promise<void> {
+  let previousChannel: ChannelEntry
+  for (const [index, peerId] of nodes.entries()) {
+    dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
+
+    let channel: ChannelEntry
+
+    if (index < nodes.length - 1) {
+      channel = getDummyChannel(peerId, nodes[index + 1])
+
+      // Store channel entry at source
+      await dbs[index].updateChannel(channel.getId(), channel)
+    }
+
+    if (index > 0) {
+      // Store channel entry at destination
+      await dbs[index].updateChannel(previousChannel.getId(), previousChannel)
+
+      // Set a commitment if we are the destination
+      await initializeCommitment(
+        dbs[index],
+        previousChannel.getId(),
+        (): any => {},
+        (): any => {}
+      )
+    }
+
+    previousChannel = channel
+  }
+}
+
+class TestingForwardInteraction extends PacketForwardInteraction {
+  /**
+   * Disable probablistic mixing
+   */
+  useMockMixer() {
+    const push = (p: Packet) => {
+      this.handleMixedPacket(p)
+    }
+    this.mixer = {
+      push
+    } as any
+  }
+}
+
+// Tests two different packet acknowledgement settings
+// - Acknowledgement for packet sender
+// - Acknowledgement for relayer, unlocking a ticket
+describe('packet acknowledgement', function () {
+  // Creating commitment chain takes time ...
   this.timeout(20e3)
 
   const events = new EventEmitter()
-  let dbs: HoprDB[] = Array.from({ length: nodes.length })
+  let dbs: HoprDB[] = Array.from({ length: nodes.length }, (_, index) =>
+    HoprDB.createMock(PublicKey.fromPeerId(nodes[index]))
+  )
 
   afterEach(async function () {
     events.removeAllListeners()
@@ -90,33 +163,14 @@ describe('packet interaction', function () {
   })
 
   beforeEach(async function () {
-    let previousChannel: ChannelEntry
-    for (const [index, peerId] of nodes.entries()) {
-      dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
-
-      let channel: ChannelEntry
-
-      if (index < nodes.length - 1) {
-        channel = getDummyChannel(peerId, nodes[index + 1])
-
-        await dbs[index].updateChannel(channel.getId(), channel)
-      }
-
-      if (index > 0) {
-        await dbs[index].updateChannel(previousChannel.getId(), previousChannel)
-
-        await initializeCommitment(
-          dbs[index],
-          previousChannel.getId(),
-          (): any => {},
-          (): any => {}
-        )
-      }
-
-      previousChannel = channel
-    }
+    await createMinimalChannelTopology(dbs, nodes)
   })
 
+  // We create a packet and send it to the first relayer.
+  // The first relayer receives it and sends an acknowledgement.
+  // The acknowledgement *must* be received by the sender.
+  // Despite it is not useful, the sender *must* understand it
+  // and call `onMessage`.
   it('acknowledgement workflow as sender', async function () {
     const secrets: Uint8Array[] = Array.from({ length: 2 }, () => Uint8Array.from(randomBytes(SECRET_LENGTH)))
 
@@ -153,6 +207,12 @@ describe('packet interaction', function () {
     await ackReceived.promise
   })
 
+  // We receive a packet, run the transformation, extract keys
+  // and validate the ticket.
+  // Then we use the private key of the next downstream node to
+  // extract the shared key and send an acknowledgement.
+  // The acknowledgement *must* be received and the half key
+  // *must* be sufficient to solve the challenge.
   it('acknowledgement workflow as relayer', async function () {
     const packet = await Packet.create(TEST_MESSAGE, [RELAY0, COUNTERPARTY], SELF, dbs[0])
 
@@ -162,7 +222,7 @@ describe('packet interaction', function () {
 
     subscribeToAcknowledgements(libp2pRelay0.subscribe, dbs[1], new EventEmitter(), RELAY0, () => ackReceived.resolve())
 
-    const interaction = new PacketForwardInteraction(
+    const interaction = new TestingForwardInteraction(
       libp2pRelay0.subscribe,
       libp2pRelay0.send as any,
       RELAY0,
@@ -171,6 +231,8 @@ describe('packet interaction', function () {
       },
       dbs[1]
     )
+
+    interaction.useMockMixer()
 
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
@@ -187,12 +249,35 @@ describe('packet interaction', function () {
 
     await ackReceived.promise
   })
+})
+
+// Integration test:
+// Creates a multi-hop packet, and sends it along the path while
+// using the packet forwarding code.
+describe('packet relaying interaction', function () {
+  // Creating commitment chain takes time ...
+  this.timeout(20e3)
+
+  const events = new EventEmitter()
+  let dbs: HoprDB[] = Array.from({ length: nodes.length }, (_, index) =>
+    HoprDB.createMock(PublicKey.fromPeerId(nodes[index]))
+  )
+
+  afterEach(async function () {
+    events.removeAllListeners()
+
+    await Promise.all(dbs.map((db: HoprDB) => db.close))
+  })
+
+  beforeEach(async function () {
+    await createMinimalChannelTopology(dbs, nodes)
+  })
 
   it('packet-acknowledgement multi-relay workflow', async function () {
     const msgDefer = defer<void>()
     const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
-    let senderInteraction: PacketForwardInteraction
+    let senderInteraction: TestingForwardInteraction
 
     for (const [index, pId] of nodes.entries()) {
       const { subscribe, send } = createFakeSendReceive(events, pId)
@@ -209,7 +294,8 @@ describe('packet interaction', function () {
         receive = console.log
       }
 
-      const interaction = new PacketForwardInteraction(subscribe, send as any, pId, receive, dbs[index])
+      const interaction = new TestingForwardInteraction(subscribe, send as any, pId, receive, dbs[index])
+      interaction.useMockMixer()
 
       if (pId.equals(SELF)) {
         senderInteraction = interaction

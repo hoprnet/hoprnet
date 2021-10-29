@@ -64,10 +64,18 @@ export function subscribeToAcknowledgements(
   async function handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
+    // There are three cases:
+    // 1. There is an unacknowledged ticket and we are
+    //    awaiting a half key.
+    // 2. We were the creator of the packet, hence we
+    //    do not wait for any half key
+    // 3. The acknowledgement is unexpected and stems from
+    //    a protocol bug or an attacker
     let pending: PendingAckowledgement
     try {
       pending = await db.getPendingAcknowledgement(ackMsg.ackChallenge)
     } catch (err) {
+      // Protocol bug?
       if (err.notFound) {
         log(
           `Received unexpected acknowledgement for half key challenge ${ackMsg.ackChallenge.toHex()} - half key ${ackMsg.ackKeyShare.toHex()}`
@@ -77,8 +85,10 @@ export function subscribeToAcknowledgements(
     }
 
     if (pending.isMessageSender == true) {
+      // No pending ticket, nothing to do.
       log(`Received acknowledgement as sender. First relayer has processed the packet.`)
     } else {
+      // Unlocking our incentive
       const ackedTicket = await acknowledge(pending.ticket, ackMsg.ackKeyShare, db, events)
       if (ackedTicket) {
         log(`Storing winning ticket`)
