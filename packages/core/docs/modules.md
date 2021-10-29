@@ -27,6 +27,7 @@
 
 ### Variables
 
+- [ACKNOWLEDGEMENT\_TIMEOUT](modules.md#acknowledgement_timeout)
 - [CHECK\_TIMEOUT](modules.md#check_timeout)
 - [DEFAULT\_STUN\_PORT](modules.md#default_stun_port)
 - [FULL\_VERSION](modules.md#full_version)
@@ -132,6 +133,16 @@ ___
 [packages/core/src/index.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L98)
 
 ## Variables
+
+### ACKNOWLEDGEMENT\_TIMEOUT
+
+• **ACKNOWLEDGEMENT\_TIMEOUT**: ``2000``
+
+#### Defined in
+
+[packages/core/src/constants.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L36)
+
+___
 
 ### CHECK\_TIMEOUT
 
