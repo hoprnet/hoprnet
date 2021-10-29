@@ -10,8 +10,8 @@ import {
   HoprDB,
   PublicKey,
   UINT256,
-  //createPoRValuesForSender,
-  //deriveAckKeyShare,
+  createPoRValuesForSender,
+  deriveAckKeyShare,
   u8aEquals,
   ChannelEntry,
   ChannelStatus,
@@ -20,13 +20,13 @@ import {
   Hash,
   PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
-//import assert from 'assert'
+import assert from 'assert'
 import { PROTOCOL_STRING } from '../../constants'
-import { /*AcknowledgementChallenge,*/ Packet /*Acknowledgement*/ } from '../../messages'
+import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 
-//const SECRET_LENGTH = 32
+const SECRET_LENGTH = 32
 
 const TEST_MESSAGE = new TextEncoder().encode('test message')
 
@@ -78,6 +78,8 @@ function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
 }
 
 describe('packet interaction', function () {
+  this.timeout(20e3)
+
   const events = new EventEmitter()
   let dbs: HoprDB[] = Array.from({ length: nodes.length })
 
@@ -88,38 +90,33 @@ describe('packet interaction', function () {
   })
 
   beforeEach(async function () {
-    this.timeout(20000)
+    let previousChannel: ChannelEntry
     for (const [index, peerId] of nodes.entries()) {
       dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
-    }
 
-    const dbFor = {} as any
-    // create channels between nodes and update their DBs
-    const channels: ChannelEntry[] = nodes.reduce((result, src, index) => {
-      const dest = nodes[index + 1]
-      if (dest) {
-        const c = getDummyChannel(src, dest)
-        result.push(c)
-        dbFor[c.getId().toHex()] = dbs[index + 1]
+      let channel: ChannelEntry
+
+      if (index < nodes.length - 1) {
+        channel = getDummyChannel(peerId, nodes[index + 1])
+
+        await dbs[index].updateChannel(channel.getId(), channel)
       }
 
-      return result
-    }, [])
+      if (index > 0) {
+        await dbs[index].updateChannel(previousChannel.getId(), previousChannel)
 
-    for (const channel of channels) {
-      for (const db of dbs) {
-        await db.updateChannel(channel.getId(), channel)
+        await initializeCommitment(
+          dbs[index],
+          previousChannel.getId(),
+          (): any => {},
+          (): any => {}
+        )
       }
-      await initializeCommitment(
-        dbFor[channel.getId().toHex()],
-        channel.getId(),
-        () => {},
-        () => {}
-      )
+
+      previousChannel = channel
     }
   })
 
-  /* Disable broken test
   it('acknowledgement workflow as sender', async function () {
     const secrets: Uint8Array[] = Array.from({ length: 2 }, () => Uint8Array.from(randomBytes(SECRET_LENGTH)))
 
@@ -129,6 +126,8 @@ describe('packet interaction', function () {
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
     const ackReceived = defer<void>()
+
+    await dbs[0].storePendingAcknowledgement(ackChallenge, true)
 
     subscribeToAcknowledgements(libp2pSelf.subscribe, dbs[0], SELF, () => ackReceived.resolve())
 
@@ -153,7 +152,6 @@ describe('packet interaction', function () {
 
     await ackReceived.promise
   })
-  */
 
   it('acknowledgement workflow as relayer', async function () {
     const packet = await Packet.create(TEST_MESSAGE, [RELAY0, COUNTERPARTY], SELF, dbs[0])
@@ -219,6 +217,8 @@ describe('packet interaction', function () {
     }
 
     const packet = await Packet.create(TEST_MESSAGE, [RELAY0, RELAY1, RELAY2, COUNTERPARTY], SELF, dbs[0])
+
+    await packet.storePendingAcknowledgement(dbs[0])
 
     // Wait for acknowledgement
     await senderInteraction.interact(RELAY0, packet)
