@@ -24,6 +24,7 @@
 - [bumpCommitment](modules.md#bumpcommitment)
 - [createChainWrapper](modules.md#createchainwrapper)
 - [findCommitmentPreImage](modules.md#findcommitmentpreimage)
+- [initializeCommitment](modules.md#initializecommitment)
 
 ## Type aliases
 
@@ -118,3 +119,26 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/commitment.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L24)
+
+___
+
+### initializeCommitment
+
+▸ **initializeCommitment**(`db`, `channelId`, `getChainCommitment`, `setChainCommitment`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `db` | `HoprDB` |
+| `channelId` | `Hash` |
+| `getChainCommitment` | `GetCommitment` |
+| `setChainCommitment` | `SetCommitment` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L60)
