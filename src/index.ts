@@ -28,10 +28,12 @@ export type HoprConnectOptions = {
   __useLocalAddresses?: boolean
 }
 
+type ConnHandler = (connection: Connection) => void
+
 /**
  * @class HoprConnect
  */
-class HoprConnect implements Transport<DialOptions, any> {
+class HoprConnect implements Transport<DialOptions, undefined> {
   get [Symbol.toStringTag]() {
     return 'HoprConnect'
   }
@@ -189,7 +191,7 @@ class HoprConnect implements Transport<DialOptions, any> {
    * @param handler
    * @returns A TCP listener
    */
-  createListener(options: any | undefined, handler: (connection: Connection) => void): Listener {
+  createListener(options: undefined, handler: ConnHandler): Listener {
     if (arguments.length == 1 && typeof options === 'function') {
       this.connHandler = options
     } else {

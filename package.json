@@ -27,7 +27,7 @@
     "prepublishOnly": "yarn clean && tsc -p ./tsconfig.npm.json"
   },
   "dependencies": {
-    "@hoprnet/hopr-utils": "1.83.0-next.8",
+    "@hoprnet/hopr-utils": "1.83.0-next.27",
     "abortable-iterator": "^3.0.0",
     "bl": "^5.0",
     "debug": "^4.3.2",
