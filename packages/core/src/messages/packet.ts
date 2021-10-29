@@ -15,16 +15,12 @@ import {
   preVerify,
   u8aSplit,
   pubKeyToPeerId,
-  HalfKeyChallenge,
-  HalfKey,
-  Challenge,
-  ChannelEntry,
   ChannelStatus,
   Balance,
-  Hash,
   PRICE_PER_PACKET,
   INVERSE_TICKET_WIN_PROB
 } from '@hoprnet/hopr-utils'
+import type { HalfKey, HalfKeyChallenge, ChannelEntry, Challenge, Hash } from '@hoprnet/hopr-utils'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import type PeerId from 'peer-id'
 import BN from 'bn.js'
@@ -66,8 +62,8 @@ export async function createTicket(
   pathLength: number,
   challenge: Challenge,
   db: HoprDB,
-  privKey: Uint8Array
-) {
+  privKey: PeerId
+): Promise<Ticket> {
   const channel = await db.getChannelTo(dest)
   const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
   const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
@@ -96,13 +92,33 @@ export async function createTicket(
     amount,
     UINT256.fromInverseProbability(winProb),
     channel.channelEpoch,
-    privKey
+    privKey.privKey.marshal()
   )
   await db.markPending(ticket)
 
   log(`Creating ticket in channel ${channel.getId().toHex()}. Ticket data: \n${ticket.toString()}`)
 
   return ticket
+}
+
+/**
+ * Creates a ticket without any value
+ * @param dest recipient of the ticket
+ * @param challenge challenge to solve
+ * @param privKey private key of the sender
+ * @returns a ticket
+ */
+export function createZeroHopTicket(dest: PublicKey, challenge: Challenge, privKey: PeerId): Ticket {
+  return Ticket.create(
+    dest.toAddress(),
+    challenge,
+    UINT256.fromString('0'),
+    UINT256.fromString('0'),
+    new Balance(new BN(0)),
+    UINT256.DUMMY_INVERSE_PROBABILITY,
+    UINT256.fromString('0'),
+    privKey.privKey.marshal()
+  )
 }
 
 // Precompute the base unit that is used for issuing and validating
@@ -287,19 +303,9 @@ export class Packet {
 
     let ticket: Ticket
     if (isDirectMessage) {
-      // Dummy Ticket
-      ticket = Ticket.create(
-        nextPeer.toAddress(),
-        ticketChallenge,
-        UINT256.fromString('0'),
-        UINT256.fromString('0'),
-        new Balance(new BN(0)),
-        UINT256.DUMMY_INVERSE_PROBABILITY,
-        UINT256.fromString('0'),
-        privKey.privKey.marshal()
-      )
+      ticket = createZeroHopTicket(nextPeer, ticketChallenge, privKey)
     } else {
-      ticket = await createTicket(nextPeer, path.length, ticketChallenge, db, privKey.privKey.marshal())
+      ticket = await createTicket(nextPeer, path.length, ticketChallenge, db, privKey)
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -391,7 +397,11 @@ export class Packet {
       )} from ${blue(pubKeyToPeerId(this.nextHop).toB58String())}`
     )
 
-    await db.storeUnacknowledgedTicket(this.ackChallenge, unacknowledged)
+    await db.storePendingAcknowledgement(this.ackChallenge, false, unacknowledged)
+  }
+
+  async storePendingAcknowledgement(db: HoprDB) {
+    await db.storePendingAcknowledgement(this.ackChallenge, true)
   }
 
   async validateUnacknowledgedTicket(db: HoprDB) {
@@ -438,19 +448,9 @@ export class Packet {
 
     const pathPosition = this.ticket.getPathPosition()
     if (pathPosition == 1) {
-      // Dummy Ticket
-      this.ticket = Ticket.create(
-        nextPeer.toAddress(),
-        this.nextChallenge,
-        UINT256.fromString('0'),
-        UINT256.fromString('0'),
-        new Balance(new BN(0)),
-        UINT256.DUMMY_INVERSE_PROBABILITY,
-        UINT256.fromString('0'),
-        privKey.privKey.marshal()
-      )
+      this.ticket = createZeroHopTicket(nextPeer, this.nextChallenge, privKey)
     } else {
-      this.ticket = await createTicket(nextPeer, pathPosition, this.nextChallenge, db, privKey.privKey.marshal())
+      this.ticket = await createTicket(nextPeer, pathPosition, this.nextChallenge, db, privKey)
     }
     this.oldChallenge = this.challenge.clone()
     this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)

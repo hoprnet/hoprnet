@@ -1,11 +1,12 @@
 import { durations, oneAtATime, debug, AcknowledgedTicket } from '@hoprnet/hopr-utils'
-import type { HalfKey, UnacknowledgedTicket } from '@hoprnet/hopr-utils'
+import type { HalfKey, UnacknowledgedTicket, PendingAckowledgement } from '@hoprnet/hopr-utils'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
 
 import type { SendMessage, Subscribe } from '../../index'
 import type PeerId from 'peer-id'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import { Acknowledgement, Packet } from '../../messages'
+import type { Packet } from '../../messages'
+import { Acknowledgement } from '../../messages'
 import { HoprDB } from '@hoprnet/hopr-utils'
 import { EventEmitter } from 'events'
 const log = debug('hopr-core:acknowledgement')
@@ -63,18 +64,28 @@ export function subscribeToAcknowledgements(
   async function handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
+    let pending: PendingAckowledgement
     try {
-      let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
-      const ackedTicket = await acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare, db, events)
+      pending = await db.getPendingAcknowledgement(ackMsg.ackChallenge)
+    } catch (err) {
+      if (err.notFound) {
+        log(
+          `Received unexpected acknowledgement for half key challenge ${ackMsg.ackChallenge.toHex()} - half key ${ackMsg.ackKeyShare.toHex()}`
+        )
+      }
+      throw err
+    }
+
+    if (pending.isMessageSender == true) {
+      log(`Received acknowledgement as sender. First relayer has processed the packet.`)
+    } else {
+      const ackedTicket = await acknowledge(pending.ticket, ackMsg.ackKeyShare, db, events)
       if (ackedTicket) {
         log(`Storing winning ticket`)
         await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
       }
-    } catch (err) {
-      if (!err.notFound) {
-        throw err
-      }
     }
+
     onMessage(ackMsg)
   }
 
