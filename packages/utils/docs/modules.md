@@ -51,6 +51,7 @@
 - [Network](modules.md#network)
 - [PRGParameters](modules.md#prgparameters)
 - [PRPParameters](modules.md#prpparameters)
+- [PendingAckowledgement](modules.md#pendingackowledgement)
 - [PromiseValue](modules.md#promisevalue)
 - [TimeoutOpts](modules.md#timeoutopts)
 - [U8aAndSize](modules.md#u8aandsize)
@@ -145,6 +146,7 @@
 - [oneAtATime](modules.md#oneatatime)
 - [parseHosts](modules.md#parsehosts)
 - [parseJSON](modules.md#parsejson)
+- [pendingAcknowledgement](modules.md#pendingacknowledgement)
 - [pickVersion](modules.md#pickversion)
 - [preVerify](modules.md#preverify)
 - [privKeyToPeerId](modules.md#privkeytopeerid)
@@ -175,7 +177,6 @@
 - [u8aToNumber](modules.md#u8atonumber)
 - [u8aToNumberOrBigInt](modules.md#u8atonumberorbigint)
 - [u8aXOR](modules.md#u8axor)
-- [unacknowledgedTicketKey](modules.md#unacknowledgedticketkey)
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
 - [validatePoRHint](modules.md#validateporhint)
 - [validatePoRResponse](modules.md#validateporresponse)
@@ -373,6 +374,16 @@ ___
 #### Defined in
 
 [crypto/prp.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L16)
+
+___
+
+### PendingAckowledgement
+
+Ƭ **PendingAckowledgement**: `WaitingAsSender` \| `WaitingAsRelayer`
+
+#### Defined in
+
+[db.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L69)
 
 ___
 
@@ -2043,6 +2054,26 @@ Parse JSON while recovering all Buffer elements
 
 ___
 
+### pendingAcknowledgement
+
+▸ `Const` **pendingAcknowledgement**(`halfKey`): `Uint8Array`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `halfKey` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+
+#### Returns
+
+`Uint8Array`
+
+#### Defined in
+
+[db.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L30)
+
+___
+
 ### pickVersion
 
 ▸ `Const` **pickVersion**(`full_version`): `string`
@@ -2821,26 +2852,6 @@ Apply an XOR on a list of arrays.
 #### Defined in
 
 [u8a/xor.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/xor.ts#L7)
-
-___
-
-### unacknowledgedTicketKey
-
-▸ `Const` **unacknowledgedTicketKey**(`halfKey`): `Uint8Array`
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `halfKey` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
-
-#### Returns
-
-`Uint8Array`
-
-#### Defined in
-
-[db.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L30)
 
 ___
 
