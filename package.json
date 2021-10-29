@@ -11,7 +11,7 @@
     "packages/hoprd"
   ],
   "scripts": {
-    "build": "yarn workspaces foreach -pvi --topological-dev --no-private run build",
+    "build": "tsc -p ./scripts && yarn workspaces foreach -pvi --topological-dev --no-private run build",
     "build:core": "yarn workspace @hoprnet/hopr-core run build",
     "build:admin": "yarn workspace @hoprnet/hoprd run buildAdmin",
     "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
@@ -39,6 +39,7 @@
     "@ethersproject/cli": "5.5.0",
     "rimraf": "3.0.2",
     "ts-node": "10.4.0",
+    "typescript": "4.4.4",
     "yargs": "17.2.1"
   },
   "prettier": {
