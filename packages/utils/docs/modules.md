@@ -55,6 +55,8 @@
 - [PromiseValue](modules.md#promisevalue)
 - [TimeoutOpts](modules.md#timeoutopts)
 - [U8aAndSize](modules.md#u8aandsize)
+- [WaitingAsRelayer](modules.md#waitingasrelayer)
+- [WaitingAsSender](modules.md#waitingassender)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 
@@ -379,11 +381,11 @@ ___
 
 ### PendingAckowledgement
 
-Ƭ **PendingAckowledgement**: `WaitingAsSender` \| `WaitingAsRelayer`
+Ƭ **PendingAckowledgement**: [`WaitingAsSender`](modules.md#waitingassender) \| [`WaitingAsRelayer`](modules.md#waitingasrelayer)
 
 #### Defined in
 
-[db.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L69)
+[db.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L70)
 
 ___
 
@@ -429,6 +431,39 @@ ___
 #### Defined in
 
 [u8a/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L20)
+
+___
+
+### WaitingAsRelayer
+
+Ƭ **WaitingAsRelayer**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `isMessageSender` | ``false`` |
+| `ticket` | [`UnacknowledgedTicket`](classes/UnacknowledgedTicket.md) |
+
+#### Defined in
+
+[db.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L65)
+
+___
+
+### WaitingAsSender
+
+Ƭ **WaitingAsSender**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `isMessageSender` | ``true`` |
+
+#### Defined in
+
+[db.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L61)
 
 ___
 
@@ -2070,7 +2105,7 @@ ___
 
 #### Defined in
 
-[db.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L30)
+[db.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L31)
 
 ___
 

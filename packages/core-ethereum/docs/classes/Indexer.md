@@ -48,6 +48,7 @@ Also keeps track of the latest block number.
 - [off](Indexer.md#off)
 - [on](Indexer.md#on)
 - [onAnnouncement](Indexer.md#onannouncement)
+- [onChannelClosed](Indexer.md#onchannelclosed)
 - [onChannelUpdated](Indexer.md#onchannelupdated)
 - [onNewBlock](Indexer.md#onnewblock)
 - [onNewEvents](Indexer.md#onnewevents)
@@ -385,7 +386,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:363](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L363)
+[packages/core-ethereum/src/indexer/index.ts:381](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L381)
 
 ___
 
@@ -399,7 +400,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:375](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L375)
+[packages/core-ethereum/src/indexer/index.ts:393](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L393)
 
 ___
 
@@ -447,7 +448,7 @@ peer's open channels
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:410](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L410)
+[packages/core-ethereum/src/indexer/index.ts:428](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L428)
 
 ___
 
@@ -467,7 +468,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:367](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L367)
+[packages/core-ethereum/src/indexer/index.ts:385](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L385)
 
 ___
 
@@ -481,7 +482,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:379](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L379)
+[packages/core-ethereum/src/indexer/index.ts:397](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L397)
 
 ___
 
@@ -500,7 +501,7 @@ an open channel
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:393](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L393)
+[packages/core-ethereum/src/indexer/index.ts:411](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L411)
 
 ___
 
@@ -521,7 +522,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:359](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L359)
+[packages/core-ethereum/src/indexer/index.ts:377](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L377)
 
 ___
 
@@ -689,6 +690,26 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/indexer/index.ts:309](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L309)
+
+___
+
+### onChannelClosed
+
+▸ `Private` **onChannelClosed**(`channel`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `channel` | [`ChannelEntry`](ChannelEntry.md) |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/indexer/index.ts:372](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L372)
 
 ___
 
@@ -1124,7 +1145,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:416](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L416)
+[packages/core-ethereum/src/indexer/index.ts:434](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L434)
 
 ___
 

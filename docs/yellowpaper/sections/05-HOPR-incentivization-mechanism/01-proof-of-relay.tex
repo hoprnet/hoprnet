@@ -49,6 +49,7 @@ Hence by knowing $hint_i = s_{i+1}^{ack} \cdot G$, the node can verify that $s_i
 As the next downstream node would not accept a packet without a ticket\footnote{By default, nodes only forward packets that include incentives. Nevertheless, the protocol does not prevent them from processing packets without enforcing an incentive.}, the node $n_i$ not only needs to transform the packet but must also issue a ticket to the next downstream node $n_{i+1}$. Therefore, it needs to know which challenge $\tilde{C}_{i+1}$ to put into the ticket issued for node $n_{i+1}$. As in the previous section, this is done with the help of the creator of the packet, who embeds $C_{i+1}$ into the part of the SPHINX packet that is readable by node $n_{i+1}$.
 
 \begin{figure}[H]
+    \label{fig:packetDetails}
     \centering
     \begin{tikzpicture}
         \def\one{0.3}
@@ -129,4 +130,4 @@ As the next downstream node would not accept a packet without a ticket\footnote{
 
 By chaining this principle, nodes are forced to \textit{always} issue a ticket to the next downstream node because they are unable to claim their own incentive without the help of the next downstream node.
 
-Since the very last node, namely the final receiver, of the packet, does not need to forward the packet to anyone else, it has no direct incentive to acknowledge tickets, hence there are no direct consequences for not acknowledging packet. In its current version, the protocol does not prevent this kind of behaviour, but research is being conducted into the necessity and feasibility of solving this issue via a reputation system.
+Since the very last node, namely the final recipient, of the packet, does not need to forward the packet to anyone else, it has no direct incentive to acknowledge tickets, hence there are no direct consequences for not acknowledging packet. In its current version, the protocol does not prevent this kind of behaviour, but research is being conducted into the necessity and feasibility of solving this issue via a reputation system.

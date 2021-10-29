@@ -1,5 +1,5 @@
-import levelup from 'levelup'
 import type { LevelUp } from 'levelup'
+import levelup from 'levelup'
 import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { existsSync, mkdirSync, rmSync } from 'fs'
@@ -25,19 +25,20 @@ const log = debug(`hopr-core:db`)
 const encoder = new TextEncoder()
 
 const TICKET_PREFIX = encoder.encode('tickets-')
+const SEPARATOR = encoder.encode(':')
 const PENDING_ACKNOWLEDGEMENTS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('pending-acknowledgement-'))
 const ACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
 export const pendingAcknowledgement = (halfKey: HalfKeyChallenge) => {
   return u8aConcat(PENDING_ACKNOWLEDGEMENTS_PREFIX, halfKey.serialize())
 }
-const acknowledgedTicketKey = (challenge: EthereumChallenge) => {
-  return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, challenge.serialize())
+const acknowledgedTicketKey = (challenge: EthereumChallenge, channelEpoch: UINT256) => {
+  return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, channelEpoch.serialize(), SEPARATOR, challenge.serialize())
 }
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
-const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
-const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('indexer-latestConfirmedSnapshot')
-const ACCOUNT_PREFIX = encoder.encode('indexer-account-')
-const CHANNEL_PREFIX = encoder.encode('indexer-channel-')
+const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
+const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('latestConfirmedSnapshot')
+const ACCOUNT_PREFIX = encoder.encode('account-')
+const CHANNEL_PREFIX = encoder.encode('channel-')
 const createChannelKey = (channelId: Hash): Uint8Array => u8aConcat(CHANNEL_PREFIX, encoder.encode(channelId.toHex()))
 const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PREFIX, encoder.encode(address.toHex()))
 const COMMITMENT_PREFIX = encoder.encode('commitment:')
@@ -48,7 +49,7 @@ const REDEEMED_TICKETS_VALUE = encoder.encode('statistics:redeemed:value')
 const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 const PENDING_TICKETS_VALUE = (address: Address) =>
   u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
-
+const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
 
@@ -57,11 +58,11 @@ enum PendingAcknowledgementPrefix {
   MessageSender = 1
 }
 
-type WaitingAsSender = {
+export type WaitingAsSender = {
   isMessageSender: true
 }
 
-type WaitingAsRelayer = {
+export type WaitingAsRelayer = {
   isMessageSender: false
   ticket: UnacknowledgedTicket
 }
@@ -272,10 +273,21 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of all acknowledged tickets
    */
-  public async getAcknowledgedTickets(filter?: { signer: PublicKey }): Promise<AcknowledgedTicket[]> {
+  public async getAcknowledgedTickets(filter?: {
+    signer?: PublicKey
+    channel?: ChannelEntry
+  }): Promise<AcknowledgedTicket[]> {
     const filterFunc = (a: AcknowledgedTicket): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
       if (filter?.signer && !a.signer.eq(filter.signer)) {
+        return false
+      }
+
+      if (
+        filter?.channel &&
+        !a.signer.eq(filter.channel.source) &&
+        !a.ticket.channelEpoch.eq(filter.channel.channelEpoch)
+      ) {
         return false
       }
       return true
@@ -284,27 +296,29 @@ export class HoprDB {
     return this.getAll<AcknowledgedTicket>(ACKNOWLEDGED_TICKETS_PREFIX, AcknowledgedTicket.deserialize, filterFunc)
   }
 
+  public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
+    const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
+    Promise.all(tickets.map((ticket) => this.delAcknowledgedTicket(ticket)))
+    await this.increment(NEGLECTED_TICKET_COUNT)
+  }
+
   /**
    * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
   public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
-    await this.del(acknowledgedTicketKey(ack.ticket.challenge))
+    await this.del(acknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
     const unAcknowledgedDbKey = pendingAcknowledgement(halfKeyChallenge)
-    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge)
+    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
 
-    try {
-      await this.db
-        .batch()
-        .del(Buffer.from(this.keyOf(unAcknowledgedDbKey)))
-        .put(Buffer.from(this.keyOf(acknowledgedDbKey)), Buffer.from(ackTicket.serialize()))
-        .write()
-    } catch (err) {
-      log(`ERROR: Error while writing to database. Error was ${err.message}.`)
-    }
+    await this.db
+      .batch()
+      .del(Buffer.from(this.keyOf(unAcknowledgedDbKey)))
+      .put(Buffer.from(this.keyOf(acknowledgedDbKey)), Buffer.from(ackTicket.serialize()))
+      .write()
   }
 
   /**
@@ -435,6 +449,10 @@ export class HoprDB {
     return this.getCoercedOrDefault(REDEEMED_TICKETS_COUNT, u8aToNumber, 0)
   }
 
+  public async getNeglectedTicketsCount(): Promise<number> {
+    return this.getCoercedOrDefault(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
+  }
+
   public async getPendingTicketCount(): Promise<number> {
     return (await this.getUnacknowledgedTickets()).length
   }
@@ -461,7 +479,7 @@ export class HoprDB {
   public async markLosing(t: UnacknowledgedTicket): Promise<void> {
     await this.increment(LOSING_TICKET_COUNT)
     await this.del(pendingAcknowledgement(t.getChallenge()))
-    // sub pending_tickets_value
+    await this.subBalance(PENDING_TICKETS_VALUE(t.ticket.counterparty), t.ticket.amount)
   }
 
   public async getRejectedTicketsValue(): Promise<Balance> {

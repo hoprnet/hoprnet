@@ -12,7 +12,7 @@
 
 - [amount](Ticket.md#amount)
 - [challenge](Ticket.md#challenge)
-- [channelIteration](Ticket.md#channeliteration)
+- [channelEpoch](Ticket.md#channelepoch)
 - [counterparty](Ticket.md#counterparty)
 - [epoch](Ticket.md#epoch)
 - [index](Ticket.md#index)
@@ -41,7 +41,7 @@
 
 ### constructor
 
-• **new Ticket**(`counterparty`, `challenge`, `epoch`, `index`, `amount`, `winProb`, `channelIteration`, `signature`)
+• **new Ticket**(`counterparty`, `challenge`, `epoch`, `index`, `amount`, `winProb`, `channelEpoch`, `signature`)
 
 #### Parameters
 
@@ -53,7 +53,7 @@
 | `index` | [`UINT256`](UINT256.md) |
 | `amount` | [`Balance`](Balance.md) |
 | `winProb` | [`UINT256`](UINT256.md) |
-| `channelIteration` | [`UINT256`](UINT256.md) |
+| `channelEpoch` | [`UINT256`](UINT256.md) |
 | `signature` | [`Signature`](Signature.md) |
 
 #### Defined in
@@ -74,9 +74,9 @@ ___
 
 ___
 
-### channelIteration
+### channelEpoch
 
-• `Readonly` **channelIteration**: [`UINT256`](UINT256.md)
+• `Readonly` **channelEpoch**: [`UINT256`](UINT256.md)
 
 ___
 
@@ -279,7 +279,7 @@ ___
 
 ### create
 
-▸ `Static` **create**(`counterparty`, `challenge`, `epoch`, `index`, `amount`, `winProb`, `channelIteration`, `signPriv`): [`Ticket`](Ticket.md)
+▸ `Static` **create**(`counterparty`, `challenge`, `epoch`, `index`, `amount`, `winProb`, `channelEpoch`, `signPriv`): [`Ticket`](Ticket.md)
 
 #### Parameters
 
@@ -291,7 +291,7 @@ ___
 | `index` | [`UINT256`](UINT256.md) |
 | `amount` | [`Balance`](Balance.md) |
 | `winProb` | [`UINT256`](UINT256.md) |
-| `channelIteration` | [`UINT256`](UINT256.md) |
+| `channelEpoch` | [`UINT256`](UINT256.md) |
 | `signPriv` | `Uint8Array` |
 
 #### Returns

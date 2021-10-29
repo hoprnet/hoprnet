@@ -27,7 +27,8 @@ Tickets:
 - Redeemed:         ${stats.redeemed}
 - Redeemed Value:   ${stats.redeemedValue.toFormattedString()}
 - Losing Tickets:   ${stats.losing}
-- Win Proportion:   ${stats.winProportion * 100}%
+- Win Proportion:   ${stats.winProportion * 100}% 
+- Neglected:        ${stats.neglected} 
 - Rejected:         ${stats.rejected}
 - Rejected Value:   ${stats.rejectedValue.toFormattedString()}
           `)

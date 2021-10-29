@@ -22,7 +22,7 @@ const createMockTicket = ({
   winProb = UINT256.fromInverseProbability(new BN(1)),
   epoch = new UINT256(new BN(1)),
   index = new UINT256(new BN(1)),
-  channelIteration = new UINT256(new BN(1))
+  channelEpoch = new UINT256(new BN(1))
 }: {
   sender?: PeerId
   targetAddress?: Address
@@ -30,7 +30,7 @@ const createMockTicket = ({
   winProb?: UINT256
   epoch?: UINT256
   index?: UINT256
-  channelIteration?: UINT256
+  channelEpoch?: UINT256
 }) => {
   return {
     counterparty: targetAddress,
@@ -39,7 +39,7 @@ const createMockTicket = ({
     winProb,
     epoch,
     index,
-    channelIteration,
+    channelEpoch,
     verify: (pubKey: PublicKey) => pubKey.eq(new PublicKey(sender.pubKey.marshal()))
   } as unknown as Ticket
 }
@@ -127,7 +127,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
   it("should throw if ticket's channel iteration does not match the current channel iteration", async function () {
     const signedTicket = createMockTicket({
-      channelIteration: new UINT256(new BN(2))
+      channelEpoch: new UINT256(new BN(2))
     })
 
     return expect(
