@@ -39,7 +39,7 @@
     "leveldown": "6.1.0",
     "levelup": "5.1.1",
     "libp2p": "0.33.0",
-    "libp2p-crypto": "0.20.0",
+    "libp2p-crypto": "0.19.7",
     "memdown": "6.1.1",
     "multiaddr": "^10.0.0",
     "multihashes": "~4.0.1",
