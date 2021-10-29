@@ -69,8 +69,8 @@ async function handleAcknowledgement(
       log(`Got a ticket that is not a win. Dropping ticket.`)
       await db.markLosing(unacknowledged)
     }
-    onMessage(acknowledgement)
   }
+  onMessage(acknowledgement)
 }
 
 export function subscribeToAcknowledgements(
