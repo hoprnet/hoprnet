@@ -469,7 +469,7 @@ __metadata:
     it-pipe: 1.1.0
     it-pushable: 1.4.2
     libp2p: 0.33.0
-    libp2p-interfaces: 1.0.1
+    libp2p-interfaces: 1.2.0
     libp2p-mplex: 0.10.4
     mocha: 9.1.3
     multiaddr: ^10.0.0
@@ -1806,6 +1806,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"eventemitter3@npm:^4.0.4":
+  version: 4.0.7
+  resolution: "eventemitter3@npm:4.0.7"
+  checksum: 1875311c42fcfe9c707b2712c32664a245629b42bb0a5a84439762dd0fd637fc54d078155ea83c2af9e0323c9ac13687e03cfba79b03af9f40c89b4960099374
+  languageName: node
+  linkType: hard
+
 "events@npm:^3.3.0":
   version: 3.3.0
   resolution: "events@npm:3.3.0"
@@ -2761,7 +2768,29 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
-"libp2p-interfaces@npm:1.0.1, libp2p-interfaces@npm:^1.0.0":
+"libp2p-interfaces@npm:1.2.0":
+  version: 1.2.0
+  resolution: "libp2p-interfaces@npm:1.2.0"
+  dependencies:
+    abort-controller: ^3.0.0
+    abortable-iterator: ^3.0.0
+    debug: ^4.3.1
+    err-code: ^3.0.1
+    it-length-prefixed: ^5.0.2
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
+    libp2p-crypto: ^0.19.5
+    multiaddr: ^10.0.0
+    multiformats: ^9.1.2
+    p-queue: ^6.6.2
+    peer-id: ^0.15.0
+    protobufjs: ^6.10.2
+    uint8arrays: ^3.0.0
+  checksum: bf10130eb4e257be52843047e30168122a875a8033354f91687c5abcef920cb58e1511a945b8715ccddea25ee63504499778e8e554572746914f96f1bc49a356
+  languageName: node
+  linkType: hard
+
+"libp2p-interfaces@npm:^1.0.0":
   version: 1.0.1
   resolution: "libp2p-interfaces@npm:1.0.1"
   dependencies:
@@ -3539,6 +3568,13 @@ fsevents@~2.3.2:
   languageName: node
   linkType: hard
 
+"p-finally@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "p-finally@npm:1.0.0"
+  checksum: 93a654c53dc805dd5b5891bab16eb0ea46db8f66c4bfd99336ae929323b1af2b70a8b0654f8f1eae924b2b73d037031366d645f1fd18b3d30cbd15950cc4b1d4
+  languageName: node
+  linkType: hard
+
 "p-limit@npm:^2.2.2":
   version: 2.3.0
   resolution: "p-limit@npm:2.3.0"
@@ -3563,6 +3599,16 @@ fsevents@~2.3.2:
   dependencies:
     p-limit: ^3.0.2
   checksum: 1623088f36cf1cbca58e9b61c4e62bf0c60a07af5ae1ca99a720837356b5b6c5ba3eb1b2127e47a06865fee59dd0453cad7cc844cda9d5a62ac1a5a51b7c86d3
+  languageName: node
+  linkType: hard
+
+"p-queue@npm:^6.6.2":
+  version: 6.6.2
+  resolution: "p-queue@npm:6.6.2"
+  dependencies:
+    eventemitter3: ^4.0.4
+    p-timeout: ^3.2.0
+  checksum: 832642fcc4ab6477b43e6d7c30209ab10952969ed211c6d6f2931be8a4f9935e3578c72e8cce053dc34f2eb6941a408a2c516a54904e989851a1a209cf19761c
   languageName: node
   linkType: hard
 
@@ -3600,6 +3646,15 @@ fsevents@~2.3.2:
     aggregate-error: ^3.0.0
     p-cancelable: ^2.0.0
   checksum: b076dfbc76626eb993bb1a563f41733d3b6e0f7b8a9f67b9e594ae0e22dcd9231bba8f6e693ad7c6d1d61b39949f584e725632e38a874ecb97a6278d4cc05e5b
+  languageName: node
+  linkType: hard
+
+"p-timeout@npm:^3.2.0":
+  version: 3.2.0
+  resolution: "p-timeout@npm:3.2.0"
+  dependencies:
+    p-finally: ^1.0.0
+  checksum: 3dd0eaa048780a6f23e5855df3dd45c7beacff1f820476c1d0d1bcd6648e3298752ba2c877aa1c92f6453c7dd23faaf13d9f5149fc14c0598a142e2c5e8d649c
   languageName: node
   linkType: hard
 
