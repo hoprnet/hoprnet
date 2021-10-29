@@ -82,8 +82,5 @@
       }
     }
   },
-  "required": [
-    "environments",
-    "networks"
-  ]
+  "required": ["environments", "networks"]
 }
