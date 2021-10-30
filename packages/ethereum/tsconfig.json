@@ -5,10 +5,13 @@
   },
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "./lib"
+    "outDir": "./lib",
+    // Typechain generates declarations with
+    // unused variables
+    "noUnusedLocals": false
   },
   "include": ["type-extension.ts", "hardhat.config.ts", "constants.ts", "index.ts", "test", "tasks", "deploy"],
-  "exclude": ["types"],
+  "exclude": ["./types"],
   "typedocOptions": {
     "entryPoints": ["index.ts"],
     "out": "docs",

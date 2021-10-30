@@ -1,15 +1,8 @@
 import type { ContractTransaction, UnsignedTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
-import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
-import {
-  Networks,
-  networks,
-  getContractData,
-  HoprToken,
-  HoprChannels,
-  HoprToken__factory,
-  HoprChannels__factory
-} from '@hoprnet/hopr-ethereum'
+import { providers, utils, errors, Wallet, BigNumber, ethers } from 'ethers'
+import type { Networks, HoprToken, HoprChannels } from '@hoprnet/hopr-ethereum'
+import { networks, getContractData } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Ticket,
@@ -52,8 +45,14 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   const hoprTokenDeployment = getContractData(network, 'HoprToken')
   const hoprChannelsDeployment = getContractData(network, 'HoprChannels')
 
-  const token = HoprToken__factory.connect(hoprTokenDeployment.address, wallet)
-  const channels = HoprChannels__factory.connect(hoprChannelsDeployment.address, wallet)
+  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, wallet) as HoprToken
+
+  const channels = new ethers.Contract(
+    hoprChannelsDeployment.address,
+    hoprChannelsDeployment.abi,
+    wallet
+  ) as HoprChannels
+
   const genesisBlock = (await provider.getTransaction(hoprChannelsDeployment.transactionHash)).blockNumber
   const channelClosureSecs = await channels.secsClosure()
 
