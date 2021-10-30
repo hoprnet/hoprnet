@@ -1479,7 +1479,7 @@ __metadata:
     solidity-coverage: 0.7.17
     ts-generator: 0.1.1
     ts-node: 10.4.0
-    typechain: 6.0.1
+    typechain: 6.0.2
     typedoc: 0.22.7
     typedoc-plugin-markdown: 3.11.3
     typescript: 4.4.4
@@ -16833,9 +16833,9 @@ resolve@1.17.0:
   languageName: node
   linkType: hard
 
-"typechain@npm:6.0.1":
-  version: 6.0.1
-  resolution: "typechain@npm:6.0.1"
+"typechain@npm:6.0.2":
+  version: 6.0.2
+  resolution: "typechain@npm:6.0.2"
   dependencies:
     "@types/prettier": ^2.1.1
     command-line-args: ^4.0.7
@@ -16851,7 +16851,7 @@ resolve@1.17.0:
     typescript: ">=4.1.0"
   bin:
     typechain: dist/cli/cli.js
-  checksum: 8d9fc53a743d5f0ac4f15b919b21dac8c7aea07d230a85335a918c4251088ea9b7526ac9c307c3645993eea92d4b3318767c1d70fda289eda1959dd68c8f9cfb
+  checksum: 8e72a05ece9eb03ee6b5175a14206f6a26f407b25071a4bb37edd42d1303075ea5d9c2798bdcbe2517fea37ebf48710d5f055055718935c363358c4343e50004
   languageName: node
   linkType: hard
 
