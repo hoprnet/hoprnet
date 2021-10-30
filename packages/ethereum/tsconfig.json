@@ -11,8 +11,8 @@
     "noUnusedLocals": false
   },
   "include": ["type-extension.ts", "hardhat.config.ts", "constants.ts", "index.ts", "test", "tasks", "deploy"],
-  "exclude": ["./types"],
   "typedocOptions": {
+    "exclude": ["types/factories"],
     "entryPoints": ["index.ts"],
     "out": "docs",
     // by default we don't want links to source code to change on every change
