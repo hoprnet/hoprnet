@@ -9,7 +9,7 @@ To ensure that the header has not been tampered while transfered through the net
 
 Nodes in the network are distinguished by the ECDSA public keys, hence the header includes the public key of the next downstream node and a distinguished byte sequence $END$ to notify the last node on the path that it is the final recipient.
 
-ECDSA public keys are given by tuple of two 32-byte field elements $(x,y)$, upon which it is sufficient to solely store the first component $x$ and the sign of $y$, resulting in a \textsf{compressed} elliptic curve point \textsf{0x02}\textless\textsf{x}\textgreater for positive $y$ and \textsf{0x03}\textless\textsf{x}\textgreater. The sequence $END$ is given as \textsf{0x04} such that the last node can ignore all subsequent bytes if $END$ is present.
+ECDSA public keys are given by tuple of two 32-byte field elements $(x,y)$, upon which it is sufficient to solely store the first component $x$ and the sign of $y$, resulting in a \textsf{compressed} elliptic curve point \textsf{0x02}\textless\textsf{x}\textgreater for positive $y$ and \textsf{0x03}\textless\textsf{x}\textgreater otherwise. The sequence $END$ is given as \textsf{0x04} such that the last node can ignore all subsequent bytes if $END$ is present.
 
 \paragraph{Blinding}
 
