@@ -3,6 +3,8 @@
 
 Each node on the path needs to decide whether it is destined to be the receiver of the message and if not, to whom it is supposed to forward the packet. To achieve the privacy properties, each node must only know its direct predecessor and successor along the chosen path. More precisely, the node must not be able to determine \textit{if} and \textit{where} the next downstream node is going to forward the packet to. This is achieved by blinding that information such that it is visible to only that node who needs it.
 
+To ensure that the header has not been tampered while transfered through the network and processed by nodes along the path, routing information contains also an integrity tag to check for modifications before processing the packet. Hence, the routing information for each node by $(y_i, \gamma_i)$ where $y_i$ denotes the public key and $\gamma_i$ the integrity tag for the next downstream node. See section \ref{sec:sphinx:integrity} for more details on the utilized integrity scheme.
+
 \paragraph{Adresses}
 
 Nodes in the network are distinguished by the ECDSA public keys, hence the header includes the public key of the next downstream node and a distinguished byte sequence $END$ to notify the last node on the path that it is the final recipient.
