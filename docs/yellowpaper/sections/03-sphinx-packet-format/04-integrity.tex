@@ -72,10 +72,6 @@ where $HMAC$ is instantiated with the hash function \textsf{BLAKE2s} and the out
 
 In order to compute the integrity tag, the sender needs to know \textit{how} the packet is going to look like once it reaches the node that checks its integrity. Hence, the creator of the packet needs to perform the whole transformations that are done by the relayers along the path \textit{in advance} before sending the packet.
 
-Since each node, shifts the routing information to left, thereby deletes their own routing information and appends their own padding in the end, the routing information of the very last node consists of the $END$ message as desribed section \ref{sec:sphinx:routinginformation} and the padding that got appended by the previous nodes. To compute the integrity tag for that node, the creator of the packet needs to compute a filler string $\phi$ and use it to compute
-
-$$\gamma_i = HMAC_{s_i^{int}}(END \ || \ \phi_i )$$
-
 \begin{figure}[H]
     \centering
     \begin{tikzpicture}
@@ -156,3 +152,7 @@ $$\gamma_i = HMAC_{s_i^{int}}(END \ || \ \phi_i )$$
     \end{tikzpicture}
     \caption{Transformed header as seen by $Z$}
 \end{figure}
+
+Since each node, shifts the routing information to left, thereby deletes their own routing information and appends their own padding in the end, the routing information of the very last node consists of the $END$ message as desribed section \ref{sec:sphinx:routinginformation} and the padding that got appended by the previous nodes. To compute the integrity tag for that node, the creator of the packet needs to compute a filler string $\phi$ and use it to compute
+
+$$\gamma_i = HMAC_{s_i^{int}}(END \ || \ \phi_i )$$
