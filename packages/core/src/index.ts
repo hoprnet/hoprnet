@@ -1,7 +1,7 @@
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
-const MPLEX = require('libp2p-mplex')
+import MPLEX from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 
