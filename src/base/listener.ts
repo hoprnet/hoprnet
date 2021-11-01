@@ -12,7 +12,7 @@ import type { NetworkInterfaceInfo } from 'os'
 
 import AbortController from 'abort-controller'
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, CODE_UDP, RELAY_CONTACT_TIMEOUT } from '../constants'
-import type { Connection } from 'libp2p'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
 import type {
   MultiaddrConnection,
   Upgrader,

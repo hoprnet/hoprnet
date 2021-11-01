@@ -3,8 +3,9 @@ import { CODE_IP4, CODE_IP6, CODE_P2P, USE_WEBRTC } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
+import type Connection from 'libp2p-interfaces/src/connection/connection'
 import type { Upgrader, Transport } from 'libp2p-interfaces/src/transport/types'
-import type { default as libp2p, Connection } from 'libp2p'
+import type { default as libp2p } from 'libp2p'
 import chalk from 'chalk'
 import { TCPConnection, Listener } from './base'
 import { WebRTCUpgrader } from './webrtc'
@@ -28,10 +29,13 @@ export type HoprConnectOptions = {
   __useLocalAddresses?: boolean
 }
 
+type ConnHandler = (connection: Connection) => void
+type ListeningOptions = undefined
+
 /**
  * @class HoprConnect
  */
-class HoprConnect implements Transport<DialOptions, any> {
+class HoprConnect implements Transport<DialOptions, ListeningOptions> {
   get [Symbol.toStringTag]() {
     return 'HoprConnect'
   }
@@ -189,7 +193,7 @@ class HoprConnect implements Transport<DialOptions, any> {
    * @param handler
    * @returns A TCP listener
    */
-  createListener(options: any | undefined, handler: (connection: Connection) => void): Listener {
+  createListener(options: ListeningOptions, handler: ConnHandler): Listener {
     if (arguments.length == 1 && typeof options === 'function') {
       this.connHandler = options
     } else {
