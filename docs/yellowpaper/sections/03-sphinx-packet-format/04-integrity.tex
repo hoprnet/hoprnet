@@ -11,7 +11,11 @@ $$\gamma_i = HMAC_{s_i^{int}}(\beta_i)$$
 
 where $HMAC$ is instantiated with the hash function \textsf{BLAKE2s} and the output size is set to 32 bytes.
 
-\paragraph{Packet transformation} tbd
+\paragraph{Packet transformation}
+
+From the predecessor, which can be the creator of the packet \textit{or} a relayer, the node receives $\gamma_i$ and uses it to verify the integrity of the received header by recomputing the integrity tag $\gamma_i'$ using the received $\beta_i$ as well as the derived sub-key $s_i^{int}$ and checking whether $\gamma_i = \gamma_i'$. If this is not the case, the node drops the packet.
+
+The node then applies the transformations from sections \ref{sec:sphinx:routinginformation} and \ref{sec:sphinx:shifting}, and thus receives not only the public key $y_{i+1}$ but also the integrity tag that the next downstream node needs to verify the integrity of the packet header.
 
 \begin{figure}[H]
     \centering
@@ -67,6 +71,8 @@ where $HMAC$ is instantiated with the hash function \textsf{BLAKE2s} and the out
     \end{tikzpicture}
     \caption{Extraction of $\gamma_{i+1}$ and creation of the next packet}
 \end{figure}
+
+The received header $(\alpha_i,\beta_i,\gamma_i)$ thereby transforms into $(\alpha_{i+1},\beta_{i+1},\gamma_{i+1})$.
 
 \paragraph{Filler}
 
@@ -153,6 +159,6 @@ In order to compute the integrity tag, the sender needs to know \textit{how} the
     \caption{Transformed header as seen by $Z$}
 \end{figure}
 
-Since each node, shifts the routing information to left, thereby deletes their own routing information and appends their own padding in the end, the routing information of the very last node consists of the $END$ message as desribed section \ref{sec:sphinx:routinginformation} and the padding that got appended by the previous nodes. To compute the integrity tag for that node, the creator of the packet needs to compute a filler string $\phi$ and use it to compute
+Since each node, shifts the routing information to left, thereby deletes their own routing information from the header and appends their own padding in the end, the routing information of the very last node consists of the $END$ message as desribed section \ref{sec:sphinx:routinginformation} and the paddings that got appended by the previous nodes. To compute the integrity tag for that node, the creator of the packet needs to compute a filler string $\phi$ and use it to compute
 
 $$\gamma_i = HMAC_{s_i^{int}}(END \ || \ \phi_i )$$
