@@ -20,6 +20,7 @@ import {
   Hash,
   PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
+import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import { PROTOCOL_STRING } from '../../constants'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
@@ -183,7 +184,18 @@ describe('packet acknowledgement', function () {
 
     await dbs[0].storePendingAcknowledgement(ackChallenge, true)
 
-    subscribeToAcknowledgements(libp2pSelf.subscribe, dbs[0], SELF, () => ackReceived.resolve())
+    subscribeToAcknowledgements(
+      libp2pSelf.subscribe,
+      dbs[0],
+      SELF,
+      (receivedAckChallenge: HalfKeyChallenge) => {
+        if (receivedAckChallenge.eq(ackChallenge)) {
+          ackReceived.resolve()
+        }
+      },
+      () => {},
+      () => {}
+    )
 
     const ackKey = deriveAckKeyShare(secrets[0])
     const ackMessage = AcknowledgementChallenge.create(ackChallenge, SELF)
@@ -220,7 +232,16 @@ describe('packet acknowledgement', function () {
 
     const ackReceived = defer<void>()
 
-    subscribeToAcknowledgements(libp2pRelay0.subscribe, dbs[1], RELAY0, () => ackReceived.resolve())
+    subscribeToAcknowledgements(
+      libp2pRelay0.subscribe,
+      dbs[1],
+      RELAY0,
+      () => {},
+      () => {
+        ackReceived.resolve()
+      },
+      () => {}
+    )
 
     const interaction = new TestingForwardInteraction(
       libp2pRelay0.subscribe,

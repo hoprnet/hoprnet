@@ -21,21 +21,24 @@ import PeerId from 'peer-id'
 import {
   PublicKey,
   Balance,
-  Address,
-  ChannelEntry,
-  NativeBalance,
-  Hash,
-  DialOpts,
   HoprDB,
   libp2pSubscribe,
   libp2pSendMessage,
   isSecp256k1PeerId,
-  AcknowledgedTicket,
   ChannelStatus,
   MIN_NATIVE_BALANCE,
   u8aConcat
 } from '@hoprnet/hopr-utils'
-import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
+import type {
+  LibP2PHandlerFunction,
+  AcknowledgedTicket,
+  ChannelEntry,
+  NativeBalance,
+  Address,
+  DialOpts,
+  Hash,
+  HalfKeyChallenge
+} from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import type { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -294,10 +297,17 @@ class Hopr extends EventEmitter {
 
     const ethereum = await this.startedPaymentChannels()
 
-    subscribeToAcknowledgements(subscribe, this.db, this.getId(), (ack) => {
-      ethereum.emit('ticket:win', ack)
-      this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
-    })
+    subscribeToAcknowledgements(
+      subscribe,
+      this.db,
+      this.getId(),
+      (ackChallenge: HalfKeyChallenge) => {
+        this.emit('message-acknowledged:' + ackChallenge.toHex())
+      },
+      (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
+      // TODO: automatically reinitialize commitments
+      () => {}
+    )
 
     ethereum.on('ticket:win', (ack) => {
       this.onWinningTicket(ack)
