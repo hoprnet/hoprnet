@@ -457,7 +457,7 @@ __metadata:
     "@types/mocha": 9.0.0
     "@types/node": 16.11.6
     "@types/simple-peer": 9.11.3
-    "@types/yargs": 17.0.4
+    "@types/yargs": 17.0.5
     abortable-iterator: 3.0.0
     bl: ^5.0
     chai: 4.3.4
@@ -904,12 +904,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/yargs@npm:17.0.4":
-  version: 17.0.4
-  resolution: "@types/yargs@npm:17.0.4"
+"@types/yargs@npm:17.0.5":
+  version: 17.0.5
+  resolution: "@types/yargs@npm:17.0.5"
   dependencies:
     "@types/yargs-parser": "*"
-  checksum: 570f5227bf7ae0ba7c5e64f825fb6168bf5fa2b9cba0cabf88c7f2094717287f6d95919ea8756596cc8c4bb3151313976163f911ca21f9cf6435b4e3cab1cb7e
+  checksum: 2be02640c84471c66aec58cfd415432fab0973283909765aa3becbdb76b5874d4770fe7f376e77b98833d5cc9d9bc258a905adce68a0baec13d430c866fce3b5
   languageName: node
   linkType: hard
 
