@@ -41,27 +41,20 @@ Before doing anything else, you need to install [Docker Desktop](https://hub.doc
 
 ### Downloading HOPRd image using Docker
 
-All our docker images can be found in [our Google Cloud Container Registry][4].
-Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `latest` tag represents the `master` branch, while the `latest-constantine` tag
-represents the most recent `release/*` branch.
+All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd).
+Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
+The `wildhorn-v2` tag represents the latest community release version.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:latest-constantine
+docker pull gcr.io/hoprassociation/hoprd:wildhorn-v2
 ```
 
-For ease of use you can set up a shell alias to run the latest release as a docker container:
+Then start a container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest-constantine'
-```
-
-**IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
-
-```sh
-HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
+docker run --pull always -ti -v $HOME/.hoprd-db-wildhorn-v2:/app/db -p 9091:9091 -p 3000:3000 -p 8080:8080 hopr/hoprd:wildhorn-v2 --password='h0pR-w1ldhorn-v2' --init --announce --identity /app/db/.hopr-id-wildhorn-v2 --testNoAuthentication
 ```
 
 Also all ports are mapped to your local host, assuming you stick to the default port numbers.
