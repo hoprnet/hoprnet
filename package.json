@@ -32,7 +32,7 @@
     "run:faucet:all": "yarn workspace @hoprnet/hopr-ethereum faucet --use-local-identities --identity-directory /tmp --identity-prefix local --password local --network localhost",
     "util:clean": "yarn workspaces foreach -pv run rimraf node_modules/@hoprnet",
     "docs:generate": "yarn workspaces foreach -pv run docs:generate",
-    "clean": "yarn workspaces foreach run clean && rimraf node_modules && rimraf packages/*/node_modules"
+    "clean": "yarn workspaces foreach run clean && rimraf packages/*/node_modules && rimraf node_modules"
   },
   "devDependencies": {
     "@ethersproject/cli": "5.5.0",
