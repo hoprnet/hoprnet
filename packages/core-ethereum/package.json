@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.81.0-next.15",
+  "version": "1.83.0-next.36",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -9,51 +9,42 @@
   "main": "lib/index.js",
   "scripts": {
     "clean": "rimraf ./lib",
-    "test": "mocha --exit",
+    "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc",
-    "prepublishOnly": "yarn build",
+    "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
   },
   "engines": {
-    "node": "16",
-    "yarn": "1"
+    "node": "16"
   },
   "files": [
-    "lib",
-    "!**/*.spec.ts",
-    "!**/*.spec.d.ts",
-    "!**/*.spec.js",
-    "!**/*.spec.js.map"
+    "lib"
   ],
   "dependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "async-mutex": "^0.3.2",
     "bn.js": "5.2.0",
-    "chalk": "^4.1.0",
-    "debug": "^4.3.1",
-    "ethers": "5.4.7",
-    "heap-js": "^2.1.2",
+    "chalk": "^4.1.2",
+    "debug": "^4.3.2",
+    "ethers": "5.5.1",
+    "heap-js": "^2.1.6",
     "multiaddr": "^10.0.0",
     "peer-id": "0.15.3",
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
-    "chai": "^4.3.4",
-    "chai-as-promised": "^7.1.1",
-    "it-pipe": "^1.1.0",
-    "levelup": "5.1.1",
-    "memdown": "6.1.1",
-    "mocha": "9.1.2",
-    "rimraf": "^3.0.2",
-    "sinon": "^11.0.0",
-    "ts-generator": "^0.1.1",
-    "ts-node": "^10.1.0",
-    "typedoc": "0.21.9",
-    "typedoc-plugin-markdown": "3.10.4",
-    "typescript": "4.4.3"
+    "chai": "4.3.4",
+    "chai-as-promised": "7.1.1",
+    "mocha": "9.1.3",
+    "rimraf": "3.0.2",
+    "sinon": "11.1.2",
+    "ts-node": "10.4.0",
+    "typedoc": "0.22.7",
+    "typedoc-plugin-markdown": "3.11.3",
+    "typescript": "4.4.4"
   },
   "mocha": {
     "extension": [

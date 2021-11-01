@@ -1,4 +1,4 @@
-[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / MintableToken__factory
+[@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / MintableToken\_\_factory
 
 # Class: MintableToken\_\_factory
 
@@ -39,13 +39,13 @@
 
 ### constructor
 
-• **new MintableToken__factory**(`signer?`)
+• **new MintableToken__factory**(...`args`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | `Signer` |
+| `...args` | [contractInterface: ContractInterface, bytecode: BytesLike \| Object, signer?: Signer] \| [signer: Signer] |
 
 #### Overrides
 
@@ -67,7 +67,7 @@ ContractFactory.bytecode
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:135
+node_modules/@ethersproject/contracts/lib/index.d.ts:137
 
 ___
 
@@ -81,7 +81,7 @@ ContractFactory.interface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:134
+node_modules/@ethersproject/contracts/lib/index.d.ts:136
 
 ___
 
@@ -95,17 +95,17 @@ ContractFactory.signer
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:136
+node_modules/@ethersproject/contracts/lib/index.d.ts:138
 
 ___
 
 ### abi
 
-▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `constant`: `boolean` = false; `inputs`: { `name`: `string` = "\_spender"; `type`: `string` = "address" }[] ; `name`: `string` = "approve"; `outputs`: { `name`: `string` = ""; `type`: `string` = "bool" }[] ; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" } \| { `anonymous`: `boolean` = false; `constant`: `undefined` = true; `inputs`: { `indexed`: `boolean` = true; `name`: `string` = "to"; `type`: `string` = "address" }[] ; `name`: `string` = "Mint"; `outputs`: `undefined` ; `payable`: `undefined` = false; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" })[]
+▪ `Static` `Readonly` **abi**: ({ `anonymous`: `undefined` = false; `constant`: `boolean` = false; `inputs`: { `name`: `string` = "\_spender"; `type`: `string` = "address" }[] ; `name`: `string` = "approve"; `outputs`: { `name`: `string` = ""; `type`: `string` = "bool" }[] ; `payable`: `boolean` = false; `stateMutability`: `string` = "nonpayable"; `type`: `string` = "function" } \| { `anonymous`: `boolean` = false; `constant`: `undefined` = true; `inputs`: { `indexed`: `boolean` = true; `name`: `string` = "to"; `type`: `string` = "address" }[] ; `name`: `string` = "Mint"; `outputs`: `undefined` ; `payable`: `undefined` = false; `stateMutability`: `undefined` = "view"; `type`: `string` = "event" })[] = `_abi`
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:396
+packages/ethereum/types/factories/MintableToken__factory.ts:402
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:395
+packages/ethereum/types/factories/MintableToken__factory.ts:401
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:389
+packages/ethereum/types/factories/MintableToken__factory.ts:395
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:392
+packages/ethereum/types/factories/MintableToken__factory.ts:398
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:379
+packages/ethereum/types/factories/MintableToken__factory.ts:385
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:384
+packages/ethereum/types/factories/MintableToken__factory.ts:390
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:400
+packages/ethereum/types/factories/MintableToken__factory.ts:406
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:397
+packages/ethereum/types/factories/MintableToken__factory.ts:403
 
 ___
 
@@ -271,7 +271,7 @@ ContractFactory.fromSolidity
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:144
+node_modules/@ethersproject/contracts/lib/index.d.ts:146
 
 ___
 
@@ -297,7 +297,7 @@ ContractFactory.getContract
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:150
+node_modules/@ethersproject/contracts/lib/index.d.ts:152
 
 ___
 
@@ -323,7 +323,7 @@ ContractFactory.getContractAddress
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:146
+node_modules/@ethersproject/contracts/lib/index.d.ts:148
 
 ___
 
@@ -347,4 +347,4 @@ ContractFactory.getInterface
 
 #### Defined in
 
-node_modules/@ethersproject/contracts/lib/index.d.ts:145
+node_modules/@ethersproject/contracts/lib/index.d.ts:147

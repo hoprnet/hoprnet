@@ -41,7 +41,7 @@
 
 ### SIZE
 
-▪ `Static` **SIZE**: `number`
+▪ `Static` **SIZE**: `number` = `SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH`
 
 #### Defined in
 

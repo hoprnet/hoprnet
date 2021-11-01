@@ -39,12 +39,14 @@ declare tmp="/tmp"
 [[ -d "${tmp}" && -h "${tmp}" ]] && tmp="/var/tmp"
 [[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
 
-declare node1_dir="${tmp}/hopr-source-node-1"
-declare node2_dir="${tmp}/hopr-source-node-2"
-declare node3_dir="${tmp}/hopr-source-node-3"
-declare node4_dir="${tmp}/hopr-source-node-4"
-declare node5_dir="${tmp}/hopr-source-node-5"
-declare node6_dir="${tmp}/hopr-source-node-6"
+declare node_prefix="hopr-source-node"
+
+declare node1_dir="${tmp}/${node_prefix}-1"
+declare node2_dir="${tmp}/${node_prefix}-2"
+declare node3_dir="${tmp}/${node_prefix}-3"
+declare node4_dir="${tmp}/${node_prefix}-4"
+declare node5_dir="${tmp}/${node_prefix}-5"
+declare node6_dir="${tmp}/${node_prefix}-6"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -59,6 +61,8 @@ declare node3_id="${node3_dir}.id"
 declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
+
+declare password="e2e-test"
 
 declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 
@@ -117,7 +121,7 @@ function setup_node() {
     --host="127.0.0.1:${node_port}" \
     --identity="${id}" \
     --init \
-    --password="e2e-test" \
+    --password="${password}" \
     --provider=http://127.0.0.1:8545/ \
     --rest \
     --restPort "${rest_port}" \
@@ -126,28 +130,6 @@ function setup_node() {
     --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
-
-  wait_for_http_port "${rest_port}" "127.0.0.1" "${log}" "${wait_delay}" "${wait_max_wait}"
-}
-
-# $1 = rest port
-# $2 = node log file
-function fund_node() {
-  local rest_port=${1}
-  local log=${2}
-  local api="127.0.0.1:${rest_port}"
-
-  local eth_address
-  eth_address="$(curl --silent "${api}/api/v1/address/hopr")"
-
-  if [ -z "${eth_address}" ]; then
-    log "Can't fund node - couldn't load ETH address"
-    exit 1
-  fi
-
-  log "Funding 1 ETH and 10 HOPR to ${eth_address}"
-  yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-    --address "${eth_address}" --network localhost --ishopraddress true --amount 10
 }
 
 # --- Log test info {{{
@@ -196,14 +178,19 @@ ensure_port_is_free 19095
 ensure_port_is_free 19096
 # }}}
 
+# --- Cleanup old deployments to localhost {{{
+log "Removing artifacts from old deployments to localhost"
+rm -Rfv packages/ethereum/deployments/*/localhost
+# }}}
+
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
 DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
+wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server" 
 log "Hardhat node started (127.0.0.1:8545)"
-wait_for_http_port 8545 "127.0.0.1" "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
@@ -215,21 +202,31 @@ setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
 # }}}
 
+#  --- Wait until started --- {{{
+# Wait until node has recovered its private key
+wait_for_regex ${node1_log} "using blockchain address"
+wait_for_regex ${node2_log} "using blockchain address"
+wait_for_regex ${node3_log} "using blockchain address"
+wait_for_regex ${node4_log} "using blockchain address"
+wait_for_regex ${node5_log} "using blockchain address"
+wait_for_regex ${node6_log} "using blockchain address"
+# }}}
+
 #  --- Fund nodes --- {{{
-fund_node 13301 "${node1_log}"
-fund_node 13302 "${node2_log}"
-fund_node 13303 "${node3_log}"
-fund_node 13304 "${node4_log}"
-fund_node 13305 "${node5_log}"
-fund_node 13306 "${node6_log}"
+yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+  --identity-prefix "${node_prefix}" \
+  --identity-directory "${tmp}" \
+  --use-local-identities \
+  --network localhost \
+  --password "${password}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_port 19091 "127.0.0.1" "${node1_log}"
-wait_for_port 19092 "127.0.0.1" "${node2_log}"
-wait_for_port 19093 "127.0.0.1" "${node3_log}"
-wait_for_port 19094 "127.0.0.1" "${node4_log}"
-wait_for_port 19095 "127.0.0.1" "${node5_log}"
+wait_for_regex ${node1_log} "STARTED NODE"
+wait_for_regex ${node2_log} "STARTED NODE"
+wait_for_regex ${node3_log} "STARTED NODE"
+wait_for_regex ${node4_log} "STARTED NODE"
+wait_for_regex ${node5_log} "STARTED NODE"
 # no need to wait for node 6 since that will stop right away
 # }}}
 
@@ -245,7 +242,7 @@ ${mydir}/../test/integration-test.sh \
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
-grep -E "^HOPR Balance: +10 HOPR$" "${node6_log}"
+grep -E "^HOPR Balance: +10 txHOPR$" "${node6_log}"
 grep -E "^ETH Balance: +1 xDAI$" "${node6_log}"
 grep -E "^Running on: localhost$" "${node6_log}"
 # }}}

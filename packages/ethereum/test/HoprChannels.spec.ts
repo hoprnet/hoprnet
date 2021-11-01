@@ -1,5 +1,4 @@
 import type { Wallet } from '@ethersproject/wallet'
-import type { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import BN from 'bn.js'
@@ -28,10 +27,11 @@ import {
   AcknowledgedTicket,
   PublicKey,
   generateChannelId,
-  ChannelStatus,
-  PromiseValue
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
-import { BigNumber } from 'ethers'
+import type { PromiseValue } from '@hoprnet/hopr-utils'
+import { BigNumber, utils } from 'ethers'
+import type { providers } from 'ethers'
 
 type TicketValues = {
   recipient: string
@@ -170,19 +170,26 @@ const MULTI_ADDR = []
 
 // recover the public key from the signer passed by ethers
 // could not find a way to get the public key through the API
-const recoverPublicKeyFromSigner = async (deployer: SignerWithAddress): Promise<PublicKey> => {
-  const msg = 'hello'
-  const sig = await deployer.signMessage(msg)
-  const msgHash = ethers.utils.hashMessage(msg)
-  const msgHashBytes = ethers.utils.arrayify(msgHash)
-  return PublicKey.fromUncompressedPubKey(ethers.utils.arrayify(ethers.utils.recoverPublicKey(msgHashBytes, sig)))
+const recoverPublicKeyFromSigner = async (deployer: providers.JsonRpcSigner): Promise<PublicKey> => {
+  const tx = await deployer.populateTransaction({
+    to: await deployer.getAddress(),
+    value: 0
+  })
+
+  // Wrong typing of nonce
+  // @ts-ignore
+  const hash = ethers.utils.keccak256(utils.serializeTransaction(tx))
+  const txReceipt = await deployer.sendTransaction(tx)
+
+  return PublicKey.fromSignature(hash, txReceipt.r, txReceipt.s, txReceipt.v)
 }
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
 const useFixtures = deployments.createFixture(
   async (_, ops: { skipAnnounceForAccountA: boolean; skipAnnounceForAccountB: boolean }) => {
-    const [deployer] = await ethers.getSigners()
+    const deployer = ethers.provider.getSigner()
+
     const deployerPubKey = await recoverPublicKeyFromSigner(deployer)
     const accountA = new ethers.Wallet(ACCOUNT_A.privateKey).connect(ethers.provider)
     const accountAPubKey = PublicKey.fromPrivKey(ethers.utils.arrayify(accountA.privateKey))
@@ -197,7 +204,7 @@ const useFixtures = deployments.createFixture(
 
     // create deployer the minter
     const minterRole = await token.MINTER_ROLE()
-    await token.connect(deployer).grantRole(minterRole, deployer.address)
+    await token.connect(deployer).grantRole(minterRole, await deployer.getAddress())
 
     const fundEther = async (addr, amount) => await deployer.sendTransaction({ to: addr, value: amount })
 
@@ -260,7 +267,7 @@ describe('announce user', function () {
 
     await expect(channels.connect(deployer).announce(deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR))
       .to.emit(channels, 'Announcement')
-      .withArgs(deployer.address, deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR)
+      .withArgs(await deployer.getAddress(), deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR)
   })
 
   it('should fail to announce user', async function () {
@@ -495,7 +502,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
     await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2) // TODO secret per account
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    blockTimestamp = (await ethers.provider.getBlock(ethers.provider.getBlockNumber())).timestamp
+    blockTimestamp = (await ethers.provider.getBlock('latest')).timestamp
   })
 
   it('should redeem ticket for account A', async function () {

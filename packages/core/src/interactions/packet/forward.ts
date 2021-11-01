@@ -1,33 +1,35 @@
 import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages'
-import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import type PeerId from 'peer-id'
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
 import { debug } from '@hoprnet/hopr-utils'
+import type { SendMessage, Subscribe } from '../../index'
 
 const log = debug('hopr-core:packet:forward')
+const error = debug('hopr-core:packet:forward:error')
 
 const FORWARD_TIMEOUT = durations.seconds(6)
 
 export class PacketForwardInteraction {
-  private mixer: Mixer
+  protected mixer: Mixer
 
   constructor(
-    private subscribe: any,
-    private sendMessage: any,
+    private subscribe: Subscribe,
+    private sendMessage: SendMessage,
     private privKey: PeerId,
-    private chain: HoprCoreEthereum,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB
   ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
-    this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this))
+    this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this), false, (err: any) => {
+      error(`Error while receiving packet`, err)
+    })
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
-    await this.sendMessage(counterparty, PROTOCOL_STRING, packet.serialize(), {
+    await this.sendMessage(counterparty, PROTOCOL_STRING, packet.serialize(), false, {
       timeout: FORWARD_TIMEOUT
     })
   }
@@ -43,17 +45,33 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
-    } else {
-      await packet.storeUnacknowledgedTicket(this.db)
-      try {
-        await packet.forwardTransform(this.privKey, this.chain)
-        await this.interact(pubKeyToPeerId(packet.nextHop), packet)
-      } catch (e) {
-        // Errors include:
-        // - not knowing about the channel in our db, because the
-        //   indexer is not caught up yet.
-        log('error while transforming packet, packet is dropped', e)
-      }
+      sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
+      // Nothing else to do
+      return
+    }
+
+    // Packet should be forwarded
+    try {
+      await packet.validateUnacknowledgedTicket(this.db)
+    } catch (err) {
+      log(`Ticket validation failed. Dropping packet`, err)
+      return
+    }
+
+    await packet.storeUnacknowledgedTicket(this.db)
+
+    try {
+      await packet.forwardTransform(this.privKey, this.db)
+    } catch (err) {
+      log(`Packet transformation failed. Dropping packet`, err)
+      return
+    }
+
+    try {
+      await this.interact(pubKeyToPeerId(packet.nextHop), packet)
+    } catch (err) {
+      log(`Forwarding transformed packet failed.`, err)
+      return
     }
 
     sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)

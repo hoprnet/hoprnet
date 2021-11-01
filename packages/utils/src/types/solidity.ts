@@ -19,16 +19,22 @@ class UINT256 {
     return `0x${this.bn.toString('hex', 2 * UINT256.SIZE)}`
   }
 
+  public eq(b: UINT256): boolean {
+    return this.toBN().eq(b.toBN())
+  }
+
   static fromString(str: string): UINT256 {
     return new UINT256(new BN(str))
   }
 
   static fromInverseProbability(inverseProb: BN): UINT256 {
-    if (inverseProb.isZero() || inverseProb.isNeg()) {
-      throw Error('Inverse probability must be strictly greater than zero')
+    if (inverseProb.isNeg()) {
+      throw Error('Inverse probability must not be negative')
     }
 
-    return new UINT256(new BN(new Uint8Array(UINT256.SIZE).fill(0xff)).div(inverseProb))
+    const highestWinProb = new BN(new Uint8Array(UINT256.SIZE).fill(0xff))
+    if (inverseProb.isZero()) return new UINT256(highestWinProb)
+    return new UINT256(highestWinProb.div(inverseProb))
   }
 
   static get DUMMY_INVERSE_PROBABILITY(): UINT256 {

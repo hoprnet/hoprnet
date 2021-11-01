@@ -6,7 +6,6 @@
 
 ### Classes
 
-- [Channel](classes/Channel.md)
 - [ChannelEntry](classes/ChannelEntry.md)
 - [Indexer](classes/Indexer.md)
 - [default](classes/default.md)
@@ -22,7 +21,10 @@
 
 ### Functions
 
+- [bumpCommitment](modules.md#bumpcommitment)
 - [createChainWrapper](modules.md#createchainwrapper)
+- [findCommitmentPreImage](modules.md#findcommitmentpreimage)
+- [initializeCommitment](modules.md#initializecommitment)
 
 ## Type aliases
 
@@ -32,13 +34,13 @@
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L27)
+[packages/core-ethereum/src/index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L28)
 
 ## Variables
 
 ### CONFIRMATIONS
 
-• `Const` **CONFIRMATIONS**: ``8``
+• **CONFIRMATIONS**: ``8``
 
 #### Defined in
 
@@ -48,13 +50,34 @@ ___
 
 ### INDEXER\_BLOCK\_RANGE
 
-• `Const` **INDEXER\_BLOCK\_RANGE**: ``2000``
+• **INDEXER\_BLOCK\_RANGE**: ``2000``
 
 #### Defined in
 
 [packages/core-ethereum/src/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L9)
 
 ## Functions
+
+### bumpCommitment
+
+▸ **bumpCommitment**(`db`, `channelId`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `db` | `HoprDB` |
+| `channelId` | `Hash` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L39)
+
+___
 
 ### createChainWrapper
 
@@ -75,3 +98,47 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/ethereum.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L40)
+
+___
+
+### findCommitmentPreImage
+
+▸ **findCommitmentPreImage**(`db`, `channelId`): `Promise`<`Hash`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `db` | `HoprDB` |
+| `channelId` | `Hash` |
+
+#### Returns
+
+`Promise`<`Hash`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L24)
+
+___
+
+### initializeCommitment
+
+▸ **initializeCommitment**(`db`, `channelId`, `getChainCommitment`, `setChainCommitment`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `db` | `HoprDB` |
+| `channelId` | `Hash` |
+| `getChainCommitment` | `GetCommitment` |
+| `setChainCommitment` | `SetCommitment` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L60)

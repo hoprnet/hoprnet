@@ -91,13 +91,9 @@
 - [ContractData](modules.md#contractdata)
 - [ContractNames](modules.md#contractnames)
 - [DeploymentTypes](modules.md#deploymenttypes)
-- [GetARGsTypeFromFactory](modules.md#getargstypefromfactory)
-- [GetContractTypeFromFactory](modules.md#getcontracttypefromfactory)
-- [MinEthersFactory](modules.md#minethersfactory)
 - [NetworkTag](modules.md#networktag)
 - [Networks](modules.md#networks)
 - [PublicNetworks](modules.md#publicnetworks)
-- [TypedListener](modules.md#typedlistener)
 
 ### Variables
 
@@ -141,64 +137,14 @@ ___
 
 Ƭ **DeploymentTypes**: ``"testing"`` \| ``"development"`` \| ``"staging"`` \| ``"production"``
 
-#### Defined in
-
-[packages/ethereum/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L5)
-
-___
-
-### GetARGsTypeFromFactory
-
-Ƭ **GetARGsTypeFromFactory**<`F`\>: `F` extends [`MinEthersFactory`](modules.md#minethersfactory)<`any`, `any`\> ? `Parameters`<`F`[``"deploy"``]\> : `never`
-
-#### Type parameters
-
-| Name |
-| :------ |
-| `F` |
+testing = for ganache / hardhat powered chains which do not auto mine
+development = chains which automine - may or may not be public chains
+staging = chain should be treated as production chain
+production = our current production chain
 
 #### Defined in
 
-packages/ethereum/types/commons.ts:34
-
-___
-
-### GetContractTypeFromFactory
-
-Ƭ **GetContractTypeFromFactory**<`F`\>: `F` extends [`MinEthersFactory`](modules.md#minethersfactory)<infer C, `any`\> ? `C` : `never`
-
-#### Type parameters
-
-| Name |
-| :------ |
-| `F` |
-
-#### Defined in
-
-packages/ethereum/types/commons.ts:28
-
-___
-
-### MinEthersFactory
-
-Ƭ **MinEthersFactory**<`C`, `ARGS`\>: `Object`
-
-#### Type parameters
-
-| Name |
-| :------ |
-| `C` |
-| `ARGS` |
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `deploy` | (...`a`: `ARGS`[]) => `Promise`<`C`\> |
-
-#### Defined in
-
-packages/ethereum/types/commons.ts:25
+[packages/ethereum/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L12)
 
 ___
 
@@ -208,7 +154,7 @@ ___
 
 #### Defined in
 
-[packages/ethereum/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L6)
+[packages/ethereum/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L13)
 
 ___
 
@@ -230,46 +176,15 @@ ___
 
 [packages/ethereum/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L3)
 
-___
-
-### TypedListener
-
-Ƭ **TypedListener**<`EventArgsArray`, `EventArgsObject`\>: (...`listenerArg`: [...EventArgsArray, [`TypedEvent`](interfaces/TypedEvent.md)<`EventArgsArray` & `EventArgsObject`\>]) => `void`
-
-#### Type parameters
-
-| Name | Type |
-| :------ | :------ |
-| `EventArgsArray` | extends `any`[] |
-| `EventArgsObject` | `EventArgsObject` |
-
-#### Type declaration
-
-▸ (...`listenerArg`): `void`
-
-##### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `...listenerArg` | [...EventArgsArray, [`TypedEvent`](interfaces/TypedEvent.md)<`EventArgsArray` & `EventArgsObject`\>] |
-
-##### Returns
-
-`void`
-
-#### Defined in
-
-packages/ethereum/types/commons.ts:15
-
 ## Variables
 
 ### networks
 
-• `Const` **networks**: { [network in PublicNetworks]: object}
+• **networks**: { [network in PublicNetworks]: Object }
 
 #### Defined in
 
-[packages/ethereum/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L8)
+[packages/ethereum/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L15)
 
 ## Functions
 

@@ -10,14 +10,14 @@ import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
 // rest
-import { HardhatUserConfig, task, types, extendEnvironment, extendConfig } from 'hardhat/config'
+import { HardhatUserConfig, task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
 import { networks, NetworkTag } from './constants'
+import fs from 'fs'
 
 const {
   DEPLOYER_WALLET_PRIVATE_KEY,
   ETHERSCAN_KEY,
   INFURA_KEY,
-  QUIKNODE_KEY,
   DEVELOPMENT = false,
   ENVIRONMENT_ID = 'default'
 } = process.env
@@ -60,14 +60,14 @@ const hardhatConfig: HardhatUserConfig = {
     xdai: {
       ...networks.xdai,
       live: true,
-      tags: ['production'] as NetworkTag[],
+      tags: ['development'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
-      url: `https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/`,
+      url: `https://provider-proxy.hoprnet.workers.dev/xdai_mainnet`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     },
     mumbai: {
       ...networks.mumbai,
-      live: false,
+      live: true,
       tags: ['development'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
@@ -76,7 +76,7 @@ const hardhatConfig: HardhatUserConfig = {
     polygon: {
       ...networks.polygon,
       live: true,
-      tags: ['testing'] as NetworkTag[],
+      tags: ['development'] as NetworkTag[],
       url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
       accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     }
@@ -85,7 +85,7 @@ const hardhatConfig: HardhatUserConfig = {
     deployer: 0
   },
   solidity: {
-    compilers: ['0.8.3', '0.6.6', '0.4.24'].map<SolcUserConfig>((version) => ({
+    compilers: ['0.8.9', '0.6.6', '0.4.24'].map<SolcUserConfig>((version) => ({
       version,
       settings: {
         optimizer: {
@@ -112,20 +112,137 @@ const hardhatConfig: HardhatUserConfig = {
   }
 }
 
-task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) => {
-  return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
-})
-  .addParam<string>('address', 'HoprToken address', undefined, types.string)
-  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', '1', types.string)
-  .addOptionalParam<boolean>(
-    'ishopraddress',
-    'Whether the address passed is a HOPR address or not',
-    false,
-    types.boolean
-  )
+const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
+const DEFAULT_FUND_AMOUNT = '1'
 
-task('accounts', 'View unlocked accounts', async (...args: any[]) => {
-  return (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
-})
+task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) =>
+  (await import('./tasks/faucet')).default(args[0], args[1], args[2])
+)
+  .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
+  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
+  .addFlag('useLocalIdentities', `Fund all identities stored in identity directory`)
+  .addOptionalParam<string>(
+    'password',
+    `Password to decrypt identities stored in identity directory`,
+    undefined,
+    types.string
+  )
+  .addOptionalParam<string>(
+    'identityDirectory',
+    `Overwrite default identity directory, default ['/tmp']`,
+    DEFAULT_IDENTITY_DIRECTORY,
+    types.string
+  )
+  .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
+
+task('accounts', 'View unlocked accounts', async (...args: any[]) =>
+  (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
+)
+
+function getSortedFiles(dependenciesGraph) {
+  const tsort = require('tsort')
+  const graph = tsort()
+
+  const filesMap = {}
+  const resolvedFiles = dependenciesGraph.getResolvedFiles()
+  resolvedFiles.forEach((f) => (filesMap[f.sourceName] = f))
+
+  for (const [from, deps] of dependenciesGraph.entries()) {
+    for (const to of deps) {
+      graph.add(to.sourceName, from.sourceName)
+    }
+  }
+
+  const topologicalSortedNames = graph.sort()
+
+  // If an entry has no dependency it won't be included in the graph, so we
+  // add them and then dedup the array
+  const withEntries = topologicalSortedNames.concat(resolvedFiles.map((f) => f.sourceName))
+
+  const sortedNames = [...new Set(withEntries)]
+  return sortedNames.map((n: number) => filesMap[n])
+}
+
+function getFileWithoutImports(resolvedFile) {
+  const IMPORT_SOLIDITY_REGEX = /^\s*import(\s+)[\s\S]*?;\s*$/gm
+
+  return resolvedFile.content.rawContent.replace(IMPORT_SOLIDITY_REGEX, '').trim()
+}
+
+subtask('flat:get-flattened-sources', 'Returns all contracts and their dependencies flattened')
+  .addOptionalParam('files', undefined, undefined, types.any)
+  .addOptionalParam('output', undefined, undefined, types.string)
+  .setAction(async ({ files, output }, { run }) => {
+    const dependencyGraph = await run('flat:get-dependency-graph', { files })
+    console.log(dependencyGraph)
+
+    let flattened = ''
+
+    if (dependencyGraph.getResolvedFiles().length === 0) {
+      return flattened
+    }
+
+    const sortedFiles = getSortedFiles(dependencyGraph)
+
+    let isFirst = true
+    for (const file of sortedFiles) {
+      if (!isFirst) {
+        flattened += '\n'
+      }
+      flattened += `// File ${file.getVersionedName()}\n`
+      flattened += `${getFileWithoutImports(file)}\n`
+
+      isFirst = false
+    }
+
+    // Remove every line started with "// SPDX-License-Identifier:"
+    flattened = flattened.replace(/SPDX-License-Identifier:/gm, 'License-Identifier:')
+
+    flattened = `// SPDX-License-Identifier: MIXED\n\n${flattened}`
+
+    // Remove every line started with "pragma experimental ABIEncoderV2;" except the first one
+    flattened = flattened.replace(
+      /pragma experimental ABIEncoderV2;\n/gm,
+      (
+        (i) => (m) =>
+          !i++ ? m : ''
+      )(0)
+    )
+
+    flattened = flattened.trim()
+    if (output) {
+      console.log('Writing to', output)
+      fs.writeFileSync(output, flattened)
+      return ''
+    }
+    return flattened
+  })
+
+subtask('flat:get-dependency-graph')
+  .addOptionalParam('files', undefined, undefined, types.any)
+  .setAction(async ({ files }, { run }) => {
+    const sourcePaths =
+      files === undefined ? await run('compile:solidity:get-source-paths') : files.map((f) => fs.realpathSync(f))
+
+    const sourceNames = await run('compile:solidity:get-source-names', {
+      sourcePaths
+    })
+
+    const dependencyGraph = await run('compile:solidity:get-dependency-graph', { sourceNames })
+
+    return dependencyGraph
+  })
+
+task('flat', 'Flattens and prints contracts and their dependencies')
+  .addOptionalVariadicPositionalParam('files', 'The files to flatten', undefined, types.inputFile)
+  .addOptionalParam('output', 'Specify the output file', undefined, types.string)
+  .setAction(async ({ files, output }, { run }) => {
+    console.log(
+      await run('flat:get-flattened-sources', {
+        files,
+        output
+      })
+    )
+  })
 
 export default hardhatConfig

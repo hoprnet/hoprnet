@@ -7,6 +7,7 @@
 ### Enumerations
 
 - [ChannelStatus](enums/ChannelStatus.md)
+- [DialStatus](enums/DialStatus.md)
 
 ### Classes
 
@@ -17,7 +18,6 @@
 - [Challenge](classes/Challenge.md)
 - [ChannelEntry](classes/ChannelEntry.md)
 - [CurvePoint](classes/CurvePoint.md)
-- [Defer](classes/Defer.md)
 - [EthereumChallenge](classes/EthereumChallenge.md)
 - [HalfKey](classes/HalfKey.md)
 - [HalfKeyChallenge](classes/HalfKeyChallenge.md)
@@ -42,15 +42,23 @@
 ### Type aliases
 
 - [AddressSorter](modules.md#addresssorter)
+- [DeferType](modules.md#defertype)
 - [DialOpts](modules.md#dialopts)
 - [DialResponse](modules.md#dialresponse)
 - [Hosts](modules.md#hosts)
 - [LibP2PHandlerArgs](modules.md#libp2phandlerargs)
 - [LibP2PHandlerFunction](modules.md#libp2phandlerfunction)
+- [Network](modules.md#network)
 - [PRGParameters](modules.md#prgparameters)
 - [PRPParameters](modules.md#prpparameters)
+- [PendingAckowledgement](modules.md#pendingackowledgement)
 - [PromiseValue](modules.md#promisevalue)
+- [TimeoutOpts](modules.md#timeoutopts)
 - [U8aAndSize](modules.md#u8aandsize)
+- [WaitingAsRelayer](modules.md#waitingasrelayer)
+- [WaitingAsSender](modules.md#waitingassender)
+- [libp2pSendMessage](modules.md#libp2psendmessage)
+- [libp2pSubscribe](modules.md#libp2psubscribe)
 
 ### Variables
 
@@ -61,6 +69,8 @@
 - [HASH\_LENGTH](modules.md#hash_length)
 - [INVERSE\_TICKET\_WIN\_PROB](modules.md#inverse_ticket_win_prob)
 - [LENGTH\_PREFIX\_LENGTH](modules.md#length_prefix_length)
+- [LINK\_LOCAL\_NETWORKS](modules.md#link_local_networks)
+- [LOOPBACK\_ADDRS](modules.md#loopback_addrs)
 - [MAX\_AUTO\_CHANNELS](modules.md#max_auto_channels)
 - [MINIMUM\_REASONABLE\_CHANNEL\_STAKE](modules.md#minimum_reasonable_channel_stake)
 - [MIN\_NATIVE\_BALANCE](modules.md#min_native_balance)
@@ -71,10 +81,12 @@
 - [PRG\_KEY\_LENGTH](modules.md#prg_key_length)
 - [PRICE\_PER\_PACKET](modules.md#price_per_packet)
 - [PRIVATE\_KEY\_LENGTH](modules.md#private_key_length)
+- [PRIVATE\_NETWORK](modules.md#private_network)
 - [PRP\_IV\_LENGTH](modules.md#prp_iv_length)
 - [PRP\_KEY\_LENGTH](modules.md#prp_key_length)
 - [PRP\_MIN\_LENGTH](modules.md#prp_min_length)
 - [PUBLIC\_KEY\_LENGTH](modules.md#public_key_length)
+- [RESERVED\_ADDRS](modules.md#reserved_addrs)
 - [SECP256K1\_CONSTANTS](modules.md#secp256k1_constants)
 - [SIGNATURE\_LENGTH](modules.md#signature_length)
 - [SIGNATURE\_RECOVERY\_LENGTH](modules.md#signature_recovery_length)
@@ -86,7 +98,9 @@
 
 ### Functions
 
+- [abortableTimeout](modules.md#abortabletimeout)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
+- [checkNetworks](modules.md#checknetworks)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
 - [createPacket](modules.md#createpacket)
@@ -94,7 +108,9 @@
 - [createPoRValuesForSender](modules.md#createporvaluesforsender)
 - [debug](modules.md#debug)
 - [decodePoRBytes](modules.md#decodeporbytes)
+- [defer](modules.md#defer)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
+- [deserializeKeyPair](modules.md#deserializekeypair)
 - [dial](modules.md#dial)
 - [forwardTransform](modules.md#forwardtransform)
 - [gcd](modules.md#gcd)
@@ -102,18 +118,29 @@
 - [generateKeyShares](modules.md#generatekeyshares)
 - [getB58String](modules.md#getb58string)
 - [getHeaderLength](modules.md#getheaderlength)
+- [getLocalAddresses](modules.md#getlocaladdresses)
+- [getLocalHosts](modules.md#getlocalhosts)
+- [getNetworkPrefix](modules.md#getnetworkprefix)
 - [getPacketLength](modules.md#getpacketlength)
+- [getPrivateAddresses](modules.md#getprivateaddresses)
+- [getPublicAddresses](modules.md#getpublicaddresses)
 - [hasB58String](modules.md#hasb58string)
+- [inSameNetwork](modules.md#insamenetwork)
+- [ipToU8aAddress](modules.md#iptou8aaddress)
+- [isAnyAddress](modules.md#isanyaddress)
 - [isErrorOutOfFunds](modules.md#iserroroutoffunds)
 - [isErrorOutOfHoprFunds](modules.md#iserroroutofhoprfunds)
 - [isErrorOutOfNativeFunds](modules.md#iserroroutofnativefunds)
 - [isExpired](modules.md#isexpired)
+- [isLinkLocaleAddress](modules.md#islinklocaleaddress)
+- [isLocalhost](modules.md#islocalhost)
 - [isMultiaddrLocal](modules.md#ismultiaddrlocal)
+- [isPrivateAddress](modules.md#isprivateaddress)
+- [isReservedAddress](modules.md#isreservedaddress)
 - [isSecp256k1PeerId](modules.md#issecp256k1peerid)
 - [iterateHash](modules.md#iteratehash)
 - [lengthPrefixedToU8a](modules.md#lengthprefixedtou8a)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
-- [libp2pSendMessageAndExpectResponse](modules.md#libp2psendmessageandexpectresponse)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 - [limitConcurrency](modules.md#limitconcurrency)
 - [localAddressesFirst](modules.md#localaddressesfirst)
@@ -121,6 +148,8 @@
 - [oneAtATime](modules.md#oneatatime)
 - [parseHosts](modules.md#parsehosts)
 - [parseJSON](modules.md#parsejson)
+- [pendingAcknowledgement](modules.md#pendingacknowledgement)
+- [pickVersion](modules.md#pickversion)
 - [preVerify](modules.md#preverify)
 - [privKeyToPeerId](modules.md#privkeytopeerid)
 - [pubKeyToPeerId](modules.md#pubkeytopeerid)
@@ -132,12 +161,15 @@
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
 - [retryWithBackoff](modules.md#retrywithbackoff)
 - [sampleGroupElement](modules.md#samplegroupelement)
+- [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
 - [stringToU8a](modules.md#stringtou8a)
 - [timeoutAfter](modules.md#timeoutafter)
 - [toLengthPrefixedU8a](modules.md#tolengthprefixedu8a)
+- [toNetworkPrefix](modules.md#tonetworkprefix)
 - [toU8a](modules.md#tou8a)
 - [u8aAdd](modules.md#u8aadd)
+- [u8aAddrToString](modules.md#u8aaddrtostring)
 - [u8aAllocate](modules.md#u8aallocate)
 - [u8aCompare](modules.md#u8acompare)
 - [u8aConcat](modules.md#u8aconcat)
@@ -147,7 +179,6 @@
 - [u8aToNumber](modules.md#u8atonumber)
 - [u8aToNumberOrBigInt](modules.md#u8atonumberorbigint)
 - [u8aXOR](modules.md#u8axor)
-- [unacknowledgedTicketKey](modules.md#unacknowledgedticketkey)
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
 - [validatePoRHint](modules.md#validateporhint)
 - [validatePoRResponse](modules.md#validateporresponse)
@@ -176,7 +207,31 @@
 
 #### Defined in
 
-[libp2p/addressSorters.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L37)
+[libp2p/addressSorters.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L63)
+
+___
+
+### DeferType
+
+Ƭ **DeferType**<`T`\>: `Object`
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `promise` | `Promise`<`T`\> |
+| `reject` | (`reason?`: `any`) => `void` |
+| `resolve` | (`value?`: `T` \| `PromiseLike`<`T`\>) => `void` |
+
+#### Defined in
+
+[async/defer.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/defer.ts#L1)
 
 ___
 
@@ -192,17 +247,17 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L97)
+[libp2p/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L93)
 
 ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
+Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  }
 
 #### Defined in
 
-[libp2p/index.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L101)
+[libp2p/dialHelper.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L35)
 
 ___
 
@@ -219,7 +274,7 @@ ___
 
 #### Defined in
 
-[hosts.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/hosts.ts#L6)
+[network/hosts.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L6)
 
 ___
 
@@ -237,17 +292,23 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:286](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L286)
+[libp2p/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L170)
 
 ___
 
 ### LibP2PHandlerFunction
 
-Ƭ **LibP2PHandlerFunction**: (`msg`: `Uint8Array`, `remotePeer`: `PeerId`) => `any`
+Ƭ **LibP2PHandlerFunction**<`T`\>: (`msg`: `Uint8Array`, `remotePeer`: `PeerId`) => `T`
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
 
 #### Type declaration
 
-▸ (`msg`, `remotePeer`): `any`
+▸ (`msg`, `remotePeer`): `T`
 
 ##### Parameters
 
@@ -258,11 +319,29 @@ ___
 
 ##### Returns
 
-`any`
+`T`
 
 #### Defined in
 
-[libp2p/index.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L287)
+[libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
+
+___
+
+### Network
+
+Ƭ **Network**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `family` | `NetworkInterfaceInfo`[``"family"``] |
+| `networkPrefix` | `Uint8Array` |
+| `subnet` | `Uint8Array` |
+
+#### Defined in
+
+[network/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L3)
 
 ___
 
@@ -300,6 +379,16 @@ ___
 
 ___
 
+### PendingAckowledgement
+
+Ƭ **PendingAckowledgement**: [`WaitingAsSender`](modules.md#waitingassender) \| [`WaitingAsRelayer`](modules.md#waitingasrelayer)
+
+#### Defined in
+
+[db.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L70)
+
+___
+
 ### PromiseValue
 
 Ƭ **PromiseValue**<`T`\>: `T` extends `PromiseLike`<infer U\> ? `U` : `T`
@@ -318,6 +407,23 @@ Infer the return value of a promise
 
 ___
 
+### TimeoutOpts
+
+Ƭ **TimeoutOpts**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `signal?` | `AbortSignal` |
+| `timeout` | `number` |
+
+#### Defined in
+
+[async/abortableTimeout.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L6)
+
+___
+
 ### U8aAndSize
 
 Ƭ **U8aAndSize**: [`Uint8Array`, `number`]
@@ -326,11 +432,92 @@ ___
 
 [u8a/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L20)
 
+___
+
+### WaitingAsRelayer
+
+Ƭ **WaitingAsRelayer**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `isMessageSender` | ``false`` |
+| `ticket` | [`UnacknowledgedTicket`](classes/UnacknowledgedTicket.md) |
+
+#### Defined in
+
+[db.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L65)
+
+___
+
+### WaitingAsSender
+
+Ƭ **WaitingAsSender**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `isMessageSender` | ``true`` |
+
+#### Defined in
+
+[db.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L61)
+
+___
+
+### libp2pSendMessage
+
+Ƭ **libp2pSendMessage**: (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`DialOpts`](modules.md#dialopts)) => `Promise`<`void`\> & (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`DialOpts`](modules.md#dialopts)) => `Promise`<`Uint8Array`[]\>
+
+Asks libp2p to establish a connection to another node and
+send message. If `includeReply` is set, wait for a response
+
+**`param`** libp2p instance
+
+**`param`** peer to connect to
+
+**`param`** protocol to speak
+
+**`param`** message to send
+
+**`param`** try to receive a reply
+
+**`param`** timeout
+
+#### Defined in
+
+[libp2p/index.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L108)
+
+___
+
+### libp2pSubscribe
+
+Ƭ **libp2pSubscribe**: (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
+
+Generates a handler that pulls messages out of a stream
+and feeds them to the given handler.
+
+**`param`** libp2p instance
+
+**`param`** protocol to dial
+
+**`param`** called once another node requests that protocol
+
+**`param`** handle stream pipeline errors
+
+**`param`** try to receive a reply
+
+#### Defined in
+
+[libp2p/index.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L240)
+
 ## Variables
 
 ### ADDRESS\_LENGTH
 
-• `Const` **ADDRESS\_LENGTH**: ``20``
+• **ADDRESS\_LENGTH**: ``20``
 
 #### Defined in
 
@@ -340,7 +527,7 @@ ___
 
 ### A\_EQUALS\_B
 
-• `Const` **A\_EQUALS\_B**: ``0``
+• **A\_EQUALS\_B**: ``0``
 
 #### Defined in
 
@@ -350,7 +537,7 @@ ___
 
 ### A\_STRICLY\_LESS\_THAN\_B
 
-• `Const` **A\_STRICLY\_LESS\_THAN\_B**: ``-1``
+• **A\_STRICLY\_LESS\_THAN\_B**: ``-1``
 
 #### Defined in
 
@@ -360,7 +547,7 @@ ___
 
 ### A\_STRICTLY\_GREATER\_THAN\_B
 
-• `Const` **A\_STRICTLY\_GREATER\_THAN\_B**: ``1``
+• **A\_STRICTLY\_GREATER\_THAN\_B**: ``1``
 
 #### Defined in
 
@@ -370,7 +557,7 @@ ___
 
 ### HASH\_LENGTH
 
-• `Const` **HASH\_LENGTH**: ``32``
+• **HASH\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -380,7 +567,7 @@ ___
 
 ### INVERSE\_TICKET\_WIN\_PROB
 
-• `Const` **INVERSE\_TICKET\_WIN\_PROB**: `BN`
+• **INVERSE\_TICKET\_WIN\_PROB**: `BN`
 
 #### Defined in
 
@@ -390,7 +577,7 @@ ___
 
 ### LENGTH\_PREFIX\_LENGTH
 
-• `Const` **LENGTH\_PREFIX\_LENGTH**: ``4``
+• **LENGTH\_PREFIX\_LENGTH**: ``4``
 
 #### Defined in
 
@@ -398,9 +585,29 @@ ___
 
 ___
 
+### LINK\_LOCAL\_NETWORKS
+
+• **LINK\_LOCAL\_NETWORKS**: [`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/constants.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L40)
+
+___
+
+### LOOPBACK\_ADDRS
+
+• **LOOPBACK\_ADDRS**: [`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/constants.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L54)
+
+___
+
 ### MAX\_AUTO\_CHANNELS
 
-• `Const` **MAX\_AUTO\_CHANNELS**: ``5``
+• **MAX\_AUTO\_CHANNELS**: ``5``
 
 #### Defined in
 
@@ -410,7 +617,7 @@ ___
 
 ### MINIMUM\_REASONABLE\_CHANNEL\_STAKE
 
-• `Const` **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
+• **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
 
 #### Defined in
 
@@ -420,7 +627,7 @@ ___
 
 ### MIN\_NATIVE\_BALANCE
 
-• `Const` **MIN\_NATIVE\_BALANCE**: `BN`
+• **MIN\_NATIVE\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -430,7 +637,7 @@ ___
 
 ### MULTI\_ADDR\_MAX\_LENGTH
 
-• `Const` **MULTI\_ADDR\_MAX\_LENGTH**: ``200``
+• **MULTI\_ADDR\_MAX\_LENGTH**: ``200``
 
 #### Defined in
 
@@ -440,7 +647,7 @@ ___
 
 ### POR\_STRING\_LENGTH
 
-• `Const` **POR\_STRING\_LENGTH**: `number`
+• **POR\_STRING\_LENGTH**: `number`
 
 #### Defined in
 
@@ -450,7 +657,7 @@ ___
 
 ### PRG\_COUNTER\_LENGTH
 
-• `Const` **PRG\_COUNTER\_LENGTH**: ``4``
+• **PRG\_COUNTER\_LENGTH**: ``4``
 
 #### Defined in
 
@@ -460,7 +667,7 @@ ___
 
 ### PRG\_IV\_LENGTH
 
-• `Const` **PRG\_IV\_LENGTH**: ``12``
+• **PRG\_IV\_LENGTH**: ``12``
 
 #### Defined in
 
@@ -470,7 +677,7 @@ ___
 
 ### PRG\_KEY\_LENGTH
 
-• `Const` **PRG\_KEY\_LENGTH**: ``16``
+• **PRG\_KEY\_LENGTH**: ``16``
 
 #### Defined in
 
@@ -480,7 +687,7 @@ ___
 
 ### PRICE\_PER\_PACKET
 
-• `Const` **PRICE\_PER\_PACKET**: `BN`
+• **PRICE\_PER\_PACKET**: `BN`
 
 #### Defined in
 
@@ -490,7 +697,7 @@ ___
 
 ### PRIVATE\_KEY\_LENGTH
 
-• `Const` **PRIVATE\_KEY\_LENGTH**: ``32``
+• **PRIVATE\_KEY\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -498,9 +705,19 @@ ___
 
 ___
 
+### PRIVATE\_NETWORK
+
+• **PRIVATE\_NETWORK**: [`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L10)
+
+___
+
 ### PRP\_IV\_LENGTH
 
-• `Const` **PRP\_IV\_LENGTH**: `number`
+• **PRP\_IV\_LENGTH**: `number`
 
 #### Defined in
 
@@ -510,7 +727,7 @@ ___
 
 ### PRP\_KEY\_LENGTH
 
-• `Const` **PRP\_KEY\_LENGTH**: `number`
+• **PRP\_KEY\_LENGTH**: `number`
 
 #### Defined in
 
@@ -520,7 +737,7 @@ ___
 
 ### PRP\_MIN\_LENGTH
 
-• `Const` **PRP\_MIN\_LENGTH**: ``32``
+• **PRP\_MIN\_LENGTH**: ``32``
 
 #### Defined in
 
@@ -530,7 +747,7 @@ ___
 
 ### PUBLIC\_KEY\_LENGTH
 
-• `Const` **PUBLIC\_KEY\_LENGTH**: ``33``
+• **PUBLIC\_KEY\_LENGTH**: ``33``
 
 #### Defined in
 
@@ -538,9 +755,19 @@ ___
 
 ___
 
+### RESERVED\_ADDRS
+
+• **RESERVED\_ADDRS**: [`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/constants.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L67)
+
+___
+
 ### SECP256K1\_CONSTANTS
 
-• `Const` **SECP256K1\_CONSTANTS**: `Object`
+• **SECP256K1\_CONSTANTS**: `Object`
 
 Several ECDSA on secp256k1 related constants
 
@@ -562,7 +789,7 @@ ___
 
 ### SIGNATURE\_LENGTH
 
-• `Const` **SIGNATURE\_LENGTH**: ``64``
+• **SIGNATURE\_LENGTH**: ``64``
 
 #### Defined in
 
@@ -572,7 +799,7 @@ ___
 
 ### SIGNATURE\_RECOVERY\_LENGTH
 
-• `Const` **SIGNATURE\_RECOVERY\_LENGTH**: ``1``
+• **SIGNATURE\_RECOVERY\_LENGTH**: ``1``
 
 #### Defined in
 
@@ -582,7 +809,7 @@ ___
 
 ### SUGGESTED\_BALANCE
 
-• `Const` **SUGGESTED\_BALANCE**: `BN`
+• **SUGGESTED\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -592,7 +819,7 @@ ___
 
 ### SUGGESTED\_NATIVE\_BALANCE
 
-• `Const` **SUGGESTED\_NATIVE\_BALANCE**: `BN`
+• **SUGGESTED\_NATIVE\_BALANCE**: `BN`
 
 #### Defined in
 
@@ -602,7 +829,7 @@ ___
 
 ### UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH
 
-• `Const` **UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH**: ``66``
+• **UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH**: ``66``
 
 #### Defined in
 
@@ -612,19 +839,19 @@ ___
 
 ### b58StringRegex
 
-• `Const` **b58StringRegex**: `RegExp`
+• **b58StringRegex**: `RegExp`
 
 Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L26)
+[libp2p/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L25)
 
 ___
 
 ### durations
 
-• `Const` **durations**: `Object`
+• **durations**: `Object`
 
 #### Type declaration
 
@@ -640,6 +867,37 @@ ___
 [time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
 
 ## Functions
+
+### abortableTimeout
+
+▸ **abortableTimeout**<`Result`, `AbortMsg`, `TimeoutMsg`\>(`fn`, `abortMsg`, `timeoutMsg`, `opts`): `Promise`<`Result` \| `AbortMsg` \| `TimeoutMsg`\>
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `Result` |
+| `AbortMsg` |
+| `TimeoutMsg` |
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `fn` | (`opts`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Result`\> |
+| `abortMsg` | `AbortMsg` |
+| `timeoutMsg` | `TimeoutMsg` |
+| `opts` | [`TimeoutOpts`](modules.md#timeoutopts) |
+
+#### Returns
+
+`Promise`<`Result` \| `AbortMsg` \| `TimeoutMsg`\>
+
+#### Defined in
+
+[async/abortableTimeout.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L11)
+
+___
 
 ### cacheNoArgAsyncFunction
 
@@ -670,7 +928,35 @@ ___
 
 #### Defined in
 
-[cache.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/cache.ts#L8)
+[async/cache.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/cache.ts#L8)
+
+___
+
+### checkNetworks
+
+▸ **checkNetworks**(`networks`, `address`, `family`): `boolean`
+
+Checks if given address is in one of the given networks
+
+**`dev`** Used to check if a node is in the same network
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `networks` | [`Network`](modules.md#network)[] | network address spaces to check |
+| `address` | `Uint8Array` | ip address to check |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
+
+#### Returns
+
+`boolean`
+
+true if address is at least one of the given networks
+
+#### Defined in
+
+[network/addrs.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L72)
 
 ___
 
@@ -692,7 +978,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[libp2p/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L43)
+[libp2p/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L42)
 
 ___
 
@@ -714,7 +1000,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[libp2p/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L33)
+[libp2p/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L32)
 
 ___
 
@@ -868,6 +1154,26 @@ ___
 
 ___
 
+### defer
+
+▸ **defer**<`T`\>(): [`DeferType`](modules.md#defertype)<`T`\>
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Returns
+
+[`DeferType`](modules.md#defertype)<`T`\>
+
+#### Defined in
+
+[async/defer.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/defer.ts#L8)
+
+___
+
 ### deriveAckKeyShare
 
 ▸ **deriveAckKeyShare**(`secret`): [`HalfKey`](classes/HalfKey.md)
@@ -892,6 +1198,35 @@ relayer for transforming and delivering the packet
 
 ___
 
+### deserializeKeyPair
+
+▸ **deserializeKeyPair**(`serialized`, `password`, `useWeakCrypto?`): `Promise`<`DeserializationResponse`\>
+
+Deserializes an encoded key pair
+
+**`dev`** This method uses a computation and memory intensive hash function,
+     for testing set `useWeakCrypto = true`
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `serialized` | `Uint8Array` | `undefined` | encoded key pair |
+| `password` | `string` | `undefined` | password to use for decryption |
+| `useWeakCrypto` | `boolean` | `false` | use faster but weaker crypto to reconstruct key pair |
+
+#### Returns
+
+`Promise`<`DeserializationResponse`\>
+
+reconstructed key pair
+
+#### Defined in
+
+[crypto/keyPair.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L84)
+
+___
+
 ### dial
 
 ▸ **dial**(`libp2p`, `destination`, `protocol`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
@@ -904,10 +1239,10 @@ Contains a baseline protection against dialing same addresses twice.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `libp2p` | `LibP2P` | a libp2p instance |
+| `libp2p` | `Libp2p` | a libp2p instance |
 | `destination` | `PeerId` | PeerId of the destination |
 | `protocol` | `string` | - |
-| `opts?` | [`DialOpts`](modules.md#dialopts) |  |
+| `opts?` | `DialOpts` |  |
 
 #### Returns
 
@@ -915,7 +1250,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L129)
+[libp2p/dialHelper.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L170)
 
 ___
 
@@ -1044,7 +1379,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[libp2p/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L70)
+[libp2p/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L69)
 
 ___
 
@@ -1070,6 +1405,68 @@ ___
 
 ___
 
+### getLocalAddresses
+
+▸ **getLocalAddresses**(`_iface?`): [`Network`](modules.md#network)[]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `_iface?` | `string` |
+
+#### Returns
+
+[`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/addrs.ts:228](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L228)
+
+___
+
+### getLocalHosts
+
+▸ **getLocalHosts**(`_iface?`): [`Network`](modules.md#network)[]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `_iface?` | `string` |
+
+#### Returns
+
+[`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/addrs.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L239)
+
+___
+
+### getNetworkPrefix
+
+▸ **getNetworkPrefix**(`address`, `subnet`, `family`): `Uint8Array`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | `Uint8Array` |
+| `subnet` | `Uint8Array` |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` |
+
+#### Returns
+
+`Uint8Array`
+
+#### Defined in
+
+[network/addrs.ts:153](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L153)
+
+___
+
 ### getPacketLength
 
 ▸ **getPacketLength**(`maxHops`, `additionalDataRelayerLength`, `additionalDataLastHopLength`): `number`
@@ -1092,6 +1489,46 @@ ___
 
 ___
 
+### getPrivateAddresses
+
+▸ **getPrivateAddresses**(`_iface?`): [`Network`](modules.md#network)[]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `_iface?` | `string` |
+
+#### Returns
+
+[`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/addrs.ts:225](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L225)
+
+___
+
+### getPublicAddresses
+
+▸ **getPublicAddresses**(`_iface?`): [`Network`](modules.md#network)[]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `_iface?` | `string` |
+
+#### Returns
+
+[`Network`](modules.md#network)[]
+
+#### Defined in
+
+[network/addrs.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L232)
+
+___
+
 ### hasB58String
 
 ▸ **hasB58String**(`content`): `Boolean`
@@ -1110,7 +1547,78 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[libp2p/index.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L53)
+[libp2p/index.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L52)
+
+___
+
+### inSameNetwork
+
+▸ **inSameNetwork**(`address`, `networkPrefix`, `subnetMask`, `family`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | `Uint8Array` |
+| `networkPrefix` | `Uint8Array` |
+| `subnetMask` | `Uint8Array` |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[network/addrs.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L166)
+
+___
+
+### ipToU8aAddress
+
+▸ **ipToU8aAddress**(`address`, `family`): `Uint8Array`
+
+Converts ip address string to Uint8Arrays
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `address` | `string` | ip address as string, e.g. 192.168.12.34 |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
+
+#### Returns
+
+`Uint8Array`
+
+Byte representation of the given ip address
+
+#### Defined in
+
+[network/addrs.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L94)
+
+___
+
+### isAnyAddress
+
+▸ **isAnyAddress**(`address`, `family`): `boolean`
+
+Checks if given address is any address
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `address` | `string` | ip address to check |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[network/addrs.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L13)
 
 ___
 
@@ -1130,7 +1638,7 @@ ___
 
 #### Defined in
 
-[ethereum.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L17)
+[ethereum/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L17)
 
 ___
 
@@ -1150,7 +1658,7 @@ ___
 
 #### Defined in
 
-[ethereum.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L11)
+[ethereum/index.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L11)
 
 ___
 
@@ -1170,7 +1678,7 @@ ___
 
 #### Defined in
 
-[ethereum.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum.ts#L6)
+[ethereum/index.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L6)
 
 ___
 
@@ -1200,23 +1708,127 @@ true if it's expired
 
 ___
 
-### isMultiaddrLocal
+### isLinkLocaleAddress
 
-▸ **isMultiaddrLocal**(`multiaddr`): `boolean`
+▸ **isLinkLocaleAddress**(`address`, `family`): `boolean`
+
+Checks if given address is link-locale address
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `multiaddr` | `Multiaddr` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `address` | `Uint8Array` | ip address to check |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
 
 #### Returns
 
 `boolean`
 
+true if is link-locale address
+
 #### Defined in
 
-[libp2p/addressSorters.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L5)
+[network/addrs.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L50)
+
+___
+
+### isLocalhost
+
+▸ **isLocalhost**(`address`, `family`): `boolean`
+
+Checks if given address is a loopback address (localhost)
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `address` | `Uint8Array` | ip address to check |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
+
+#### Returns
+
+`boolean`
+
+true if localhost
+
+#### Defined in
+
+[network/addrs.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L30)
+
+___
+
+### isMultiaddrLocal
+
+▸ **isMultiaddrLocal**(`multiaddr`): `boolean`
+
+Checks if given Multiaddr encodes a private address
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `multiaddr` | `Multiaddr` | multiaddr to check |
+
+#### Returns
+
+`boolean`
+
+true if address is a private ip address
+
+#### Defined in
+
+[libp2p/addressSorters.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L11)
+
+___
+
+### isPrivateAddress
+
+▸ **isPrivateAddress**(`address`, `family`): `boolean`
+
+Checks if given address is a private address
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `address` | `Uint8Array` | ip address to check |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
+
+#### Returns
+
+`boolean`
+
+true if private address
+
+#### Defined in
+
+[network/addrs.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L40)
+
+___
+
+### isReservedAddress
+
+▸ **isReservedAddress**(`address`, `family`): `boolean`
+
+Checks if given address is a reserved address
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `address` | `Uint8Array` | ip address to check |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
+
+#### Returns
+
+`boolean`
+
+true if address is a reserved address
+
+#### Defined in
+
+[network/addrs.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L60)
 
 ___
 
@@ -1240,7 +1852,7 @@ whether embedded privKey is a secp256k1 key
 
 #### Defined in
 
-[libp2p/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L86)
+[libp2p/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L85)
 
 ___
 
@@ -1252,11 +1864,11 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `seed` | `Uint8Array` \| `undefined` |
+| `seed` | `Uint8Array` |
 | `hashFunc` | (`preImage`: `Uint8Array`) => `Uint8Array` |
 | `iterations` | `number` |
 | `stepSize` | `number` |
-| `hint?` | (`index`: `number`) => `Uint8Array` \| `undefined` \| `Promise`<`Uint8Array` \| `undefined`\> |
+| `hint?` | (`index`: `number`) => `Uint8Array` \| `Promise`<`Uint8Array`\> |
 
 #### Returns
 
@@ -1294,63 +1906,41 @@ ___
 
 ### libp2pSendMessage
 
-▸ **libp2pSendMessage**(`libp2p`, `destination`, `protocol`, `message`, `opts?`): `Promise`<`void`\>
+▸ **libp2pSendMessage**(`libp2p`, `destination`, `protocol`, `message`, `includeReply`, `opts?`): `Promise`<`void` \| `Uint8Array`[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `libp2p` | `LibP2P` |
+| `libp2p` | `Libp2p` |
 | `destination` | `PeerId` |
 | `protocol` | `string` |
 | `message` | `Uint8Array` |
+| `includeReply` | `boolean` |
 | `opts?` | [`DialOpts`](modules.md#dialopts) |
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`<`void` \| `Uint8Array`[]\>
 
 #### Defined in
 
-[libp2p/index.ts:243](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L243)
-
-___
-
-### libp2pSendMessageAndExpectResponse
-
-▸ **libp2pSendMessageAndExpectResponse**(`libp2p`, `destination`, `protocol`, `message`, `opts?`): `Promise`<`Uint8Array`[]\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `libp2p` | `LibP2P` |
-| `destination` | `PeerId` |
-| `protocol` | `string` |
-| `message` | `Uint8Array` |
-| `opts?` | [`DialOpts`](modules.md#dialopts) |
-
-#### Returns
-
-`Promise`<`Uint8Array`[]\>
-
-#### Defined in
-
-[libp2p/index.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L259)
+[libp2p/index.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L125)
 
 ___
 
 ### libp2pSubscribe
 
-▸ **libp2pSubscribe**(`libp2p`, `protocol`, `handler`, `includeReply?`): `void`
+▸ **libp2pSubscribe**(`libp2p`, `protocol`, `handler`, `errHandler`, `includeReply?`): `void`
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `libp2p` | `LibP2P` | `undefined` |
+| `libp2p` | `Libp2p` | `undefined` |
 | `protocol` | `string` | `undefined` |
-| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction) | `undefined` |
+| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void` \| `Uint8Array`\>\> | `undefined` |
+| `errHandler` | `ErrHandler` | `undefined` |
 | `includeReply` | `boolean` | `false` |
 
 #### Returns
@@ -1359,7 +1949,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:322](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L322)
+[libp2p/index.ts:255](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L255)
 
 ___
 
@@ -1396,6 +1986,10 @@ ___
 
 ▸ **localAddressesFirst**(`addresses`): `Address`[]
 
+Take an array of addresses and sorts such that private addresses are first
+
+**`dev`** used to run Hopr locally
+
 #### Parameters
 
 | Name | Type |
@@ -1408,7 +2002,7 @@ ___
 
 #### Defined in
 
-[libp2p/addressSorters.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L33)
+[libp2p/addressSorters.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L59)
 
 ___
 
@@ -1420,7 +2014,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `amount` | `BigNumber` \| `string` \| `number` |
+| `amount` | `string` \| `number` \| `BigNumber` |
 | `position` | `number` |
 
 #### Returns
@@ -1455,7 +2049,7 @@ ___
 
 #### Defined in
 
-[concurrency.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/concurrency.ts#L8)
+[async/concurrency.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/concurrency.ts#L8)
 
 ___
 
@@ -1469,7 +2063,7 @@ ___
 
 #### Defined in
 
-[hosts.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/hosts.ts#L11)
+[network/hosts.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L11)
 
 ___
 
@@ -1492,6 +2086,50 @@ Parse JSON while recovering all Buffer elements
 #### Defined in
 
 [parseJSON.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/parseJSON.ts#L5)
+
+___
+
+### pendingAcknowledgement
+
+▸ `Const` **pendingAcknowledgement**(`halfKey`): `Uint8Array`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `halfKey` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+
+#### Returns
+
+`Uint8Array`
+
+#### Defined in
+
+[db.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L31)
+
+___
+
+### pickVersion
+
+▸ `Const` **pickVersion**(`full_version`): `string`
+
+Used by our network stack and deployment scripts to determine.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `full_version` | `string` |
+
+#### Returns
+
+`string`
+
+major and minor versions, ex: `1.8.5` -> `1.8.0`
+
+#### Defined in
+
+[libp2p/pickVersion.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pickVersion.ts#L6)
 
 ___
 
@@ -1537,7 +2175,7 @@ It equips the generated peerId with private key and public key.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `privKey` | `Uint8Array` \| `string` | the plain private key |
+| `privKey` | `string` \| `Uint8Array` | the plain private key |
 
 #### Returns
 
@@ -1563,7 +2201,7 @@ Using `libsecp256k1` directly does not work.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `pubKey` | `Uint8Array` \| `string` | the plain public key |
+| `pubKey` | `string` \| `Uint8Array` | the plain public key |
 
 #### Returns
 
@@ -1778,7 +2416,7 @@ A general use backoff that will reject once MAX_DELAY is reached.
 
 #### Defined in
 
-[backoff.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L17)
+[async/backoff.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L17)
 
 ___
 
@@ -1804,6 +2442,39 @@ and the product of exponent and base-point.
 #### Defined in
 
 [crypto/sampleGroupElement.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/sampleGroupElement.ts#L11)
+
+___
+
+### serializeKeyPair
+
+▸ **serializeKeyPair**(`peerId`, `password`, `useWeakCrypto?`, `__iv?`, `__salt?`, `__uuidSalt?`): `Promise`<`Uint8Array`\>
+
+Serializes a peerId using geth's KeyStore format
+see https://medium.com/@julien.maffre/what-is-an-ethereum-keystore-file-86c8c5917b97
+
+**`dev`** This method uses a computation and memory intensive hash function,
+     for testing set `useWeakCrypto = true`
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `peerId` | `PeerId` | `undefined` | id to store |
+| `password` | `string` | `undefined` | password used for encryption |
+| `useWeakCrypto` | `boolean` | `false` | weak parameter for fast serialization |
+| `__iv?` | `string` | `undefined` | - |
+| `__salt?` | `string` | `undefined` | - |
+| `__uuidSalt?` | `string` | `undefined` | - |
+
+#### Returns
+
+`Promise`<`Uint8Array`\>
+
+Uint8Array representation
+
+#### Defined in
+
+[crypto/keyPair.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L18)
 
 ___
 
@@ -1879,7 +2550,7 @@ ___
 
 #### Defined in
 
-[timeout.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/timeout.ts#L5)
+[async/timeout.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/timeout.ts#L5)
 
 ___
 
@@ -1904,6 +2575,26 @@ Adds a length-prefix to a Uint8Array
 #### Defined in
 
 [u8a/toLengthPrefixedU8a.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toLengthPrefixedU8a.ts#L12)
+
+___
+
+### toNetworkPrefix
+
+▸ **toNetworkPrefix**(`addr`): [`Network`](modules.md#network)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `addr` | `NetworkInterfaceInfo` |
+
+#### Returns
+
+[`Network`](modules.md#network)
+
+#### Defined in
+
+[network/addrs.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L199)
 
 ___
 
@@ -1961,9 +2652,32 @@ u8aAdd(false, new Uint8Array([0, 1], new Uint8Array([0, 255])) // Uint8Array([1,
 
 ___
 
+### u8aAddrToString
+
+▸ **u8aAddrToString**(`address`, `family`): `string`
+
+Converts ip address from byte representation to string
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `address` | `Uint8Array` | ip addr given as Uint8Array |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | ip address family, 'IPv4' or 'IPv6' |
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[network/addrs.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L134)
+
+___
+
 ### u8aAllocate
 
-▸ **u8aAllocate**(`__namedParameters`, ...`list`): `Uint8Array`
+▸ **u8aAllocate**(`{`, ...`list`): `Uint8Array`
 
 Writes to the provided mempage the data on a given list of u8a on a given offset
 
@@ -1971,10 +2685,10 @@ Writes to the provided mempage the data on a given list of u8a on a given offset
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `__namedParameters` | `MemoryPage` |
-| `...list` | (`Uint8Array` \| `undefined`)[] |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `{` | `MemoryPage` | page: ArrayBuffer, offset: number } |
+| `...list` | `Uint8Array`[] |  |
 
 #### Returns
 
@@ -2028,7 +2742,7 @@ u8aConcat(
 
 | Name | Type |
 | :------ | :------ |
-| `...list` | (`Uint8Array` \| `undefined`)[] |
+| `...list` | `Uint8Array`[] |
 
 #### Returns
 
@@ -2176,26 +2890,6 @@ Apply an XOR on a list of arrays.
 
 ___
 
-### unacknowledgedTicketKey
-
-▸ `Const` **unacknowledgedTicketKey**(`halfKey`): `Uint8Array`
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `halfKey` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
-
-#### Returns
-
-`Uint8Array`
-
-#### Defined in
-
-[db.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L29)
-
-___
-
 ### validatePoRHalfKeys
 
 ▸ **validatePoRHalfKeys**(`ethereumChallenge`, `ownKey`, `ack`): `boolean`
@@ -2305,4 +2999,4 @@ ___
 
 #### Defined in
 
-[backoff.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/backoff.ts#L6)
+[async/backoff.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L6)

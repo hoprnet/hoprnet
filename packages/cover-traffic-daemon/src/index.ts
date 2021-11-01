@@ -11,7 +11,7 @@ import type PeerId from 'peer-id'
 import BN from 'bn.js'
 import { debug } from '@hoprnet/hopr-utils'
 
-const log = debug('cover-traffic')
+const log = debug('hopr:cover-traffic')
 
 function stopGracefully(signal: number) {
   console.log(`Process exiting with signal ${signal}`)
@@ -92,7 +92,11 @@ if (require.main === module) {
   process.once('exit', stopGracefully)
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)
-  process.on('uncaughtException', stopGracefully)
+
+  process.on('uncaughtExceptionMonitor', (err, origin) => {
+    // Make sure we get a log.
+    log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
+  })
 
   main((state: State) => {
     console.log(

@@ -40,7 +40,8 @@ declare api5="${5}"
 # $3 = OPTIONAL: positive assertion message
 # $4 = OPTIONAL: maximum wait time in seconds during which we busy try
 # afterwards we fail, defaults to 0
-# $4 = OPTIONAL: step time between retries in seconds, defaults to 5 seconds
+# $4 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds 
+# (8 blocks with 1-3 s/block in ganache)
 # $5 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
 # priority than wait time, defaults to 0
 run_command(){
@@ -49,10 +50,10 @@ run_command(){
   local hopr_cmd="${2}"
   local assertion="${3:-}"
   local wait_time=${4:-0}
-  local step_time=${5:-5}
+  local step_time=${5:-25}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v1/command --data "
+  local cmd="curl -m ${step_time} --connect-timeout ${step_time} --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v1/command --data "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -109,11 +110,11 @@ validate_node_eth_address() {
 validate_node_balance_gt0() {
   local balance eth_balance hopr_balance
 
-  balance="$(run_command ${1} "balance")"
+  balance="$(run_command ${1} "balance" "Balance" 600)"
   eth_balance="$(echo -e "$balance" | grep -c " xDAI" || true)"
-  hopr_balance="$(echo -e "$balance" | grep -c " HOPR" || true)"
+  hopr_balance="$(echo -e "$balance" | grep -c " txHOPR" || true)"
 
-  if [[ "$eth_balance" != "0" && "$hopr_balance" != "Hopr Balance: 0 HOPR" ]]; then
+  if [[ "$eth_balance" != "0" && "$hopr_balance" != "Hopr Balance: 0 txHOPR" ]]; then
     log "$1 is funded"
   else
     log "⛔️ $1 Node has an invalid balance: $eth_balance, $hopr_balance"
@@ -165,26 +166,30 @@ result=$(run_command ${api2} "ping ${addr3}" "Pong received in:" 600)
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
-result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 HOPR" 600)
+result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 txHOPR" 600)
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
 run_command "${api1}" "send ,${addr2} 'hello, world'" "Message sent" 600
 
 log "Node 1 open channel to Node 2"
-result=$(run_command "${api1}" "open ${addr2} 0.1" "Successfully opened channel" 600)
+result=$(run_command "${api1}" "open ${addr2} 1" "Successfully opened channel" 600)
 log "-- ${result}"
 
 log "Node 2 open channel to Node 3"
-result=$(run_command "${api2}" "open ${addr3} 0.1" "Successfully opened channel" 600)
+result=$(run_command "${api2}" "open ${addr3} 1" "Successfully opened channel" 600)
 log "-- ${result}"
 
 log "Node 3 open channel to Node 4"
-result=$(run_command "${api3}" "open ${addr4} 0.1" "Successfully opened channel" 600)
+result=$(run_command "${api3}" "open ${addr4} 1" "Successfully opened channel" 600)
 log "-- ${result}"
 
 log "Node 4 open channel to Node 5"
-result=$(run_command "${api4}" "open ${addr5} 0.1" "Successfully opened channel" 600)
+result=$(run_command "${api4}" "open ${addr5} 1" "Successfully opened channel" 600)
+log "-- ${result}"
+
+log "Node 5 open channel to Node 1"
+result=$(run_command "${api5}" "open ${addr1} 0.001" "Successfully opened channel" 600)
 log "-- ${result}"
 
 for i in `seq 1 10`; do
@@ -226,6 +231,9 @@ for i in `seq 1 10`; do
 
   log "Node 3 send 1 hop message to node 5 via node 4"
   run_command "${api3}" "send ${addr4},${addr5} 'hello, world'" "Message sent" 600
+
+  log "Node 5 send 1 hop message to node 2 via node 1"
+  run_command "${api5}" "send ${addr1},${addr2} 'hello, world'" "Could not send message" 600
 done
 
 for i in `seq 1 10`; do

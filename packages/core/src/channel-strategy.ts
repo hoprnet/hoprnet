@@ -1,4 +1,4 @@
-import type { ChannelEntry, Channel } from '@hoprnet/hopr-core-ethereum'
+import type { ChannelEntry } from '@hoprnet/hopr-core-ethereum'
 import {
   AcknowledgedTicket,
   PublicKey,
@@ -10,6 +10,7 @@ import BN from 'bn.js'
 import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants'
 import { debug } from '@hoprnet/hopr-utils'
 import type NetworkPeers from './network/network-peers'
+import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 const log = debug('hopr-core:channel-strategy')
 
 export type ChannelsToOpen = [PublicKey, BN]
@@ -35,8 +36,8 @@ export interface ChannelStrategy {
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
   // TBD: Include ChannelsToClose as well.
 
-  onChannelWillClose(c: Channel): Promise<void> // Before a channel closes
-  onWinningTicket(t: AcknowledgedTicket, channel: Channel): Promise<void>
+  onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum): Promise<void> // Before a channel closes
+  onWinningTicket(t: AcknowledgedTicket, chain: HoprCoreEthereum): Promise<void>
   shouldCommitToChannel(c: ChannelEntry): Promise<boolean>
 
   tickInterval: number
@@ -48,17 +49,18 @@ export interface ChannelStrategy {
  * At present this does not take gas into consideration.
  */
 export abstract class SaneDefaults {
-  async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
+  async onWinningTicket(_a: AcknowledgedTicket, chain: HoprCoreEthereum) {
     log('auto redeeming')
-    await c.redeemTicket(ack)
+    await chain.redeemAllTickets()
   }
 
-  async onChannelWillClose(c: Channel) {
+  async onChannelWillClose(_c: ChannelEntry, chain: HoprCoreEthereum) {
     log('auto redeeming')
-    await c.redeemAllTickets()
+    await chain.redeemAllTickets()
   }
 
   async shouldCommitToChannel(_c: ChannelEntry): Promise<boolean> {
+    log('committing to channel')
     return true
   }
 

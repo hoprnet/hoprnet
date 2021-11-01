@@ -5,6 +5,8 @@ on:
     branches: ['master', 'yellowpaper/**']
     paths:
       - 'docs/yellowpaper/**'
+      - '.github/workflows/latexcompile.yml'
+      - '!.github/workflows/*.yml'
       - '!docs/yellowpaper/yellowpaper.pdf'
       - '!docs/yellowpaper/*.md'
 
@@ -15,18 +17,19 @@ jobs:
       - name: Set up Git repository
         uses: actions/checkout@v2
 
-      - name: Compile LaTeX document
-        run: |
-          sudo apt -y install texlive texlive-latex-extra texlive-science texlive-bibtex-extra latexmk
-          make -C docs/yellowpaper/
-
-      - name: 'Configure Git info'
+      - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
+      - name: Install dependencies
+        run: |
+          sudo apt -y install texlive texlive-latex-extra texlive-science texlive-bibtex-extra latexmk
+
+      - name: Compile LaTeX document
+        run: |
+          make -C docs/yellowpaper/
+
       - name: Commit & Push changes
-        if: ${{ !env.ACT }}
+        run: ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: "chore(build): update yellowpaper"
-          HOPR_GITHUB_REF: ${{ github.ref }}
-        run: ./scripts/commit-and-push-all-changes.sh
 
