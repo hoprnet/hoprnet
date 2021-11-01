@@ -1,9 +1,15 @@
 \subsubsection{Delete and shift}
 \label{sec:sphinx:shifting}
 
-After $B$ extracts the public key of $C$, it deletes the routing information from the packet. $B$ then fills the empty space with its own blinding (which is different from the one received from $A$) by setting the key share $\alpha_0$ to $\alpha_1=g^{xb_0}$. $B$ also computes $\beta_1$ as follows:
+Unblinding the $\beta_i$ reveals the public key $y_{i+1}$ of the next downstream node as well as the integrity tag $\gamma_{i+1}$ that allows the next downstream to verify the integrity of $\beta_{i+1}$. The $rest$ of $\beta_i$ is kept hidden to the node as it contains random data, see section \lcnameref{sec:sphinx:shorterpaths}, \textit{or} blindings from other nodes which is assumed to be indistinguishable by that node.
 
-The first $\kappa$ bits of $\beta_0$ will be $n_{1}$ itself, the next $\kappa$ bits will be $\gamma_{1}$, and the remaining $(2r-1)\kappa$ bits of $\beta_0$ are shifted left to form the leftmost $(2r-1)\kappa$ bits of $\beta_{1}$; the rightmost $2\kappa$ bits of $\beta_{1}$ are simply a substring of an output of the PRG function.
+$$ \{ y_{i+1}, \gamma_{i+1}, rest \} = \beta_i \oplus \textsf{PRG}_{s_i^{bl}}(0, | \beta |) $$
+
+After extracting $y_{i+1}$ and $\gamma_{i+1}$, the node shifts $rest$ to the beginning and thereby overwrites its own routing information $y_{i+1}$ and $\gamma_{i+1}$. In addition, it fills the hole in the end by adding its own blinding:
+
+$$ \beta_{i+1} = rest \ || \ \textsf{PRG}_{s_i^{bl}}(| \beta |, | \beta | + |y| + |\gamma|)$$
+
+Note that the blindings are created using different boundaries. The first blinding is created from 0 to length of $\beta$ and the second one is created as if public key and integrity were appended in the end of $\beta$, hence boundaries are set from $| \beta |$ to $| \beta | + |y| + |\gamma|$.
 
 \begin{figure}[H]
     \centering
@@ -14,13 +20,15 @@ The first $\kappa$ bits of $\beta_0$ will be $n_{1}$ itself, the next $\kappa$ b
         \def\one{0.6}
         \draw (0,0) rectangle (\betaLength,\one);
 
-        \draw (0,0) rectangle (\pubKey,\one) node[midway] {$y_i$};
+        \draw (0,0) rectangle (\pubKey,\one) node[midway] {$y_{i+1}$};
         \draw (\pubKey,0) rectangle (\pubKey+\authTag,\one) node[midway] {$\gamma_{i+1}$};
+
+        \draw[decoration={brace,raise=5pt},decorate] (0,\one) -- (\betaLength,\one) node [midway,above=6pt] {$\beta_i \oplus \textsf{PRG}_{s_i^{bl}}(0, | \beta |)$};
 
         \draw[decoration={brace,raise=5pt,mirror},decorate] (\authTag+\pubKey,0) -- (\betaLength,0);
 
         \def\halfBeta{{(\betaLength-\pubKey-\authTag)}*0.5}
-        \draw [->,dashed] (4.05+\pubKey+\authTag, -0.35) -- (4.05, -0.85);
+        \draw [->,dashed] (4.0+\pubKey+\authTag, -0.35) -- (4.1, -0.85);
 
         \draw[decoration={brace,raise=5pt},decorate] (0,-1.25) -- (\betaLength-\authTag-\pubKey,-1.25);
 
@@ -44,6 +52,8 @@ The first $\kappa$ bits of $\beta_0$ will be $n_{1}$ itself, the next $\kappa$ b
 
         \begin{scope}[shift={(0, -1.75)}]
             \draw (0,0) rectangle (\betaLength,\one);
+            \draw[decoration={brace,raise=5pt,mirror},decorate] (0,0) -- (\betaLength,0) node[midway,below=5pt] {$\beta_{i+1}$};
+
             \draw (\betaLength-\pubKey-\authTag, 0) -- (\betaLength-\pubKey-\authTag,\one);
 
             \begin{scope}[shift={(0,0)}]
@@ -81,9 +91,3 @@ The first $\kappa$ bits of $\beta_0$ will be $n_{1}$ itself, the next $\kappa$ b
     \end{tikzpicture}
     \caption{Shifting in the header}
 \end{figure}
-
-The new mix header is now ready to be sent to $C$, defined as the node with public key $y_1$:
-
-$$M_1=(\alpha_1,\beta_1,\gamma_1)$$
-
-where $\alpha$, $\beta$ and $\gamma$ are defined in equations $\ref{eq:1}$, $\ref{eq:2}$ and $\ref{eq:6}$

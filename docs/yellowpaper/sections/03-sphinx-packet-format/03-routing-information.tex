@@ -29,7 +29,7 @@ The routing information for each node $n_i$ is blinded by XORing the content wit
         \def\nodeWidth{1.95}
         \def\endWidth{1.2}
         \def\width{3*2*\nodeWidth+\endWidth}
-        \foreach \i\namePub\nameInt in{0/B/C,1/C/D,2/D/Z,3/Z/Z} {
+        \foreach \i\name in{0/B,1/C,2/D,3/Z} {
                 \begin{scope}[shift={(\i*\nodeWidth*2,0)}]
                     \ifnum\i=0
                         \def\a{11.7}
@@ -85,13 +85,17 @@ The routing information for each node $n_i$ is blinded by XORing the content wit
                     \fi
                 \end{scope}
                 \ifnum\i<3
-                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$y_{\namePub}$};
+                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$y_{\name}$};
                     \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
-                    \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$\gamma_{\nameInt}$};
+                    \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$\gamma_{\name}$};
                     \draw (\i*2*\nodeWidth+\nodeWidth,0) -- (\i*2*\nodeWidth+\nodeWidth,\one);
+
+                    \draw[decoration={brace,raise=5pt,mirror},decorate] (\nodeWidth*2*\i,0) -- (\nodeWidth*2*\i+\nodeWidth*2,0) node[midway,below=6pt] {readable by \name};
                 \else
                     \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black,fill=white,inner sep=1.5pt] {$end$};
                     \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
+
+                    \draw[decoration={brace,raise=5pt,mirror},decorate] (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth+\endWidth,0) node[midway,below=6pt] {r. by \name};
                 \fi
             }
 
