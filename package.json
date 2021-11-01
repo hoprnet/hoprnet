@@ -12,6 +12,7 @@
   "scripts": {
     "build": "yarn workspaces foreach -pvi --topological-dev run build",
     "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "yarn workspaces foreach -pv run test",
@@ -38,6 +39,7 @@
     "prettier": "2.4.1",
     "rimraf": "3.0.2",
     "ts-node": "10.4.0",
+    "typescript": "4.4.4",
     "yargs": "17.2.1"
   },
   "prettier": {

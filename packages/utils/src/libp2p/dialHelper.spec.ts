@@ -1,5 +1,5 @@
 import { NOISE } from '@chainsafe/libp2p-noise'
-const MPLEX = require('libp2p-mplex')
+import MPLEX from 'libp2p-mplex'
 import Libp2p from 'libp2p'
 import { dial as dialHelper, DialStatus } from './dialHelper'
 import { privKeyToPeerId } from './privKeyToPeerId'

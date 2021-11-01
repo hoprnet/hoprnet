@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.83.0-next.29",
+  "version": "1.83.0-next.36",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -37,7 +37,7 @@
   "devDependencies": {
     "@types/blessed": "0.1.19",
     "@types/rimraf": "3.0.2",
-    "@types/yargs": "17.0.4",
+    "@types/yargs": "17.0.5",
     "mocha": "9.1.3",
     "rimraf": "3.0.2",
     "typedoc": "0.22.7",

@@ -1,11 +1,15 @@
-import { oneAtATime, debug, AcknowledgedTicket, HoprDB, Hash } from '@hoprnet/hopr-utils'
-import type { PendingAckowledgement } from '@hoprnet/hopr-utils'
+import { oneAtATime, debug, AcknowledgedTicket, HoprDB } from '@hoprnet/hopr-utils'
+import type { PendingAckowledgement, HalfKeyChallenge, Hash } from '@hoprnet/hopr-utils'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
 import type { SendMessage, Subscribe } from '../../index'
 import type PeerId from 'peer-id'
 import { PROTOCOL_ACKNOWLEDGEMENT, ACKNOWLEDGEMENT_TIMEOUT } from '../../constants'
 import { Acknowledgement, Packet } from '../../messages'
 const log = debug('hopr-core:acknowledgement')
+
+type OnAcknowledgement = (halfKey: HalfKeyChallenge) => void
+type OnWinningTicket = (ackMessage: AcknowledgedTicket) => void
+type OnOutOfCommitments = (channelId: Hash) => void
 
 /**
  * Reserve a preImage for the given ticket if it is a winning ticket.
@@ -15,14 +19,24 @@ async function handleAcknowledgement(
   remotePeer: PeerId,
   pubKey: PeerId,
   db: HoprDB,
-  onMessage: (ackMessage: Acknowledgement) => void
+  onAcknowledgement: OnAcknowledgement,
+  onWinningTicket: OnWinningTicket,
+  onOutOfCommitments: OnOutOfCommitments
 ) {
   const acknowledgement = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
+  // There are three cases:
+  // 1. There is an unacknowledged ticket and we are
+  //    awaiting a half key.
+  // 2. We were the creator of the packet, hence we
+  //    do not wait for any half key
+  // 3. The acknowledgement is unexpected and stems from
+  //    a protocol bug or an attacker
   let pending: PendingAckowledgement
   try {
     pending = await db.getPendingAcknowledgement(acknowledgement.ackChallenge)
   } catch (err) {
+    // Protocol bug?
     if (err.notFound) {
       log(
         `Received unexpected acknowledgement for half key challenge ${acknowledgement.ackChallenge.toHex()} - half key ${acknowledgement.ackKeyShare.toHex()}`
@@ -31,14 +45,16 @@ async function handleAcknowledgement(
     throw err
   }
 
+  // No pending ticket, nothing to do.
   if (pending.isMessageSender == true) {
     log(`Received acknowledgement as sender. First relayer has processed the packet.`)
     // Resolves `sendMessage()` promise
-    onMessage(acknowledgement)
+    onAcknowledgement(acknowledgement.ackChallenge)
     // nothing else to do
     return
   }
 
+  // Try to unlock our incentive
   const unacknowledged = pending.ticket
 
   if (!unacknowledged.verifyChallenge(acknowledgement.ackKeyShare)) {
@@ -60,35 +76,48 @@ async function handleAcknowledgement(
   const ticket = unacknowledged.ticket
   const opening = await findCommitmentPreImage(db, channelId)
 
-  if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
-    const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledged.signer)
-    log(`Acknowledging ticket. Using opening ${opening.toHex()} and response ${response.toHex()}`)
-    try {
-      await bumpCommitment(db, channelId)
-      await db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
-      log(`Stored winning ticket`)
-    } catch (e) {
-      log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
-    }
-  } else {
+  if (!ticket.isWinningTicket(opening, response, ticket.winProb)) {
     log(`Got a ticket that is not a win. Dropping ticket.`)
     await db.markLosing(unacknowledged)
+    return
   }
 
-  onMessage(acknowledgement)
+  // Ticket is a win, let's store it
+  const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledged.signer)
+  log(`Acknowledging ticket. Using opening ${opening.toHex()} and response ${response.toHex()}`)
+
+  try {
+    await db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
+    log(`Stored winning ticket`)
+  } catch (e) {
+    log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
+  }
+
+  try {
+    await bumpCommitment(db, channelId)
+  } catch (err) {
+    log(`Channel ${channelId.toHex()} is out of commitments`)
+    onOutOfCommitments(channelId)
+  }
+
+  onWinningTicket(ack)
 }
 
 export function subscribeToAcknowledgements(
   subscribe: Subscribe,
   db: HoprDB,
   pubKey: PeerId,
-  onMessage: (ackMessage: Acknowledgement) => void
+  onAcknowledgement: OnAcknowledgement,
+  onWinningTicket: OnWinningTicket,
+  onOutOfCommitments: OnOutOfCommitments
 ) {
   const limitConcurrency = oneAtATime()
   subscribe(
     PROTOCOL_ACKNOWLEDGEMENT,
     (msg: Uint8Array, remotePeer: PeerId) =>
-      limitConcurrency(() => handleAcknowledgement(msg, remotePeer, pubKey, db, onMessage)),
+      limitConcurrency(() =>
+        handleAcknowledgement(msg, remotePeer, pubKey, db, onAcknowledgement, onWinningTicket, onOutOfCommitments)
+      ),
     false,
     (err: any) => {
       log(`Error while receiving acknowledgement`, err)
