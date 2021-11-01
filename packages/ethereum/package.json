@@ -25,12 +25,7 @@
   "files": [
     "contracts",
     "deployments",
-    "lib",
-    "!lib/test",
-    "!**/*.test.ts",
-    "!**/*.test.d.ts",
-    "!**/*.test.js",
-    "!**/*.test.js.map"
+    "lib"
   ],
   "dependencies": {
     "@openzeppelin/contracts": "4.3.2",
