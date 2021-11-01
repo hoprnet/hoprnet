@@ -1,3 +1,13 @@
+<a name="0.2.45"></a>
+
+## [0.2.45](https://github.com/hoprnet/hopr-connect/compare/v0.2.43...v0.2.45) (2021-11-01)
+
+Changes:
+
+- migration from `dependabot` to `renovate`
+- huge code deduplication, now using more shared code from `hopr-utils` (#349,#338,#335)
+- reduce control-flow debug output and control-flow enhancements (#333)
+
 <a name="0.2.43"></a>
 
 ## [0.2.43](https://github.com/hoprnet/hopr-connect/compare/v0.2.42...v0.2.43) (2021-10-08)
