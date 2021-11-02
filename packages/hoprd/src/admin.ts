@@ -7,7 +7,7 @@ import { parse, URL } from 'url'
 import next from 'next'
 import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
-import { LogStream } from './logs'
+import type { LogStream } from './logs'
 import { NODE_ENV } from './env'
 import {
   Balance,
@@ -15,7 +15,7 @@ import {
   SUGGESTED_BALANCE,
   SUGGESTED_NATIVE_BALANCE,
   debug,
-  startResourceLogger
+  startResourceUsageLogger
 } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import cookie from 'cookie'
@@ -178,8 +178,7 @@ export class AdminServer {
 
     // Setup some noise
     connectionReport(this.node, this.logs)
-
-    reportMemoryUsage(this.logs)
+    startResourceUsageLogger(debugLog)
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
 
@@ -194,13 +193,6 @@ export function showDisclaimer(logs: LogStream) {
   setInterval(() => {
     logs.warn(DISCLAIMER)
   }, 60 * 1000)
-}
-
-export async function reportMemoryUsage(logs: LogStream) {
-  const used = process.memoryUsage()
-  const usage = process.resourceUsage()
-  debugLog(`Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` + `cputime: ${usage.userCPUTime}`)
-  setTimeout(() => reportMemoryUsage(logs), 60_000)
 }
 
 export async function connectionReport(node: Hopr, logs: LogStream) {
