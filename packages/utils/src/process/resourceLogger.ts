@@ -17,7 +17,7 @@ function createResourceLog(log: LogType) {
 export function startResourceUsageLogger(log: LogType, ms = 60_000): () => void {
   createResourceLog(log)
 
-  const interval = setInterval(createResourceLog, ms)
+  const interval = setInterval(() => createResourceLog(log), ms)
 
   return () => clearInterval(interval)
 }
