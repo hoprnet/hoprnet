@@ -38,7 +38,7 @@ steps:
         (
           set -e
           test ! -f cache.tar.gz
-          tar -zcf cache.tar.gz node_modules public .cache
+          tar -zcf cache.tar.gz node_modules
           gsutil -m cp cache.tar.gz "gs://hoprd-cache/$(cat hashed.yarn-lock)"
         ) || true
     waitFor: ["build"]
