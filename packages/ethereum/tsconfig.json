@@ -7,7 +7,7 @@
   "include": ["src/**/*.ts"],
   "exclude": ["lib"],
   "typedocOptions": {
-    "entryPoints": ["index.ts"],
+    "entryPoints": ["src/index.ts"],
     "out": "docs",
     // by default we don't want links to source code to change on every change
     // when building docs for releases we can fix the revision on the cmdline
