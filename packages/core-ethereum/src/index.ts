@@ -12,15 +12,16 @@ import {
   cacheNoArgAsyncFunction,
   HoprDB,
   ChannelEntry,
+  ChannelStatus,
+  generateChannelId,
   Hash
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
-import { Channel, redeemTickets } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
-import { initializeCommitment } from './commitment'
+import { initializeCommitment, findCommitmentPreImage, bumpCommitment } from './commitment'
 
 const log = debug('hopr-core-ethereum')
 
@@ -90,10 +91,6 @@ export default class HoprEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  public getChannel(src: PublicKey, counterparty: PublicKey) {
-    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey, this)
-  }
-
   async announce(multiaddr: Multiaddr): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
     const tx = await this.chain.announce(multiaddr)
@@ -110,14 +107,6 @@ export default class HoprEthereum extends EventEmitter {
 
   public getOpenChannelsFrom(p: PublicKey) {
     return this.indexer.getOpenChannelsFrom(p)
-  }
-
-  public getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
-    return this.indexer.getChannelsFrom(addr)
-  }
-
-  public getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
-    return this.indexer.getChannelsTo(addr)
   }
 
   public async getAccount(addr: Address) {
@@ -178,7 +167,7 @@ export default class HoprEthereum extends EventEmitter {
       const tx = await this.chain.setCommitment(c.source.toAddress(), commitment)
       return this.indexer.resolvePendingTransaction('channel-updated', tx)
     }
-    const getCommitment = async () => (await this.indexer.getChannel(c.getId())).commitment
+    const getCommitment = async () => (await this.db.getChannel(c.getId())).commitment
     initializeCommitment(this.db, c.getId(), getCommitment, setCommitment)
   }
 
@@ -187,14 +176,151 @@ export default class HoprEthereum extends EventEmitter {
       return this.redeemingAll
     }
     const _redeemAll = async () => {
-      for (const ce of await this.getChannelsTo(this.publicKey.toAddress())) {
-        await redeemTickets(ce.source, this.db, this.chain, this.indexer, this)
+      for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
+        await this.redeemTicketsInChannel(ce)
       }
       this.redeemingAll = undefined
     }
     this.redeemingAll = _redeemAll()
     return this.redeemingAll
   }
+
+  private async redeemTicketsInChannel(channel: ChannelEntry) {
+    if (!channel.destination.eq(this.getPublicKey())) {
+      throw new Error('Cannot redeem ticket in channel that isnt to us')
+    }
+    // Because tickets are ordered and require the previous redemption to
+    // have succeeded before we can redeem the next, we need to do this
+    // sequentially.
+    const tickets = await this.db.getAcknowledgedTickets({ channel })
+    log(`redeeming ${tickets.length} tickets from ${channel.source.toB58String()}`)
+    try {
+      for (const ticket of tickets) {
+        log('redeeming ticket', ticket)
+        const result = await this.redeemTicket(channel.source, ticket)
+        if (result.status !== 'SUCCESS') {
+          log('Error redeeming ticket', result)
+          // We need to abort as tickets require ordered redemption.
+          return
+        }
+        log('ticket was redeemed')
+      }
+    } catch (e) {
+      // We are going to swallow the error here, as more than one consumer may
+      // be inspecting this same promise.
+      log('Error when redeeming tickets, aborting', e)
+    }
+    log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
+  }
+
+  // Private as out of order redemption will break things - redeem all at once.
+  private async redeemTicket(counterparty: PublicKey, ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
+    if (!ackTicket.verify(counterparty)) {
+      return {
+        status: 'FAILURE',
+        message: 'Invalid response to acknowledgement'
+      }
+    }
+
+    try {
+      const ticket = ackTicket.ticket
+
+      log('Submitting ticket', ackTicket.response.toHex())
+      const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
+      const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
+      if (!hasPreImage) {
+        log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'PreImage is empty.'`)
+        return {
+          status: 'FAILURE',
+          message: 'PreImage is empty.'
+        }
+      }
+
+      const isWinning = ticket.isWinningTicket(ackTicket.preImage, ackTicket.response, ticket.winProb)
+
+      if (!isWinning) {
+        log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
+        return {
+          status: 'FAILURE',
+          message: 'Not a winning ticket.'
+        }
+      }
+
+      const receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket)
+      await this.indexer.resolvePendingTransaction('channel-updated', receipt)
+
+      log('Successfully submitted ticket', ackTicket.response.toHex())
+      await this.db.markRedeemeed(ackTicket)
+      this.emit('ticket:redeemed', ackTicket)
+      return {
+        status: 'SUCCESS',
+        receipt,
+        ackTicket
+      }
+    } catch (err) {
+      // TODO delete ackTicket -- check if it's due to gas!
+      log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
+      return {
+        status: 'ERROR',
+        error: err
+      }
+    }
+  }
+
+  async initializeClosure(dest: PublicKey): Promise<string> {
+    const c = await this.db.getChannelTo(dest)
+    if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
+      throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
+    }
+    const tx = await this.chain.initiateChannelClosure(dest.toAddress())
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+  }
+
+  public async finalizeClosure(dest: PublicKey): Promise<string> {
+    const c = await this.db.getChannelTo(dest)
+    if (c.status !== ChannelStatus.PendingToClose) {
+      throw Error('Channel status is not PENDING_TO_CLOSE')
+    }
+    return await this.chain.finalizeChannelClosure(dest.toAddress())
+  }
+
+  public async openChannel(dest: PublicKey, amount: Balance): Promise<Hash> {
+    // channel may not exist, we can still open it
+    let c: ChannelEntry
+    try {
+      c = await this.db.getChannelTo(dest)
+    } catch {}
+    if (c && c.status !== ChannelStatus.Closed) {
+      throw Error('Channel is already opened')
+    }
+
+    const myBalance = await this.getBalance()
+    if (myBalance.lt(amount)) {
+      throw Error('We do not have enough balance to open a channel')
+    }
+    const tx = await this.chain.openChannel(this.publicKey.toAddress(), dest.toAddress(), amount)
+    await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    return generateChannelId(this.publicKey.toAddress(), dest.toAddress())
+  }
+
+  public async fundChannel(dest: PublicKey, myFund: Balance, counterpartyFund: Balance) {
+    const totalFund = myFund.add(counterpartyFund)
+    const myBalance = await this.getBalance()
+    if (totalFund.gt(myBalance)) {
+      throw Error('We do not have enough balance to fund the channel')
+    }
+    const tx = await this.chain.fundChannel(this.publicKey.toAddress(), dest.toAddress(), myFund, counterpartyFund)
+    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+  }
 }
 
-export { ChannelEntry, Channel, Indexer, createChainWrapper, INDEXER_BLOCK_RANGE, CONFIRMATIONS }
+export {
+  ChannelEntry,
+  Indexer,
+  createChainWrapper,
+  initializeCommitment,
+  findCommitmentPreImage,
+  bumpCommitment,
+  INDEXER_BLOCK_RANGE,
+  CONFIRMATIONS
+}

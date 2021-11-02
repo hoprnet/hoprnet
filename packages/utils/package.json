@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.83.0-next.2",
+  "version": "1.83.0-next.39",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -12,7 +12,7 @@
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
-    "prepublishOnly": "yarn build",
+    "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
   },
@@ -20,11 +20,7 @@
     "node": "14 || 16"
   },
   "files": [
-    "lib",
-    "!**/*.spec.ts",
-    "!**/*.spec.d.ts",
-    "!**/*.spec.js",
-    "!**/*.spec.js.map"
+    "lib"
   ],
   "dependencies": {
     "abort-controller": "~3.0.0",
@@ -39,7 +35,7 @@
     "leveldown": "6.1.0",
     "levelup": "5.1.1",
     "libp2p": "0.33.0",
-    "libp2p-crypto": "0.19.7",
+    "libp2p-crypto": "0.20.0",
     "memdown": "6.1.1",
     "multiaddr": "^10.0.0",
     "multihashes": "~4.0.1",
@@ -49,16 +45,21 @@
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
+    "@chainsafe/libp2p-noise": "4.1.1",
     "@types/mocha": "9.0.0",
     "@types/pino": "6.3.11",
     "bl": "5.0.0",
     "chai": "4.3.4",
+    "libp2p": "0.33.0",
+    "libp2p-kad-dht": "0.25.0",
+    "libp2p-mplex": "0.10.4",
+    "libp2p-tcp": "0.17.2",
     "mocha": "9.1.3",
     "rewiremock": "3.14.3",
     "rimraf": "3.0.2",
     "sinon": "11.1.2",
-    "ts-node": "10.3.0",
-    "typedoc": "0.22.6",
+    "ts-node": "10.4.0",
+    "typedoc": "0.22.7",
     "typedoc-plugin-markdown": "3.11.3",
     "typescript": "4.4.4"
   },

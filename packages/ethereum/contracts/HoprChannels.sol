@@ -357,7 +357,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
 
     /**
-    * @dev Request a channelIteration bump, so we can make a new set of
+    * @dev Request a channelEpoch bump, so we can make a new set of
     * commitments
     * Implies that msg.sender is the destination of the channel.
     * @param source the address of the channel source
@@ -537,7 +537,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
         address recipient,
         uint256 recipientCounter,
         bytes32 proofOfRelaySecret,
-        uint256 channelIteration,
+        uint256 channelEpoch,
         uint256 amount,
         uint256 ticketIndex,
         uint256 winProb
@@ -551,7 +551,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
             amount,
             winProb,
             ticketIndex,
-            channelIteration
+            channelEpoch
         );
     }
     

@@ -4,13 +4,13 @@
 
 import pipe from 'it-pipe'
 import chalk from 'chalk'
-const yargs = require('yargs/yargs')
+import yargs from 'yargs/yargs'
 
 import { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import Upgrader from 'libp2p/src/upgrader'
-const MPLEX = require('libp2p-mplex')
+import MPLEX from 'libp2p-mplex'
 const Multistream = require('multistream-select')
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')

@@ -1,10 +1,11 @@
-import levelup, { LevelUp } from 'levelup'
+import type { LevelUp } from 'levelup'
+import levelup from 'levelup'
 import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import { debug } from './debug'
-import { Hash, u8aConcat, Address, Intermediate, Ticket } from '.'
+import { Hash, u8aConcat, Address, Intermediate, Ticket, generateChannelId } from '.'
 import {
   AcknowledgedTicket,
   UnacknowledgedTicket,
@@ -24,19 +25,20 @@ const log = debug(`hopr-core:db`)
 const encoder = new TextEncoder()
 
 const TICKET_PREFIX = encoder.encode('tickets-')
-const UNACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('unacknowledged-'))
+const SEPARATOR = encoder.encode(':')
+const PENDING_ACKNOWLEDGEMENTS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('pending-acknowledgement-'))
 const ACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
-export const unacknowledgedTicketKey = (halfKey: HalfKeyChallenge) => {
-  return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, halfKey.serialize())
+export const pendingAcknowledgement = (halfKey: HalfKeyChallenge) => {
+  return u8aConcat(PENDING_ACKNOWLEDGEMENTS_PREFIX, halfKey.serialize())
 }
-const acknowledgedTicketKey = (challenge: EthereumChallenge) => {
-  return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, challenge.serialize())
+const acknowledgedTicketKey = (challenge: EthereumChallenge, channelEpoch: UINT256) => {
+  return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, channelEpoch.serialize(), SEPARATOR, challenge.serialize())
 }
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
-const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
-const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('indexer-latestConfirmedSnapshot')
-const ACCOUNT_PREFIX = encoder.encode('indexer-account-')
-const CHANNEL_PREFIX = encoder.encode('indexer-channel-')
+const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
+const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('latestConfirmedSnapshot')
+const ACCOUNT_PREFIX = encoder.encode('account-')
+const CHANNEL_PREFIX = encoder.encode('channel-')
 const createChannelKey = (channelId: Hash): Uint8Array => u8aConcat(CHANNEL_PREFIX, encoder.encode(channelId.toHex()))
 const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PREFIX, encoder.encode(address.toHex()))
 const COMMITMENT_PREFIX = encoder.encode('commitment:')
@@ -47,11 +49,30 @@ const REDEEMED_TICKETS_VALUE = encoder.encode('statistics:redeemed:value')
 const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 const PENDING_TICKETS_VALUE = (address: Address) =>
   u8aConcat(encoder.encode('statistics:pending:value:'), encoder.encode(address.toHex()))
+const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
+const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
+const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
+
+enum PendingAcknowledgementPrefix {
+  Relayer = 0,
+  MessageSender = 1
+}
+
+export type WaitingAsSender = {
+  isMessageSender: true
+}
+
+export type WaitingAsRelayer = {
+  isMessageSender: false
+  ticket: UnacknowledgedTicket
+}
+
+export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
 
 export class HoprDB {
   private db: LevelUp
 
-  constructor(private id: Address, initialize: boolean, version: string, dbPath?: string, forceCreate?: boolean) {
+  constructor(private id: PublicKey, initialize: boolean, version: string, dbPath?: string, forceCreate?: boolean) {
     if (!dbPath) {
       dbPath = path.join(process.cwd(), 'db', version)
     }
@@ -73,7 +94,7 @@ export class HoprDB {
       }
     }
     this.db = levelup(leveldown(dbPath))
-    log('namespacing db by pubkey: ', id.toHex())
+    log('namespacing db by pubkey: ', id.toAddress().toHex())
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
@@ -174,36 +195,77 @@ export class HoprDB {
     await this.put(key, new Balance(val.toBN().sub(amount.toBN())).serialize())
   }
 
+  private serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
+    if (isMessageSender) {
+      return Uint8Array.from([PendingAcknowledgementPrefix.MessageSender])
+    } else {
+      return Uint8Array.from([PendingAcknowledgementPrefix.Relayer, ...unackTicket.serialize()])
+    }
+  }
+
+  private deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgement {
+    switch (data[0] as PendingAcknowledgementPrefix) {
+      case PendingAcknowledgementPrefix.MessageSender:
+        return {
+          isMessageSender: true
+        }
+      case PendingAcknowledgementPrefix.Relayer:
+        return {
+          isMessageSender: false,
+          ticket: UnacknowledgedTicket.deserialize(data.slice(1))
+        }
+    }
+  }
+
   /**
    * Get unacknowledged tickets.
    * @param filter optionally filter by signer
    * @returns an array of all unacknowledged tickets
    */
   public async getUnacknowledgedTickets(filter?: { signer: PublicKey }): Promise<UnacknowledgedTicket[]> {
-    const filterFunc = (u: UnacknowledgedTicket): boolean => {
+    const filterFunc = (pending: PendingAckowledgement): boolean => {
+      if (pending.isMessageSender == true) {
+        return false
+      }
+
       // if signer provided doesn't match our ticket's signer dont add it to the list
-      if (filter?.signer && u.signer.eq(filter.signer)) {
+      if (filter?.signer && pending.ticket.signer.eq(filter.signer)) {
         return false
       }
       return true
     }
 
-    return this.getAll<UnacknowledgedTicket>(
-      UNACKNOWLEDGED_TICKETS_PREFIX,
-      UnacknowledgedTicket.deserialize,
-      filterFunc
-    )
+    return (
+      await this.getAll<WaitingAsRelayer>(
+        PENDING_ACKNOWLEDGEMENTS_PREFIX,
+        this.deserializePendingAcknowledgement as any,
+        filterFunc
+      )
+    ).map((pending: WaitingAsRelayer) => pending.ticket)
   }
 
-  public async getUnacknowledgedTicket(halfKeyChallenge: HalfKeyChallenge): Promise<UnacknowledgedTicket> {
-    return UnacknowledgedTicket.deserialize(await this.get(unacknowledgedTicketKey(halfKeyChallenge)))
+  public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAckowledgement> {
+    const data = await this.get(pendingAcknowledgement(halfKeyChallenge))
+
+    return this.deserializePendingAcknowledgement(data)
   }
 
-  public async storeUnacknowledgedTicket(
+  public async storePendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge, isMessageSender: true): Promise<void>
+  public async storePendingAcknowledgement(
     halfKeyChallenge: HalfKeyChallenge,
+    isMessageSender: false,
     unackTicket: UnacknowledgedTicket
+  ): Promise<void>
+
+  public async storePendingAcknowledgement(
+    halfKeyChallenge: HalfKeyChallenge,
+    isMessageSender: boolean,
+    unackTicket?: UnacknowledgedTicket
   ): Promise<void> {
-    await this.put(unacknowledgedTicketKey(halfKeyChallenge), unackTicket.serialize())
+    await this.put(
+      pendingAcknowledgement(halfKeyChallenge),
+      this.serializePendingAcknowledgement(isMessageSender, unackTicket)
+    )
   }
 
   /**
@@ -211,10 +273,21 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of all acknowledged tickets
    */
-  public async getAcknowledgedTickets(filter?: { signer: PublicKey }): Promise<AcknowledgedTicket[]> {
+  public async getAcknowledgedTickets(filter?: {
+    signer?: PublicKey
+    channel?: ChannelEntry
+  }): Promise<AcknowledgedTicket[]> {
     const filterFunc = (a: AcknowledgedTicket): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
       if (filter?.signer && !a.signer.eq(filter.signer)) {
+        return false
+      }
+
+      if (
+        filter?.channel &&
+        !a.signer.eq(filter.channel.source) &&
+        !a.ticket.channelEpoch.eq(filter.channel.channelEpoch)
+      ) {
         return false
       }
       return true
@@ -223,27 +296,29 @@ export class HoprDB {
     return this.getAll<AcknowledgedTicket>(ACKNOWLEDGED_TICKETS_PREFIX, AcknowledgedTicket.deserialize, filterFunc)
   }
 
+  public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
+    const tickets = await this.getAcknowledgedTickets({ signer: channel.source })
+    Promise.all(tickets.map((ticket) => this.delAcknowledgedTicket(ticket)))
+    await this.increment(NEGLECTED_TICKET_COUNT)
+  }
+
   /**
    * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
   public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
-    await this.del(acknowledgedTicketKey(ack.ticket.challenge))
+    await this.del(acknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
-    const unAcknowledgedDbKey = unacknowledgedTicketKey(halfKeyChallenge)
-    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge)
+    const unAcknowledgedDbKey = pendingAcknowledgement(halfKeyChallenge)
+    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
 
-    try {
-      await this.db
-        .batch()
-        .del(Buffer.from(this.keyOf(unAcknowledgedDbKey)))
-        .put(Buffer.from(this.keyOf(acknowledgedDbKey)), Buffer.from(ackTicket.serialize()))
-        .write()
-    } catch (err) {
-      log(`ERROR: Error while writing to database. Error was ${err.message}.`)
-    }
+    await this.db
+      .batch()
+      .del(Buffer.from(this.keyOf(unAcknowledgedDbKey)))
+      .put(Buffer.from(this.keyOf(acknowledgedDbKey)), Buffer.from(ackTicket.serialize()))
+      .write()
   }
 
   /**
@@ -262,6 +337,13 @@ export class HoprDB {
     )
   }
 
+  /**
+   * Checks whether the given packet tag is present in the database.
+   * If not, sets the packet tag and return false, otherwise return
+   * true.
+   * @param packetTag packet tag to check for
+   * @returns a Promise that resolves to true if packet tag is present in db
+   */
   async checkAndSetPacketTag(packetTag: Uint8Array) {
     let present = await this.has(this.keyOf(PACKET_TAG_PREFIX, packetTag))
 
@@ -367,6 +449,10 @@ export class HoprDB {
     return this.getCoercedOrDefault(REDEEMED_TICKETS_COUNT, u8aToNumber, 0)
   }
 
+  public async getNeglectedTicketsCount(): Promise<number> {
+    return this.getCoercedOrDefault(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
+  }
+
   public async getPendingTicketCount(): Promise<number> {
     return (await this.getUnacknowledgedTickets()).length
   }
@@ -392,17 +478,52 @@ export class HoprDB {
 
   public async markLosing(t: UnacknowledgedTicket): Promise<void> {
     await this.increment(LOSING_TICKET_COUNT)
-    await this.del(unacknowledgedTicketKey(t.getChallenge()))
-    // sub pending_tickets_value
+    await this.del(pendingAcknowledgement(t.getChallenge()))
+    await this.subBalance(PENDING_TICKETS_VALUE(t.ticket.counterparty), t.ticket.amount)
   }
 
-  static createMock(): HoprDB {
+  public async getRejectedTicketsValue(): Promise<Balance> {
+    return await this.getCoercedOrDefault(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO())
+  }
+  public async getRejectedTicketsCount(): Promise<number> {
+    return this.getCoercedOrDefault(REJECTED_TICKETS_COUNT, u8aToNumber, 0)
+  }
+  public async markRejected(t: Ticket): Promise<void> {
+    await this.increment(REJECTED_TICKETS_COUNT)
+    await this.addBalance(REJECTED_TICKETS_VALUE, t.amount)
+  }
+
+  static createMock(id?: PublicKey): HoprDB {
     const mock: HoprDB = {
-      id: Address.createMock(),
+      id: id ?? PublicKey.createMock(),
       db: new levelup(MemDown())
     } as any
     Object.setPrototypeOf(mock, HoprDB.prototype)
 
     return mock
+  }
+
+  public async getChannelX(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
+    return await this.getChannel(generateChannelId(src.toAddress(), dest.toAddress()))
+  }
+
+  public async getChannelTo(dest: PublicKey): Promise<ChannelEntry> {
+    return await this.getChannel(generateChannelId(this.id.toAddress(), dest.toAddress()))
+  }
+
+  public async getChannelFrom(src: PublicKey): Promise<ChannelEntry> {
+    return await this.getChannel(generateChannelId(src.toAddress(), this.id.toAddress()))
+  }
+
+  public async getChannelsFrom(address: Address) {
+    return this.getChannels((channel) => {
+      return address.eq(channel.source.toAddress())
+    })
+  }
+
+  public async getChannelsTo(address: Address) {
+    return this.getChannels((channel) => {
+      return address.eq(channel.destination.toAddress())
+    })
   }
 }

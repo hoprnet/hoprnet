@@ -22,9 +22,12 @@
 - [ChannelsToOpen](modules.md#channelstoopen)
 - [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
+- [SendMessage](modules.md#sendmessage)
+- [Subscribe](modules.md#subscribe)
 
 ### Variables
 
+- [ACKNOWLEDGEMENT\_TIMEOUT](modules.md#acknowledgement_timeout)
 - [CHECK\_TIMEOUT](modules.md#check_timeout)
 - [DEFAULT\_STUN\_PORT](modules.md#default_stun_port)
 - [FULL\_VERSION](modules.md#full_version)
@@ -97,7 +100,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L74)
+[packages/core/src/index.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L78)
 
 ___
 
@@ -107,9 +110,39 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L96)
+[packages/core/src/index.ts:100](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L100)
+
+___
+
+### SendMessage
+
+Ƭ **SendMessage**: (`dest`: `PeerId`, `protocol`: `string`, `msg`: `Uint8Array`, `includeReply`: ``false``, `opts`: `DialOpts`) => `Promise`<`void`\> & (`dest`: `PeerId`, `protocol`: `string`, `msg`: `Uint8Array`, `includeReply`: ``true``, `opts`: `DialOpts`) => `Promise`<`Uint8Array`[]\>
+
+#### Defined in
+
+[packages/core/src/index.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L115)
+
+___
+
+### Subscribe
+
+Ƭ **Subscribe**: (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`void`\>\>, `includeReply`: ``false``, `errHandler`: (`err`: `any`) => `void`) => `void` & (`protocol`: `string`, `handler`: `LibP2PHandlerFunction`<`Promise`<`Uint8Array`\>\>, `includeReply`: ``true``, `errHandler`: (`err`: `any`) => `void`) => `void`
+
+#### Defined in
+
+[packages/core/src/index.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L102)
 
 ## Variables
+
+### ACKNOWLEDGEMENT\_TIMEOUT
+
+• **ACKNOWLEDGEMENT\_TIMEOUT**: ``2000``
+
+#### Defined in
+
+[packages/core/src/constants.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L36)
+
+___
 
 ### CHECK\_TIMEOUT
 

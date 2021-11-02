@@ -1,47 +1,50 @@
-\section{Paths and Path Selection}
+\section{Path Selection}
 \label{sec:path-selection}
 HOPR currently utilizes free-route sender-selected paths which are known to provide better privacy than other topologies, as well as better packet delivery in the event of partial network failure \cite{Dingledine2004SynchronousBF}. HOPR makes it easy to customize various different routing strategies. In this section, we present the free-routing strategy that HOPR nodes are currently following. Another strategy is later introduced in the \lcnameref{sec:CT} section.
 
-Packets in the HOPR network are sent via multiple \textit{hops} before they are delivered to their final destination. To meet HOPR's stated \lcnameref{sec:securitygoals}, it is crucial for nodes in the network to keep the chosen path secret.
+\subsection{Objectives and Approach}
+A packet in the HOPR network is sent via multiple mix node hops before it is delivered to its final recipient. A sender has to consider three partially antagonistic points when selecting a path
 
-As relay nodes differ in their ability to forward packets, path choices need to consider the nodes' resources and cannot be chosen entirely at random.
+\begin{enumerate}
+    \item selected nodes should be effective at mixing packets
+    \item path selection must not be deterministic
+    \item offline nodes should be avoided
+\end{enumerate}
 
-Path selection is therefore done in multiple steps: first, there is a preprocessing step to assign each payment channel a score, which by default equals to its balance (the number of HOPR tokens locked in a payment channel). Here we use the balance that a node has staked in a particular payment channel as a signal for how much traffic the node is willing to relay in a fashion that aligns its incentives with the rest of the network.
+As anyone can run a node in the HOPR network, it is also important to have neutral Schelling points for effective mix nodes. The default path selection mechanism uses the number of tokens that a node has staked in a particular payment channel as a signal for how much traffic the node is willing to relay in a fashion that aligns its incentives with the rest of the network. Thus, stake is used as a Schelling point for which nodes will mix packets more effectively than others with lower traffic.
 
-The score is then multiplied by a random number to yield the channel's final weight. This randomization helps reduce linkability, which is a risk in a purely deterministic selection process. Finally, a path is chosen to the destination based on these scores while considering the relative availability of intermediate hops in a depth-first greedy search.
+To meet HOPR's stated \lcnameref{sec:securitygoals}, it is crucial for nodes in the network to keep the chosen path secret. While the individual nodes along a path are selected, based on their stake, a node's individual path selection must remain hard to predict for third parties in order to provide sender-receipient unlinkability. HOPR achieves that by randomizing channel stake by multiplying its stake with a random number.
 
-This chapter explains \lcnameref{sec:path-selection:node-score} based on a node's payment channel balances, \lcnameref{sec:path-selection:randomization} of the edge weights of the graph, and how nodes employ \lcnameref{sec:path-selection:graph-traversal} to find a path through the HOPR network based on randomized channel weights and node availability.
+In order to keep sender-receiver packet loss low, the sender only chooses nodes that it considers to be online. The path selection mechanism uses a heartbeat mechanism for this.
 
-\subsection{Node score assignment}
-\label{sec:path-selection:node-score}
 
-The HOPR network is kept open and permissionless, hence there is no gatekeeper which grants access to the network and maintains a full list of active nodes. For this reason, it is necessary for network participants to maintain a solid understanding of the network topology to decide which nodes they can use to relay their mixnet packets.
 
-The network topology includes two layers: the payment channel graph and the ability of nodes to establish a network connection to each other. Whilst the former is easily constructed by observing and indexing on-chain interactions, the latter needs active communication with other nodes to check their availability. Since the network status can change abruptly, e.g., due to electricity outages or unstable network links, availability needs to be measured frequently on an ongoing basis.
+\subsection{Randomization Stake as Edge Weights}
+The path selection algorithm outlined below uses edge weights that determine likelihood of randomly choosing a specific edge. The edge weights are initialized with the payment channel balance and the payment channel topology. The more tokens a node stakes to an outgoing payment channel, the more likely the edge is selected on a path, hence the more likely the connected nodes are chosen as relayers by other nodes.
 
-\subsubsection{Node availabilty}
+Since this initialization step based on channel stake is entirely deterministic and potential adversaries could thus deduce the path of an individual packet from public information, each node score is randomized by multiplying it with a random number, $0 \le r_i \le 1$. Over long time scales, the expectation value of the weight is still proportional to the channels's score and thus provides a predictable Schelling point.
 
-The availability of nodes in the network is estimated by regularly pinging other nodes in the network and listening to ping attempts from other nodes. Receiving a \textit{ping} request or a \textit{pong} response from another node means that a node is available and gradually increases their network score.
-
-If a node does not respond to \textit{ping} attempts, their network score decreases and the waiting time to the next \textit{ping} attempt increases exponentially. This exponential backoff occurs until an upper bound is reached. A successful response to \textit{ping} resets the backoff timer.
-$$t_{bo} = \exp (t_{base}, {\exp (f_{bo}, n_{fail})})$$
-where $t_{bo}$ is the backoff time, $t_{base}$ is the initial backoff time, $f_{bo}$ is the backoff factor, and $ n_{fail}$ is the number of failed attempts since the last sucessful attempt or the network start.
-
-When the network score is below the network quality threshold, the node is considered offline. All incoming and outgoing channels of this node are ignored and the node will not be utilized in the path selection process.
-
-\subsubsection{Payment channel graph and stake}
-
-Incentives for relaying mixnet packet require the existence of an open payment channel that is funded towards the relay node. Hence, it is necessary to be in sync with the latest on-chain state.
-
-Funding a payment channel with HOPR tokens means staking these tokens in the HOPR network. The more tokens a node stakes to an outgoing payment channel, the more likely the payment channel is selected as a path, hence the more likely the node is chosen as a relayer by other nodes.
-
-\subsection{Randomization}
-\label{sec:path-selection:randomization}
-
-Since the previous step is entirely deterministic and potential adversaries could thus deduce the path of an individual packet from public information, each node score is randomized by multiplying it with a random number, $r_i$. Over long time scales, the expectation value of the weight is still proportional to the node's score and thus predictable.
-$$weight(n_i) := score(n_i) * r_i$$
+$$ weight(n_i) := balance(n_i) * r_i$$
 
 Note that the random numbers are assigned once at the beginning of the process and reassigned upon the selection of a subsequent packet.
+
+
+\subsection{Heartbeat}
+HOPR nodes use a heartbeat mechanism to estimate the availability of nodes in the network. Nodes keep scores of each other that measure their health. They utilize a exponential backoff to efficiently measure health scores.
+
+\subsubsection{Health Score}
+Each node keeps a score of all other nodes and increases that score if it has been observed online and decreases if it could not be reached. Each node that has an funded outgoing payment channel is initially listed with $healthScore = 0.2$. Responding to a \textit{ping} with a \textit{pong} packet or sending its own \textit{ping} increases a node's score by 0.1. Not responding to a \textit{ping} reduces the node's score by 0.1. The minimal node score is 0 and the maximal score is 1. Nodes with a $healthScore \ge healthThreshold$ considered online and utilized in paths, nodes with lower scores are omitted. The default $healthThreshold$ is $0.5$.
+
+\subsubsection{Exponential Backoff}
+Since the network status can change abruptly, e.g., due to electricity outages or unstable network links, availability needs to be measured frequently on an ongoing basis. On the other hand, it does not make sense to constantly probe nodes that are known to be offline. To provide a dynamic trade-off for both cases, HOPR utilizes a heartbeat with exponential backoff, the time until the next \textit{ping} is sent to a node increases with the number of failed ping attempts $n_{fail}$ since the last sucessful attempt or the network start. A successful response to \textit{ping} resets the backoff timer.
+
+$$ t_{bo} = {t_{base}}^{{f_{bo}}^{n_{fail}}} $$
+
+where $t_{bo}$ is the backoff time, $t_{base} = 2s$ is the initial backoff time and $f_{bo} = 1.5$.
+
+The maximal backoff time of 512 seconds corresponds to $n_{fail} = 5$.
+
+
 
 \subsection{Path selection}
 \label{sec:path-selection:graph-traversal}
@@ -53,6 +56,8 @@ To achieve the aforementioned privacy guarantees, paths must include at least on
 Nodes can only be chosen once per path. For example, when choosing the third node in the path $A\rightarrow B$, if $A$ is found to be the only node with an open channel to $B$, the search will fail and a new path will be generated.
 
 The algorithm terminates once a path with $targetLength$ is found. To prevent the algorithm from visiting too many nodes, the number of iterations is bound by $maxIterations$ and the longest known path is returned if no path of length $targetLength$ was found.
+
+The default path selection algorithm is a best-first search of edges which got initialized with randomized payment channels stakes as outlined above. It omits paths that would contain loops and nodes with $healthScore < healthThreshold$ and paths that would be shorter than $targetLength$.
 
 \begin{algorithm}[H]
     \SetAlgoNoLine
@@ -74,7 +79,7 @@ The algorithm terminates once a path with $targetLength$ is found. To prevent th
         $open \leftarrow \emptyset$\;
         \;
         \ForEach{$next \in \{ y \in V \ | \ (x,y) \in E \ \land \ x = current \}$}{
-            \If{$score(next) > threshold \ \mathbf{and} \ y \notin closed \ \mathbf{and} \ y \notin path$}{
+            \If{$healthScore(next) \ge healthThreshold \ \mathbf{and} \ y \notin closed \ \mathbf{and} \ y \notin path$}{
                 $open.push(y)$\;
             }
         }

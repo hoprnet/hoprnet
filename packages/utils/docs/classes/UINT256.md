@@ -15,6 +15,7 @@
 
 ### Methods
 
+- [eq](UINT256.md#eq)
 - [serialize](UINT256.md#serialize)
 - [toBN](UINT256.md#tobn)
 - [toHex](UINT256.md#tohex)
@@ -50,7 +51,7 @@
 
 #### Defined in
 
-[types/solidity.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L34)
+[types/solidity.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L40)
 
 ___
 
@@ -64,9 +65,29 @@ ___
 
 #### Defined in
 
-[types/solidity.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L38)
+[types/solidity.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L44)
 
 ## Methods
+
+### eq
+
+▸ **eq**(`b`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `b` | [`UINT256`](UINT256.md) |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[types/solidity.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L22)
+
+___
 
 ### serialize
 
@@ -146,7 +167,7 @@ ___
 
 #### Defined in
 
-[types/solidity.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L26)
+[types/solidity.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L30)
 
 ___
 
@@ -166,4 +187,4 @@ ___
 
 #### Defined in
 
-[types/solidity.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L22)
+[types/solidity.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L26)

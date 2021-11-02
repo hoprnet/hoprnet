@@ -1,51 +1,37 @@
+import { HoprDB, UINT256, u8aEquals, u8aToHex, Balance } from '@hoprnet/hopr-utils'
+import { PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
 import { Packet, INTERMEDIATE_HOPS } from './packet'
-import {
-  HoprDB,
-  Ticket,
-  UINT256,
-  Balance,
-  PublicKey,
-  u8aEquals,
-  Challenge,
-  PRICE_PER_PACKET
-} from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import BN from 'bn.js'
 import assert from 'assert'
+import BN from 'bn.js'
 
-function createMockTickets(privKey: Uint8Array) {
-  const acknowledge = () => {}
+function createMockTickets() {
+  const tags = new Set<string>()
+  const db = {
+    getChannelTo: () => ({
+      getId: () => ({ toHex: () => '0xdeadbeef' }),
+      ticketEpoch: new UINT256(new BN(0)),
+      channelEpoch: new UINT256(new BN(0)),
+      balance: new Balance(new BN(100).mul(PRICE_PER_PACKET))
+    }),
+    getCurrentTicketIndex: () => {},
+    setCurrentTicketIndex: () => {},
+    checkAndSetPacketTag: async (tag: Uint8Array) => {
+      const tagString = u8aToHex(tag)
+      if (tags.has(tagString)) {
+        return true
+      }
 
-  const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
-    acknowledge,
-    createTicket: async (pathLength: number, challenge: Challenge) => {
-      return Promise.resolve(
-        Ticket.create(
-          counterparty.toAddress(),
-          challenge,
-          new UINT256(new BN(0)),
-          new UINT256(new BN(0)),
-          new Balance(PRICE_PER_PACKET.muln(pathLength)),
-          UINT256.fromInverseProbability(new BN(1)),
-          new UINT256(new BN(0)),
-          privKey
-        )
-      )
+      tags.add(tagString)
+
+      return false
     },
-    createDummyTicket: (challenge: Challenge) =>
-      Ticket.create(
-        counterparty.toAddress(),
-        challenge,
-        new UINT256(new BN(0)),
-        new UINT256(new BN(0)),
-        new Balance(new BN(0)),
-        UINT256.DUMMY_INVERSE_PROBABILITY,
-        new UINT256(new BN(0)),
-        privKey
-      )
-  })
-
-  return { getChannel }
+    storeUnacknowledgedTicket: () => Promise.resolve(),
+    markPending: () => Promise.resolve(),
+    getPendingBalanceTo: async () => new Balance(new BN(0)),
+    storePendingAcknowledgement: () => Promise.resolve()
+  }
+  return { db: db as any as HoprDB }
 }
 
 describe('packet creation and transformation', function () {
@@ -54,34 +40,22 @@ describe('packet creation and transformation', function () {
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
-
-    const chain = createMockTickets(self.privKey.marshal())
-
+    const { db } = createMockTickets()
     const testMsg = new TextEncoder().encode('test')
-
-    let packet = await Packet.create(testMsg, path, self, chain as any)
-
+    let packet = await Packet.create(testMsg, path, self, db)
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
-
-      const db = HoprDB.createMock()
-
+      const { db } = createMockTickets()
       await packet.checkPacketTag(db)
-
-      assert.rejects(packet.checkPacketTag(db))
-
-      const chain = createMockTickets(node.privKey.marshal())
 
       if (packet.isReceiver) {
         assert(index == path.length - 1)
-
         assert(u8aEquals(packet.plaintext, testMsg))
       } else {
         await packet.storeUnacknowledgedTicket(db)
-
-        await packet.forwardTransform(node, chain as any)
+        await packet.forwardTransform(node, db)
       }
     }
   })
@@ -91,34 +65,25 @@ describe('packet creation and transformation', function () {
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
-
-    const chain = createMockTickets(self.privKey.marshal())
-
+    const { db } = createMockTickets()
     const testMsg = new TextEncoder().encode('test')
-
-    let packet = await Packet.create(testMsg, path, self, chain as any)
-
+    let packet = await Packet.create(testMsg, path, self, db)
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
-
-      const db = HoprDB.createMock()
-
+      const { db } = createMockTickets()
       await packet.checkPacketTag(db)
 
-      assert.rejects(packet.checkPacketTag(db))
-
-      const chain = createMockTickets(node.privKey.marshal())
+      // Checks that packet tag is set and cannot set twice
+      await assert.rejects(packet.checkPacketTag(db))
 
       if (packet.isReceiver) {
         assert(index == path.length - 1)
-
         assert(u8aEquals(packet.plaintext, testMsg))
       } else {
         await packet.storeUnacknowledgedTicket(db)
-
-        await packet.forwardTransform(node, chain as any)
+        await packet.forwardTransform(node, db)
       }
     }
   })
@@ -129,33 +94,25 @@ describe('packet creation and transformation', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const chain = createMockTickets(self.privKey.marshal())
-
+    const { db } = createMockTickets()
     const testMsg = new TextEncoder().encode('test')
-
-    let packet = await Packet.create(testMsg, path, self, chain as any)
-
+    let packet = await Packet.create(testMsg, path, self, db)
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
-
-      const db = HoprDB.createMock()
-
+      const { db } = createMockTickets()
       await packet.checkPacketTag(db)
 
-      assert.rejects(packet.checkPacketTag(db))
-
-      const chain = createMockTickets(node.privKey.marshal())
+      // Checks that packet tag is set and cannot set twice
+      await assert.rejects(packet.checkPacketTag(db))
 
       if (packet.isReceiver) {
         assert(index == path.length - 1)
-
         assert(u8aEquals(packet.plaintext, testMsg))
       } else {
         await packet.storeUnacknowledgedTicket(db)
-
-        await packet.forwardTransform(node, chain as any)
+        await packet.forwardTransform(node, db)
       }
     }
   })
@@ -165,17 +122,11 @@ describe('packet creation and transformation', function () {
     const [self, ...path] = await Promise.all(
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
-
-    const chain = createMockTickets(self.privKey.marshal())
-
+    const { db } = createMockTickets()
     const testMsg = new TextEncoder().encode('test')
-
-    const packet = await Packet.create(testMsg, path, self, chain as any)
-
+    const packet = await Packet.create(testMsg, path, self, db)
     const transformedPacket = Packet.deserialize(packet.serialize(), path[0], self)
-
-    await transformedPacket.forwardTransform(path[0], chain as any)
-
+    await transformedPacket.forwardTransform(path[0], db)
     assert.throws(() => Packet.deserialize(transformedPacket.serialize(), path[0], self))
   })
 })

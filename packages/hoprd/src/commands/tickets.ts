@@ -28,6 +28,9 @@ Tickets:
 - Redeemed Value:   ${stats.redeemedValue.toFormattedString()}
 - Losing Tickets:   ${stats.losing}
 - Win Proportion:   ${stats.winProportion * 100}% 
+- Neglected:        ${stats.neglected} 
+- Rejected:         ${stats.rejected}
+- Rejected Value:   ${stats.rejectedValue.toFormattedString()}
           `)
     } catch (err) {
       log(styleValue(err.message, 'failure'))
