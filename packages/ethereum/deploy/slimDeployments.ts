@@ -8,7 +8,7 @@ import { readdir, writeFile } from 'fs/promises'
 // folder with various artifacts, this task loops through `deployments`
 // folder and removes data that are optional & will end up being commited
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const basePath = join(__dirname, '..', 'deployments', hre.environment, hre.network.name)
+  const basePath = join(__dirname, '..', 'deployments', hre.environment, hre.network.name === 'hardhat' ? 'localhost' : hre.network.name)
 
   let contracts: string[]
 
