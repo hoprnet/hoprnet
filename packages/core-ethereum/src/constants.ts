@@ -7,3 +7,4 @@ export const PROVIDER_DEFAULT_URI = 'http://127.0.0.1:8545/'
 export const CONFIRMATIONS = 8
 export const TX_CONFIRMATION_WAIT = 1e3
 export const INDEXER_BLOCK_RANGE = 2000
+export const INDEXER_TIMEOUT = 900000 // 15 minutes
