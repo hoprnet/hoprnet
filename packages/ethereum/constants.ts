@@ -1,5 +1,5 @@
-export type PublicNetworks = 'xdai' | 'goerli' | 'mumbai' | 'polygon'
-export type Networks = 'hardhat' | 'localhost' | PublicNetworks
+export type PublicNetworks = 'xdai' | 'goerli'
+export type Networks = 'hardhat' | PublicNetworks
 
 /**
  * testing = for ganache / hardhat powered chains which do not auto mine

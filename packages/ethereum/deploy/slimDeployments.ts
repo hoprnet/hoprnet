@@ -13,7 +13,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     '..',
     'deployments',
     hre.environment,
-    hre.network.name === 'hardhat' ? 'localhost' : hre.network.name
+    hre.network.name
   )
 
   let contracts: string[]
@@ -51,5 +51,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 main.runAtTheEnd = true
+main.dependencies = ['preDeploy']
+main.tags = ['slimDeployments']
 
 export default main

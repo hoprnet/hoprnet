@@ -36,4 +36,6 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   await result.deploy()
 }
 
+main.dependencies = ['preDeploy']
+
 export default main

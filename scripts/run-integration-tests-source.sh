@@ -189,14 +189,14 @@ ensure_port_is_free 19096
 ensure_port_is_free 19097
 # }}}
 
-# --- Cleanup old deployments to localhost {{{
-log "Removing artifacts from old deployments to localhost"
-rm -Rfv packages/ethereum/deployments/*/localhost
+# --- Cleanup old contract deployments {{{
+log "Removing artifacts from old contract deployments"
+rm -Rfv packages/ethereum/deployments/hardhat-localhost/localhost
 # }}}
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
+DEVELOPMENT=true HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 

@@ -12,65 +12,65 @@ import '@typechain/hardhat'
 import { utils } from 'ethers'
 
 // rest
-import { HardhatUserConfig, task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
+import { task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
+import type { HardhatUserConfig } from 'hardhat/types'
 import fs from 'fs'
 
-const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY } = process.env
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID } = process.env
 import { expandVars } from '@hoprnet/hopr-utils'
+
+const PROTOCOL_CONFIG = require('../core/protocol-config.json')
 
 extendConfig((config: HardhatConfig) => {
   config.etherscan.apiKey = ETHERSCAN_KEY
 })
 
 extendEnvironment((hre: HardhatRuntimeEnvironment) => {
-  hre.environment = ENVIRONMENT_ID
+  hre.environment = HOPR_ENVIRONMENT_ID
 })
 
-const PROTOCOL_CONFIG = require('../core/protocol-config.json')
-
-function networkToHardhatNetwork(input: any): any {
-  let res: any = {
+function networkToHardhatNetwork(name: String, input: any): any {
+  let cfg: any = {
     chainId: input.chain_id,
-    gasPrice: 'auto',
     gasMultiplier: input.gas_multiplier,
     live: input.live,
-    tags: input.tags
+    tags: input.tags,
+    saveDeployments: !input.live,
+    mining: undefined
   }
 
   if (input.gas) {
     const parsedGas = input.gas.split(' ')
-    res.gasPrice = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
+    cfg.gasPrice = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
   }
 
+  if (name !== "hardhat") {
   try {
-    res.url = expandVars(input.default_provider, process.env)
+    cfg.url = expandVars(input.default_provider, process.env)
   } catch (_) {
-    res.url = 'invalid_url'
+    cfg.url = 'invalid_url'
+  }
   }
 
   if (input.live) {
-    res.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-    res.companionNetworks = {}
-    res.mining = undefined
+    cfg.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+    cfg.companionNetworks = {}
   } else {
-    res.saveDeployments = true
-    res.mining = {
+    cfg.mining = {
       auto: true, // every transaction will trigger a new block (without this deployments fail)
       interval: [1000, 3000] // mine new block every 1 - 3s
     }
   }
-  return res
+  return cfg
 }
 
 const networks = {}
 
-for (const [environmentId, environment] of Object.entries(PROTOCOL_CONFIG.environments)) {
-  const network = PROTOCOL_CONFIG.networks[environment['network_id']]
-  if (!environment['deprecated'] && network) {
-    const hardhatNetwork = networkToHardhatNetwork(network)
-    networks[environmentId] = hardhatNetwork
-  }
+for (const [networkId, network] of Object.entries(PROTOCOL_CONFIG.networks)) {
+    const hardhatNetwork = networkToHardhatNetwork(networkId, network)
+    networks[networkId] = hardhatNetwork
 }
+console.log(networks)
 
 const hardhatConfig: HardhatUserConfig = {
   networks,
@@ -93,7 +93,7 @@ const hardhatConfig: HardhatUserConfig = {
     tests: './test',
     cache: './hardhat/cache',
     artifacts: './hardhat/artifacts',
-    deployments: `./deployments/${ENVIRONMENT_ID}`
+    deployments: `./deployments/${HOPR_ENVIRONMENT_ID}`
   },
   typechain: {
     outDir: './types',
