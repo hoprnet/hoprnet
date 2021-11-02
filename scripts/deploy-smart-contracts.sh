@@ -54,5 +54,6 @@ for environment_id in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "
 
   log "deploying for environment ${environment_id} on network ${network_id}"
 
-  HOPR_ENVIRONMENT_ID="${environment_id}" yarn workspace @hoprnet/hopr-ethereum hardhat deploy --network "${network_id}"
+  HOPR_ENVIRONMENT_ID="${environment_id}" yarn workspace @hoprnet/hopr-ethereum \
+    hardhat deploy --network "${network_id}" --write true
 done

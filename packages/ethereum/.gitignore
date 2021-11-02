@@ -30,6 +30,7 @@ lib
 hardhat
 deployments/**/solcInputs
 deployments/hardhat-localhost/localhost
+deployments/hardhat-localhost/hardhat
 
 # typechain
 types
