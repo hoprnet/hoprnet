@@ -14,6 +14,7 @@
     "noUnusedParameters": true,
     "sourceMap": true,
     "forceConsistentCasingInFileNames": true,
-    "composite": true
+    "composite": true,
+    "declarationMap": true
   }
 }
