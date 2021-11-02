@@ -176,11 +176,19 @@ update_if_existing() {
 # $1 = vm name
 # $2 = docker image
 # $3 = chain provider
+# $4 = preemptible
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
   local rpc=${3}
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
+
+  local preemptible
+  preemptible="${4:-}"
+
+  if [ -n "${preemptible}" ]; then
+    preemptible_args="--preemptible --metadata-from-file shutdown-script=gcloud-shutdown.sh"
+  fi
 
   if [ "$(update_if_existing $1 $2 ${rpc})" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
@@ -188,6 +196,7 @@ start_testnode_vm() {
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-image=$2 \
+      ${preemptible_args} \
       --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--announce" \
@@ -204,27 +213,18 @@ start_testnode_vm() {
   fi
 }
 
-# $1 = vm name
-# Run a VM with a hardhat instance
-start_chain_provider(){
-  gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
-      --container-image='hopr-provider'
-
-  #hardhat node --config packages/ethereum/hardhat.config.ts
-}
-
 # $1 = network name
 # $2 = docker image
 # $3 = node number
 # $4 = chain provider
+# $5 = preemptible
 start_testnode() {
   local vm ip eth_address
 
   # start or update vm
   vm=$(vm_name "node-$3" $1)
   log "- Starting test node $vm with $2 ${4}"
-  start_testnode_vm $vm $2 ${4}
+  start_testnode_vm $vm $2 ${4} $5
 
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
@@ -254,11 +254,12 @@ add_keys() {
 # $2 = number of nodes
 # $3 = docker image
 # $4 = chain provider
+# $5 = preemptible
 start_testnet() {
   for i in $(seq 1 $2);
   do
     log "Start node $i"
-    start_testnode $1 $3 $i ${4}
+    start_testnode $1 $3 $i ${4} $5
   done
   # @jose can you fix this pls.
   # add_keys scripts/keys/authorized_keys

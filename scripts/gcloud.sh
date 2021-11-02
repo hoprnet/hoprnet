@@ -28,8 +28,10 @@ GCLOUD_META="--metadata=google-logging-enabled=true,google-monitoring-enabled=tr
 GCLOUD_TAGS="--tags=hopr-node,web-client,rest-client,portainer,healthcheck"
 GCLOUD_BOOTDISK="--boot-disk-size=20GB --boot-disk-type=pd-standard"
 GCLOUD_IMAGE="--image-family=cos-stable --image-project=cos-cloud"
+GCLOUD_SCOPES="--scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/trace.append,https://www.googleapis.com/auth/compute"
 
-GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDISK $GCLOUD_IMAGE"
+
+GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDISK $GCLOUD_IMAGE $GCLOUD_SCOPES"
 
 # let keys expire after 1 hour
 alias gssh="gcloud compute ssh --force-key-file-overwrite --ssh-key-expire-after=1h --ssh-flag='-t' $ZONE"
