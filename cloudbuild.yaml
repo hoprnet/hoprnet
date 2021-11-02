@@ -1,19 +1,27 @@
 steps:
-  - id: 'download-cached-yarn-dependencies'
-    waitFor: ['-']
-    name: gcr.io/cloud-builders/gsutil
-    entrypoint: bash
+  - id: 'fetch-cache'
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: sh
     args:
-      - '-c'
+      - -c
       - |
-        gsutil cp gs://${PROJECT_ID}_cloudbuild/cache/yarn-dependencies.tgz yarn-dependencies.tgz || exit 0
-        tar -zxf yarn-dependencies.tgz || exit 0
+        (
+          set -e
+          gsutil hash -h yarn.lock | grep md5 | tr -s " " | awk '{print $3}' > hashed.yarn-lock
+          gsutil -m cp "gs://hoprd-cache/$(cat hashed.yarn-lock)" cache.tar.gz 2> /dev/null
+          test -f cache.tar.gz
+          tar -zxf cache.tar.gz
+          echo "Using cache from: gs://hoprd-cache/$(cat hashed.yarn-lock)"
+        ) || true
 
   - id: 'install-yarn'
     name: node:16
-    waitFor: ['download-cached-yarn-dependencies']
-    entrypoint: yarn
-    args: ['install']
+    waitFor: ['fetch-cache']
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        test -f cache.tar.gz || yarn install
 
   - id: 'build'
     waitFor: ['install-yarn']
@@ -21,16 +29,19 @@ steps:
     entrypoint: yarn
     args: ['build']
 
-  - id: 'upload-cached-yarn-dependencies'
-    waitFor: ['build']
-    name: gcr.io/cloud-builders/gsutil
-    entrypoint: bash
-    dir: cloudcmr-front
+  - id: 'cache'
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: sh
     args:
-      - '-c'
+      - -c
       - |
-        tar -zcf yarn-dependencies.tgz ./node_modules
-        gsutil cp yarn-dependencies.tgz gs://${PROJECT_ID}_cloudbuild/cache/yarn-dependencies.tgz
+        (
+          set -e
+          test ! -f cache.tar.gz
+          tar -zcf cache.tar.gz node_modules public .cache
+          gsutil -m cp cache.tar.gz "gs://hoprd-cache/$(cat hashed.yarn-lock)"
+        ) || true
+    waitFor: ['build']
 
   - name: 'gcr.io/cloud-builders/docker'
     waitFor: ['build']
