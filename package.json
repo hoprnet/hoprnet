@@ -30,7 +30,7 @@
     "run:hoprd:charlie": "yarn workspace @hoprnet/hoprd run dev --host=0.0.0.0:9094 --adminPort=3030 --restPort=3031 --provider=http://127.0.0.1:8545/ --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses  --testPreferLocalAddresses --testNoAuthentication --data=/tmp/charlie --identity=/tmp/local-charly.id",
     "run:faucet:all": "yarn workspace @hoprnet/hopr-ethereum faucet --use-local-identities --identity-directory /tmp --identity-prefix local --password local --network localhost",
     "docs:generate": "yarn workspaces foreach -pv run docs:generate",
-    "clean": "yarn workspaces foreach --exclude hoprnet -v run clean",
+    "clean": "yarn workspaces foreach --exclude hoprnet -v run clean && rimraf tsconfig.scripts.tsbuildinfo",
     "reset": "rimraf packages/*/node_modules && rimraf node_modules"
   },
   "devDependencies": {
