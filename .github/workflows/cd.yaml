@@ -2,10 +2,10 @@ name: HOPR CD
 
 on:
   push:
-    branches: ['debug/**']
+    branches: ["debug/**"]
     paths-ignore:
-      - 'docs/**/*'
-      - 'packages/*/docs/**/*'
+      - "docs/**/*"
+      - "packages/*/docs/**/*"
 
 jobs:
   cd:
@@ -85,3 +85,14 @@ jobs:
           RPC_NETWORK: ${{ steps.set-rpc-network.outputs.network }}
           RELEASE: ${{ steps.set-image-version.outputs.vsn }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+
+      - name: Set IP url per commit
+        id: set-ip-per-commit
+        run: echo "::set-output name=url::$(git rev-parse --short HEAD | cut -c1-7 | xargs -I {} curl --silent 'https://api.hoprnet.org/api/ceramic/ip/{}/get?text=true' | xargs -I XX echo 'http://XX:3000')"
+
+      - name: Update response
+        uses: LouisBrunner/checks-action@v1.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ set-ip-per-commit.outputs.url }}
+          conclusion: ${{ job.status }}
