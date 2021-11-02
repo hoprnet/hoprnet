@@ -114,7 +114,11 @@ type CLIOPts = {
 /**
  * Faucets HOPR and ETH tokens to a local account with HOPR
  */
-async function main(opts: CLIOPts, { ethers, network }: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
+async function main(
+  opts: CLIOPts,
+  { ethers, network, environment }: HardhatRuntimeEnvironment,
+  _runSuper: RunSuperFunction<any>
+) {
   if (!network.tags.development) {
     throw Error('Faucet is only valid in a development network')
   }
@@ -122,7 +126,7 @@ async function main(opts: CLIOPts, { ethers, network }: HardhatRuntimeEnvironmen
   let hoprTokenAddress: string
   try {
     console.log(network)
-    const contract = getContractData(network.name, 'HoprToken')
+    const contract = getContractData(network.name, environment, 'HoprToken')
     hoprTokenAddress = contract.address
   } catch (error) {
     console.error('You need to ensure the network deployed the contracts')

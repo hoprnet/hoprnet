@@ -49,8 +49,8 @@ export async function createChainWrapper(
     throw Error(`Providers chain id ${providerChainId} does not match ${networkInfo.chainId}`)
   }
 
-  const hoprTokenDeployment = getContractData(networkInfo.environment, 'HoprToken')
-  const hoprChannelsDeployment = getContractData(networkInfo.environment, 'HoprChannels')
+  const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
+  const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
 
   const token = HoprToken__factory.connect(hoprTokenDeployment.address, wallet)
   const channels = HoprChannels__factory.connect(hoprChannelsDeployment.address, wallet)

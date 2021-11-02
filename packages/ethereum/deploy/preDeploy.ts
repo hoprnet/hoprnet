@@ -12,7 +12,9 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 
   if (environment.network_id !== hre.network.name) {
-    console.log(`Error: specified environment ${hre.environment} and network ${hre.network.name} not supported together`)
+    console.log(
+      `Error: specified environment ${hre.environment} and network ${hre.network.name} not supported together`
+    )
     process.exit(1)
   }
 }

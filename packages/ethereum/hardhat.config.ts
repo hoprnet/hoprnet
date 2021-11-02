@@ -35,7 +35,7 @@ function networkToHardhatNetwork(name: String, input: any): any {
     gasMultiplier: input.gas_multiplier,
     live: input.live,
     tags: input.tags,
-    saveDeployments: !input.live,
+    saveDeployments: true,
     mining: undefined
   }
 
@@ -44,12 +44,12 @@ function networkToHardhatNetwork(name: String, input: any): any {
     cfg.gasPrice = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
   }
 
-  if (name !== "hardhat") {
-  try {
-    cfg.url = expandVars(input.default_provider, process.env)
-  } catch (_) {
-    cfg.url = 'invalid_url'
-  }
+  if (name !== 'hardhat') {
+    try {
+      cfg.url = expandVars(input.default_provider, process.env)
+    } catch (_) {
+      cfg.url = 'invalid_url'
+    }
   }
 
   if (input.live) {
@@ -67,10 +67,9 @@ function networkToHardhatNetwork(name: String, input: any): any {
 const networks = {}
 
 for (const [networkId, network] of Object.entries(PROTOCOL_CONFIG.networks)) {
-    const hardhatNetwork = networkToHardhatNetwork(networkId, network)
-    networks[networkId] = hardhatNetwork
+  const hardhatNetwork = networkToHardhatNetwork(networkId, network)
+  networks[networkId] = hardhatNetwork
 }
-console.log(networks)
 
 const hardhatConfig: HardhatUserConfig = {
   networks,
