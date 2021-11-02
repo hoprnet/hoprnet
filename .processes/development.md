@@ -50,7 +50,7 @@ Responsibilities:
 
 _Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nionis)
 
-_Expiry:_ 5/11/21
+_Expiry:_ 01/02/22
 
 ### Trifecta
 
