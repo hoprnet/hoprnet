@@ -16,7 +16,9 @@ import { join } from 'path'
  */
 async function send(signer: providers.JsonRpcSigner, txparams: UnsignedTransaction): Promise<void> {
   try {
-    await signer.sendTransaction(txparams)
+    const tx = await signer.sendTransaction(txparams)
+    const txReceipt = await tx.wait(3)
+    console.log(`Transaction included on-chain in block #${txReceipt.blockNumber}`)
   } catch (err) {
     console.log(`Error: ${err}`)
   }
@@ -125,7 +127,6 @@ async function main(
 
   let hoprTokenAddress: string
   try {
-    console.log(network)
     const contract = getContractData(network.name, environment, 'HoprToken')
     hoprTokenAddress = contract.address
   } catch (error) {

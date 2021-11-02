@@ -78,10 +78,10 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096 19097; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -191,7 +191,9 @@ ensure_port_is_free 19097
 
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rfv packages/ethereum/deployments/hardhat-localhost/localhost
+rm -Rfv \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
 
 # --- Running Mock Blockchain --- {{{
@@ -202,6 +204,14 @@ DEVELOPMENT=true HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
+
+# need to mirror contract data because of hardhat-deploy node only writing to localhost
+cp -R \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
+cp -R \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
 
 #  --- Run nodes --- {{{
@@ -225,7 +235,7 @@ wait_for_regex ${node6_log} "using blockchain address"
 # }}}
 
 #  --- Fund nodes --- {{{
-yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \

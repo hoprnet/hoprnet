@@ -44,6 +44,7 @@ export function resolveEnvironment(environment_id: string): ResolvedEnvironment 
   const environment = protocolConfig.environments[environment_id]
   const network = protocolConfig.networks[environment?.network_id]
   if (environment && network) {
+    network.id = environment?.network_id
     return {
       id: environment_id,
       network,

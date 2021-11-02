@@ -162,6 +162,7 @@ class Hopr extends EventEmitter {
       options.forceCreateDB
     )
     this.environment = options.environment
+    console.log(options.environment)
 
     const provider = expandVars(this.environment.network.default_provider, process.env)
     log(`using environment: ${this.environment.id}`)
