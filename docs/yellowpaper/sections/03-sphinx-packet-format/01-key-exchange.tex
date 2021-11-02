@@ -19,9 +19,13 @@ yielding $b_0$ and $s_0$ where $y_0$ refers to the private key of node $n_0$. Th
 
 \textit{under construction}
 Relayers who receive a packet first perform the key derivation as described in previous paragraph and then add the blinding to make incoming and outgoing $\alpha$ indistinguishable from random number of the same length and to make sure that keys can only be derived in the intended order
+
+Hence $s_i$ can be computed as from $\alpha_i$ as
+
+$$ \alpha_i = x \cdot \biggl(\prod_{j=0}^{i} b_j \biggr) \cdot G = \biggl(\prod_{j=0}^{i} b_j \biggr) \cdot \alpha_0 = \biggl(\prod_{j=k+1}^{i} b_j \biggr) \cdot \alpha_k $$
 % key derivation
 
-% altering alpha adding blinding
+% altering alpha adding blinding 
 
 % sending to next node
 
