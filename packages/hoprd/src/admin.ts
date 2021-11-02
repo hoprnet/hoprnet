@@ -1,16 +1,22 @@
-import Hopr from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
 import path from 'path'
-import { debug } from '@hoprnet/hopr-utils'
 import { parse, URL } from 'url'
 import next from 'next'
 import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
 import { LogStream } from './logs'
 import { NODE_ENV } from './env'
-import { Balance, NativeBalance, SUGGESTED_BALANCE, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import {
+  Balance,
+  NativeBalance,
+  SUGGESTED_BALANCE,
+  SUGGESTED_NATIVE_BALANCE,
+  debug,
+  startResourceLogger
+} from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import cookie from 'cookie'
 
@@ -172,6 +178,7 @@ export class AdminServer {
 
     // Setup some noise
     connectionReport(this.node, this.logs)
+
     reportMemoryUsage(this.logs)
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)

@@ -9,7 +9,7 @@ import type { TimeoutOpts } from '../async'
 
 import { abortableTimeout } from '../async'
 
-import { debug } from '../debug'
+import { debug } from '../process'
 import { green } from 'chalk'
 
 const verbose = debug('hopr-core:libp2p:verbose')

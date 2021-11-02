@@ -7,7 +7,7 @@ import multihashes from 'multihashes'
 import type { Connection, MuxedStream } from 'libp2p'
 import type LibP2P from 'libp2p'
 
-import { debug } from '../debug'
+import { debug } from '../process'
 import pipe from 'it-pipe'
 import { dial } from './dialHelper'
 
