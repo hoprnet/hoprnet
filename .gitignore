@@ -32,5 +32,4 @@ packages/utils/lib/types/
 .pnp.*
 
 # Typescript build info
-tsconfig.scripts.tsbuildinfo
-**/tsconfig.tsbuildinfo
+**/*.tsbuildinfo

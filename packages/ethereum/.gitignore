@@ -33,5 +33,4 @@ deployments/default/localhost
 src/types
 
 # Typescript builds
-*.tsbuildinfo
 lib
