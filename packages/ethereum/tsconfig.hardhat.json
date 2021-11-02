@@ -3,6 +3,6 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["hardhat/type-extension.ts", "hardhat", "hardhat.config.ts", "src"],
+  "include": ["type-extension.ts", "hardhat.config.ts", "tasks", "test", "deploy", "src"],
   "references": [{ "path": "../utils" }]
 }

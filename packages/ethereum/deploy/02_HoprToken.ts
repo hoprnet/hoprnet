@@ -1,6 +1,6 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import { HoprToken__factory } from '../../src/types'
+import { HoprToken__factory } from '../src/types'
 import { utils, constants } from 'ethers'
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
