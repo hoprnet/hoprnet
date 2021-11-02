@@ -22,7 +22,7 @@ import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } from './types'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import { utils } from 'ethers'
-import { INDEXER_TIMEOUT } from './constants'
+import { INDEXER_TIMEOUT } from '../constants'
 
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
