@@ -187,7 +187,7 @@ start_testnode_vm() {
   preemptible="${4:-}"
 
   if [ -n "${preemptible}" ]; then
-    preemptible_args="--preemptible --metadata-from-file shutdown-script=gcloud-shutdown.sh"
+    preemptible_args="--preemptible --metadata-from-file shutdown-script=scripts/gcloud-shutdown.sh"
   fi
 
   if [ "$(update_if_existing $1 $2 ${rpc})" = "no container" ]; then
