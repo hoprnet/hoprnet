@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/core-ethereum" },
+    { "path": "packages/cover-traffic-daemon" },
+    { "path": "packages/ethereum" },
+    { "path": "packages/hoprd" },
+    { "path": "packages/utils" }
+  ]
+}

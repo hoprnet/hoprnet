@@ -5,15 +5,25 @@
   },
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "./lib"
+    "outDir": "./lib",
+    "rootDir": "."
   },
-  "include": ["type-extension.ts", "hardhat.config.ts", "constants.ts", "index.ts", "test", "tasks", "deploy"],
-  "exclude": ["types"],
+  "include": [
+    "type-extension.ts",
+    "hardhat.config.ts",
+    "constants.ts",
+    "index.ts",
+    "test/**/*.ts",
+    "tasks/**/*.ts",
+    "deploy/**/*.ts"
+  ],
+  "exclude": ["types", "lib"],
   "typedocOptions": {
     "entryPoints": ["index.ts"],
     "out": "docs",
     // by default we don't want links to source code to change on every change
     // when building docs for releases we can fix the revision on the cmdline
     "gitRevision": "master"
-  }
+  },
+  "references": [{ "path": "../utils" }]
 }
