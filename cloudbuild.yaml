@@ -1,5 +1,5 @@
 steps:
-  - id: "fetch-cache"
+  - id: 'fetch-cache'
     name: gcr.io/cloud-builders/gcloud
     entrypoint: sh
     args:
@@ -14,22 +14,22 @@ steps:
           echo "Using cache from: gs://hoprd-cache/$(cat hashed.yarn-lock)"
         ) || true
 
-  - id: "install-yarn"
+  - id: 'install-yarn'
     name: node:16
-    waitFor: ["fetch-cache"]
+    waitFor: ['fetch-cache']
     entrypoint: sh
     args:
       - -c
       - |
         test -f cache.tar.gz || yarn install
 
-  - id: "build"
-    waitFor: ["install-yarn"]
+  - id: 'build'
+    waitFor: ['install-yarn']
     name: node:16
     entrypoint: yarn
-    args: ["build"]
+    args: ['build']
 
-  - id: "cache"
+  - id: 'cache'
     name: gcr.io/cloud-builders/gcloud
     entrypoint: sh
     args:
@@ -41,20 +41,20 @@ steps:
           tar -zcf cache.tar.gz node_modules
           gsutil -m cp cache.tar.gz "gs://hoprd-cache/$(cat hashed.yarn-lock)"
         ) || true
-    waitFor: ["build"]
+    waitFor: ['build']
 
-  - id: "docker"
+  - id: 'docker'
     name: gcr.io/cloud-builders/docker
-    waitFor: ["build"]
+    waitFor: ['build']
     args:
-      - "build"
-      - "."
-      - "--tag=gcr.io/$PROJECT_ID/hoprd:$_HOPR_IMAGE_VERSION"
-      - "--build-arg=HOPRD_VERSION=$_HOPR_PACKAGE_VERSION"
+      - 'build'
+      - '.'
+      - '--tag=gcr.io/$PROJECT_ID/hoprd:$_HOPR_IMAGE_VERSION'
+      - '--build-arg=HOPRD_VERSION=$_HOPR_PACKAGE_VERSION'
 
 options:
   logStreamingOption: STREAM_ON
   machineType: N1_HIGHCPU_8
 timeout: 630s
 images:
-  - "gcr.io/$PROJECT_ID/hoprd"
+  - 'gcr.io/$PROJECT_ID/hoprd'
