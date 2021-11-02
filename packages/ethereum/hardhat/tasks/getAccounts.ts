@@ -1,7 +1,7 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import type { HoprToken } from '../types'
+import type { HoprToken } from '../../src/types'
 
-import { getContractData, Networks } from '..'
+import { getContractData, Networks } from '../../src'
 
 /**
  * Display unlocked accounts alongside with how much

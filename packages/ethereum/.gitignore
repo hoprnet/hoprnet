@@ -23,13 +23,15 @@ scTopics
 # Exclude built npm packages
 *.tgz
 
-# distribution files
-lib
-
 # Hardhat
-hardhat
+hardhat/artifacts
+hardhat/cache
 deployments/**/solcInputs
 deployments/default/localhost
 
 # typechain
-types
+src/types
+
+# Typescript builds
+*.tsbuildinfo
+lib

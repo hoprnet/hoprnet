@@ -1,10 +1,10 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import type { UnsignedTransaction, BigNumber, providers } from 'ethers'
-import type { HoprToken } from '../types'
+import type { HoprToken } from '../../src/types'
 
 import { utils, constants } from 'ethers'
 import { deserializeKeyPair, PublicKey, hasB58String } from '@hoprnet/hopr-utils'
-import { getContractData, Networks } from '..'
+import { getContractData, Networks } from '../../src'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
 

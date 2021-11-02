@@ -11,7 +11,7 @@ import 'solidity-coverage'
 import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
-import { networks, NetworkTag } from './constants'
+import { networks, NetworkTag } from './src/constants'
 import fs from 'fs'
 
 const {
@@ -97,13 +97,13 @@ const hardhatConfig: HardhatUserConfig = {
   },
   paths: {
     sources: './contracts',
-    tests: './test',
+    tests: '../test',
     cache: './hardhat/cache',
     artifacts: './hardhat/artifacts',
     deployments: `./deployments/${ENVIRONMENT_ID}`
   },
   typechain: {
-    outDir: './types',
+    outDir: './src/types',
     target: 'ethers-v5'
   },
   gasReporter: {
@@ -116,7 +116,7 @@ const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
 const DEFAULT_FUND_AMOUNT = '1'
 
 task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) =>
-  (await import('./tasks/faucet')).default(args[0], args[1], args[2])
+  (await import('./hardhat/tasks/faucet')).default(args[0], args[1], args[2])
 )
   .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
@@ -136,7 +136,7 @@ task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR 
   .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
 
 task('accounts', 'View unlocked accounts', async (...args: any[]) =>
-  (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
+  (await import('./hardhat/tasks/getAccounts')).default(args[0], args[1], args[2])
 )
 
 function getSortedFiles(dependenciesGraph) {

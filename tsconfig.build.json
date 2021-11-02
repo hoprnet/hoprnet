@@ -7,6 +7,7 @@
     { "path": "packages/ethereum" },
     { "path": "packages/hoprd" },
     { "path": "packages/utils" },
-    { "path": "./tsconfig.scripts.json" }
+    { "path": "./tsconfig.scripts.json" },
+    { "path": "packages/ethereum/tsconfig.hardhat.json" }
   ]
 }
