@@ -29,12 +29,17 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
   hre.environment = HOPR_ENVIRONMENT_ID
 })
 
+// For reference on how the configuration is structured refer to:
+//
+// https://hardhat.org/hardhat-network/reference/#config
+// https://github.com/wighawag/hardhat-deploy/blob/master/README.md
 function networkToHardhatNetwork(name: String, input: any): any {
   let cfg: any = {
     chainId: input.chain_id,
     gasMultiplier: input.gas_multiplier,
     live: input.live,
     tags: input.tags,
+    // used by hardhat-deploy
     saveDeployments: true,
     mining: undefined
   }
@@ -92,6 +97,7 @@ const hardhatConfig: HardhatUserConfig = {
     tests: './test',
     cache: './hardhat/cache',
     artifacts: './hardhat/artifacts',
+    // used by hardhat-deploy
     deployments: `./deployments/${HOPR_ENVIRONMENT_ID}`
   },
   typechain: {
