@@ -12,7 +12,7 @@
     "hopr-cover-traffic-daemon-dashboard": "lib/dashboard.js"
   },
   "scripts": {
-    "clean": "rimraf ./lib",
+    "clean": "rimraf ./lib && rimraf ./tsconfig.tsbuildinfo",
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",

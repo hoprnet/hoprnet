@@ -5,8 +5,7 @@
   },
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "./lib",
-    "rootDir": "."
+    "outDir": "./lib"
   },
   "include": [
     "type-extension.ts",

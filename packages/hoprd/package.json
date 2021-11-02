@@ -15,7 +15,7 @@
     "node": "16"
   },
   "scripts": {
-    "clean": "rimraf ./lib",
+    "clean": "rimraf ./lib && rimraf ./tsconfig.tsbuildinfo",
     "build": "yarn clean && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "next build hopr-admin",
     "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit . test",
