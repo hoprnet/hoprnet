@@ -42,7 +42,7 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 
 ### Representantives
 
-Elected representantives are rotated every `2 months`.
+Representantives are elected every `2 months`, previous representatives may be re-elected.
 
 Responsibilities:
 
