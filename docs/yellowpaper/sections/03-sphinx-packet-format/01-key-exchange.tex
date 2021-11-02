@@ -1,6 +1,31 @@
-\subsubsection{Key Exchange}
+\subsubsection{Key Derivation}
 \label{sec:sphinx:keyderivation}
 
+Path selection, see section \ref{sec:path-selection}, results in a list $n_0, \dots, n_r$ of mixnodes which are supposed to process and forward the packet before the message reaches its destination $dest$. HOPR nodes use their public keys as addresses, hence the public keys $Y_0, \dots , Y_r$ are known to the creator of a packet.
+
+\paragraph{Key Exchange}
+
+Having this knowledge allows the creator of the packet to perform an offline Diffie-Hellman key exchange with each of the mix nodes $n_0 , \dots , n_r$ and the destination $dest$, resulting in shared secrets $s_0, \dots , s_r$ and $s_{dest}$.
+
+To provide perfect forward secrecy and thereby minimize the risk of key corruption, the sender first samples a random value $x \in \mathbb{F}$ and derives $\alpha_0 = x \cdot G$. It further derives blinding factor $b_0$ as $b_0 = \mathsf{KDF}(\alpha_0, x \cdot Y_0)$ where \textsf{KDF} is a key derivation function, and derives the shared secret as $s_0 = x \cdot b_0 \cdot Y_0$. Hence, deriving the shared secret $s_0$ requires the knowledge of the sender's field element $\alpha_0 = x \cdot G$ as well as the receivers' field element $x \cdot b_0 \cdot Y_0$.
+
+The first relayer $n_0$ is then able to compute $s_0$ by first deriving $x \cdot Y_0$ as
+
+$$y_0 \cdot \alpha_0 = y_0 \cdot x \cdot G = x \cdot ( y_0 \cdot G) = x \cdot Y_0$$
+
+yielding $b_0$ and $s_0$ where $y_0$ refers to the private key of node $n_0$. The value $s_0$ then servers as a master secret to perform further key derivations as described in appendix \ref{appendix:keyderivation}.
+
+\paragraph{Transformation}
+
+\textit{under construction}
+Relayers who receive a packet first perform the key derivation as described in previous paragraph and then add the blinding to make incoming and outgoing $\alpha$ indistinguishable from random number of the same length and to make sure that keys can only be derived in the intended order
+% key derivation
+
+% altering alpha adding blinding
+
+% sending to next node
+
+After deriving the shared key
 Once path selection as seen in section \ref{sec:path-selection}
 
 Before sending, path selection
@@ -15,13 +40,17 @@ $A$ performs an offline Diffie-Hellman (DH) key exchange with each of these node
 
 $A$ computes a sequence of tuples $(\alpha_i,s_i,b_i) \in \{ B, C, D, Z \}$ with $\alpha_A = g^x$ and $b_A = h_b(\alpha_A, y_B^{x})$ as follows:
 
+\paragraph{Example}
+
+\textit{under construction}
+
 \begin{align}
-    \nonumber M_0 & =(\alpha_B,s_B,b_B) = (g^{x b_A},y_B^{x b_A},h_b(\alpha_B,s_B))                                   \\
-    \nonumber M_1 & =(\alpha_C,s_C,b_C) = (g^{x b_A b_B},y_C^{x b_A b_B},h_b(\alpha_C,s_C))                           \\
-    \nonumber M_2 & =(\alpha_D,s_D,b_D) = (g^{x b_A b_B b_C},y_D^{x b_A b_B b_C},h_b(\alpha_D,s_D))                   \\
+    \nonumber M_0 & =(\alpha_B,s_B,b_B) = (g^{x b_A},y_B^{x b_A},h_b(\alpha_B,s_B)                                    \\
+    \nonumber M_1 & =(\alpha_C,s_C,b_C) = (g^{x b_A b_B},y_C^{x b_A b_B},h_b(\alpha_C,s_C)                            \\
+    \nonumber M_2 & =(\alpha_D,s_D,b_D) = (g^{x b_A b_B b_C},y_D^{x b_A b_B b_C},h_b(\alpha_D,s_D)                    \\
     \nonumber M_3 & =(\alpha_Z,s_Z,b_Z)           = (g^{x b_A b_B b_C b_D},y_Z^{x b_A b_B b_C b_D},h_b(\alpha_Z,s_Z))
 \end{align}
-where $y_B, y_C, y_D$, and $y_Z$ are the public keys of the nodes $B, C, D$, and $Z$, respectively, which we assume to be available to $A$.
+% where $y_B, y_C, y_D$, and $y_Z$ are the public keys of the nodes $B, C, D$, and $Z$, respectively, which we assume to be available to $A$.
 
 \begin{figure}[H]
     \begin{tikzpicture}
