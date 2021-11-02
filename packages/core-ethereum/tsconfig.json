@@ -1,8 +1,8 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "./lib",
-    "composite": true
+    "outDir": "lib",
+    "rootDir": "src"
   },
   "include": ["src/**/*.ts"],
   "typedocOptions": {

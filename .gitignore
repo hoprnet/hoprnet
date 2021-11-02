@@ -30,3 +30,6 @@ packages/utils/lib/types/
 !.yarn/sdks
 !.yarn/versions
 .pnp.*
+
+# Typescript build info
+**/tsconfig.tsbuildinfo

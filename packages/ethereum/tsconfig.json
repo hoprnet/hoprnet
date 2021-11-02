@@ -15,9 +15,10 @@
     "index.ts",
     "test/**/*.ts",
     "tasks/**/*.ts",
-    "deploy/**/*.ts"
+    "deploy/**/*.ts",
+    "types/**/*.ts"
   ],
-  "exclude": ["types", "lib"],
+  "exclude": ["lib"],
   "typedocOptions": {
     "entryPoints": ["index.ts"],
     "out": "docs",
