@@ -96,3 +96,5 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: ${{ steps.set-ip-per-commit.outputs.url }}
           details_url: ${{ steps.set-ip-per-commit.outputs.url }}
+          conclusion: ${{ job.status }}
+
