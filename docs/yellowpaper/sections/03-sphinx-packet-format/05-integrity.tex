@@ -76,7 +76,7 @@ The received header $(\alpha_i,\beta_i,\gamma_i)$ thereby transforms into $(\alp
 
 \paragraph{Filler}
 
-In order to compute the integrity tag, the sender needs to know \textit{how} the packet is going to look like once it reaches the node that checks its integrity. Hence, the creator of the packet needs to perform the whole transformations that are done by the relayers along the path \textit{in advance} before sending the packet.
+In order to compute the integrity tag, the sender needs to know \textit{how} the packet is going to look like when it reaches the node that checks its integrity. Hence, the creator of the packet needs to perform the whole transformations that are done by the relayers along the path \textit{in advance} before sending the packet.
 
 \begin{figure}[H]
     \centering
@@ -152,11 +152,11 @@ In order to compute the integrity tag, the sender needs to know \textit{how} the
             }
 
         \draw (0,0) rectangle (\width,\one);
-        \draw[decoration={brace,raise=5pt},decorate] (\endWidth,\one) -- node[above=5pt] {filler string $\phi_3$} (\width,\one);
+        \draw[decoration={brace,raise=5pt},decorate] (\endWidth,\one) -- node[above=5pt] {filler string } (\width,\one);
         \draw[decoration={brace,mirror,raise=5pt},decorate] (0,0) -- node[below=7pt] {Used for integrity check by $Z$} (\width,0);
 
     \end{tikzpicture}
-    \caption{Transformed header as seen by $Z$}
+    \caption{Node $A$ is sending a packet through mix nodes $B,C,D$ to final destination $Z$ such that the readable part for $Z$ includes the $END$ tag and the blindings $blinding_B, blinding_C, blinding_D$ that were appended by the predecessors.}
 \end{figure}
 
 Since each node, shifts the routing information to left, thereby deletes their own routing information from the header and appends their own padding in the end, the routing information of the very last node consists of the $END$ message as desribed section \ref{sec:sphinx:routinginformation} and the paddings that got appended by the previous nodes. To compute the integrity tag for that node, the creator of the packet needs to compute a filler string $\phi$ and use it to compute

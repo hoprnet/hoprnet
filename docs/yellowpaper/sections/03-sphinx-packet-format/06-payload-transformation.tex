@@ -57,7 +57,15 @@ To allow the final recipient to determine whether a message is meaningful conten
     \caption{Padded message consisting of 0-padding, protocol tag $\tau$ ($\mathtt{0x484f5052}$, ASCII-encoded ``HOPR"), and payload $m$.}
 \end{figure}
 
-The sender takes the padded message and encrypts it using $\mathsf{PRP.permutate}$ with the derived subkeys in reverse order ($...,s_{i+1}^{prp}, s_i^{prp}, s_{i-1}^{prp},....$) $$\delta_i = \mathsf{PRP.permutate}_{s_i^{prp}}(\delta_{i+1})$$ where $\delta_4 = m_{pad}$ and $\delta_0$ is the ciphertext that is sent to the first relayer when using three intermediate hops.
+The sender takes the padded message and encrypts it using $\mathsf{PRP.permutate}$ with the derived subkeys in reverse order ($...,s_{i+1}^{prp}, s_i^{prp}, s_{i-1}^{prp},....$)
 
-Each node $n_i$ along the chosen path then removes one layer of encryption by setting $$\delta_{i-1} = \mathsf{PRP.inverse}_{s_i^{prp}}(\delta_i)$$ yielding $\delta_0 = m_{pad}$ in case the node is the final recipient.
+$$\delta_i = \mathsf{PRP.permutate}_{s_i^{prp}}(\delta_{i+1})$$
+
+where $\delta_4 = m_{pad}$ and $\delta_0$ is the ciphertext that is sent to the first relayer when using three intermediate hops.
+
+Each node $n_i$ along the chosen path then removes one layer of encryption by setting
+
+$$\delta_{i-1} = \mathsf{PRP.inverse}_{s_i^{prp}}(\delta_i)$$
+
+yielding $\delta_0 = m_{pad}$ in case the node is the final recipient.
 

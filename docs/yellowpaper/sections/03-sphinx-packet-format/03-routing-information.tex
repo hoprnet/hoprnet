@@ -21,6 +21,10 @@ As a result of the Diffie-Helman key exchange done in section \ref{sec:sphinx:ke
 
 The routing information for each node $n_i$ is blinded by XORing the content with $blinding_i$ as well as the blindings $blinding_0, \dots , blinding_{i-1}$ of all previous hops. Each node that receives the packet, removes their own blinding from the header and is thus able to extract the routing information destined for them. By removing the blinding from the header, it allows the next downstream node to extract their routing information since it is now only blinded by their blinding.
 
+\paragraph{Example}
+
+The following assumes the sender $A$ is generating routing information for $B,C,D,Z$ and applies their corresponding blinding which is visualized by different hatchings.
+
 \begin{figure}[H]
     \centering
     \begin{tikzpicture}
