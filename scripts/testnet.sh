@@ -259,7 +259,7 @@ start_testnet() {
   for i in $(seq 1 $2);
   do
     log "Start node $i"
-    start_testnode $1 $3 $i ${4} $5
+    start_testnode $1 $3 $i ${4} ${5}
   done
   # @jose can you fix this pls.
   # add_keys scripts/keys/authorized_keys
