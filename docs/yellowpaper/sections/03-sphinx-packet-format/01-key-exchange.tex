@@ -36,7 +36,9 @@ The following example shows the key extraction process for a sender $A$, three m
     (\alpha_Z,b_Z,s_Z) & = (x \cdot b_A \ b_B \ b_C \ b_D \cdot G,\textsf{KDF}(\alpha_Z,y_Z \cdot \alpha_Z), y_Z \cdot b_Z \cdot \alpha_Z \cdot G \\
 \end{align*}
 
-where $b_A = x \cdot G$ and $y_i$ for $i \in \{ B,C,D,Z \}$ refers to the nodes' private key. Packets consist of $(\alpha, \beta, \gamma)$ where $\beta$ is described in section \ref{sec:sphinx:routinginformation} and $\gamma$ in section \ref{sec:sphinx:integrity}, leaving both underspecified for the moment. Let further be $packet_i = (\alpha_i, \beta_i, \gamma_i)$, leading to:
+where $b_A = x \cdot G$ and $y_i$ for $i \in \{ B,C,D,Z \}$ refers to the nodes' private key.
+
+Packets consist of $(\alpha, \beta, \gamma)$ where $\beta$ is described in section \ref{sec:sphinx:routinginformation} and $\gamma$ in section \ref{sec:sphinx:integrity}, leaving both underspecified for the moment. Let further be $packet_i = (\alpha_i, \beta_i, \gamma_i)$, leading to:
 
 \begin{figure}[H]
     \begin{tikzpicture}
