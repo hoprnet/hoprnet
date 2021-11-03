@@ -182,7 +182,7 @@ start_testnode_vm() {
   local rpc=${3}
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
-
+  local preemptible_args=""
   local preemptible="${4:-}"
 
   if [ -n "${preemptible}" ]; then
