@@ -1,2 +1,8 @@
 \subsubsection{Replay protection}
 \label{sec:sphinx:replayprotection}
+
+The creator of a packet picks a path that the packet is supposed to take. As seen in section \ref{sec:sphinx:keyderivation}, the key derivation is done such that the packet cannot be processed in a order than the one chosen by its creator.
+
+This behavior prevents the adversary from changing the route but also allows no other route. Hence the adversary can be sure that there is no second possible route. Therefore, it can try to replicate the packet and send it multiple to see which connections get used more and thus reveals the route of the packet.
+
+To prevent from this attack scenario, each node $n_i$ computes a fingerprint $s_i^{tag}$ of each processed packet and stores it in order to refuse the processing of already seen packets. The value $s_i^{tag}$ is generated from master secret $s_i$ as seen in section \ref{sec:sphinx:keyderivation} using the key derivation described in section \ref{appendix:keyderivation}.

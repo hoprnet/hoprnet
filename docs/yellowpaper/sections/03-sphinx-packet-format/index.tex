@@ -55,6 +55,7 @@ $s_i$ are the DH shared secrets, $b_i$ are the blinding factors.
 \input{sections/03-sphinx-packet-format/07-shorter-paths.tex}
 
 
+\begin{comment}
 \subsection{Implementation choices}
 
 HOPR employs the following cryptographic primitives:
@@ -71,3 +72,4 @@ HOPR employs the following cryptographic primitives:
     \item \textbf{Padding} The original Sphinx paper uses a sequence of 0s for padding. However, this allows the last mix node in the path to infer information about the length of the path and the final destination, hence breaking one of the security properties promised by Sphinx. In order to prevent this attack, HOPR replaces the 0-padding with randomized padding for the final mix node when $v<r$. This ensures the exit node cannot identify where the padding starts and thus will not be able to determine the path length. In the case where $v=r$ there is no need to add padding as the length of the path is the maximum length, and thus no additional information is being revealed.
 
 \end{itemize}
+\end{comment}
