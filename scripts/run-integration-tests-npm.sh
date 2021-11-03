@@ -23,6 +23,9 @@ usage() {
 }
 
 # verify and set parameters
+declare wait_delay=2
+declare wait_max_wait=1000
+declare cwd=`pwd`
 declare npm_package_version=""
 declare skip_cleanup="false"
 
@@ -53,9 +56,6 @@ while (( "$#" )); do
   esac
 done
 
-declare wait_delay=2
-declare wait_max_wait=1000
-declare cwd=`pwd`
 
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   wait_delay=10
@@ -111,7 +111,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${npm_install_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -121,7 +121,7 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-if [ "${skip_cleanup}" != "true" ]; then
+if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
@@ -200,10 +200,20 @@ function install_npm_packages() {
 
     # Copies local deployment information to npm install directory
     # Fixme: copy also other environments
+    # need to mirror contract data because of hardhat-deploy node only writing to localhost
     log "Copying deployment information to npm directory (${npm_install_dir})"
     cp -R \
-      ${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost \
-      ${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost/
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
+    cp -R \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+    cp -R \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+      "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost"
+    cp -R \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+      "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost2"
   fi
 }
 
@@ -254,27 +264,23 @@ ensure_port_is_free 13303
 ensure_port_is_free 13304
 ensure_port_is_free 13305
 ensure_port_is_free 13306
+ensure_port_is_free 13307
 ensure_port_is_free 19091
 ensure_port_is_free 19092
 ensure_port_is_free 19093
 ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
+ensure_port_is_free 19097
 # }}}
 
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rfv packages/ethereum/deployments/hardhat-localhost/localhost
-# }}}
-
-# --- Running Mock Blockchain --- {{{
-log "Running hardhat local node"
-DEVELOPMENT=true HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat --show-stack-traces > \
-  "${hardhat_rpc_log}" 2>&1 &
-
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Hardhat node started (127.0.0.1:8545)"
+rm -Rfv \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2" \
+  "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost" \
+  "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost2"
 # }}}
 
 #  --- Create packages if needed --- {{{
@@ -287,6 +293,16 @@ if [ -z "${npm_package_version}" ]; then
   echo '{"id": "hardhat-localhost"}' > "${mydir}/../packages/hoprd/default-environment.json"
   create_npm_package "hoprd"
 fi
+# }}}
+
+# --- Running Mock Blockchain --- {{{
+log "Running hardhat local node"
+DEVELOPMENT=true HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
+  --network hardhat --show-stack-traces > \
+  "${hardhat_rpc_log}" 2>&1 &
+
+wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
+log "Hardhat node started (127.0.0.1:8545)"
 # }}}
 
 #  --- Run nodes --- {{{
@@ -308,10 +324,11 @@ wait_for_regex ${node3_log} "using blockchain address"
 wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
+wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 #  --- Fund nodes --- {{{
-yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \
@@ -343,5 +360,5 @@ ${mydir}/../test/integration-test.sh \
 log "Verifying node6 log output"
 grep -E "^HOPR Balance: +10 txHOPR$" "${node6_log}"
 grep -E "^ETH Balance: +1 xDAI$" "${node6_log}"
-grep -E "^Running on: localhost$" "${node6_log}"
+grep -E "^Running on: hardhat$" "${node6_log}"
 # }}}

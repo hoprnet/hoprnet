@@ -17,8 +17,8 @@ import { join } from 'path'
 async function send(signer: providers.JsonRpcSigner, txparams: UnsignedTransaction): Promise<void> {
   try {
     const tx = await signer.sendTransaction(txparams)
-    const txReceipt = await tx.wait(3)
-    console.log(`Transaction included on-chain in block #${txReceipt.blockNumber}`)
+    const txReceipt = await tx.wait()
+    console.log(`Funding transaction included on-chain in block #${txReceipt.blockNumber}`)
   } catch (err) {
     console.log(`Error: ${err}`)
   }
@@ -118,7 +118,7 @@ type CLIOPts = {
  */
 async function main(
   opts: CLIOPts,
-  { ethers, network, environment }: HardhatRuntimeEnvironment,
+  { network, environment }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
   if (!network.tags.development) {
@@ -158,7 +158,6 @@ async function main(
     throw Error(`Could not get any usable addresses.`)
   }
 
-  const signer = ethers.provider.getSigner()
   const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(hoprTokenAddress) as HoprToken
 
   const txs: UnsignedTransaction[] = []
@@ -167,6 +166,13 @@ async function main(
       ...(await createTransaction(hoprToken, identity, utils.parseEther('1.0'), utils.parseEther('10.0'), network.name))
     )
   }
+
+  // we use a custom ethers object here instead of the ethers object from the
+  // hre which is managed by hardhat-ethers, because that one seems to
+  // run its own in-memory hardhat instance, which is undesirable
+  const rpcUrl = network.default_provider
+  const provider = new ethers.providers.JsonRpcProvider(rpcUrl)
+  const signer = provider.getSigner()
 
   for (const tx of txs) {
     await send(signer, tx)

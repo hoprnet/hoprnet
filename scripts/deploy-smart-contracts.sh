@@ -54,6 +54,10 @@ for environment_id in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "
 
   log "deploying for environment ${environment_id} on network ${network_id}"
 
+  # We need to pass the --write parameter due to hardhat-deploy expecting that
+  # to be set in addition to the hardhat config saveDeployments.
+  # See:
+  # https://github.com/wighawag/hardhat-deploy/blob/8c76e7f942010d09b3607650042007f935401633/src/DeploymentsManager.ts#L503
   HOPR_ENVIRONMENT_ID="${environment_id}" yarn workspace @hoprnet/hopr-ethereum \
     hardhat deploy --network "${network_id}" --write true
 done

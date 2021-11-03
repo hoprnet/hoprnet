@@ -15,19 +15,37 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0"
+  msg "Usage: $0 [-h|--help] [-s|--skip-cleanup]"
   msg
-  msg "\tThe cleanup process can be skipped by setting the environment variable HOPRD_SKIP_CLEANUP to 'true'."
+  msg "The cleanup process can be skipped by using '--skip-cleanup'."
   msg
 }
-
-# return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
 # verify and set parameters
 declare wait_delay=2
 declare wait_max_wait=1000
-declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
+declare skip_cleanup="false"
+
+while (( "$#" )); do
+  case "$1" in
+    -h|--help)
+      # return early with help info when requested
+      usage
+      exit 0
+      ;;
+    -s|--skip-cleanup)
+      skip_cleanup="true"
+      shift
+      ;;
+    -*|--*=)
+      usage
+      exit 1
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
 
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   wait_delay=10
@@ -180,6 +198,7 @@ ensure_port_is_free 13303
 ensure_port_is_free 13304
 ensure_port_is_free 13305
 ensure_port_is_free 13306
+ensure_port_is_free 13307
 ensure_port_is_free 19091
 ensure_port_is_free 19092
 ensure_port_is_free 19093
@@ -232,6 +251,7 @@ wait_for_regex ${node3_log} "using blockchain address"
 wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
+wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -267,5 +287,5 @@ ${mydir}/../test/integration-test.sh \
 log "Verifying node6 log output"
 grep -E "^HOPR Balance: +10 txHOPR$" "${node6_log}"
 grep -E "^ETH Balance: +1 xDAI$" "${node6_log}"
-grep -E "^Running on: localhost$" "${node6_log}"
+grep -E "^Running on: hardhat$" "${node6_log}"
 # }}}
