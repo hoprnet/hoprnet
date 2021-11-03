@@ -7,6 +7,7 @@ import { deserializeKeyPair, PublicKey, hasB58String } from '@hoprnet/hopr-utils
 import { getContractData } from '..'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
+import { ethers } from 'hardhat'
 
 /**
  * Takes an array of transactions, signs them and
@@ -167,11 +168,10 @@ async function main(
     )
   }
 
-  // we use a custom ethers object here instead of the ethers object from the
+  // we use a custom ethers provider here instead of the ethers object from the
   // hre which is managed by hardhat-ethers, because that one seems to
   // run its own in-memory hardhat instance, which is undesirable
-  const rpcUrl = network.default_provider
-  const provider = new ethers.providers.JsonRpcProvider(rpcUrl)
+  const provider = new ethers.providers.JsonRpcProvider()
   const signer = provider.getSigner()
 
   for (const tx of txs) {
