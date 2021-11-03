@@ -64,8 +64,22 @@ wait_until_node_is_ready() {
 
 # Get external IP for running node or die
 # $1 - name
+# $2 - preemptible
+# NB: If the instance is preemptible, the response will add an extra column which will
+# make awk parse the wrong ip.
+# e.g. w/preemptible
+# NAME                       ZONE            MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP  STATUS
+# testing-1635856913-node-1  europe-west6-a  e2-medium     true         10.172.0.23  34.65.88.77  RUNNING
+# e.g. w/o preemptible
+# NAME                       ZONE            MACHINE_TYPE  INTERNAL_IP  EXTERNAL_IP  STATUS
+# testing-1635856913-node-1  europe-west6-a  e2-medium     10.172.0.23  34.65.88.77  RUNNING
 gcloud_get_ip() {
-  gcloud compute instances list | grep "$1" | awk '{ print $5 }'
+  local preemptible="${2:-}"
+  local column_number="5"
+  if [ -n "${preemptible}" ]; then
+    column_number="6"
+  fi
+  gcloud compute instances list | grep "$1" | awk "{ print \$$column_number }"
 }
 
 # $1 = VM name

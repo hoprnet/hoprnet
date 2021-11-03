@@ -227,7 +227,7 @@ start_testnode() {
   start_testnode_vm $vm $2 ${4} $preemptible
 
   # ensure node has funds, even after just updating a release
-  ip=$(gcloud_get_ip "${vm}")
+  ip=$(gcloud_get_ip "${vm}" $preemptible)
   wait_until_node_is_ready $ip
   store_git_commit_per_ip $ip
   eth_address=$(get_eth_address "${ip}")
