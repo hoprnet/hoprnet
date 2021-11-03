@@ -24,7 +24,7 @@ declare gcloud_region="--region=europe-west6"
 declare gcloud_disk_name="hoprd-data-disk"
 
 GCLOUD_MACHINE="--machine-type=e2-medium"
-GCLOUD_META="--metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true --maintenance-policy=TERMINATE"
+GCLOUD_META="--metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true --maintenance-policy=MIGRATE"
 GCLOUD_TAGS="--tags=hopr-node,web-client,rest-client,portainer,healthcheck"
 GCLOUD_BOOTDISK="--boot-disk-size=20GB --boot-disk-type=pd-standard"
 GCLOUD_IMAGE="--image-family=cos-stable --image-project=cos-cloud"
@@ -188,7 +188,7 @@ gcloud_create_or_update_instance_template() {
     gcloud compute instance-templates create-with-container "${name}" \
       --machine-type=e2-medium \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
-      --maintenance-policy=TERMINATE \
+      --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
       --boot-disk-size=20GB \
       --boot-disk-type=pd-balanced \
@@ -204,7 +204,7 @@ gcloud_create_or_update_instance_template() {
     gcloud compute instance-templates create-with-container "${name}" \
       --machine-type=e2-medium \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
-      --maintenance-policy=TERMINATE \
+      --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
       --boot-disk-size=20GB \
       --boot-disk-type=pd-balanced \
