@@ -224,7 +224,7 @@ start_testnode() {
   # start or update vm
   vm=$(vm_name "node-$3" $1)
   log "- Starting test node $vm with $2 ${4}"
-  start_testnode_vm $vm $2 ${4} preemptible
+  start_testnode_vm $vm $2 ${4} $preemptible
 
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
@@ -260,7 +260,7 @@ start_testnet() {
   for i in $(seq 1 $2);
   do
     log "Start node $i"
-    start_testnode $1 $3 $i ${4} preemptible
+    start_testnode $1 $3 $i ${4} $preemptible
   done
   # @jose can you fix this pls.
   # add_keys scripts/keys/authorized_keys
