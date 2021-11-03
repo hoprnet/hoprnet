@@ -111,7 +111,7 @@ function setup_node() {
     log "Additional args: \"${additional_args}\""
   fi
 
-  DEBUG="hopr*" node packages/hoprd/lib/index.js \
+  DEBUG="hopr*" NODE_ENV=development node packages/hoprd/lib/index.js \
     --admin \
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \
