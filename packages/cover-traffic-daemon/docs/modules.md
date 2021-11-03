@@ -4,9 +4,29 @@
 
 ## Table of contents
 
+### Type aliases
+
+- [DefaultEnvironment](modules.md#defaultenvironment)
+
 ### Functions
 
 - [main](modules.md#main)
+
+## Type aliases
+
+### DefaultEnvironment
+
+Ƭ **DefaultEnvironment**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `id?` | `string` |
+
+#### Defined in
+
+[index.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic-daemon/src/index.ts#L24)
 
 ## Functions
 
@@ -27,4 +47,4 @@
 
 #### Defined in
 
-[index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic-daemon/src/index.ts#L47)
+[index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic-daemon/src/index.ts#L65)
