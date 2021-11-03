@@ -183,8 +183,7 @@ start_testnode_vm() {
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
-  local preemptible
-  preemptible="${4:-}"
+  local preemptible="${4:-}"
 
   if [ -n "${preemptible}" ]; then
     preemptible_args="--preemptible --metadata-from-file shutdown-script=scripts/gcloud-shutdown.sh"
@@ -220,11 +219,12 @@ start_testnode_vm() {
 # $5 = preemptible
 start_testnode() {
   local vm ip eth_address
+  local preemptible="${5:-}"
 
   # start or update vm
   vm=$(vm_name "node-$3" $1)
   log "- Starting test node $vm with $2 ${4}"
-  start_testnode_vm $vm $2 ${4} $5
+  start_testnode_vm $vm $2 ${4} preemptible
 
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
@@ -256,10 +256,11 @@ add_keys() {
 # $4 = chain provider
 # $5 = preemptible
 start_testnet() {
+  local preemptible="${5:-}"
   for i in $(seq 1 $2);
   do
     log "Start node $i"
-    start_testnode $1 $3 $i ${4} ${5}
+    start_testnode $1 $3 $i ${4} preemptible
   done
   # @jose can you fix this pls.
   # add_keys scripts/keys/authorized_keys
