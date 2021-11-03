@@ -39,4 +39,4 @@ HOPRD_API_TOKEN='D3f4ul+!_2021'
 BS_PASSWORD='d3f4ul+!_2021'
 
 echo "Starting single testing node for hoprd:$RELEASE"
-start_testnet "testing-$RELEASE" 1 "gcr.io/hoprassociation/hoprd:$RELEASE" "${RPC}"
+start_testnet "testing-$RELEASE" 1 "gcr.io/hoprassociation/hoprd:$RELEASE" "${RPC}" true

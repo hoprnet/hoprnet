@@ -195,7 +195,6 @@ start_testnode_vm() {
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-image=$2 \
-      ${preemptible_args} \
       --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--announce" \
@@ -208,7 +207,8 @@ start_testnode_vm() {
       --container-arg="--provider" --container-arg="${rpc}" \
       --container-arg="--rest" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
-      --container-restart-policy=always
+      --container-restart-policy=always \
+      ${preemptible_args}
   fi
 }
 

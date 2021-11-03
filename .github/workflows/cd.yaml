@@ -94,5 +94,4 @@ jobs:
         uses: LouisBrunner/checks-action@v1.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          name: ${{ steps.set-ip-per-commit.outputs.url }}
-          conclusion: ${{ job.status }}
+          details_url: ${{ steps.set-ip-per-commit.outputs.url }}
