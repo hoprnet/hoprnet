@@ -17,7 +17,7 @@ import {
   Hash
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
-import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
+import { CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
@@ -51,7 +51,14 @@ export default class HoprEthereum extends EventEmitter {
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
-    private options?: { provider?: string; maxConfirmations?: number }
+    private options?: {
+      provider: string
+      maxConfirmations?: number
+      chainId: number
+      gasPrice?: number
+      network: string
+      environment: string
+    }
   ) {
     super()
     this.indexer = new Indexer(
@@ -68,7 +75,7 @@ export default class HoprEthereum extends EventEmitter {
     }
 
     const _start = async (): Promise<HoprEthereum> => {
-      this.chain = await createChainWrapper(this.options.provider || PROVIDER_DEFAULT_URI, this.privateKey)
+      this.chain = await createChainWrapper(this.options, this.privateKey)
       await this.chain.waitUntilReady()
       await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 

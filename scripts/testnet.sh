@@ -18,50 +18,64 @@ source "${mydir}/dns.sh"
 declare min_funds=0.01291
 declare min_funds_hopr=0.5
 
-# $1 = role (ie. node-4)
-# $2 = network name
+# $1=role (ie. node-4)
+# $2=network name
 vm_name() {
-  echo "$2-$1"
+  local role="${1}"
+  local network_name="${2}"
+
+  echo "${network_name}-${role}"
 }
 
-# $1 = vm name
+# $1=vm name
 disk_name() {
-  echo "$1-dsk"
+  local vm_name="${1}"
+  echo "${vm_name}-dsk"
 }
 
-# $1 = account (hex)
-# $2 = chain provider
+# $1=environment id
+get_rpc() {
+  local environment_id="${1}"
+  local network_id=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".network_id")
+  local unresolved_rpc=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".networks.\"${network_id}\".default_provider")
+  echo "${unresolved_rpc}" | envsubst
+}
+
+# $1=account (hex)
+# $2=rpc
 wallet_balance() {
   local address=${1}
   local rpc=${2}
 
-  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('$1').then(b => formatEther(b))"
+  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('${address}').then(b => formatEther(b))"
 }
 
-# $1 = chain provider
+# $1=rpc
 funding_wallet_address() {
-  local rpc="${1}"
+  local rpc=${1}
 
   # the value of FUNDING_PRIV_KEY must be prefixed with 0x
   yarn run --silent ethers --rpc "${rpc}" --account ${FUNDING_PRIV_KEY} eval 'accounts[0].getAddress().then(a => a)'
 }
 
-# $1 = account (hex)
-# $2 = chain provider
-# $3 = optional: hopr token contract
+# $1=account (hex)
+# $2=environment_id
+# $3=optional: hopr token contract
 fund_if_empty() {
   local address="${1}"
-  local rpc="${2}"
+  local environment_id="${2}"
   local token_contract="${3:-}"
 
   local funding_address funding_balance balance
+
+  local rpc=$(get_rpc "${environment_id}")
 
   funding_address=$(funding_wallet_address "${rpc}")
 
   log "Checking balance of funding wallet ${funding_address} using RPC ${rpc}"
   funding_balance="$(wallet_balance "${funding_address}" "${rpc}")"
 
-  if [ "${funding_balance}" = '0.0' ]; then
+  if [ "${funding_balance}" == '0.0' ]; then
     log "Wallet ${funding_address} has zero balance and cannot fund node ${address}"
   else
     log "Funding wallet ${funding_address} has enough funds: ${funding_balance}"
@@ -69,7 +83,7 @@ fund_if_empty() {
     balance="$(wallet_balance "${address}" "${rpc}")"
 
     log "Balance of ${address} is ${balance}"
-    if [ "${balance}" = '0.0' ]; then
+    if [ "${balance}" == '0.0' ]; then
       # need to wait to make retries work
       local ethers_opts="--rpc ${rpc} --account ${FUNDING_PRIV_KEY} --yes --wait"
 
@@ -85,8 +99,8 @@ fund_if_empty() {
   fi
 }
 
-# $1 = IP
-# $2 = optional: port, defaults to 3001
+# $1=IP
+# $2=optional: port, defaults to 3001
 get_eth_address(){
   local ip=${1}
   local port=${2:-3001}
@@ -96,8 +110,8 @@ get_eth_address(){
   try_cmd "${cmd}" 30 5
 }
 
-# $1 = IP
-# $2 = optional: port, defaults to 3001
+# $1=IP
+# $2=optional: port, defaults to 3001
 get_hopr_address() {
   local ip=${1}
   local port=${2:-3001}
@@ -107,17 +121,21 @@ get_hopr_address() {
   try_cmd "${cmd}" 30 5
 }
 
-# $1 = IP
-# $2 = Hopr command
-# $3 = optional: port
+# $1=IP
+# $2=Hopr command
+# $3=optional: port
 run_command(){
   curl --silent -X POST --data "${2}" "${1}:${3:-3001}/api/v1/command"
 }
 
-# $1 = vm name
-# $2 = docker image
-# $3 = chain provider
+# $1=vm name
+# $2=docker image
+# $3=environment id
 update_if_existing() {
+  local vm_name=${1}
+  local docker_image=${2}
+  local environment_id=${3}
+
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
     log "Container exists, updating" 1>&2
     PREV=$(gcloud_get_image_running_on_vm $1)
@@ -126,31 +144,35 @@ update_if_existing() {
       return 0
     fi
     log "Previous GCloud VM Image: $PREV"
-    gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db" "${3}"
+    gcloud_update_container_with_image "${vm_name}" "${docker_image}" "$(disk_name ${vm_name})" "/app/db" "${environment_id}"
 
     # prevent docker images overloading the disk space
-    gcloud_cleanup_docker_images "$1"
+    gcloud_cleanup_docker_images "${vm_name}"
   else
     echo "no container"
   fi
 
 }
 
-# $1 = vm name
-# $2 = docker image
-# $3 = chain provider
+# $1=vm name
+# $2=docker image
+# $3=environment id
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  local rpc=${3}
+  local vm_name=${1}
+  local docker_image=${2}
+  local environment_id=${3}
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
-  if [ "$(update_if_existing $1 $2 ${rpc})" = "no container" ]; then
-    gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
+  local rpc=$(get_rpc "${environment_id}")
+
+  if [ "$(update_if_existing ${vm_name} ${docker_image} ${environment_id})"="no container" ]; then
+    gcloud compute instances create-with-container ${vm_name} $GCLOUD_DEFAULTS \
+      --create-disk name=$(disk_name ${vm_name}),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
-      --container-image=$2 \
+      --container-image=${docker_image} \
       --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--announce" \
@@ -160,7 +182,7 @@ start_testnode_vm() {
       --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
       --container-arg="--init" \
       --container-arg="--password" --container-arg="${password}" \
-      --container-arg="--provider" --container-arg="${rpc}" \
+      --container-arg="--environment" --container-arg="${environment_id}" \
       --container-arg="--rest" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
@@ -168,7 +190,7 @@ start_testnode_vm() {
   fi
 }
 
-# $1 = vm name
+# $1=vm name
 # Run a VM with a hardhat instance
 start_chain_provider(){
   gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
@@ -178,23 +200,28 @@ start_chain_provider(){
   #hardhat node --config packages/ethereum/hardhat.config.ts
 }
 
-# $1 = network name
-# $2 = docker image
-# $3 = node number
-# $4 = chain provider
+# $1=testnet name
+# $2=docker image
+# $3=node number
+# $4=environment id
 start_testnode() {
   local vm ip eth_address
 
+  local testnet_name=${1}
+  local docker_image=${2}
+  local node_number=${3}
+  local environment_id=${4}
+
   # start or update vm
-  vm=$(vm_name "node-$3" $1)
-  log "- Starting test node $vm with $2 ${4}"
-  start_testnode_vm $vm $2 ${4}
+  vm=$(vm_name "node-${node_number}" ${testnet_name})
+  log "- Starting test node ${vm} with ${docker_image} ${environment_id}"
+  start_testnode_vm ${vm} ${docker_image} ${environment_id}
 
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
-  wait_until_node_is_ready $ip
+  wait_until_node_is_ready ${ip}
   eth_address=$(get_eth_address "${ip}")
-  fund_if_empty "${eth_address}" "${4}"
+  fund_if_empty "${eth_address}" "${environment_id}"
 }
 
 # $1 authorized keys file
@@ -213,10 +240,10 @@ add_keys() {
 # either update or start VM's to create a network of
 # N nodes
 
-# $1 = network name
-# $2 = number of nodes
-# $3 = docker image
-# $4 = chain provider
+# $1=network name
+# $2=number of nodes
+# $3=docker image
+# $4=chain provider
 start_testnet() {
   for i in $(seq 1 $2);
   do

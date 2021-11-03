@@ -9,7 +9,10 @@
   "bin": "lib/index.js",
   "files": [
     "lib",
-    "hopr-admin/.next/**"
+    "hopr-admin/.next/**",
+    "hoprd-default.sh",
+    "releases.json",
+    "default-environment.json"
   ],
   "engines": {
     "node": "16"
@@ -73,10 +76,6 @@
     ],
     "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
-  },
-  "hopr": {
-    "description": "master",
-    "environment_id": "master"
   },
   "publishConfig": {
     "access": "public"

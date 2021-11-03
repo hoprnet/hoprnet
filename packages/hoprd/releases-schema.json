@@ -1,0 +1,40 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "the release id used for VM naming"
+      },
+      "version_major": {
+        "type": "integer",
+        "description": "major semver for the release"
+      },
+      "version_minor": {
+        "type": "integer",
+        "description": "minor semver for the release"
+      },
+      "git_ref": {
+        "type": "string",
+        "description": "every time this git ref is updated, the release is deployed"
+      },
+      "environment_id": {
+        "type": "string",
+        "description": "the environment id to run release nodes in, see protocol-config.json"
+      },
+      "deprecated": {
+        "type": "boolean",
+        "description": "if true, this release is kept for historical purposes and not re-deployed",
+        "default": false
+      },
+      "default": {
+        "type": "boolean",
+        "description": "if true, this release's environment is used as the default for packaged releases",
+        "default": false
+      }
+    },
+    "required": ["id", "git_ref", "environment_id", "deprecated"],
+    "additionalProperties": false
+  }
+}
