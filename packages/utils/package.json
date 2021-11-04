@@ -11,7 +11,7 @@
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -p .",
+    "build": "tsc -p .",
     "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
