@@ -1,8 +1,6 @@
 \subsubsection{Shorter Paths}
 \label{sec:sphinx:shorterpaths}
 
-\textit{under construction} TODO: add reference to paper
-
 SPHINX packets define a maximum packet length $r$\footnote{HOPR nodes use by default a path length of three and refuse the processing of packets with greater path lengths.}, meaning $r$ intermediate mix nodes and one destination. They also allow the usage of shorter paths of length $v$ with $0 \le v < r$. Despite these packets have the same size and are due to their construction indistinguishable from packet with maximum path length, it not advisable to shorter paths since they introduce observable patterns that deviate from normal usage. By observing these patterns, an adversary can be able to reconstruct route of distinguished packets.
 
 Creating a header for shorter paths require less routing information, and thus leaves empty space in the end of $\beta$, which is filled as suggested by \cite{sphinxpaperfix} with \textit{random} data. This is necessary because the very last node, i.e. the one for which the message is destined, is otherwise able to determine the utilized path length.
