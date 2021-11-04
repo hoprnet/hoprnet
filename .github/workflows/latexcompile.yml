@@ -9,6 +9,7 @@ on:
       - '!.github/workflows/*.yml'
       - '!docs/yellowpaper/yellowpaper.pdf'
       - '!docs/yellowpaper/*.md'
+      - '!.processes/**/*'
 
 jobs:
   build_latex:

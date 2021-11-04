@@ -12,6 +12,7 @@ on:
     # branches: ['master', 'release/**', 'debug-e2e-gcloud/**']
     branches: ['debug-e2e-gcloud/**']
     paths-ignore:
+      - '.processes/**/*'
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
 

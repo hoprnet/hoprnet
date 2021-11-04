@@ -10,6 +10,7 @@ on:
   push:
     branches: ['integration/**', 'master', 'release/**', 'avado', 'debug-deploy/**']
     paths-ignore:
+      - '.processes/**/*'
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
 

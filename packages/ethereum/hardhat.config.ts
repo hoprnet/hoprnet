@@ -18,7 +18,7 @@ import { expandVars } from '../utils/src/utils'
 import { task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
 
-const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID } = process.env
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
 
 const PROTOCOL_CONFIG = require('../core/protocol-config.json')
 
@@ -45,9 +45,13 @@ function networkToHardhatNetwork(name: String, input: any): any {
     mining: undefined
   }
 
-  if (input.gas) {
-    const parsedGas = input.gas.split(' ')
-    cfg.gasPrice = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
+  if (input.gas_price) {
+    const parsedGasPrice = input.gas_price.split(' ')
+    if (parsedGasPrice.length > 1) {
+      cfg.gasPrice = Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
+    } else {
+      cfg.gasPrice = Number(parsedGasPrice[0])
+    }
   }
 
   if (name !== 'hardhat') {
@@ -61,7 +65,13 @@ function networkToHardhatNetwork(name: String, input: any): any {
   if (input.live) {
     cfg.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     cfg.companionNetworks = {}
-  } else {
+  }
+
+  // we enable auto-mine only in development networks
+  if (HOPR_HARDHAT_TAG) {
+    cfg.tags = [HOPR_HARDHAT_TAG]
+  }
+  if (cfg.tags.indexOf('development') >= 0) {
     cfg.mining = {
       auto: true, // every transaction will trigger a new block (without this deployments fail)
       interval: [1000, 3000] // mine new block every 1 - 3s
