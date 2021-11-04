@@ -8,6 +8,7 @@ on:
     branches: ['**']
     paths-ignore:
       - 'docs/**/*'
+      - '.processes/**/*'
 
 jobs:
   docs:
@@ -36,6 +37,9 @@ jobs:
 
       - name: Install dependencies
         run: yarn
+
+      - name: Build repository
+        run: yarn build
 
       - name: Generate docs
         run: ./scripts/regenerate-typedocs.sh
