@@ -70,7 +70,7 @@ function networkToHardhatNetwork(name: String, input: any): any {
   if (HOPR_HARDHAT_TAG) {
     cfg.tags = [HOPR_HARDHAT_TAG]
   }
-  if (cfg.tags.development) {
+  if (cfg.tags.indexOf('development') >= 0) {
     cfg.mining = {
       auto: true, // every transaction will trigger a new block (without this deployments fail)
       interval: [1000, 3000] // mine new block every 1 - 3s
