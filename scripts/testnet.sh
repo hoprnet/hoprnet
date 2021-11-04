@@ -279,7 +279,7 @@ add_keys() {
 # $1=network name
 # $2=number of nodes
 # $3=docker image
-# $4=chain provider
+# $4=environment id
 # $5=preemptible
 start_testnet() {
   local preemptible="${5:-}"
