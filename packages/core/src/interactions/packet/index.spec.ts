@@ -22,7 +22,6 @@ import {
 } from '@hoprnet/hopr-utils'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import { PROTOCOL_STRING } from '../../constants'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
@@ -194,7 +193,8 @@ describe('packet acknowledgement', function () {
         }
       },
       () => {},
-      () => {}
+      () => {},
+      'protocolAck'
     )
 
     const ackKey = deriveAckKeyShare(secrets[0])
@@ -213,7 +213,8 @@ describe('packet acknowledgement', function () {
       } as any,
       SELF,
       libp2pCounterparty.send as any,
-      COUNTERPARTY
+      COUNTERPARTY,
+      'protocolAck'
     )
 
     await ackReceived.promise
@@ -240,7 +241,8 @@ describe('packet acknowledgement', function () {
       () => {
         ackReceived.resolve()
       },
-      () => {}
+      () => {},
+      'protocolAck'
     )
 
     const interaction = new TestingForwardInteraction(
@@ -250,19 +252,22 @@ describe('packet acknowledgement', function () {
       () => {
         throw Error(`Node is not supposed to receive message`)
       },
-      dbs[1]
+      dbs[1],
+      'protocolMsg',
+      'protocolAck'
     )
 
     interaction.useMockMixer()
 
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
-    libp2pCounterparty.subscribe(PROTOCOL_STRING, (msg: Uint8Array) => {
+    libp2pCounterparty.subscribe('protocolMsg', (msg: Uint8Array) => {
       sendAcknowledgement(
         Packet.deserialize(msg, COUNTERPARTY, RELAY0),
         RELAY0,
         libp2pCounterparty.send as any,
-        COUNTERPARTY
+        COUNTERPARTY,
+        'protocolAck'
       )
     })
 
@@ -315,7 +320,15 @@ describe('packet relaying interaction', function () {
         receive = console.log
       }
 
-      const interaction = new TestingForwardInteraction(subscribe, send as any, pId, receive, dbs[index])
+      const interaction = new TestingForwardInteraction(
+        subscribe,
+        send as any,
+        pId,
+        receive,
+        dbs[index],
+        'protocolMsg',
+        'protocolAck'
+      )
       interaction.useMockMixer()
 
       if (pId.equals(SELF)) {

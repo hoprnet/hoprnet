@@ -7,8 +7,12 @@ import { getContractData, Networks } from '..'
  * Display unlocked accounts alongside with how much
  * ETH / HOPR they have.
  */
-async function main(_params, { network, ethers }: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
-  const contracts = getContractData(network.name as Networks, 'HoprToken')
+async function main(
+  _params,
+  { network, ethers, environment }: HardhatRuntimeEnvironment,
+  _runSuper: RunSuperFunction<any>
+) {
+  const contracts = getContractData(network.name as Networks, environment, 'HoprToken')
   if (!contracts?.[network.name]) throw Error(`cannot find HoprToken address for network ${network.name}`)
   const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(
     contracts[network.name].HoprToken.address

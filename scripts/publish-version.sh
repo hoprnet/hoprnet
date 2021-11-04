@@ -57,7 +57,13 @@ if [[ "${version_type}" = "prerelease" ]]; then
   fi
 fi
 
-echo "Creating new version ${current_version} + ${version_type}"
+log "get default environment id"
+
+declare environment_id
+environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r ".[] | select(.git_ref==\"refs/heads/${branch}\" and default==true).id")
+: ${environment_id:?"Could not read value for default environment id"}
+
+log "creating new version ${current_version} + ${version_type}"
 
 # create new version in each package
 yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version ${version_type} --preid=next
@@ -85,5 +91,16 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
     yarn config set npmAuthToken "${NODE_AUTH_TOKEN:-}"
   fi
+
+  # set default environments
+  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
+  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+
+  # pack and publish packages
   yarn workspaces foreach -piv --no-private --topological-dev npm publish --access public
+
+  # delete default environments
+  rm -f \
+    "${mydir}/../packages/hoprd/default-environment.json" \
+    "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
 fi

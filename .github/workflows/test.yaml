@@ -34,3 +34,5 @@ jobs:
 
       - name: Test
         run: yarn test
+        env:
+          HOPR_ENVIRONMENT_ID: hardhat-localhost

@@ -26,6 +26,8 @@ const main = async function (hre: HardhatRuntimeEnvironment, signer?: Signer) {
   console.log(`"ERC1820Registry" deployed at ${ERC1820_REGISTRY_ADDRESS}`)
 }
 
+main.dependencies = ['preDeploy']
+
 export default main
 
 export const ERC1820_DEPLOYER = '0xa990077c3205cbDf861e17Fa532eeB069cE9fF96'

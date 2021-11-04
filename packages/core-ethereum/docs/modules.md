@@ -44,7 +44,7 @@
 
 #### Defined in
 
-[packages/core-ethereum/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L7)
+[packages/core-ethereum/src/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L6)
 
 ___
 
@@ -54,7 +54,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L9)
+[packages/core-ethereum/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L8)
 
 ## Functions
 
@@ -81,13 +81,18 @@ ___
 
 ### createChainWrapper
 
-▸ **createChainWrapper**(`providerURI`, `privateKey`, `checkDuplicate?`): `Promise`<`Object`\>
+▸ **createChainWrapper**(`networkInfo`, `privateKey`, `checkDuplicate?`): `Promise`<`Object`\>
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `providerURI` | `string` | `undefined` |
+| `networkInfo` | `Object` | `undefined` |
+| `networkInfo.chainId` | `number` | `undefined` |
+| `networkInfo.environment` | `string` | `undefined` |
+| `networkInfo.gasPrice?` | `number` | `undefined` |
+| `networkInfo.network` | `string` | `undefined` |
+| `networkInfo.provider` | `string` | `undefined` |
 | `privateKey` | `Uint8Array` | `undefined` |
 | `checkDuplicate` | `Boolean` | `true` |
 
@@ -97,7 +102,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/ethereum.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L40)
+[packages/core-ethereum/src/ethereum.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L34)
 
 ___
 
