@@ -160,7 +160,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:117
+packages/ethereum/src/types/LegacyERC20.d.ts:117
 
 ___
 
@@ -195,7 +195,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:134
+packages/ethereum/src/types/LegacyERC20.d.ts:134
 
 ___
 
@@ -209,7 +209,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:132
+packages/ethereum/src/types/LegacyERC20.d.ts:132
 
 ___
 
@@ -230,7 +230,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:89
+packages/ethereum/src/types/LegacyERC20.d.ts:89
 
 ___
 
@@ -244,7 +244,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:87
+packages/ethereum/src/types/LegacyERC20.d.ts:87
 
 ___
 
@@ -265,7 +265,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:149
+packages/ethereum/src/types/LegacyERC20.d.ts:149
 
 ___
 
@@ -405,7 +405,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:48
+packages/ethereum/src/types/LegacyERC20.d.ts:48
 
 ___
 
@@ -429,7 +429,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:47
+packages/ethereum/src/types/LegacyERC20.d.ts:47
 
 ___
 
@@ -447,7 +447,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:49
+packages/ethereum/src/types/LegacyERC20.d.ts:49
 
 ___
 
@@ -551,7 +551,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:51
+packages/ethereum/src/types/LegacyERC20.d.ts:51
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -571,7 +571,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:74
+packages/ethereum/src/types/LegacyERC20.d.ts:74
 
 ___
 
@@ -603,7 +603,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:54
+packages/ethereum/src/types/LegacyERC20.d.ts:54
 
 ▸ **off**(`eventName`, `listener`): [`LegacyERC20`](LegacyERC20.md)
 
@@ -624,7 +624,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:75
+packages/ethereum/src/types/LegacyERC20.d.ts:75
 
 ___
 
@@ -656,7 +656,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:58
+packages/ethereum/src/types/LegacyERC20.d.ts:58
 
 ▸ **on**(`eventName`, `listener`): [`LegacyERC20`](LegacyERC20.md)
 
@@ -677,7 +677,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:76
+packages/ethereum/src/types/LegacyERC20.d.ts:76
 
 ___
 
@@ -709,7 +709,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:62
+packages/ethereum/src/types/LegacyERC20.d.ts:62
 
 ▸ **once**(`eventName`, `listener`): [`LegacyERC20`](LegacyERC20.md)
 
@@ -730,7 +730,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:77
+packages/ethereum/src/types/LegacyERC20.d.ts:77
 
 ___
 
@@ -763,7 +763,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:81
+packages/ethereum/src/types/LegacyERC20.d.ts:81
 
 ___
 
@@ -794,7 +794,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:70
+packages/ethereum/src/types/LegacyERC20.d.ts:70
 
 ▸ **removeAllListeners**(`eventName?`): [`LegacyERC20`](LegacyERC20.md)
 
@@ -814,7 +814,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:79
+packages/ethereum/src/types/LegacyERC20.d.ts:79
 
 ___
 
@@ -846,7 +846,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:66
+packages/ethereum/src/types/LegacyERC20.d.ts:66
 
 ▸ **removeListener**(`eventName`, `listener`): [`LegacyERC20`](LegacyERC20.md)
 
@@ -867,7 +867,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:78
+packages/ethereum/src/types/LegacyERC20.d.ts:78
 
 ___
 
@@ -889,7 +889,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:111
+packages/ethereum/src/types/LegacyERC20.d.ts:111
 
 ___
 
@@ -912,7 +912,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/LegacyERC20.d.ts:104
+packages/ethereum/src/types/LegacyERC20.d.ts:104
 
 ___
 

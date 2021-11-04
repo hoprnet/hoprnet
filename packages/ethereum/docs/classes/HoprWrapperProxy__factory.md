@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:220
+packages/ethereum/src/types/factories/HoprWrapperProxy__factory.ts:220
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:247
+packages/ethereum/src/types/factories/HoprWrapperProxy__factory.ts:247
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:246
+packages/ethereum/src/types/factories/HoprWrapperProxy__factory.ts:246
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:240
+packages/ethereum/src/types/factories/HoprWrapperProxy__factory.ts:240
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:243
+packages/ethereum/src/types/factories/HoprWrapperProxy__factory.ts:243
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:230
+packages/ethereum/src/types/factories/HoprWrapperProxy__factory.ts:230
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:235
+packages/ethereum/src/types/factories/HoprWrapperProxy__factory.ts:235
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:251
+packages/ethereum/src/types/factories/HoprWrapperProxy__factory.ts:251
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprWrapperProxy__factory.ts:248
+packages/ethereum/src/types/factories/HoprWrapperProxy__factory.ts:248
 
 ___
 

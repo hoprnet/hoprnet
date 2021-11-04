@@ -193,7 +193,7 @@ ___
 
 ### libp2p
 
-• `Private` **libp2p**: [`LibP2P`](LibP2P.md)
+• `Private` **libp2p**: `Libp2p`
 
 #### Defined in
 

@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/Ownable__factory.ts:65
+packages/ethereum/src/types/factories/Ownable__factory.ts:65
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/Ownable__factory.ts:65
 
 #### Defined in
 
-packages/ethereum/types/factories/Ownable__factory.ts:69
+packages/ethereum/src/types/factories/Ownable__factory.ts:69
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Ownable__factory.ts:66
+packages/ethereum/src/types/factories/Ownable__factory.ts:66

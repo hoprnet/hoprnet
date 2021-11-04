@@ -196,7 +196,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:641
+packages/ethereum/src/types/ChannelsMock.d.ts:641
 
 ___
 
@@ -249,7 +249,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:1058
+packages/ethereum/src/types/ChannelsMock.d.ts:1058
 
 ___
 
@@ -284,7 +284,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:768
+packages/ethereum/src/types/ChannelsMock.d.ts:768
 
 ___
 
@@ -323,7 +323,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:381
+packages/ethereum/src/types/ChannelsMock.d.ts:381
 
 ___
 
@@ -337,7 +337,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:379
+packages/ethereum/src/types/ChannelsMock.d.ts:379
 
 ___
 
@@ -376,7 +376,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:1177
+packages/ethereum/src/types/ChannelsMock.d.ts:1177
 
 ___
 
@@ -438,7 +438,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:513
+packages/ethereum/src/types/ChannelsMock.d.ts:513
 
 ___
 
@@ -458,7 +458,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:515
+packages/ethereum/src/types/ChannelsMock.d.ts:515
 
 ___
 
@@ -554,7 +554,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:517
+packages/ethereum/src/types/ChannelsMock.d.ts:517
 
 ___
 
@@ -578,7 +578,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:340
+packages/ethereum/src/types/ChannelsMock.d.ts:340
 
 ___
 
@@ -600,7 +600,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:523
+packages/ethereum/src/types/ChannelsMock.d.ts:523
 
 ___
 
@@ -622,7 +622,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:529
+packages/ethereum/src/types/ChannelsMock.d.ts:529
 
 ___
 
@@ -643,7 +643,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:535
+packages/ethereum/src/types/ChannelsMock.d.ts:535
 
 ___
 
@@ -664,7 +664,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:550
+packages/ethereum/src/types/ChannelsMock.d.ts:550
 
 ___
 
@@ -688,7 +688,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:339
+packages/ethereum/src/types/ChannelsMock.d.ts:339
 
 ___
 
@@ -706,7 +706,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:341
+packages/ethereum/src/types/ChannelsMock.d.ts:341
 
 ___
 
@@ -776,7 +776,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:555
+packages/ethereum/src/types/ChannelsMock.d.ts:555
 
 ___
 
@@ -800,7 +800,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:560
+packages/ethereum/src/types/ChannelsMock.d.ts:560
 
 ___
 
@@ -822,7 +822,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:568
+packages/ethereum/src/types/ChannelsMock.d.ts:568
 
 ___
 
@@ -849,7 +849,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:574
+packages/ethereum/src/types/ChannelsMock.d.ts:574
 
 ___
 
@@ -876,7 +876,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:585
+packages/ethereum/src/types/ChannelsMock.d.ts:585
 
 ___
 
@@ -899,7 +899,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:596
+packages/ethereum/src/types/ChannelsMock.d.ts:596
 
 ___
 
@@ -920,7 +920,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:603
+packages/ethereum/src/types/ChannelsMock.d.ts:603
 
 ___
 
@@ -975,7 +975,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:343
+packages/ethereum/src/types/ChannelsMock.d.ts:343
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -995,7 +995,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:366
+packages/ethereum/src/types/ChannelsMock.d.ts:366
 
 ___
 
@@ -1016,7 +1016,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:608
+packages/ethereum/src/types/ChannelsMock.d.ts:608
 
 ___
 
@@ -1048,7 +1048,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:346
+packages/ethereum/src/types/ChannelsMock.d.ts:346
 
 ▸ **off**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1069,7 +1069,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:367
+packages/ethereum/src/types/ChannelsMock.d.ts:367
 
 ___
 
@@ -1101,7 +1101,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:350
+packages/ethereum/src/types/ChannelsMock.d.ts:350
 
 ▸ **on**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1122,7 +1122,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:368
+packages/ethereum/src/types/ChannelsMock.d.ts:368
 
 ___
 
@@ -1154,7 +1154,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:354
+packages/ethereum/src/types/ChannelsMock.d.ts:354
 
 ▸ **once**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1175,7 +1175,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:369
+packages/ethereum/src/types/ChannelsMock.d.ts:369
 
 ___
 
@@ -1196,7 +1196,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:613
+packages/ethereum/src/types/ChannelsMock.d.ts:613
 
 ___
 
@@ -1229,7 +1229,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:373
+packages/ethereum/src/types/ChannelsMock.d.ts:373
 
 ___
 
@@ -1257,7 +1257,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:615
+packages/ethereum/src/types/ChannelsMock.d.ts:615
 
 ___
 
@@ -1288,7 +1288,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:362
+packages/ethereum/src/types/ChannelsMock.d.ts:362
 
 ▸ **removeAllListeners**(`eventName?`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1308,7 +1308,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:371
+packages/ethereum/src/types/ChannelsMock.d.ts:371
 
 ___
 
@@ -1340,7 +1340,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:358
+packages/ethereum/src/types/ChannelsMock.d.ts:358
 
 ▸ **removeListener**(`eventName`, `listener`): [`ChannelsMock`](ChannelsMock.md)
 
@@ -1361,7 +1361,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:370
+packages/ethereum/src/types/ChannelsMock.d.ts:370
 
 ___
 
@@ -1381,7 +1381,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:627
+packages/ethereum/src/types/ChannelsMock.d.ts:627
 
 ___
 
@@ -1401,7 +1401,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:629
+packages/ethereum/src/types/ChannelsMock.d.ts:629
 
 ___
 
@@ -1427,7 +1427,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ChannelsMock.d.ts:631
+packages/ethereum/src/types/ChannelsMock.d.ts:631
 
 ___
 

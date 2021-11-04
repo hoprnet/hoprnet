@@ -4,13 +4,8 @@
 
 ## Table of contents
 
-### Namespaces
-
-- [LibP2P](modules/LibP2P.md)
-
 ### Classes
 
-- [LibP2P](classes/LibP2P.md)
 - [PassiveStrategy](classes/PassiveStrategy.md)
 - [PromiscuousStrategy](classes/PromiscuousStrategy.md)
 - [SaneDefaults](classes/SaneDefaults.md)

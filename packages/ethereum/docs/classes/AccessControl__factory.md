@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/AccessControl__factory.ts:241
+packages/ethereum/src/types/factories/AccessControl__factory.ts:241
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/AccessControl__factory.ts:241
 
 #### Defined in
 
-packages/ethereum/types/factories/AccessControl__factory.ts:245
+packages/ethereum/src/types/factories/AccessControl__factory.ts:245
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/AccessControl__factory.ts:242
+packages/ethereum/src/types/factories/AccessControl__factory.ts:242

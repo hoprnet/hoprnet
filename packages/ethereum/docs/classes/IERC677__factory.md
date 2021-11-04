@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC677__factory.ts:304
+packages/ethereum/src/types/factories/IERC677__factory.ts:304
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/IERC677__factory.ts:304
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC677__factory.ts:308
+packages/ethereum/src/types/factories/IERC677__factory.ts:308
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC677__factory.ts:305
+packages/ethereum/src/types/factories/IERC677__factory.ts:305
