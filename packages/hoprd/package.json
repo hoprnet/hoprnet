@@ -18,16 +18,16 @@
     "node": "16"
   },
   "scripts": {
-    "clean": "rimraf ./lib",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
     "build": "yarn clean && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "next build hopr-admin",
-    "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit . test",
+    "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
     "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "start": "node lib/index.js --admin --init --rest",
     "dev": "yarn build && NODE_ENV=development yarn start",
-    "docs:generate": "yarn typedoc",
-    "docs:watch": "yarn typedoc --watch"
+    "docs:generate": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "dependencies": {
     "@ceramicnetwork/http-client": "^1.2.0",

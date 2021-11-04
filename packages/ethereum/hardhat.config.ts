@@ -1,4 +1,4 @@
-import type { HardhatRuntimeEnvironment, HardhatConfig, SolcUserConfig } from 'hardhat/types'
+import type { HardhatRuntimeEnvironment, HardhatConfig, SolcUserConfig, HardhatUserConfig } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
 // load hardhat plugins
@@ -11,13 +11,14 @@ import 'solidity-coverage'
 import '@typechain/hardhat'
 import { utils } from 'ethers'
 
+// Import typescript file directly since hopr-utils has probably not been built yet
+import { expandVars } from '../utils/src/utils'
+
 // rest
 import { task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
-import type { HardhatUserConfig } from 'hardhat/types'
-import fs from 'fs'
+import { writeFileSync, realpathSync } from 'fs'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
-import { expandVars } from '@hoprnet/hopr-utils'
 
 const PROTOCOL_CONFIG = require('../core/protocol-config.json')
 
@@ -111,7 +112,7 @@ const hardhatConfig: HardhatUserConfig = {
     deployments: `./deployments/${HOPR_ENVIRONMENT_ID}`
   },
   typechain: {
-    outDir: './types',
+    outDir: './src/types',
     target: 'ethers-v5'
   },
   gasReporter: {
@@ -220,7 +221,7 @@ subtask('flat:get-flattened-sources', 'Returns all contracts and their dependenc
     flattened = flattened.trim()
     if (output) {
       console.log('Writing to', output)
-      fs.writeFileSync(output, flattened)
+      writeFileSync(output, flattened)
       return ''
     }
     return flattened
@@ -230,7 +231,7 @@ subtask('flat:get-dependency-graph')
   .addOptionalParam('files', undefined, undefined, types.any)
   .setAction(async ({ files }, { run }) => {
     const sourcePaths =
-      files === undefined ? await run('compile:solidity:get-source-paths') : files.map((f) => fs.realpathSync(f))
+      files === undefined ? await run('compile:solidity:get-source-paths') : files.map((f: string) => realpathSync(f))
 
     const sourceNames = await run('compile:solidity:get-source-names', {
       sourcePaths
