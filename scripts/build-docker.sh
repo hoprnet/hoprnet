@@ -59,7 +59,7 @@ image_version="$(date +%s)"
 package_version="$("${mydir}/get-package-version.sh")"
 docker_image="gcr.io/hoprassociation/${package}"
 docker_image_full="${docker_image}:${image_version}"
-releases="$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r ".[] | select(.git_ref==\"refs/heads/${branch}\") | .id")"
+releases="$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"refs/heads/${branch}\") | .key")"
 
 if [ -z "${releases}" ] && [ "${force:-}" != "true" ]; then
   # return early if no environments are found for branch

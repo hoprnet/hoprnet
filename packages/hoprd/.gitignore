@@ -6,3 +6,4 @@ hopr-admin/.next
 # Exclude built npm packages
 *.tgz
 cache/
+.testid
