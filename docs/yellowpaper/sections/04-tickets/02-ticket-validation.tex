@@ -1,0 +1,21 @@
+\subsection{Ticket Validation}
+\label{sec:tickets:validation}
+
+Tickets are received together with packets. To this end, the recipient and the next downstream node share a secret, $s$, whose key shares $s_i$ and $s_{i+1}$ are derivable by those nodes as introduced in section \lcnameref{sec:sphinx:keyderivation}. Ticket validation requires the following steps:
+
+\textbf{Validate response} Once $A$ receives $s_{i+1}^{(1)}$ from $B$ via secret sharing, it can compute $$r_i=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
+$$r_i*G=T_{c_i}$$
+\\\textbf{Validate hint} Once the recipient transforms the packet, it can compute $s_i$. The recipient can now also extract the routing information from the packet.
+This includes a hint to the value $s_{i+1}$, given as $$H_i=s_{i+1}^{(1)}*G,$$ which is stored in the Sphinx packet header.
+
+The unacknowledged ticket is stored in the database under the hint to the promised value to ensure the acknowledgement can be later linked to the unacknowledged ticket.
+
+Together with $s_i^{(0)}$, the node can verify that
+
+$$T_{c_i}=s_i^{(0)}*G+H_i$$
+
+with
+
+$$s_i^{(0)}*G+H_i=s_i^{(0)}*G+s_{i+1}^{(1)}*G=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
+
+This allows the recipient to verify that the promised value $s_{i+1}^{(1)}$ indeed leads to a solution for the challenge given in the ticket. If this is not the case, the node should drop the packet. Without this check, the sender could intentionally create false challenges which lead to unredeemable tickets.

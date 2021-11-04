@@ -1,0 +1,46 @@
+\section{Tickets}
+\label{sec:tickets}
+
+In the HOPR protocol, nodes that have staked funds within a payment channel can issue tickets that are used for payment to other nodes. Tickets are used for \lcnameref{sec:incentives:probabilistic}; every ticket is bound to a specific payment channel and cannot be spent elsewhere. Tickets are redeemable at most once and lose their value when the associated payment channel is closed or when the commitment is reset. A commitment is a secret on-chain value used to verify whether a ticket is a winner or not when an attempt is made to redeem it.
+
+\begin{figure}[H]
+      \centering
+      \begin{tikzpicture}[every text node part/.style={align=center}]
+            \def\width{9}
+            \def\headerWidth{9}
+            \def\headerHeight{1.5}
+            \def\headerOffset{3.25}
+            \def\dashOffset{4.5}
+            \def\dashWidth{1}
+
+            \def\ticketDataHeight{1}
+            \def\ticketSignatureHeight{0.5}
+
+            \draw[decoration={brace,raise=5pt,mirror},decorate] (0,0) -- node[left=8pt] {SPHINX Packet} (0,-\headerHeight);
+
+            \draw (0,0) rectangle (\headerOffset,-\headerHeight) node [midway] {Extended header,\\see section \ref{sec:incentives:proofofrelay}};
+            \path [shape=rectangle] (\headerOffset,0) rectangle (\headerWidth,-\headerHeight) node [midway] {Body,\\see section \ref{sec:sphinx:payload}};
+
+            \draw (\headerOffset+\dashOffset,-\headerHeight) -- (\headerOffset,-\headerHeight) -- (\headerOffset,0) -- (\headerOffset+\dashOffset,0);
+
+            \draw [dashed] (\headerOffset+\dashOffset,0) -- (\headerOffset+\dashOffset+\dashWidth,0);
+            \draw [dashed] (\headerOffset+\dashOffset,-\headerHeight) -- (\headerOffset+\dashOffset+\dashWidth,-\headerHeight);
+
+            \draw (\headerOffset+\dashOffset+\dashWidth,-\headerHeight) -- (\headerWidth,-\headerHeight) -- (\headerWidth,0) -- (\headerOffset+\dashOffset+\dashWidth,0);
+
+            \begin{scope}[shift={(0,-\headerHeight-0.5)}]
+                  \def\padding{0.25}
+
+                  \draw[decoration={brace,raise=5pt,mirror},decorate] (0,0) -- node[left=8pt] {Ticket} (0,-\ticketDataHeight-\padding-\ticketSignatureHeight);
+
+                  \draw (0,0) rectangle (\headerWidth,-\ticketDataHeight) node [midway] {Ticket data};
+
+                  \draw (0,-\ticketDataHeight-\padding) rectangle (\headerWidth,-\ticketDataHeight-\ticketSignatureHeight-\padding) node [midway] {Signature};
+            \end{scope}
+      \end{tikzpicture}
+      \caption{Schematic overview of a mixnet packet that is sent together with a ticket.}
+\end{figure}
+
+\input{sections/04-tickets/01-ticket-issuance.tex}
+\input{sections/04-tickets/02-ticket-validation.tex}
+\input{sections/04-tickets/03-ticket-redemption.tex}
