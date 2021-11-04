@@ -11,28 +11,14 @@ import 'solidity-coverage'
 import '@typechain/hardhat'
 import { utils } from 'ethers'
 
+// Import typescript file directly since hopr-utils has probably not been built yet
+import { expandVars } from '../utils/src/utils'
+
 // rest
 import { task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID } = process.env
-
-// Do not import hopr packages since they create cricular dependencies
-// FIXME:copied from hopr-utils due to build issues
-/**
- *
- * @param input a string containing templated references to environment variables e.g. 'foo ${bar}'
- * @param vars a key-value vars storage object, e.g. { 'bar': 'bar_value' }
- * @returns a string with variables resolved to the actual values
- */
-export function expandVars(input: string, vars: { [key: string]: any }) {
-  return input.replace(/\$\{(.*)\}/g, (_, varName) => {
-    if (!(varName in vars)) {
-      throw new Error(`failed to expand vars in string '${input}', var ${varName} not defined`)
-    }
-    return vars[varName]
-  })
-}
 
 const PROTOCOL_CONFIG = require('../core/protocol-config.json')
 
