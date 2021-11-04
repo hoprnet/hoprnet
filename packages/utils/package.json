@@ -13,8 +13,8 @@
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
     "prepublishOnly": "tsc -p ./tsconfig.npm.json",
-    "docs:generate": "yarn typedoc",
-    "docs:watch": "yarn typedoc --watch"
+    "docs:generate": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "engines": {
     "node": "14 || 16"

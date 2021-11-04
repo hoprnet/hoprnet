@@ -1,7 +1,8 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": "."
   },
   "include": ["type-extension.ts", "hardhat.config.ts", "tasks", "test", "deploy", "src"],
   "references": [{ "path": "../utils" }]

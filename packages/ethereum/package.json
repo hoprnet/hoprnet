@@ -20,7 +20,7 @@
     "test": "hardhat test",
     "coverage": "hardhat coverage",
     "prepublishOnly": "yarn clean && yarn build:sol:types && tsc -p ./tsconfig.npm.json",
-    "docs:generate": "yarn clean && yarn build:sol:types && typedoc",
+    "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
   "files": [

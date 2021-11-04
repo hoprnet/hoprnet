@@ -20,8 +20,8 @@
     "build": "yarn clean && tsc -p .",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" yarn mocha --reporter=tap --full-trace --exit",
     "prepublishOnly": "tsc -p ./tsconfig.npm.json",
-    "docs:generate": "yarn typedoc",
-    "docs:watch": "yarn typedoc --watch"
+    "docs:generate": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "files": [
     "protocol-config.json",
