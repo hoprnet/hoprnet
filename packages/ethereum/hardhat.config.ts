@@ -17,6 +17,7 @@ import { writeFileSync, realpathSync } from 'fs'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID } = process.env
 
+// Do not import hopr packages since they create cricular dependencies
 // FIXME:copied from hopr-utils due to build issues
 /**
  *
