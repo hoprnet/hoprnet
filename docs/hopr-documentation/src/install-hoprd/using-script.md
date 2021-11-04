@@ -28,8 +28,8 @@ Do you agree to our Privacy Policy? [y/n]:y
 Terrific!
 Warning! Running this script repeatedly will cause you to have a new node address each time.
 Would you like to run this script? [y/n]:y
-What release are you installing? Format: X.XX.X (https://github.com/hoprnet/hoprnet/releases)
-latest
+What release are you installing? Example: wildhorn-v2 (The latest community release version you will find on the docs page)
+wildhorn-v2
 ```
 
 You might need to restart your terminal for your computer to be able to find `hoprd` after the script completes installation.
@@ -43,6 +43,7 @@ $ sudo apt install -y curl
 $ curl https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setup-hoprd.sh --output setup-hoprd.sh
 $ chmod +x setup-hoprd.sh
 $ ./setup-hoprd.sh
+$ cd hopr-wildhorn-v2
 ```
 
 ### macOS
@@ -60,6 +61,7 @@ $ brew install curl
 $ curl https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setup-hoprd-macos.sh --output setup-hoprd.sh
 $ chmod +x setup-hoprd.sh
 $ ./setup-hoprd.sh
+$ cd hopr-wildhorn-v2
 ```
 
 ### One-liner
@@ -71,3 +73,15 @@ bash -c "$(curl -s https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setu
 ```
 
 (we even removed the `$` so you can copy and paste that on your terminal, you savage).
+
+## Running HOPRd
+
+```bash
+# run hoprd
+$ DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --testNoAuthentication
+
+# add security
+$ DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --apiToken='<YOU_SECRET_TOKEN>'
+```
+Please note that if `--admin` is specificed, you **must** provide an `--apiToken` which is at least 8 symbols, contains a lowercase and an uppercase letter, a number and a special symbol. This ensures the node cannot be accessed by a malicious user residing in the same network.
+
