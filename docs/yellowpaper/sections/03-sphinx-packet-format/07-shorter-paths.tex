@@ -5,7 +5,7 @@
 
 SPHINX packets define a maximum packet length $r$\footnote{HOPR nodes use by default a path length of three and refuse the processing of packets with greater path lengths.}, meaning $r$ intermediate mix nodes and one destination. They also allow the usage of shorter paths of length $v$ with $0 \le v < r$. Despite these packets have the same size and are due to their construction indistinguishable from packet with maximum path length, it not advisable to shorter paths since they introduce observable patterns that deviate from normal usage. By observing these patterns, an adversary can be able to reconstruct route of distinguished packets.
 
-Creating a header for shorter paths require less space, hence in the end of $\beta$, there is free space left, which is filled with \textit{random} data.
+Creating a header for shorter paths require less routing information, and thus leaves empty space in the end of $\beta$, which is filled as suggested by \cite{sphinxpaperfix} with \textit{random} data. This is necessary because the very last node, i.e. the one for which the message is destined, is otherwise able to determine the utilized path length.
 
 \begin{figure}[H]
     \centering
@@ -60,32 +60,32 @@ Creating a header for shorter paths require less space, hence in the end of $\be
                     \fi
                 \end{scope}
                 \ifnum\i=3
-                    \draw (\i*2*\nodeWidth-2*\nodeWidth+\endWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,fill=white,inner sep=2pt] {\textsf{random}};
+                    \draw (\i*2*\nodeWidth-2*\nodeWidth+\endWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,fill=white,inner sep=2pt] {$random$};
                 \else
                     \ifnum\i<2
-                        \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$y_{\name}$};
+                        \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$Y_{\name}$};
                         \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
                         \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$\gamma_{\name}$};
                         \draw (\i*2*\nodeWidth+\nodeWidth,0) -- (\i*2*\nodeWidth+\nodeWidth,\one);
 
-                        \draw[decoration={brace,raise=5pt,mirror},decorate] (\nodeWidth*2*\i,0) -- (\nodeWidth*2*\i+\nodeWidth*2,0) node[midway,below=6pt] {readable by \name};
+                        \draw[decoration={brace,raise=5pt,mirror},decorate] (\nodeWidth*2*\i+0.05,0) -- (\nodeWidth*2*\i+\nodeWidth*2-0.05,0) node[midway,below=6pt] {readable by \name};
                     \else
                         \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black,fill=white,inner sep=1.5pt] {$end$};
 
                         \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
                         \draw (\i*2*\nodeWidth+\endWidth,0) -- (\i*2*\nodeWidth+\endWidth,\one);
 
-                        \draw[decoration={brace,raise=5pt,mirror},decorate] (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth+\endWidth,0) node[midway,below=6pt] {r. by \name};
+                        \draw[decoration={brace,raise=5pt,mirror},decorate] (\i*2*\nodeWidth+0.05,0) -- (\i*2*\nodeWidth+\endWidth-0.05,0) node[midway,below=6pt] {r. by \name};
                     \fi
                 \fi
             }
 
         \draw (0,0) rectangle (\width,\one);
     \end{tikzpicture}
-    \caption{tbd}
+    \caption{Node $A$ has created routing information for $B,C$ and the final recipient $D$, filling the empty part of $\beta$ with random data.}
 \end{figure}
 
-This is necessary because the very last node, i.e. the one for which the message is destined, the free space is not covered by any blinding, hence that node is able to determine that the message was sent with a shorter path.
+By applying the transformations seen in section \ref{sec:sphinx:shifting} through the mixnet nodes, all blindings got removed, hence the plaintext of $\beta$ becomes visible and the node is able to decide which parts of $\beta$ were not used.
 
 \begin{figure}[H]
     \centering
@@ -142,7 +142,7 @@ This is necessary because the very last node, i.e. the one for which the message
                 \end{scope}
 
                 \ifnum\i=3
-                    \draw (\i*2*\nodeWidth-2*\nodeWidth+\endWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway] {\textsf{random}};
+                    \draw (\i*2*\nodeWidth-2*\nodeWidth+\endWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway] {$random$};
                 \else
                     \ifnum\i>0
                         \draw (\i*2*\nodeWidth+\endWidth,0) -- (\i*2*\nodeWidth+\endWidth,\one);
@@ -154,9 +154,6 @@ This is necessary because the very last node, i.e. the one for which the message
             }
 
         \draw (0,0) rectangle (\width,\one);
-        % \draw[decoration={brace,raise=5pt},decorate] (\endWidth,\one) -- node[above=5pt] {filler string } (\width,\one);
-        % \draw[decoration={brace,mirror,raise=5pt},decorate] (0,0) -- node[below=7pt] {Used for integrity check by $Z$} (\width,0);
-
     \end{tikzpicture}
-    \caption{tbd}
+    \caption{Node $D$ receives a packet which was relayed by two intermediate nodes.}
 \end{figure}

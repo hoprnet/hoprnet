@@ -89,17 +89,17 @@ The following assumes the sender $A$ is generating routing information for $B,C,
                     \fi
                 \end{scope}
                 \ifnum\i<3
-                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$y_{\name}$};
+                    \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$Y_{\name}$};
                     \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
                     \draw [color=white] (\i*2*\nodeWidth+\nodeWidth,0) rectangle (\i*2*\nodeWidth+2*\nodeWidth,\one) node [midway,color=black,fill=white,inner sep=2pt] {$\gamma_{\name}$};
                     \draw (\i*2*\nodeWidth+\nodeWidth,0) -- (\i*2*\nodeWidth+\nodeWidth,\one);
 
-                    \draw[decoration={brace,raise=5pt,mirror},decorate] (\nodeWidth*2*\i,0) -- (\nodeWidth*2*\i+\nodeWidth*2,0) node[midway,below=6pt] {readable by \name};
+                    \draw[decoration={brace,raise=5pt,mirror},decorate] (\nodeWidth*2*\i+0.05,0) -- (\nodeWidth*2*\i+\nodeWidth*2-0.05,0) node[midway,below=6pt] {readable by \name};
                 \else
                     \draw [color=white] (\i*2*\nodeWidth,0) rectangle (\i*2*\nodeWidth+\endWidth,\one) node [midway,color=black,fill=white,inner sep=1.5pt] {$end$};
                     \draw (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth,\one);
 
-                    \draw[decoration={brace,raise=5pt,mirror},decorate] (\i*2*\nodeWidth,0) -- (\i*2*\nodeWidth+\endWidth,0) node[midway,below=6pt] {r. by \name};
+                    \draw[decoration={brace,raise=5pt,mirror},decorate] (\i*2*\nodeWidth+0.05,0) -- (\i*2*\nodeWidth+\endWidth-0.05,0) node[midway,below=6pt] {r. by \name};
                 \fi
             }
 

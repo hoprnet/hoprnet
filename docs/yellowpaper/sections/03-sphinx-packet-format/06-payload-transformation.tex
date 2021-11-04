@@ -24,7 +24,7 @@ To allow the final recipient to determine whether a message is meaningful conten
 
         \draw[decoration={brace,raise=5pt},decorate] (0,0.5) -- node[above=5pt] {$\packetLength - |payload| - 4$ bytes} (\paddingLength,0.5);
         \begin{scope}
-            \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=10pt] {padding} (0,0.5);
+            \draw[decoration={brace,raise=5pt},decorate] (0,0.05) -- node[left=10pt] {padding} (0,0.5-0.05);
             \def\width{\paddingLength}
             \draw (1,0.25) node {$\mathtt{0...0}$};
             \draw [line width=\lw mm] (\middle,0.5) -- (0,0.5) --  (0,0) -- (\middle,0);
@@ -34,13 +34,13 @@ To allow the final recipient to determine whether a message is meaningful conten
         \end{scope}
 
         \begin{scope}[shift={(0,-0.5)}]
-            \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=10pt] {tag} (0,0.5);
+            \draw[decoration={brace,raise=5pt},decorate] (0,0.05) -- node[left=10pt] {tag} (0,0.5-0.05);
             \draw [draw] (0,0) rectangle (2,0.5);
             \draw (1,0.25) node {$\mathtt{HOPR}$};
         \end{scope}
 
         \begin{scope}[shift={(0,-1)}]
-            \draw[decoration={brace,raise=5pt},decorate] (0,0) -- node[left=10pt] {payload} (0,0.5);
+            \draw[decoration={brace,raise=5pt},decorate] (0,0.05) -- node[left=10pt] {payload} (0,0.5-0.05);
             \draw (1,0.25) node {$\mathtt{message}$};
             \def\width{\payloadLength}
             \draw [line width=\lw mm] (\middle,0.5) -- (0,0.5) --  (0,0) -- (\middle,0);

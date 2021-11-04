@@ -1,13 +1,13 @@
 \subsubsection{Delete and shift}
 \label{sec:sphinx:shifting}
 
-Unblinding the $\beta_i$ reveals the public key $y_{i+1}$ of the next downstream node as well as the integrity tag $\gamma_{i+1}$ that allows the next downstream to verify the integrity of $\beta_{i+1}$. The $rest$ of $\beta_i$ is kept hidden to the node as it contains random data, see section \lcnameref{sec:sphinx:shorterpaths}, \textit{or} blindings from other nodes which is assumed to be indistinguishable by that node.
+Unblinding the $\beta_i$ reveals the public key $Y_{i+1}$ of the next downstream node as well as the integrity tag $\gamma_{i+1}$ that allows the next downstream to verify the integrity of $\beta_{i+1}$. The $rest$ of $\beta_i$ is kept hidden to the node as it contains random data, see section \lcnameref{sec:sphinx:shorterpaths}, \textit{or} blindings from other nodes which is assumed to be indistinguishable by that node.
 
-$$ \{ y_{i+1}, \gamma_{i+1}, rest \} = \beta_i \oplus \textsf{PRG}_{s_i^{bl}}(0, | \beta |) $$
+$$ \{ Y_{i+1}, \gamma_{i+1}, rest \} = \beta_i \oplus \textsf{PRG}_{s_i^{bl}}(0, | \beta |) $$
 
-After extracting $y_{i+1}$ and $\gamma_{i+1}$, the node shifts $rest$ to the beginning and thereby overwrites its own routing information $y_{i+1}$ and $\gamma_{i+1}$. In addition, it fills the hole in the end by adding its own blinding:
+After extracting $Y_{i+1}$ and $\gamma_{i+1}$, the node shifts $rest$ to the beginning and thereby overwrites its own routing information $Y_{i+1}$ and $\gamma_{i+1}$. In addition, it fills the hole in the end by adding its own blinding:
 
-$$ \beta_{i+1} = rest \ || \ \textsf{PRG}_{s_i^{bl}}(| \beta |, | \beta | + |y| + |\gamma|)$$
+$$ \beta_{i+1} = rest \ || \ \textsf{PRG}_{s_i^{bl}}(| \beta |, | \beta | + |Y| + |\gamma|)$$
 
 Note that the blindings are created using different boundaries. The first blinding is created from 0 to length of $\beta$ and the second one is created as if public key and integrity were appended in the end of $\beta$, hence boundaries are set from $| \beta |$ to $| \beta | + |y| + |\gamma|$.
 
@@ -20,7 +20,7 @@ Note that the blindings are created using different boundaries. The first blindi
         \def\one{0.6}
         \draw (0,0) rectangle (\betaLength,\one);
 
-        \draw (0,0) rectangle (\pubKey,\one) node[midway] {$y_{i+1}$};
+        \draw (0,0) rectangle (\pubKey,\one) node[midway] {$Y_{i+1}$};
         \draw (\pubKey,0) rectangle (\pubKey+\authTag,\one) node[midway] {$\gamma_{i+1}$};
 
         \draw[decoration={brace,raise=5pt},decorate] (0,\one) -- (\betaLength,\one) node [midway,above=6pt] {$\beta_i \oplus \textsf{PRG}_{s_i^{bl}}(0, | \beta |)$};
