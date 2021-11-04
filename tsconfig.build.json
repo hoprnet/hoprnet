@@ -1,4 +1,6 @@
 {
+  // Used to compile *all* packages at once by using
+  // Typescript Project references, see https://www.typescriptlang.org/docs/handbook/project-references.html
   "files": [],
   "references": [
     { "path": "packages/core" },

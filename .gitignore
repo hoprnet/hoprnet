@@ -31,7 +31,8 @@ packages/utils/lib/types/
 !.yarn/versions
 .pnp.*
 
-# Typescript build info
+# Typescript build info resulting from Typescript Project References
+# see https://www.typescriptlang.org/docs/handbook/project-references.html
 **/*.tsbuildinfo
 
 # used only in release and should not be tracked
