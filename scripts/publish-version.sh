@@ -60,7 +60,7 @@ fi
 log "get default environment id"
 
 declare environment_id
-environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r ".[] | select(.git_ref==\"refs/heads/${branch}\" and default==true).id")
+environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"refs/heads/${branch}\" and .value.default==true) | .key")
 : ${environment_id:?"Could not read value for default environment id"}
 
 log "creating new version ${current_version} + ${version_type}"

@@ -297,7 +297,7 @@ fi
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-DEVELOPMENT=true HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
+HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 

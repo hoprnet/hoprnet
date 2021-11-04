@@ -17,7 +17,7 @@
     "faucet": "hardhat faucet",
     "accounts": "hardhat accounts",
     "network": "DEVELOPMENT=true hardhat node",
-    "test": "hardhat test",
+    "test": "HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat test",
     "coverage": "hardhat coverage",
     "prepublishOnly": "yarn clean && yarn build:sol && yarn copy:types && tsc -p ./tsconfig.npm.json",
     "docs:generate": "yarn clean && yarn build:sol && typedoc",
