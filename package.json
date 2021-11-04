@@ -10,7 +10,7 @@
     "packages/hoprd"
   ],
   "scripts": {
-    "build": "yarn workspace @hoprnet/hopr-utils run build && yarn workspace @hoprnet/hopr-ethereum run build:sol:types && tsc --build tsconfig.build.json",
+    "build": "yarn workspace @hoprnet/hopr-ethereum run build:sol:types && tsc --build tsconfig.build.json",
     "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
