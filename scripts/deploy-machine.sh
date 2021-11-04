@@ -24,5 +24,5 @@ fi
 HOPRD_API_TOKEN='D3f4ul+!_2021'
 BS_PASSWORD='d3f4ul+!_2021'
 
-echo "Starting single preview pr node for hoprd:$RELEASE"
-start_testnet "pr-preview-$RELEASE" 1 "gcr.io/hoprassociation/hoprd:$RELEASE" "master-goerli" true
+echo "Starting single preview pr node on xdai for hoprd:$RELEASE"
+start_testnet "pr-preview-xdai-$RELEASE" 1 "gcr.io/hoprassociation/hoprd:$RELEASE" "master-xdai" true
