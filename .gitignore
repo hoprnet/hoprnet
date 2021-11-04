@@ -33,3 +33,7 @@ packages/utils/lib/types/
 
 # Typescript build info
 **/*.tsbuildinfo
+
+# used only in release and should not be tracked
+packages/hoprd/default-environment.json
+packages/cover-traffic-daemon/default-environment.json

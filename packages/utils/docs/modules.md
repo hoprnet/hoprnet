@@ -112,6 +112,7 @@
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
 - [deserializeKeyPair](modules.md#deserializekeypair)
 - [dial](modules.md#dial)
+- [expandVars](modules.md#expandvars)
 - [forwardTransform](modules.md#forwardtransform)
 - [gcd](modules.md#gcd)
 - [generateChannelId](modules.md#generatechannelid)
@@ -143,6 +144,7 @@
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 - [limitConcurrency](modules.md#limitconcurrency)
+- [loadJson](modules.md#loadjson)
 - [localAddressesFirst](modules.md#localaddressesfirst)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
 - [oneAtATime](modules.md#oneatatime)
@@ -165,6 +167,7 @@
 - [serializeToU8a](modules.md#serializetou8a)
 - [stringToU8a](modules.md#stringtou8a)
 - [timeoutAfter](modules.md#timeoutafter)
+- [timer](modules.md#timer)
 - [toLengthPrefixedU8a](modules.md#tolengthprefixedu8a)
 - [toNetworkPrefix](modules.md#tonetworkprefix)
 - [toU8a](modules.md#tou8a)
@@ -179,6 +182,7 @@
 - [u8aToNumber](modules.md#u8atonumber)
 - [u8aToNumberOrBigInt](modules.md#u8atonumberorbigint)
 - [u8aXOR](modules.md#u8axor)
+- [validateData](modules.md#validatedata)
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
 - [validatePoRHint](modules.md#validateporhint)
 - [validatePoRResponse](modules.md#validateporresponse)
@@ -1254,6 +1258,29 @@ Contains a baseline protection against dialing same addresses twice.
 
 ___
 
+### expandVars
+
+▸ **expandVars**(`input`, `vars`): `string`
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `input` | `string` | a string containing templated references to environment variables e.g. 'foo ${bar}' |
+| `vars` | `Object` | a key-value vars storage object, e.g. { 'bar': 'bar_value' } |
+
+#### Returns
+
+`string`
+
+a string with variables resolved to the actual values
+
+#### Defined in
+
+[utils.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L19)
+
+___
+
 ### forwardTransform
 
 ▸ **forwardTransform**(`privKey`, `packet`, `additionalDataRelayerLength`, `additionalDataLastHopLength`, `maxHops`): `LastNodeOutput` \| `RelayNodeOutput`
@@ -1982,6 +2009,32 @@ ___
 
 ___
 
+### loadJson
+
+▸ **loadJson**(`file_path`): `any`
+
+loads JSON data from file
+
+**`throws`** if unable to open the file the JSON data is malformed
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `file_path` | `string` | json file to load |
+
+#### Returns
+
+`any`
+
+object parsed from JSON data
+
+#### Defined in
+
+[utils.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L34)
+
+___
+
 ### localAddressesFirst
 
 ▸ **localAddressesFirst**(`addresses`): `Address`[]
@@ -2554,6 +2607,26 @@ ___
 
 ___
 
+### timer
+
+▸ **timer**(`fn`): `number`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[utils.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L6)
+
+___
+
 ### toLengthPrefixedU8a
 
 ▸ **toLengthPrefixedU8a**(`arg`, `additionalPadding?`, `length?`): `Uint8Array`
@@ -2887,6 +2960,32 @@ Apply an XOR on a list of arrays.
 #### Defined in
 
 [u8a/xor.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/xor.ts#L7)
+
+___
+
+### validateData
+
+▸ **validateData**(`data`, `schema`): `void`
+
+validates JSON data against JSON schema
+prints errors to the console and throws in case of non-conforming
+
+**`throws`**
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `data` | `any` | parsed JSON data |
+| `schema` | `any` | parsed JSON schema for the data |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+[utils.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L46)
 
 ___
 

@@ -36,20 +36,22 @@ alias gssh="gcloud compute ssh --force-key-file-overwrite --ssh-key-expire-after
 
 # NB: This is useless for getting an IP of a VM
 # Get or create an IP address
-# $1 = name
+# $1=VM name
 gcloud_get_address() {
-  local ip=$(gcloud compute addresses describe $1 $gcloud_region 2>&1)
+  local vm_name="${1}"
+
+  local ip=$(gcloud compute addresses describe ${vm_name} $gcloud_region 2>&1)
   # Google does not return an appropriate exit code :(
   if [ "$(echo "$ip" | grep 'ERROR')" ]; then
     log "No address, creating"
-    gcloud compute addresses create $1 $gcloud_region
-    ip=$(gcloud compute addresses describe $1 $gcloud_region 2>&1)
+    gcloud compute addresses create ${vm_name} $gcloud_region
+    ip=$(gcloud compute addresses describe ${vm_name} $gcloud_region 2>&1)
   fi
   echo $ip | awk '{ print $2 }'
 }
 
-# $1 = ip
-# $2 = optional: healthcheck port, defaults to 8080
+# $1=ip
+# $2=optional: healthcheck port, defaults to 8080
 wait_until_node_is_ready() {
   local ip=${1}
   local port=${2:-8080}
@@ -61,50 +63,63 @@ wait_until_node_is_ready() {
 }
 
 # Get external IP for running node or die
-# $1 - name
+# $1 - VM name
 gcloud_get_ip() {
-  gcloud compute instances list | grep "$1" | awk '{ print $5 }'
+  local vm_name="${1}"
+  gcloud compute instances list | grep "${vm_name}" | awk '{ print $5 }'
 }
 
-# $1 = VM name
-gcloud_find_vm_with_name() {
-  gcloud compute instances list | grep "$1" | grep 'RUNNING'
+# $1=VM name
+gcloud_find_vm_with_name() {  
+  local vm_name="${1}"
+  gcloud compute instances list | grep "${vm_name}" | grep 'RUNNING'
 }
 
 # $1 - VM name
 # Warning, using `--format='value[](metadata*)` is an unsupported API by gcloud and can change any time.
 # More information on https://cloud.google.com/compute/docs/storing-retrieving-metadata
 gcloud_get_image_running_on_vm() {
-  gcloud compute instances describe $1 $ZONE \
+  local vm_name="${1}"
+
+  gcloud compute instances describe ${vm_name} $ZONE \
     --format='value[](metadata.items.gce-container-declaration)' \
     | grep image \
     | tr -s ' ' \
     | cut -f3 -d' '
 }
 
-# $1 = vm name
-# $2 = container-image
-# $3 = disk name
-# $4 = mount path
-# $5 = chain provider
+# $1=vm name
+# $2=container-image
+# $3=disk name
+# $4=mount path
+# $5=environment_id
 gcloud_update_container_with_image() {
-  local rpc=${5}
+  local vm_name="${1}"
+  local container_image="${2}"
+  local disk_image="${3}"
+  local mount_path="${4}"
+  local environment_id="${5}"
   local api_token="${HOPRD_API_TOKEN}"
   local password="${BS_PASSWORD}"
 
-  log "Updating container on vm:$1 - $2 (disk: $3:$4)"
+  log "${vm_name}"
+  log "${container_name}"
+  log "${disk_image}"
+  log "${mount_path}"
+
+  log "Updating container on vm:${vm_name} - ${$container_name} (disk: ${disk_image}:${mount_path})"
   gcloud compute instances update-container $1 $ZONE \
-    --container-image=$2 --container-mount-disk name=$3,mount-path="$4" \
+    --container-image=${container_image} --container-mount-disk name=${disk_image},mount-path="${mount_path}" \
     --container-arg="--admin" \
     --container-arg="--adminHost" --container-arg="0.0.0.0" \
     --container-arg="--announce" \
     --container-arg="--apiToken" --container-arg="${api_token}" \
     --container-arg="--healthCheck" \
     --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-    --container-arg="--identity" --container-arg="${4}/.hopr-identity" \
+    --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
     --container-arg="--init" \
     --container-arg="--password" --container-arg="${password}" \
-    --container-arg="--provider" --container-arg="${rpc}" \
+    --container-arg="--environment" --container-arg="${environment_id}" \
     --container-arg="--rest" \
     --container-arg="--restHost" --container-arg="0.0.0.0" \
     --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
@@ -114,27 +129,35 @@ gcloud_update_container_with_image() {
 # $1 - vm name
 # $2 - docker image
 gcloud_stop() {
-  log "Stopping docker image:$2 on vm $1"
-  gssh $1 -- "export DOCKER_IMAGE=$2 && docker stop \$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)"
+  local vm_name="${1}"
+  local docker_image="${2}"
+
+  log "Stopping docker image:${docker_image} on vm ${vm_name}"
+  gssh ${vm_name} -- "export DOCKER_IMAGE=${docker_image} && docker stop \$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)"
 }
 
 # $1 - vm name
 # $2 - docker image
 gcloud_get_logs() {
+  local vm_name="${1}"
+  local docker_image="${2}"
+
   # Docker sucks and gives us warnings in stdout.
-  local id=$(gssh $1 --command "docker ps -q --filter ancestor='$2' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
-  gssh $1 --command "docker logs $id"
+  local id=$(gssh ${vm_name} --command "docker ps -q --filter ancestor='${docker_image}' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
+  gssh ${vm_name} --command "docker logs $id"
 }
 
 # $1 - vm name
 gcloud_cleanup_docker_images() {
-  log "pruning docker images on host $1"
-  gssh "$1" --command "sudo docker system prune -a -f"
+  local vm_name="${1}"
+
+  log "pruning docker images on host ${vm_name}"
+  gssh "${vm_name}" --command "sudo docker system prune -a -f"
 }
 
 # $1 - template name
 # $2 - container image
-# $3 - rpc endpoint
+# $3 - environment id
 # $4 - optional: api token
 # $5 - optional: password
 # $6 - optional: private key
@@ -145,7 +168,7 @@ gcloud_create_or_update_instance_template() {
 
   name="${1}"
   image="${2}"
-  rpc="${3}"
+  environment_id="${3}"
 
   # these parameters are only used by hoprd nodes
   api_token="${4:-}"
@@ -158,7 +181,7 @@ gcloud_create_or_update_instance_template() {
   # if set no additional arguments are used to start the container
   no_args="${7:-}"
 
-  args="--container-arg=--provider --container-arg=\"${rpc}\""
+  args="--container-arg=\"--environment\" --container-arg=\"${environment_id}\""
 
   if [ -n "${api_token}" ]; then
     extra_args="${extra_args} --container-arg=\"--apiToken\" --container-arg=\"${api_token}\""
@@ -230,23 +253,19 @@ gcloud_create_or_update_instance_template() {
 
 # $1 - template name
 gcloud_delete_instance_template() {
-  local name
-
-  name="${1}"
+  local name="${1}"
 
   log "deleting instance template ${name}"
   gcloud compute instance-templates delete "${name}" --quiet
 }
 
-# $1 = group name
-# $2 = group size
-# $3 = template name
+# $1=group name
+# $2=group size
+# $3=template name
 gcloud_create_or_update_managed_instance_group() {
-  local name size template
-
-  name="${1}"
-  size="${2}"
-  template="${3}"
+  local name="${1}"
+  local size="${2}"
+  local template="${3}"
 
   log "checking for managed instance group ${name}"
   if gcloud compute instance-groups managed describe "${name}" ${gcloud_region} --quiet; then
@@ -271,11 +290,9 @@ gcloud_create_or_update_managed_instance_group() {
     ${gcloud_region}
 }
 
-# $1 = group name
+# $1=group name
 gcloud_delete_managed_instance_group() {
-  local name
-
-  name="${1}"
+  local name="${1}"
 
   log "deleting managed instance group ${name}"
   gcloud compute instance-groups managed delete "${name}" \
@@ -283,11 +300,9 @@ gcloud_delete_managed_instance_group() {
     ${gcloud_region}
 }
 
-# $1 = group name
+# $1=group name
 gcloud_get_managed_instance_group_instances_ips() {
-  local name
-
-  name="${1}"
+  local name="${1}"
 
   gcloud compute instance-groups list-instances "${name}" \
     ${gcloud_region} --uri | \

@@ -9,8 +9,10 @@
   "scripts": {
     "clean": "rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./hardhat ./deployments/default/localhost",
     "build": "yarn clean && yarn build:sol:types && yarn build:tsc",
-    "build:sol:types": "hardhat typechain",
     "build:tsc": "tsc -p .",
+    "build:sol": "hardhat compile",
+    "build:sol:types": "hardhat typechain",
+    "prepack": "rm -rf deployments/hardhat-localhost deployments/hardhat-localhost2",
     "fund": "hardhat fund",
     "faucet": "hardhat faucet",
     "accounts": "hardhat accounts",

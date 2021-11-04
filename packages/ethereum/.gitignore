@@ -27,7 +27,8 @@ scTopics
 hardhat/artifacts
 hardhat/cache
 deployments/**/solcInputs
-deployments/default/localhost
+deployments/hardhat-localhost
+deployments/hardhat-localhost2
 
 # typechain
 src/types

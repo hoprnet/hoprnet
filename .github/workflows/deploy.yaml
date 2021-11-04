@@ -8,7 +8,7 @@ env:
 
 on:
   push:
-    branches: ['master', 'release/**', 'avado', 'debug-deploy/**']
+    branches: ['integration/**', 'master', 'release/**', 'avado', 'debug-deploy/**']
     paths-ignore:
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
@@ -181,82 +181,8 @@ jobs:
           branch=$(git rev-parse --abbrev-ref HEAD)
           git pull origin "${branch}" --rebase
 
-      - name: Set image version
-        id: set-image-version
-        run: echo "::set-output name=vsn::$(date +%s)"
-
-      - name: Set package version
-        id: set-package-version
-        run: echo "::set-output name=vsn::$(./scripts/get-package-version.sh)"
-        env:
-          HOPR_PACKAGE: hoprd
-
-      - name: Set latest release tag
-        id: set-latest-release-tag
-        run: |
-          # we must set the tag specific to the release to prevent overrides
-          # from other release branches
-          declare release_name=${HOPR_GITHUB_REF##refs/heads/release/}
-          declare tag="latest-${release_name}"
-          echo "::set-output name=tag::${tag}"
-
-      - name: Building Docker image using Google Cloud Build
-        working-directory: packages/hoprd
-        run: |
-          gcloud builds submit --config cloudbuild.yaml \
-            --substitutions=_HOPR_PACKAGE_VERSION=${HOPR_PACKAGE_VERSION},_HOPR_IMAGE_VERSION=${HOPR_IMAGE_VERSION}
-        env:
-          HOPR_PACKAGE: hoprd
-          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
-          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
-
-      - name: Verify the correct hoprd package version has been bundled
-        run: |
-          declare v=$(docker run --pull always ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
-          [ "${v}" = "${HOPR_PACKAGE_VERSION}" ]
-        env:
-          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
-          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
-
-      - name: Add additional tags to new Docker image (on master and release branches)
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
-        run: |
-          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION}
-        env:
-          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
-          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
-
-      - name: Add tag latest to new Docker image on master
-        if: ${{ !env.ACT }} && ${{ github.ref == 'refs/heads/master' }}
-        run: |
-          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:latest
-        env:
-          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
-          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-
-      - name: Add tag for latest release to new Docker image on release branches
-        if: ${{ !env.ACT &&  startsWith(github.ref, 'refs/heads/release/') }}
-        run: |
-          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${TAG}
-        env:
-          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
-          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          TAG: ${{ steps.set-latest-release-tag.outputs.tag }}
-
-      - name: Add debug tags to new Docker image (on debug-deploy branches)
-        if: ${{ startsWith(github.ref, 'refs/heads/debug-deploy/') && !env.ACT }}
-        run: |
-          declare last_git_tag="$(git describe --tags --abbrev=0)"
-          declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
-          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
-          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_IMAGE_VERSION} ${HOPR_DOCKER_IMAGE}:${tag}
-        env:
-          HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
-          HOPR_IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          HOPR_PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+      - name: Build Docker image
+        run: ./scripts/build-docker.sh -p hoprd
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
@@ -291,81 +217,8 @@ jobs:
           branch=$(git rev-parse --abbrev-ref HEAD)
           git pull origin "${branch}" --rebase
 
-      - name: Set image version
-        id: set-image-version
-        run: echo "::set-output name=vsn::$(date +%s)"
-
-      - name: Set package version
-        id: set-package-version
-        run: echo "::set-output name=vsn::$(./scripts/get-package-version.sh)"
-        env:
-          HOPR_PACKAGE: hopr-cover-traffic-daemon
-
-      - name: Set latest release tag
-        id: set-latest-release-tag
-        run: |
-          # we must set the tag specific to the release to prevent overrides
-          # from other release branches
-          declare release_name=${HOPR_GITHUB_REF##refs/heads/release/}
-          declare tag="latest-${release_name}"
-          echo "::set-output name=tag::${tag}"
-
-      - name: Building Docker image using Google Cloud Build
-        working-directory: packages/cover-traffic-daemon
-        run: |
-          gcloud builds submit --config cloudbuild.yaml \
-            --substitutions=_PACKAGE_VERSION=${PACKAGE_VERSION},_IMAGE_VERSION=${IMAGE_VERSION}
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
-
-      - name: Verify the correct package version has been bundled
-        run: |
-          declare v=$(docker run --pull always ${DOCKER_IMAGE}:${IMAGE_VERSION} --version 2> /dev/null | sed -n '3p')
-          [ "${v}" = "${PACKAGE_VERSION}" ]
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
-
-      - name: Add additional tags to new Docker image (on master and release branches)
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
-        run: |
-          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:${PACKAGE_VERSION}
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
-
-      - name: Add tag latest to new Docker image on master
-        if: ${{ !env.ACT }} && ${{ github.ref == 'refs/heads/master' }}
-        run: |
-          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:latest
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-
-      - name: Add tag for latest release to new Docker image on release branches
-        if: ${{ !env.ACT &&  startsWith(github.ref, 'refs/heads/release/') }}
-        run: |
-          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:${TAG}
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          TAG: ${{ steps.set-latest-release-tag.outputs.tag }}
-
-      - name: Add debug tags to new Docker image (on debug-deploy branches)
-        if: ${{ startsWith(github.ref, 'refs/heads/debug-deploy/') && !env.ACT }}
-        run: |
-          declare last_git_tag="$(git describe --tags --abbrev=0)"
-          declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
-          declare tag="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
-          gcloud container images add-tag ${DOCKER_IMAGE}:${IMAGE_VERSION} ${DOCKER_IMAGE}:${tag}
-        env:
-          DOCKER_IMAGE: gcr.io/hoprassociation/hopr-cover-traffic-daemon
-          IMAGE_VERSION: ${{ steps.set-image-version.outputs.vsn }}
-          PACKAGE_VERSION: ${{ steps.set-package-version.outputs.vsn }}
+      - name: Build Docker image
+        run: ./scripts/build-docker.sh -p cover-traffic-daemon
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
@@ -455,49 +308,21 @@ jobs:
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
 
-      - name: Set rpc network to xdai on release branches or goerli on master branch
-        id: set-rpc-network
-        run: |
-          declare network
-          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/* ]]; then
-            network="xdai"
-          fi
-          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/wildhorn ]]; then
-            network="polygon"
-          fi
-          if [[ "${HOPR_GITHUB_REF}" == refs/heads/release/rio ]]; then
-            network="polygon"
-          fi
-          if [[ "${HOPR_GITHUB_REF}" == refs/heads/master ]]; then
-            network="goerli"
-          fi
-          if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
-            network="goerli"
-          fi
-          echo "::set-output name=network::${network}"
-
-      - name: Run start script
+      - name: Run deploy script
         if: ${{ !env.ACT }}
         run: |
           # get latest version
           git pull
           # need to install tools first which may be used during deployment
           yarn
-          # set release to intermediate docker build for debugging PRs
-          if [[ "${HOPR_GITHUB_REF}" == refs/heads/debug-deploy/* ]]; then
-            declare last_git_tag="$(git describe --tags --abbrev=0)"
-            declare commits_since_tag="$(git rev-list ${last_git_tag}..HEAD --count)"
-            export RELEASE="debug-${HOPR_GITHUB_REF##refs/heads/debug-deploy/}-${last_git_tag}-${commits_since_tag}"
-          fi
-          echo "Pre-deploy env var RELEASE=${RELEASE}"
           ./scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           INFURA_KEY: ${{ secrets.INFURA_KEY }}
           GITHUB_REF: ${{ github.ref }}
           BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
-          RPC_NETWORK: ${{ steps.set-rpc-network.outputs.network }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
