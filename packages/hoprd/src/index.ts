@@ -1,24 +1,44 @@
 #!/usr/bin/env node
-import Hopr from '@hoprnet/hopr-core'
-import type { HoprOptions } from '@hoprnet/hopr-core'
-import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+
+import { passwordStrength } from 'check-password-strength'
 import { decode } from 'rlp'
-import { Commands } from './commands'
-import { LogStream } from './logs'
-import { AdminServer } from './admin'
+import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
+
+import Hopr, { resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+
 import setupAPI from './api'
+import { AdminServer } from './admin'
+import { Commands } from './commands'
+import { LogStream } from './logs'
 import { getIdentity } from './identity'
-import path from 'path'
-import { passwordStrength } from 'check-password-strength'
+
+import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
+export type DefaultEnvironment = {
+  id?: string
+}
+
+function defaultEnvironment(): string {
+  try {
+    const config = require('../default-environment.json') as DefaultEnvironment
+    return config?.id || ''
+  } catch (error) {
+    // its ok if the file isn't there or cannot be read
+    return ''
+  }
+}
+
 const argv = yargs(process.argv.slice(2))
-  .option('provider', {
-    describe: 'A provider url for the Network you specified',
-    default: 'https://provider-proxy.hoprnet.workers.dev/xdai_mainnet'
+  .option('environment', {
+    string: true,
+    describe: 'Environment id which the node shall run on',
+    choices: supportedEnvironments().map((env) => env.id),
+    default: defaultEnvironment()
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -153,14 +173,14 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-async function generateNodeOptions(): Promise<HoprOptions> {
+async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
-    provider: argv.provider,
     announce: argv.announce,
     hosts: parseHosts(),
     announceLocalAddresses: argv.testAnnounceLocalAddresses,
-    preferLocalAddresses: argv.testPreferLocalAddresses
+    preferLocalAddresses: argv.testPreferLocalAddresses,
+    environment
   }
 
   if (argv.password !== undefined) {
@@ -170,7 +190,6 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   if (argv.data && argv.data !== '') {
     options.dbPath = argv.data
   }
-
   return options
 }
 
@@ -238,8 +257,8 @@ async function main() {
     await adminServer.setup()
   }
 
-  logs.log('Creating HOPR Node')
-  let options = await generateNodeOptions()
+  const environment = resolveEnvironment(argv.environment)
+  let options = await generateNodeOptions(environment)
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
     process.exit(0)
@@ -256,9 +275,9 @@ async function main() {
 
   // 2. Create node instance
   try {
+    logs.log('Creating HOPR Node')
     node = new Hopr(peerId, options)
     logs.logStatus('PENDING')
-    logs.log('Creating HOPR Node')
     node.on('hopr:message', logMessageToNode)
 
     // 2.1 start all monitoring services

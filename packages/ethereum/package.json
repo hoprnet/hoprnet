@@ -1,12 +1,13 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.83.0-next.39",
+  "version": "1.83.0-next.40",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
   "homepage": "https://hoprnet.org",
   "main": "./lib/index.js",
   "scripts": {
+    "prepack": "rm -rf deployments/hardhat-localhost deployments/hardhat-localhost2",
     "clean": "rimraf ./lib && rimraf ./types && hardhat clean",
     "build": "yarn clean && yarn build:sol && yarn copy:types && yarn build:tsc",
     "build:sol": "hardhat compile",

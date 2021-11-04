@@ -1737,7 +1737,7 @@ event or that is rejected if the `EventEmitter` emits `'error'` while waiting.
 The `Promise` will resolve with an array of all the arguments emitted to the
 given event.
 
-This method is intentionally generic and works with the web platform[EventTarget](https://dom.spec.whatwg.org/#interface-eventtarget) interface, which has no special`'error'` event
+This method is intentionally generic and works with the web platform [EventTarget](https://dom.spec.whatwg.org/#interface-eventtarget) interface, which has no special`'error'` event
 semantics and does not listen to the `'error'` event.
 
 ```js

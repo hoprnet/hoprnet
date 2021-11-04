@@ -30,3 +30,7 @@ packages/utils/lib/types/
 !.yarn/sdks
 !.yarn/versions
 .pnp.*
+
+# used only in release and should not be tracked
+packages/hoprd/default-environment.json
+packages/cover-traffic-daemon/default-environment.json
