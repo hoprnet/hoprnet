@@ -44,9 +44,13 @@ function networkToHardhatNetwork(name: String, input: any): any {
     mining: undefined
   }
 
-  if (input.gas) {
-    const parsedGas = input.gas.split(' ')
-    cfg.gasPrice = Number(utils.parseUnits(parsedGas[0], parsedGas[1]))
+  if (input.gas_price) {
+    const parsedGasPrice = input.gas_price.split(' ')
+    if (parsedGasPrice.length > 1) {
+      cfg.gasPrice = Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
+    } else {
+      cfg.gasPrice = Number(parsedGasPrice[0])
+    }
   }
 
   if (name !== 'hardhat') {

@@ -263,7 +263,6 @@ const useFixtures = deployments.createFixture(
 
 describe('announce user', function () {
   it('should announce user', async function () {
-    this.timeout(60e3)
     const { channels, deployer, deployerPubKey } = await useFixtures()
 
     await expect(channels.connect(deployer).announce(deployerPubKey.toUncompressedPubKeyHex(), MULTI_ADDR))
@@ -272,7 +271,6 @@ describe('announce user', function () {
   })
 
   it('should fail to announce user', async function () {
-    this.timeout(60e3)
     const { channels, deployer, accountA } = await useFixtures()
 
     await expect(
