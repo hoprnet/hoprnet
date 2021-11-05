@@ -15,13 +15,13 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-p|--package hoprd|cover-traffic-daemon] [-f|--force]"
+  msg "Usage: $0 [-h|--help] [-p|--package hoprd|cover-traffic-daemon] [-f|--force] [-n|--no-tags]"
   msg
-  msg "Use -f to force a Docker build. No additional tags will be applied though."
+  msg "Use -f to force a Docker build. No additional tags will be applied though if no environment has been found."
   msg
 }
 
-declare image_version package_version docker_image releases branch docker_image_full package force
+declare image_version package_version docker_image releases branch docker_image_full package force no_tags
 
 while (( "$#" )); do
   case "$1" in
@@ -36,6 +36,10 @@ while (( "$#" )); do
       ;;
     -f|--force)
       force="true"
+      shift
+      ;;
+    -n|--no-tags)
+      no_tags="true"
       shift
       ;;
     -*|--*=)
@@ -86,9 +90,14 @@ if [ "${v}" != "${package_version}" ]; then
   exit 1
 fi
 
-if [ -z "${releases}" ] then
+if [ -z "${releases}" ]; then
   # stopping here after forced build
   log "no releases were configured for branch ${branch}"
+  exit 0
+fi
+
+if [ "${no_tags:-}" = "true" ]; then
+  log "skip tagging as requested"
   exit 0
 fi
 
