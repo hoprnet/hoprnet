@@ -71,7 +71,7 @@ done
 log "creating new version ${current_version} + ${version_type}"
 
 # create new version in each package
-yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version ${version_type} --preid=next
+yarn workspaces foreach -piv --topological-dev --exclude hoprnet exec -- npm version ${version_type} --preid=next
 declare new_version
 new_version=$(${mydir}/get-package-version.sh)
 
@@ -102,7 +102,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
 
   # pack and publish packages
-  yarn workspaces foreach -piv --no-private --topological-dev npm publish --access public
+  yarn workspaces foreach -piv --topological-dev --exclude hoprnet npm publish --access public
 
   # delete default environments
   rm -f \
