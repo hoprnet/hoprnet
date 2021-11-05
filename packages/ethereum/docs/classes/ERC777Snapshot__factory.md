@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Snapshot__factory.ts:667
+packages/ethereum/src/types/factories/ERC777Snapshot__factory.ts:667
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/ERC777Snapshot__factory.ts:667
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Snapshot__factory.ts:671
+packages/ethereum/src/types/factories/ERC777Snapshot__factory.ts:671
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777Snapshot__factory.ts:668
+packages/ethereum/src/types/factories/ERC777Snapshot__factory.ts:668

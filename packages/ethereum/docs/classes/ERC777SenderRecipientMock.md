@@ -178,7 +178,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:359
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:359
 
 ___
 
@@ -222,7 +222,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:565
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:565
 
 ___
 
@@ -245,7 +245,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:423
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:423
 
 ___
 
@@ -275,7 +275,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:215
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:215
 
 ___
 
@@ -289,7 +289,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:213
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:213
 
 ___
 
@@ -319,7 +319,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:638
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:638
 
 ___
 
@@ -459,7 +459,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:174
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:174
 
 ___
 
@@ -482,7 +482,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:288
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:288
 
 ___
 
@@ -504,7 +504,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:295
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:295
 
 ___
 
@@ -528,7 +528,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:173
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:173
 
 ___
 
@@ -546,7 +546,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:175
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:175
 
 ___
 
@@ -650,7 +650,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:177
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:177
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -670,7 +670,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:200
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:200
 
 ___
 
@@ -702,7 +702,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:180
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:180
 
 ▸ **off**(`eventName`, `listener`): [`ERC777SenderRecipientMock`](ERC777SenderRecipientMock.md)
 
@@ -723,7 +723,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:201
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:201
 
 ___
 
@@ -755,7 +755,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:184
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:184
 
 ▸ **on**(`eventName`, `listener`): [`ERC777SenderRecipientMock`](ERC777SenderRecipientMock.md)
 
@@ -776,7 +776,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:202
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:202
 
 ___
 
@@ -808,7 +808,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:188
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:188
 
 ▸ **once**(`eventName`, `listener`): [`ERC777SenderRecipientMock`](ERC777SenderRecipientMock.md)
 
@@ -829,7 +829,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:203
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:203
 
 ___
 
@@ -862,7 +862,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:207
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:207
 
 ___
 
@@ -883,7 +883,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:301
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:301
 
 ___
 
@@ -904,7 +904,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:306
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:306
 
 ___
 
@@ -925,7 +925,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:311
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:311
 
 ___
 
@@ -956,7 +956,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:196
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:196
 
 ▸ **removeAllListeners**(`eventName?`): [`ERC777SenderRecipientMock`](ERC777SenderRecipientMock.md)
 
@@ -976,7 +976,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:205
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:205
 
 ___
 
@@ -1008,7 +1008,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:192
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:192
 
 ▸ **removeListener**(`eventName`, `listener`): [`ERC777SenderRecipientMock`](ERC777SenderRecipientMock.md)
 
@@ -1029,7 +1029,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:204
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:204
 
 ___
 
@@ -1053,7 +1053,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:316
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:316
 
 ___
 
@@ -1074,7 +1074,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:324
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:324
 
 ___
 
@@ -1095,7 +1095,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:329
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:329
 
 ___
 
@@ -1116,7 +1116,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:334
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:334
 
 ___
 
@@ -1142,7 +1142,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:339
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:339
 
 ___
 
@@ -1168,7 +1168,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC777SenderRecipientMock.d.ts:349
+packages/ethereum/src/types/ERC777SenderRecipientMock.d.ts:349
 
 ___
 

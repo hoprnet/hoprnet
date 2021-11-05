@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/ChannelsMock__factory.ts:839
+packages/ethereum/src/types/factories/ChannelsMock__factory.ts:839
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ChannelsMock__factory.ts:874
+packages/ethereum/src/types/factories/ChannelsMock__factory.ts:874
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ChannelsMock__factory.ts:873
+packages/ethereum/src/types/factories/ChannelsMock__factory.ts:873
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ChannelsMock__factory.ts:867
+packages/ethereum/src/types/factories/ChannelsMock__factory.ts:867
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ChannelsMock__factory.ts:870
+packages/ethereum/src/types/factories/ChannelsMock__factory.ts:870
 
 ___
 
@@ -189,7 +189,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ChannelsMock__factory.ts:849
+packages/ethereum/src/types/factories/ChannelsMock__factory.ts:849
 
 ___
 
@@ -215,7 +215,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ChannelsMock__factory.ts:860
+packages/ethereum/src/types/factories/ChannelsMock__factory.ts:860
 
 ___
 
@@ -236,7 +236,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ChannelsMock__factory.ts:878
+packages/ethereum/src/types/factories/ChannelsMock__factory.ts:878
 
 ___
 
@@ -250,7 +250,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ChannelsMock__factory.ts:875
+packages/ethereum/src/types/factories/ChannelsMock__factory.ts:875
 
 ___
 

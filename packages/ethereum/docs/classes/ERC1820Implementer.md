@@ -158,7 +158,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:96
+packages/ethereum/src/types/ERC1820Implementer.d.ts:96
 
 ___
 
@@ -192,7 +192,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:106
+packages/ethereum/src/types/ERC1820Implementer.d.ts:106
 
 ___
 
@@ -206,7 +206,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:104
+packages/ethereum/src/types/ERC1820Implementer.d.ts:104
 
 ___
 
@@ -226,7 +226,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:82
+packages/ethereum/src/types/ERC1820Implementer.d.ts:82
 
 ___
 
@@ -240,7 +240,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:80
+packages/ethereum/src/types/ERC1820Implementer.d.ts:80
 
 ___
 
@@ -260,7 +260,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:114
+packages/ethereum/src/types/ERC1820Implementer.d.ts:114
 
 ___
 
@@ -400,7 +400,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:41
+packages/ethereum/src/types/ERC1820Implementer.d.ts:41
 
 ___
 
@@ -422,7 +422,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:90
+packages/ethereum/src/types/ERC1820Implementer.d.ts:90
 
 ___
 
@@ -446,7 +446,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:40
+packages/ethereum/src/types/ERC1820Implementer.d.ts:40
 
 ___
 
@@ -464,7 +464,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:42
+packages/ethereum/src/types/ERC1820Implementer.d.ts:42
 
 ___
 
@@ -568,7 +568,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:44
+packages/ethereum/src/types/ERC1820Implementer.d.ts:44
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -588,7 +588,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:67
+packages/ethereum/src/types/ERC1820Implementer.d.ts:67
 
 ___
 
@@ -620,7 +620,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:47
+packages/ethereum/src/types/ERC1820Implementer.d.ts:47
 
 ▸ **off**(`eventName`, `listener`): [`ERC1820Implementer`](ERC1820Implementer.md)
 
@@ -641,7 +641,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:68
+packages/ethereum/src/types/ERC1820Implementer.d.ts:68
 
 ___
 
@@ -673,7 +673,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:51
+packages/ethereum/src/types/ERC1820Implementer.d.ts:51
 
 ▸ **on**(`eventName`, `listener`): [`ERC1820Implementer`](ERC1820Implementer.md)
 
@@ -694,7 +694,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:69
+packages/ethereum/src/types/ERC1820Implementer.d.ts:69
 
 ___
 
@@ -726,7 +726,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:55
+packages/ethereum/src/types/ERC1820Implementer.d.ts:55
 
 ▸ **once**(`eventName`, `listener`): [`ERC1820Implementer`](ERC1820Implementer.md)
 
@@ -747,7 +747,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:70
+packages/ethereum/src/types/ERC1820Implementer.d.ts:70
 
 ___
 
@@ -780,7 +780,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:74
+packages/ethereum/src/types/ERC1820Implementer.d.ts:74
 
 ___
 
@@ -811,7 +811,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:63
+packages/ethereum/src/types/ERC1820Implementer.d.ts:63
 
 ▸ **removeAllListeners**(`eventName?`): [`ERC1820Implementer`](ERC1820Implementer.md)
 
@@ -831,7 +831,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:72
+packages/ethereum/src/types/ERC1820Implementer.d.ts:72
 
 ___
 
@@ -863,7 +863,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:59
+packages/ethereum/src/types/ERC1820Implementer.d.ts:59
 
 ▸ **removeListener**(`eventName`, `listener`): [`ERC1820Implementer`](ERC1820Implementer.md)
 
@@ -884,7 +884,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC1820Implementer.d.ts:71
+packages/ethereum/src/types/ERC1820Implementer.d.ts:71
 
 ___
 

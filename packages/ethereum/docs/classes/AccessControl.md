@@ -172,7 +172,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:241
+packages/ethereum/src/types/AccessControl.d.ts:241
 
 ___
 
@@ -213,7 +213,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:338
+packages/ethereum/src/types/AccessControl.d.ts:338
 
 ___
 
@@ -238,7 +238,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:282
+packages/ethereum/src/types/AccessControl.d.ts:282
 
 ___
 
@@ -265,7 +265,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:161
+packages/ethereum/src/types/AccessControl.d.ts:161
 
 ___
 
@@ -279,7 +279,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:159
+packages/ethereum/src/types/AccessControl.d.ts:159
 
 ___
 
@@ -306,7 +306,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:382
+packages/ethereum/src/types/AccessControl.d.ts:382
 
 ___
 
@@ -368,7 +368,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:202
+packages/ethereum/src/types/AccessControl.d.ts:202
 
 ___
 
@@ -466,7 +466,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:120
+packages/ethereum/src/types/AccessControl.d.ts:120
 
 ___
 
@@ -490,7 +490,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:119
+packages/ethereum/src/types/AccessControl.d.ts:119
 
 ___
 
@@ -508,7 +508,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:121
+packages/ethereum/src/types/AccessControl.d.ts:121
 
 ___
 
@@ -578,7 +578,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:204
+packages/ethereum/src/types/AccessControl.d.ts:204
 
 ___
 
@@ -600,7 +600,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:206
+packages/ethereum/src/types/AccessControl.d.ts:206
 
 ___
 
@@ -621,7 +621,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:212
+packages/ethereum/src/types/AccessControl.d.ts:212
 
 ___
 
@@ -643,7 +643,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:217
+packages/ethereum/src/types/AccessControl.d.ts:217
 
 ___
 
@@ -665,7 +665,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:223
+packages/ethereum/src/types/AccessControl.d.ts:223
 
 ___
 
@@ -720,7 +720,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:123
+packages/ethereum/src/types/AccessControl.d.ts:123
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -740,7 +740,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:146
+packages/ethereum/src/types/AccessControl.d.ts:146
 
 ___
 
@@ -772,7 +772,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:126
+packages/ethereum/src/types/AccessControl.d.ts:126
 
 ▸ **off**(`eventName`, `listener`): [`AccessControl`](AccessControl.md)
 
@@ -793,7 +793,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:147
+packages/ethereum/src/types/AccessControl.d.ts:147
 
 ___
 
@@ -825,7 +825,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:130
+packages/ethereum/src/types/AccessControl.d.ts:130
 
 ▸ **on**(`eventName`, `listener`): [`AccessControl`](AccessControl.md)
 
@@ -846,7 +846,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:148
+packages/ethereum/src/types/AccessControl.d.ts:148
 
 ___
 
@@ -878,7 +878,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:134
+packages/ethereum/src/types/AccessControl.d.ts:134
 
 ▸ **once**(`eventName`, `listener`): [`AccessControl`](AccessControl.md)
 
@@ -899,7 +899,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:149
+packages/ethereum/src/types/AccessControl.d.ts:149
 
 ___
 
@@ -932,7 +932,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:153
+packages/ethereum/src/types/AccessControl.d.ts:153
 
 ___
 
@@ -963,7 +963,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:142
+packages/ethereum/src/types/AccessControl.d.ts:142
 
 ▸ **removeAllListeners**(`eventName?`): [`AccessControl`](AccessControl.md)
 
@@ -983,7 +983,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:151
+packages/ethereum/src/types/AccessControl.d.ts:151
 
 ___
 
@@ -1015,7 +1015,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:138
+packages/ethereum/src/types/AccessControl.d.ts:138
 
 ▸ **removeListener**(`eventName`, `listener`): [`AccessControl`](AccessControl.md)
 
@@ -1036,7 +1036,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:150
+packages/ethereum/src/types/AccessControl.d.ts:150
 
 ___
 
@@ -1058,7 +1058,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:229
+packages/ethereum/src/types/AccessControl.d.ts:229
 
 ___
 
@@ -1080,7 +1080,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/AccessControl.d.ts:235
+packages/ethereum/src/types/AccessControl.d.ts:235
 
 ___
 

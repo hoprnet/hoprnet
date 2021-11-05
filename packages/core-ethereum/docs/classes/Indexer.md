@@ -105,10 +105,10 @@ EventEmitter.constructor
 | `announce` | (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> |
 | `finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
 | `fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> |
-| `getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
-| `getChannels` | () => `HoprChannels` |
+| `getBalance` | (`address`: `Address`) => `any` |
+| `getChannels` | () => `any` |
 | `getGenesisBlock` | () => `number` |
-| `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
+| `getInfo` | () => { `channelClosureSecs`: `any` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
 | `getLatestBlockNumber` | () => `Promise`<`number`\> |
 | `getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
@@ -120,9 +120,9 @@ EventEmitter.constructor
 | `redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> |
 | `setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> |
 | `subscribeBlock` | (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` |
-| `subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
+| `subscribeChannelEvents` | (`cb`: `any`) => `any` |
 | `subscribeError` | (`cb`: `any`) => `void` |
-| `subscribeTokenEvents` | (`cb`: `any`) => `HoprToken` |
+| `subscribeTokenEvents` | (`cb`: `any`) => `any` |
 | `unsubscribe` | () => `void` |
 | `updateConfirmedTransaction` | (`hash`: `string`) => `void` |
 | `waitUntilReady` | () => `Promise`<`Network`\> |
@@ -166,7 +166,7 @@ ___
 
 ### unconfirmedEvents
 
-• `Private` **unconfirmedEvents**: `Heap`<`Event`<`any`\> \| `TokenEvent`<`any`\>\>
+• `Private` **unconfirmedEvents**: `Heap`<`any`\>
 
 #### Defined in
 
@@ -680,7 +680,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | `Event`<``"Announcement"``\> |
+| `event` | `any` |
 | `blockNumber` | `BN` |
 
 #### Returns
@@ -721,7 +721,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | `Event`<``"ChannelUpdated"``\> |
+| `event` | `any` |
 
 #### Returns
 
@@ -768,7 +768,7 @@ Called whenever we receive new events.
 
 | Name | Type |
 | :------ | :------ |
-| `events` | `Event`<`any`\>[] \| `TokenEvent`<`any`\>[] |
+| `events` | `any`[] |
 
 #### Returns
 
@@ -1210,10 +1210,10 @@ Starts indexing.
 | `chain.announce` | (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> |
 | `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
 | `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> |
-| `chain.getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
-| `chain.getChannels` | () => `HoprChannels` |
+| `chain.getBalance` | (`address`: `Address`) => `any` |
+| `chain.getChannels` | () => `any` |
 | `chain.getGenesisBlock` | () => `number` |
-| `chain.getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
+| `chain.getInfo` | () => { `channelClosureSecs`: `any` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
 | `chain.getLatestBlockNumber` | () => `Promise`<`number`\> |
 | `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `chain.getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
@@ -1225,9 +1225,9 @@ Starts indexing.
 | `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> |
 | `chain.setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> |
 | `chain.subscribeBlock` | (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` |
-| `chain.subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
+| `chain.subscribeChannelEvents` | (`cb`: `any`) => `any` |
 | `chain.subscribeError` | (`cb`: `any`) => `void` |
-| `chain.subscribeTokenEvents` | (`cb`: `any`) => `HoprToken` |
+| `chain.subscribeTokenEvents` | (`cb`: `any`) => `any` |
 | `chain.unsubscribe` | () => `void` |
 | `chain.updateConfirmedTransaction` | (`hash`: `string`) => `void` |
 | `chain.waitUntilReady` | () => `Promise`<`Network`\> |

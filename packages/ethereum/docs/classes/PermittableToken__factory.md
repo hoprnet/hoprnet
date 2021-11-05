@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:852
+packages/ethereum/src/types/factories/PermittableToken__factory.ts:852
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:899
+packages/ethereum/src/types/factories/PermittableToken__factory.ts:899
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:898
+packages/ethereum/src/types/factories/PermittableToken__factory.ts:898
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:892
+packages/ethereum/src/types/factories/PermittableToken__factory.ts:892
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:895
+packages/ethereum/src/types/factories/PermittableToken__factory.ts:895
 
 ___
 
@@ -191,7 +191,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:862
+packages/ethereum/src/types/factories/PermittableToken__factory.ts:862
 
 ___
 
@@ -219,7 +219,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:877
+packages/ethereum/src/types/factories/PermittableToken__factory.ts:877
 
 ___
 
@@ -240,7 +240,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:903
+packages/ethereum/src/types/factories/PermittableToken__factory.ts:903
 
 ___
 
@@ -254,7 +254,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/PermittableToken__factory.ts:900
+packages/ethereum/src/types/factories/PermittableToken__factory.ts:900
 
 ___
 

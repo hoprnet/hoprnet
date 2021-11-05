@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/Multicall__factory.ts:32
+packages/ethereum/src/types/factories/Multicall__factory.ts:32
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/Multicall__factory.ts:32
 
 #### Defined in
 
-packages/ethereum/types/factories/Multicall__factory.ts:36
+packages/ethereum/src/types/factories/Multicall__factory.ts:36
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Multicall__factory.ts:33
+packages/ethereum/src/types/factories/Multicall__factory.ts:33

@@ -66,7 +66,7 @@ Event.args
 
 #### Defined in
 
-packages/ethereum/types/common.d.ts:11
+packages/ethereum/src/types/common.d.ts:11
 
 ___
 

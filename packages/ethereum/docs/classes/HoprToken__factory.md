@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:941
+packages/ethereum/src/types/factories/HoprToken__factory.ts:941
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:968
+packages/ethereum/src/types/factories/HoprToken__factory.ts:968
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:967
+packages/ethereum/src/types/factories/HoprToken__factory.ts:967
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:961
+packages/ethereum/src/types/factories/HoprToken__factory.ts:961
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:964
+packages/ethereum/src/types/factories/HoprToken__factory.ts:964
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:951
+packages/ethereum/src/types/factories/HoprToken__factory.ts:951
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:956
+packages/ethereum/src/types/factories/HoprToken__factory.ts:956
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:972
+packages/ethereum/src/types/factories/HoprToken__factory.ts:972
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprToken__factory.ts:969
+packages/ethereum/src/types/factories/HoprToken__factory.ts:969
 
 ___
 

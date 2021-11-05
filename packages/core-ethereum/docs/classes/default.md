@@ -161,10 +161,10 @@ ___
 | `announce` | (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> |
 | `finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
 | `fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> |
-| `getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
-| `getChannels` | () => `HoprChannels` |
+| `getBalance` | (`address`: `Address`) => `any` |
+| `getChannels` | () => `any` |
 | `getGenesisBlock` | () => `number` |
-| `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
+| `getInfo` | () => { `channelClosureSecs`: `any` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
 | `getLatestBlockNumber` | () => `Promise`<`number`\> |
 | `getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
@@ -176,9 +176,9 @@ ___
 | `redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> |
 | `setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> |
 | `subscribeBlock` | (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` |
-| `subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
+| `subscribeChannelEvents` | (`cb`: `any`) => `any` |
 | `subscribeError` | (`cb`: `any`) => `void` |
-| `subscribeTokenEvents` | (`cb`: `any`) => `HoprToken` |
+| `subscribeTokenEvents` | (`cb`: `any`) => `any` |
 | `unsubscribe` | () => `void` |
 | `updateConfirmedTransaction` | (`hash`: `string`) => `void` |
 | `waitUntilReady` | () => `Promise`<`Network`\> |
@@ -1301,11 +1301,11 @@ ___
 
 ### uncachedGetBalance
 
-▸ `Private` **uncachedGetBalance**(): `Promise`<`Balance`\>
+▸ `Private` **uncachedGetBalance**(): `any`
 
 #### Returns
 
-`Promise`<`Balance`\>
+`any`
 
 #### Defined in
 

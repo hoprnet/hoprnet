@@ -182,7 +182,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:336
+packages/ethereum/src/types/IERC777.d.ts:336
 
 ___
 
@@ -228,7 +228,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:533
+packages/ethereum/src/types/IERC777.d.ts:533
 
 ___
 
@@ -257,7 +257,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:393
+packages/ethereum/src/types/IERC777.d.ts:393
 
 ___
 
@@ -289,7 +289,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:218
+packages/ethereum/src/types/IERC777.d.ts:218
 
 ___
 
@@ -303,7 +303,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:216
+packages/ethereum/src/types/IERC777.d.ts:216
 
 ___
 
@@ -335,7 +335,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:593
+packages/ethereum/src/types/IERC777.d.ts:593
 
 ___
 
@@ -475,7 +475,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:177
+packages/ethereum/src/types/IERC777.d.ts:177
 
 ___
 
@@ -496,7 +496,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:278
+packages/ethereum/src/types/IERC777.d.ts:278
 
 ___
 
@@ -517,7 +517,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:283
+packages/ethereum/src/types/IERC777.d.ts:283
 
 ___
 
@@ -539,7 +539,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:285
+packages/ethereum/src/types/IERC777.d.ts:285
 
 ___
 
@@ -563,7 +563,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:176
+packages/ethereum/src/types/IERC777.d.ts:176
 
 ___
 
@@ -583,7 +583,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:291
+packages/ethereum/src/types/IERC777.d.ts:291
 
 ___
 
@@ -601,7 +601,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:178
+packages/ethereum/src/types/IERC777.d.ts:178
 
 ___
 
@@ -670,7 +670,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:293
+packages/ethereum/src/types/IERC777.d.ts:293
 
 ___
 
@@ -692,7 +692,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:295
+packages/ethereum/src/types/IERC777.d.ts:295
 
 ___
 
@@ -747,7 +747,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:180
+packages/ethereum/src/types/IERC777.d.ts:180
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -767,7 +767,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:203
+packages/ethereum/src/types/IERC777.d.ts:203
 
 ___
 
@@ -787,7 +787,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:301
+packages/ethereum/src/types/IERC777.d.ts:301
 
 ___
 
@@ -819,7 +819,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:183
+packages/ethereum/src/types/IERC777.d.ts:183
 
 ▸ **off**(`eventName`, `listener`): [`IERC777`](IERC777.md)
 
@@ -840,7 +840,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:204
+packages/ethereum/src/types/IERC777.d.ts:204
 
 ___
 
@@ -872,7 +872,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:187
+packages/ethereum/src/types/IERC777.d.ts:187
 
 ▸ **on**(`eventName`, `listener`): [`IERC777`](IERC777.md)
 
@@ -893,7 +893,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:205
+packages/ethereum/src/types/IERC777.d.ts:205
 
 ___
 
@@ -925,7 +925,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:191
+packages/ethereum/src/types/IERC777.d.ts:191
 
 ▸ **once**(`eventName`, `listener`): [`IERC777`](IERC777.md)
 
@@ -946,7 +946,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:206
+packages/ethereum/src/types/IERC777.d.ts:206
 
 ___
 
@@ -970,7 +970,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:303
+packages/ethereum/src/types/IERC777.d.ts:303
 
 ___
 
@@ -995,7 +995,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:311
+packages/ethereum/src/types/IERC777.d.ts:311
 
 ___
 
@@ -1028,7 +1028,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:210
+packages/ethereum/src/types/IERC777.d.ts:210
 
 ___
 
@@ -1059,7 +1059,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:199
+packages/ethereum/src/types/IERC777.d.ts:199
 
 ▸ **removeAllListeners**(`eventName?`): [`IERC777`](IERC777.md)
 
@@ -1079,7 +1079,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:208
+packages/ethereum/src/types/IERC777.d.ts:208
 
 ___
 
@@ -1111,7 +1111,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:195
+packages/ethereum/src/types/IERC777.d.ts:195
 
 ▸ **removeListener**(`eventName`, `listener`): [`IERC777`](IERC777.md)
 
@@ -1132,7 +1132,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:207
+packages/ethereum/src/types/IERC777.d.ts:207
 
 ___
 
@@ -1153,7 +1153,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:320
+packages/ethereum/src/types/IERC777.d.ts:320
 
 ___
 
@@ -1176,7 +1176,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:325
+packages/ethereum/src/types/IERC777.d.ts:325
 
 ___
 
@@ -1196,7 +1196,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:332
+packages/ethereum/src/types/IERC777.d.ts:332
 
 ___
 
@@ -1216,7 +1216,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777.d.ts:334
+packages/ethereum/src/types/IERC777.d.ts:334
 
 ___
 

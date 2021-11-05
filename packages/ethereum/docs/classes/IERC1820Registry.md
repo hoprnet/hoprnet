@@ -172,7 +172,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:245
+packages/ethereum/src/types/IERC1820Registry.d.ts:245
 
 ___
 
@@ -213,7 +213,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:327
+packages/ethereum/src/types/IERC1820Registry.d.ts:327
 
 ___
 
@@ -236,7 +236,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:291
+packages/ethereum/src/types/IERC1820Registry.d.ts:291
 
 ___
 
@@ -263,7 +263,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:155
+packages/ethereum/src/types/IERC1820Registry.d.ts:155
 
 ___
 
@@ -277,7 +277,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:153
+packages/ethereum/src/types/IERC1820Registry.d.ts:153
 
 ___
 
@@ -304,7 +304,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:373
+packages/ethereum/src/types/IERC1820Registry.d.ts:373
 
 ___
 
@@ -444,7 +444,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:114
+packages/ethereum/src/types/IERC1820Registry.d.ts:114
 
 ___
 
@@ -468,7 +468,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:113
+packages/ethereum/src/types/IERC1820Registry.d.ts:113
 
 ___
 
@@ -486,7 +486,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:115
+packages/ethereum/src/types/IERC1820Registry.d.ts:115
 
 ___
 
@@ -557,7 +557,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:201
+packages/ethereum/src/types/IERC1820Registry.d.ts:201
 
 ___
 
@@ -578,7 +578,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:207
+packages/ethereum/src/types/IERC1820Registry.d.ts:207
 
 ___
 
@@ -600,7 +600,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:209
+packages/ethereum/src/types/IERC1820Registry.d.ts:209
 
 ___
 
@@ -622,7 +622,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:215
+packages/ethereum/src/types/IERC1820Registry.d.ts:215
 
 ___
 
@@ -643,7 +643,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:221
+packages/ethereum/src/types/IERC1820Registry.d.ts:221
 
 ___
 
@@ -698,7 +698,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:117
+packages/ethereum/src/types/IERC1820Registry.d.ts:117
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -718,7 +718,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:140
+packages/ethereum/src/types/IERC1820Registry.d.ts:140
 
 ___
 
@@ -750,7 +750,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:120
+packages/ethereum/src/types/IERC1820Registry.d.ts:120
 
 ▸ **off**(`eventName`, `listener`): [`IERC1820Registry`](IERC1820Registry.md)
 
@@ -771,7 +771,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:141
+packages/ethereum/src/types/IERC1820Registry.d.ts:141
 
 ___
 
@@ -803,7 +803,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:124
+packages/ethereum/src/types/IERC1820Registry.d.ts:124
 
 ▸ **on**(`eventName`, `listener`): [`IERC1820Registry`](IERC1820Registry.md)
 
@@ -824,7 +824,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:142
+packages/ethereum/src/types/IERC1820Registry.d.ts:142
 
 ___
 
@@ -856,7 +856,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:128
+packages/ethereum/src/types/IERC1820Registry.d.ts:128
 
 ▸ **once**(`eventName`, `listener`): [`IERC1820Registry`](IERC1820Registry.md)
 
@@ -877,7 +877,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:143
+packages/ethereum/src/types/IERC1820Registry.d.ts:143
 
 ___
 
@@ -910,7 +910,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:147
+packages/ethereum/src/types/IERC1820Registry.d.ts:147
 
 ___
 
@@ -941,7 +941,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:136
+packages/ethereum/src/types/IERC1820Registry.d.ts:136
 
 ▸ **removeAllListeners**(`eventName?`): [`IERC1820Registry`](IERC1820Registry.md)
 
@@ -961,7 +961,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:145
+packages/ethereum/src/types/IERC1820Registry.d.ts:145
 
 ___
 
@@ -993,7 +993,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:132
+packages/ethereum/src/types/IERC1820Registry.d.ts:132
 
 ▸ **removeListener**(`eventName`, `listener`): [`IERC1820Registry`](IERC1820Registry.md)
 
@@ -1014,7 +1014,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:144
+packages/ethereum/src/types/IERC1820Registry.d.ts:144
 
 ___
 
@@ -1037,7 +1037,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:226
+packages/ethereum/src/types/IERC1820Registry.d.ts:226
 
 ___
 
@@ -1059,7 +1059,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:233
+packages/ethereum/src/types/IERC1820Registry.d.ts:233
 
 ___
 
@@ -1081,7 +1081,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC1820Registry.d.ts:239
+packages/ethereum/src/types/IERC1820Registry.d.ts:239
 
 ___
 

@@ -158,7 +158,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:92
+packages/ethereum/src/types/Multicall.d.ts:92
 
 ___
 
@@ -192,7 +192,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:98
+packages/ethereum/src/types/Multicall.d.ts:98
 
 ___
 
@@ -206,7 +206,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:96
+packages/ethereum/src/types/Multicall.d.ts:96
 
 ___
 
@@ -226,7 +226,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:80
+packages/ethereum/src/types/Multicall.d.ts:80
 
 ___
 
@@ -240,7 +240,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:78
+packages/ethereum/src/types/Multicall.d.ts:78
 
 ___
 
@@ -260,7 +260,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:105
+packages/ethereum/src/types/Multicall.d.ts:105
 
 ___
 
@@ -400,7 +400,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:39
+packages/ethereum/src/types/Multicall.d.ts:39
 
 ___
 
@@ -424,7 +424,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:38
+packages/ethereum/src/types/Multicall.d.ts:38
 
 ___
 
@@ -442,7 +442,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:40
+packages/ethereum/src/types/Multicall.d.ts:40
 
 ___
 
@@ -546,7 +546,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:42
+packages/ethereum/src/types/Multicall.d.ts:42
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -566,7 +566,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:65
+packages/ethereum/src/types/Multicall.d.ts:65
 
 ___
 
@@ -587,7 +587,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:87
+packages/ethereum/src/types/Multicall.d.ts:87
 
 ___
 
@@ -619,7 +619,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:45
+packages/ethereum/src/types/Multicall.d.ts:45
 
 ▸ **off**(`eventName`, `listener`): [`Multicall`](Multicall.md)
 
@@ -640,7 +640,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:66
+packages/ethereum/src/types/Multicall.d.ts:66
 
 ___
 
@@ -672,7 +672,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:49
+packages/ethereum/src/types/Multicall.d.ts:49
 
 ▸ **on**(`eventName`, `listener`): [`Multicall`](Multicall.md)
 
@@ -693,7 +693,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:67
+packages/ethereum/src/types/Multicall.d.ts:67
 
 ___
 
@@ -725,7 +725,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:53
+packages/ethereum/src/types/Multicall.d.ts:53
 
 ▸ **once**(`eventName`, `listener`): [`Multicall`](Multicall.md)
 
@@ -746,7 +746,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:68
+packages/ethereum/src/types/Multicall.d.ts:68
 
 ___
 
@@ -779,7 +779,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:72
+packages/ethereum/src/types/Multicall.d.ts:72
 
 ___
 
@@ -810,7 +810,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:61
+packages/ethereum/src/types/Multicall.d.ts:61
 
 ▸ **removeAllListeners**(`eventName?`): [`Multicall`](Multicall.md)
 
@@ -830,7 +830,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:70
+packages/ethereum/src/types/Multicall.d.ts:70
 
 ___
 
@@ -862,7 +862,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:57
+packages/ethereum/src/types/Multicall.d.ts:57
 
 ▸ **removeListener**(`eventName`, `listener`): [`Multicall`](Multicall.md)
 
@@ -883,7 +883,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/Multicall.d.ts:69
+packages/ethereum/src/types/Multicall.d.ts:69
 
 ___
 
