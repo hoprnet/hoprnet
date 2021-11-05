@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC1820Implementer__factory.ts:40
+packages/ethereum/src/types/factories/IERC1820Implementer__factory.ts:40
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/IERC1820Implementer__factory.ts:40
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC1820Implementer__factory.ts:44
+packages/ethereum/src/types/factories/IERC1820Implementer__factory.ts:44
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC1820Implementer__factory.ts:41
+packages/ethereum/src/types/factories/IERC1820Implementer__factory.ts:41

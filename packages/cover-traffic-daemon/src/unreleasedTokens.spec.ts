@@ -2,14 +2,13 @@ import assert from 'assert'
 import BigNumber from 'bignumber.js'
 import PeerId from 'peer-id'
 import { utils } from 'ethers'
-import UNRELEASED_TOKENS from './unreleasedTokens.json'
 
 describe('test unreleasedTokens.json', function () {
   const unreleasedTokens: {
     ethAddress: string
     hoprId: string
     tokens: string
-  }[] = UNRELEASED_TOKENS
+  }[] = require('./unreleasedTokens.json')
 
   it('should validate entries', function () {
     for (const { ethAddress, hoprId, tokens } of unreleasedTokens) {

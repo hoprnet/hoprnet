@@ -37,14 +37,14 @@ echo "Looking for releases to deploy from branch ${branch}"
 
 # iterate through releases with git ref == "refs/heads/${branch}"
 
-for row in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r ".[] | select(.git_ref==\"refs/heads/${branch}\") | @base64"); do
+for row in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"refs/heads/${branch}\") | @base64"); do
   declare release_id deprecated environment_id version_major version_minor docker_image_full token_contract_address
 
-  release_id=$(_jq "${row}" ".id")
-  deprecated=$(_jq "${row}" ".deprecated")
-  environment_id=$(_jq "${row}" ".environment_id")
-  version_major=$(_jq "${row}" ".version_major")
-  version_minor=$(_jq "${row}" ".version_minor")
+  release_id=$(_jq "${row}" ".key")
+  deprecated=$(_jq "${row}" ".value.deprecated")
+  environment_id=$(_jq "${row}" ".value.environment_id")
+  version_major=$(_jq "${row}" ".value.version_major")
+  version_minor=$(_jq "${row}" ".value.version_minor")
   docker_image_full="${docker_image}:${release_id}"
   token_contract_address=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".token_contract_address")
 

@@ -136,7 +136,10 @@ function setup_node() {
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
 
-  DEBUG="hopr*" node packages/hoprd/lib/index.js \
+  # Set NODE_ENV=development to rebuild hopr-admin next files
+  # at runtime. Necessary to start multiple instances of hoprd
+  # in parallel
+  DEBUG="hopr*" NODE_ENV=development node packages/hoprd/lib/index.js \
     --admin \
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \
@@ -217,7 +220,7 @@ rm -Rfv \
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-DEVELOPMENT=true HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
+HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 

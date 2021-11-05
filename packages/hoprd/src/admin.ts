@@ -6,7 +6,7 @@ import path from 'path'
 import { debug } from '@hoprnet/hopr-utils'
 import { parse, URL } from 'url'
 import next from 'next'
-import type { Server } from 'http'
+import type { Server as HttpServer } from 'http'
 import stripAnsi from 'strip-ansi'
 import { LogStream } from './logs'
 import { NODE_ENV } from './env'
@@ -20,10 +20,10 @@ const MIN_BALANCE = new Balance(SUGGESTED_BALANCE).toFormattedString()
 const MIN_NATIVE_BALANCE = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
 export class AdminServer {
-  private app: any
-  private server: Server | undefined
+  private app: ReturnType<typeof next>
+  private server: HttpServer | undefined
   private node: Hopr | undefined
-  private wsServer: any
+  private wsServer: ws.Server
   private cmds: Commands
 
   constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) {}
@@ -79,10 +79,18 @@ export class AdminServer {
     }
     debugLog('using', adminPath)
 
-    this.app = next({
+    const nextConfig = {
       dev: NODE_ENV === 'development',
       dir: adminPath
-    })
+    } as any
+
+    if (NODE_ENV === 'development') {
+      nextConfig.conf = {
+        distDir: `build/${this.port}`
+      }
+    }
+
+    this.app = next(nextConfig)
     const handle = this.app.getRequestHandler()
     await this.app.prepare()
 

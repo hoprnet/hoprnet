@@ -1,4 +1,6 @@
 {
+  // Only typecheck Typescript files in `script` folder as
+  // they are executed using ts-node
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true

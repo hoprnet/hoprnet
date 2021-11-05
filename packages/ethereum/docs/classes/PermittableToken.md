@@ -226,7 +226,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:705
+packages/ethereum/src/types/PermittableToken.d.ts:705
 
 ___
 
@@ -294,7 +294,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:957
+packages/ethereum/src/types/PermittableToken.d.ts:957
 
 ___
 
@@ -327,7 +327,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:864
+packages/ethereum/src/types/PermittableToken.d.ts:864
 
 ___
 
@@ -381,7 +381,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:375
+packages/ethereum/src/types/PermittableToken.d.ts:375
 
 ___
 
@@ -395,7 +395,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:373
+packages/ethereum/src/types/PermittableToken.d.ts:373
 
 ___
 
@@ -449,7 +449,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:1115
+packages/ethereum/src/types/PermittableToken.d.ts:1115
 
 ___
 
@@ -511,7 +511,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:569
+packages/ethereum/src/types/PermittableToken.d.ts:569
 
 ___
 
@@ -531,7 +531,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:565
+packages/ethereum/src/types/PermittableToken.d.ts:565
 
 ___
 
@@ -627,7 +627,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:682
+packages/ethereum/src/types/PermittableToken.d.ts:682
 
 ___
 
@@ -649,7 +649,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:545
+packages/ethereum/src/types/PermittableToken.d.ts:545
 
 ___
 
@@ -673,7 +673,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:334
+packages/ethereum/src/types/PermittableToken.d.ts:334
 
 ___
 
@@ -694,7 +694,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:609
+packages/ethereum/src/types/PermittableToken.d.ts:609
 
 ___
 
@@ -714,7 +714,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:674
+packages/ethereum/src/types/PermittableToken.d.ts:674
 
 ___
 
@@ -735,7 +735,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:590
+packages/ethereum/src/types/PermittableToken.d.ts:590
 
 ___
 
@@ -757,7 +757,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:603
+packages/ethereum/src/types/PermittableToken.d.ts:603
 
 ___
 
@@ -781,7 +781,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:333
+packages/ethereum/src/types/PermittableToken.d.ts:333
 
 ___
 
@@ -801,7 +801,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:567
+packages/ethereum/src/types/PermittableToken.d.ts:567
 
 ___
 
@@ -823,7 +823,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:649
+packages/ethereum/src/types/PermittableToken.d.ts:649
 
 ___
 
@@ -845,7 +845,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:597
+packages/ethereum/src/types/PermittableToken.d.ts:597
 
 ___
 
@@ -863,7 +863,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:335
+packages/ethereum/src/types/PermittableToken.d.ts:335
 
 ___
 
@@ -910,7 +910,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:699
+packages/ethereum/src/types/PermittableToken.d.ts:699
 
 ___
 
@@ -954,7 +954,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:617
+packages/ethereum/src/types/PermittableToken.d.ts:617
 
 ___
 
@@ -974,7 +974,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:623
+packages/ethereum/src/types/PermittableToken.d.ts:623
 
 ___
 
@@ -996,7 +996,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:571
+packages/ethereum/src/types/PermittableToken.d.ts:571
 
 ___
 
@@ -1018,7 +1018,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:676
+packages/ethereum/src/types/PermittableToken.d.ts:676
 
 ___
 
@@ -1039,7 +1039,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:615
+packages/ethereum/src/types/PermittableToken.d.ts:615
 
 ___
 
@@ -1094,7 +1094,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:337
+packages/ethereum/src/types/PermittableToken.d.ts:337
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -1114,7 +1114,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:360
+packages/ethereum/src/types/PermittableToken.d.ts:360
 
 ___
 
@@ -1136,7 +1136,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:584
+packages/ethereum/src/types/PermittableToken.d.ts:584
 
 ___
 
@@ -1156,7 +1156,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:541
+packages/ethereum/src/types/PermittableToken.d.ts:541
 
 ___
 
@@ -1179,7 +1179,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:667
+packages/ethereum/src/types/PermittableToken.d.ts:667
 
 ___
 
@@ -1199,7 +1199,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:543
+packages/ethereum/src/types/PermittableToken.d.ts:543
 
 ___
 
@@ -1220,7 +1220,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:621
+packages/ethereum/src/types/PermittableToken.d.ts:621
 
 ___
 
@@ -1252,7 +1252,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:340
+packages/ethereum/src/types/PermittableToken.d.ts:340
 
 ▸ **off**(`eventName`, `listener`): [`PermittableToken`](PermittableToken.md)
 
@@ -1273,7 +1273,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:361
+packages/ethereum/src/types/PermittableToken.d.ts:361
 
 ___
 
@@ -1305,7 +1305,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:344
+packages/ethereum/src/types/PermittableToken.d.ts:344
 
 ▸ **on**(`eventName`, `listener`): [`PermittableToken`](PermittableToken.md)
 
@@ -1326,7 +1326,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:362
+packages/ethereum/src/types/PermittableToken.d.ts:362
 
 ___
 
@@ -1358,7 +1358,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:348
+packages/ethereum/src/types/PermittableToken.d.ts:348
 
 ▸ **once**(`eventName`, `listener`): [`PermittableToken`](PermittableToken.md)
 
@@ -1379,7 +1379,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:363
+packages/ethereum/src/types/PermittableToken.d.ts:363
 
 ___
 
@@ -1399,7 +1399,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:633
+packages/ethereum/src/types/PermittableToken.d.ts:633
 
 ___
 
@@ -1427,7 +1427,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:635
+packages/ethereum/src/types/PermittableToken.d.ts:635
 
 ___
 
@@ -1449,7 +1449,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:688
+packages/ethereum/src/types/PermittableToken.d.ts:688
 
 ___
 
@@ -1471,7 +1471,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:661
+packages/ethereum/src/types/PermittableToken.d.ts:661
 
 ___
 
@@ -1504,7 +1504,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:367
+packages/ethereum/src/types/PermittableToken.d.ts:367
 
 ___
 
@@ -1535,7 +1535,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:356
+packages/ethereum/src/types/PermittableToken.d.ts:356
 
 ▸ **removeAllListeners**(`eventName?`): [`PermittableToken`](PermittableToken.md)
 
@@ -1555,7 +1555,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:365
+packages/ethereum/src/types/PermittableToken.d.ts:365
 
 ___
 
@@ -1587,7 +1587,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:352
+packages/ethereum/src/types/PermittableToken.d.ts:352
 
 ▸ **removeListener**(`eventName`, `listener`): [`PermittableToken`](PermittableToken.md)
 
@@ -1608,7 +1608,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:364
+packages/ethereum/src/types/PermittableToken.d.ts:364
 
 ___
 
@@ -1628,7 +1628,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:611
+packages/ethereum/src/types/PermittableToken.d.ts:611
 
 ___
 
@@ -1649,7 +1649,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:551
+packages/ethereum/src/types/PermittableToken.d.ts:551
 
 ___
 
@@ -1669,7 +1669,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:647
+packages/ethereum/src/types/PermittableToken.d.ts:647
 
 ___
 
@@ -1689,7 +1689,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:556
+packages/ethereum/src/types/PermittableToken.d.ts:556
 
 ___
 
@@ -1711,7 +1711,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:655
+packages/ethereum/src/types/PermittableToken.d.ts:655
 
 ___
 
@@ -1734,7 +1734,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:577
+packages/ethereum/src/types/PermittableToken.d.ts:577
 
 ___
 
@@ -1757,7 +1757,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:558
+packages/ethereum/src/types/PermittableToken.d.ts:558
 
 ___
 
@@ -1778,7 +1778,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:694
+packages/ethereum/src/types/PermittableToken.d.ts:694
 
 ___
 
@@ -1798,7 +1798,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/PermittableToken.d.ts:595
+packages/ethereum/src/types/PermittableToken.d.ts:595
 
 ___
 
