@@ -16,18 +16,16 @@ source "${mydir}/testnet.sh"
 
 declare branch cluster_size package_version docker_image
 
+: ${HOPRD_API_TOKEN:?"env var missing"}
+: ${HOPRD_PASSWORD:?"env var missing"}
+: ${FUNDING_PRIV_KEY:?"env var missing"}
+
 branch=$(git rev-parse --abbrev-ref HEAD)
 cluster_size=3
 package_version=$(${mydir}/get-package-version.sh)
 docker_image="gcr.io/hoprassociation/hoprd"
-
-# ---- On Deployment -----
-#
-# This finds matching entries in packages/hoprd/releases.json and deploys accordingly
-#
-# ENV Variables:
-# - FUNDING_PRIV_KEY: funding private key, raw
-# - BS_PASSWORD: database password
+api_token="${HOPRD_API_TOKEN}"
+password="${HOPRD_PASSWORD}"
 
 _jq() {
   echo "$1" | base64 --decode | jq -r "$2"
@@ -75,7 +73,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
 
       gcloud_create_or_update_instance_template "${cluster_template_name}" \
         "${docker_image_full}" \
-        "${environment}" \
+        "${environment_id}" \
         "${api_token}" \
         "${password}"
 
