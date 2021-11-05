@@ -1,5 +1,4 @@
 node_modules
-.DS_Store
 /.bin
 
 db
@@ -7,7 +6,8 @@ db
 *.swp
 .vercel
 
-.DS_Store
+# Exclude OSX stuff
+**/.DS_Store
 
 test/local-fixtures
 
@@ -15,14 +15,9 @@ test/local-fixtures
 *.log
 logs.txt
 
-# we need to specify the direct paths since act only supports strict git ignore checks
-packages/ethereum/types/
-packages/ethereum/lib/types/
-packages/utils/lib/types/
-/types/
 .direnv/
 
-# yarn v2 specific
+# yarn v3 specific
 .yarn/*
 !.yarn/patches
 !.yarn/releases
