@@ -162,33 +162,32 @@ _When:_ first day of the sprint
 
 The target of prioritization are issues marked as
 [epic](https://github.com/hoprnet/hoprnet/issues?q=is%3Aissue+is%3Aopen+label%3Aepic).
-Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/projects/9) which only contains epic issues.
+Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/projects/15) which only contains epic issues.
 
 - epics are issues which encapsulate the work that need to be done for X feature/bug
 - epics are not bound by sprints and they can be long lived
-- closed epics are moved to `Acceptance`
-- epics within `Acceptance` column are accepted by [Trifecta](#trifecta) prior to the meeting
-  - unaccepted epics are moved back to `Next` column with a comment explaining why it wasn't accepted
+- closed epics are moved to `acceptance`
+- epics within `acceptance` column are accepted by [Trifecta](#trifecta) prior to the meeting
+  - unaccepted epics are moved back to `next` column with a comment explaining why it wasn't accepted
 - ensure newly created [epics](#issue-creation) are well created
   - must use the [epic issue template](../.github/ISSUE_TEMPLATE/epic.md)
 - adapt epic priorities
-- create new [Sprint](#sprint-planning) project
 
 #### The Roadmap columns
 
-- `Icebox` contains epics which require further specification or are specifically paused.
-- `Backlog` contains epics which are well specified but haven't been given any
+- `icebox` contains epics which require further specification or are specifically paused.
+- `backlog` contains epics which are well specified but haven't been given any
   priority to be worked on during the current sprint.
-- `Next` column contains epics which are given priority to be worked on during
+- `next` column contains epics which are given priority to be worked on during
   the current sprint. The priorities are descending from top to bottom. Priorites
   with hard deadlines must be marked with the label
   [deadline](https://github.com/hoprnet/hoprnet/labels/deadline) with more
   information on the deadline being available within the issue's description.
-- `Acceptance` column contains epics which were completed but require
+- `acceptance` column contains epics which were completed but require
   acceptance testing from an additional team member or outside person. When moving
-  issues into `Acceptance` the person who's input is required must be pinged
+  issues into `acceptance` the person who's input is required must be pinged
   directly.
-- `Done` column contains epics which were accepted. The column is cleaned up
+- `done` column contains epics which were accepted. The column is cleaned up
   as part of the `Task Grooming` phase.
 
 _Who:_ [Trifecta](#trifecta)
@@ -200,9 +199,9 @@ _When_: first day of a sprint
 The task planning follows the `Prioritization` and takes the priorities into
 account as much as possible.
 
-- Each sprint has its own taskboard, e.g. [Sprint 36-37](https://github.com/orgs/hoprnet/projects/11).
+- Tasks and PRs which are actively worked on are gathered on the [Taskboard](https://github.com/orgs/hoprnet/projects/15/views/10).
 - Epic issues are further refined into tasks which have clear definitions of work and done.
-- Ideally each team member has only one task assigned which is `in progress`.
+- Ideally each team member has only one task assigned which is in status `next`.
 - members which are coming back from vacation should already have tasks assigned to them.
 
 _Who:_ all tech members within a meeting
