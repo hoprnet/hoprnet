@@ -23,7 +23,7 @@
     "buildAdmin": "next build hopr-admin",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
-    "prepack": "../../scripts/remove-tests.sh",
+    "prepack": "../../scripts/remove-tests.sh packages/hoprd",
     "start": "node lib/index.js --admin --init --rest",
     "dev": "yarn build && NODE_ENV=development yarn start",
     "docs:generate": "typedoc",

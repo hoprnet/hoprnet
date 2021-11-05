@@ -16,7 +16,7 @@
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
-    "prepack": "../../scripts/remove-tests.sh",
+    "prepack": "../../scripts/remove-tests.sh packages/cover-traffic-daemon",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
   },
