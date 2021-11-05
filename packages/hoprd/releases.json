@@ -10,7 +10,8 @@
   },
   "debug-goerli": {
     "git_ref": "debug-deploy/.*",
-    "environment_id": "debug-xdai"
+    "environment_id": "debug-goerli",
+    "default": true
   },
   "integration-test": {
     "git_ref": "integration/.*",

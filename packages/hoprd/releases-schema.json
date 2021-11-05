@@ -17,7 +17,7 @@
           },
           "git_ref": {
             "type": "string",
-            "description": "every time this git ref is updated, the release is deployed"
+            "description": "regex which is matched against git refs and determins if the release is build and deployed"
           },
           "environment_id": {
             "type": "string",
