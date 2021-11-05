@@ -294,11 +294,8 @@ jobs:
           ./scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
-          INFURA_KEY: ${{ secrets.INFURA_KEY }}
-          GITHUB_REF: ${{ github.ref }}
-          BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-          QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
