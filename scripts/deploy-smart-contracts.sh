@@ -49,15 +49,19 @@ done
 
 cd "${mydir}/../"
 
-for environment_id in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"refs/heads/${branch}\") | .key"); do
-  declare network_id=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".network_id")
+for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
+  if [[ "${branch}" =~ ${git_ref} ]]; then
+    for environment_id in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .value.environment_id"); do
+      declare network_id=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".network_id")
 
-  log "deploying for environment ${environment_id} on network ${network_id}"
+      log "deploying for environment ${environment_id} on network ${network_id}"
 
-  # We need to pass the --write parameter due to hardhat-deploy expecting that
-  # to be set in addition to the hardhat config saveDeployments.
-  # See:
-  # https://github.com/wighawag/hardhat-deploy/blob/8c76e7f942010d09b3607650042007f935401633/src/DeploymentsManager.ts#L503
-  HOPR_ENVIRONMENT_ID="${environment_id}" yarn workspace @hoprnet/hopr-ethereum \
-    hardhat deploy --network "${network_id}" --write true
+      # We need to pass the --write parameter due to hardhat-deploy expecting that
+      # to be set in addition to the hardhat config saveDeployments.
+      # See:
+      # https://github.com/wighawag/hardhat-deploy/blob/8c76e7f942010d09b3607650042007f935401633/src/DeploymentsManager.ts#L503
+      HOPR_ENVIRONMENT_ID="${environment_id}" yarn workspace @hoprnet/hopr-ethereum \
+        hardhat deploy --network "${network_id}" --write true
+    done
+  fi
 done

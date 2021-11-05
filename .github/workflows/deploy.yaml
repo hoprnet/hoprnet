@@ -54,37 +54,12 @@ jobs:
           yarn
           yarn build
 
-      - name: '[SMART-CONTRACTS] Deploy on Goerli'
+      - name: '[SMART-CONTRACTS] Deploy for known environments'
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
         env:
           DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-          INFURA_KEY: ${{ secrets.INFURA_KEY }}
           ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
-          NETWORK: goerli
-
-      - name: '[SMART-CONTRACTS] Deploy on Polygon'
-        if: ${{ !env.ACT }}
-        run: ./scripts/deploy-smart-contracts.sh
-        env:
-          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-          INFURA_KEY: ${{ secrets.INFURA_KEY }}
-          NETWORK: polygon
-
-      - name: '[SMART-CONTRACTS] Deploy on xDai'
-        if: ${{ !env.ACT }}
-        run: ./scripts/deploy-smart-contracts.sh
-        env:
-          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-          QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
-          NETWORK: xdai
-
-      - name: '[SMART-CONTRACTS] Deploy on hardhat localhost'
-        if: ${{ !env.ACT }}
-        run: ./scripts/deploy-smart-contracts.sh
-        env:
-          DEVELOPMENT: true
-          NETWORK: hardhat
 
       - name: '[SMART-CONTRACTS] Commit & push changes'
         if: ${{ !env.ACT }}

@@ -1,15 +1,19 @@
 {
   "master-goerli": {
-    "git_ref": "refs/heads/master",
+    "git_ref": "master",
     "environment_id": "master-goerli",
     "default": true
   },
   "master-xdai": {
-    "git_ref": "refs/heads/master",
+    "git_ref": "master",
     "environment_id": "master-xdai"
   },
+  "debug-goerli": {
+    "git_ref": "debug-deploy/.*",
+    "environment_id": "debug-xdai"
+  },
   "integration-test": {
-    "git_ref": "refs/heads/integration/release-environment-v2",
+    "git_ref": "integration/.*",
     "environment_id": "master-goerli",
     "default": true
   }
