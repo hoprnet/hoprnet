@@ -42,31 +42,3 @@ If $B$ tries to redeem a ticket from the channel $A\rightarrow B$ (spending chan
 Nodes can close a payment channel in order to access their previously staked funds. Only the payment channel creator can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $Pending to close$ and triggers a grace period during which the destination node can redeem any unredeemed tickets. Nodes should actively monitor blockchain events to be aware of this payment channel state change.
 
 Once the grace period has elapsed, the payment channel creator can call \textit{finalizeChannelClosure()} which changes the payment channel to $Closed$. When a payment channel is closed, the remaining funds are automatically transferred to the payment channel creator. The channel epoch increments, meaning any unredeemed tickets can no longer be redeemed.
-
-\begin{comment}
-
-\begin{figure}[H]
-    \centering
-    \begin{tikzpicture}[looseness=1,auto]
-        \path (0,0) node (closed) [ellipse,draw] {$Closed$};
-        \path (-1,-1)  node (commitment) [ellipse,draw,align=left] {$Waiting$\\$Commitment$};
-        \path (5,0)  node (open) [ellipse,draw] {$Open$};
-        \path (2.5,-1)  node (pending) [ellipse,draw,align=left] {$Pending$\\$Timeout$};
-
-        \draw [->,draw](closed) to [bend left] node {\textsf{fund()}} (commitment);
-        \draw [->,draw](commitment) to [bend left] node {\textsf{fund()}} (open);
-        \draw [->,draw](open) to [bend left] node [align=center] {\textsf{initiateChannelClosure()}} (pending);
-        \draw [->,draw](pending) to [bend left] node {\textsf{finalizeChannelClosure()}} (closed);
-
-        \path[->] (open) edge [out=+120,in=+60,distance=2em,below] node [align=center,above] {\textsf{redeemTicket()}}  (open);
-    \end{tikzpicture}
-    \label{fig:channel workflow}
-    \caption{Channel workflow}
-\end{figure}
-\end{comment}
-
-\begin{comment}
-\draw [->,draw](commitment) to [bend left] node {\textsf{fund()}} (open);
-\draw [->,draw](open) to [bend left] node [align=center] {\textsf{initiateChannelClosure()}} (pending);
-\draw [->,draw](pending) to [bend left] node {\textsf{finalizeChannelClosure()}} (closed);
-\end{comment}
