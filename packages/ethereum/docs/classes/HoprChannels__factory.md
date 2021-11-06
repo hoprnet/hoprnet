@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:669
+packages/ethereum/src/types/factories/HoprChannels__factory.ts:669
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:704
+packages/ethereum/src/types/factories/HoprChannels__factory.ts:704
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:703
+packages/ethereum/src/types/factories/HoprChannels__factory.ts:703
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:697
+packages/ethereum/src/types/factories/HoprChannels__factory.ts:697
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:700
+packages/ethereum/src/types/factories/HoprChannels__factory.ts:700
 
 ___
 
@@ -189,7 +189,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:679
+packages/ethereum/src/types/factories/HoprChannels__factory.ts:679
 
 ___
 
@@ -215,7 +215,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:690
+packages/ethereum/src/types/factories/HoprChannels__factory.ts:690
 
 ___
 
@@ -236,7 +236,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:708
+packages/ethereum/src/types/factories/HoprChannels__factory.ts:708
 
 ___
 
@@ -250,7 +250,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprChannels__factory.ts:705
+packages/ethereum/src/types/factories/HoprChannels__factory.ts:705
 
 ___
 

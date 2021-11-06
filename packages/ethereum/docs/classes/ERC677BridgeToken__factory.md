@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC677BridgeToken__factory.ts:664
+packages/ethereum/src/types/factories/ERC677BridgeToken__factory.ts:664
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC677BridgeToken__factory.ts:707
+packages/ethereum/src/types/factories/ERC677BridgeToken__factory.ts:707
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC677BridgeToken__factory.ts:706
+packages/ethereum/src/types/factories/ERC677BridgeToken__factory.ts:706
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC677BridgeToken__factory.ts:700
+packages/ethereum/src/types/factories/ERC677BridgeToken__factory.ts:700
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC677BridgeToken__factory.ts:703
+packages/ethereum/src/types/factories/ERC677BridgeToken__factory.ts:703
 
 ___
 
@@ -190,7 +190,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC677BridgeToken__factory.ts:674
+packages/ethereum/src/types/factories/ERC677BridgeToken__factory.ts:674
 
 ___
 
@@ -217,7 +217,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC677BridgeToken__factory.ts:687
+packages/ethereum/src/types/factories/ERC677BridgeToken__factory.ts:687
 
 ___
 
@@ -238,7 +238,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC677BridgeToken__factory.ts:711
+packages/ethereum/src/types/factories/ERC677BridgeToken__factory.ts:711
 
 ___
 
@@ -252,7 +252,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC677BridgeToken__factory.ts:708
+packages/ethereum/src/types/factories/ERC677BridgeToken__factory.ts:708
 
 ___
 

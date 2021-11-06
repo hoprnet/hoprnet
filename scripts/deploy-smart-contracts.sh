@@ -49,7 +49,7 @@ done
 
 cd "${mydir}/../"
 
-for environment_id in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r ".[] | select(.git_ref==\"refs/heads/${branch}\") | .id"); do
+for environment_id in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"refs/heads/${branch}\") | .key"); do
   declare network_id=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".network_id")
 
   log "deploying for environment ${environment_id} on network ${network_id}"

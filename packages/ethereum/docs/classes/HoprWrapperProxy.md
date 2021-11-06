@@ -174,7 +174,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:235
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:235
 
 ___
 
@@ -216,7 +216,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:296
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:296
 
 ___
 
@@ -239,7 +239,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:268
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:268
 
 ___
 
@@ -267,7 +267,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:163
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:163
 
 ___
 
@@ -281,7 +281,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:161
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:161
 
 ___
 
@@ -309,7 +309,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:334
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:334
 
 ___
 
@@ -371,7 +371,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:201
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:201
 
 ___
 
@@ -391,7 +391,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:203
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:203
 
 ___
 
@@ -411,7 +411,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:205
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:205
 
 ___
 
@@ -431,7 +431,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:207
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:207
 
 ___
 
@@ -451,7 +451,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:209
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:209
 
 ___
 
@@ -471,7 +471,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:211
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:211
 
 ___
 
@@ -569,7 +569,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:122
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:122
 
 ___
 
@@ -593,7 +593,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:121
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:121
 
 ___
 
@@ -611,7 +611,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:123
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:123
 
 ___
 
@@ -715,7 +715,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:125
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:125
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -735,7 +735,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:148
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:148
 
 ___
 
@@ -767,7 +767,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:128
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:128
 
 ▸ **off**(`eventName`, `listener`): [`HoprWrapperProxy`](HoprWrapperProxy.md)
 
@@ -788,7 +788,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:149
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:149
 
 ___
 
@@ -820,7 +820,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:132
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:132
 
 ▸ **on**(`eventName`, `listener`): [`HoprWrapperProxy`](HoprWrapperProxy.md)
 
@@ -841,7 +841,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:150
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:150
 
 ___
 
@@ -864,7 +864,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:213
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:213
 
 ___
 
@@ -896,7 +896,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:136
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:136
 
 ▸ **once**(`eventName`, `listener`): [`HoprWrapperProxy`](HoprWrapperProxy.md)
 
@@ -917,7 +917,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:151
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:151
 
 ___
 
@@ -950,7 +950,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:155
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:155
 
 ___
 
@@ -971,7 +971,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:220
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:220
 
 ___
 
@@ -1002,7 +1002,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:144
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:144
 
 ▸ **removeAllListeners**(`eventName?`): [`HoprWrapperProxy`](HoprWrapperProxy.md)
 
@@ -1022,7 +1022,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:153
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:153
 
 ___
 
@@ -1054,7 +1054,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:140
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:140
 
 ▸ **removeListener**(`eventName`, `listener`): [`HoprWrapperProxy`](HoprWrapperProxy.md)
 
@@ -1075,7 +1075,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:152
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:152
 
 ___
 
@@ -1101,7 +1101,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprWrapperProxy.d.ts:225
+packages/ethereum/src/types/HoprWrapperProxy.d.ts:225
 
 ___
 

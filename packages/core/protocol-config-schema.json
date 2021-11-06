@@ -46,8 +46,9 @@
             "chain_id": {
               "type": "integer"
             },
-            "gas": {
-              "type": "string"
+            "gas_price": {
+              "type": "string",
+              "description": "Gas price as either 'auto', a number '11' or a value which should be converted like '1 gwei'."
             },
             "gas_multiplier": {
               "type": "number"

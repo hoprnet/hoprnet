@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:125
+packages/ethereum/src/types/factories/BurnableToken__factory.ts:125
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:152
+packages/ethereum/src/types/factories/BurnableToken__factory.ts:152
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:151
+packages/ethereum/src/types/factories/BurnableToken__factory.ts:151
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:145
+packages/ethereum/src/types/factories/BurnableToken__factory.ts:145
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:148
+packages/ethereum/src/types/factories/BurnableToken__factory.ts:148
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:135
+packages/ethereum/src/types/factories/BurnableToken__factory.ts:135
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:140
+packages/ethereum/src/types/factories/BurnableToken__factory.ts:140
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:156
+packages/ethereum/src/types/factories/BurnableToken__factory.ts:156
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BurnableToken__factory.ts:153
+packages/ethereum/src/types/factories/BurnableToken__factory.ts:153
 
 ___
 

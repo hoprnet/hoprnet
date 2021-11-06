@@ -1,4 +1,5 @@
 {
+  // Exclude tests when building NPM package
   "extends": "./tsconfig.json",
-  "include": ["index.ts"]
+  "exclude": ["src/**/*.spec.ts"]
 }

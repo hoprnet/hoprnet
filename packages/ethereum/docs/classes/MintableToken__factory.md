@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:375
+packages/ethereum/src/types/factories/MintableToken__factory.ts:375
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:402
+packages/ethereum/src/types/factories/MintableToken__factory.ts:402
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:401
+packages/ethereum/src/types/factories/MintableToken__factory.ts:401
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:395
+packages/ethereum/src/types/factories/MintableToken__factory.ts:395
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:398
+packages/ethereum/src/types/factories/MintableToken__factory.ts:398
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:385
+packages/ethereum/src/types/factories/MintableToken__factory.ts:385
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:390
+packages/ethereum/src/types/factories/MintableToken__factory.ts:390
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:406
+packages/ethereum/src/types/factories/MintableToken__factory.ts:406
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/MintableToken__factory.ts:403
+packages/ethereum/src/types/factories/MintableToken__factory.ts:403
 
 ___
 

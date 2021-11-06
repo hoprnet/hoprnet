@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC20__factory.ts:186
+packages/ethereum/src/types/factories/ERC20__factory.ts:186
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/ERC20__factory.ts:186
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC20__factory.ts:190
+packages/ethereum/src/types/factories/ERC20__factory.ts:190
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC20__factory.ts:187
+packages/ethereum/src/types/factories/ERC20__factory.ts:187

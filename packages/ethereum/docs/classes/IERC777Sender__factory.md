@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC777Sender__factory.ts:51
+packages/ethereum/src/types/factories/IERC777Sender__factory.ts:51
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/IERC777Sender__factory.ts:51
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC777Sender__factory.ts:55
+packages/ethereum/src/types/factories/IERC777Sender__factory.ts:55
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC777Sender__factory.ts:52
+packages/ethereum/src/types/factories/IERC777Sender__factory.ts:52

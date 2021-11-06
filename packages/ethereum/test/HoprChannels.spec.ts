@@ -9,7 +9,7 @@ import {
   HoprChannels,
   HoprToken,
   ChannelsMock
-} from '../types'
+} from '../src/types'
 import { increaseTime } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './constants'
 import {

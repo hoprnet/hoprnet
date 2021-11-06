@@ -1026,7 +1026,7 @@ class Hopr extends EventEmitter {
   }
 }
 
-export { Hopr as default, LibP2P }
+export default Hopr
 export * from './constants'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }

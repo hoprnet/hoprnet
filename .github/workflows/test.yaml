@@ -4,6 +4,7 @@ on:
   push:
     branches: ['**']
     paths-ignore:
+      - '.processes/**/*'
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
 

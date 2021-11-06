@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/IBurnableMintableERC677Token__factory.ts:344
+packages/ethereum/src/types/factories/IBurnableMintableERC677Token__factory.ts:344
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/IBurnableMintableERC677Token__factory.ts:344
 
 #### Defined in
 
-packages/ethereum/types/factories/IBurnableMintableERC677Token__factory.ts:348
+packages/ethereum/src/types/factories/IBurnableMintableERC677Token__factory.ts:348
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/IBurnableMintableERC677Token__factory.ts:345
+packages/ethereum/src/types/factories/IBurnableMintableERC677Token__factory.ts:345

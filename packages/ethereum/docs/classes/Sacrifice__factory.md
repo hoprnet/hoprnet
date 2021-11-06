@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:33
+packages/ethereum/src/types/factories/Sacrifice__factory.ts:33
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:62
+packages/ethereum/src/types/factories/Sacrifice__factory.ts:62
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:61
+packages/ethereum/src/types/factories/Sacrifice__factory.ts:61
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:55
+packages/ethereum/src/types/factories/Sacrifice__factory.ts:55
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:58
+packages/ethereum/src/types/factories/Sacrifice__factory.ts:58
 
 ___
 
@@ -188,7 +188,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:43
+packages/ethereum/src/types/factories/Sacrifice__factory.ts:43
 
 ___
 
@@ -213,7 +213,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:49
+packages/ethereum/src/types/factories/Sacrifice__factory.ts:49
 
 ___
 
@@ -234,7 +234,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:66
+packages/ethereum/src/types/factories/Sacrifice__factory.ts:66
 
 ___
 
@@ -248,7 +248,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/Sacrifice__factory.ts:63
+packages/ethereum/src/types/factories/Sacrifice__factory.ts:63
 
 ___
 

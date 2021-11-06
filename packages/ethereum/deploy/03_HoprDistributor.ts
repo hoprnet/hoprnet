@@ -1,6 +1,6 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import type { DeploymentTypes } from '../constants'
+import type { DeploymentTypes } from '../src/constants'
 import { durations } from '@hoprnet/hopr-utils'
 import { ethers } from 'ethers'
 
