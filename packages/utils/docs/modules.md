@@ -165,6 +165,7 @@
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
+- [startResourceUsageLogger](modules.md#startresourceusagelogger)
 - [stringToU8a](modules.md#stringtou8a)
 - [timeoutAfter](modules.md#timeoutafter)
 - [timer](modules.md#timer)
@@ -1129,7 +1130,7 @@ ___
 
 #### Defined in
 
-[debug.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/debug.ts#L14)
+[process/debug.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/debug.ts#L14)
 
 ___
 
@@ -2548,6 +2549,41 @@ ___
 #### Defined in
 
 [u8a/index.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L22)
+
+___
+
+### startResourceUsageLogger
+
+▸ **startResourceUsageLogger**(`log`, `ms?`): () => `void`
+
+Creates a resource logger and provides a function to stop it.
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `log` | `LogType` | `undefined` | logs resource stat strings |
+| `ms` | `number` | `60_000` | interval to redo the measurement |
+
+#### Returns
+
+`fn`
+
+a function that stop the resource logger
+
+▸ (): `void`
+
+Creates a resource logger and provides a function to stop it.
+
+##### Returns
+
+`void`
+
+a function that stop the resource logger
+
+#### Defined in
+
+[process/resourceLogger.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/resourceLogger.ts#L17)
 
 ___
 
