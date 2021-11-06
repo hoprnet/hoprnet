@@ -1,58 +1,76 @@
 \subsection{Ticket Issuance}
 \label{sec:tickets:issuance}
 
+Before a node is able to issue tickets for another node, it needs to lock funds to cover the current as well as potential future tickets. Locking funds is considered equal to staking tokens in the HOPR network as it allows node to send packets and act as relayer. By locking these tokens, the node creates a unidirectional payment channel towards the recipient and is thus able to convince the recipient that it is eligable to issue tickets.
+
+As ticket issuance happens without any interaction with the blockchain, it is the duty of the node who receives the ticket to check whether there were any tokens locked on-chain and to keep track about previously issued tickets. If there is no record on-chain about locked funds or if the sum of the received tickets exceed the amount of tokens that were locked on-chain, the node should refuse the processing of the ticket.
+
+Each ticket has a winning probability which means that not every received ticket finally leads to a claimable incentive and
+
 A ticket can be issued once two nodes have established a payment channel with each other. By definition this means at least one of them has staked HOPR tokens. A ticket is issued by a node for the next downstream relay node along the path. In the following, we describe this process between the sender $A$ and the first downstream node $B$ but the same process applies for the ticket that is issued by $B$ for $C$ and following nodes.
 
-The ticket issuer $A$ (who could also be the packet creator) sets a winning probability and relay fee to use and sets the amount to: $$\sigma=\dfrac{L\times F}{P_w}$$ where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee, and $P_w$ is the ticket's winning probability. These are currently static values which apply network wide.
+The ticket issuer $A$ (who could also be the packet creator) sets a winning probability and relay fee to use and sets the amount to: $$\sigma=\frac{L\times F}{P_w}$$ where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee, and $P_w$ is the ticket's winning probability. These are currently static values which apply network wide.
 
 $A$ issues a ticket for the next downstream node. The challenge is given together with the routing information by the packet. $A$ does not know whether the ticket is a winner or not.
 
 $A$ sets the content of the ticket to: $$t=(R,\sigma,P_w,\alpha,I,T_c,\zeta),$$ where $t$ has the following components, in addition to those already defined above:
 
+\begin{figure}[H]
+      \centering
+      \begin{tabular}{|l|c|c|}
+            \hline
+            \textbf{Value}                                    & \textbf{Ethereum datatype} & \textbf{size (in bytes)} \\
+            \hline
+            \hline
+            \nameref{sec:tickets:issuance:recipient}          & address                    & 20 bytes                 \\
+            \nameref{sec:tickets:issuance:challenge}          & bytes32                    & 32 bytes                 \\
+            \nameref{sec:tickets:issuance:ticketepoch}        & uint256                    & 32 bytes                 \\
+            \nameref{sec:tickets:issuance:ticketvalue}        & uint256                    & 32 bytes                 \\
+            \nameref{sec:tickets:issuance:winningprobability} & uint256                    & 32 bytes                 \\
+            \nameref{sec:tickets:issuance:ticketindex}        & uint256                    & 32 bytes                 \\
+            \nameref{sec:tickets:issuance:channelepoch}       & uint256                    & 32 bytes                 \\
+            \hline
+            \hline
+            Signature $r$                                     & bytes32                    & 32 bytes                 \\
+            Signature $s$                                     & bytes32                    & 32 bytes                 \\
+            Recovery value $v$                                & uint8                      & 1 byte                   \\
+            \hline
+      \end{tabular}
+      \caption{Structure of a ticket.}
+\end{figure}
+
+\paragraph{Recipient}
+\label{sec:tickets:issuance:recipient}
+
+\paragraph{Challenge}
+\label{sec:tickets:issuance:challenge}
+
+\paragraph{Ticket epoch}
+\label{sec:tickets:issuance:ticketepoch}
+
+\paragraph{Ticket value}
+\label{sec:tickets:issuance:ticketvalue}
+
+\paragraph{Winning probablity}
+\label{sec:tickets:issuance:winningprobability}
+
+\paragraph{Ticket index}
+\label{sec:tickets:issuance:ticketindex}
+
+\paragraph{Channel epoch}
+\label{sec:tickets:issuance:channelepoch}
+
 \begin{itemize}
-    \item
-          \textbf{Recipient's Ethereum address $R$}: a unique identifier derived from the ticket recipient's public key.
-    \item
-          \textbf{Ticket epoch $\alpha$}: used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha$ whenever a node resets a commitment, which helps keep track of updates to the on-chain commitments and invalidates tickets from earlier epochs.
-    \item
-          \textbf{Ticket index $I$}: set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops any packets where this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with an unchanged index.
-    \item
-          \textbf{Ticket challenge $T_c$}: set by the ticket issuer and used to check whether a ticket is redeemable before the packet is been relayed. If it is not redeemable, the packet is dropped.
-    \item
-          \textbf{Channel epoch $\zeta$}: used to give each incarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel become invalid once a channel is reopened ($\alpha$'s count restarts again). This is due to the fact that $\zeta$ increments whenever a closed channel is (re)opened.
+      \item
+            \textbf{Recipient's Ethereum address $R$}: a unique identifier derived from the ticket recipient's public key.
+      \item
+            \textbf{Ticket epoch $\alpha$}: used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha$ whenever a node resets a commitment, which helps keep track of updates to the on-chain commitments and invalidates tickets from earlier epochs.
+      \item
+            \textbf{Ticket index $I$}: set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops any packets where this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with an unchanged index.
+      \item
+            \textbf{Ticket challenge $T_c$}: set by the ticket issuer and used to check whether a ticket is redeemable before the packet is been relayed. If it is not redeemable, the packet is dropped.
+      \item
+            \textbf{Channel epoch $\zeta$}: used to give each incarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel become invalid once a channel is reopened ($\alpha$'s count restarts again). This is due to the fact that $\zeta$ increments whenever a closed channel is (re)opened.
 \end{itemize}
 
 $A$ then signs the ticket with its private key and sends $T = (t, Sig_I(t))$ to the recipient together with a mixnet packet.
-\begin{comment}
-
-
-\\\textbf{ChainId $c_{Id}$:} The channel identifier which is defined by the ticket issuer in order to determine which channel will be used between issuer and next downstream node. For example, tickets that are valid on xDAI are not valid on Ethereum.
-\\\textbf{Tag $\tau$} is given as a constant and depends on the utilized blockchain. It is used to distinguish HOPR tickets from others with the same structure that are meant for different payment channels and invalidates their usage in HOPR.
-\\\textbf{Version $V$} is given as a constant and depends on the utilized blockchain. It is used to invalidate tickets that were issued for previous versions of HOPR from being used in future iterations of the protocol.
-
-\end{comment}
-
-\begin{figure}[H]
-    \centering
-    \begin{tikzpicture}[auto]
-        \draw (0,0) node (a) [rectangle,draw] {$A$};
-        \draw (2.5,0) node (b) [rectangle,draw] {$B$};
-        \draw (5,0) node (c) [rectangle,draw] {$C$};
-        \draw (7.5,0) node (d) [rectangle,draw] {$D$};
-        \draw (10,0) node (z) [rectangle,draw] {$Z$};
-
-        \draw [->,draw,dashed] (a.east) to node [align=center,below] {packet,\\ticket} (b.west);
-        \draw [->,draw] (b.east) to node [align=center,below] {packet,\\ticket} (c.west);
-        \draw [->,draw] (c.east) to node [align=center,below] {packet,\\ticket} (d.west);
-        \draw [->,draw,dashed] (d.east) to node [align=center,below] {packet,\\(ticket)}  (z.west);
-
-        \path[->] (a) edge [out=-120,in=-60,distance=2em,below] node [align=center] {send\\packet}  (a);    % \draw 
-        \path[->] (b) edge [out=-120,in=-60,distance=2em,below] node [align=center] {issue\\packet}  (b);    % \draw 
-        \path[->] (c) edge [out=-120,in=-60,distance=2em,below] node [align=center] {relay\\packet}  (c);    % \draw 
-        \path[->] (d) edge [out=-120,in=-60,distance=2em,below] node [align=center] {create\\ack}  (d);    % \draw 
-        \path[->] (z) edge [out=-120,in=-60,distance=2em,below] node [align=center] {receive\\packet}  (z);    % \draw 
-
-        \path[->,draw,looseness=1.5,dashed,bend right] (d.north west) to [above] node {ack} (c.north east);
-    \end{tikzpicture}    \caption{Ticket workflow}
-    \label{fig:Ticket worklow}
-\end{figure}
