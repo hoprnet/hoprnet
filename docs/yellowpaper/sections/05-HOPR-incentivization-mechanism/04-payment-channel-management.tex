@@ -3,35 +3,28 @@
 
 For node $A$ to transfer packets to node $B$, it must first open a payment channel. There are four distinct payment channel states, represented in the following scheme:
 
-\begin{tikzpicture}[every text node part/.style={align=center}]
-    \def\nodeWidth{3.75}
-    \def\nodeHeight{0.75}
-    \foreach \posX\posY\tag in{0/0/Closed,4/2/PendingToClose,8/0/Open,4/-2/WaitingForCommitment} {
-            \draw[rounded corners=3mm,shift={(\posX,\posY)}]  (0,0) rectangle (\nodeWidth,\nodeHeight) node[midway] {\smaller{\tag}};
-        }
-
-    \draw[->] (4,2+\nodeHeight/2) to [bend right] (\nodeWidth/2,\nodeHeight);
-    \draw[->] (8+\nodeWidth/2,\nodeHeight) to [bend right] (4+\nodeWidth,2+\nodeHeight/2);
-    \draw[->] (\nodeWidth/2,0) to [bend right] (4,-2+\nodeHeight/2);
-    \draw[->] (4+\nodeWidth,-2+\nodeHeight/2) to [bend right] (8+\nodeWidth/2,0);
-
-    \draw[->] (4+\nodeWidth/2,-2+\nodeHeight) -- (4+\nodeWidth/2,2) node[midway,above=30pt,right=4pt] {\tiny{Initiate closure}\\\tiny{(if not committed)}};
-    \draw[->] (\nodeWidth,\nodeHeight/2) -- (8,\nodeHeight/2) node[midway,fill=white,above=0.2pt] {\tiny{Fund (if already committed)}};
-
-    % \draw[->] (4,2+\nodeHeight/2) to [bend right] (\nodeWidth/2,\nodeHeight);
-    % \draw[->] (4,2+\nodeHeight/2) to [bend right] (\nodeWidth/2,\nodeHeight);
-
-
-    % \draw[name=open,rounded corners=6mm]  (0,0) rectangle (3,3) node[midway] {Open};
-    % \draw[name=waitingForCommitment,rounded corners=6mm]  (0,0) rectangle (3,3) node[midway] {WaitingForCommitment};
-\end{tikzpicture}
-
 \begin{figure}[H]
     \centering
-    \includegraphics[width=9cm,height=9cm,keepaspectratio]{../yellowpaper/images/statesTransition.png}
-    \label{fig:payment channel states}
+    \begin{tikzpicture}[every text node part/.style={align=center}]
+        \def\nodeWidth{3.75}
+        \def\nodeHeight{0.75}
+        \def\padding{0.1}
+        \foreach \posX\posY\tag in{0/0/Closed,4/2/PendingToClose,8/0/Open,4/-2/WaitingForCommitment} {
+                \draw[rounded corners=3mm,shift={(\posX,\posY)}] (0,0) rectangle (\nodeWidth,\nodeHeight) node[midway] {\smaller{\tag}};
+            }
+
+        \draw[->] (4-\padding,2+\nodeHeight/2) to [bend right] (\nodeWidth/2,\nodeHeight+\padding) node[midway,above=55pt,right=10pt] {\tiny{Finalize Closure}};
+        \draw[->] (8+\nodeWidth/2,\nodeHeight+\padding) to [bend right] (4+\nodeWidth+\padding,2+\nodeHeight/2) node[below=15pt,right=50pt] {\tiny{Initiate Closure}};
+        \draw[->] (\nodeWidth/2,0-\padding) to [bend right] (4-\padding,-2+\nodeHeight/2) node[left=60pt,above=15pt] {\tiny{fund}};
+        \draw[->] (4+\nodeWidth+\padding,-2+\nodeHeight/2) to [bend right] (8+\nodeWidth/2,0-\padding) node[below=25pt,right=0.1pt] {\tiny{bump Commitment}};
+
+        \draw[->] (4+\nodeWidth/2,-2+\nodeHeight+\padding) -- (4+\nodeWidth/2,\nodeHeight/2-\padding);
+        \draw[->] (4+\nodeWidth/2,\nodeHeight/2+\padding) -- (4+\nodeWidth/2,2-\padding) node[midway,above=10pt,right=4pt] {\tiny{Initiate closure}\\\tiny{(if not committed)}};
+        \draw[->] (\nodeWidth,\nodeHeight/2) -- (8,\nodeHeight/2) node[midway,fill=white,above=0.2pt] {\tiny{Fund (if already committed)}};
+    \end{tikzpicture}
     \caption{Payment channel states}
 \end{figure}
+
 Initially, each payment channel is \textit{Closed}.
 
 \paragraph{Opening a channel} Node $A$ can open a channel by transferring funds to the payment channels contract \textit{HoprChannels} and including the following \textit{userdata}:
