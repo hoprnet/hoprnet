@@ -42,9 +42,11 @@ The ticket issuer creates a data structure $ticketData$ and creates the ticket a
 \paragraph{Recipient}
 \label{sec:tickets:issuance:recipient}
 
-The Ethereum address of the recipient which can be derived from the recipient's public key. This makes sure that the ticket is valid for exactly one payment channel, the one from issuer to recipient. Note that Ethereum addresses are computed as:
+The Ethereum address of the recipient which can be derived from the recipient's public key. This makes sure that the ticket is valid for exactly one payment channel, the one from issuer to recipient. Note that Ethereum addresses are computed as
 
-$$ addr = keccak256( uncompressedPublicKey)$$
+$$ addr = keccak256( uncompressedPublicKey).slice(12,32)$$
+
+(the last 20 bytes of the keccak256 hash of the uncompressed ECDSA public key).
 
 \paragraph{Challenge}
 \label{sec:tickets:issuance:challenge}
