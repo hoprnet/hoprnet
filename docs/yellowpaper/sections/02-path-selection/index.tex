@@ -13,7 +13,7 @@ A packet in the HOPR network is sent via multiple mix node hops before it is del
 
 As anyone can run a node in the HOPR network, it is also important to have neutral Schelling points for effective mix nodes. The default path selection mechanism uses the number of tokens that a node has staked in a particular payment channel as a signal for how much traffic the node is willing to relay in a fashion that aligns its incentives with the rest of the network. Thus, stake is used as a Schelling point for which nodes will mix packets more effectively than others with lower traffic.
 
-To meet HOPR's stated \lcnameref{sec:securitygoals}, it is crucial for nodes in the network to keep the chosen path secret. While the individual nodes along a path are selected, based on their stake, a node's individual path selection must remain hard to predict for third parties in order to provide sender-receipient unlinkability. HOPR achieves that by randomizing channel stake by multiplying its stake with a random number.
+To meet HOPR's stated \lcnameref{sec:intro:securitygoals}, it is crucial for nodes in the network to keep the chosen path secret. While the individual nodes along a path are selected, based on their stake, a node's individual path selection must remain hard to predict for third parties in order to provide sender-receipient unlinkability. HOPR achieves that by randomizing channel stake by multiplying its stake with a random number.
 
 In order to keep sender-receiver packet loss low, the sender only chooses nodes that it considers to be online. The path selection mechanism uses a heartbeat mechanism for this.
 

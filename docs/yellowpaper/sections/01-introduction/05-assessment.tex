@@ -1,6 +1,7 @@
 \subsection{Assessment}
+\label{sec:intro:assessment}
 
-Although there are numerous projects attempting to solve the problem of online privacy, most fail to satisfy the design principles and security goals outlined in Section \ref{sec:securitygoals}.
+Although there are numerous projects attempting to solve the problem of online privacy, most fail to satisfy the design principles and security goals outlined in Section \ref{sec:intro:securitygoals}.
 
 \paragraph{Privacy} The metadata privacy properties that a mixnet like HOPR provides are significantly beyond what VPNs, dVPNs, or even Tor can deliver. VPNs and dVPNs have single points of trust and failure. Tor and I2P have been shown to be subject to a large variety of de-anonymizing attacks, which a mixnet like HOPR is resilient against. The HOPR mixnet unlinks sender and recipient even when faced by powerful global passive adversaries (GPAs) which can monitor every packet in the network. This is achieved by packet transformation, mixing, and introducing delays before forwarding a packet, as well as bandwidth overhead in form of cover traffic and packet padding.
 
