@@ -35,22 +35,7 @@ function defaultEnvironment(): string {
   }
 }
 
-const argv = yargs(process.argv.slice(2))
-  .option('environment', {
-    string: true,
-    describe: 'Environment id which the node shall run on',
-    choices: supportedEnvironments().map((env) => env.id),
-    default: defaultEnvironment()
-  })
-  .option('privateKey', {
-    describe: 'A private key to be used for the node',
-    string: true,
-    demandOption: true
-  })
-  .wrap(Math.min(120, terminalWidth()))
-  .parseSync()
-
-async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
+export async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
   const options: HoprOptions = {
     announce: false,
     createDbIfNotExist: true,
@@ -62,7 +47,26 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
   return options
 }
 
+export function generateNode(peerId: PeerId, options: HoprOptions): Hopr {
+  return new Hopr(peerId, options)
+}
+
 export async function main(update: (State: State) => void, peerId?: PeerId) {
+  const argv = yargs(process.argv.slice(2))
+    .option('environment', {
+      string: true,
+      describe: 'Environment id which the node shall run on',
+      choices: supportedEnvironments().map((env) => env.id),
+      default: defaultEnvironment()
+    })
+    .option('privateKey', {
+      describe: 'A private key to be used for the node',
+      string: true,
+      demandOption: true
+    })
+    .wrap(Math.min(120, terminalWidth()))
+    .parseSync()
+
   const environment = resolveEnvironment(argv.environment)
   const options = await generateNodeOptions(environment)
   if (!peerId) {
@@ -81,7 +85,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   log('creating a node')
-  const node = new Hopr(peerId, options)
+  const node = generateNode(peerId, options)
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
@@ -120,8 +124,8 @@ if (require.main === module) {
   main((state: State) => {
     console.log(
       `CT: State update:` +
-        `${Object.keys(state.nodes).length} nodes, ` +
-        `${Object.keys(state.channels).length} channels`
+      `${Object.keys(state.nodes).length} nodes, ` +
+      `${Object.keys(state.channels).length} channels`
     )
   })
 }
