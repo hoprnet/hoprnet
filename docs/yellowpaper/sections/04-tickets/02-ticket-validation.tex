@@ -1,21 +1,32 @@
 \subsection{Ticket Validation}
 \label{sec:tickets:validation}
 
-Tickets are received together with packets. To this end, the recipient and the next downstream node share a secret, $s$, whose key shares $s_i$ and $s_{i+1}$ are derivable by those nodes as introduced in section \lcnameref{sec:sphinx:keyderivation}. Ticket validation requires the following steps:
+Tickets are used to convince its recipient that it will receive the promised incentive once the challenge is solved. As ticket issuance happens without any on-chain interaction, it is the duty of the recipient to decide whether it accepts the ticket or refuses it because the node considers it invalid.
 
-\textbf{Validate response} Once $A$ receives $s_{i+1}^{(1)}$ from $B$ via secret sharing, it can compute $$r_i=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
-$$r_i*G=T_{c_i}$$
-\\\textbf{Validate hint} Once the recipient transforms the packet, it can compute $s_i$. The recipient can now also extract the routing information from the packet.
-This includes a hint to the value $s_{i+1}$, given as $$H_i=s_{i+1}^{(1)}*G,$$ which is stored in the Sphinx packet header.
+Ticket validation runs through two states: receiving the ticket without knowing the response to the given challenge stated as $ticket.challenge$, ``validation of locked tickets", and once the response is known to the node, ``validation of unlocked tickets".
 
-The unacknowledged ticket is stored in the database under the hint to the promised value to ensure the acknowledgement can be later linked to the unacknowledged ticket.
+\paragraph{Validation of Locked Tickets} As the node is not yet able to claim the incentives embedded in the ticket due to lack of a response to the stated challenge, it is the duty of the node to check the ticket economically before further processing it.
 
-Together with $s_i^{(0)}$, the node can verify that
+Therefore, the node computes the winning probability as
 
-$$T_{c_i}=s_i^{(0)}*G+H_i$$
+$$ticket.winProb = \frac{ticket.invWinProb}{2^{256} - 1} $$
 
-with
+which leads $ value(ticket) = ticket.value \cdot ticket.invWinProb $. If the node considers $value(ticket)$, i.e. because it does match the expected amount, or winning probability inappropriate, it should refuse the ticket.
 
-$$s_i^{(0)}*G+H_i=s_i^{(0)}*G+s_{i+1}^{(1)}*G=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
+As ticket issuance happens without any interaction with the blockchain and there is thus no guarantee that there are enough tokens locked in payment channel in the smart contract, the recipient needs keep track about previous tickets, denoted as $stored$, and check that
 
-This allows the recipient to verify that the promised value $s_{i+1}^{(1)}$ indeed leads to a solution for the challenge given in the ticket. If this is not the case, the node should drop the packet. Without this check, the sender could intentionally create false challenges which lead to unredeemable tickets.
+$$ channel.amount \le value(ticket) + \sum_{t \ \in \ stored} value(t)$$
+
+If this is not the case, the node should refuse the ticket. In addtion, as tickets are issued using an ongoing serial numbers, the recipient must check that $ticket_i.index \le \max(ticket_{i-1}.index,0)$ and refuse the ticket otherwise.
+
+It now remains to show that the ticket issuer knows any $response$ that solves $ticket.challenge$. This is especially necessary if the ticket issuer was given the challenge by a third party, i.e. the creator of a mixnet packet. This topic is covered in section \ref{sec:incentives:proofofrelay} and out of scope of this section.
+
+\paragraph{Validation of Unlocked Tickets} Once the $response$ to $ticket.challenge$ is known, the node is able determine whether the ticket is going to be a winner.
+
+To check this, the node first computes the next $opening$ to the currently stored $commitment$ in the smart contract and checks that
+
+$$ \mathsf{keccak256} ( \ \mathsf{keccak256}(ticketData) \ || \ solution \ || \ opening \ ) < ticket.winProb $$
+
+If true, then the node can submit the ticket to the smart contract and claim their incentive. Otherwise, the node can be sure that the ticket has no added value and can thus drop it.
+
+Note that this does not reduce average payout of the ticket recipient since the value of a ticket is given by the expected value, hence the next winning ticket is going to compensate that loss, see section on \lcnameref{sec:incentives:probabilistic} for further explanation.
