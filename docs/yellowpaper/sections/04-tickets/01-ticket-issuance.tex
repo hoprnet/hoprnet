@@ -17,24 +17,27 @@ The ticket issuer creates a data structure $ticketData$ and creates the ticket a
 
 \begin{figure}[H]
       \centering
-      \begin{tabular}{|l|c|c|}
-            \hline
-            \textbf{Value}                                    & \textbf{Ethereum datatype} & \textbf{size (in bytes)} \\
-            \hline
-            \hline
-            \nameref{sec:tickets:issuance:recipient}          & address                    & 20 bytes                 \\
-            \nameref{sec:tickets:issuance:challenge}          & bytes32                    & 32 bytes                 \\
-            \nameref{sec:tickets:issuance:ticketepoch}        & uint256                    & 32 bytes                 \\
-            \nameref{sec:tickets:issuance:ticketvalue}        & uint256                    & 32 bytes                 \\
-            \nameref{sec:tickets:issuance:winningprobability} & uint256                    & 32 bytes                 \\
-            \nameref{sec:tickets:issuance:ticketindex}        & uint256                    & 32 bytes                 \\
-            \nameref{sec:tickets:issuance:channelepoch}       & uint256                    & 32 bytes                 \\
-            \hline
-            \hline
-            Signature $r$                                     & bytes32                    & 32 bytes                 \\
-            Signature $s$                                     & bytes32                    & 32 bytes                 \\
-            Recovery value $v$                                & uint8                      & 1 byte                   \\
-            \hline
+      \begin{tabular}{c|l|c|c|}
+            \cline{2-4}
+                                                        & \textbf{Value}                                    & \textbf{Ethereum datatype} & \textbf{size (in bytes)} \\
+            \cline{2-4}
+            \noalign{\smallskip}
+            \cline{2-4}
+            \multirow{7}{*}{\rotatebox{90}{TicketData}} & \nameref{sec:tickets:issuance:recipient}          & address                    & 20 bytes                 \\
+                                                        & \nameref{sec:tickets:issuance:challenge}          & bytes32                    & 32 bytes                 \\
+                                                        & \nameref{sec:tickets:issuance:ticketepoch}        & uint256                    & 32 bytes                 \\
+                                                        & \nameref{sec:tickets:issuance:ticketvalue}        & uint256                    & 32 bytes                 \\
+                                                        & \nameref{sec:tickets:issuance:winningprobability} & uint256                    & 32 bytes                 \\
+                                                        & \nameref{sec:tickets:issuance:ticketindex}        & uint256                    & 32 bytes                 \\
+                                                        & \nameref{sec:tickets:issuance:channelepoch}       & uint256                    & 32 bytes                 \\
+            \cline{2-4}
+            \noalign{\smallskip}
+
+            \cline{2-4}
+            \multirow{3}{*}{\rotatebox{90}{Sig}}        & Signature $r$                                     & bytes32                    & 32 bytes                 \\
+                                                        & Signature $s$                                     & bytes32                    & 32 bytes                 \\
+                                                        & Recovery value $v$                                & uint8                      & 1 byte                   \\
+            \cline{2-4}
       \end{tabular}
       \caption{Structure of a ticket.}
 \end{figure}
@@ -44,7 +47,7 @@ The ticket issuer creates a data structure $ticketData$ and creates the ticket a
 
 The Ethereum address of the recipient which can be derived from the recipient's public key. This makes sure that the ticket is valid for exactly one payment channel, the one from issuer to recipient. Note that Ethereum addresses are computed as
 
-$$ addr = keccak256( uncompressedPublicKey).slice(12,32)$$
+$$ addr = \mathsf{keccak256}( uncompressedPublicKey).\mathsf{slice}(12,32)$$
 
 (the last 20 bytes of the keccak256 hash of the uncompressed ECDSA public key).
 
