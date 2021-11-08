@@ -2,8 +2,9 @@
 
 Cover traffic (CT) node is a daemon built with HOPR's core-protocol (`hopr-core`), which allows it to join the HOPR network in the same way as other HOPR nodes. What distinguishs a CT node from other default HOPR nodes is that:
 
-- CT node maintains a persisted state locally, which records the topology of the network and the latest status of CT delivery.
+- CT node maintains a persisted state locally, which records the topology of the network from its own perspective and the latest status of CT delivery to facilitate the management of CT channels and path-selection for cover traffic.
 - CT node adopts `CoverTrafficStrategy`. At each strategy tick, CT strategy decides which channels to be opened/closed based on the current publicly-available network state. Those channels are referred as cover traffic channels (CT channels). At each tick, destination of all the open CT channels are served as the first hop for CT node to send looped traffic.
+- CT node is an application of HOPR core. It does not expose any `sendMessage()` methods and is not designed to be used by end users.
 
 ### Persisted state
 
