@@ -40,12 +40,13 @@ Some metrics can be extracted from the logs, please check [metrics.md](./metrics
 
 ```
 yarn install
+yarn build
 ```
 
 ## Run
 
 ```sh
-$ node ./lib/index.js --help
+$ hopr-cover-traffic-daemon --help
 Options:
   --help        Show help  [boolean]
   --version     Show version number  [boolean]
