@@ -12,13 +12,19 @@
       "program": "${workspaceFolder}/packages/hoprd/src/index.ts",
       "args": ["--admin", "--init", "--rest", "--password=''", "--data=/tmp/debug"],
       "outFiles": ["${workspaceFolder}/**/*.js"]
-    },{
+    },
+    {
       "type": "node",
       "request": "launch",
       "name": "Launch HOPR Cover Traffic node",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/packages/cover-traffic-daemon/src/index.ts",
-      "args": ["--privateKey", "0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332", "--environment", "master-xdai"],
+      "args": [
+        "--privateKey",
+        "0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332",
+        "--environment",
+        "master-xdai"
+      ],
       "outFiles": ["${workspaceFolder}/**/*.js"]
     },
     {
