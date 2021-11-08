@@ -87,13 +87,20 @@ fund_if_empty() {
       # need to wait to make retries work
       local ethers_opts="--rpc ${rpc} --account ${FUNDING_PRIV_KEY} --yes --wait"
 
+      # the funding might fail due to network issues and such, but we don't want to block the deployment on such occassions entirely
+      # thus, we continue anyway after retrying a few times
+
       log "Funding account with native token -> ${address} ${min_funds}"
-      try_cmd "yarn run --silent ethers send ${address} ${min_funds} ${ethers_opts}" 12 10
+      if ! try_cmd "yarn run --silent ethers send ${address} ${min_funds} ${ethers_opts}" 3 3; then
+        log "Funding account with native token -> ${address} ${min_funds} - FAILED"
+      fi
 
       if [ -n "${token_contract}" ]; then
         # at this point we assume that the account needs HOPR as well
         log "Funding account with HOPR token -> ${address} ${min_funds_hopr}"
-        try_cmd "yarn run --silent ethers send-token ${token_contract} ${address} ${min_funds_hopr} ${ethers_opts}" 12 10
+        if ! try_cmd "yarn run --silent ethers send-token ${token_contract} ${address} ${min_funds_hopr} ${ethers_opts}" 3 3; then
+          log "Funding account with HOPR token -> ${address} ${min_funds_hopr} - FAILED"
+	fi
       fi
     fi
   fi
