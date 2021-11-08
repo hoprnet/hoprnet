@@ -31,6 +31,10 @@ While filtering channels to close, CT strategy also selects nodes to which it op
 
 For the definition of "importance", please check [§6 HOPR yellow paper](https://github.com/hoprnet/hoprnet/blob/master/docs/yellowpaper/yellowpaper.pdf)
 
+### Metrics
+
+Some metrics can be extracted from the logs, please check [metrics.md](./metrics.md)
+
 ## Installation
 
 ```
