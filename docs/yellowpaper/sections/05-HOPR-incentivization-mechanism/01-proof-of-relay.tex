@@ -3,10 +3,30 @@
 
 HOPR incentivizes packet transformation and delivery using a mechanism called \textbf{proof of relay}. This mechanism guarantees that a node's relay services are verifiable.
 
+\begin{figure}[H]
+      \centering
+      \begin{tikzpicture}
+            \def\one{0.6}
+            \def\nodeHeight{4*\one}
+            \def\nodeWidth{1.5*\one}
+            \def\nodeOffset{8*\one}
+
+            \foreach \i\name in{0/$n_{i-1}$,1/$n_i$,2/$n_{i+1}$} {
+                        \draw[shift={(\i*\nodeOffset,0)}] (0,0) rectangle (\nodeWidth,-\nodeHeight) node[midway] {\name};
+                  }
+
+            \foreach \i\packet\ack in{0/$packet_{i-1}$/$ack_i$,1/$packet_{i}$/$ack_{i+1}$} {
+                        \draw[->,shift={(\i*\nodeOffset,-\i*\one)}] (\nodeWidth,-0.5*\one) -- (\nodeOffset,-\one) node[midway,above=2pt] {\packet};
+
+                        \draw[->,shift={(\i*\nodeOffset,-\i*\one)}] (\nodeOffset,-2*\one) -- (\nodeWidth,-2.5*\one) node[midway,below=2pt] {\ack};
+                  }
+      \end{tikzpicture}
+      \caption{PoR workflow}
+\end{figure}
 \paragraph{Secret sharing}
 \label{sec:incentives:proofofrelay:secretSharing}
 
-Each node derives two keys, $s_i^{own}$ and $_i^{ack}$, by using the $s_i$ as given by the SPHINX packet (see the \lcnameref{appendix:keyderivation} section for more details). $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
+Each node derives two keys, $s_i^{own}$ and $s_i^{ack}$, by using the $s_i$ as given by the SPHINX packet (see the \lcnameref{appendix:keyderivation} section for more details). $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
 
 Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requires the cooperation of the next downstream node $n_{i+1}$ and is sent as an \textit{acknowledgement} if $n_{i+1}$ has received the transformed packet and considers both the packet and embedded ticket valid.
 
