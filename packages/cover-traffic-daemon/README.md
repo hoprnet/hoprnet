@@ -24,10 +24,12 @@ Among all the existing open CT channels, a CT channel will be closed on a strate
 
 #### Open channels
 
-While filtering channels to close, CT strategy also selects nodes to which it opens CT channels, if the total amount of CT channels does not reach the `CHANNELS_PER_COVER_TRAFFIC_NODE` limit (default: 10). Nodes must:
+While filtering channels to close, CT strategy also selects nodes to which it opens CT channels based on the probability weighted by importance, if the total amount of CT channels does not reach the `CHANNELS_PER_COVER_TRAFFIC_NODE` limit (default: 10). Nodes must:
 
 - not be the CT node itself.
 - not be the destination of CT channels from the lastest update.
+
+For the definition of "importance", please check [§6 HOPR yellow paper](https://github.com/hoprnet/hoprnet/blob/master/docs/yellowpaper/yellowpaper.pdf)
 
 ## Installation
 
