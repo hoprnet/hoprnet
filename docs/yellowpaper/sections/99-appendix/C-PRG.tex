@@ -1,7 +1,19 @@
-\section{Pseudo-random generator - PRG}
+\section{Pseudorandomness generator - PRG}
 \label{appendix:prg}
 
-% AES counter mode
+A pseudorandomness generator (PRG) consumes a key $k$ and creates an output of an arbitrary length that is indistinguishable from random numbers of the same length. Within HOPR, it is used to create the blindings necessary to hide the routing information of the SPHINX packet which is covered in section \ref{sec:sphinx:routinginformation}.
+
+$$ PRG : k \in \{ 0,1 \}^{32} \times start \in \mathbb{N} \times end \in \mathbb{N} \mapsto \{ 0,1 \}^{end - start} $$
+
+$PRG$ takes a key $k \in \{ 0,1 \}^{32}$, a natural number $start$ and a natural number $end$ and creates an output of size $end - start$. For $start$ values strictly greater than $0$, it returns the PRG output beginning with $start$.
+
+The PRG output is generated using AES with 256 bytes block length in counter mode (AES-CTR-256), encrypting zeros and using $k$ as encryption key and $iv_{pre} \in \{ 0, 1 \}^{12}$ as an initiailization vector where $iv := iv_{pre} \ || \ blockNumber$ and $blockNumber \in \{ 0, \dots, 2^{32} - 1 \}$.
+
+$$ block_i = \mathsf{AES\_CTR\_256}_{k, \ iv \ || \ i}(0) $$
+
+The final output is generated as
+
+$$ ( block_{\lfloor \frac{start}{bLength}\rfloor} \ || \ \dots \ || \ block_{\lceil \frac{end}{bLength}\rceil} ).slice(start \ \textbf{mod} \ bLength,end - start)$$
 
 \begin{figure}[H]
     \centering
@@ -48,5 +60,5 @@
             }
 
     \end{tikzpicture}
-    \caption{Pseudorandomness generator}
+    \caption{Pseudorandomness generator used within the HOPR protocol}
 \end{figure}
