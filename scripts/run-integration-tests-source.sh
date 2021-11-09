@@ -173,20 +173,17 @@ function setup_ct_node() {
   local id=${2}
   local additional_args=${3:-""}
 
-  log "Run CT node ${id}"
-
-  if [ -n "${additional_args}" ]; then
-    log "Additional args: \"${additional_args}\""
-  fi
+  log "Run CT node ${id} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
-
+  log "Additional args: \"${additional_args}\""
+  
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
-    --privateKey 0x123456789 \  
+    --privateKey 0x423432 \
     ${additional_args} \
-    > "${log}" 2>&1 &
+     > "${log}" 2>&1 &
 }
 
 # --- Log test info {{{
@@ -250,20 +247,20 @@ rm -Rfv \
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat --show-stack-traces > \
-  "${hardhat_rpc_log}" 2>&1 &
+# HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
+#   --network hardhat --show-stack-traces > \
+#   "${hardhat_rpc_log}" 2>&1 &
 
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Hardhat node started (127.0.0.1:8545)"
+# wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
+# log "Hardhat node started (127.0.0.1:8545)"
 
 # need to mirror contract data because of hardhat-deploy node only writing to localhost
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+# cp -R \
+#   "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
+#   "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
+# cp -R \
+#   "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+#   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
 
 #  --- Run nodes --- {{{
@@ -277,6 +274,10 @@ cp -R \
 # setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
 setup_ct_node "${ct_node1_log}" ${ct_node1_id}
 # }}}
+
+log "Waiting for CT address"
+declare ct1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
+log "Found address: ${ct1_address}"
 
 #  --- Wait until started --- {{{
 # Wait until node has recovered its private key
