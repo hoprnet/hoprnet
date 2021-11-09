@@ -82,7 +82,10 @@ function networkToHardhatNetwork(name: String, input: any): any {
 
 const networks = {}
 
+const environment = PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID]
+
 for (const [networkId, network] of Object.entries(PROTOCOL_CONFIG.networks)) {
+  network.tags = environment.tags
   const hardhatNetwork = networkToHardhatNetwork(networkId, network)
   networks[networkId] = hardhatNetwork
 }

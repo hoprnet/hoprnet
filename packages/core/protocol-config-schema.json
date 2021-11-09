@@ -18,13 +18,20 @@
             },
             "channels_contract_address": {
               "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "required": [
             "network_id",
             "channel_contract_deploy_block",
             "token_contract_address",
-            "channels_contract_address"
+            "channels_contract_address",
+            "tags"
           ],
           "additionalProperties": false
         }
@@ -61,12 +68,6 @@
             },
             "hopr_token_name": {
               "type": "string"
-            },
-            "tags": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
             }
           },
           "required": [
