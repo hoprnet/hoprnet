@@ -67,6 +67,8 @@ declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
 declare node7_dir="${tmp}/${node_prefix}-7"
 
+declare ct_node1_dir="${tmp}/${node_prefix}-ct1"
+
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
 declare node3_log="${node3_dir}.log"
@@ -75,6 +77,8 @@ declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
 declare node7_log="${node7_dir}.log"
 
+declare ct_node1_log="${ct_node1_dir}.log"
+
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
 declare node3_id="${node3_dir}.id"
@@ -82,6 +86,8 @@ declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
 declare node7_id="${node7_dir}.id"
+
+declare ct_node1_id="${ct_node1_dir}.id"
 
 declare password="e2e-test"
 
@@ -155,6 +161,30 @@ function setup_node() {
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
+    ${additional_args} \
+    > "${log}" 2>&1 &
+}
+
+# $1 = node log file
+# $2 = node id
+# $3 = OPTIONAL: additional args to hoprd
+function setup_ct_node() {
+  local log=${1}
+  local id=${2}
+  local additional_args=${3:-""}
+
+  log "Run CT node ${id}"
+
+  if [ -n "${additional_args}" ]; then
+    log "Additional args: \"${additional_args}\""
+  fi
+
+  if [[ "${additional_args}" != *"--environment "* ]]; then
+    additional_args="--environment hardhat-localhost ${additional_args}"
+  fi
+
+  DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
+    --privateKey 0x123456789 \  
     ${additional_args} \
     > "${log}" 2>&1 &
 }
@@ -237,13 +267,15 @@ cp -R \
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
-setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
-setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
+# setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
+# setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
+# setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
+# setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
+# setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
+# setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+# setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
+# setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
+setup_ct_node "${ct_node1_log}" ${ct_node1_id}
 # }}}
 
 #  --- Wait until started --- {{{
@@ -255,6 +287,7 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
+wait_for_regex ${ct_node1_log} "CT: State update:0 nodes, 0 channels"
 # }}}
 
 #  --- Fund nodes --- {{{
