@@ -3,9 +3,12 @@
 
 Tickets are used to convince its recipient that it will receive the promised incentive once the challenge is solved. As ticket issuance happens without any on-chain interaction, it is the duty of the recipient to decide whether it accepts the ticket or refuses it because the node considers it invalid.
 
-Ticket validation runs through two states: receiving the ticket without knowing the response to the given challenge stated as $ticket.challenge$, ``validation of locked tickets", and once the response is known to the node, ``validation of unlocked tickets".
+Ticket validation runs through two states: receiving the ticket without knowing the response to the given challenge stated as $ticket.challenge$, \lcnameref{sec:tickets:validation:locked}, and once the response is known to the node, \lcnameref{sec:tickets:validation:unlocked}.
 
-\paragraph{Validation of Locked Tickets} As the node is not yet able to claim the incentives embedded in the ticket due to lack of a response to the stated challenge, it is the duty of the node to check the ticket economically before further processing it.
+\paragraph{Validation of Locked Tickets}
+\label{sec:tickets:validation:locked}
+
+As the node is not yet able to claim the incentives embedded in the ticket due to lack of a response to the stated challenge, it is the duty of the node to check the ticket economically before further processing it.
 
 Therefore, the node computes the winning probability as
 
@@ -21,12 +24,15 @@ If this is not the case, the node should refuse the ticket. In addtion, as ticke
 
 It now remains to show that the ticket issuer knows any $response$ that solves $ticket.challenge$. This is especially necessary if the ticket issuer was given the challenge by a third party, i.e. the creator of a mixnet packet. This topic is covered in section \ref{sec:incentives:proofofrelay} and out of scope of this section.
 
-\paragraph{Validation of Unlocked Tickets} Once the $response$ to $ticket.challenge$ is known, the node is able determine whether the ticket is going to be a winner.
+\paragraph{Validation of Unlocked Tickets}
+\label{sec:tickets:validation:unlocked}
+
+Once the $response$ to $ticket.challenge$ is known, the node is able determine whether the ticket is going to be a winner.
 
 To check this, the node first computes the next $opening$ to the currently stored $commitment$ in the smart contract and checks that
 
 $$ \mathsf{keccak256} ( \ \mathsf{keccak256}(ticketData) \ || \ solution \ || \ opening \ ) < ticket.winProb $$
 
-If true, then the node can submit the ticket to the smart contract and claim their incentive. Otherwise, the node can be sure that the ticket has no added value and can thus drop it.
+If true, then the node stores the ticket to claim it at a later point in time. In case the ticket turned out to be a loss, there is no added value to the ticket and the node can thus drop it.
 
 Note that this does not reduce average payout of the ticket recipient since the value of a ticket is given by the expected value, hence the next winning ticket is going to compensate that loss, see section on \lcnameref{sec:incentives:probabilistic} for further explanation.
