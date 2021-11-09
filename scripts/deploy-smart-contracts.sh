@@ -79,6 +79,7 @@ for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref"
 
       cat "${protocol_config}" | jq ".environments.\"${environment_id}\".channels_contract_address = \"${channels_contract_address}\"" > "${protocol_config}.new"
       mv "${protocol_config}.new" "${protocol_config}"
+
     done
   fi
 done
