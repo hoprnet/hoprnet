@@ -275,9 +275,7 @@ log "Running hardhat local node"
 setup_ct_node "${ct_node1_log}" ${ct_node1_id}
 # }}}
 
-log "Waiting for CT address"
-declare ct1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
-log "Found address: ${ct1_address}"
+log "Waiting for nodes startup"
 
 #  --- Wait until started --- {{{
 # Wait until node has recovered its private key
@@ -288,8 +286,10 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
-wait_for_regex ${ct_node1_log} "CT: State update:0 nodes, 0 channels"
+declare ct1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
 # }}}
+
+log "Funding nodes"
 
 #  --- Fund nodes --- {{{
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
@@ -300,6 +300,8 @@ HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hard
   --password "${password}"
 # }}}
 
+log "Waiting for port binding"
+
 #  --- Wait for ports to be bound --- {{{
 wait_for_regex ${node1_log} "STARTED NODE"
 wait_for_regex ${node2_log} "STARTED NODE"
@@ -309,6 +311,8 @@ wait_for_regex ${node5_log} "STARTED NODE"
 # no need to wait for node 6 since that will stop right away
 wait_for_port 19097 "127.0.0.1" "${node7_log}"
 # }}}
+
+log "All nodes came up online"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
