@@ -15,8 +15,8 @@
     "master-goerli": {
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
-      "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
-      "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
+      "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
+      "channels_contract_address": "0xfc7Efa21C3847325755389B5bcD2B38f6D2535dE"
     },
     "debug-goerli": {
       "network_id": "goerli",
@@ -27,8 +27,8 @@
     "master-xdai": {
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
-      "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
-      "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
+      "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
+      "channels_contract_address": "0x6f3999E1Ca72b6BB396E46aD454f5ADEC783b035"
     }
   },
   "networks": {
@@ -40,7 +40,9 @@
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
       "hopr_token_name": "wxHOPR",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "xdai": {
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
@@ -51,7 +53,9 @@
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
       "hopr_token_name": "wxHOPR",
-      "tags": ["production"]
+      "tags": [
+        "production"
+      ]
     },
     "goerli": {
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
@@ -62,7 +66,9 @@
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "native_token_name": "gETH",
       "hopr_token_name": "wxHOPR",
-      "tags": ["staging"]
+      "tags": [
+        "staging"
+      ]
     }
   }
 }
