@@ -90,7 +90,7 @@ declare node7_id="${node7_dir}.id"
 declare ct_node1_id="${ct_node1_dir}.id"
 
 declare password="e2e-test"
-declare ct_private_key = "0x123456"
+declare ct_private_key="0x123456"
 
 declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 
