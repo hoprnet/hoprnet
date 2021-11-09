@@ -247,31 +247,31 @@ rm -Rfv \
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-# HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
-#   --network hardhat --show-stack-traces > \
-#   "${hardhat_rpc_log}" 2>&1 &
+HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
+  --network hardhat --show-stack-traces > \
+  "${hardhat_rpc_log}" 2>&1 &
 
 # wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-# log "Hardhat node started (127.0.0.1:8545)"
+log "Hardhat node started (127.0.0.1:8545)"
 
 # need to mirror contract data because of hardhat-deploy node only writing to localhost
-# cp -R \
-#   "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
-#   "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
-# cp -R \
-#   "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-#   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+cp -R \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
+cp -R \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
 
 #  --- Run nodes --- {{{
-# setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
-# setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
-# setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
-# setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
-# setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
-# setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
-# setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
-# setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
+setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
+setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
+setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
+setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
+setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
+setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
 setup_ct_node "${ct_node1_log}" ${ct_node1_id}
 # }}}
 
