@@ -20,7 +20,7 @@ For node $A$ to transfer packets to node $B$, it must first open a payment chann
 
         \draw (4+\nodeWidth/2,-2+\nodeHeight+\padding) -- (4+\nodeWidth/2,\nodeHeight/2-\padding);
         \draw[->] (4+\nodeWidth/2,\nodeHeight/2+\padding) -- (4+\nodeWidth/2,2-\padding) node[midway,above=10pt,right=4pt] {\tiny{Initiate closure}\\\tiny{(if not committed)}};
-        \draw[->] (\nodeWidth,\nodeHeight/2) -- (8,\nodeHeight/2) node[midway,fill=white,above=0.2pt] {\tiny{Fund (if already committed)}};
+        \draw[->] (\nodeWidth+\padding,\nodeHeight/2) -- (8-\padding,\nodeHeight/2) node[midway,fill=white,above=0.2pt] {\tiny{Fund (if already committed)}};
     \end{tikzpicture}
     \caption{Payment channel states}
 \end{figure}

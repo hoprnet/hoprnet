@@ -20,13 +20,15 @@ HOPR incentivizes packet transformation and delivery using a mechanism called \t
 
                         \draw[->,shift={(\i*\nodeOffset,-\i*\one)}] (\nodeOffset,-2*\one) -- (\nodeWidth,-2.5*\one) node[midway,below=2pt] {\ack};
                   }
+
+            \draw[->] (-0.5,0) -- (-0.5,-\nodeHeight) node[midway,left=2pt] {\rotatebox{90}{time}};
       \end{tikzpicture}
       \caption{PoR workflow}
 \end{figure}
 \paragraph{Secret sharing}
 \label{sec:incentives:proofofrelay:secretSharing}
 
-Each node derives two keys, $s_i^{own}$ and $s_i^{ack}$, by using the $s_i$ as given by the SPHINX packet (see the \lcnameref{appendix:keyderivation} section for more details). $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
+Each node derives two keys, $s_i^{own}$ and $_i^{ack}$, by using the $s_i$ as given by the SPHINX packet (see the \lcnameref{appendix:keyderivation} section for more details). $s_i^{own}$ and $s_{i+1}^{ack}$ serve as key shares of a 2-out-of-2 secret sharing between a node $n_i$ and the next downstream node $n_{i+1}$ along the chosen path. Once a node knows \textit{both} key shares, $s_i^{own}$ and $s_{i+1}^{ack}$, it is able to reconstruct $s_i^{response}$ to redeem the received ticket on-chain.
 
 Whilst $s_i^{own}$ is derivable upon reception of a packet, $s_{i+1}^{ack}$ requires the cooperation of the next downstream node $n_{i+1}$ and is sent as an \textit{acknowledgement} if $n_{i+1}$ has received the transformed packet and considers both the packet and embedded ticket valid.
 
@@ -142,7 +144,7 @@ As the next downstream node would not accept a packet without a ticket\footnote{
             \draw (0,-9.3) rectangle (\one*32,-9.9);
             \draw[decoration={brace,mirror,raise=5pt},decorate] (0,-9.9) -- node[below=5pt] {32 bytes} (32*\one,-9.9);
 
-            \draw[decoration={brace,raise=5pt},decorate] (33*\one,0.5) -- node[right=12pt,above=2pt,rotate=-90] {453 bytes} (33*\one,-9.9) ;
+            \draw[decoration={brace,raise=5pt},decorate] (33*\one,0.5) -- node[midway,right=6pt] {\rotatebox{270}{453 bytes}} (33*\one,-9.9) ;
 
       \end{tikzpicture}
       \caption{Mixnet packet header with PoR fields that is sent from the sender $A$ to $B$ and supposed to be forwarded through nodes $C, D$ to $Z$.}
