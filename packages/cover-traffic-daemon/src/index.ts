@@ -70,7 +70,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
   const selfPub = PublicKey.fromPeerId(peerId)
   const selfAddr = selfPub.toAddress()
-  const data = new PersistedState(update)
+  const data = new PersistedState(update, './ct.json')
 
   const onChannelUpdate = (newChannel: ChannelEntry) => {
     data.setChannel(newChannel)
@@ -122,8 +122,8 @@ if (require.main === module) {
   main((state: State) => {
     console.log(
       `CT: State update:` +
-        `${Object.keys(state.nodes).length} nodes, ` +
-        `${Object.keys(state.channels).length} channels`
+      `${Object.keys(state.nodes).length} nodes, ` +
+      `${Object.keys(state.channels).length} channels`
     )
   })
 }
