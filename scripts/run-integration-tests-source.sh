@@ -251,7 +251,7 @@ HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum ha
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
-# wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
+wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
 
 # need to mirror contract data because of hardhat-deploy node only writing to localhost
@@ -286,8 +286,10 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
-declare ct1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
+declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
 # }}}
+
+log "CT node1 address: ${ct_node1_address}"
 
 log "Funding nodes"
 
@@ -297,6 +299,7 @@ HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hard
   --identity-directory "${tmp}" \
   --use-local-identities \
   --network hardhat \
+  --address "${ct_node1_address}" \
   --password "${password}"
 # }}}
 
