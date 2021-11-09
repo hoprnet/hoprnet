@@ -90,6 +90,8 @@ declare node7_id="${node7_dir}.id"
 declare password="e2e-test"
 declare ct_private_key="0x123456"
 
+declare ct_db_file="${tmp}/hopr-ct-db.json"
+
 declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 
 function cleanup {
@@ -177,6 +179,7 @@ function setup_ct_node() {
   
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
     --privateKey "${ct_private_key}" \
+    --dbFile "${ct_db_file}" \
     ${additional_args} \
      > "${log}" 2>&1 &
 }

@@ -47,6 +47,11 @@ const argv = yargs(process.argv.slice(2))
     string: true,
     demandOption: true
   })
+  .option('dbFile', {
+    describe: 'A path to DB file for persistent storage',
+    string: true,
+    default: './ct.json'
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -70,7 +75,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
   const selfPub = PublicKey.fromPeerId(peerId)
   const selfAddr = selfPub.toAddress()
-  const data = new PersistedState(update, './ct.json')
+  const data = new PersistedState(update, argv.dbFile)
 
   const onChannelUpdate = (newChannel: ChannelEntry) => {
     data.setChannel(newChannel)
