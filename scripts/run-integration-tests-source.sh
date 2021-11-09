@@ -87,8 +87,6 @@ declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
 declare node7_id="${node7_dir}.id"
 
-declare ct_node1_id="${ct_node1_dir}.id"
-
 declare password="e2e-test"
 declare ct_private_key="0x123456"
 
@@ -165,14 +163,12 @@ function setup_node() {
 }
 
 # $1 = node log file
-# $2 = node id
-# $3 = OPTIONAL: additional args to hoprd
+# $2 = OPTIONAL: additional args to hoprd
 function setup_ct_node() {
   local log=${1}
-  local id=${2}
-  local additional_args=${3:-""}
+  local additional_args=${2:-""}
 
-  log "Run CT node ${id} -> ${log}"
+  log "Run CT node -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
@@ -271,7 +267,7 @@ setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
-setup_ct_node "${ct_node1_log}" ${ct_node1_id}
+setup_ct_node "${ct_node1_log}" 
 # }}}
 
 log "Waiting for nodes startup"
