@@ -132,7 +132,7 @@ function setup_node() {
   local id=${6}
   local additional_args=${7:-""}
 
-  log "Run node ${id} on rest port ${rest_port}"
+  log "Run node ${id} on rest port ${rest_port} -> ${log}"
 
   if [ -n "${additional_args}" ]; then
     log "Additional args: \"${additional_args}\""
