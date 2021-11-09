@@ -86,7 +86,7 @@ const environment = PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] || {}
 
 for (const [networkId, network] of Object.entries(PROTOCOL_CONFIG.networks)) {
   // environment could be undefined at this point
-  network.tags = environment.tags || []
+  network["tags"] = environment.tags || []
   const hardhatNetwork = networkToHardhatNetwork(networkId, network)
   networks[networkId] = hardhatNetwork
 }
