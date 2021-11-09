@@ -90,6 +90,7 @@ declare node7_id="${node7_dir}.id"
 declare ct_node1_id="${ct_node1_dir}.id"
 
 declare password="e2e-test"
+declare ct_private_key = "0x123456"
 
 declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 
@@ -134,13 +135,11 @@ function setup_node() {
 
   log "Run node ${id} on rest port ${rest_port} -> ${log}"
 
-  if [ -n "${additional_args}" ]; then
-    log "Additional args: \"${additional_args}\""
-  fi
-
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
+  
+  log "Additional args: \"${additional_args}\""
 
   # Set NODE_ENV=development to rebuild hopr-admin next files
   # at runtime. Necessary to start multiple instances of hoprd
@@ -181,7 +180,7 @@ function setup_ct_node() {
   log "Additional args: \"${additional_args}\""
   
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
-    --privateKey 0x423432 \
+    --privateKey "${ct_private_key}" \
     ${additional_args} \
      > "${log}" 2>&1 &
 }
