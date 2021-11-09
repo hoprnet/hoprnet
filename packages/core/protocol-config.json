@@ -40,9 +40,7 @@
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
       "hopr_token_name": "wxHOPR",
-      "tags": [
-        "development"
-      ]
+      "tags": ["development"]
     },
     "xdai": {
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
@@ -53,9 +51,7 @@
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
       "hopr_token_name": "wxHOPR",
-      "tags": [
-        "production"
-      ]
+      "tags": ["production"]
     },
     "goerli": {
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
@@ -66,9 +62,7 @@
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "native_token_name": "gETH",
       "hopr_token_name": "wxHOPR",
-      "tags": [
-        "staging"
-      ]
+      "tags": ["staging"]
     }
   }
 }
