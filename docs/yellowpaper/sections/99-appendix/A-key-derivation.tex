@@ -20,19 +20,19 @@ $$s_i^{sub} \longleftarrow \mathsf{expand}(s_i^{master}, length(purpose), hashKe
 \begin{center}
     \begin{tabular}{c | c|  c | c | l |}
         \cline{2-5}
-                                                                                      & Usage           & Name      & Length   & Hash Key (UTF-8)                \\
+                                             & Usage           & Name      & Length   & Hash Key (UTF-8)                \\
         \cline{2-5}
         \noalign{\smallskip}
         \cline{2-5}
-        \multirow{4}{*}{\hbox{ \rotatebox{90}{SPHINX}}\hbox{ \rotatebox{90}{Packet}}} & PRG             & $s^{prg}$ & 32       & \texttt{HASH\_KEY\_PRG}         \\
-                                                                                      & PRP             & $s^{prp}$ & 128 + 64 & \texttt{HASH\_KEY\_PRP}         \\
-                                                                                      & Packet tag      & $s^{tag}$ & 32       & \texttt{HASH\_KEY\_PACKET\_TAG} \\
-                                                                                      & Blinding        & $s^{bl}$  & 32 + 12  & \texttt{HASH\_KEY\_BLINDING}    \\
+        \multirow{4}{*}{\rotatebox{90}{\shortstack{SPHINX                                                               \\packet}}} & PRG             & $s^{prg}$ & 32       & \texttt{HASH\_KEY\_PRG}         \\
+                                             & PRP             & $s^{prp}$ & 128 + 64 & \texttt{HASH\_KEY\_PRP}         \\
+                                             & Packet tag      & $s^{tag}$ & 32       & \texttt{HASH\_KEY\_PACKET\_TAG} \\
+                                             & Blinding        & $s^{bl}$  & 32 + 12  & \texttt{HASH\_KEY\_BLINDING}    \\
         \cline{2-5}
         \noalign{\smallskip}
         \cline{2-5}
-        \multirow{2}{*}{\rotatebox{90}{PoR}}                                          & acknowledgement & $s^{ack}$ & 32*      & \texttt{HASH\_KEY\_ACK\_KEY}    \\
-                                                                                      & ownKey          & $s^{own}$ & 32*      & \texttt{HASH\_KEY\_OWN\_KEY}    \\
+        \multirow{2}{*}{\rotatebox{90}{PoR}} & acknowledgement & $s^{ack}$ & 32*      & \texttt{HASH\_KEY\_ACK\_KEY}    \\
+                                             & ownKey          & $s^{own}$ & 32*      & \texttt{HASH\_KEY\_OWN\_KEY}    \\
 
         \cline{2-5}
     \end{tabular}
