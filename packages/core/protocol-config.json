@@ -5,35 +5,45 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "hardhat-localhost2": {
       "network_id": "hardhat",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "master-goerli": {
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
       "channels_contract_address": "0xC3e3603c6210cDEe67B905cc3bF24A6416ab747B",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "debug-goerli": {
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
       "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "master-xdai": {
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
       "channels_contract_address": "0x6f3999E1Ca72b6BB396E46aD454f5ADEC783b035",
-      "tags": ["production"]
+      "tags": [
+        "production"
+      ]
     }
   },
   "networks": {
