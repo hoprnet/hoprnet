@@ -24,8 +24,8 @@
     "debug-goerli": {
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
-      "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
-      "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6",
+      "token_contract_address": "0xC3Ff0A2C4F404D6a9B31a7ABc2a41E616bd4F34C",
+      "channels_contract_address": "0x0Df426849D532fa06BC843dcaBf14CD60c89e78f",
       "tags": ["development"]
     },
     "master-xdai": {
