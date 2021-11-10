@@ -4,8 +4,8 @@ import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import Hopr, { resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
-import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
+import Hopr, { resolveEnvironment, supportedEnvironments, VERSION } from '@hoprnet/hopr-core'
+import { ChannelEntry, privKeyToPeerId, PublicKey, debug, HoprDB } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
@@ -81,7 +81,14 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   log('creating a node')
-  const node = new Hopr(peerId, options)
+  const db = new HoprDB(
+    PublicKey.fromPrivKey(peerId.privKey.marshal()),
+    options.createDbIfNotExist,
+    VERSION,
+    options.dbPath,
+    options.forceCreateDB
+  )
+  const node = new Hopr(peerId, db, options)
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
@@ -120,8 +127,8 @@ if (require.main === module) {
   main((state: State) => {
     console.log(
       `CT: State update:` +
-        `${Object.keys(state.nodes).length} nodes, ` +
-        `${Object.keys(state.channels).length} channels`
+      `${Object.keys(state.nodes).length} nodes, ` +
+      `${Object.keys(state.channels).length} channels`
     )
   })
 }

@@ -77,26 +77,27 @@ type PeerStoreAddress = {
   multiaddrs: Multiaddr[]
 }
 
-export type HoprOptions = {
-  announce?: boolean
-  dbPath?: string
-  createDbIfNotExist?: boolean
-  forceCreateDB?: boolean
-  password?: string
-  connector?: HoprCoreEthereum
-  strategy?: ChannelStrategy
-  hosts?: {
-    ip4?: NetOptions
-    ip6?: NetOptions
-  }
-  // You almost certainly want this to be false, this is so we can test with
-  // local testnets, and announce 127.0.0.1 addresses.
-  announceLocalAddresses?: boolean
-
-  // when true, addresses will be sorted local first
-  // when false, addresses will be sorted public first
-  preferLocalAddresses?: boolean
-  environment: ResolvedEnvironment
+export class HoprOptions {
+  constructor(
+    public environment: ResolvedEnvironment,
+    public announce?: boolean,
+    public dbPath?: string,
+    public createDbIfNotExist?: boolean,
+    public forceCreateDB?: boolean,
+    public password?: string,
+    public connector?: HoprCoreEthereum,
+    public strategy?: ChannelStrategy,
+    public hosts?: {
+      ip4?: NetOptions
+      ip6?: NetOptions
+    },
+    // You almost certainly want this to be false, this is so we can test with
+    // local testnets, and announce 127.0.0.1 addresses.
+    public announceLocalAddresses?: boolean,
+    // when true, addresses will be sorted local first
+    // when false, addresses will be sorted public first
+    public preferLocalAddresses?: boolean
+  ) { }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -132,7 +133,6 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private db: HoprDB
   private paymentChannels: HoprCoreEthereum
   private addressSorter: AddressSorter
   private publicNodesEmitter: HoprConnectOptions['publicNodes']
@@ -148,19 +148,12 @@ class Hopr extends EventEmitter {
    * @param options
    * @param provider
    */
-  public constructor(private id: PeerId, private options: HoprOptions) {
+  public constructor(private id: PeerId, private db: HoprDB, private options: HoprOptions) {
     super()
 
     if (!id.privKey || !isSecp256k1PeerId(id)) {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
-    this.db = new HoprDB(
-      PublicKey.fromPrivKey(id.privKey.marshal()),
-      options.createDbIfNotExist,
-      VERSION,
-      options.dbPath,
-      options.forceCreateDB
-    )
     this.environment = options.environment
     console.log(options.environment)
 
@@ -329,7 +322,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => {},
+      () => { },
       protocolAck
     )
 

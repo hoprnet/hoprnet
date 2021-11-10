@@ -6,8 +6,8 @@ import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import Hopr, { resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
-import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import Hopr, { resolveEnvironment, supportedEnvironments, VERSION } from '@hoprnet/hopr-core'
+import { HoprDB, NativeBalance, PublicKey, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 
 import setupAPI from './api'
 import { AdminServer } from './admin'
@@ -276,7 +276,14 @@ async function main() {
   // 2. Create node instance
   try {
     logs.log('Creating HOPR Node')
-    node = new Hopr(peerId, options)
+    const db = new HoprDB(
+      PublicKey.fromPrivKey(peerId.privKey.marshal()),
+      options.createDbIfNotExist,
+      VERSION,
+      options.dbPath,
+      options.forceCreateDB
+    )
+    node = new Hopr(peerId, db, options)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
 
