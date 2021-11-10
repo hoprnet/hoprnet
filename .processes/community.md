@@ -4,8 +4,10 @@ The HOPR Association _tech_ members, _community_ members and [Project Owner](./d
 
 ## Creating Issues
 
-Community team is expected to create github issues in [this repository](https://github.com/hoprnet/hopr-devrel) using [this template](https://github.com/hoprnet/hopr-devrel/blob/main/.github/ISSUE_TEMPLATE/request-for-tech-work.md).
+Community team is expected to create github issues in [this repository](https://github.com/hoprnet/hopr-devrel).
 
+- should use [RFM](https://github.com/hoprnet/hopr-devrel/blob/main/.github/ISSUE_TEMPLATE/request-for-minting-hoprboost-nft.md) template for minting NFTs
+- should use [Request Tech Work](https://github.com/hoprnet/hopr-devrel/blob/main/.github/ISSUE_TEMPLATE/request-for-tech-work.md) template for other work
 - issues labelled as `high priority` will be treated as a [file-alarm](./development.md#fire-alarm)
 - normal issues will be queued for work in next sprint planning
 
