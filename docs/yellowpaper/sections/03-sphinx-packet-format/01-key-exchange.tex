@@ -30,10 +30,10 @@ Since each $s_{i+1}$ depends on $b_{i+1}$ and therefore on all $\alpha_0, \dots 
 The following example shows the key extraction process for a sender $A$, three mix nodes $B,C,D$ and a receiver $Z$.
 
 \begin{align*}
-    (\alpha_B,b_B,s_B) & = (x \cdot b_A \cdot G,\textsf{KDF}(\alpha_B,y_B \cdot \alpha_B), y_B \cdot b_B \cdot \alpha_B \cdot G                   \\
-    (\alpha_C,b_C,s_C) & = (x \cdot b_A \ b_B \cdot G,\textsf{KDF}(\alpha_C,y_C \cdot \alpha_C), y_C \cdot b_C \cdot \alpha_C \cdot G             \\
-    (\alpha_D,b_D,s_D) & = (x \cdot b_A \ b_B \ b_C \cdot G,\textsf{KDF}(\alpha_D,y_D \cdot \alpha_D), y_D \cdot b_D \cdot \alpha_D \cdot G       \\
-    (\alpha_Z,b_Z,s_Z) & = (x \cdot b_A \ b_B \ b_C \ b_D \cdot G,\textsf{KDF}(\alpha_Z,y_Z \cdot \alpha_Z), y_Z \cdot b_Z \cdot \alpha_Z \cdot G \\
+    (\alpha_B,b_B,s_B) & = (x \cdot b_A \cdot G,\textsf{KDF}(\alpha_B,y_B \cdot \alpha_B), y_B \cdot b_B \cdot \alpha_B \cdot G )                   \\
+    (\alpha_C,b_C,s_C) & = (x \cdot b_A \ b_B \cdot G,\textsf{KDF}(\alpha_C,y_C \cdot \alpha_C), y_C \cdot b_C \cdot \alpha_C \cdot G )             \\
+    (\alpha_D,b_D,s_D) & = (x \cdot b_A \ b_B \ b_C \cdot G,\textsf{KDF}(\alpha_D,y_D \cdot \alpha_D), y_D \cdot b_D \cdot \alpha_D \cdot G )       \\
+    (\alpha_Z,b_Z,s_Z) & = (x \cdot b_A \ b_B \ b_C \ b_D \cdot G,\textsf{KDF}(\alpha_Z,y_Z \cdot \alpha_Z), y_Z \cdot b_Z \cdot \alpha_Z \cdot G ) \\
 \end{align*}
 
 where $b_A = x \cdot G$ and $y_i$ for $i \in \{ B,C,D,Z \}$ refers to the nodes' private key.
