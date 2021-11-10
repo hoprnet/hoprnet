@@ -9,6 +9,9 @@
 *.synctex(busy)
 *.xdv
 
+# SVG builds
+svg-inkscape
+
 # Built PDF files
 *.pdf
 !yellowpaper.pdf

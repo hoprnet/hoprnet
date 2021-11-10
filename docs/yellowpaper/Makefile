@@ -1,6 +1,6 @@
 .PHONY: all
 all:
-	latexmk -pdf
+	latexmk -pdf -pdflatex="pdflatex --shell-escape %O %S"
 	cp main.pdf yellowpaper.pdf
 
 .PHONY: watch
