@@ -49,15 +49,37 @@ done
 
 cd "${mydir}/../"
 
-for environment_id in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"refs/heads/${branch}\") | .key"); do
-  declare network_id=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".network_id")
+declare release_config="${mydir}/../packages/hoprd/releases.json"
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
 
-  log "deploying for environment ${environment_id} on network ${network_id}"
+for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref" | uniq); do
+  if [[ "${branch}" =~ ${git_ref} ]]; then
+    for environment_id in $(cat "${release_config}" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .value.environment_id"); do
+      declare network_id=$(cat "${protocol_config}" | jq -r ".environments.\"${environment_id}\".network_id")
 
-  # We need to pass the --write parameter due to hardhat-deploy expecting that
-  # to be set in addition to the hardhat config saveDeployments.
-  # See:
-  # https://github.com/wighawag/hardhat-deploy/blob/8c76e7f942010d09b3607650042007f935401633/src/DeploymentsManager.ts#L503
-  HOPR_ENVIRONMENT_ID="${environment_id}" yarn workspace @hoprnet/hopr-ethereum \
-    hardhat deploy --network "${network_id}" --write true
+      log "deploying for environment ${environment_id} on network ${network_id}"
+
+      # We need to pass the --write parameter due to hardhat-deploy expecting that
+      # to be set in addition to the hardhat config saveDeployments.
+      # See:
+      # https://github.com/wighawag/hardhat-deploy/blob/8c76e7f942010d09b3607650042007f935401633/src/DeploymentsManager.ts#L503
+      HOPR_ENVIRONMENT_ID="${environment_id}" yarn workspace @hoprnet/hopr-ethereum \
+        hardhat deploy --network "${network_id}" --write true
+
+      log "updating contract addresses in protocol configuration"
+
+      declare token_contract_address channels_contract_address deployments_path
+
+      deployments_path="${mydir}/../packages/ethereum/deployments/${environment_id}/${network_id}"
+      token_contract_address="$(cat "${deployments_path}/HoprToken.json" | jq -r ".address")"
+      channels_contract_address="$(cat "${deployments_path}/HoprChannels.json" | jq -r ".address")"
+
+      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".token_contract_address = \"${token_contract_address}\"" > "${protocol_config}.new"
+      mv "${protocol_config}.new" "${protocol_config}"
+
+      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".channels_contract_address = \"${channels_contract_address}\"" > "${protocol_config}.new"
+      mv "${protocol_config}.new" "${protocol_config}"
+
+    done
+  fi
 done

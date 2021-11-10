@@ -162,7 +162,6 @@ class Hopr extends EventEmitter {
       options.forceCreateDB
     )
     this.environment = options.environment
-    console.log(options.environment)
 
     const provider = expandVars(this.environment.network.default_provider, process.env)
     log(`using environment: ${this.environment.id}`)
@@ -188,8 +187,6 @@ class Hopr extends EventEmitter {
       log('Addresses are sorted by default')
     }
     this.indexer = this.paymentChannels.indexer // TODO temporary
-
-    log(`using environment: ${this.environment.id}`)
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
