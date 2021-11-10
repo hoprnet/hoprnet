@@ -9,7 +9,7 @@ $PRG$ takes a key $k \in \{ 0,1 \}^{32}$, a natural number $start$ and a natural
 
 The PRG output is generated using AES with 256 bytes block length in counter mode (AES-CTR-256), encrypting zeros and using $k$ as encryption key and $iv_{pre} \in \{ 0, 1 \}^{12}$ as an initiailization vector where $iv := iv_{pre} \ || \ blockNumber$ and $blockNumber \in \{ 0, \dots, 2^{32} - 1 \}$, yielding
 
-$$ block_i = \mathsf{AES\_CTR\_256}_{k, \ iv \ || \ i}(0) $$
+$$ block_i = \mathsf{AES\_CTR\_256}_{k, \ iv_{pre} \ || \ i}(0) $$
 
 The final output is generated as
 
@@ -34,13 +34,12 @@ where $bStart=start \ \textbf{mod} \ bLength$ and $bEnd = start - end + bStart$.
 
         \draw (1,\one/2) node {AES-CTR};
 
-        \draw[->] (0,\arrowHeight) -- (0,\one+\padding)  node[above=10pt] {$0$};
-        \draw[->] (\arrowstart,\arrowHeight) -- (\arrowstart,\one+\padding)  node[above=10pt] {$start$};
-        \draw[->] (\arrowend,\arrowHeight) -- (\arrowend,\one+\padding) node[above=10pt] {$end$};
-
-        \draw (\arrowstart,0) -- (\arrowstart,\one);
-        \draw (\arrowend,0) -- (\arrowend,\one);
-
+        \foreach \offset\name in{0/0,\arrowstart/$tart$,\arrowend/$end$} {
+                \begin{scope}[shift={(\offset,0)}]
+                    \draw[->] (0,\arrowHeight) -- (0,\one+\padding)  node[above=10pt] {\name};
+                    \draw (0,0) -- (0,\one);
+                \end{scope}
+            }
 
         \begin{scope}[shift={(\arrowstart,0)}]
             \def\a{2.4}
