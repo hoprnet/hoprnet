@@ -16,8 +16,14 @@ describe('cover-traffic daemon', async function () {
     node = generateNode(peerId, options)
     libp2p = sinon.createStubInstance(LibP2P)
     sinon.stub(node.indexer, 'start').callsFake(() => Promise.resolve(log('indexer called for cover-traffic daemon')))
-    sinon.stub(node.indexer, 'getPublicNodes').callsFake(() => { log('indexer called for public nodes'); return Promise.resolve([]) })
-    sinon.stub(LibP2P, 'create').callsFake(() => { log('libp2p stub started'); return Promise.resolve(libp2p) })
+    sinon.stub(node.indexer, 'getPublicNodes').callsFake(() => {
+      log('indexer called for public nodes')
+      return Promise.resolve([])
+    })
+    sinon.stub(LibP2P, 'create').callsFake(() => {
+      log('libp2p stub started')
+      return Promise.resolve(libp2p)
+    })
   })
   afterEach(function () {
     sinon.restore()
