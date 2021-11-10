@@ -61,7 +61,7 @@
       "chain_id": 5,
       "live": true,
       "gas_price": "1 gwei",
-      "gas_multiplier": 1.1,
+      "gas_multiplier": 1.3,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "native_token_name": "gETH",
       "hopr_token_name": "wxHOPR"
