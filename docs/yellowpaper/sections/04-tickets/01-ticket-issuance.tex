@@ -1,7 +1,7 @@
 \subsection{Ticket Issuance}
 \label{sec:tickets:issuance}
 
-Before a node is able to issue tickets for another node, it needs to lock funds on-chain to cover for the current as well as future tickets. Locking funds is considered equal to staking tokens in the HOPR network as it allows the node to create mixnet packets and act as relayer. By locking tokens in the smart contract, the node creates a unidirectional payment channel towards the recipient and is thus able to convince the recipient that it is eligable to issue tickets.
+Before a node is able to issue tickets for another node, it needs to lock funds on-chain to cover for the current as well as future tickets. Locking funds is considered equal to staking tokens in the HOPR network as it allows the node to create mixnet packets and act as relayer. By locking tokens in the smart contract, the node creates a unidirectional payment channel towards the recipient and is thus able to convince the recipient that it is eligible to issue tickets.
 
 As ticket issuance happens without any interaction to the blockchain, it is the duty of the node who receives the ticket to check whether there were any tokens locked on-chain and to keep track about previously issued tickets. If there is no record on-chain about any locked funds or if the sum of the received tickets exceed the amount of tokens that were locked on-chain, the recipient should refuse the ticket.
 
