@@ -5,7 +5,7 @@ A pseudorandomness generator (PRG) consumes a key $k$ and creates an output of a
 
 $$ PRG : k \in \{ 0,1 \}^{32} \times start \in \mathbb{N} \times end \in \mathbb{N} \mapsto \{ 0,1 \}^{end - start} $$
 
-$PRG$ takes a key $k \in \{ 0,1 \}^{32}$, a natural number $start$ and a natural number $end$ and creates an output of size $end - start$. For $start$ values strictly greater than $0$, it returns the PRG output beginning with $start$.
+$PRG$ takes a key $k \in \{ 0,1 \}^{32}$, a natural number $start$ and a natural number $end$ with $start \le end$ and creates an output of size $end - start$. For $start$ values strictly greater than $0$, it returns the PRG output beginning with $start$.
 
 The PRG output is generated using AES with 256 bytes block length in counter mode (AES-CTR-256), encrypting zeros and using $k$ as encryption key and $iv_{pre} \in \{ 0, 1 \}^{12}$ as an initiailization vector where $iv := iv_{pre} \ || \ blockNumber$ and $blockNumber \in \{ 0, \dots, 2^{32} - 1 \}$, yielding
 
