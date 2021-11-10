@@ -97,7 +97,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) { }
+  ) {}
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -322,7 +322,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => { },
+      () => {},
       protocolAck
     )
 
