@@ -80,4 +80,16 @@ Each ticket is labeled by an ongoing serial number named ticket index $i$ and it
 \paragraph{Channel epoch}
 \label{sec:tickets:issuance:channelepoch}
 
-Payment channels can get opened and closed as often as their participants like to, see section \ref{sec:incentives:channels} for more information. To make sure that tickets from previous channel incarnations lose their value once the channel is reopened, tickets include the current channel epoch counter and the smart contract considers the ticket invalid if the signed channel epoch does not match the stored channel epoch.
+Payment channels might run throug multiple \textit{open} and \textit{close} sequences, see section \ref{sec:incentives:channels} for more information. To make sure that tickets from previous channel incarnations lose their value once the channel is reopened, tickets include the current channel epoch counter and the smart contract considers the ticket invalid if the signed channel epoch does not match the stored channel epoch.
+
+\paragraph{Signature}
+\label{sec:tickets:issuance:channelepoch}
+
+As a last step, the issuer creates a signature over the hash of the ticket with
+
+\begin{multline*}
+      ticketHash = keccak256 (recipient \ || \ ethAddr(challenge) \ || \ ticketEpoch \ ||  \\
+      amount \ || \ invWinProb \ || \ index \ || \ channelEpoch)
+\end{multline*}
+
+yielding the ticket $t = (ticketData, Sig_{Issuer}(ticketHash))$.

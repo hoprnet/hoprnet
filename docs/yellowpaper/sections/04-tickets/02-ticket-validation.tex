@@ -25,8 +25,8 @@ It remains to show that the ticket issuer indeed knows any $response$ that solve
 \paragraph{Validation of Unlocked Tickets}
 \label{sec:tickets:validation:unlocked}
 
-Once the $response$ to $ticket.challenge$ is known, i.e. after receiving a packet acknowledgement, the node is able determine whether the ticket is going to be a winner. To check this, the node first computes the next $opening$ to the current value $commitment$ stored in the smart contract and checks that
+Once the $response$ to $ticket.challenge$ is known, i.e. after receiving a packet acknowledgement, the node is able determine whether the ticket is going to be a winner. To check this, the node first computes the next $opening$ to the current value $commitment$ stored in the smart contract and checks whether
 
 $$ \mathsf{keccak256} ( \ \mathsf{keccak256}(ticketData) \ || \ solution \ || \ opening \ ) < ticket.winProb $$
 
-If true, the node can consider the ticket to be a winner and store it for later use. In case the ticket turned out to be a loss, there is no added value to it and the node can safely drop it. Note that losing tickets are a integral part of the mechanism and do not reduce the average payout to the ticket recipient. This is the case because $value(tikcet)$ is given by the expected value and hence the asymptotic payout does not change.
+If true, the node can consider the ticket to be a winner and store it for later use. In case the ticket turned out to be a loss, there is no added value to it and the node can safely drop it. Note that losing tickets are an integral part of the mechanism and do not reduce the average payout to the ticket recipient. This is the case because $value(ticket)$ is given by the expected value and hence the asymptotic payout does not change.
