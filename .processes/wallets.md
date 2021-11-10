@@ -29,11 +29,7 @@ No HD-derived wallets (e.g. mnemonics) are used for HOPR Association as having t
 There are multiple ways to safely create wallets, but for quick and dirty (disposable) wallets which require not much scrutiny, feel free to use the following JS script runnable in a web console:
 
 ```js
-((_=>_.reduce((a, v)=>`${v.toString(16).padStart(2,"0")}${a}`,""))((_=>crypto.getRandomValues(_))(new Uint8Array(32))))
+;((_) => _.reduce((a, v) => `${v.toString(16).padStart(2, '0')}${a}`, ''))(
+  ((_) => crypto.getRandomValues(_))(new Uint8Array(32))
+)
 ```
-
-
-
-
-
-
