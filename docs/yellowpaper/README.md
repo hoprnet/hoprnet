@@ -4,7 +4,7 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 
 ## hopr-yellowpaper
 
-Contains the source code for the [yellowpaper](./yellowpaper.pdf) of [hoprnet.org](https://hoprnet.org).
+Contains the source code for the [yellowpaper](./yellowpaper.pdf?raw=true) of [hoprnet.org](https://hoprnet.org).
 
 ## Developer setup
 
@@ -14,7 +14,7 @@ Contains the source code for the [yellowpaper](./yellowpaper.pdf) of [hoprnet.or
 - LaTeX
 
 ```sh
-apt install -y git
+apt install -y git make
 apt install -y texlive texlive-latex-extra texlive-science texlive-bibtex-extra
 ```
 
@@ -35,5 +35,7 @@ brew install git
 ## Workspace
 
 ```sh
-git clone git@github.com:hoprnet/hoprnet.git
+git clone git@github.com:hoprnet/hoprnet.git && cd hoprnet
+
+make -C docs/yellowpaper
 ```
