@@ -17,6 +17,7 @@
     "test": "yarn workspaces foreach -pv run test",
     "test:core": "yarn workspace @hoprnet/hopr-core run test",
     "test:hoprd": "yarn workspace @hoprnet/hoprd run test",
+    "test:ct": "yarn workspace @hoprnet/hopr-cover-traffic-daemon run test",
     "test:utils": "yarn workspace @hoprnet/hopr-utils run test",
     "test:contracts": "yarn workspace @hoprnet/hopr-ethereum run test",
     "run:network": "yarn workspace @hoprnet/hopr-ethereum run network",
