@@ -17,7 +17,7 @@ usage() {
   msg
   msg "Usage: $0 [-h|--help] [-p|--package hoprd|cover-traffic-daemon] [-f|--force] [-n|--no-tags]"
   msg
-  msg "Use -f to force a Docker build. No additional tags will be applied though if no environment has been found."
+  msg "Use -f to force a Docker build even though no environment can be found. This is useful for local testing. No additional docker tags will be applied though if no environment has been found which is in contrast to the normal execution of the script."
   msg
 }
 
@@ -96,15 +96,15 @@ if [ -z "${releases}" ]; then
   exit 0
 fi
 
-if [ "${no_tags:-}" = "true" ]; then
+if ! [ "${no_tags:-}" = "true" ]; then
+  log "attach additional tag ${package_version} to docker image ${docker_image_full}"
+  gcloud container images add-tag ${docker_image_full} ${docker_image}:${package_version}
+
+  for release in ${releases}; do
+    log "attach additional tag ${release} to docker image ${docker_image_full}"
+    gcloud container images add-tag ${docker_image_full} ${docker_image}:${release}
+  done
+else
   log "skip tagging as requested"
-  exit 0
 fi
 
-log "attach additional tag ${package_version} to docker image ${docker_image_full}"
-gcloud container images add-tag ${docker_image_full} ${docker_image}:${package_version}
-
-for release in ${releases}; do
-  log "attach additional tag ${release} to docker image ${docker_image_full}"
-  gcloud container images add-tag ${docker_image_full} ${docker_image}:${release}
-done
