@@ -23,7 +23,7 @@ $$ \alpha_i = x \cdot \biggl(\prod_{j=0}^{i} b_j \biggr) \cdot G = \biggl(\prod_
 
 By adding an additional blinding for every node along the selected path, each incoming $\alpha_i$ and each outgoing $\alpha_{i+1}$ become indistinguishable from random numbers of the same length. Hence, an adversary who observes incoming and outgoing packets cannot use $\alpha$ to track packets.
 
-Since each $s_{i+1}$ depends on $b_{i+1}$ and therefore on all $\alpha_0, \dots , \alpha_i$, the key extraction can only be done in the foreseen order; first derive $s_0$, then derive $s_1$ etc. Hence, an adversary is unable to extract keys in a more favorable order, e.g. because has it managed to compromise \textit{some} but not \textit{all} nodes on the path.
+Since each $s_{i+1}$ depends on $b_{i+1}$ and therefore on all $\alpha_0, \dots , \alpha_i$, the key extraction can only be done in the foreseen order; first derive $s_0$, then derive $s_1$ etc. Hence, an adversary is unable to extract keys in a more favorable order, e.g. because it has managed to compromise \textit{some} but not \textit{all} nodes on the path.
 
 \paragraph{Example}
 
