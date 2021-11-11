@@ -6,9 +6,8 @@ import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments, VERSION } from '@hoprnet/hopr-core'
-import { expandVars, HoprDB, NativeBalance, PublicKey, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 
 import setupAPI from './api'
 import { AdminServer } from './admin'
@@ -277,7 +276,7 @@ async function main() {
   // 2. Create node instance
   try {
     logs.log('Creating HOPR Node')
-    const node = createHoprNode(peerId, options)
+    node = createHoprNode(peerId, options)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
 

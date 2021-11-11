@@ -4,9 +4,8 @@ import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments, VERSION } from '@hoprnet/hopr-core'
-import { ChannelEntry, privKeyToPeerId, PublicKey, debug, HoprDB, expandVars } from '@hoprnet/hopr-utils'
+import { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
