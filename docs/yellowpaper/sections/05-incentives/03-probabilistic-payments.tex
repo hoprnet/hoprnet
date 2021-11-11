@@ -1,5 +1,9 @@
-\subsection{Probabilistic Payments}
+\subsection{Probabilistic Payment Channels}
 \label{sec:incentives:probabilistic}
+
+% Use data structure tickets
+
+% Steady payments, expect continuous payments
 
 In traditional payment channels, two parties $A$ and $B$ lock some funds within a smart contract, make transactions off-chain and only commit the aggregation on-chain. Thus, a payment channel is bidirectional, which means both $A$ and $B$ can send and receive transactions within the same payment channel. The HOPR protocol uses unidirectional payment channels to implement bidirectional payment channel behaviour, where one payment channel is created from $A$ to $B$ and another from $B$ to $A$. The payment channel creator is the sole owner of funds in the payment channel and the only one able to create \textbf{tickets}, encapsulated funds which are described in detail in Section \ref{sec:tickets}. A payment channel created from party $A$ to party $B$ is different from a payment channel created from party $B$ to party $A$.
 
@@ -17,7 +21,7 @@ where $n$ is the total number of mixnet packets transformed.
 An issue arises when $B$ receives $ACK_n$ for $packet_n$ before sending $packet_{n-1}$. At this point $B$ would have no incentive to process $packet_{n-1}$ rather than $packet_{n}$. To avoid such false incentives, the HOPR protocol utilizes probabilistic payments. A \textit{ticket} can be either a win or a loss, determined based on some winning probability lower than 1. This means nodes are incentivized to continue relaying packets, as they do not know which tickets will result in a payout. From a node's perspective, each ticket has the same value until it is claimed; therefore, the HOPR protocol encourages nodes to claim tickets independently from each other.
 
 \begin{align}
-    value ( ACK_i ) & =value ( ACK_j ) \quad for \quad i,j\in \{1,n\}
+    value ( ACK_i ) & =value ( ACK_j ) \quad for \quad i,j\in \{1,\dots,n\}
 \end{align}
 
 If we assume constant costs, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed. On the contrary, a node would reduce its potential payouts if it were to forward packets slowly or not at all.

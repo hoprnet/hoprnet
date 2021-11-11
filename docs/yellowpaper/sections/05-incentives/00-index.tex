@@ -1,6 +1,16 @@
 \section{Incentivization Mechanism}
 \label{sec:incentives}
 
+% what gets incentivized
+
+% how is it verified -> PoR
+
+% accounting -> probabilistic payments
+
+% expectation, source of entropy
+
+% payment channel management
+
 The HOPR protocol provides incentives to nodes in the network to achieve correct transformation and delivery of mixnet packets. This is accomplished through a combination of \lcnameref{sec:incentives:proofofrelay}, a novel mechanism which is cost effective and privacy preserving, and \lcnameref{sec:incentives:probabilistic}. The high-level overview of the motivation behind this incentive scheme was covered in the \lcnameref{sec:intro}. This section focuses on the technical details used to implement the mechanism.
 
 \paragraph{Construction}
@@ -12,7 +22,8 @@ The HOPR protocol provides incentives to nodes in the network to achieve correct
     \item The challenge can be solved after the packet has been forwarded.
 \end{itemize}
 
-\input{sections/05-incentives/01-proof-of-relay.tex}
-\input{sections/05-incentives/02-on-chain-commitment.tex}
+\input{sections/05-incentives/01-behavior.tex}
+\input{sections/05-incentives/02-proof-of-relay.tex}
 \input{sections/05-incentives/03-probabilistic-payments.tex}
-\input{sections/05-incentives/04-payment-channel-management.tex}
+\input{sections/05-incentives/04-on-chain-commitment.tex}
+\input{sections/05-incentives/05-payment-channel-management.tex}
