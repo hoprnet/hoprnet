@@ -133,9 +133,7 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private chain: HoprCoreEthereum
   private addressSorter: AddressSorter
-  private publicNodesEmitter: HoprConnectOptions['publicNodes']
   private environment: ResolvedEnvironment
 
   public indexer: Indexer
@@ -148,27 +146,14 @@ class Hopr extends EventEmitter {
    * @param options
    * @param provider
    */
-  public constructor(private id: PeerId, private db: HoprDB, private options: HoprOptions) {
+  public constructor(private id: PeerId, private db: HoprDB, private chain: HoprCoreEthereum, private options: HoprOptions, private publicNodesEmitter: HoprConnectOptions['publicNodes'] = new EventEmitter()) {
     super()
 
     if (!id.privKey || !isSecp256k1PeerId(id)) {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
     this.environment = options.environment
-
-    const provider = expandVars(this.environment.network.default_provider, process.env)
     log(`using environment: ${this.environment.id}`)
-    log(`using provider URL: ${provider}`)
-
-    this.chain = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      chainId: this.environment.network.chain_id,
-      environment: this.environment.id,
-      gasPrice: this.environment.network.gasPrice,
-      network: this.environment.network.id,
-      provider
-    })
-
-    this.publicNodesEmitter = new EventEmitter()
 
     if (this.options.preferLocalAddresses) {
       this.addressSorter = localAddressesFirst
@@ -180,8 +165,6 @@ class Hopr extends EventEmitter {
       log('Addresses are sorted by default')
     }
     this.indexer = this.chain.indexer // TODO temporary
-
-    log(`using environment: ${this.environment.id}`)
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
@@ -1020,6 +1003,7 @@ class Hopr extends EventEmitter {
 
 export default Hopr
 export * from './constants'
+export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
 export type { ProtocolConfig, Network, ResolvedEnvironment } from './environment'

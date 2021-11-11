@@ -4,8 +4,9 @@ import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import Hopr, { resolveEnvironment, supportedEnvironments, VERSION } from '@hoprnet/hopr-core'
-import { ChannelEntry, privKeyToPeerId, PublicKey, debug, HoprDB } from '@hoprnet/hopr-utils'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments, VERSION } from '@hoprnet/hopr-core'
+import { ChannelEntry, privKeyToPeerId, PublicKey, debug, HoprDB, expandVars } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
@@ -81,14 +82,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   log('creating a node')
-  const db = new HoprDB(
-    PublicKey.fromPrivKey(peerId.privKey.marshal()),
-    options.createDbIfNotExist,
-    VERSION,
-    options.dbPath,
-    options.forceCreateDB
-  )
-  const node = new Hopr(peerId, db, options)
+  const node = createHoprNode(peerId, options)
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
