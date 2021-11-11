@@ -1,0 +1,15 @@
+\subsection{Closing cover traffic channels}
+\label{sec:ct:channelclose}
+
+To minimize wasted cover traffic, CT nodes will close any channel deemed likely to result in failed distribution and open new channel in its place. A cover traffic channel is closed and a new one opened if any of the following factors falls below its threshold:
+
+\begin{itemize}
+    \item \textbf{Channel balance} The channel balance must remain higher than the minimum stake value, defined as:
+          $$B(C) < L * \sigma$$
+          where $B(C)$ is the channel balance, $L$ is the path length, and $\sigma$ is the ticket payout amount, which is currently hardcoded as 0.1 HOPR per ticket.
+    \item \textbf{Connection quality} Connection quality, $q$, is defined as the fraction of `pings' the node has responded to within a 5 second cut-off. $q$ must not drop below the defined upper bound.
+    \item \textbf{Number of failed packets} The number of failed packets must stay above the failed packet threshold.
+          $$ $$
+\end{itemize}
+
+If a node is detected as having fallen below any of these thresholds, the CT node calls \textit{initiateChannelClosure()} and emits two events: \textit{ChannelUpdate} and \textit{ChannelClosureInitiated}.

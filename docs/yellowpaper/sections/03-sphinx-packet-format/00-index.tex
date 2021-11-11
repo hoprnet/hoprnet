@@ -1,7 +1,7 @@
 \section{Sphinx Packet Format}
 \label{sec:sphinx}
 
-HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route data packets in order to ensure sender and recipient unlinkability. The Sphinx packet format determines how mixnet packets are created and transformed before relaying them to the next downstream node in a way that does not leak path information to relayers or other parties. Each Sphinx packet consists of two parts, a header and an onion-encrypted payload:
+HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route data packets its final recipient while achieving sender and recipient unlinkability. The Sphinx packet format determines how mixnet packets are created and transformed. This happens in a way that does not leak path information to relayers or other parties eavesdropping the communication. A Sphinx packet consists of two parts, a header and an onion-encrypted payload:
 
 \begin{figure}[H]
     \centering

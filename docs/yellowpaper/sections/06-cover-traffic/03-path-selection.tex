@@ -1,0 +1,8 @@
+\subsection{Path selection and payout}
+\label{sec:ct:pathselection}
+
+After opening channels, the CT node sends cover traffic packets at regular intervals. The path selection algorithm used for cover traffic is the same one used to select nodes for real traffic (see Section \ref{sec:path-selection} for more details) where nodes are selected at random but weighted by importance, starting at the CT node.
+
+The first relay node is chosen with a probability proportional to the amount funded by the CT node, so every node has an equal chance of getting selected. For subsequent hops, nodes are selected with a probability weighted proportional to their importance. We use a weighted priority queue of potential paths to choose the next node. If the queue is empty then it fails.
+
+As with real traffic, rewards are distributed to all selected nodes in a path as tickets which can be redeemed for HOPR tokens with a certain probability (see Section \ref{sec:tickets}). Thus there is a direct correlation between a node's importance and the cover traffic rewards it receives, ensuring that rewards are distributed fairly. These cover traffic rewards also serve as an incentive for node operators to open meaningful payment channels instead of, e.g., Sibyls or nodes with insignificant stake who would thus not be able to relay a lot of traffic.

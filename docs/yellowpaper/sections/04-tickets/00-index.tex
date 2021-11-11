@@ -1,11 +1,9 @@
 \section{Tickets}
 \label{sec:tickets}
 
-The HOPR protocol makes use of a custom micropayment scheme to process its incentives. See section \ref{sec:incentives} for a description how and for which services nodes are supposed to receive incentives. This section focuses on the utilized micro-payment scheme and serves as a building block for section \ref{sec:incentives}.
+The HOPR protocol makes use of a custom micropayment scheme to process its incentives. This section focuses on the utilized micro-payment scheme and serves as a building block for section \ref{sec:incentives}.
 
-Incentives are handled by a structure called \textit{tickets} that is inspired by payment channels as well as probabilistic payments and allows nodes to issue asset transfers without requiring each time an on-chain interaction. Tickets can be sent locked and afterwards get unlocked, i. e. after proving that a packet has been relayed, see section \ref{sec:incentives:proofofrelay} for more details. Nodes who receive locked tickets have the opportunity to check their validity but are not able to claim their incentives on-chain before receiving the required cryptographic material to unlock them.
-
-A ticket is usually sent together with a mixnet packet and consists of ticket data and a signature.
+Incentives are handled by a structure called \textit{tickets} that is inspired by payment channels as well as probabilistic payments and allows nodes to issue asset transfers without requiring each time an on-chain interaction. Tickets are sent locked and get unlocked afterwards, i. e. after proving that a packet has been relayed. Nodes who receive a locked ticket are able to validate its validity. Once a node has received the required cryptographic material to unlock the ticket, it is able to claim the incentive by submitting the ticket to the smart contract.
 
 \begin{figure}[H]
     \centering
