@@ -13,14 +13,30 @@ For node $A$ to transfer packets to node $B$, it must first open a payment chann
                 \draw[rounded corners=3mm,shift={(\posX,\posY)}] (0,0) rectangle (\nodeWidth,\nodeHeight) node[midway] {\smaller{\tag}};
             }
 
-        \draw[->] (4-\padding,2+\nodeHeight/2) to [bend right] (\nodeWidth/2,\nodeHeight+\padding) node[midway,above=55pt,right=10pt] {\tiny{Finalize Closure}};
-        \draw[->] (8+\nodeWidth/2,\nodeHeight+\padding) to [bend right] (4+\nodeWidth+\padding,2+\nodeHeight/2) node[below=15pt,right=50pt] {\tiny{Initiate Closure}};
-        \draw[->] (\nodeWidth/2,0-\padding) to [bend right] (4-\padding,-2+\nodeHeight/2) node[left=60pt,above=15pt] {\tiny{fund}};
-        \draw[->] (4+\nodeWidth+\padding,-2+\nodeHeight/2) to [bend right] (8+\nodeWidth/2,0-\padding) node[below=25pt,right=0.1pt] {\tiny{bump Commitment}};
+        % Finalize closure
+        \draw[->] (4-\padding,2+\nodeHeight/2) to [bend right] (\nodeWidth/2,\nodeHeight+\padding);
+        \draw (1.6,1.95) node {\tiny{\textsf{finalize Closure}}};
 
+        % Initiate closure
+        \draw[->] (8+\nodeWidth/2,\nodeHeight+\padding) to [bend right] (4+\nodeWidth+\padding,2+\nodeHeight/2);
+        \draw (10.25,1.95) node {\tiny{\textsf{initiate Closure}}};
+
+        % Fund
+        \draw[->] (\nodeWidth/2,0-\padding) to [bend right] (4-\padding,-2+\nodeHeight/2);
+        \draw (1.8,-0.95) node {\tiny{\textsf{fund}}};
+
+        % Bump commitment
+        \draw[->] (4+\nodeWidth+\padding,-2+\nodeHeight/2) to [bend right] (8+\nodeWidth/2,0-\padding) ;
+        \draw (10.65,-0.95) node {\tiny{\textsf{bump Commitment}}};
+
+        % Initiate closure if not committed
         \draw (4+\nodeWidth/2,-2+\nodeHeight+\padding) -- (4+\nodeWidth/2,\nodeHeight/2-\padding);
-        \draw[->] (4+\nodeWidth/2,\nodeHeight/2+\padding) -- (4+\nodeWidth/2,2-\padding) node[midway,above=10pt,right=4pt] {\tiny{Initiate closure}\\\tiny{(if not committed)}};
-        \draw[->] (\nodeWidth+\padding,\nodeHeight/2) -- (8-\padding,\nodeHeight/2) node[midway,fill=white,above=0.2pt] {\tiny{Fund (if already committed)}};
+        \draw[->] (4+\nodeWidth/2,\nodeHeight/2+\padding) -- (4+\nodeWidth/2,2-\padding);
+        \draw (6,1.3) node[fill=white,inner sep=2pt] {\tiny{\textsf{\shortstack{initiate closure\\(if not committed)}}}};
+
+        % Fund if committed
+        \draw[->] (\nodeWidth+\padding,\nodeHeight/2) -- (8-\padding,\nodeHeight/2);
+        \draw (6,0.6) node[fill=white,inner sep=2pt] {\tiny{\textsf{fund (if already committed)}}};
     \end{tikzpicture}
     \caption{Payment channel states}
 \end{figure}
