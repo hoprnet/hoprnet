@@ -11,6 +11,22 @@ To use the HOPR network, you will need a HOPR node. Currently, the only way to d
 
 There are several ways to run `hoprd`: you can run it in your own device, install it on a virtual private server (VPS) or use a dedicated hardware device such as the AVADO HOPR Node PC, which has it as a package (Docker image).
 
+## For VPS users
+
+If you’re running your nodes on a VPS, make sure you’ve logged in to your server with the port forwarding feature.
+
+```
+ssh -L 3000:127.0.0.1:3000 <root or username>@<Your_server_ip>
+```
+
+`<root or username>` - replace with your server username
+
+`<Your_server_ip>` - replace with your server IP
+
+Example: `ssh -L 3000:127.0.0.1:3000 root@192.168.0.1`
+
+## hoprd installation methods
+
 We support multiple distribution mechanisms to install a `hoprd`:
 
 - **(recommended)** **[hopr-sh](using-script.md)**: An automated script able to install all the dependencies on your operating system alongside `hoprd`.
