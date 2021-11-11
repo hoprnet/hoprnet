@@ -14,31 +14,31 @@ $$ ticketData.value := \frac{value(ticket)}{winProb} $$
 Note that the ticket issuer should not choose $winProb$ too low as the recipient might refuse the ticket due to inappropriate winning probability.
 
 \begin{figure}[H]
-      \centering
-      \begin{tabular}{c|l|c|c|}
-            \cline{2-4}
-                                                        & \textbf{Value}                                    & \textbf{Ethereum datatype} & \textbf{size (in bytes)} \\
-            \cline{2-4}
-            \noalign{\smallskip}
-            \cline{2-4}
-            \multirow{7}{*}{\rotatebox{90}{TicketData}} & \nameref{sec:tickets:issuance:recipient}          & address                    & 20 bytes                 \\
-                                                        & \nameref{sec:tickets:issuance:challenge}          & bytes32                    & 32 bytes                 \\
-                                                        & \nameref{sec:tickets:issuance:ticketepoch}        & uint256                    & 32 bytes                 \\
-                                                        & \nameref{sec:tickets:issuance:ticketvalue}        & uint256                    & 32 bytes                 \\
-                                                        & \nameref{sec:tickets:issuance:winningprobability} & uint256                    & 32 bytes                 \\
-                                                        & \nameref{sec:tickets:issuance:ticketindex}        & uint256                    & 32 bytes                 \\
-                                                        & \nameref{sec:tickets:issuance:channelepoch}       & uint256                    & 32 bytes                 \\
-            \cline{2-4}
-            \noalign{\smallskip}
+    \centering
+    \begin{tabular}{c|l|c|c|}
+        \cline{2-4}
+                                                    & \textbf{Value}                                    & \textbf{Ethereum datatype} & \textbf{size (in bytes)} \\
+        \cline{2-4}
+        \noalign{\smallskip}
+        \cline{2-4}
+        \multirow{7}{*}{\rotatebox{90}{TicketData}} & \nameref{sec:tickets:issuance:recipient}          & address                    & 20 bytes                 \\
+                                                    & \nameref{sec:tickets:issuance:challenge}          & bytes32                    & 32 bytes                 \\
+                                                    & \nameref{sec:tickets:issuance:ticketepoch}        & uint256                    & 32 bytes                 \\
+                                                    & \nameref{sec:tickets:issuance:ticketvalue}        & uint256                    & 32 bytes                 \\
+                                                    & \nameref{sec:tickets:issuance:winningprobability} & uint256                    & 32 bytes                 \\
+                                                    & \nameref{sec:tickets:issuance:ticketindex}        & uint256                    & 32 bytes                 \\
+                                                    & \nameref{sec:tickets:issuance:channelepoch}       & uint256                    & 32 bytes                 \\
+        \cline{2-4}
+        \noalign{\smallskip}
 
-            \cline{2-4}
-            \multirow{3}{*}{\rotatebox{90}{Sig}}        & Signature $r$                                     & bytes32                    & 32 bytes                 \\
-                                                        & Signature $s$                                     & bytes32                    & 32 bytes                 \\
-                                                        & Recovery value $v$                                & uint8                      & 1 byte                   \\
-            \cline{2-4}
-      \end{tabular}
-      \caption{Structure of a ticket.}
-      \label{fig:ticketdata}
+        \cline{2-4}
+        \multirow{3}{*}{\rotatebox{90}{Sig}}        & Signature $r$                                     & bytes32                    & 32 bytes                 \\
+                                                    & Signature $s$                                     & bytes32                    & 32 bytes                 \\
+                                                    & Recovery value $v$                                & uint8                      & 1 byte                   \\
+        \cline{2-4}
+    \end{tabular}
+    \caption{Structure of a ticket.}
+    \label{fig:ticketdata}
 \end{figure}
 
 \paragraph{Recipient}
@@ -83,13 +83,13 @@ Each ticket is labeled by an ongoing serial number named ticket index $i$ and it
 Payment channels might run throug multiple \textit{open} and \textit{close} sequences, see section \ref{sec:incentives:channels} for more information. To make sure that tickets from previous channel incarnations lose their value once the channel is reopened, tickets include the current channel epoch counter and the smart contract considers the ticket invalid if the signed channel epoch does not match the stored channel epoch.
 
 \paragraph{Signature}
-\label{sec:tickets:issuance:channelepoch}
+\label{sec:tickets:issuance:signature}
 
 As a last step, the issuer creates a signature over the hash of the ticket with
 
 \begin{multline*}
-      ticketHash = keccak256 (recipient \ || \ ethAddr(challenge) \ || \ ticketEpoch \ ||  \\
-      amount \ || \ invWinProb \ || \ index \ || \ channelEpoch)
+    ticketHash = keccak256 (recipient \ || \ ethAddr(challenge) \ || \ ticketEpoch \ ||  \\
+    amount \ || \ invWinProb \ || \ index \ || \ channelEpoch)
 \end{multline*}
 
 yielding the ticket $t = (ticketData, Sig_{Issuer}(ticketHash))$.
