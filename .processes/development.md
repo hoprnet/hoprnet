@@ -48,7 +48,7 @@ Responsibilities:
 
 - to be the bridge between tech team and Project Owner
 
-_Current:_ 
+_Current:_
 
 - [Tino](https://github.com/tolbrino) until 20/12/2021
 - [Steve](https://github.com/nionis) until 05/02/2022
