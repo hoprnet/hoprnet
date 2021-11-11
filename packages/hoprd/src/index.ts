@@ -302,11 +302,13 @@ async function main() {
       })
     }
 
+    logs.log(`Node address: ${node.getId().toB58String()}`)
+
     const ethAddr = (await node.getEthereumAddress()).toHex()
     const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
-    logs.log(`Node address: ${node.getId().toB58String()}`)
     logs.log(`Node is not started, please fund this node ${ethAddr} with atleast ${fundsReq}`)
+
     // 2.5 Await funding of wallet.
     await node.waitForFunds()
     logs.log('Node has been funded, starting...')
@@ -334,14 +336,12 @@ async function main() {
         }
         await cmds.execute((msg) => {
           logs.log(msg)
-          console.log(msg)
         }, c)
       }
       await node.stop()
       process.exit(0)
     }
   } catch (e) {
-    console.log(e)
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
     if (!argv.admin) {

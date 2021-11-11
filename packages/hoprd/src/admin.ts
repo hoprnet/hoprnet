@@ -78,11 +78,22 @@ export class AdminServer {
   }
 
   async setup() {
-    let adminPath = path.resolve(__dirname, '../hopr-admin/')
-    if (!fs.existsSync(adminPath)) {
-      // In Docker
-      adminPath = path.resolve(__dirname, './hopr-admin')
+    let adminPath
+    for (const adminRelPath of ['../hopr-admin', './hopr-admin']) {
+      const adminPathInt = path.resolve(__dirname, adminRelPath)
+      const nextPath = path.resolve(adminPathInt, '.next')
+      if (!fs.existsSync(nextPath)) {
+        continue
+      }
+      adminPath = adminPathInt
+      break
     }
+
+    if (!adminPath) {
+      console.log('Failed to start Admin interface: could not find NextJS app')
+      process.exit(1)
+    }
+
     debugLog('using', adminPath)
 
     const nextConfig = {
@@ -106,7 +117,7 @@ export class AdminServer {
     })
 
     this.server.once('error', (err: any) => {
-      console.log(`Failed to start Admin interface`)
+      console.log('Failed to start Admin interface')
       console.log(err)
       process.exit(1)
     })
