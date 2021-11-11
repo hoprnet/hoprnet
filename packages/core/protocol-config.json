@@ -5,6 +5,7 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
+      "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "hardhat-localhost2": {
@@ -12,6 +13,7 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
+      "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "master-goerli": {
@@ -19,6 +21,7 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
       "channels_contract_address": "0xC3e3603c6210cDEe67B905cc3bF24A6416ab747B",
+      "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "tags": ["development"]
     },
     "debug-goerli": {
@@ -26,6 +29,7 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xC3Ff0A2C4F404D6a9B31a7ABc2a41E616bd4F34C",
       "channels_contract_address": "0x0Df426849D532fa06BC843dcaBf14CD60c89e78f",
+      "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "tags": ["development"]
     },
     "master-xdai": {
