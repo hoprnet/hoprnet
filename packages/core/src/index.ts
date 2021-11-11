@@ -133,7 +133,7 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private paymentChannels: HoprCoreEthereum
+  private chain: HoprCoreEthereum
   private addressSorter: AddressSorter
   private publicNodesEmitter: HoprConnectOptions['publicNodes']
   private environment: ResolvedEnvironment
@@ -155,13 +155,12 @@ class Hopr extends EventEmitter {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
     this.environment = options.environment
-    console.log(options.environment)
 
     const provider = expandVars(this.environment.network.default_provider, process.env)
     log(`using environment: ${this.environment.id}`)
     log(`using provider URL: ${provider}`)
 
-    this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
+    this.chain = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
       chainId: this.environment.network.chain_id,
       environment: this.environment.id,
       gasPrice: this.environment.network.gasPrice,
@@ -180,13 +179,13 @@ class Hopr extends EventEmitter {
       this.addressSorter = (x) => x
       log('Addresses are sorted by default')
     }
-    this.indexer = this.paymentChannels.indexer // TODO temporary
+    this.indexer = this.chain.indexer // TODO temporary
 
     log(`using environment: ${this.environment.id}`)
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
-    return await this.paymentChannels.start()
+    return await this.chain.start()
   }
 
   /**
@@ -680,7 +679,7 @@ class Hopr extends EventEmitter {
       return 'Node has not started yet'
     }
     const connected = this.networkPeers.debugLog()
-    const announced = await this.paymentChannels.indexer.getAnnouncedAddresses()
+    const announced = await this.chain.indexer.getAnnouncedAddresses()
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
@@ -801,7 +800,7 @@ class Hopr extends EventEmitter {
   ): Promise<{
     channelId: Hash
   }> {
-    const ethereum = this.paymentChannels
+    const ethereum = this.chain
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const myAvailableTokens = await ethereum.getBalance(true)
