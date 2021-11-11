@@ -42,15 +42,16 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 
 ### Representantives
 
-Representantives are elected every `3 months`, previous representatives may be re-elected.
+Each individual representantive is elected for a period of `3 months`. The periods are overlapped to create a staggered schedule during which new representatives can be guided by their co-representatives who have already served half of their election period. Previous representatives may be re-elected.
 
 Responsibilities:
 
 - to be the bridge between tech team and Project Owner
 
-_Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nionis)
+_Current:_ 
 
-_Expiry:_ 5/02/22
+- [Tino](https://github.com/tolbrino) until 20/12/2021
+- [Steve](https://github.com/nionis) until 05/02/2022
 
 ### Trifecta
 
