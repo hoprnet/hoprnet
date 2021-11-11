@@ -1,7 +1,7 @@
-import { expandVars, HoprDB, PublicKey } from "@hoprnet/hopr-utils"
-import HoprEthereum from "@hoprnet/hopr-core-ethereum"
-import PeerId from "peer-id"
-import Hopr, { HoprOptions, VERSION } from "."
+import { expandVars, HoprDB, PublicKey } from '@hoprnet/hopr-utils'
+import HoprEthereum from '@hoprnet/hopr-core-ethereum'
+import PeerId from 'peer-id'
+import Hopr, { HoprOptions, VERSION } from '.'
 
 export function createHoprNode(peerId: PeerId, options: HoprOptions) {
   const db = new HoprDB(
@@ -20,5 +20,5 @@ export function createHoprNode(peerId: PeerId, options: HoprOptions) {
     provider
   })
   const node = new Hopr(peerId, db, chain, options)
-  return node;
+  return node
 }

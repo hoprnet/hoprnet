@@ -146,7 +146,13 @@ class Hopr extends EventEmitter {
    * @param options
    * @param provider
    */
-  public constructor(private id: PeerId, private db: HoprDB, private chain: HoprCoreEthereum, private options: HoprOptions, private publicNodesEmitter: HoprConnectOptions['publicNodes'] = new EventEmitter()) {
+  public constructor(
+    private id: PeerId,
+    private db: HoprDB,
+    private chain: HoprCoreEthereum,
+    private options: HoprOptions,
+    private publicNodesEmitter: HoprConnectOptions['publicNodes'] = new EventEmitter()
+  ) {
     super()
 
     if (!id.privKey || !isSecp256k1PeerId(id)) {
