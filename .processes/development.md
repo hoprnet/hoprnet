@@ -47,6 +47,7 @@ Representantives are elected every `3 months`, previous representatives may be r
 Responsibilities:
 
 - to be the bridge between tech team and Project Owner
+- daily check for community created tasks in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 
 _Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nionis)
 
@@ -172,6 +173,7 @@ Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/project
 - ensure newly created [epics](#issue-creation) are well created
   - must use the [epic issue template](../.github/ISSUE_TEMPLATE/epic.md)
 - adapt epic priorities
+- make an epic if necessary for issues created by community in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 
 #### The Roadmap columns
 
