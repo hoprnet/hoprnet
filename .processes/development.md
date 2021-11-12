@@ -50,8 +50,8 @@ Responsibilities:
 
 _Current:_
 
-- [Tino](https://github.com/tolbrino) until 20/12/2021
-- [Steve](https://github.com/nionis) until 05/02/2022
+- [Tino](https://github.com/tolbrino) until 05/02/2022
+- [Steve](https://github.com/nionis) until 20/12/2021
 
 ### Trifecta
 
