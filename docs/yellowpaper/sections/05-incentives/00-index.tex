@@ -1,29 +1,10 @@
 \section{Incentivization Mechanism}
 \label{sec:incentives}
 
-% what gets incentivized
-
-% how is it verified -> PoR
-
-% accounting -> probabilistic payments
-
-% expectation, source of entropy
-
-% payment channel management
-
-The HOPR protocol provides incentives to nodes in the network to achieve correct transformation and delivery of mixnet packets. This is accomplished through a combination of \lcnameref{sec:incentives:proofofrelay}, a novel mechanism which is cost effective and privacy preserving, and \lcnameref{sec:incentives:probabilistic}. The high-level overview of the motivation behind this incentive scheme was covered in the \lcnameref{sec:intro}. This section focuses on the technical details used to implement the mechanism.
-
-\paragraph{Construction}
-
-\begin{itemize}
-    \item Every packet is sent together with a ticket.
-    \item Each ticket contains a challenge.
-    \item The validity of a ticket can be checked on receipt of the packet, but the on-chain logic enforces a solution to the challenge stated in the ticket.
-    \item The challenge can be solved after the packet has been forwarded.
-\end{itemize}
+Nodes in the HOPR network receive incentives for providing services that allow others to achieve privacy. The HOPR protocol incentivizes nodes for transforming and delivering mixnet packets. To turn this into a trustless solution, HOPR uses a custom \nameref{sec:incentives:proofofrelay} scheme which makes the nodes' work verifiable. Incentives are handled by a micropayment scheme based on \lcnameref{sec:incentives:probabilistic}. This requires the issuer of incentives to not know whether a specific incentive lead to a payout or not. The receiver of an incentive therefore deposits in advance an iterated \lcnameref{sec:incentives:commitment} to the smart contract and reveals its openings whenever claiming an incentive.
 
 \input{sections/05-incentives/01-behavior.tex}
 \input{sections/05-incentives/02-proof-of-relay.tex}
 \input{sections/05-incentives/03-probabilistic-payments.tex}
-\input{sections/05-incentives/04-on-chain-commitment.tex}
+\input{sections/05-incentives/04-commitment.tex}
 \input{sections/05-incentives/05-payment-channel-management.tex}

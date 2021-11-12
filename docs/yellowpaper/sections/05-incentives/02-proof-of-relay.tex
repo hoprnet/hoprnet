@@ -1,11 +1,7 @@
 \subsection{Proof of Relay}
 \label{sec:incentives:proofofrelay}
 
-% make packet transformation verifiable
-
-% Who verifies that? -> next downstream node
-
-HOPR incentivizes packet transformation and delivery using a mechanism called \textbf{proof of relay}. This mechanism guarantees that a node's relay services are verifiable.
+The \nameref{sec:sphinx} guarantees that packets can only be processed in the order that has been chosen by the creator. As a result, the next downstream node can either decode the packet or end up with some random bitstring. Hence it is the next downstream node who is able to verify the correctness of the previously applied tranformation which it confirms by sending an acknowledgement.
 
 \begin{figure}[H]
       \centering
@@ -27,8 +23,13 @@ HOPR incentivizes packet transformation and delivery using a mechanism called \t
 
             \draw[->] (-0.5,0) -- (-0.5,-\nodeHeight) node[midway,left=2pt] {\rotatebox{90}{time}};
       \end{tikzpicture}
-      \caption{PoR workflow}
+      \caption{Node $n_{i-1}$ sends $packet_{i-1}$ to node $n_i$. Node $n_i$ transforms the incoming packet, resulting in ${packet_i}$ and sends it to node $n_{i+1}$. Afterwards it acknowledges the processing of $packet_{i-1}$ to node $n_{i-1}.$}
 \end{figure}
+
+% Acknowledgements are sent out of order because otherwise introducing observable patterns
+
+% Acknowledgement structure + utilized signatures
+
 \paragraph{Secret sharing}
 \label{sec:incentives:proofofrelay:secretSharing}
 
