@@ -1046,7 +1046,6 @@ __metadata:
     yargs: 17.2.1
   bin:
     hopr-cover-traffic-daemon: lib/index.js
-    hopr-cover-traffic-daemon-dashboard: lib/dashboard.js
   languageName: unknown
   linkType: soft
 
