@@ -39,6 +39,8 @@ To allow the final recipient to determine whether a message is meaningful conten
 
             }
 
+        \draw[decoration={brace,raise=5pt},decorate] (0,0.5) -- node[above=5pt] {$|padding|$ bytes} (\paddingLength,0.5);
+
         \draw[decoration={brace,raise=5pt,mirror},decorate] (0,-1.0) -- node[below=5pt] {$|payload|$ bytes} (\payloadLength,-1.0);
         \draw[decoration={brace,raise=5pt,mirror},decorate] (0,-1.25) -- node[below=5pt] {4 bytes} (2,-1.25);
 
