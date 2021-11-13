@@ -15,6 +15,7 @@ svg-inkscape
 # Built PDF files
 *.pdf
 !yellowpaper.pdf
+!images/*.pdf
 
 # temp latex files
 **/__latexindent_temp.tex
