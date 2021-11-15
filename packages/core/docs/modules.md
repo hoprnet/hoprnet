@@ -6,6 +6,7 @@
 
 ### Classes
 
+- [HoprOptions](classes/HoprOptions.md)
 - [PassiveStrategy](classes/PassiveStrategy.md)
 - [PromiscuousStrategy](classes/PromiscuousStrategy.md)
 - [SaneDefaults](classes/SaneDefaults.md)
@@ -15,7 +16,6 @@
 
 - [ChannelsToClose](modules.md#channelstoclose)
 - [ChannelsToOpen](modules.md#channelstoopen)
-- [HoprOptions](modules.md#hoproptions)
 - [Network](modules.md#network)
 - [NodeStatus](modules.md#nodestatus)
 - [ProtocolConfig](modules.md#protocolconfig)
@@ -45,6 +45,7 @@
 
 ### Functions
 
+- [createHoprNode](modules.md#createhoprnode)
 - [findPath](modules.md#findpath)
 - [resolveEnvironment](modules.md#resolveenvironment)
 - [supportedEnvironments](modules.md#supportedenvironments)
@@ -68,34 +69,6 @@ ___
 #### Defined in
 
 [packages/core/src/channel-strategy.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L16)
-
-___
-
-### HoprOptions
-
-Ƭ **HoprOptions**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `announce?` | `boolean` |
-| `announceLocalAddresses?` | `boolean` |
-| `connector?` | `HoprCoreEthereum` |
-| `createDbIfNotExist?` | `boolean` |
-| `dbPath?` | `string` |
-| `environment` | [`ResolvedEnvironment`](modules.md#resolvedenvironment) |
-| `forceCreateDB?` | `boolean` |
-| `hosts?` | `Object` |
-| `hosts.ip4?` | `NetOptions` |
-| `hosts.ip6?` | `NetOptions` |
-| `password?` | `string` |
-| `preferLocalAddresses?` | `boolean` |
-| `strategy?` | `ChannelStrategy` |
-
-#### Defined in
-
-[packages/core/src/index.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L80)
 
 ___
 
@@ -361,6 +334,27 @@ ___
 [packages/core/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L8)
 
 ## Functions
+
+### createHoprNode
+
+▸ **createHoprNode**(`peerId`, `options`): [`default`](classes/default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `peerId` | `PeerId` |
+| `options` | [`HoprOptions`](classes/HoprOptions.md) |
+
+#### Returns
+
+[`default`](classes/default.md)
+
+#### Defined in
+
+[packages/core/src/main.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L16)
+
+___
 
 ### findPath
 
