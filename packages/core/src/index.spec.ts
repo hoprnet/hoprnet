@@ -7,7 +7,7 @@ import Hopr, { HoprOptions, resolveEnvironment, VERSION } from '.'
 
 const log = debug('hopr-core:test:index')
 
-describe('hopr controller ', async function () {
+describe('hopr core (instance)', async function () {
   let peerId: PeerId, db: HoprDB, chain: HoprCoreEthereum, options: HoprOptions
   beforeEach(async function () {
     peerId = await PeerId.create({ keyType: 'secp256k1', bits: 256 })
@@ -32,10 +32,12 @@ describe('hopr controller ', async function () {
     sinon.restore()
   })
 
-  it('should start a hopr node properly', async function () {
-    log('Starting hopr node...')
-    const node = new Hopr(peerId, db, chain, options)
-    log('Node started with Id', node.getId().toB58String())
-    expect(node instanceof Hopr)
+  it('should be able to create a hopr node instance without crashing', async function () {
+    expect(() => {
+      log('Creating hopr node...')
+      const node = new Hopr(peerId, db, chain, options)
+      log('Node created with Id', node.getId().toB58String())
+      expect(node instanceof Hopr)
+    }).to.not.throw()
   })
 })
