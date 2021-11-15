@@ -8,6 +8,26 @@ import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr:cover-traffic')
 
+/**
+ * Interval of the unreleased token schedule. Unrecordeed intervals has 0 unreleased token allocation.
+ * @param lowerBlock The lower bound of the time interval during which the unreleased token amount is defined
+ * @param unreleased The unreleased token amount in 18 decimals
+ */
+export type UnreleasedSchedule = {
+  lowerBlock: number
+  upperBlock: number
+  unreleased: string
+}
+
+export type UnreleasedTokens = {
+  // hopr id to node Ethereum addresses
+  link: Record<string, string[]>
+  // Node Ethereum address to the array of unreleased token schedule
+  allocation: Record<string, UnreleasedSchedule[]>
+}
+
+const unreleasedTokens: UnreleasedTokens = require('./unreleasedTokens.json')
+
 export const addBN = (a: BN, b: BN): BN => a.add(b)
 export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().integerValue().toFixed(), 10)
 
@@ -34,11 +54,44 @@ export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
     .reduce(addBN, new BN('0'))
 
 /**
+ * Get the stake of a node which consists of the total channel balance 
+ * and the unreleased token amount in big number
+ * 
+ * stake(n) = unreleasedTokens(n) + totalChannelBalance(n)
+ * 
+ * @param p Public key of the node
+ * @param state State of the network
+ * @returns Stake of a node in big number
+ */
+export const stakeFor = (p: PublicKey, state: State): BN => {
+  const linkedAccountsIndex = Object.keys(unreleasedTokens.link).findIndex(
+    id => id.toLowerCase() == p.toB58String().toLowerCase()
+  )
+  
+  if (linkedAccountsIndex < 0) {
+    return totalChannelBalanceFor(p, state);
+  }
+
+  const currentBlockNumber = state.block.toNumber()
+
+  return Object.values(unreleasedTokens.link)[linkedAccountsIndex].map(
+    (nodeAddress) => {
+      const scheduleIndex = unreleasedTokens.allocation[nodeAddress].findIndex(
+        schedule => schedule.lowerBlock <= currentBlockNumber && currentBlockNumber < schedule.upperBlock
+      )
+      return scheduleIndex < 0 
+      ? new BN('0') 
+      : new BN(unreleasedTokens.allocation[nodeAddress][scheduleIndex].unreleased)
+    })
+    .reduce(addBN, new BN('0'))
+    .add(totalChannelBalanceFor(p, state))
+}
+  
+/**
  * Get the importance score of a node, given the network state.
  * Sum of the square root of all the outgoing channels
  * importance(node) = sum(squareRoot((balance(node) * stake(node) * totalStake(node)))
  * where stake(n) = unreleasedTokens(n) + totalChannelBalance(n)
- * FIXME: Current version does not contain unreleased token balance.
  * @param p Public key of the node
  * @param state State of the network
  * @returns Total channel balance in big number
@@ -46,7 +99,7 @@ export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
 export const importance = (p: PublicKey, state: State): BN =>
   findChannelsFrom(p, state)
     .map((c: ChannelEntry) =>
-      sqrtBN(totalChannelBalanceFor(p, state).mul(c.balance.toBN()).mul(totalChannelBalanceFor(c.destination, state)))
+      sqrtBN(stakeFor(p, state).mul(c.balance.toBN()).mul(stakeFor(c.destination, state)))
     )
     .reduce(addBN, new BN('0'))
 
@@ -114,8 +167,6 @@ export const sendCTMessage = async (
     path.forEach((p) => data.incrementForwards(p))
     log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
   } catch (e) {
-    // could not find path
-    log(`Could not find path: ${startNode.toB58String()} -> ${selfPub.toPeerId().toB58String()} (${e})`)
     return false
   }
   try {
