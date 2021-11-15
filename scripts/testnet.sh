@@ -240,23 +240,3 @@ add_keys() {
     echo "Authorized keys file not found"
   fi
 }
-
-# ----- Start Testnet -------
-#
-# Using a standard naming scheme, based on a name, we
-# either update or start VM's to create a network of
-# N nodes
-
-# $1=network name
-# $2=number of nodes
-# $3=docker image
-# $4=chain provider
-start_testnet() {
-  for i in $(seq 1 $2);
-  do
-    log "Start node $i"
-    start_testnode $1 $3 $i ${4}
-  done
-  # @jose can you fix this pls.
-  # add_keys scripts/keys/authorized_keys
-}

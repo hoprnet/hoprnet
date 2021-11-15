@@ -24,11 +24,12 @@ usage() {
   msg "an initial setup script against these nodes. Once testing has"
   msg "completed the script can be used to cleanup the cluster as well."
   msg
-  msg "Usage: $0 [<cluster_id> [<docker_image> [<init_script>]]]"
+  msg "Usage: $0 <environment> [<cluster_id> [<docker_image> [<init_script>]]]"
   msg
-  msg "where <cluster_id>:\t\tuses a random value as default"
-  msg "      <docker_image>:\t\tuses 'gcr.io/hoprassociation/hoprd:latest' as default"
-  msg "      <init_script>:\t\tpath to a script which is called with all node API endpoints as parameters"
+  msg "where <environment>\t\tthe environment from which the smart contract addresses are derived"
+  msg "      <cluster_id>\t\tuses a random value as default"
+  msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:latest' as default"
+  msg "      <init_script>\t\tpath to a script which is called with all node API endpoints as parameters"
   msg
   msg "Required environment variables"
   msg "------------------------------"
@@ -40,11 +41,8 @@ usage() {
   msg
   msg "HOPRD_API_TOKEN\t\t\tused as api token for all nodes, defaults to a random value"
   msg "HOPRD_PASSWORD\t\t\tused as password for all nodes, defaults to a random value"
-  msg "HOPRD_PROVIDER\t\t\tused as provider for all nodes, defaults to infura/goerli"
-  msg "              \t\t\twhich requires the additional env var HOPRD_INFURA_KEY to be set"
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
-  msg "HOPRD_TOKEN_CONTRACT\t\tused to fund HOPR token, defaults to 0x566a5c774bb8ABE1A88B4f187e24d4cD55C207A5"
   msg
 }
 
@@ -52,14 +50,13 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
-declare cluster_id="${1:-custom-cluster-${RANDOM}-${RANDOM}}"
-declare docker_image=${2:-gcr.io/hoprassociation/hoprd:latest}
-declare init_script=${3:-}
+declare environment="${1?"missing parameter <environment>"}"
+declare cluster_id="${2:-custom-cluster-${RANDOM}-${RANDOM}}"
+declare docker_image=${3:-gcr.io/hoprassociation/hoprd:latest}
+declare init_script=${4:-}
 
 declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}%${RANDOM}%${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
-declare provider="${HOPRD_PROVIDER:-https://goerli.infura.io/v3/${HOPRD_INFURA_KEY}}"
-declare hopr_token_contract="${HOPRD_TOKEN_CONTRACT:-0x566a5c774bb8ABE1A88B4f187e24d4cD55C207A5}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 
@@ -80,16 +77,6 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-function fund_ip() {
-  local ip="${1}"
-  local eth_address
-
-  wait_until_node_is_ready "${ip}"
-  eth_address=$(get_eth_address "${ip}")
-  fund_if_empty "${eth_address}" "${provider}" "${hopr_token_contract}"
-  wait_for_port "9091" "${ip}"
-}
-
 if [ "${perform_cleanup}" = "1" ] || [ "${perform_cleanup}" = "true" ]; then
   cleanup
 
@@ -103,10 +90,9 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
   log "\tdocker_image: ${docker_image}"
   log "\tcluster_id: ${cluster_id}"
   log "\tinit_script: ${init_script}"
+  log "\tenvironment: ${environment}"
   log "\tapi_token: ${api_token}"
   log "\tpassword: ${password}"
-  log "\tprovider: ${provider}"
-  log "\thopr_token_contract: ${hopr_token_contract}"
   log "\tperform_cleanup: ${perform_cleanup}"
   log "\tshow_prestartinfo: ${show_prestartinfo}"
 fi
@@ -115,7 +101,7 @@ fi
 # create test specific instance template
 gcloud_create_or_update_instance_template "${cluster_id}" \
   "${docker_image}" \
-  "${provider}" \
+  "" \
   "${api_token}" \
   "${password}"
 #
@@ -134,7 +120,7 @@ declare eth_address
 for ip in ${node_ips}; do
   wait_until_node_is_ready "${ip}"
   eth_address=$(get_eth_address "${ip}")
-  fund_if_empty "${eth_address}" "${provider}" "${hopr_token_contract}"
+  fund_if_empty "${eth_address}" "${environment}"
 done
 
 for ip in ${node_ips}; do
