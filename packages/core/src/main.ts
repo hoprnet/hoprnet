@@ -8,7 +8,7 @@ import Hopr, { HoprOptions, VERSION } from '.'
  * range of options.
  * @param peerId:PeerId - Identity used by the HOPR node
  * @param options:HoprOptions - Required options to create node
- * @returns {Hopr} - HOPR node 
+ * @returns {Hopr} - HOPR node
  */
 export function createHoprNode(peerId: PeerId, options: HoprOptions): Hopr {
   const db = new HoprDB(
