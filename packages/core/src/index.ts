@@ -16,7 +16,6 @@ import { findPath } from './path'
 
 import { protocols, Multiaddr } from 'multiaddr'
 import chalk from 'chalk'
-import { expandVars } from '@hoprnet/hopr-utils'
 
 import PeerId from 'peer-id'
 import {
@@ -77,26 +76,27 @@ type PeerStoreAddress = {
   multiaddrs: Multiaddr[]
 }
 
-export type HoprOptions = {
-  announce?: boolean
-  dbPath?: string
-  createDbIfNotExist?: boolean
-  forceCreateDB?: boolean
-  password?: string
-  connector?: HoprCoreEthereum
-  strategy?: ChannelStrategy
-  hosts?: {
-    ip4?: NetOptions
-    ip6?: NetOptions
-  }
-  // You almost certainly want this to be false, this is so we can test with
-  // local testnets, and announce 127.0.0.1 addresses.
-  announceLocalAddresses?: boolean
-
-  // when true, addresses will be sorted local first
-  // when false, addresses will be sorted public first
-  preferLocalAddresses?: boolean
-  environment: ResolvedEnvironment
+export class HoprOptions {
+  constructor(
+    public environment: ResolvedEnvironment,
+    public announce?: boolean,
+    public dbPath?: string,
+    public createDbIfNotExist?: boolean,
+    public forceCreateDB?: boolean,
+    public password?: string,
+    public connector?: HoprCoreEthereum,
+    public strategy?: ChannelStrategy,
+    public hosts?: {
+      ip4?: NetOptions
+      ip6?: NetOptions
+    },
+    // You almost certainly want this to be false, this is so we can test with
+    // local testnets, and announce 127.0.0.1 addresses.
+    public announceLocalAddresses?: boolean,
+    // when true, addresses will be sorted local first
+    // when false, addresses will be sorted public first
+    public preferLocalAddresses?: boolean
+  ) {}
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -132,10 +132,7 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private db: HoprDB
-  private paymentChannels: HoprCoreEthereum
   private addressSorter: AddressSorter
-  private publicNodesEmitter: HoprConnectOptions['publicNodes']
   private environment: ResolvedEnvironment
 
   public indexer: Indexer
@@ -148,34 +145,20 @@ class Hopr extends EventEmitter {
    * @param options
    * @param provider
    */
-  public constructor(private id: PeerId, private options: HoprOptions) {
+  public constructor(
+    private id: PeerId,
+    private db: HoprDB,
+    private chain: HoprCoreEthereum,
+    private options: HoprOptions,
+    private publicNodesEmitter: HoprConnectOptions['publicNodes'] = new EventEmitter()
+  ) {
     super()
 
     if (!id.privKey || !isSecp256k1PeerId(id)) {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
-    this.db = new HoprDB(
-      PublicKey.fromPrivKey(id.privKey.marshal()),
-      options.createDbIfNotExist,
-      VERSION,
-      options.dbPath,
-      options.forceCreateDB
-    )
     this.environment = options.environment
-
-    const provider = expandVars(this.environment.network.default_provider, process.env)
     log(`using environment: ${this.environment.id}`)
-    log(`using provider URL: ${provider}`)
-
-    this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      chainId: this.environment.network.chain_id,
-      environment: this.environment.id,
-      gasPrice: this.environment.network.gasPrice,
-      network: this.environment.network.id,
-      provider
-    })
-
-    this.publicNodesEmitter = new EventEmitter()
 
     if (this.options.preferLocalAddresses) {
       this.addressSorter = localAddressesFirst
@@ -186,11 +169,11 @@ class Hopr extends EventEmitter {
       this.addressSorter = (x) => x
       log('Addresses are sorted by default')
     }
-    this.indexer = this.paymentChannels.indexer // TODO temporary
+    this.indexer = this.chain.indexer // TODO temporary
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
-    return await this.paymentChannels.start()
+    return await this.chain.start()
   }
 
   /**
@@ -684,7 +667,7 @@ class Hopr extends EventEmitter {
       return 'Node has not started yet'
     }
     const connected = this.networkPeers.debugLog()
-    const announced = await this.paymentChannels.indexer.getAnnouncedAddresses()
+    const announced = await this.chain.indexer.getAnnouncedAddresses()
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
@@ -805,7 +788,7 @@ class Hopr extends EventEmitter {
   ): Promise<{
     channelId: Hash
   }> {
-    const ethereum = this.paymentChannels
+    const ethereum = this.chain
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const myAvailableTokens = await ethereum.getBalance(true)
@@ -1025,6 +1008,7 @@ class Hopr extends EventEmitter {
 
 export default Hopr
 export * from './constants'
+export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
 export type { ProtocolConfig, Network, ResolvedEnvironment } from './environment'
