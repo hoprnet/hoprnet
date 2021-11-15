@@ -3,7 +3,14 @@ import HoprEthereum from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 import Hopr, { HoprOptions, VERSION } from '.'
 
-export function createHoprNode(peerId: PeerId, options: HoprOptions) {
+/*
+ * General function to create a HOPR node given an identity an
+ * range of options.
+ * @param peerId:PeerId - Identity used by the HOPR node
+ * @param options:HoprOptions - Required options to create node
+ * @returns {Hopr} - HOPR node 
+ */
+export function createHoprNode(peerId: PeerId, options: HoprOptions): Hopr {
   const db = new HoprDB(
     PublicKey.fromPrivKey(peerId.privKey.marshal()),
     options.createDbIfNotExist,
