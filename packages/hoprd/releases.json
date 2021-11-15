@@ -4,9 +4,11 @@
     "environment_id": "master-goerli",
     "default": true
   },
-  "master-xdai": {
-    "git_ref": "^master$",
-    "environment_id": "master-xdai"
+  "tuttlingen": {
+    "git_ref": "^release/tuttlingen$",
+    "environment_id": "tuttlingen",
+    "version_major": "1",
+    "version_minor": "83"
   },
   "debug-goerli": {
     "git_ref": "^debug-deploy/.*",
