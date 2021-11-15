@@ -157,7 +157,7 @@ gcloud_cleanup_docker_images() {
 
 # $1 - template name
 # $2 - container image
-# $3 - environment id
+# $3 - optional: environment id
 # $4 - optional: api token
 # $5 - optional: password
 # $6 - optional: private key
@@ -168,7 +168,7 @@ gcloud_create_or_update_instance_template() {
 
   name="${1}"
   image="${2}"
-  environment_id="${3}"
+  environment_id="${3:-}"
 
   # these parameters are only used by hoprd nodes
   api_token="${4:-}"
@@ -181,7 +181,11 @@ gcloud_create_or_update_instance_template() {
   # if set no additional arguments are used to start the container
   no_args="${7:-}"
 
-  args="--container-arg=\"--environment\" --container-arg=\"${environment_id}\""
+  args=""
+  # the environment is optional, since each docker image has a default environment set
+  if [ -n "${environment_id}" ]; then
+    args="--container-arg=\"--environment\" --container-arg=\"${environment_id}\""
+  fi
 
   if [ -n "${api_token}" ]; then
     extra_args="${extra_args} --container-arg=\"--apiToken\" --container-arg=\"${api_token}\""

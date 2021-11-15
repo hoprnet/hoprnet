@@ -23,9 +23,9 @@ usage() {
   msg
   msg "Usage: $0 [<cluster_id> [<docker_image_tag> [<number_of_nodes>]]]"
   msg
-  msg "where <cluster_id>:\t\tuses a random value as default"
-  msg "      <docker_image_tag>:\tuses 'latest' as default"
-  msg "      <number_of_nodes>:\tuses '1' as default"
+  msg "where <cluster_id>\t\tuses a random value as default"
+  msg "      <docker_image_tag>\tuses 'latest' as default"
+  msg "      <number_of_nodes>\tuses '1' as default"
   msg
   msg "The docker image 'gcr.io/hoprassociation/hopr-cover-traffic-daemon' is used."
   msg
@@ -33,13 +33,10 @@ usage() {
   msg "------------------------------"
   msg
   msg "CT_PRIV_KEY\t\t\tsets the account which is used to run the nodes"
-  msg "HOPRD_INFURA_KEY\t\t\tfor the provider"
   msg
   msg "Optional environment variables"
   msg "------------------------------"
   msg
-  msg "HOPRD_PROVIDER\t\t\tused as provider for all nodes, defaults to infura/goerli"
-  msg "              \t\t\twhich requires the additional env var HOPRD_INFURA_KEY to be set"
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
   msg
@@ -54,7 +51,6 @@ declare docker_image_tag=${2:-latest}
 declare number_of_nodes=${3:-1}
 
 declare docker_image="gcr.io/hoprassociation/hopr-cover-traffic-daemon:${docker_image_tag}"
-declare provider="${HOPRD_PROVIDER:-https://goerli.infura.io/v3/${HOPRD_INFURA_KEY}}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-1}"
 
@@ -84,7 +80,6 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
   log "Pre-Start Info"
   log "\tdocker_image: ${docker_image}"
   log "\tcluster_id: ${cluster_id}"
-  log "\tprovider: ${provider}"
   log "\tperform_cleanup: ${perform_cleanup}"
   log "\tshow_prestartinfo: ${show_prestartinfo}"
 fi
@@ -92,16 +87,18 @@ fi
 
 # create test specific instance template
 # the empty values are placeholders for optional parameters which are not used
-gcloud_create_or_update_instance_template "${cluster_id}" \
+gcloud_create_or_update_instance_template \
+  "${cluster_id}" \
   "${docker_image}" \
-  "${provider}" \
+  "" \
   "" \
   "" \
   "${CT_PRIV_KEY}" \
   "true"
 
 # start nodes
-gcloud_create_or_update_managed_instance_group "${cluster_id}" \
+gcloud_create_or_update_managed_instance_group \
+  "${cluster_id}" \
   "${number_of_nodes}" \
   "${cluster_id}"
 
