@@ -982,7 +982,7 @@ __metadata:
     secp256k1: ^4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.8
+    typedoc: 0.22.9
     typedoc-plugin-markdown: 3.11.6
     typescript: 4.4.4
   languageName: unknown
@@ -1020,7 +1020,7 @@ __metadata:
     secp256k1: ~4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.8
+    typedoc: 0.22.9
     typedoc-plugin-markdown: 3.11.6
     typescript: 4.4.4
   languageName: unknown
@@ -1040,7 +1040,7 @@ __metadata:
     mocha: 9.1.3
     peer-id: 0.15.3
     rimraf: 3.0.2
-    typedoc: 0.22.8
+    typedoc: 0.22.9
     typedoc-plugin-markdown: 3.11.6
     typescript: 4.4.4
     yargs: 17.2.1
@@ -1078,7 +1078,7 @@ __metadata:
     ts-generator: 0.1.1
     ts-node: 10.4.0
     typechain: 6.0.2
-    typedoc: 0.22.8
+    typedoc: 0.22.9
     typedoc-plugin-markdown: 3.11.6
     typescript: 4.4.4
   languageName: unknown
@@ -1151,7 +1151,7 @@ __metadata:
     secp256k1: ^4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.8
+    typedoc: 0.22.9
     typedoc-plugin-markdown: 3.11.6
     typescript: 4.4.4
   languageName: unknown
@@ -1193,7 +1193,7 @@ __metadata:
     strip-ansi: 6.0.1
     tiny-hashes: ^1.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.8
+    typedoc: 0.22.9
     typedoc-plugin-markdown: 3.11.6
     typescript: 4.4.4
     ws: 8.2.3
@@ -16605,9 +16605,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.22.8":
-  version: 0.22.8
-  resolution: "typedoc@npm:0.22.8"
+"typedoc@npm:0.22.9":
+  version: 0.22.9
+  resolution: "typedoc@npm:0.22.9"
   dependencies:
     glob: ^7.2.0
     lunr: ^2.3.9
@@ -16618,7 +16618,7 @@ __metadata:
     typescript: 4.0.x || 4.1.x || 4.2.x || 4.3.x || 4.4.x
   bin:
     typedoc: bin/typedoc
-  checksum: c54929f219f6663b55ce1314742467d621371c6e063cd41ec79bc5c2e30ddf2736d0ca5e32b22d5a1775e7ff60a6c0bc8d10d929c4955cdc90c681fa4612dcb6
+  checksum: a9728074a357fd48fdcbd661ced298f37e2f5b366e5eb921cf06767eabf87fada30ffe791059272e2336cb1d02f1034116a72ca6f159df811906eb82e03071e3
   languageName: node
   linkType: hard
 
