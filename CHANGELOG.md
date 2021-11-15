@@ -6,6 +6,21 @@ None
 
 ---
 
+<a name="1.83"></a>
+
+## [1.83](https://github.com/hoprnet/hoprnet/compare/release/freiburg...hoprnet:release/tuttlingen) (2021-11-15)
+
+# Breaking changes
+
+Due to the configuration changes (refer to #2778), transport packets are now properly encapsulated between environments/releases.
+Thus, existing nodes won't be able to communicate to new nodes.
+
+### Changes
+
+- Added git hash in `hopr-admin` page ([#2869](https://github.com/hoprnet/hoprnet/pull/2869))
+- Remove legacy bi-directional channels code ([#2765](https://github.com/hoprnet/hoprnet/pull/2765))
+- Use environments as central configuration for hoprd releases ([#2778](https://github.com/hoprnet/hoprnet/pull/2778))
+
 <a name="1.82"></a>
 
 ## [1.82](https://github.com/hoprnet/hoprnet/compare/release/limassol...hoprnet:release/freiburg) (2021-10-15)
