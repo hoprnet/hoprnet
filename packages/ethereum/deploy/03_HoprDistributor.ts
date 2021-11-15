@@ -42,6 +42,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 // this smart contract should not be redeployed on a production network
 main.skip = async (env) => !!env.network.tags.production
-main.dependencies = ['preDeploy']
+main.dependencies = ['preDeploy', 'HoprToken']
+main.tags = ['HoprDistributor']
 
 export default main

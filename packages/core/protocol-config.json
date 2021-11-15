@@ -32,7 +32,7 @@
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "tags": ["development"]
     },
-    "master-xdai": {
+    "tuttlingen": {
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
