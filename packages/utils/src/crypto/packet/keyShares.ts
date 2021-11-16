@@ -19,35 +19,46 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
 
   let keyPair: [x: Uint8Array, alpha: Uint8Array]
 
-  const product = new Uint8Array(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH)
+  const alpha_prev = new Uint8Array(SECP256K1_CONSTANTS.UNCOMPRESSED_PUBLIC_KEY_LENGTH) // This becomes: x * b_0 * b_1 * b_2 * ... * G
+  const coeff_prev = new Uint8Array(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH) // This becomes: x * b_0 * b_1 * b_2 * ...
 
   do {
     secrets = []
 
-    keyPair = sampleGroupElement()
+    keyPair = sampleGroupElement(false)
 
-    product.set(keyPair[0])
+    coeff_prev.set(keyPair[0]) // x
+    alpha_prev.set(keyPair[1]) // alpha_0 = x*G
 
-    for (const [index, peerId] of path.entries()) {
-      let y = publicKeyTweakMul(publicKeyConvert(peerId.pubKey.marshal(), false), product, false)
+    for (const [k, peerId] of path.entries()) {
 
-      const secret = keyExtract(y, peerId.pubKey.marshal())
+      const s_k = publicKeyTweakMul(publicKeyConvert(peerId.pubKey.marshal(), false), coeff_prev, false)
 
-      if (!privateKeyVerify(secret)) {
-        break
-      }
+      secrets.push(s_k)
 
-      secrets.push(secret)
-
-      product.set(privateKeyTweakMul(product, secret))
-
-      if (!privateKeyVerify(product)) {
-        break
-      }
-
-      if (index == path.length - 1) {
+      // If this was the last shared secret, no need to compute anymore
+      if (k == path.length - 1) {
         done = true
+        break
       }
+
+      // Compute the new blinding factor b_k
+      const b_k = keyExtract(s_k, alpha_prev) // KDF(secret, salt)
+
+      // NOTE: This check would not be needed on modern curves
+      if (!privateKeyVerify(b_k)) {
+        break
+      }
+
+      // Accumulate the new blinding factor b_k in the coeff_prev
+      coeff_prev.set(privateKeyTweakMul(coeff_prev, b_k))
+
+      if (!privateKeyVerify(coeff_prev)) {
+        break
+      }
+
+      // Also update alpha_prev with the new blinding factor b_k
+      alpha_prev.set(publicKeyTweakMul(alpha_prev, b_k, false))
     }
   } while (!done)
 
