@@ -131,7 +131,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   const channels = await node.getChannelsFrom(selfAddr)
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))
   node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))
-  
+
   setInterval(async () => {
     // CT stats
     console.log('-- CT Stats --')
