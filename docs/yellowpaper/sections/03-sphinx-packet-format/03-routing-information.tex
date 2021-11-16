@@ -5,7 +5,7 @@ Each node on the path needs to decide whether it is destined to be the receiver 
 
 This is achieved by applying multiple layers of blinding and sequentially removing layer by layer at each hop such that the address of the next hop is only visible for one hop along the path.
 
-To ensure that the header has not been tampered while traveling through and network and beign transformed by the nodes along the path, there is an integrity tag that is sent in addition to the public key of the next hop. The routing information is thus given by $(y_i, \gamma_i)$ where $y_i$ denotes the public key and $\gamma_i$ the integrity tag for the next downstream node. See section \ref{sec:sphinx:integrity} for more details on the utilized integrity scheme.
+To ensure that the header has not been tampered while traveling through and network and being transformed by the nodes along the path, there is an integrity tag that is sent in addition to the public key of the next hop. The routing information is thus given by $(y_i, \gamma_i)$ where $y_i$ denotes the public key and $\gamma_i$ the integrity tag for the next downstream node. See section \ref{sec:sphinx:integrity} for more details on the utilized integrity scheme.
 
 \paragraph{Adresses}
 
