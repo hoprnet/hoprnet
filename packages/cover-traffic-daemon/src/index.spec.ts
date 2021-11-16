@@ -9,7 +9,7 @@ import sinon from 'sinon'
 const log = debug('hopr:test:cover-traffic')
 
 describe('cover-traffic daemon', async function () {
-  const privateKey = '0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332'  
+  const privateKey = '0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332'
 
   let node: Hopr, libp2p: LibP2P
   let peerId: PeerId, db: HoprDB, chain: HoprCoreEthereum, options: HoprOptions
