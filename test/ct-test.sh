@@ -17,6 +17,8 @@ declare HOPR_LOG_ID="e2e-ct-test"
 source "${mydir}/../scripts/utils.sh"
 
 declare ct_node1_log="${1}"
+declare healthcheck_host="${2}"
+declare healthcheck_port="${3}"
 
 log "Running Cover Traffic test"
 log "Waiting for CT strategy to be applied"

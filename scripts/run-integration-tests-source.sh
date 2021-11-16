@@ -106,7 +106,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${ct_node1_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -169,7 +169,7 @@ function setup_node() {
 # $3 = OPTIONAL: additional args to ct daemon
 function setup_ct_node() {
   local log=${1}
-  local health_check_port = ${2}
+  local health_check_port=${2}
   local additional_args=${3:-""}
 
   log "Run CT node -> ${log}"
@@ -238,6 +238,7 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
 ensure_port_is_free 19097
+ensure_port_is_free 20000
 # }}}
 
 # --- Cleanup old contract deployments {{{
@@ -274,7 +275,7 @@ setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
-setup_ct_node "${ct_node1_log}" 
+setup_ct_node "${ct_node1_log}" 20000
 # }}}
 
 log "Waiting for nodes startup"
@@ -338,5 +339,5 @@ grep -E "Running on: hardhat" "${node6_log}"
 
 # -- CT test {{{
 ${mydir}/../test/ct-test.sh \
-  "${ct_node1_log}"
+  "${ct_node1_log}" "127.0.0.01" 20000
 # }}}
