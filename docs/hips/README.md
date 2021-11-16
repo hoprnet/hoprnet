@@ -8,7 +8,7 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 
 HIPs - HOPR Improvement Proposals serve as a foundation for upcoming changes on the HOPR protocol.
 
-See current [HIPs](./hips?raw=true)
+See current [HIPs](./hips.pdf?raw=true)
 
 ## Developer setup
 
