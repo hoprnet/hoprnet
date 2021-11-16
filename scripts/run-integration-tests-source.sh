@@ -333,21 +333,6 @@ grep -E "Running on: hardhat" "${node6_log}"
 # }}}
 
 # -- CT test {{{
-log "Running CT test"
-log "Waiting for CT strategy to be applied"
-wait_for_regex "${ct_node1_log}" "strategy tick RUNNING covertraffic"
-
-log "Waiting for the first strategy tick"
-wait_for_regex "${ct_node1_log}" "strategy tick:"
-
-log "Waiting for the channel open"
-wait_for_regex "${ct_node1_log}" "hopr:cover-traffic opening"
-
-log "Waiting for the first CT send OR failed due to lacking number of nodes"
-wait_for_regex "${ct_node1_log}" "(cover-traffic SEND)|(aborting send messages - less channels in network than hops required)"
-
-log "Waiting for phase complete marker"
-wait_for_regex "${ct_node1_log}" "message send phase complete"
-
-log "CT tests finished successfully"
+${mydir}/../test/ct-test.sh \
+  "${ct_node1_log}"
 # }}}
