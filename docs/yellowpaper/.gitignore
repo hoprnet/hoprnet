@@ -10,7 +10,7 @@
 *.xdv
 
 # SVG builds
-svg-inkscape
+svg-inkscape/
 
 # Built PDF files
 *.pdf

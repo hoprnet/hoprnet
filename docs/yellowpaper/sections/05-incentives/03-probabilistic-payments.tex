@@ -1,6 +1,36 @@
 \subsection{Probabilistic Payment Channels}
 \label{sec:incentives:probabilistic}
 
+TODO: add polish paper
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[domain=0:2]
+        \def\padding{0.1}
+        \def\plotHeight{2}
+        \def\plotWidth{4}
+        \def\plotOffset{7}
+        \def\textOffset{0.6}
+        \foreach \i in {0,1} {
+                \begin{scope}[shift={(\i*\plotOffset,0)}]
+                    \draw[->] (-2*\padding,0) -- (\plotWidth+2*\padding,0) node[right] {$time$};
+                    \draw[->] (0,-2*\padding) -- (0,\plotHeight+2*\padding) node[above] {$balance(B)$};
+
+                    \ifnum\i=0
+                        \path (0,-\textOffset) -- (\plotWidth,-\textOffset) node[midway] {\shortstack{unidirectional\\payment channel}};
+                        \draw (0.4,0) -- (0.4,0.6) -- (1.4,0.6) -- (1.9,0.6) -- (1.9,1.3) -- (2.6,1.3) -- (3.4,1.3) -- (3.4,1.7) -- (4.0,1.7);
+                    \else
+                        \path (0,-\textOffset) -- (\plotWidth,-\textOffset) node[midway] {\shortstack{bidirectional\\payment channel}};
+
+                        \draw (0.3,0) -- (0.3,0.6) -- (1.2,0.6) -- (1.2,1.9) -- (2.1,1.9) -- (2.1,1.2) -- (3.0,1.2) -- (3.0,0.2) -- (4.0,0.2);
+                    \fi
+                \end{scope}
+            }
+    \end{tikzpicture}
+    \label{fig:channels}
+    \caption{Node $A$ and $B$ have a payment channel. Whilst in case of unidirectional payment channels, $balance(B)$ is strictly increasing, the derivative of $balance(B)$ \textit{can} change sign if the channel is bidirectional.}
+\end{figure}
+
 \begin{figure}[H]
     \centering
     \begin{tikzpicture}
