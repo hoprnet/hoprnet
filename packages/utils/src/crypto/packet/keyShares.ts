@@ -31,7 +31,6 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
     alpha_prev.set(keyPair[1]) // alpha_0 = x*G
 
     for (const [k, peerId] of path.entries()) {
-
       const s_k = publicKeyTweakMul(publicKeyConvert(peerId.pubKey.marshal(), false), coeff_prev, false)
 
       secrets.push(s_k)
