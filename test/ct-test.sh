@@ -21,6 +21,10 @@ declare healthcheck_host="${2}"
 declare healthcheck_port="${3}"
 
 log "Running Cover Traffic test"
+
+log "Check CT daemon health"
+curl "http://${healthcheck_host}:${healthcheck_port}/healthcheck/v1/version" | grep "CT node: "
+
 log "Waiting for CT strategy to be applied"
 wait_for_regex "${ct_node1_log}" "strategy tick RUNNING covertraffic"
 
