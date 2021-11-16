@@ -1,7 +1,7 @@
 \subsection{Proof of Relay}
 \label{sec:incentives:proofofrelay}
 
-The \nameref{sec:sphinx} guarantees that packets can only be processed in the order that has been chosen by the creator. As a result, the next downstream node can either decode the packet or end up with some random bitstring. Hence it is the next downstream node who is able to verify the correctness of the previously applied tranformation which it confirms by sending an acknowledgement.
+The \nameref{sec:sphinx} guarantees that packets can only get processed in the order that has been chosen by the creator. As a result, after applying the required transformations, the next downstream node can either decode the packet or ends up with some random bitstring. Hence it is the next downstream node who is able to verify the correctness of the previously applied tranformations which it confirms by sending an acknowledgement.
 
 \begin{figure}[H]
       \centering
@@ -26,7 +26,20 @@ The \nameref{sec:sphinx} guarantees that packets can only be processed in the or
       \caption{Node $n_{i-1}$ sends $packet_{i-1}$ to node $n_i$. Node $n_i$ transforms the incoming packet, resulting in ${packet_i}$ and sends it to node $n_{i+1}$. Afterwards it acknowledges the processing of $packet_{i-1}$ to node $n_{i-1}.$}
 \end{figure}
 
-% Acknowledgements are sent out of order because otherwise introducing observable patterns
+Note that acknowledgements are sent immediately once the processing of the incoming packet has been completed. This makes sure that sending acknowledgements does not create any observable pattern in reverse to the chosen path. It is rather that each acknowledgement depends on one incoming packet but it does not depend on the chosen path.
+
+% \paragraph{Construction}
+
+% \begin{itemize}
+%       \item The creator of the packet creates a secret sharing between itself and the first relayer as well as for each relayer $n_i$ and their corresponding next downstream node $n_{i+1}$
+%       \item Having both key shares allows the node to reconstruct a value $response$.
+%       \item $response$ is the solution necessary to solve a $challenge$.
+%       \item
+% \end{itemize}
+
+% First of all, the creator of the packet samples challenges and their responses for each relayer and its corresponding next downstream node, including the first relayer. Whenever a node issues a ticket (see section \ref{sec:tickets}), it embeds the corresponding ch
+
+% secret sharings for each relayer and its next downstream node. These secret sharings
 
 % Acknowledgement structure + utilized signatures
 
