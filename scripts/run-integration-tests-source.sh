@@ -316,13 +316,13 @@ wait_for_port 19097 "127.0.0.1" "${node7_log}"
 log "All nodes came up online"
 
 # --- Run security tests --- {{{
-# ${mydir}/../test/security-test.sh \
-#   127.0.0.1 13301 19501 19502
-#}}}
+${mydir}/../test/security-test.sh \
+  127.0.0.1 13301 19501 19502
+# }}}
 
 # --- Run protocol test --- {{{
-# ${mydir}/../test/integration-test.sh \
-#   "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
+${mydir}/../test/integration-test.sh \
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
 # -- Verify node6 has executed the commands {{{
@@ -334,13 +334,20 @@ grep -E "Running on: hardhat" "${node6_log}"
 
 # -- CT test {{{
 log "Running CT test"
-log "Checking if CT strategy is applied"
-wait_for_regex ${ct_node1_log} "strategy tick RUNNING covertraffic"
-log "Checking strategy tick"
-wait_for_regex ${ct_node1_log} "strategy tick:"
-log "Checking if CT was sent"
-wait_for_regex ${ct_node1_log} "cover-traffic SEND "
-log "Checking message send phase complete marker"
-wait_for_regex ${ct_node1_log} "message send phase complete"
+log "Waiting for CT strategy to be applied"
+wait_for_regex "${ct_node1_log}" "strategy tick RUNNING covertraffic"
+
+log "Waiting for the first strategy tick"
+wait_for_regex "${ct_node1_log}" "strategy tick:"
+
+log "Waiting for the channel open"
+wait_for_regex "${ct_node1_log}" "hopr:cover-traffic opening"
+
+log "Waiting for the first CT send OR failed due to lacking number of nodes"
+wait_for_regex "${ct_node1_log}" "(cover-traffic SEND)|(aborting send messages - less channels in network than hops required)"
+
+log "Waiting for phase complete marker"
+wait_for_regex "${ct_node1_log}" "message send phase complete"
+
 log "CT tests finished successfully"
 # }}}
