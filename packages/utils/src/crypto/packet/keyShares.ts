@@ -34,7 +34,7 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
       const secret = keyExtract(y, peerId.pubKey.marshal())
 
       if (!privateKeyVerify(secret)) {
-        return
+        break
       }
 
       secrets.push(secret)
@@ -42,7 +42,7 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
       product.set(privateKeyTweakMul(product, secret))
 
       if (!privateKeyVerify(product)) {
-        return
+        break
       }
 
       if (index == path.length - 1) {
