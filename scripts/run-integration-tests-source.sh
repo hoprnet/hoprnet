@@ -165,10 +165,12 @@ function setup_node() {
 }
 
 # $1 = node log file
-# $2 = OPTIONAL: additional args to hoprd
+# $2 = health check port
+# $3 = OPTIONAL: additional args to ct daemon
 function setup_ct_node() {
   local log=${1}
-  local additional_args=${2:-""}
+  local health_check_port = ${2}
+  local additional_args=${3:-""}
 
   log "Run CT node -> ${log}"
 
@@ -180,6 +182,8 @@ function setup_ct_node() {
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
     --privateKey "${ct_private_key}" \
     --dbFile "${ct_db_file}" \
+    --healthCheckHost "127.0.0.1" \
+    --healthCheckPort "${health_check_port}" \
     ${additional_args} \
      > "${log}" 2>&1 &
 }

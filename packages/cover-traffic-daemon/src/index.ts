@@ -13,6 +13,8 @@ import { CoverTrafficStrategy } from './strategy'
 import type PeerId from 'peer-id'
 import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
 import type { PeerData, State } from './state'
+import http from 'http'
+import restana from 'restana'
 
 const log = debug('hopr:cover-traffic')
 
@@ -52,6 +54,14 @@ const argv = yargs(process.argv.slice(2))
     string: true,
     default: './ct.json'
   })
+  .option('healthCheckHost', {
+    describe: 'Host to listen on for health check',
+    string: true
+  })
+  .option('healthCheckPort', {
+    describe: 'Port to listen on for health check',
+    number: true
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -73,6 +83,21 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }
+
+  if (argv.healthCheckHost != null) {
+    const service = restana()
+    service.get('/healthcheck/v1/version', (_, res) => res.send(`CT node: ${node.getVersion()}`))
+    const hostname = argv.healthCheckHost
+    const port = argv.healthCheckPort
+    const server = http.createServer(service as any).on('error', (err) => {
+      throw err
+    })
+    server.listen(port, hostname, (err?: Error) => {
+      if (err) throw err
+      console.log(`Healthcheck server on ${hostname} listening on port ${port}`)
+    })
+  }
+
   const selfPub = PublicKey.fromPeerId(peerId)
   const selfAddr = selfPub.toAddress()
   const data = new PersistedState(update, argv.dbFile)
@@ -106,7 +131,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   const channels = await node.getChannelsFrom(selfAddr)
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))
   node.setChannelStrategy(new CoverTrafficStrategy(selfPub, node, data))
-
+  
   setInterval(async () => {
     // CT stats
     console.log('-- CT Stats --')
