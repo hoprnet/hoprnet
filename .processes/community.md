@@ -10,7 +10,7 @@ Community team is expected to create github issues in [this repository](https://
 - should use [Request Tech Work](https://github.com/hoprnet/hopr-devrel/blob/main/.github/ISSUE_TEMPLATE/request-for-tech-work.md) template for other work
 - issues labelled as `high priority` will be treated as a [file-alarm](./development.md#fire-alarm)
 - normal issues will be queued for work in next sprint planning
-- issues should ideally contain all information the author can provide, even if that means sometimes it includes noise or possibly unreleated
+- issues should ideally contain all information the author can provide, even if that means sometimes it includes noise or possibly unrelated
 - tech members might ask questions to get more information from the issue author
 - issues should be made as soon as possible
 
