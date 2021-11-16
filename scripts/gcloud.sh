@@ -157,18 +157,18 @@ gcloud_cleanup_docker_images() {
 
 # $1 - template name
 # $2 - container image
-# $3 - environment id
+# $3 - optional: environment id
 # $4 - optional: api token
 # $5 - optional: password
 # $6 - optional: private key
 # $7 - optional: no args
 gcloud_create_or_update_instance_template() {
-  local args name mount_path image rpc api_token password host_path extra_args
-  local no_args private_key
+  local args name mount_path image rpc api_token password host_path no_args private_key
+  local extra_args=""
 
   name="${1}"
   image="${2}"
-  environment_id="${3}"
+  environment_id="${3:-}"
 
   # these parameters are only used by hoprd nodes
   api_token="${4:-}"
@@ -181,7 +181,11 @@ gcloud_create_or_update_instance_template() {
   # if set no additional arguments are used to start the container
   no_args="${7:-}"
 
-  args="--container-arg=\"--environment\" --container-arg=\"${environment_id}\""
+  args=""
+  # the environment is optional, since each docker image has a default environment set
+  if [ -n "${environment_id}" ]; then
+    args="--container-arg=\"--environment\" --container-arg=\"${environment_id}\""
+  fi
 
   if [ -n "${api_token}" ]; then
     extra_args="${extra_args} --container-arg=\"--apiToken\" --container-arg=\"${api_token}\""
@@ -207,7 +211,7 @@ gcloud_create_or_update_instance_template() {
   log "creating instance template ${name}"
 
   if [ "${no_args}" = "true" ]; then
-    gcloud compute instance-templates create-with-container "${name}" \
+    eval gcloud compute instance-templates create-with-container "${name}" \
       --machine-type=e2-medium \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
@@ -223,7 +227,7 @@ gcloud_create_or_update_instance_template() {
       ${args} \
       ${extra_args}
   else
-    gcloud compute instance-templates create-with-container "${name}" \
+    eval gcloud compute instance-templates create-with-container "${name}" \
       --machine-type=e2-medium \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
@@ -236,8 +240,6 @@ gcloud_create_or_update_instance_template() {
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
       --container-restart-policy=always \
-      ${args} \
-      ${extra_args} \
       --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--announce" \
@@ -247,7 +249,8 @@ gcloud_create_or_update_instance_template() {
       --container-arg="--init" \
       --container-arg="--rest" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
-      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\""
+      ${args} \
+      ${extra_args}
   fi
 }
 

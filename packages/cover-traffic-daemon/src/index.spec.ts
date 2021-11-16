@@ -1,19 +1,24 @@
 import LibP2P from 'libp2p'
-import Hopr, { resolveEnvironment } from '@hoprnet/hopr-core'
-import { debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
+import PeerId from 'peer-id'
+import Hopr from '@hoprnet/hopr-core'
+import { HoprOptions } from '@hoprnet/hopr-core'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { debug, privKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
-import { generateNode, generateNodeOptions } from '.'
 
 const log = debug('hopr:test:cover-traffic')
 
 describe('cover-traffic daemon', async function () {
-  const privateKey = '0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332'
-  const options = await generateNodeOptions(resolveEnvironment('master-xdai'))
-  const peerId = privKeyToPeerId(privateKey)
+  const privateKey = '0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332'  
 
   let node: Hopr, libp2p: LibP2P
+  let peerId: PeerId, db: HoprDB, chain: HoprCoreEthereum, options: HoprOptions
   beforeEach(function () {
-    node = generateNode(peerId, options)
+    peerId = privKeyToPeerId(privateKey)
+    options = { environment: { id: '1' } } as unknown as HoprOptions
+    db = sinon.createStubInstance(HoprDB)
+    chain = sinon.createStubInstance(HoprCoreEthereum)
+    node = new Hopr(peerId, db, chain, options)
     libp2p = sinon.createStubInstance(LibP2P)
     sinon.stub(node.indexer, 'start').callsFake(() => Promise.resolve(log('indexer called for cover-traffic daemon')))
     sinon.stub(node.indexer, 'getPublicNodes').callsFake(() => {

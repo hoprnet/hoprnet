@@ -206,8 +206,6 @@ The following are a series of manual tasks that are needed to be executed for th
 
 - [ ] Deploy a set of `$release` CT nodes for our testnet using our **`cover-traffic` deployment script**.
 
-- [ ] Deploy a set of `$release` cloud nodes for our testnet to support DEADR and be used as relayers (to be removed after https://github.com/hoprnet/hoprnet/issues/2537 is fixed).
-
 - [ ] Deploy a set of `$release` cloud nodes for our testnet with a full topology connected to feed event data for our leaderboard using our **`topology` deployment script**.
 
 - [ ] Tag a distribution manually $release on npm and on Docker Hub.
@@ -233,9 +231,7 @@ The following are a series of manual tasks that are needed to be executed for th
 
 ```
 CT_PRIV_KEY=14e6...a6a5 \
-HOPRD_INFURA_KEY=51d4...caf6 \
-HOPRD_PROVIDER=https://provider-proxy.hoprnet.workers.dev/matic_rio \
-./scripts/setup-ct-gcloud-cluster.sh cover-traffic-node-01
+  ./scripts/setup-ct-gcloud-cluster.sh ${release_name}-cover-traffic
 ```
 
 #### `topology` deployment script
@@ -247,5 +243,5 @@ HOPRD_INFURA_KEY=51d4...caf6 \
 HOPRD_PROVIDER=https://polygon.infura.io/v3/51d4...caf6 \
 HOPRD_TOKEN_CONTRACT="0x6F80d1a3AB9006548c2fBb180879b87364D63Bf7" \
 HOPRD_SHOW_PRESTART_INFO=true \
-./scripts/setup-gcloud-cluster.sh matic-testnet-01 gcr.io/hoprassociation/hoprd:latest `pwd`/scripts/topologies/full_interconnected_cluster.sh
+  ./scripts/setup-gcloud-cluster.sh matic-testnet-01 gcr.io/hoprassociation/hoprd:latest `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```

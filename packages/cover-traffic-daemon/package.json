@@ -1,16 +1,13 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.83.0-next.40",
+  "version": "1.83.0-next.67",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
-  "bin": {
-    "hopr-cover-traffic-daemon": "lib/index.js",
-    "hopr-cover-traffic-daemon-dashboard": "lib/dashboard.js"
-  },
+  "bin": "lib/index.js",
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
     "test": "mocha --parallel",
@@ -41,8 +38,8 @@
     "@types/yargs": "17.0.5",
     "mocha": "9.1.3",
     "rimraf": "3.0.2",
-    "typedoc": "0.22.8",
-    "typedoc-plugin-markdown": "3.11.3",
+    "typedoc": "0.22.9",
+    "typedoc-plugin-markdown": "3.11.6",
     "typescript": "4.4.4"
   },
   "mocha": {

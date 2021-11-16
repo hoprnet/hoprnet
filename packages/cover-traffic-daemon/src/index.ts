@@ -4,7 +4,7 @@ import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import Hopr, { resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
 import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
@@ -47,10 +47,6 @@ export async function generateNodeOptions(environment: ResolvedEnvironment): Pro
   return options
 }
 
-export function generateNode(peerId: PeerId, options: HoprOptions): Hopr {
-  return new Hopr(peerId, options)
-}
-
 export async function main(update: (State: State) => void, peerId?: PeerId) {
   const argv = yargs(process.argv.slice(2))
     .option('environment', {
@@ -85,7 +81,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   log('creating a node')
-  const node = generateNode(peerId, options)
+  const node = createHoprNode(peerId, options)
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)

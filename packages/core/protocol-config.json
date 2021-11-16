@@ -4,25 +4,40 @@
       "network_id": "hardhat",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
-      "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}"
+      "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
+      "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
+      "tags": ["development"]
     },
     "hardhat-localhost2": {
       "network_id": "hardhat",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
-      "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}"
+      "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
+      "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
+      "tags": ["development"]
     },
     "master-goerli": {
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
-      "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
-      "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
+      "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
+      "channels_contract_address": "0xC3e3603c6210cDEe67B905cc3bF24A6416ab747B",
+      "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
+      "tags": ["development"]
     },
-    "master-xdai": {
+    "debug-goerli": {
+      "network_id": "goerli",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "0xC3Ff0A2C4F404D6a9B31a7ABc2a41E616bd4F34C",
+      "channels_contract_address": "0x0Df426849D532fa06BC843dcaBf14CD60c89e78f",
+      "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
+      "tags": ["development"]
+    },
+    "tuttlingen": {
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
-      "token_contract_address": "0xa3722f4758C6F41e3c1Dfd3a7dbA6FD9BAec9190",
-      "channels_contract_address": "0x71b1ba4c741dc9b1fffb3ea22a831707ecc826b6"
+      "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
+      "channels_contract_address": "0x6f3999E1Ca72b6BB396E46aD454f5ADEC783b035",
+      "tags": ["production"]
     }
   },
   "networks": {
@@ -33,8 +48,7 @@
       "gas_multiplier": 1.1,
       "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
-      "hopr_token_name": "wxHOPR",
-      "tags": ["development"]
+      "hopr_token_name": "wxHOPR"
     },
     "xdai": {
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
@@ -44,19 +58,17 @@
       "gas_multiplier": 1.1,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
-      "hopr_token_name": "wxHOPR",
-      "tags": ["production"]
+      "hopr_token_name": "wxHOPR"
     },
     "goerli": {
       "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
       "chain_id": 5,
       "live": true,
       "gas_price": "1 gwei",
-      "gas_multiplier": 1.1,
+      "gas_multiplier": 1.3,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/eth_goerli",
       "native_token_name": "gETH",
-      "hopr_token_name": "wxHOPR",
-      "tags": ["staging"]
+      "hopr_token_name": "wxHOPR"
     }
   }
 }

@@ -15,13 +15,13 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-p|--package hoprd|cover-traffic-daemon] [-f|--force]"
+  msg "Usage: $0 [-h|--help] [-p|--package hoprd|cover-traffic-daemon] [-f|--force] [-n|--no-tags]"
   msg
-  msg "Use -f to force a Docker build. No additional tags will be applied though."
+  msg "Use -f to force a Docker build even though no environment can be found. This is useful for local testing. No additional docker tags will be applied though if no environment has been found which is in contrast to the normal execution of the script."
   msg
 }
 
-declare image_version package_version docker_image releases branch docker_image_full package force
+declare image_version package_version docker_image releases branch docker_image_full package force no_tags
 
 while (( "$#" )); do
   case "$1" in
@@ -36,6 +36,10 @@ while (( "$#" )); do
       ;;
     -f|--force)
       force="true"
+      shift
+      ;;
+    -n|--no-tags)
+      no_tags="true"
       shift
       ;;
     -*|--*=)
@@ -59,7 +63,14 @@ image_version="$(date +%s)"
 package_version="$("${mydir}/get-package-version.sh")"
 docker_image="gcr.io/hoprassociation/${package}"
 docker_image_full="${docker_image}:${image_version}"
-releases="$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"refs/heads/${branch}\") | .key")"
+releases=""
+
+for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
+  if [[ "${branch}" =~ ${git_ref} ]]; then
+    declare additional_releases="$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .key")"
+    releases="${releases} ${additional_releases}"
+  fi
+done
 
 if [ -z "${releases}" ] && [ "${force:-}" != "true" ]; then
   # return early if no environments are found for branch
@@ -79,16 +90,21 @@ if [ "${v}" != "${package_version}" ]; then
   exit 1
 fi
 
-if [ -z "${releases}" ] then
+if [ -z "${releases}" ]; then
   # stopping here after forced build
   log "no releases were configured for branch ${branch}"
   exit 0
 fi
 
-log "attach additional tag ${package_version} to docker image ${docker_image_full}"
-gcloud container images add-tag ${docker_image_full} ${docker_image}:${package_version}
+if ! [ "${no_tags:-}" = "true" ]; then
+  log "attach additional tag ${package_version} to docker image ${docker_image_full}"
+  gcloud container images add-tag ${docker_image_full} ${docker_image}:${package_version}
 
-for release in ${releases}; do
-  log "attach additional tag ${release} to docker image ${docker_image_full}"
-  gcloud container images add-tag ${docker_image_full} ${docker_image}:${release}
-done
+  for release in ${releases}; do
+    log "attach additional tag ${release} to docker image ${docker_image_full}"
+    gcloud container images add-tag ${docker_image_full} ${docker_image}:${release}
+  done
+else
+  log "skip tagging as requested"
+fi
+
