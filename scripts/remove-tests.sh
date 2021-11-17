@@ -28,8 +28,8 @@ packagedir=$1
 
 # Remove built unit tests and source maps from given package
 find ${mydir}/../packages/${packagedir}/lib \
-  -name "*.spec.js" -delete -o \
-  -name "*.spec.js.map" -delete -o \
-  -name "*.spec.d.ts" -delete -o \
+  -name "*.spec.js" -delete -a \
+  -name "*.spec.js.map" -delete -a \
+  -name "*.spec.d.ts" -delete -a \
   -name "*.spec.d.ts.map" -delete
 
