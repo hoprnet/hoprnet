@@ -1,5 +1,5 @@
 import { createHmac } from 'crypto'
-import {HASH_ALGORITHM, HASH_LENGTH, PRESECRET_LENGTH, SECRET_LENGTH} from './constants'
+import { HASH_ALGORITHM, HASH_LENGTH, PRESECRET_LENGTH, SECRET_LENGTH } from './constants'
 import { expand } from 'futoin-hkdf'
 
 const HASH_KEY_HMAC = 'HASH_KEY_HMAC'

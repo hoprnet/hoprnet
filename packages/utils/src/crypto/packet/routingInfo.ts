@@ -1,6 +1,6 @@
 import { u8aEquals, u8aXOR } from '../../u8a'
 import { derivePRGParameters } from './keyDerivation'
-import {MAC_LENGTH, END_PREFIX, END_PREFIX_LENGTH, PRESECRET_LENGTH} from './constants'
+import { MAC_LENGTH, END_PREFIX, END_PREFIX_LENGTH, PRESECRET_LENGTH } from './constants'
 import { SECP256K1_CONSTANTS } from '../constants'
 import { randomFillSync } from 'crypto'
 import { PRG } from '../prg'

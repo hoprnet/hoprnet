@@ -1,6 +1,6 @@
 import { generateFiller } from './filler'
 import { randomBytes } from 'crypto'
-import {PRESECRET_LENGTH} from './constants'
+import { PRESECRET_LENGTH } from './constants'
 import { u8aXOR } from '../../u8a'
 import { PRG } from '../prg'
 import { derivePRGParameters } from './keyDerivation'
