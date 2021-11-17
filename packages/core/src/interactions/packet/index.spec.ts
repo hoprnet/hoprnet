@@ -25,8 +25,9 @@ import assert from 'assert'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
+import {PRESECRET_LENGTH} from "@hoprnet/hopr-utils/lib/crypto/packet/constants";
 
-const SECRET_LENGTH = 32
+//const SECRET_LENGTH = 32
 
 const TEST_MESSAGE = new TextEncoder().encode('test message')
 
@@ -172,7 +173,7 @@ describe('packet acknowledgement', function () {
   // Despite it is not useful, the sender *must* understand it
   // and call `onMessage`.
   it('acknowledgement workflow as sender', async function () {
-    const secrets: Uint8Array[] = Array.from({ length: 2 }, () => Uint8Array.from(randomBytes(SECRET_LENGTH)))
+    const secrets: Uint8Array[] = Array.from({ length: 2 }, () => Uint8Array.from(randomBytes(PRESECRET_LENGTH)))
 
     const { ackChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
 

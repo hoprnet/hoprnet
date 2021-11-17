@@ -81,7 +81,6 @@ export function createRoutingInfo(
       // Add pubkey of next downstream node
       extendedHeader.set(path[invIndex + 1].pubKey.marshal())
 
-      // !!lukas-note: check if this is really doing what it should
       extendedHeader.set(mac, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)
 
       extendedHeader.set(additionalDataRelayer[invIndex], SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)

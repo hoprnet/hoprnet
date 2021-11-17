@@ -2,6 +2,7 @@ import { expand } from 'futoin-hkdf'
 import { privateKeyVerify } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
 import { HalfKey } from '../../types'
+import {PRESECRET_LENGTH} from "../packet/constants";
 
 const HASH_KEY_OWN_KEY = 'HASH_KEY_OWN_KEY'
 const HASH_KEY_ACK_KEY = 'HASH_KEY_ACK_KEY'
@@ -14,7 +15,7 @@ const MAX_ITERATIONS = 1000
  * @returns the key share
  */
 export function deriveOwnKeyShare(secret: Uint8Array): HalfKey {
-  if (secret.length != SECRET_LENGTH) {
+  if (secret.length != PRESECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
@@ -22,14 +23,14 @@ export function deriveOwnKeyShare(secret: Uint8Array): HalfKey {
 }
 
 /**
- * Comutes the key share that is embedded in the acknowledgement
+ * Computes the key share that is embedded in the acknowledgement
  * for a packet and thereby unlocks the incentive for the previous
  * relayer for transforming and delivering the packet
  * @param secret shared secret with the creator of the packet
  * @returns
  */
 export function deriveAckKeyShare(secret: Uint8Array): HalfKey {
-  if (secret.length != SECRET_LENGTH) {
+  if (secret.length != PRESECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 

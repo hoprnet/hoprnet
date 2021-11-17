@@ -1,9 +1,10 @@
-import { SECRET_LENGTH } from './constants'
+//import { SECRET_LENGTH } from './constants'
 import { deriveAckKeyShare, deriveOwnKeyShare } from './keyDerivation'
 import { SECP256K1_CONSTANTS } from '../constants'
 import { HalfKeyChallenge, HalfKey, Challenge, Response, EthereumChallenge } from '../../types'
 import { u8aSplit } from '../../u8a'
 import { randomBytes } from 'crypto'
+import {PRESECRET_LENGTH} from "../packet/constants";
 
 export const POR_STRING_LENGTH = 2 * SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
 
@@ -21,12 +22,12 @@ export function createPoRValuesForSender(
   secretB: Uint8Array,
   secretC?: Uint8Array
 ): { ackChallenge: HalfKeyChallenge; ticketChallenge: Challenge; ownKey: HalfKey } {
-  if (secretB.length != SECRET_LENGTH || (secretC != undefined && secretC.length != SECRET_LENGTH)) {
+  if (secretB.length != PRESECRET_LENGTH || (secretC != undefined && secretC.length != PRESECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
   }
 
   const s0 = deriveOwnKeyShare(secretB)
-  const s1 = deriveAckKeyShare(secretC ?? randomBytes(SECRET_LENGTH))
+  const s1 = deriveAckKeyShare(secretC ?? randomBytes(PRESECRET_LENGTH))
 
   const ackChallenge = deriveAckKeyShare(secretB).toChallenge()
   const ticketChallenge = Response.fromHalfKeys(s0, s1).toChallenge()
@@ -44,14 +45,14 @@ export function createPoRValuesForSender(
  * information for each relayer
  */
 export function createPoRString(secretC: Uint8Array, secretD?: Uint8Array): Uint8Array {
-  if (secretC.length != SECRET_LENGTH || (secretD != undefined && secretD.length != SECRET_LENGTH)) {
+  if (secretC.length != PRESECRET_LENGTH || (secretD != undefined && secretD.length != PRESECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
   }
 
   const s0 = deriveAckKeyShare(secretC)
 
   const s1 = deriveOwnKeyShare(secretC)
-  const s2 = deriveAckKeyShare(secretD ?? randomBytes(SECRET_LENGTH))
+  const s2 = deriveAckKeyShare(secretD ?? randomBytes(PRESECRET_LENGTH))
 
   return Uint8Array.from([...createChallenge(s1, s2).serialize(), ...s0.toChallenge().serialize()])
 }
@@ -84,7 +85,7 @@ export function preVerify(
   porBytes: Uint8Array,
   challenge: EthereumChallenge
 ): ValidOutput | InvalidOutput {
-  if (secret.length != SECRET_LENGTH || porBytes.length != POR_STRING_LENGTH) {
+  if (secret.length != PRESECRET_LENGTH || porBytes.length != POR_STRING_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
