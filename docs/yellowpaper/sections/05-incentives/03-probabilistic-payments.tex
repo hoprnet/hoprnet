@@ -1,7 +1,21 @@
 \subsection{Probabilistic Payment Channels}
 \label{sec:incentives:probabilistic}
 
-TODO: add polish paper
+Payment channels give two nodes, $A$ and $B$, the opportunity to lock funds on-chain and later on handle who of them possesses which fraction. At each moment, it holds that
+
+$$ balance(A) + balance(B) = const. $$
+
+The state becomes final once one of the nodes submits the most recent state to the smart contract. Therefore it requires a proof by the counterparty that the proclaimed state is in their interest, which is given by a digital signature and named \textit{update transaction}. Hence an update transaction that transfers $x > 0$ digital assets from $A$ to $B$ is approved by,
+
+$$ update_i = Sig_A (balance(A) - x \ || \ balance(B) + x) $$
+
+By doing so, payments can only in one direction, turning the payment channel into a unidirectional payment channel. This is possible because digital assets will only be transferred from $A$ to $B$ and thus $B$ will always pick in its own the interest the most recent update transaction since $balance(B)$ is strictly increasing.
+
+If the channel allowed asset transfers in the opposite direction, namely from $B$ to $A$ the update transactions need to include a versioning element that prevents any of the parties from rollback to the most beneficial state since the smart contract is unable to determine the most recent transaction otherwise. Hence,
+
+$$ update_i = Sig_A (i \ || \ balance(A) - x \ || \ balance(B) + x) $$
+
+In addition, this requires certain timeframes in which the counterparty is given the opportunity to present their most recent update update transaction. This is necessary because none of the nodes can prove that there does \textit{not} exist a more recent update transaction. Once the timeout ends, and none of the parties have submitted any more recent update transaction, the last submitted state becomes final.
 
 \begin{figure}[H]
     \centering
@@ -30,6 +44,12 @@ TODO: add polish paper
     \label{fig:channels}
     \caption{Node $A$ and $B$ have a payment channel. Whilst in case of unidirectional payment channels, $balance(B)$ is strictly increasing, the derivative of $balance(B)$ \textit{can} change sign if the channel is bidirectional.}
 \end{figure}
+
+Within the HOPR protocol, payment channels are implemented as unidirectional channels, hence there \textit{can} be one from $A \rightarrow B$ and another one from $B \rightarrow A$. Whenever, an update transaction is submitted to the blockchain, the assets get transferred to the channel in the opposite direction, or directly to the counterparty if there is no such channel. This obviously controverses the original purpose of payment channels, which is \textit{aggregation} of asset transfers.
+
+When talking about unidirectional payment channels, aggregation means that $value(update_i) = value(update_{i-1}) + \Delta x$, hence $update_i$ makes $update_{i-1}$ obsolete as it already includes the additional assets $\Delta x$. So, if a node manages to receive $update_i$ before $update_{i-1}$, there is no need to provide the services the which were supposed to be compensated by $update_{i-1}$.
+
+This is problematic for HOPR because it uses \nameref{sec:incentives:proofofrelay} to unlock payment made from one node to the other and the state of a payment channel between nodes $n_{i-1}$ and $n_i$ therefore relies on third-party actions, namely by $n_{i+1}$ and $n_{i+1}'$. Both of them acknowledge the reception of the packet and the correct transformation done by node $n_i$. Using update transactions arises the question which update transaction node $n_{i+1}$ and node $n_{i+1}'$ should sign because they cannot know which acknowledgement reaches $n_i$ first. Hence, the incentives for packet need to be done independently and thus should not rely on update transactions.
 
 \begin{figure}[H]
     \centering
@@ -60,13 +80,7 @@ TODO: add polish paper
     \label{fig:sharedpaymentchannel}
 \end{figure}
 
-% Use data structure tickets
-
-% Steady payments, expect continuous payments
-
-% Entropy
-
-% Continuous payments
+\paragraph{Probabilistic payments}
 
 \paragraph{Payment channels}
 
