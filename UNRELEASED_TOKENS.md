@@ -25,7 +25,7 @@ Read [#2093](https://github.com/hoprnet/hoprnet/issues/2093) for context and [#2
 16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h
 ```
 
-2. PM creates a github issue containing the email's content and assigns a [team member](#who-is-team-member) to tackle. Any personally identifyable data should be removed from the email.
+2. One of the [Representantives](./.processes/development.md#representantives) creates a github issue containing the email's content. Any personally identifyable data should be removed from the email. Issue is treated as a [Fire alarm](./.processes/development.md#fire-alarm).
 3. Team member must then verify the validity of the request:
 
    1. User has indeed signed the right message:
@@ -59,13 +59,6 @@ Hello,
 
 Your HOPR ID has been added into the list.
 ```
-
-## Who is "team member"
-
-The release's [PM](./.processes/development.md) is responsible for ensuring that a new entry is added within atleast 2 working days.
-
-- PM has the ability to assign himself or a team member to follow up on newly created issue
-- Assigned team member must not be on holidays and should prioritize this issue
 
 ## Notes for tech
 
