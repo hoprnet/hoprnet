@@ -1,5 +1,5 @@
 import { expand } from 'futoin-hkdf'
-import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH, TAG_LENGTH } from './constants'
+import {HASH_ALGORITHM, HASH_LENGTH, TAG_LENGTH, PRESECRET_LENGTH} from './constants'
 import { SECP256K1_CONSTANTS } from '../constants'
 import { PRG_IV_LENGTH, PRG_KEY_LENGTH } from '../prg'
 import { PRP_IV_LENGTH, PRP_KEY_LENGTH } from '../prp'
@@ -18,7 +18,7 @@ const HASH_KEY_PACKET_TAG = 'HASH_KEY_PACKET_TAG'
  * @returns the blinding
  */
 export function deriveBlinding(secret: Uint8Array): Uint8Array {
-  if (secret.length != SECRET_LENGTH) {
+  if (secret.length != PRESECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
@@ -38,7 +38,7 @@ export function deriveBlinding(secret: Uint8Array): Uint8Array {
  * @returns the PRG seed
  */
 export function derivePRGParameters(secret: Uint8Array): PRGParameters {
-  if (secret.length != SECRET_LENGTH) {
+  if (secret.length != PRESECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
@@ -57,7 +57,7 @@ export function derivePRGParameters(secret: Uint8Array): PRGParameters {
  * @returns
  */
 export function derivePRPParameters(secret: Uint8Array): PRPParameters {
-  if (secret.length != SECRET_LENGTH) {
+  if (secret.length != PRESECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
@@ -70,7 +70,7 @@ export function derivePRPParameters(secret: Uint8Array): PRPParameters {
 }
 
 export function derivePacketTag(secret: Uint8Array): Uint8Array {
-  if (secret.length != SECRET_LENGTH) {
+  if (secret.length != PRESECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 

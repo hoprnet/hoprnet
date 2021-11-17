@@ -1,6 +1,6 @@
 import { u8aEquals, u8aXOR } from '../../u8a'
 import { derivePRGParameters } from './keyDerivation'
-import { MAC_LENGTH, SECRET_LENGTH, END_PREFIX, END_PREFIX_LENGTH } from './constants'
+import {MAC_LENGTH, END_PREFIX, END_PREFIX_LENGTH, PRESECRET_LENGTH} from './constants'
 import { SECP256K1_CONSTANTS } from '../constants'
 import { randomFillSync } from 'crypto'
 import { PRG } from '../prg'
@@ -28,7 +28,7 @@ export function createRoutingInfo(
   additionalDataLastHop?: Uint8Array
 ): { routingInformation: Uint8Array; mac: Uint8Array } {
   if (
-    secrets.some((s) => s.length != SECRET_LENGTH) ||
+    secrets.some((s) => s.length != PRESECRET_LENGTH) ||
     additionalDataRelayer.some((r) => r.length != additionalDataRelayerLength) ||
     secrets.length > maxHops
   ) {
@@ -81,6 +81,7 @@ export function createRoutingInfo(
       // Add pubkey of next downstream node
       extendedHeader.set(path[invIndex + 1].pubKey.marshal())
 
+      // !!lukas-note: check if this is really doing what it should
       extendedHeader.set(mac, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)
 
       extendedHeader.set(additionalDataRelayer[invIndex], SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
@@ -130,7 +131,7 @@ export function forwardTransform(
 
   const headerLength = lastHopLength + (maxHops - 1) * routingInfoLength
 
-  if (secret.length != SECRET_LENGTH || mac.length != MAC_LENGTH || preHeader.length != headerLength) {
+  if (secret.length != PRESECRET_LENGTH || mac.length != MAC_LENGTH || preHeader.length != headerLength) {
     throw Error(`Invalid arguments`)
   }
 
