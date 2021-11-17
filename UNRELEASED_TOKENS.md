@@ -72,6 +72,7 @@ The release's [PM](./.processes/development.md) is responsible for ensuring that
 - A live **mainnet** instance has not been deployed yet, this means that the discribed process cannot be followed through yet.
 - Test [unreleasedTokens.spec.ts](./packages/cover-traffic/unreleasedTokens.json) validates entries on each PR, however it does not validate if the `CLAIMANT_ADDR` has claimable tokens. This is topic we will have to tackle once tokens become claimable.
 - While we may run HOPR in xDai, Goerli, or other networks, `unreleasedTokens` source of truth lives in a **mainnet** HoprDistributor contract. These tokens should only affect importance calculation when HOPR is running on `xDai` or `mainnet`, else it can be ignored.
+- **mainnet** HoprDistributor contract can be updated. Therefore, when the tech team is made aware of such updates, `allocation` field inside the `unreleasedTokens.json` should be updated at the same time. To update this field, please download the result from the [Dune query](https://dune.xyz/queries/237335/444204) and use the [parsing tool](https://github.com/hoprnet/hopr-devrel/tree/parse-unrelased-token/parse-unreleased-token) to get the correct format.
 
 ## Notes for community
 
