@@ -54,39 +54,39 @@ export const totalChannelBalanceFor = (p: PublicKey, state: State): BN =>
     .reduce(addBN, new BN('0'))
 
 /**
- * Get the stake of a node which consists of the total channel balance 
+ * Get the stake of a node which consists of the total channel balance
  * and the unreleased token amount in big number
- * 
+ *
  * stake(n) = unreleasedTokens(n) + totalChannelBalance(n)
- * 
+ *
  * @param p Public key of the node
  * @param state State of the network
  * @returns Stake of a node in big number
  */
 export const stakeFor = (p: PublicKey, state: State): BN => {
   const linkedAccountsIndex = Object.keys(unreleasedTokens.link).findIndex(
-    id => id.toLowerCase() == p.toB58String().toLowerCase()
+    (id) => id.toLowerCase() == p.toB58String().toLowerCase()
   )
-  
+
   if (linkedAccountsIndex < 0) {
-    return totalChannelBalanceFor(p, state);
+    return totalChannelBalanceFor(p, state)
   }
 
   const currentBlockNumber = state.block.toNumber()
 
-  return Object.values(unreleasedTokens.link)[linkedAccountsIndex].map(
-    (nodeAddress) => {
+  return Object.values(unreleasedTokens.link)
+    [linkedAccountsIndex].map((nodeAddress) => {
       const scheduleIndex = unreleasedTokens.allocation[nodeAddress].findIndex(
-        schedule => schedule.lowerBlock <= currentBlockNumber && currentBlockNumber < schedule.upperBlock
+        (schedule) => schedule.lowerBlock <= currentBlockNumber && currentBlockNumber < schedule.upperBlock
       )
-      return scheduleIndex < 0 
-      ? new BN('0') 
-      : new BN(unreleasedTokens.allocation[nodeAddress][scheduleIndex].unreleased)
+      return scheduleIndex < 0
+        ? new BN('0')
+        : new BN(unreleasedTokens.allocation[nodeAddress][scheduleIndex].unreleased)
     })
     .reduce(addBN, new BN('0'))
     .add(totalChannelBalanceFor(p, state))
 }
-  
+
 /**
  * Get the importance score of a node, given the network state.
  * Sum of the square root of all the outgoing channels
@@ -98,9 +98,7 @@ export const stakeFor = (p: PublicKey, state: State): BN => {
  */
 export const importance = (p: PublicKey, state: State): BN =>
   findChannelsFrom(p, state)
-    .map((c: ChannelEntry) =>
-      sqrtBN(stakeFor(p, state).mul(c.balance.toBN()).mul(stakeFor(c.destination, state)))
-    )
+    .map((c: ChannelEntry) => sqrtBN(stakeFor(p, state).mul(c.balance.toBN()).mul(stakeFor(c.destination, state))))
     .reduce(addBN, new BN('0'))
 
 /**
