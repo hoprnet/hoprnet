@@ -48,6 +48,7 @@ Responsibilities:
 
 - to be the bridge between tech team and Project Owner
 - daily check for community created tasks in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
+- daily check for new [unreleased tokens](../UNRELEASED_TOKENS.md) emails send to `tech@hoprnet.org`
 
 _Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nionis)
 
