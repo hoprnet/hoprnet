@@ -77,9 +77,14 @@ export function forwardTransform(alpha: Uint8Array, privKey: PeerId): { alpha: U
     throw Error(`Invalid arguments`)
   }
 
-  const secret = keyExtract(publicKeyTweakMul(alpha, privKey.privKey.marshal(), false), privKey.pubKey.marshal())
+  const decomp_alpha = publicKeyConvert(alpha, false)
 
-  return { alpha: publicKeyConvert(publicKeyTweakMul(alpha, secret, false)), secret }
+  const s_k = publicKeyTweakMul(decomp_alpha, privKey.privKey.marshal(), false)
+  const b_k = keyExtract(s_k, decomp_alpha)
+
+  const alpha_next = publicKeyTweakMul(decomp_alpha, b_k, false)
+
+  return { alpha: publicKeyConvert(alpha_next), secret: s_k }
 }
 
 function keyExtract(groupElement: Uint8Array, pubKey: Uint8Array): Uint8Array {
