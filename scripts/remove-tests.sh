@@ -15,7 +15,7 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [<pkg_dir>]"
+  msg "Usage: $0 <pkg_dir>"
   msg
   msg "\t<pkg_dir> package directory, e.g. 'packages/utils'"
   msg
@@ -27,7 +27,9 @@ declare packagedir
 packagedir=$1
 
 # Remove built unit tests and source maps from given directory
-rm -Rf ${mydir}/../${packagedir}/lib/**/*.spec.js ${mydir}/../${packagedir}/lib/*.spec.js
-rm -Rf ${mydir}/../${packagedir}/lib/**/*.spec.js.map ${mydir}/../${packagedir}/lib/*.spec.js.map
-rm -Rf ${mydir}/../${packagedir}/lib/**/*.spec.d.ts ${mydir}/../${packagedir}/lib/*.spec.d.ts
-rm -Rf ${mydir}/../${packagedir}/lib/**/*.spec.d.ts.map ${mydir}/../${packagedir}/lib/*.spec.d.ts.map
+find ${mydir}/../${packagedir}/lib \
+  -name "*.spec.js" -delete -o \
+  -name "*.spec.js.map" -delete -o \
+  -name "*.spec.d.ts" -delete -o \
+  -name "*.spec.d.ts.map" -delete
+

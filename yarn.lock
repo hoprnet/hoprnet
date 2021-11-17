@@ -1179,6 +1179,7 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@types/mocha": 9.0.0
     async-mutex: ^0.3.2
     bn.js: 5.2.0
     chai: 4.3.4
@@ -1211,6 +1212,7 @@ __metadata:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/chai-as-promised": 7.1.4
+    "@types/mocha": 9.0.0
     abort-controller: ^3.0.0
     bn.js: 5.2.0
     chai: 4.3.4
@@ -1245,8 +1247,7 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@types/blessed": 0.1.19
-    "@types/rimraf": 3.0.2
+    "@types/mocha": 9.0.0
     "@types/yargs": 17.0.5
     bignumber.js: 9.0.1
     bn.js: 5.2.0
@@ -1377,7 +1378,7 @@ __metadata:
     "@ceramicnetwork/stream-tile": ^1.2.0
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@types/body-parser": 1.19.1
+    "@types/mocha": 9.0.0
     "@types/yargs": 17.0.5
     bn.js: 5.2.0
     body-parser: ^1.19.0
@@ -2336,15 +2337,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/blessed@npm:0.1.19":
-  version: 0.1.19
-  resolution: "@types/blessed@npm:0.1.19"
-  dependencies:
-    "@types/node": "*"
-  checksum: 255e6f5ffdfcea15400d01ee468585f04b72d0a263bd1972e9ae236157d24e5e01524591d751b992afe761a67b648bc296633935c6018425593175c7d055775d
-  languageName: node
-  linkType: hard
-
 "@types/bn.js@npm:*, @types/bn.js@npm:^5.1.0":
   version: 5.1.0
   resolution: "@types/bn.js@npm:5.1.0"
@@ -2360,16 +2352,6 @@ __metadata:
   dependencies:
     "@types/node": "*"
   checksum: 7f66f2c7b7b9303b3205a57184261974b114495736b77853af5b18d857c0b33e82ce7146911e86e87a87837de8acae28986716fd381ac7c301fd6e8d8b6c811f
-  languageName: node
-  linkType: hard
-
-"@types/body-parser@npm:1.19.1":
-  version: 1.19.1
-  resolution: "@types/body-parser@npm:1.19.1"
-  dependencies:
-    "@types/connect": "*"
-    "@types/node": "*"
-  checksum: 2990656ea2de81f3529a3359a79a13b67feb4c627caf7a367fdc0017a178e567b0cc410546bdd219104ad7197c5ee5a90b70193f5253839ea43d9cdb2d2dacee
   languageName: node
   linkType: hard
 
@@ -2398,15 +2380,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/connect@npm:*":
-  version: 3.4.35
-  resolution: "@types/connect@npm:3.4.35"
-  dependencies:
-    "@types/node": "*"
-  checksum: fe81351470f2d3165e8b12ce33542eef89ea893e36dd62e8f7d72566dfb7e448376ae962f9f3ea888547ce8b55a40020ca0e01d637fab5d99567673084542641
-  languageName: node
-  linkType: hard
-
 "@types/console-log-level@npm:^1.4.0":
   version: 1.4.2
   resolution: "@types/console-log-level@npm:1.4.2"
@@ -2423,7 +2396,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/glob@npm:*, @types/glob@npm:^7.1.1":
+"@types/glob@npm:^7.1.1":
   version: 7.2.0
   resolution: "@types/glob@npm:7.2.0"
   dependencies:
@@ -2629,16 +2602,6 @@ __metadata:
   version: 0.12.1
   resolution: "@types/retry@npm:0.12.1"
   checksum: 5f46b2556053655f78262bb33040dc58417c900457cc63ff37d6c35349814471453ef511af0cec76a540c601296cd2b22f64bab1ab649c0dacc0223765ba876c
-  languageName: node
-  linkType: hard
-
-"@types/rimraf@npm:3.0.2":
-  version: 3.0.2
-  resolution: "@types/rimraf@npm:3.0.2"
-  dependencies:
-    "@types/glob": "*"
-    "@types/node": "*"
-  checksum: b47fa302f46434cba704d20465861ad250df79467d3d289f9d6490d3aeeb41e8cb32dd80bd1a8fd833d1e185ac719fbf9be12e05ad9ce9be094d8ee8f1405347
   languageName: node
   linkType: hard
 
