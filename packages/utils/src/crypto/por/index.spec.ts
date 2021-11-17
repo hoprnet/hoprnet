@@ -11,7 +11,7 @@ import { Response } from '../../types'
 import { randomBytes } from 'crypto'
 import { deriveAckKeyShare } from './keyDerivation'
 import assert from 'assert'
-import {PRESECRET_LENGTH} from "../packet/constants";
+import { PRESECRET_LENGTH } from '../packet/constants'
 
 describe('PoR - proof of relay', function () {
   it('generate PoR string, preVerify, validate', function () {

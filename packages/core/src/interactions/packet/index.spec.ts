@@ -25,7 +25,7 @@ import assert from 'assert'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
-import {PRESECRET_LENGTH} from "@hoprnet/hopr-utils/lib/crypto/packet/constants";
+import { PRESECRET_LENGTH } from '@hoprnet/hopr-utils/lib/crypto/packet/constants'
 
 //const SECRET_LENGTH = 32
 

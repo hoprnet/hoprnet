@@ -2,7 +2,7 @@ import { expand } from 'futoin-hkdf'
 import { privateKeyVerify } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
 import { HalfKey } from '../../types'
-import {PRESECRET_LENGTH} from "../packet/constants";
+import { PRESECRET_LENGTH } from '../packet/constants'
 
 const HASH_KEY_OWN_KEY = 'HASH_KEY_OWN_KEY'
 const HASH_KEY_ACK_KEY = 'HASH_KEY_ACK_KEY'
