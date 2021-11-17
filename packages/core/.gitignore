@@ -16,3 +16,7 @@ log.txt
 
 # Exclude built npm packages
 *.tgz
+
+# Exclude coverage
+.nyc_output
+coverage

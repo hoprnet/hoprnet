@@ -1,15 +1,22 @@
 {
   "master-goerli": {
-    "git_ref": "refs/heads/master",
+    "git_ref": "^master$",
     "environment_id": "master-goerli",
     "default": true
   },
-  "master-xdai": {
-    "git_ref": "refs/heads/master",
-    "environment_id": "master-xdai"
+  "tuttlingen": {
+    "git_ref": "^release/tuttlingen$",
+    "environment_id": "tuttlingen",
+    "version_major": "1",
+    "version_minor": "83"
+  },
+  "debug-goerli": {
+    "git_ref": "^debug-deploy/.*",
+    "environment_id": "debug-goerli",
+    "default": true
   },
   "integration-test": {
-    "git_ref": "refs/heads/integration/release-environment-v2",
+    "git_ref": "^integration/.*",
     "environment_id": "master-goerli",
     "default": true
   }

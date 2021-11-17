@@ -36,6 +36,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   await result.deploy()
 }
 
-main.dependencies = ['preDeploy']
+main.dependencies = ['preDeploy', 'HoprToken']
+main.tags = ['HoprChannels']
 
 export default main

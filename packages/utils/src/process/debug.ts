@@ -1,5 +1,5 @@
 import debug from 'debug'
-import util from 'util'
+import { format } from 'util'
 import pino from 'pino'
 import { createWriteStream } from 'pino-logflare'
 
@@ -14,7 +14,7 @@ const logger = pino({}, stream)
 const wrappedDebug = (namespace: any) => {
   return (message: any, ...parameters: any[]) => {
     if (process.env.TELEMETRY && process.env.TELEMETRY_ID) {
-      const log = util.format(message, ...parameters)
+      const log = format(message, ...parameters)
       logger.info({ id: process.env.TELEMETRY_ID, log: log, ts: new Date(Date.now()).toISOString() })
     }
     return debug(namespace)(message, ...parameters)

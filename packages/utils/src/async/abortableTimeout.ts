@@ -1,5 +1,5 @@
 import { defer } from './defer'
-import { debug } from '../debug'
+import { debug } from '../process'
 
 const logError = debug('hopr:lateTimeout')
 

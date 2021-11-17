@@ -6,7 +6,7 @@ import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import Hopr, { resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 
 import setupAPI from './api'
@@ -276,7 +276,7 @@ async function main() {
   // 2. Create node instance
   try {
     logs.log('Creating HOPR Node')
-    node = new Hopr(peerId, options)
+    node = createHoprNode(peerId, options)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
 
@@ -301,11 +301,13 @@ async function main() {
       })
     }
 
+    logs.log(`Node address: ${node.getId().toB58String()}`)
+
     const ethAddr = (await node.getEthereumAddress()).toHex()
     const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
-    logs.log(`Node address: ${node.getId().toB58String()}`)
     logs.log(`Node is not started, please fund this node ${ethAddr} with atleast ${fundsReq}`)
+
     // 2.5 Await funding of wallet.
     await node.waitForFunds()
     logs.log('Node has been funded, starting...')
@@ -333,14 +335,12 @@ async function main() {
         }
         await cmds.execute((msg) => {
           logs.log(msg)
-          console.log(msg)
         }, c)
       }
       await node.stop()
       process.exit(0)
     }
   } catch (e) {
-    console.log(e)
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
     if (!argv.admin) {

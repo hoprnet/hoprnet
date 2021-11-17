@@ -1,16 +1,22 @@
-import Hopr from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
 import path from 'path'
-import { debug } from '@hoprnet/hopr-utils'
 import { parse, URL } from 'url'
 import next from 'next'
 import type { Server as HttpServer } from 'http'
 import stripAnsi from 'strip-ansi'
-import { LogStream } from './logs'
+import type { LogStream } from './logs'
 import { NODE_ENV } from './env'
-import { Balance, NativeBalance, SUGGESTED_BALANCE, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import {
+  Balance,
+  NativeBalance,
+  SUGGESTED_BALANCE,
+  SUGGESTED_NATIVE_BALANCE,
+  debug,
+  startResourceUsageLogger
+} from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import cookie from 'cookie'
 
@@ -72,11 +78,22 @@ export class AdminServer {
   }
 
   async setup() {
-    let adminPath = path.resolve(__dirname, '../hopr-admin/')
-    if (!fs.existsSync(adminPath)) {
-      // In Docker
-      adminPath = path.resolve(__dirname, './hopr-admin')
+    let adminPath
+    for (const adminRelPath of ['../hopr-admin', './hopr-admin']) {
+      const adminPathInt = path.resolve(__dirname, adminRelPath)
+      const nextPath = path.resolve(adminPathInt, '.next')
+      if (!fs.existsSync(nextPath)) {
+        continue
+      }
+      adminPath = adminPathInt
+      break
     }
+
+    if (!adminPath) {
+      console.log('Failed to start Admin interface: could not find NextJS app')
+      process.exit(1)
+    }
+
     debugLog('using', adminPath)
 
     const nextConfig = {
@@ -100,7 +117,7 @@ export class AdminServer {
     })
 
     this.server.once('error', (err: any) => {
-      console.log(`Failed to start Admin interface`)
+      console.log('Failed to start Admin interface')
       console.log(err)
       process.exit(1)
     })
@@ -180,7 +197,7 @@ export class AdminServer {
 
     // Setup some noise
     connectionReport(this.node, this.logs)
-    reportMemoryUsage(this.logs)
+    startResourceUsageLogger(debugLog)
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
 
@@ -195,13 +212,6 @@ export function showDisclaimer(logs: LogStream) {
   setInterval(() => {
     logs.warn(DISCLAIMER)
   }, 60 * 1000)
-}
-
-export async function reportMemoryUsage(logs: LogStream) {
-  const used = process.memoryUsage()
-  const usage = process.resourceUsage()
-  debugLog(`Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` + `cputime: ${usage.userCPUTime}`)
-  setTimeout(() => reportMemoryUsage(logs), 60_000)
 }
 
 export async function connectionReport(node: Hopr, logs: LogStream) {

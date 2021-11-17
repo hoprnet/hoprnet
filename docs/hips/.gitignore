@@ -1,0 +1,15 @@
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.bbl
+*.blg
+*.synctex.gz
+*.synctex(busy)
+*.xdv
+
+# temp latex files
+**/__latexindent_temp.tex
+*.bcf
+*.xml

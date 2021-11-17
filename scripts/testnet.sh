@@ -87,13 +87,20 @@ fund_if_empty() {
       # need to wait to make retries work
       local ethers_opts="--rpc ${rpc} --account ${FUNDING_PRIV_KEY} --yes --wait"
 
+      # the funding might fail due to network issues and such, but we don't want to block the deployment on such occassions entirely
+      # thus, we continue anyway after retrying a few times
+
       log "Funding account with native token -> ${address} ${min_funds}"
-      try_cmd "yarn run --silent ethers send ${address} ${min_funds} ${ethers_opts}" 12 10
+      if ! try_cmd "yarn run --silent ethers send ${address} ${min_funds} ${ethers_opts}" 3 3; then
+        log "Funding account with native token -> ${address} ${min_funds} - FAILED"
+      fi
 
       if [ -n "${token_contract}" ]; then
         # at this point we assume that the account needs HOPR as well
         log "Funding account with HOPR token -> ${address} ${min_funds_hopr}"
-        try_cmd "yarn run --silent ethers send-token ${token_contract} ${address} ${min_funds_hopr} ${ethers_opts}" 12 10
+        if ! try_cmd "yarn run --silent ethers send-token ${token_contract} ${address} ${min_funds_hopr} ${ethers_opts}" 3 3; then
+          log "Funding account with HOPR token -> ${address} ${min_funds_hopr} - FAILED"
+	fi
       fi
     fi
   fi
@@ -232,24 +239,4 @@ add_keys() {
   else
     echo "Authorized keys file not found"
   fi
-}
-
-# ----- Start Testnet -------
-#
-# Using a standard naming scheme, based on a name, we
-# either update or start VM's to create a network of
-# N nodes
-
-# $1=network name
-# $2=number of nodes
-# $3=docker image
-# $4=chain provider
-start_testnet() {
-  for i in $(seq 1 $2);
-  do
-    log "Start node $i"
-    start_testnode $1 $3 $i ${4}
-  done
-  # @jose can you fix this pls.
-  # add_keys scripts/keys/authorized_keys
 }
