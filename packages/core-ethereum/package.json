@@ -12,7 +12,7 @@
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc",
-    "prepack": "../../scripts/remove-tests.sh packages/core-ethereum",
+    "prepack": "../../scripts/remove-tests.sh core-ethereum",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },

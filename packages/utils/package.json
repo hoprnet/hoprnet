@@ -12,7 +12,7 @@
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
-    "prepack": "../../scripts/remove-tests.sh packages/utils",
+    "prepack": "../../scripts/remove-tests.sh utils",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
