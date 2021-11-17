@@ -96,7 +96,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) {}
+  ) { }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -173,6 +173,7 @@ class Hopr extends EventEmitter {
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
+    log('Starting on-chain payment channel from Hopr class via "startedPaymentChannels"')
     return await this.chain.start()
   }
 
@@ -201,7 +202,10 @@ class Hopr extends EventEmitter {
    */
   public async start() {
     this.status = 'INITIALIZING'
-    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
+    log('Starting hopr node...')
+    const balance = await this.getNativeBalance()
+    verbose('Retrieve node balance', balance.toBN().lte(MIN_NATIVE_BALANCE), MIN_NATIVE_BALANCE)
+    if (!balance || balance.toBN().lte(MIN_NATIVE_BALANCE)) {
       throw new Error('Cannot start node without a funded wallet')
     }
 
@@ -309,7 +313,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => {},
+      () => { },
       protocolAck
     )
 
@@ -762,6 +766,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getNativeBalance(): Promise<NativeBalance> {
+    verbose('Requesting native balance from node.')
     const chain = await this.startedPaymentChannels()
     return await chain.getNativeBalance(true)
   }

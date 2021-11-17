@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "yarn workspace @hoprnet/hopr-ethereum run build:sol:types && echo \"Building Typescript files\" && tsc --build tsconfig.build.json && yarn workspace @hoprnet/hoprd run buildAdmin",
+    "build:core": "yarn workspace @hoprnet/hopr-core run build",
     "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
