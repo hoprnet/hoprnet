@@ -328,10 +328,13 @@ wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 #  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json yarn workspace @hoprnet/hopr-ethereum exec "hardhat faucet" \
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum exec "hardhat faucet" \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \
+  --network hardhat \
   --password "${password}"
 # }}}
 
