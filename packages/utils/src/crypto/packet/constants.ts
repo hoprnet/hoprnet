@@ -2,7 +2,7 @@
  * Hash algorithm that is used to derive the shared secrets
  * and its output length
  */
-import {SECP256K1_CONSTANTS} from "../constants";
+import { SECP256K1_CONSTANTS } from '../constants'
 
 export const HASH_ALGORITHM = 'blake2s256'
 export const HASH_LENGTH = 32
