@@ -25,9 +25,8 @@ import assert from 'assert'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
-import { SECRET_LENGTH } from '@hoprnet/hopr-utils/lib/crypto/packet/constants'
 
-//const SECRET_LENGTH = 32
+const SECRET_LENGTH = 32
 
 const TEST_MESSAGE = new TextEncoder().encode('test message')
 

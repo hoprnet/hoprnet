@@ -4,7 +4,7 @@ import { SECP256K1_CONSTANTS } from '../constants'
 import { HalfKeyChallenge, HalfKey, Challenge, Response, EthereumChallenge } from '../../types'
 import { u8aSplit } from '../../u8a'
 import { randomBytes } from 'crypto'
-import { SECRET_LENGTH } from '../packet/constants'
+import { SECRET_LENGTH } from "./constants";
 
 export const POR_STRING_LENGTH = 2 * SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
 
