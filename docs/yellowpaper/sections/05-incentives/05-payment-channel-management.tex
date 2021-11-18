@@ -56,7 +56,7 @@ $$ channelId = keccak256 (\ ethAddr(n_{open}) \ || \ ethAddr(n_{dest}) \ ) $$
 
 where $ethAddr$ maps public keys to Ethereum addresses. Note that using this scheme leads to different $channelIds$ for the channel from $n_{open} \rightarrow n_{dest}$ and the one from $n_{dest} \rightarrow n_{open}$.
 
-Once $n_{open}$ locks funds, the smart contract instantiates the data structure \textit{ChannelData} and stores it under the previously computed $channelId$ within its storage. Instantiation of \textit{ChannelData} can happen it two ways: either there has been a previous instance of the channel of not. If there were one, the smart contract keeps the values $commitment$ and $epoch$ from the previous instance. For $epoch$ this is necessary because tickets from previous instances must lose their value once the channel gets closed. This is achieved by incrementing $epoch$ on every incarnation of the channel. On the other hand, commitments are kept to simplify channel reopenings.
+Once $n_{open}$ locks funds, the smart contract instantiates the data structure \textit{ChannelData} and stores it under the previously computed $channelId$ within its storage. Instantiation of \textit{ChannelData} can happen it two ways: either there has been a previous instance of the channel of not. If there has been one, the smart contract keeps the values $commitment$ and $epoch$ from the previous instance. For $epoch$ this is necessary because tickets from previous instances must lose their value once the channel gets closed. This is achieved by incrementing $epoch$ on every incarnation of the channel. On the other hand, commitments are kept to simplify channel reopenings.
 
 \begin{figure}[H]
     \centering
