@@ -3,15 +3,22 @@ import PeerId from 'peer-id'
 import Hopr from '@hoprnet/hopr-core'
 import { HoprOptions } from '@hoprnet/hopr-core'
 import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
-import { debug, privKeyToPeerId, HoprDB, NativeBalance } from '@hoprnet/hopr-utils'
+import { debug, privKeyToPeerId, HoprDB, NativeBalance, AccountEntry, Address } from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
 import BN from 'bn.js'
+import ConnectionManager from 'libp2p/src/connection-manager'
+import PeerStore from 'libp2p/src/peer-store'
+import { Multiaddr } from 'multiaddr'
+import AddressManager from 'libp2p/src/address-manager'
 
 const namespace = 'hopr:test:cover-traffic'
 const log = debug(namespace)
 
 describe('cover-traffic daemon', async function () {
   const privateKey = '0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332'
+  const sampleAddress = Address.fromString('0x55CfF15a5159239002D57C591eF4ACA7f2ACAfE6')
+  const samplePeerId = PeerId.createFromB58String('16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7');
+  const sampleMultiaddrs = new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${samplePeerId.toB58String()}`)
 
   let node: Hopr, libp2p: LibP2P, indexer: Indexer
   let peerId: PeerId, db: HoprDB, chain: HoprCoreEthereum, options: HoprOptions
@@ -40,26 +47,50 @@ describe('cover-traffic daemon', async function () {
           // @TODO: Pick a more relevant value.
           return Promise.resolve(new NativeBalance(new BN('10000000000000000000')))
         },
+        getPublicKey: () => {
+          chainLogger('getPublicKey method was called')
+          return {
+            toAddress: () => Promise.resolve(sampleAddress)
+          }
+        },
+        getAccount: () => {
+          chainLogger('getAccount method was called')
+          return Promise.resolve(new AccountEntry(sampleAddress, sampleMultiaddrs, new BN('1')))
+        },
         waitForPublicNodes: () => {
           chainLogger('On-chain request for existing public nodes.')
           return Promise.resolve([])
         },
-        on: () => {
-          chainLogger('On-chain signal for event.')
+        announce: () => {
+          chainLogger('On-chain announce request sent');
+        },
+        on: (event: string) => {
+          chainLogger(`On-chain signal for event "${event}"`)
         },
         indexer: {
-          on: () => indexerLogger('Indexer on handler top of chain called'),
-          off: () => indexerLogger('Indexer off handler top of chain called')
+          on: (event: string) => indexerLogger(`Indexer on handler top of chain called with event "${event}"`),
+          off: (event: string) => indexerLogger(`Indexer off handler top of chain called with event "${event}`)
         }
       };
     });
 
     const libp2pLogger = debug(namespace + ':libp2p')
     libp2p = sinon.createStubInstance(LibP2P)
+    libp2p._options = Object.assign({}, libp2p._options, {
+      addresses: {
+        announceFilter: () => [sampleMultiaddrs]
+      }
+    })
     sinon.stub(LibP2P, 'create').callsFake(() => {
       libp2pLogger('libp2p stub started')
       return Promise.resolve(libp2p)
     })
+    libp2p.connectionManager = sinon.createStubInstance(ConnectionManager)
+    libp2p.connectionManager.on = sinon.fake((event: string) => {
+      libp2pLogger(`Connection manager event handler called with event "${event}"`)
+    })
+    libp2p.peerStore = new PeerStore({ peerId: samplePeerId });
+    libp2p.addressManager = new AddressManager(peerId, { announce: [sampleMultiaddrs.toString()] })
 
     node = new Hopr(peerId, db, chain, options)
   })
