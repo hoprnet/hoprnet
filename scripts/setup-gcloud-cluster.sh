@@ -50,7 +50,7 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
-: ${FUNDING_PRIV_KEY?"Missing env var FUNDING_PRIV_KEY"}
+: ${FUNDING_PRIV_KEY?"Missing environment variable FUNDING_PRIV_KEY"}
 
 declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}

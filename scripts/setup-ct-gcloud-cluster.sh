@@ -21,11 +21,12 @@ usage() {
   msg "Once usage has completed the script can be used to cleanup the"
   msg "cluster as well."
   msg
-  msg "Usage: $0 [<cluster_id> [<docker_image_tag> [<number_of_nodes>]]]"
+  msg "Usage: $0 <environment> [<number_of_nodes> [<cluster_id> [<docker_image>]]]"
   msg
-  msg "where <cluster_id>\t\tuses a random value as default"
-  msg "      <docker_image_tag>\tuses 'latest' as default"
-  msg "      <number_of_nodes>\tuses '1' as default"
+  msg "where <environment>\t\tthe environment from which the smart contract addresses are derived"
+  msg "      <number_of_nodes>\t\tuses '1' as default"
+  msg "      <cluster_id>\t\tuses a random value as default"
+  msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hopr-cover-traffic-daemon:<environment>' as default"
   msg
   msg "The docker image 'gcr.io/hoprassociation/hopr-cover-traffic-daemon' is used."
   msg
@@ -46,15 +47,16 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
-declare cluster_id="${1:-custom-ct-cluster-${RANDOM}-${RANDOM}}"
-declare docker_image_tag=${2:-latest}
-declare number_of_nodes=${3:-1}
+: ${CT_PRIV_KEY?"Missing environment variable CT_PRIV_KEY"}
 
-declare docker_image="gcr.io/hoprassociation/hopr-cover-traffic-daemon:${docker_image_tag}"
+declare environment="${1?"missing parameter <environment>"}"
+declare number_of_nodes=${2:-1}
+declare cluster_id="${3:-${environment}-cover-traffic--${RANDOM}-${RANDOM}}"
+declare docker_image=${4:-gcr.io/hoprassociation/hopr-cover-traffic-daemon:${environment}}
+
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-1}"
 
-test -z "${CT_PRIV_KEY:-}" && { msg "Missing environment variable CT_PRIV_KEY"; usage; exit 1; }
 
 function cleanup {
   local EXIT_CODE=$?
@@ -80,6 +82,7 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
   log "Pre-Start Info"
   log "\tdocker_image: ${docker_image}"
   log "\tcluster_id: ${cluster_id}"
+  log "\tenvironment: ${environment}"
   log "\tperform_cleanup: ${perform_cleanup}"
   log "\tshow_prestartinfo: ${show_prestartinfo}"
 fi
@@ -90,7 +93,7 @@ fi
 gcloud_create_or_update_instance_template \
   "${cluster_id}" \
   "${docker_image}" \
-  "" \
+  "${environment}" \
   "" \
   "" \
   "${CT_PRIV_KEY}" \
