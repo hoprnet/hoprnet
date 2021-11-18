@@ -144,6 +144,15 @@ if (require.main === module) {
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)
 
+  process.on('unhandledRejection', (err: Error) => {
+    if (err.message === 'Peer lookup failed') {
+      // @TODO: this is a hack to prevent from crashing with unresolved rejection
+      // due to libp2p bug, see: https://github.com/libp2p/js-libp2p/pull/1025/files
+      return
+    }
+    throw err
+  })
+
   process.on('uncaughtExceptionMonitor', (err, origin) => {
     // Make sure we get a log.
     log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
