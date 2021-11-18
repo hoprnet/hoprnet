@@ -55,7 +55,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
     announce: false,
     createDbIfNotExist: true,
     environment,
-    forceCreateDB: true,
+    forceCreateDB: false,
     password: ''
   }
 
