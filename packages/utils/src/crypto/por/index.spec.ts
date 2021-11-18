@@ -11,12 +11,12 @@ import { Response } from '../../types'
 import { randomBytes } from 'crypto'
 import { deriveAckKeyShare } from './keyDerivation'
 import assert from 'assert'
-import { PRESECRET_LENGTH } from '../packet/constants'
+import { SECRET_LENGTH } from '../packet/constants'
 
 describe('PoR - proof of relay', function () {
   it('generate PoR string, preVerify, validate', function () {
     const AMOUNT = 4
-    const secrets = Array.from({ length: AMOUNT }, (_) => randomBytes(PRESECRET_LENGTH))
+    const secrets = Array.from({ length: AMOUNT }, (_) => randomBytes(SECRET_LENGTH))
 
     // Challenge generation
     const firstChallenge = createPoRValuesForSender(secrets[0], secrets[1])
@@ -71,7 +71,7 @@ describe('PoR - proof of relay', function () {
 
   it('test functionality for unit tests', function () {
     const AMOUNT = 2
-    const secrets = Array.from({ length: AMOUNT }, (_) => randomBytes(PRESECRET_LENGTH))
+    const secrets = Array.from({ length: AMOUNT }, (_) => randomBytes(SECRET_LENGTH))
 
     const firstChallenge = createPoRValuesForSender(secrets[0], secrets[1])
 

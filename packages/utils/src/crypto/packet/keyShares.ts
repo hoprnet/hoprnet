@@ -1,10 +1,16 @@
 import { HASH_ALGORITHM, HASH_LENGTH } from './constants'
 import { SECP256K1_CONSTANTS } from '../constants'
 import { sampleGroupElement } from '../sampleGroupElement'
-import { privateKeyTweakMul, publicKeyTweakMul, publicKeyConvert, publicKeyVerify, privateKeyVerify } from 'secp256k1'
-import { extract } from 'futoin-hkdf'
+import {
+  privateKeyTweakMul,
+  publicKeyTweakMul,
+  publicKeyConvert,
+  publicKeyVerify,
+  privateKeyVerify
+} from 'secp256k1'
 
 import type PeerId from 'peer-id'
+import hkdf from "futoin-hkdf";
 
 /**
  * Performs an offline Diffie-Hellman key exchange with
@@ -19,21 +25,23 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
 
   let keyPair: [x: Uint8Array, alpha: Uint8Array]
 
-  const alpha_prev = new Uint8Array(SECP256K1_CONSTANTS.UNCOMPRESSED_PUBLIC_KEY_LENGTH) // This becomes: x * b_0 * b_1 * b_2 * ... * G
   const coeff_prev = new Uint8Array(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH) // This becomes: x * b_0 * b_1 * b_2 * ...
+  const alpha_prev = new Uint8Array(SECP256K1_CONSTANTS.UNCOMPRESSED_PUBLIC_KEY_LENGTH) // This becomes: x * b_0 * b_1 * b_2 * ... * G
 
   do {
     secrets = []
 
+    // NOTE: we're keeping alpha uncompressed during computation for better performance
     keyPair = sampleGroupElement(false)
 
     coeff_prev.set(keyPair[0]) // x
     alpha_prev.set(keyPair[1]) // alpha_0 = x*G
 
     for (const [k, peerId] of path.entries()) {
-      const s_k = publicKeyTweakMul(publicKeyConvert(peerId.pubKey.marshal(), false), coeff_prev, false)
 
-      secrets.push(s_k)
+      // Compute the shared group element and extract keying material as a shared secret
+      const s_k = publicKeyTweakMul(peerId.pubKey.marshal(), coeff_prev, true)
+      secrets.push(keyExtract(s_k, peerId.pubKey.marshal()))
 
       // If this was the last shared secret, no need to compute anymore
       if (k == path.length - 1) {
@@ -41,8 +49,8 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
         break
       }
 
-      // Compute the new blinding factor b_k
-      const b_k = keyExtract(s_k, alpha_prev) // KDF(secret, salt)
+      // Compute the new blinding factor b_k (alpha needs compressing, s_k is already compressed)
+      const b_k = fullKdf(s_k, publicKeyConvert(alpha_prev, true)) // KDF(secret, salt)
 
       // NOTE: This check would not be needed on modern curves
       if (!privateKeyVerify(b_k)) {
@@ -56,7 +64,7 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
         break
       }
 
-      // Also update alpha_prev with the new blinding factor b_k
+      // Also update alpha_prev with the new blinding factor b_k, keep alpha uncompressed
       alpha_prev.set(publicKeyTweakMul(alpha_prev, b_k, false))
     }
   } while (!done)
@@ -68,24 +76,29 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
  * Applies the forward transformation of the key shares to
  * an incoming packet.
  * @param alpha the group element used for the offline
- * Diffie-Hellman key exchange
- * @param privKey private key of the relayer
+ * Diffie-Hellman key exchange (compressed EC point)
+ * @param peerId id of the relayer
+ * @return Next public key (compressed EC point) and derived secret
  */
-export function forwardTransform(alpha: Uint8Array, privKey: PeerId): { alpha: Uint8Array; secret: Uint8Array } {
-  if (!publicKeyVerify(alpha) || privKey.privKey == null) {
+export function forwardTransform(alpha: Uint8Array, peerId: PeerId): { alpha: Uint8Array; secret: Uint8Array } {
+  if (!publicKeyVerify(alpha) || peerId.privKey == null || peerId.pubKey == null) {
     throw Error(`Invalid arguments`)
   }
 
-  const decomp_alpha = publicKeyConvert(alpha, false)
+  const s_k = publicKeyTweakMul(alpha, peerId.privKey.marshal(), true)
+  const b_k = fullKdf(s_k, alpha)
 
-  const s_k = publicKeyTweakMul(decomp_alpha, privKey.privKey.marshal(), false)
-  const b_k = keyExtract(s_k, decomp_alpha)
+  return {
+    alpha: publicKeyTweakMul(alpha, b_k, true), // advance alpha by the blinding factor
+    secret: keyExtract(s_k, peerId.pubKey.marshal()) // extract keying material from the group element
+  }
+}
 
-  const alpha_next = publicKeyTweakMul(decomp_alpha, b_k, false)
-
-  return { alpha: publicKeyConvert(alpha_next), secret: s_k }
+function fullKdf(secret: Uint8Array, pubKey: Uint8Array): Uint8Array {
+  return hkdf(Buffer.from(secret), HASH_LENGTH,
+      { hash: HASH_ALGORITHM, salt: Buffer.from(pubKey) })
 }
 
 function keyExtract(groupElement: Uint8Array, pubKey: Uint8Array): Uint8Array {
-  return extract(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(publicKeyConvert(groupElement)), Buffer.from(pubKey))
+  return hkdf.extract(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(groupElement), Buffer.from(pubKey))
 }

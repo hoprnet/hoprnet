@@ -1,6 +1,6 @@
 import { generateFiller } from './filler'
 import { randomBytes } from 'crypto'
-import { PRESECRET_LENGTH } from './constants'
+import { SECRET_LENGTH } from './constants'
 import { u8aXOR } from '../../u8a'
 import { PRG } from '../prg'
 import { derivePRGParameters } from './keyDerivation'
@@ -13,7 +13,7 @@ describe('test filler', function () {
     const hops = 3
     const maxHops = hops
 
-    const secrets = Array.from({ length: hops }, (_) => randomBytes(PRESECRET_LENGTH))
+    const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
     const extendedHeaderLength = perHop * maxHops + lastHop
     const headerLength = perHop * (maxHops - 1) + lastHop
 
@@ -49,7 +49,7 @@ describe('test filler', function () {
     const hops = 4
     const maxHops = 5
 
-    const secrets = Array.from({ length: hops }, (_) => randomBytes(PRESECRET_LENGTH))
+    const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
     const extendedHeaderLength = perHop * maxHops + lastHop
     const headerLength = perHop * (maxHops - 1) + lastHop
     const paddingLength = perHop * (maxHops - hops)
@@ -86,7 +86,7 @@ describe('test filler', function () {
     const hops = 1
     const maxHops = hops
 
-    const secrets = Array.from({ length: hops }, (_) => randomBytes(PRESECRET_LENGTH))
+    const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
 
     const firstFiller = generateFiller(maxHops, perHop, lastHop, secrets)
 

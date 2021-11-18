@@ -1,5 +1,5 @@
 import { createHmac } from 'crypto'
-import { HASH_ALGORITHM, HASH_LENGTH, PRESECRET_LENGTH, SECRET_LENGTH } from './constants'
+import { HASH_ALGORITHM, HASH_LENGTH, SECRET_LENGTH } from './constants'
 import { expand } from 'futoin-hkdf'
 
 const HASH_KEY_HMAC = 'HASH_KEY_HMAC'
@@ -12,7 +12,7 @@ const HASH_KEY_HMAC = 'HASH_KEY_HMAC'
  * @returns the authentication tag
  */
 export function createMAC(secret: Uint8Array, header: Uint8Array): Uint8Array {
-  if (secret.length != PRESECRET_LENGTH) {
+  if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
