@@ -41,30 +41,47 @@ Closing a payment channel means accessing the previously locked funds and transf
         % Fund if committed
         \draw[->] (\nodeWidth+\padding,\nodeHeight/2) -- (8-\padding,\nodeHeight/2);
         \draw (6,0.6) node[fill=white,inner sep=2pt] {\tiny{\textsf{fund (if already committed)}}};
+        \draw (3,-2.5) node {TODO: add redeemTicket arrows};
     \end{tikzpicture}
     \caption{Payment channel states and possible state transitions.}
 \end{figure}
 
+In rare cases it can happen that a node $n_{open}$ intends to open a payment channel, but $n_{dest}$ does not submit an on-chain commitment. Under this circumstance, $n_{open}$ has the opportunity to immediately turn the channel into \textit{PendingToClose}.
+
+\paragraph{State}
+
+Each channel is assigned a unique identifier, computed from the addresses of $n_{open}$ and $n_{dest}$,
+
+$$ channelId = keccak256 (\ ethAddr(n_{open}) \ || \ ethAddr(n_{dest}) \ ) $$
+
+where $ethAddr$ maps public keys to Ethereum addresses. Note that using this scheme leads to different $channelIds$ for the channel from $n_{open} \rightarrow n_{dest}$ and the one from $n_{dest} \rightarrow n_{open}$.
+
+Once $n_{open}$ locks funds, the smart contract instantiates the data structure \textit{ChannelData} and stores it under the previously computed $channelId$ within its storage. Instantiation of \textit{ChannelData} can happen it two ways: either there has been a previous instance of the channel of not. If there were one, the smart contract keeps the values $commitment$ and $epoch$ from the previous instance. For $epoch$ this is necessary because tickets from previous instances must lose their value once the channel gets closed. This is achieved by incrementing $epoch$ on every incarnation of the channel. On the other hand, commitments are kept to simplify channel reopenings.
+
 \begin{figure}[H]
     \centering
-    \begin{tabular}{| l | c | c |}
-        \hline
-        Value        & Ethereum datatype & size (in bytes) \\
-        \hline
-        \hline
-        Balance      & uint256           & 32 bytes        \\
-        Commitment   & bytes32           & 32 bytes        \\
-        Ticket Epoch & uint256           & 32 bytes        \\
-        Ticket Index & uint256           & 32 bytes        \\
-        Status       & enum              & 1 byte          \\
-        Epoch        & uint256           & 32 bytes        \\
-        Closure time & uint32            & 4 bytes         \\
-        \hline
+    \begin{tabular}{c|l|c|c|}
+        \cline{2-4}
+                                                     & \textbf{Value} & \textbf{Ethereum datatype} & \textbf{size (in bytes)} \\
+        \cline{2-4}
+        \noalign{\smallskip}
+        \cline{2-4}
+        \multirow{7}{*}{\rotatebox{90}{ChannelData}} & Balance        & uint256                    & 32 bytes                 \\
+                                                     & Commitment*    & bytes32                    & 32 bytes                 \\
+                                                     & Ticket Epoch   & uint256                    & 32 bytes                 \\
+                                                     & Ticket Index   & uint256                    & 32 bytes                 \\
+                                                     & Status         & enum                       & 32 bytes                 \\
+                                                     & Epoch*         & uint256                    & 1 bytes                  \\
+                                                     & Closure Time   & uint32                     & 4 bytes                  \\
+        \cline{2-4}
     \end{tabular}
-    \caption{Channel data structure.}
+    \caption{The structure of a stored channel. Values marked with * survive reincarnations of the channel.}
+    \label{fig:channeldata}
 \end{figure}
 
+Closing a channel sets $closureTime$ to current UNIX timestamp plus the timeframe\footnote{As of now, the timeframe is set for debugging purposes to five minutes.} in miliseconds in which node $n_{dest}$ is allowed to submit previously unredeemed tickets.
 
+\begin{comment}
 \paragraph{Opening a channel} Node $A$ can open a channel by transferring funds to the payment channels contract \textit{HoprChannels} and including the following \textit{userdata}:
 
 $$[A: address, B: address, \lambda: uint8, \mu: uint8], \mu = 0,$$
@@ -80,3 +97,4 @@ If $B$ tries to redeem a ticket from the channel $A\rightarrow B$ (spending chan
 Nodes can close a payment channel in order to access their previously staked funds. Only the payment channel creator can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $Pending to close$ and triggers a grace period during which the destination node can redeem any unredeemed tickets. Nodes should actively monitor blockchain events to be aware of this payment channel state change.
 
 Once the grace period has elapsed, the payment channel creator can call \textit{finalizeChannelClosure()} which changes the payment channel to $Closed$. When a payment channel is closed, the remaining funds are automatically transferred to the payment channel creator. The channel epoch increments, meaning any unredeemed tickets can no longer be redeemed.
+\end{comment}
