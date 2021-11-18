@@ -67,6 +67,8 @@ declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
 declare node7_dir="${tmp}/${node_prefix}-7"
 
+declare ct_node1_dir="${tmp}/${node_prefix}-ct1"
+
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
 declare node3_log="${node3_dir}.log"
@@ -74,6 +76,8 @@ declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
 declare node7_log="${node7_dir}.log"
+
+declare ct_node1_log="${ct_node1_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
@@ -84,6 +88,9 @@ declare node6_id="${node6_dir}.id"
 declare node7_id="${node7_dir}.id"
 
 declare password="e2e-test"
+declare ct_private_key="0x123456"
+
+declare ct_db_file="${tmp}/hopr-ct-db.json"
 
 declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 
@@ -96,10 +103,10 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${ct_node1_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -126,15 +133,13 @@ function setup_node() {
   local id=${6}
   local additional_args=${7:-""}
 
-  log "Run node ${id} on rest port ${rest_port}"
-
-  if [ -n "${additional_args}" ]; then
-    log "Additional args: \"${additional_args}\""
-  fi
+  log "Run node ${id} on rest port ${rest_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
+  
+  log "Additional args: \"${additional_args}\""
 
   # Set NODE_ENV=development to rebuild hopr-admin next files
   # at runtime. Necessary to start multiple instances of hoprd
@@ -157,6 +162,30 @@ function setup_node() {
     --testUseWeakCrypto \
     ${additional_args} \
     > "${log}" 2>&1 &
+}
+
+# $1 = node log file
+# $2 = health check port
+# $3 = OPTIONAL: additional args to ct daemon
+function setup_ct_node() {
+  local log=${1}
+  local health_check_port=${2}
+  local additional_args=${3:-""}
+
+  log "Run CT node -> ${log}"
+
+  if [[ "${additional_args}" != *"--environment "* ]]; then
+    additional_args="--environment hardhat-localhost ${additional_args}"
+  fi
+  log "Additional args: \"${additional_args}\""
+  
+  DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
+    --privateKey "${ct_private_key}" \
+    --dbFile "${ct_db_file}" \
+    --healthCheckHost "127.0.0.1" \
+    --healthCheckPort "${health_check_port}" \
+    ${additional_args} \
+     > "${log}" 2>&1 &
 }
 
 # --- Log test info {{{
@@ -209,6 +238,7 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
 ensure_port_is_free 19097
+ensure_port_is_free 20000
 # }}}
 
 # --- Cleanup old contract deployments {{{
@@ -244,7 +274,11 @@ setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
+setup_ct_node "${ct_node1_log}" 20000
 # }}}
+
+log "Waiting for nodes startup"
 
 #  --- Wait until started --- {{{
 # Wait until node has recovered its private key
@@ -255,7 +289,12 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
+declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
 # }}}
+
+log "CT node1 address: ${ct_node1_address}"
+
+log "Funding nodes"
 
 #  --- Fund nodes --- {{{
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
@@ -263,8 +302,11 @@ HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hard
   --identity-directory "${tmp}" \
   --use-local-identities \
   --network hardhat \
+  --address "${ct_node1_address}" \
   --password "${password}"
 # }}}
+
+log "Waiting for port binding"
 
 #  --- Wait for ports to be bound --- {{{
 wait_for_regex ${node1_log} "STARTED NODE"
@@ -276,10 +318,12 @@ wait_for_regex ${node5_log} "STARTED NODE"
 wait_for_port 19097 "127.0.0.1" "${node7_log}"
 # }}}
 
+log "All nodes came up online"
+
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
   127.0.0.1 13301 19501 19502
-#}}}
+# }}}
 
 # --- Run protocol test --- {{{
 ${mydir}/../test/integration-test.sh \
@@ -291,4 +335,9 @@ log "Verifying node6 log output"
 grep -E "HOPR Balance: +10 txHOPR" "${node6_log}"
 grep -E "ETH Balance: +1 xDAI" "${node6_log}"
 grep -E "Running on: hardhat" "${node6_log}"
+# }}}
+
+# -- CT test {{{
+${mydir}/../test/ct-test.sh \
+  "${ct_node1_log}" "127.0.0.01" 20000
 # }}}

@@ -13,6 +13,8 @@ import { CoverTrafficStrategy } from './strategy'
 import type PeerId from 'peer-id'
 import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
 import type { PeerData, State } from './state'
+import http from 'http'
+import restana from 'restana'
 
 const log = debug('hopr:cover-traffic')
 
@@ -35,12 +37,40 @@ function defaultEnvironment(): string {
   }
 }
 
-export async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
+const argv = yargs(process.argv.slice(2))
+  .option('environment', {
+    string: true,
+    describe: 'Environment id which the node shall run on',
+    choices: supportedEnvironments().map((env) => env.id),
+    default: defaultEnvironment()
+  })
+  .option('privateKey', {
+    describe: 'A private key to be used for the node',
+    string: true,
+    demandOption: true
+  })
+  .option('dbFile', {
+    describe: 'A path to DB file for persistent storage',
+    string: true,
+    default: './ct.json'
+  })
+  .option('healthCheckHost', {
+    describe: 'Host to listen on for health check',
+    string: true
+  })
+  .option('healthCheckPort', {
+    describe: 'Port to listen on for health check',
+    number: true
+  })
+  .wrap(Math.min(120, terminalWidth()))
+  .parseSync()
+
+async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
   const options: HoprOptions = {
     announce: false,
     createDbIfNotExist: true,
     environment,
-    forceCreateDB: true,
+    forceCreateDB: false,
     password: ''
   }
 
@@ -48,29 +78,29 @@ export async function generateNodeOptions(environment: ResolvedEnvironment): Pro
 }
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
-  const argv = yargs(process.argv.slice(2))
-    .option('environment', {
-      string: true,
-      describe: 'Environment id which the node shall run on',
-      choices: supportedEnvironments().map((env) => env.id),
-      default: defaultEnvironment()
-    })
-    .option('privateKey', {
-      describe: 'A private key to be used for the node',
-      string: true,
-      demandOption: true
-    })
-    .wrap(Math.min(120, terminalWidth()))
-    .parseSync()
-
   const environment = resolveEnvironment(argv.environment)
   const options = await generateNodeOptions(environment)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }
+
+  if (argv.healthCheckHost != null) {
+    const service = restana()
+    service.get('/healthcheck/v1/version', (_, res) => res.send(`CT node: ${node.getVersion()}`))
+    const hostname = argv.healthCheckHost
+    const port = argv.healthCheckPort
+    const server = http.createServer(service as any).on('error', (err) => {
+      throw err
+    })
+    server.listen(port, hostname, (err?: Error) => {
+      if (err) throw err
+      console.log(`Healthcheck server on ${hostname} listening on port ${port}`)
+    })
+  }
+
   const selfPub = PublicKey.fromPeerId(peerId)
   const selfAddr = selfPub.toAddress()
-  const data = new PersistedState(update)
+  const data = new PersistedState(update, argv.dbFile)
 
   const onChannelUpdate = (newChannel: ChannelEntry) => {
     data.setChannel(newChannel)
@@ -86,6 +116,8 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
   node.indexer.on('block', (blockNumber) => data.setBlock(new BN(blockNumber.toString())))
+
+  console.log(`Address: ${selfAddr.toHex()}`)
 
   log('waiting for node to be funded')
   await node.waitForFunds()
@@ -111,6 +143,15 @@ if (require.main === module) {
   process.once('exit', stopGracefully)
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)
+
+  process.on('unhandledRejection', (err: Error) => {
+    if (err.message === 'Peer lookup failed') {
+      // @TODO: this is a hack to prevent from crashing with unresolved rejection
+      // due to libp2p bug, see: https://github.com/libp2p/js-libp2p/pull/1025/files
+      return
+    }
+    throw err
+  })
 
   process.on('uncaughtExceptionMonitor', (err, origin) => {
     // Make sure we get a log.

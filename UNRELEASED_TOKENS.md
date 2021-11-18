@@ -1,6 +1,6 @@
 # Guide
 
-Read [#2093](https://github.com/hoprnet/hoprnet/issues/2093) for context.
+Read [#2093](https://github.com/hoprnet/hoprnet/issues/2093) for context and [#2102](https://github.com/hoprnet/hoprnet/issues/2102) for specifications.
 
 ## Words
 
@@ -25,7 +25,7 @@ Read [#2093](https://github.com/hoprnet/hoprnet/issues/2093) for context.
 16Uiu2HAmQBZA4TzjKjU5fpCSprGuM2y8mpepNwMS6ZKFATiKg68h
 ```
 
-2. PM creates a github issue containing the email's content and assigns a [team member](#who-is-team-member) to tackle. Any personally identifyable data should be removed from the email.
+2. One of the [Representantives](./.processes/development.md#representantives) creates a github issue containing the email's content. Any personally identifyable data should be removed from the email. Issue is treated as a [Fire alarm](./.processes/development.md#fire-alarm).
 3. Team member must then verify the validity of the request:
 
    1. User has indeed signed the right message:
@@ -39,10 +39,18 @@ Read [#2093](https://github.com/hoprnet/hoprnet/issues/2093) for context.
 
    2. Verify signature [MEW](https://www.myetherwallet.com/wallet/verify)
    3. Signer address (aka `CLAIMANT_ADDR`) of the signature has claimable tokens on schedules `EarlyTokenBuyers` or `TeamAndAdvisors` _(link to etherscan method)_.
-   4. Signer does not already exist in [unreleasedTokens.json](./packages/cover-traffic/unreleasedTokens.json)
+   4. Signer does not already exist in [unreleasedTokens.json](./packages/cover-traffic-daemon/src/unreleasedTokens.json)
    5. Inserted `HOPR_ID` is a valid HOPR ID _(link to tooling)_
 
-4. Team member adds another entry to [unreleasedTokens.json](./packages/cover-traffic/unreleasedTokens.json) using syntax `{ tokens: string, ethAddress: string, hoprId: string }[]`
+4. Team member adds another entry to under `link` in [unreleasedTokens.json](./packages/cover-traffic-daemon/src/unreleasedTokens.json) as
+
+```
+  hoprId: [
+    ethAddress1,
+    ethAddress2
+  ]
+```
+
 5. Team member creates a PR so another team member can review and approve, from here on we follow our usual [DEVELOPMENT_PROCESSES](./.processes/development.md) steps, reviewer must verify the validity of the request as well.
 6. Once merged, team member replies to user with:
 
@@ -52,18 +60,12 @@ Hello,
 Your HOPR ID has been added into the list.
 ```
 
-## Who is "team member"
-
-The release's [PM](./.processes/development.md) is responsible for ensuring that a new entry is added within atleast 2 working days.
-
-- PM has the ability to assign himself or a team member to follow up on newly created issue
-- Assigned team member must not be on holidays and should prioritize this issue
-
 ## Notes for tech
 
 - A live **mainnet** instance has not been deployed yet, this means that the discribed process cannot be followed through yet.
 - Test [unreleasedTokens.spec.ts](./packages/cover-traffic/unreleasedTokens.json) validates entries on each PR, however it does not validate if the `CLAIMANT_ADDR` has claimable tokens. This is topic we will have to tackle once tokens become claimable.
 - While we may run HOPR in xDai, Goerli, or other networks, `unreleasedTokens` source of truth lives in a **mainnet** HoprDistributor contract. These tokens should only affect importance calculation when HOPR is running on `xDai` or `mainnet`, else it can be ignored.
+- **mainnet** HoprDistributor contract can be updated. Therefore, when the tech team is made aware of such updates, `allocation` field inside the `unreleasedTokens.json` should be updated at the same time. To update this field, please download the result from the [Dune query](https://dune.xyz/queries/237335/444204) and use the [parsing tool](https://github.com/hoprnet/hopr-devrel/tree/parse-unrelased-token/parse-unreleased-token) to get the correct format.
 
 ## Notes for community
 

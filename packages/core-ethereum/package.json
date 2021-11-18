@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.83.0-next.67",
+  "version": "1.83.0-next.75",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -44,7 +44,7 @@
     "ts-node": "10.4.0",
     "typedoc": "0.22.9",
     "typedoc-plugin-markdown": "3.11.6",
-    "typescript": "4.4.4"
+    "typescript": "4.5.2"
   },
   "mocha": {
     "extension": [

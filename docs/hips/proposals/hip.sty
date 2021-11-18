@@ -1,0 +1,147 @@
+\usepackage{authblk}
+\usepackage[utf8]{inputenc}
+
+%%% layout
+\usepackage{geometry}
+\geometry{a4paper, margin=1.5in}
+
+%%% define colors 
+\usepackage{xcolor}
+\definecolor{hopr-blue}{HTML}{0000b4}
+
+%%% bibliograph, appendix and reference
+\usepackage{hyperref}
+\usepackage{appendix}
+\hypersetup{colorlinks = true,
+            linkcolor = hopr-blue,
+            urlcolor  = hopr-blue,
+            citecolor = hopr-blue,
+            anchorcolor = hopr-blue
+}
+\bibliographystyle{apalike}
+% overfull box due to citation
+% https://tex.stackexchange.com/questions/2773/how-do-i-make-latex-push-long-citations-to-a-new-line
+\usepackage{breakcites}
+% underfull box in bibliography
+% https://tex.stackexchange.com/questions/10924/underfull-hbox-in-bibliography/10928#10928
+\usepackage{etoolbox}
+\apptocmd{\thebibliography}{\raggedright}{}{}
+
+%%% graphs and tables
+\usepackage{array}
+\usepackage{makecell}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{pgf}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathreplacing,shapes,arrows,topaths}
+
+%%% math/symbol/algorithm
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage[ruled,vlined]{algorithm2e}
+
+%%% comments
+\usepackage{comment}
+
+%%% computation
+\usepackage{setspace,calc}
+
+
+%\usepackage{fancyhdr}
+%\renewcommand{\footrulewidth}{1pt}
+%\pagestyle{fancy}
+%\fancyhf{}
+
+\renewcommand{\today}{\ifcase \month \or January\or February\or March\or %
+April\or May \or June\or July\or August\or September\or October\or November\or %
+December\fi \ \number \year}
+
+\newcommand{\MYhref}[3][blue]{\href{#2}{\color{#1}{#3}}}%
+
+\newtheorem{defnsub}{Definition}[subsection]
+
+
+% Beautiful lowercase namerefs https://tex.stackexchange.com/questions/445404/capitalization-variants-of-nameref/449775
+\AtBeginDocument{%
+  \newcommand\My@Macro[1]{#1}%
+  \newcommand\My@Thirdoffive[5]{\My@Macro{#3}}%
+  \renewcommand*\@namerefstar[1]{%
+    \HyRef@StarSetRef{#1}\My@Thirdoffive
+  }%
+  \renewcommand*\T@nameref[1]{%
+    \begingroup
+    \let\label\@gobble
+    \NR@setref{#1}\My@Thirdoffive{#1}%
+    \endgroup
+  }%
+  \DeclareRobustCommand\fucnameref{%
+    \@ifstar\fucnameref@star\fucnameref@nostar
+  }%
+  \newcommand\callemakefirstuc[1]{%
+    \MakeLowercase{\emakefirstuc{#1}}%
+  }%
+  \newcommand\fucnameref@star[1]{%
+    \begingroup
+    \let\My@Macro=\callemakefirstuc
+    \nameref*{#1}%
+    \endgroup
+  }%
+  \newcommand\fucnameref@nostar[1]{%
+    \begingroup
+    \let\My@Macro=\callemakefirstuc
+    \nameref{#1}%
+    \endgroup
+  }%
+  \DeclareRobustCommand\ucnameref{%
+    \@ifstar\ucnameref@star\ucnameref@nostar
+  }%
+  \newcommand\ucnameref@star[1]{%
+    \begingroup
+    \MFUhyphentrue
+    \let\My@Macro=\ecapitalisefmtwords
+    \nameref*{#1}%
+    \endgroup
+  }%
+  \newcommand\ucnameref@nostar[1]{%
+    \begingroup
+    \MFUhyphentrue
+    \let\My@Macro=\ecapitalisefmtwords
+    \nameref{#1}%
+    \endgroup
+  }%
+  \DeclareRobustCommand\lcnameref{%
+    \@ifstar\lcnameref@star\lcnameref@nostar
+  }%
+  \newcommand\lcnameref@star[1]{%
+    \begingroup
+    \let\My@Macro=\MakeLowercase
+    \nameref*{#1}%
+    \endgroup
+  }%
+  \newcommand\lcnameref@nostar[1]{%
+    \begingroup
+    \let\My@Macro=\MakeLowercase
+    \nameref{#1}%
+    \endgroup
+  }%
+}%
+
+
+%%% formatting document layout
+% Beginning of the document
+\AtBeginDocument{
+\sloppy
+\maketitle
+} 
+% end \AtBeginDocument
+%%%
+
+\setlength{\parindent}{0em} % no indentation in paragraph
+\setlength{\parskip}{1em}   % spacing between paragraphs
+
+% Do not use word breaks for some words
+\hyphenation{LIONESS}
