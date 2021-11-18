@@ -1,16 +1,10 @@
 import { HASH_ALGORITHM, HASH_LENGTH } from './constants'
 import { SECP256K1_CONSTANTS } from '../constants'
 import { sampleGroupElement } from '../sampleGroupElement'
-import {
-  privateKeyTweakMul,
-  publicKeyTweakMul,
-  publicKeyConvert,
-  publicKeyVerify,
-  privateKeyVerify
-} from 'secp256k1'
+import { privateKeyTweakMul, publicKeyTweakMul, publicKeyConvert, publicKeyVerify, privateKeyVerify } from 'secp256k1'
 
 import type PeerId from 'peer-id'
-import hkdf from "futoin-hkdf";
+import hkdf from 'futoin-hkdf'
 
 /**
  * Performs an offline Diffie-Hellman key exchange with
@@ -38,7 +32,6 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
     alpha_prev.set(keyPair[1]) // alpha_0 = x*G
 
     for (const [k, peerId] of path.entries()) {
-
       // Compute the shared group element and extract keying material as a shared secret
       const s_k = publicKeyTweakMul(peerId.pubKey.marshal(), coeff_prev, true)
       secrets.push(keyExtract(s_k, peerId.pubKey.marshal()))
@@ -95,8 +88,7 @@ export function forwardTransform(alpha: Uint8Array, peerId: PeerId): { alpha: Ui
 }
 
 function fullKdf(secret: Uint8Array, pubKey: Uint8Array): Uint8Array {
-  return hkdf(Buffer.from(secret), HASH_LENGTH,
-      { hash: HASH_ALGORITHM, salt: Buffer.from(pubKey) })
+  return hkdf(Buffer.from(secret), HASH_LENGTH, { hash: HASH_ALGORITHM, salt: Buffer.from(pubKey) })
 }
 
 function keyExtract(groupElement: Uint8Array, pubKey: Uint8Array): Uint8Array {
