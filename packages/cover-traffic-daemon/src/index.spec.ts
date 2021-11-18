@@ -27,12 +27,11 @@ describe('cover-traffic daemon', async function () {
     options = { environment: { id: '1' } } as unknown as HoprOptions
     db = sinon.createStubInstance(HoprDB)
 
-    const indexerLogger = debug(namespace + ':indexer')
-    indexer = {
-      getPublicNodes: () => {
-        indexerLogger('getPublicNodes method was called')
-      },
-    } as unknown as Indexer
+    const dbLogger = debug(namespace + ':db')
+    db.close = () => {
+      dbLogger('Closing database')
+      return Promise.resolve()
+    }
 
     const chainLogger = debug(namespace + ':chain')
     chain = sinon.createStubInstance(HoprCoreEthereum)
@@ -68,8 +67,8 @@ describe('cover-traffic daemon', async function () {
           chainLogger(`On-chain signal for event "${event}"`)
         },
         indexer: {
-          on: (event: string) => indexerLogger(`Indexer on handler top of chain called with event "${event}"`),
-          off: (event: string) => indexerLogger(`Indexer off handler top of chain called with event "${event}`)
+          on: (event: string) => chainLogger(`Indexer on handler top of chain called with event "${event}"`),
+          off: (event: string) => chainLogger(`Indexer off handler top of chain called with event "${event}`)
         }
       };
     });
@@ -97,10 +96,15 @@ describe('cover-traffic daemon', async function () {
   afterEach(function () {
     sinon.restore()
   })
-  it('should run properly', async function () {
+  it('should run and stop properly', async function () {
     log('starting stubbed cover-traffic daemon')
     await node.start()
-    log('starting stubbed cover-traffic daemonasdad')
-
+    log('completed stubbed cover-traffic')
+    log('Starting node stop process')
+    await node.stop()
+    log('Stopped node succesfully')
+    log('Triggering period check to exit cover-traffic strategy now that node is stopped')
+    await node.periodicCheck()
+    log('Everything is now stopped')
   })
 })

@@ -432,6 +432,12 @@ class Hopr extends EventEmitter {
     }
 
     const currentChannels = await this.getAllChannels()
+    verbose('Channels obtained', currentChannels)
+
+    if (!currentChannels) {
+      log('not enough channels to iterate over')
+      return
+    }
     for (const channel of currentChannels) {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
@@ -500,8 +506,9 @@ class Hopr extends EventEmitter {
   public async stop(): Promise<void> {
     this.status = 'DESTROYED'
     clearTimeout(this.checkTimeout)
-    await Promise.all([this.heartbeat.stop(), (await this.startedPaymentChannels()).stop()])
-
+    verbose('Stopping heartbeat & indexer')
+    await Promise.all([this.heartbeat.stop(), (await this.chain.stop())])
+    verbose('Stoping database & libp2p', this.db)
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
     // Give the operating system some extra time to close the sockets
@@ -677,7 +684,7 @@ class Hopr extends EventEmitter {
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
   }
 
-  private async periodicCheck() {
+  public async periodicCheck() {
     log('periodic check', this.status)
     if (this.status != 'RUNNING') {
       return
