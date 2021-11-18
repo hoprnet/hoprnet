@@ -656,7 +656,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L8)
+[crypto/por/index.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L9)
 
 ___
 
@@ -1064,7 +1064,7 @@ information for each relayer
 
 #### Defined in
 
-[crypto/por/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L46)
+[crypto/por/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L47)
 
 ___
 
@@ -1097,7 +1097,7 @@ the challenge for the first ticket sent to the first relayer
 
 #### Defined in
 
-[crypto/por/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L20)
+[crypto/por/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L21)
 
 ___
 
@@ -1155,7 +1155,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L111)
+[crypto/por/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L112)
 
 ___
 
@@ -1183,7 +1183,7 @@ ___
 
 ▸ **deriveAckKeyShare**(`secret`): [`HalfKey`](classes/HalfKey.md)
 
-Comutes the key share that is embedded in the acknowledgement
+Computes the key share that is embedded in the acknowledgement
 for a packet and thereby unlocks the incentive for the previous
 relayer for transforming and delivering the packet
 
@@ -2213,7 +2213,7 @@ to create it and the challenge for the next relayer.
 
 #### Defined in
 
-[crypto/por/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L82)
+[crypto/por/index.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L83)
 
 ___
 
@@ -3043,7 +3043,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L127)
+[crypto/por/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L128)
 
 ___
 
@@ -3065,7 +3065,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L137)
+[crypto/por/index.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L138)
 
 ___
 
@@ -3086,7 +3086,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L132)
+[crypto/por/index.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L133)
 
 ___
 
