@@ -106,7 +106,7 @@ EventEmitter.constructor
 | `finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
 | `fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> |
 | `getBalance` | (`address`: `Address`) => `any` |
-| `getChannels` | () => `any` |
+| `getChannels` | () => `HoprChannels` |
 | `getGenesisBlock` | () => `number` |
 | `getInfo` | () => { `channelClosureSecs`: `any` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
 | `getLatestBlockNumber` | () => `Promise`<`number`\> |
@@ -680,7 +680,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | `any` |
+| `event` | `TypedEvent`<`unknown`\> |
 | `blockNumber` | `BN` |
 
 #### Returns
@@ -721,7 +721,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `event` | `any` |
+| `event` | `TypedEvent`<`unknown`\> |
 
 #### Returns
 
@@ -768,7 +768,7 @@ Called whenever we receive new events.
 
 | Name | Type |
 | :------ | :------ |
-| `events` | `any`[] |
+| `events` | `TypedEvent`<`unknown`\>[] |
 
 #### Returns
 
@@ -1211,7 +1211,7 @@ Starts indexing.
 | `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
 | `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> |
 | `chain.getBalance` | (`address`: `Address`) => `any` |
-| `chain.getChannels` | () => `any` |
+| `chain.getChannels` | () => `HoprChannels` |
 | `chain.getGenesisBlock` | () => `number` |
 | `chain.getInfo` | () => { `channelClosureSecs`: `any` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
 | `chain.getLatestBlockNumber` | () => `Promise`<`number`\> |

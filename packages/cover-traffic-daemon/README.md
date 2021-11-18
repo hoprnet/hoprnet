@@ -46,17 +46,20 @@ yarn build
 ## Run
 
 ```sh
-$ hopr-cover-traffic-daemon --help
+$ yarn hopr-cover-traffic-daemon --help
 Options:
-  --help        Show help  [boolean]
-  --version     Show version number  [boolean]
-  --provider    A provider url for the network this node shall operate on  [default: "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"]
-  --privateKey  A private key to be used for the node  [string]
-  --environment Choose the environment where this node runs in. "hardhat-localhost", "hardhat-localhost2", "master-goerli", "master-xdai"
+  --help            Show help  [boolean]
+  --version         Show version number  [boolean]
+  --provider        A provider url for the network this node shall operate on  [default: "https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"]
+  --privateKey      A private key to be used for the node  [string]
+  --dbFile          Path to DB file for persistent storage
+  --healthCheckHost Host to listen on for health check
+  --healthCheckPort Port to listen on for health check
+  --environment     Choose the environment where this node runs in. "hardhat-localhost", "hardhat-localhost2", "master-goerli", "master-xdai"
 ```
 
 Example
 
 ```sh
-DEBUG="hopr*" node ./lib/index.js --privateKey 0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332
+DEBUG="hopr*" yarn hopr-cover-traffic-daemon --environment hardhat-localhost --privateKey 0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332 --healthCheckHost "127.0.0.1" --healthCheckPort 20000
 ```

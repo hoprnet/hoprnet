@@ -162,7 +162,7 @@ ___
 | `finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<`string`\> |
 | `fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> |
 | `getBalance` | (`address`: `Address`) => `any` |
-| `getChannels` | () => `any` |
+| `getChannels` | () => `HoprChannels` |
 | `getGenesisBlock` | () => `number` |
 | `getInfo` | () => { `channelClosureSecs`: `any` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
 | `getLatestBlockNumber` | () => `Promise`<`number`\> |
