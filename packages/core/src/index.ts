@@ -96,7 +96,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) { }
+  ) {}
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -313,7 +313,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => { },
+      () => {},
       protocolAck
     )
 
@@ -507,7 +507,7 @@ class Hopr extends EventEmitter {
     this.status = 'DESTROYED'
     clearTimeout(this.checkTimeout)
     verbose('Stopping heartbeat & indexer')
-    await Promise.all([this.heartbeat.stop(), (await this.chain.stop())])
+    await Promise.all([this.heartbeat.stop(), await this.chain.stop()])
     verbose('Stoping database & libp2p', this.db)
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
