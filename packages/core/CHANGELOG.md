@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - catching various previously uncatched errors
+- shared secret derivation now properly follows the Yellow Paper.
 
 ## [0.3.0]
 
