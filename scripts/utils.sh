@@ -158,6 +158,7 @@ function wait_for_regex {
     if [ -f ${file} ]; then
       local res=$(grep -E "${regex}" "${file}" || echo "")
       if [[ "${res}" != "" ]]; then
+        echo "${res}"
         return 0
       fi
     fi
