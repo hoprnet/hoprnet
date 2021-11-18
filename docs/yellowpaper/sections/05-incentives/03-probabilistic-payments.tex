@@ -83,41 +83,18 @@ This is problematic for HOPR because it uses \nameref{sec:incentives:proofofrela
 \paragraph{Probabilistic payments}
 \label{sec:incentives:probabilistic:probabilistic}
 
-Incentives relate to packets which are assumed to be sent very often in the HOPR network. Nodes can therefore expect that they will shortly receive another micropayment from the same node. It is thus not necessary to assign each packet its own incentive. This is why nodes issue each other probabilistic \lcnameref{sec:tickets} that have the same asymptotic payout but do neither require in-order processing nor require an on-chain operation for every incentive.
+Incentives relate to packets which are assumed to be sent very often in the HOPR network. Nodes can therefore expect that they will shortly receive another micropayment from the same node. It is thus not necessary to claim the incentive for each packet individually. This is why nodes issue each other probabilistic \lcnameref{sec:tickets} that have the same asymptotic payout but do neither require in-order processing nor require an on-chain operation for every incentive. Hence when picking the same relay fee, it holds that
 
-Moreover, the nodes estimate the usage of the link to the nodes with whom they have engaged in a payment channel and pick a ticket winning probability that leads to a continous. Connections with higher througput can use lower probabilities whilst those with small throughput are supposed to use winning probabilities closer to 1.
+$$ \forall i \ \forall j \ : \ value(ticket_i) = value(ticket_j) $$
+
+Moreover, the nodes estimate the usage of the link to the nodes with whom they have engaged in a payment channel and pick a ticket winning probability that leads to a continous payout. Connections with higher througput can use lower probabilities whilst those with fewer traffic are supposed to use winning probabilities closer to 1.
 
 Probabilistic payments rely on the necessity for the ticket issuer to not know whether a ticket that is issued will turn into an asset transfer or not. Hence, the ticket redemption must rely on some entropy provided by the ticket redeemer and need to be kept secret until the ticket is redeemed. This is necessary, because by knowing which ticket is going to become a winner, the ticket issuer would solely issue losing tickets and thereby withhold the incentives for the next downstream node.
 
-Analogously, the ticket receiver should not know whether a ticket will be a win before being able to reconstruct the response to the challenge stated in the ticket. If not, the ticket receiver would just process those packet that come with a winning and drop all other packets.
+Analogously, the ticket receiver should not know whether a ticket will be a win before being able to reconstruct the response to the challenge stated in the ticket. If not, the ticket receiver would just process those packet that come with a winning ticket and drop all other packets.
 
-\paragraph{Payment channels}
+A ticket is a winner if
 
-In traditional payment channels, two parties $A$ and $B$ lock some funds within a smart contract, make transactions off-chain and only commit the aggregation on-chain.
+$$ keccak256 ( ticketHash \ || \ porSecret \ || \ opening) < ticket.invWinProb $$
 
-
-
-Thus, a payment channel is bidirectional, which means both $A$ and $B$ can send and receive transactions within the same payment channel. The HOPR protocol uses unidirectional payment channels to implement bidirectional payment channel behaviour, where one payment channel is created from $A$ to $B$ and another from $B$ to $A$. The payment channel creator is the sole owner of funds in the payment channel and the only one able to create \textbf{tickets}, encapsulated funds which are described in detail in Section \ref{sec:tickets}. A payment channel created from party $A$ to party $B$ is different from a payment channel created from party $B$ to party $A$.
-
-$$A\rightarrow B \neq B\rightarrow A$$
-
-\paragraph{Probabilistic payments}
-
-This separation reflects the directional nature of packets flowing through the network. It also brings the advantage that each payment channel's logic is easier to verify.
-
-\paragraph{Wrap Up}
-
-\paragraph{Acknowledgements} are messages which allow every node to acknowledge the processing of a packet to the previous node. This acknowledgement ($ACK$) contains the cryptographic material needed to unlock the possible payout for the previous node. Note that an acknowledgement is always sent to the previous node, and using acknowledgments with vanilla payment channels results in accumulated incentives, where the latest acknowledgement contains all previous incentives plus the incentive for the most recent interaction, as explained below:
-
-\begin{align}
-    value (ACK_n) & =\sum_{i=1}^nfee_{packet_i},
-\end{align}
-where $n$ is the total number of mixnet packets transformed.
-
-An issue arises when $B$ receives $ACK_n$ for $packet_n$ before sending $packet_{n-1}$. At this point $B$ would have no incentive to process $packet_{n-1}$ rather than $packet_{n}$. To avoid such false incentives, the HOPR protocol utilizes probabilistic payments. A \textit{ticket} can be either a win or a loss, determined based on some winning probability lower than 1. This means nodes are incentivized to continue relaying packets, as they do not know which tickets will result in a payout. From a node's perspective, each ticket has the same value until it is claimed; therefore, the HOPR protocol encourages nodes to claim tickets independently from each other.
-
-\begin{align}
-    value ( ACK_i ) & =value ( ACK_j ) \quad for \quad i,j\in \{1,\dots,n\}
-\end{align}
-
-If we assume constant costs, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed. On the contrary, a node would reduce its potential payouts if it were to forward packets slowly or not at all.
+where $ticketHash$ is the hash of the received ticket, see section \ref{sec:tickets:redemption}, and thus known by both ticket issuer and recipient whereas $porSecret$ is known by the ticket issuer and can be reconstructed as part of the $\nameref{sec:incentives:proofofrelay}$ scheme by the ticket recipient once it receives the acknowledgement for the forwarded ticket. On the other hand, $opening$ refers to the value that opens the most recent commitment that is stored on-chain, see section \ref{sec:incentives:commitment}. The on-chain commitment is chosen by the ticket recipient and due to the hiding property of the utilized commitment scheme, the opening values are solely known by the ticket recipient.
