@@ -11,11 +11,11 @@ const { PRIVATE_KEY } = process.env
 const PROTOCOL_CONFIG = require('../packages/core/protocol-config.json')
 
 function parseGasPrice(gasPrice: string) {
-    const parsedGasPrice = gasPrice.split(' ')
-    if (parsedGasPrice.length > 1) {
-      return Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
-    }
-    return Number(parsedGasPrice[0])
+  const parsedGasPrice = gasPrice.split(' ')
+  if (parsedGasPrice.length > 1) {
+    return Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
+  }
+  return Number(parsedGasPrice[0])
 }
 
 async function getNativeBalance(chain, address: string) {
