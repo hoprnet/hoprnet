@@ -24,12 +24,12 @@ usage() {
   msg "an initial setup script against these nodes. Once testing has"
   msg "completed the script can be used to cleanup the cluster as well."
   msg
-  msg "Usage: $0 <environment> [<cluster_id> [<docker_image> [<init_script>]]]"
+  msg "Usage: $0 <environment> [<init_script> [<cluster_id> [<docker_image>]]]"
   msg
   msg "where <environment>\t\tthe environment from which the smart contract addresses are derived"
-  msg "      <cluster_id>\t\tuses a random value as default"
-  msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:latest' as default"
   msg "      <init_script>\t\tpath to a script which is called with all node API endpoints as parameters"
+  msg "      <cluster_id>\t\tuses a random value as default"
+  msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:<environment>' as default"
   msg
   msg "Required environment variables"
   msg "------------------------------"
@@ -50,17 +50,17 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
+: ${FUNDING_PRIV_KEY?"Missing env var FUNDING_PRIV_KEY"}
+
 declare environment="${1?"missing parameter <environment>"}"
-declare cluster_id="${2:-custom-cluster-${RANDOM}-${RANDOM}}"
-declare docker_image=${3:-gcr.io/hoprassociation/hoprd:latest}
-declare init_script=${4:-}
+declare init_script=${2:-}
+declare cluster_id="${3:-${environment}-topology-${RANDOM}-${RANDOM}}"
+declare docker_image=${4:-gcr.io/hoprassociation/hoprd:${environment}}
 
 declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}%${RANDOM}%${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
-
-test -z "${FUNDING_PRIV_KEY:-}" && { msg "Missing FUNDING_PRIV_KEY"; usage; exit 1; }
 
 function cleanup {
   local EXIT_CODE=$?
@@ -99,14 +99,16 @@ fi
 # }}}
 
 # create test specific instance template
-gcloud_create_or_update_instance_template "${cluster_id}" \
+gcloud_create_or_update_instance_template \
+  "${cluster_id}" \
   "${docker_image}" \
-  "" \
+  "${environment}" \
   "${api_token}" \
   "${password}"
-#
+
 # start nodes
-gcloud_create_or_update_managed_instance_group "${cluster_id}" \
+gcloud_create_or_update_managed_instance_group  \
+  "${cluster_id}" \
   6 \
   "${cluster_id}"
 
