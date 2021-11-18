@@ -12,7 +12,8 @@
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -p .",
+    "build": "yarn clean && tsc -p . && yarn build:copy",
+    "build:copy": "cp ./src/unreleasedTokens.json ./lib",
     "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
