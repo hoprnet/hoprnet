@@ -17,7 +17,7 @@ const log = debug(namespace)
 describe('cover-traffic daemon', async function () {
   const privateKey = '0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332'
   const sampleAddress = Address.fromString('0x55CfF15a5159239002D57C591eF4ACA7f2ACAfE6')
-  const samplePeerId = PeerId.createFromB58String('16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7');
+  const samplePeerId = PeerId.createFromB58String('16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7')
   const sampleMultiaddrs = new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${samplePeerId.toB58String()}`)
 
   let node: Hopr, libp2p: LibP2P, indexer: Indexer
@@ -35,7 +35,7 @@ describe('cover-traffic daemon', async function () {
 
     const chainLogger = debug(namespace + ':chain')
     chain = sinon.createStubInstance(HoprCoreEthereum)
-    chain.indexer = indexer;
+    chain.indexer = indexer
     // @TODO: Use better (ie typed) way to overload stub
     chain.start = sinon.fake(() => {
       chainLogger('On-chain instance start method was called.')
@@ -61,7 +61,7 @@ describe('cover-traffic daemon', async function () {
           return Promise.resolve([])
         },
         announce: () => {
-          chainLogger('On-chain announce request sent');
+          chainLogger('On-chain announce request sent')
         },
         on: (event: string) => {
           chainLogger(`On-chain signal for event "${event}"`)
@@ -70,8 +70,8 @@ describe('cover-traffic daemon', async function () {
           on: (event: string) => chainLogger(`Indexer on handler top of chain called with event "${event}"`),
           off: (event: string) => chainLogger(`Indexer off handler top of chain called with event "${event}`)
         }
-      };
-    });
+      }
+    })
 
     const libp2pLogger = debug(namespace + ':libp2p')
     libp2p = sinon.createStubInstance(LibP2P)
@@ -88,7 +88,7 @@ describe('cover-traffic daemon', async function () {
     libp2p.connectionManager.on = sinon.fake((event: string) => {
       libp2pLogger(`Connection manager event handler called with event "${event}"`)
     })
-    libp2p.peerStore = new PeerStore({ peerId: samplePeerId });
+    libp2p.peerStore = new PeerStore({ peerId: samplePeerId })
     libp2p.addressManager = new AddressManager(peerId, { announce: [sampleMultiaddrs.toString()] })
 
     node = new Hopr(peerId, db, chain, options)
