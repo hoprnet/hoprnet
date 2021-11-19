@@ -96,7 +96,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) { }
+  ) {}
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -313,7 +313,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => { },
+      () => {},
       protocolAck
     )
 
@@ -349,8 +349,8 @@ class Hopr extends EventEmitter {
     libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
     this.maybeLogProfilingToGCloud()
     this.checkTimeout = setTimeout(() => {
-      log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`);
-      this.periodicCheck();
+      log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
+      this.periodicCheck()
     }, this.strategy.tickInterval)
   }
 
@@ -706,8 +706,8 @@ class Hopr extends EventEmitter {
     clearTimeout(logTimeout)
     log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
     this.checkTimeout = setTimeout(() => {
-      log('Triggering again periodCheck');
-      this.periodicCheck();
+      log('Triggering again periodCheck')
+      this.periodicCheck()
     }, this.strategy.tickInterval)
   }
 
