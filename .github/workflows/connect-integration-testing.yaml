@@ -4,6 +4,7 @@ on:
   push:
     branches: ['**']
     paths: 
+      - "scripts/connect/*"
       - "packages/connect/**/*"
 
 jobs:
