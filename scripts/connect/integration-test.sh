@@ -11,7 +11,7 @@ test "$?" -eq "0" && {
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)
 declare HOPR_LOG_ID="hopr-connect-test"
-source "${mydir}/utils.sh"
+source "${mydir}/../utils.sh"
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail

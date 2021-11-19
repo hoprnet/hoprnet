@@ -129,12 +129,3 @@ const node = await libp2p.create({
 
 - IPv6 support disabled for the moment
 - [WIP] libp2p test suite
-
-## Contributors (in alphabetical order)
-
-- [José Perez Aguinaga](https://github.com/jjperezaguinaga)
-- [Peter Braden](https://github.com/peterbraden)
-- [Sebastian Bürgel](https://github.com/scbuergel)
-- [Robert Kiel](https://github.com/robertkiel)
-
-and the rest of the [HOPR](https://hoprnet.org) team!

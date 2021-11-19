@@ -38,7 +38,7 @@ function start_node() {
   declare rest_args=${@:4}
 
   DEBUG=flow:hopr-connect*,hopr-connect*,simple-peer \
-    ${filename} \
+    yarn ts-node "${mydir}/../../packages/connect/${filename}" \
     ${rest_args} \
     --script "${script}" > "${log_file}" \
     2>&1 &

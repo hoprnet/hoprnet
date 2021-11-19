@@ -166,4 +166,21 @@ function wait_for_regex {
   done
 }
 
+# $1 = filename
+# $2 = expected content
+function expect_file_content() {
+  local filename="${1}"
+  local expected="${2}"
+  local actual="$(cat "${filename}")"
+
+  if [[ "${expected}" != "${actual}" ]]; then
+    log "⛔️ bad content for ${filename}"
+    log "expected: "
+    log "${expected}"
+    log "actual: "
+    log "${actual}"
+    exit 1
+  fi
+}
+
 setup_colors

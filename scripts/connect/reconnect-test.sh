@@ -9,7 +9,7 @@ test "$?" -eq "0" && {
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)
 declare HOPR_LOG_ID="hopr-connect-test"
-source "${mydir}/utils.sh"
+source "${mydir}/../utils.sh"
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -20,7 +20,7 @@ setup "reconnect"
 
 # run alice (client)
 # should be able to send 'test from alice' to bob through relay charly
-start_node tests/node.ts \
+start_node tests/node \
   "${alice_log}" \
   "[ 
       {
@@ -51,7 +51,7 @@ start_node tests/node.ts \
 # run bob (client)
 # should be able to receive 'test' from alice through charly
 # should be able to reply with 'echo: test'
-start_node tests/node.ts "${bob_log}" \
+start_node tests/node "${bob_log}" \
   "[ {
         'cmd': 'wait',
         'waitForSecs': 2
@@ -74,7 +74,7 @@ start_node tests/node.ts "${bob_log}" \
 # run charly
 # should able to serve as a bootstrap
 # should be able to relay 1 connection at a time
-start_node tests/node.ts "${charly_log}" \
+start_node tests/node "${charly_log}" \
   "[]" \
   --port ${charly_port} \
   --identityName 'charly' \
@@ -83,14 +83,14 @@ start_node tests/node.ts "${charly_log}" \
   --useLocalAddress true
 
 # wait till nodes finish communicating
-wait_for_regex_in_file "${alice_log}" "all tasks executed"
-wait_for_regex_in_file "${bob_log}" "all tasks executed"
+wait_for_regex "${alice_log}" "all tasks executed"
+wait_for_regex "${bob_log}" "all tasks executed"
 
 # wait a little
 sleep 1
 
 # run another instance of alice
-start_node tests/node.ts \
+start_node tests/node \
   "${alice2_log}" \
   "[ 
       {
@@ -119,10 +119,10 @@ start_node tests/node.ts \
   --useLocalAddress true
 
 # wait for the second alice to finish sending
-wait_for_regex_in_file "${alice2_log}" "all tasks executed"
+wait_for_regex "${alice2_log}" "all tasks executed"
 
 # bob should have received RESTART status msg
-wait_for_regex_in_file "${bob_log}" "RESTART received. Ending stream"
+wait_for_regex "${bob_log}" "RESTART received. Ending stream"
 
 # bob should have received both messages from alice1 and alice2
 expect_file_content "${bob_pipe}" \

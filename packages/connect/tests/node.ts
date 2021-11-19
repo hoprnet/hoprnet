@@ -1,4 +1,3 @@
-#!/usr/bin/env -S ./node_modules/.bin/ts-node
 import libp2p from 'libp2p'
 import type { Connection, HandlerProps } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
