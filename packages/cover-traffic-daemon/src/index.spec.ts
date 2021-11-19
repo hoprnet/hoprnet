@@ -103,8 +103,5 @@ describe('cover-traffic daemon', async function () {
     log('Starting node stop process')
     await node.stop()
     log('Stopped node succesfully')
-    log('Triggering period check to exit cover-traffic strategy now that node is stopped')
-    await node.periodicCheck()
-    log('Everything is now stopped')
   })
 })

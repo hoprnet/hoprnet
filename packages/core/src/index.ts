@@ -96,7 +96,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) {}
+  ) { }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -313,7 +313,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => {},
+      () => { },
       protocolAck
     )
 
@@ -348,7 +348,10 @@ class Hopr extends EventEmitter {
     log(`Available under the following addresses:`)
     libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
     this.maybeLogProfilingToGCloud()
-    this.periodicCheck()
+    this.checkTimeout = setTimeout(() => {
+      log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`);
+      this.periodicCheck();
+    }, this.strategy.tickInterval)
   }
 
   private maybeLogProfilingToGCloud() {
@@ -505,6 +508,7 @@ class Hopr extends EventEmitter {
    */
   public async stop(): Promise<void> {
     this.status = 'DESTROYED'
+    verbose('Stopping checking timeout')
     clearTimeout(this.checkTimeout)
     verbose('Stopping heartbeat & indexer')
     await Promise.all([this.heartbeat.stop(), await this.chain.stop()])
@@ -693,13 +697,18 @@ class Hopr extends EventEmitter {
       log('strategy tick took longer than 10 secs')
     }, 10000)
     try {
+      log('Triggering tick channel strategy')
       await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
     }
+    log('Clearing out logging timeout.')
     clearTimeout(logTimeout)
-
-    this.checkTimeout = setTimeout(() => this.periodicCheck(), this.strategy.tickInterval)
+    log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
+    this.checkTimeout = setTimeout(() => {
+      log('Triggering again periodCheck');
+      this.periodicCheck();
+    }, this.strategy.tickInterval)
   }
 
   /**
