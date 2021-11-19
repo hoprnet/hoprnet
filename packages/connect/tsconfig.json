@@ -1,0 +1,21 @@
+{
+  "ts-node": {
+    // Type-checking is already done by 'yarn build'
+    "transpileOnly": true
+  },
+  "compilerOptions": {
+    "lib": ["es2021", "dom"],
+    "module": "commonjs",
+    "target": "es2021",
+    "declaration": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "noImplicitReturns": true,
+    "strict": true,
+    "outDir": "lib",
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*.ts"]
+}

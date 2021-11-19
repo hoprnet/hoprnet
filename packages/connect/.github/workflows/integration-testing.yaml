@@ -1,0 +1,42 @@
+name: HOPR Connect integration tests
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - '**/docs/**/*'
+
+jobs:
+  integration-test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        node-version: [16]
+        os: ['ubuntu-latest', 'macos-latest']
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2.4.1
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: |
+          yarn install        
+      
+      - name: Test
+        run: ./scripts/integration-test.sh
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: hopr-connect-integration-test-logs
+          path: |
+            /var/tmp/hopr-connect-*.log
+            /tmp/hopr-connect-*.log
