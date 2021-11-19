@@ -1158,6 +1158,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": 4.1.1
     "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@types/bl": 5.0.2
     "@types/chai": 4.2.22
     "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
@@ -2329,6 +2330,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/bl@npm:5.0.2":
+  version: 5.0.2
+  resolution: "@types/bl@npm:5.0.2"
+  dependencies:
+    "@types/node": "*"
+    "@types/readable-stream": "*"
+  checksum: 5fcdf594ab775fc221bbe9d62e6d597db2c9cec294ea337f65682b968cc6a21c9106b411cb3971f4140eedc4a3a72f12e9b748ccab1658d0e14c2838654168cd
+  languageName: node
+  linkType: hard
+
 "@types/blessed@npm:0.1.19":
   version: 0.1.19
   resolution: "@types/blessed@npm:0.1.19"
@@ -2622,6 +2633,16 @@ __metadata:
   version: 6.9.7
   resolution: "@types/qs@npm:6.9.7"
   checksum: 7fd6f9c25053e9b5bb6bc9f9f76c1d89e6c04f7707a7ba0e44cc01f17ef5284adb82f230f542c2d5557d69407c9a40f0f3515e8319afd14e1e16b5543ac6cdba
+  languageName: node
+  linkType: hard
+
+"@types/readable-stream@npm:*":
+  version: 2.3.12
+  resolution: "@types/readable-stream@npm:2.3.12"
+  dependencies:
+    "@types/node": "*"
+    safe-buffer: "*"
+  checksum: e4f645bc9c3683780ce2e1ed8a7749c801aded4c27d4e93493b5f2cf51200c0d1cc23f9a186f7fd8b417b17ba499d93e1a6ac85db4e31aeb3af5389695dc9cb1
   languageName: node
   linkType: hard
 
@@ -15255,17 +15276,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"safe-buffer@npm:*, safe-buffer@npm:^5.0.1, safe-buffer@npm:^5.1.0, safe-buffer@npm:^5.1.1, safe-buffer@npm:^5.1.2, safe-buffer@npm:^5.2.0, safe-buffer@npm:^5.2.1, safe-buffer@npm:~5.2.0":
+  version: 5.2.1
+  resolution: "safe-buffer@npm:5.2.1"
+  checksum: b99c4b41fdd67a6aaf280fcd05e9ffb0813654894223afb78a31f14a19ad220bba8aba1cb14eddce1fcfb037155fe6de4e861784eb434f7d11ed58d1e70dd491
+  languageName: node
+  linkType: hard
+
 "safe-buffer@npm:5.1.2, safe-buffer@npm:~5.1.0, safe-buffer@npm:~5.1.1":
   version: 5.1.2
   resolution: "safe-buffer@npm:5.1.2"
   checksum: f2f1f7943ca44a594893a852894055cf619c1fbcb611237fc39e461ae751187e7baf4dc391a72125e0ac4fb2d8c5c0b3c71529622e6a58f46b960211e704903c
-  languageName: node
-  linkType: hard
-
-"safe-buffer@npm:^5.0.1, safe-buffer@npm:^5.1.0, safe-buffer@npm:^5.1.1, safe-buffer@npm:^5.1.2, safe-buffer@npm:^5.2.0, safe-buffer@npm:^5.2.1, safe-buffer@npm:~5.2.0":
-  version: 5.2.1
-  resolution: "safe-buffer@npm:5.2.1"
-  checksum: b99c4b41fdd67a6aaf280fcd05e9ffb0813654894223afb78a31f14a19ad220bba8aba1cb14eddce1fcfb037155fe6de4e861784eb434f7d11ed58d1e70dd491
   languageName: node
   linkType: hard
 
