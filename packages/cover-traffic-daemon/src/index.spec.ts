@@ -80,16 +80,16 @@ describe('cover-traffic daemon', async function () {
         announceFilter: () => [sampleMultiaddrs]
       }
     })
-    sinon.stub(LibP2P, 'create').callsFake(() => {
-      libp2pLogger('libp2p stub started')
-      return Promise.resolve(libp2p)
-    })
     libp2p.connectionManager = sinon.createStubInstance(ConnectionManager)
     libp2p.connectionManager.on = sinon.fake((event: string) => {
       libp2pLogger(`Connection manager event handler called with event "${event}"`)
     })
     libp2p.peerStore = new PeerStore({ peerId: samplePeerId })
     libp2p.addressManager = new AddressManager(peerId, { announce: [sampleMultiaddrs.toString()] })
+    sinon.stub(LibP2P, 'create').callsFake(() => {
+      libp2pLogger('libp2p stub started')
+      return Promise.resolve(libp2p)
+    })
 
     node = new Hopr(peerId, db, chain, options)
   })
