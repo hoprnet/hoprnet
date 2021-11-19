@@ -94,7 +94,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     })
     server.listen(port, hostname, (err?: Error) => {
       if (err) throw err
-      console.log(`Healthcheck server on ${hostname} listening on port ${port}`)
+      log(`Healthcheck server on ${hostname} listening on port ${port}`)
     })
   }
 
@@ -117,7 +117,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   node.indexer.on('peer', peerUpdate)
   node.indexer.on('block', (blockNumber) => data.setBlock(new BN(blockNumber.toString())))
 
-  console.log(`Address: ${selfAddr.toHex()}`)
+  log(`Address: ${selfAddr.toHex()}`)
 
   log('waiting for node to be funded')
   await node.waitForFunds()
@@ -125,8 +125,8 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   await node.start()
   log('node is running')
 
-  console.log(node.getVersion())
-  console.log(node.smartContractInfo())
+  log(node.getVersion())
+  log(node.smartContractInfo())
 
   const channels = await node.getChannelsFrom(selfAddr)
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))
