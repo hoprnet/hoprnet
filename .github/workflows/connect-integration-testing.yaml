@@ -31,7 +31,7 @@ jobs:
           yarn install        
       
       - name: Test
-        run: ./packages/connect/scripts/integration-test.sh
+        run: ./scripts/connect/integration-test.sh
 
       - name: Upload node logs (Linux)
         uses: actions/upload-artifact@v2
