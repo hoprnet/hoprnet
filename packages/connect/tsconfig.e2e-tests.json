@@ -1,7 +1,9 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "typeRoots": ["src/types", "node_modules/@types", "../../node_modules/@types"],
+    "strict": true
   },
-  "include": ["src/@types", "tests/*.ts"]
+  "include": ["src/@types", "tests/*.ts", "src/**/*.ts"]
 }

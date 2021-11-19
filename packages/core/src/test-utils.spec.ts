@@ -1,7 +1,8 @@
 import type LibP2P from 'libp2p'
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import type { PeerStore } from 'libp2p-kad-dht'
+import type NetworkPeers from './network/network-peers'
+import { MAX_BACKOFF } from './network/network-peers'
 
 export function getAddress(node: LibP2P): Multiaddr {
   let addr = node.multiaddrs[0]
@@ -25,6 +26,12 @@ export function fakeAddress(id: PeerId): Multiaddr {
   } as Multiaddr
 }
 
-export function showBackoff(networkPeers: PeerStore): number {
-  return parseFloat(networkPeers.debugLog().match(/(?<=\(backoff\s)(.*)(?=\,)/g))
+export function showBackoff(networkPeers: NetworkPeers): number {
+  const matches = networkPeers.debugLog().match(/(?<=\(backoff\s)(.*)(?=\,)/g)
+
+  if (matches.length == 0) {
+    return MAX_BACKOFF
+  }
+
+  return parseFloat(matches[0])
 }

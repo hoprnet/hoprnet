@@ -291,4 +291,4 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
   }
 }
 
-export { HoprConnect }
+export default HoprConnect

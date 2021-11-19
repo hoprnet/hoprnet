@@ -2,6 +2,7 @@
   "name": "hoprnet",
   "repository": "https://github.com/hoprnet/hoprnet",
   "workspaces": [
+    "packages/connect",
     "packages/core",
     "packages/core-ethereum",
     "packages/cover-traffic-daemon",

@@ -5,7 +5,7 @@ import MPLEX from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 
-const { HoprConnect } = require('@hoprnet/hopr-connect')
+import HoprConnect from '@hoprnet/hopr-connect'
 import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
