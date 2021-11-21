@@ -48,15 +48,14 @@ function randomBoundedInteger(bound: number): number {
  * @returns random number between @param start and @param end
  */
 export function randomInteger(start: number, end?: number): number {
-
   if (!end) {
-    end = start;
+    end = start
     start = 0
   }
 
   if (end <= start || start < 0) throw Error('invalid range')
 
-  return start + randomBoundedInteger(end-start)
+  return start + randomBoundedInteger(end - start)
 }
 
 export function randomChoice<T>(collection: T[]): T {
