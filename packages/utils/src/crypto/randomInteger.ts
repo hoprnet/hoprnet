@@ -41,23 +41,25 @@ function randomBoundedInteger(bound: number): number {
  * Returns a random value between `start` and `end`.
  * @example
  * ```
- * randomInteger(3) // result in { 0, 1, 2, 3 }
- * randomInteger(0, 3) // result in { 0, 1, 2, 3 }
- * randomInteger(7, 9) // result in { 7, 8, 9 }
- * randomInteger(8, 8) == 8
+ * randomInteger(3) // result in { 0, 1, 2}
+ * randomInteger(0, 3) // result in { 0, 1, 2 }
+ * randomInteger(7, 9) // result in { 7, 8 }
  * ```
- * @param start start of the interval
- * @param end end of the interval inclusive
+ * @param start start of the interval (inclusive)
+ * @param end end of the interval (not inclusive)
  * @returns random number between @param start and @param end
  */
 export function randomInteger(start: number, end?: number): number {
 
-  if (!end) end = Number(MAX_RANDOM_INTEGER)
+  if (!end) {
+    end = start;
+    start = 0
+  }
 
   if (end <= start || start < 0)
     throw Error("invalid range")
 
-  return start + randomBoundedInteger(end-start+1)
+  return start + randomBoundedInteger(end-start)
 }
 
 export function randomChoice<T>(collection: T[]): T {

@@ -1,10 +1,10 @@
 import assert from 'assert'
 import { randomInteger } from './randomInteger'
-import { u8aAdd } from '../u8a'
+
 
 describe('testing random-number generator', function () {
   let ATTEMPTS = 10000
-  it(`should output generate values between [0, end)`, function () {
+  it(`should output generate values between [0, end)`, function() {
     let result: number
     let end = 10024
     for (let i = 0; i < ATTEMPTS; i++) {
@@ -15,7 +15,7 @@ describe('testing random-number generator', function () {
     }
   })
 
-  it(`should output values between [start, end) with start > 0`, function () {
+  it(`should output values between [start, end) with start > 0`, function() {
     let result: number
     let start = 253
     let end = 73111
@@ -38,7 +38,7 @@ describe('testing random-number generator', function () {
   })
   */
 
-  it('should yield correct values for edge cases', function () {
+  it('should yield correct values for edge cases', function() {
     /*
     const MAX_INTEGER = 2 ** 31
 
@@ -54,8 +54,8 @@ describe('testing random-number generator', function () {
 */
     assert(randomInteger(23, 24) == 23)
   })
-
-  it('should verify the randomInteger by using deterministic seeds', function () {
+})
+  /*it('should verify the randomInteger by using deterministic seeds', function () {
     const LENGTH = 2
 
     const LOWERBOUND = 27
@@ -72,4 +72,4 @@ describe('testing random-number generator', function () {
       assert(result < UPPERBOUND && result >= LOWERBOUND)
     }
   })
-})
+})*/
