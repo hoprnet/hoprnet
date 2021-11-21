@@ -3,7 +3,7 @@ import crypto from 'crypto'
 const BIT_WIDTH = 64n
 
 function nextRandomFullWidth(): bigint {
-  return crypto.randomBytes(Number(BIT_WIDTH/8n)).readBigUInt64LE()
+  return crypto.randomBytes(Number(BIT_WIDTH / 8n)).readBigUInt64LE()
 }
 
 /**
@@ -19,17 +19,15 @@ export const MAX_RANDOM_INTEGER = (1n << BIT_WIDTH) - 1n
  * @param bound Maximum number that can be generated.
  */
 function randomBoundedInteger(bound: number): number {
-
   let bnBound = BigInt(bound) > MAX_RANDOM_INTEGER ? MAX_RANDOM_INTEGER : BigInt(bound)
 
-  let uboundTwosComplement = ((~ bnBound) + 1n) + MAX_RANDOM_INTEGER
+  let uboundTwosComplement = ~bnBound + 1n + MAX_RANDOM_INTEGER
 
   let res = bnBound * nextRandomFullWidth()
   let resHi = res >> BIT_WIDTH
 
   // Fast-out
-  if ((res & MAX_RANDOM_INTEGER) <= uboundTwosComplement)
-    return Number(resHi)
+  if ((res & MAX_RANDOM_INTEGER) <= uboundTwosComplement) return Number(resHi)
 
   let newRnd = (bnBound * nextRandomFullWidth()) >> BIT_WIDTH
   let carry = ((resHi + newRnd) >> BIT_WIDTH) & 1n
@@ -51,13 +49,11 @@ function randomBoundedInteger(bound: number): number {
  * @returns random number between @param start and @param end
  */
 export function randomInteger(start: number, end?: number): number {
-
   if (!end) end = Number(MAX_RANDOM_INTEGER)
 
-  if (end <= start || start < 0)
-    throw Error("invalid range")
+  if (end <= start || start < 0) throw Error('invalid range')
 
-  return start + randomBoundedInteger(end-start+1)
+  return start + randomBoundedInteger(end - start + 1)
 }
 
 export function randomChoice<T>(collection: T[]): T {
