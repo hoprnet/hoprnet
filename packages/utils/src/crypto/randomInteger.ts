@@ -27,7 +27,6 @@ export const MAX_RANDOM_INTEGER = (1n << BIT_WIDTH) - 1n
  * @param bound Maximum number that can be generated.
  */
 function randomBoundedInteger(bound: number): number {
-
   /* -- Here's the original explanation of the optimized method by Stephen Canon: --
    *
    * Everyone knows that generating an unbiased random integer in a range
@@ -118,7 +117,7 @@ function randomBoundedInteger(bound: number): number {
    * generating multiple random samples at once, but that is only of
    * theoretical interest--it is still interesting, however, since I
    * don't think anyone has described how to attain it previously.
-  */
+   */
 
   const bnBound = BigInt(bound) > MAX_RANDOM_INTEGER ? MAX_RANDOM_INTEGER : BigInt(bound)
 
