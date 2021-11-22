@@ -54,7 +54,7 @@ describe('testing random-number generator', function () {
     assert(randomInteger(23, 24) == 23)
   })
 
-/*
+  /*
 
 NOTE: This test has been removed, because once we started using CSPRNG in randomInteger,
  we can no longer inject custom fixed seed.
@@ -78,5 +78,4 @@ it('should verify the randomInteger by using deterministic seeds', function () {
   })
 })
 */
-
 })
