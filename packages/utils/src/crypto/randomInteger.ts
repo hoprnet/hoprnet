@@ -1,7 +1,13 @@
 import crypto from 'crypto'
 
+/**
+ * Maximum bit length of a random number.
+ */
 const BIT_WIDTH = 64n
 
+/**
+ * Internal function generating fix length random integer.
+ */
 function nextRandomFullWidth(): bigint {
   return crypto.randomBytes(Number(BIT_WIDTH / 8n)).readBigUInt64LE()
 }
@@ -16,18 +22,21 @@ export const MAX_RANDOM_INTEGER = (1n << BIT_WIDTH) - 1n
  * Uses an optimized Lemire's method (https://arxiv.org/abs/1805.10941)
  * as devised in https://github.com/apple/swift/pull/39143 by Stepen Canon.
  *
+ * NOTE: The maximum bit length of a number that can be generated using this function
+ * is fixed to 64 bits.
  * @param bound Maximum number that can be generated.
  */
 function randomBoundedInteger(bound: number): number {
   let bnBound = BigInt(bound) > MAX_RANDOM_INTEGER ? MAX_RANDOM_INTEGER : BigInt(bound)
 
-  let uboundTwosComplement = ~bnBound + 1n + MAX_RANDOM_INTEGER
+  // 2's complement
+  let uboundNeg = MAX_RANDOM_INTEGER - bnBound + 1n
 
   let res = bnBound * nextRandomFullWidth()
   let resHi = res >> BIT_WIDTH
 
   // Fast-out
-  if ((res & MAX_RANDOM_INTEGER) <= uboundTwosComplement) return Number(resHi)
+  if ((res & MAX_RANDOM_INTEGER) <= uboundNeg) return Number(resHi)
 
   let newRnd = (bnBound * nextRandomFullWidth()) >> BIT_WIDTH
   let carry = ((resHi + newRnd) >> BIT_WIDTH) & 1n
