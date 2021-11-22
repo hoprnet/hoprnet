@@ -6,7 +6,7 @@ import crypto from 'crypto'
 const BIT_WIDTH = 64n
 
 /**
- * Internal function generating fix length random integer.
+ * Internal function generating fixed length random integer.
  */
 function nextRandomFullWidth(): bigint {
   return crypto.randomBytes(Number(BIT_WIDTH / 8n)).readBigUInt64LE()
