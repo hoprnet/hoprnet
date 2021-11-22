@@ -18,7 +18,7 @@ function nextRandomFullWidth(): bigint {
 export const MAX_RANDOM_INTEGER = (1n << BIT_WIDTH) - 1n
 
 /**
- * Internal function generating random integer in half-close interval [0, bound).
+ * Internal function generating random integer in { 0,1,2,... bound-1 }.
  * Uses an optimized Lemire's method (https://arxiv.org/abs/1805.10941)
  * as devised in https://github.com/apple/swift/pull/39143 by Stepen Canon.
  *
@@ -125,14 +125,14 @@ function randomBoundedInteger(bound: number): number {
   // 2's complement
   const uboundNeg = MAX_RANDOM_INTEGER - bnBound + 1n
 
-  let res = bnBound * nextRandomFullWidth()
-  let resHi = res >> BIT_WIDTH
+  const res = bnBound * nextRandomFullWidth()
+  const resHi = res >> BIT_WIDTH
 
-  // Fast-out
+  // Early-out
   if ((res & MAX_RANDOM_INTEGER) <= uboundNeg) return Number(resHi)
 
-  let newRnd = (bnBound * nextRandomFullWidth()) >> BIT_WIDTH
-  let carry = ((resHi + newRnd) >> BIT_WIDTH) & 1n
+  const newRnd = (bnBound * nextRandomFullWidth()) >> BIT_WIDTH
+  const carry = ((resHi + newRnd) >> BIT_WIDTH) & 1n
 
   return Number(resHi + carry)
 }
