@@ -27,7 +27,7 @@ $$ comm_i = keccak256 (\widetilde{comm_{i-1}}) $$
 \paragraph{Commitment phase}
 \label{sec:incentives:commitment:commitmentphase}
 
-Once a node is the destination of a payment channel, it samples a master key $comm_0 \in \{ 0, 1\} ^32$ and computes $comm_n = keccak256^n(comm_0)$ and submits a transaction that stores $comm_n$ on-chain within the payment channel. The value $n > 0$ is chosen by the ticket recipient and should reflect the amount of tickets that are expected to be sent using this channel.
+Once a node is the destination of a payment channel, it samples a master key $comm_0 \in \{0, 1\}^{32}$ and computes $comm_n = keccak256^n(comm_0)$ and submits a transaction that stores $comm_n$ on-chain within the payment channel. The value $n > 0$ is chosen by the ticket recipient and should reflect the amount of tickets that are expected to be sent using this channel.
 
 Obviously, the ticket recipient can run out of openings after redeeming a huge amount of tickets - or losing the master secret $x$. Therefore, the ticket recipient has the opportunity to renew the stored on-chain commitment. As this would allow the recipient to alter the opening to a more pleasant value just before redeeming a ticket, i.e. to turn a previously losing ticket into a winning one. Therefore, each payment channel includes a counter that gets increased on every renewal.
 
