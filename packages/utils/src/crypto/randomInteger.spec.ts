@@ -53,8 +53,13 @@ describe('testing random-number generator', function () {
 */
     assert(randomInteger(23, 24) == 23)
   })
-})
-/*it('should verify the randomInteger by using deterministic seeds', function () {
+
+/*
+
+NOTE: This test has been removed, because once we started using CSPRNG in randomInteger,
+ we can no longer inject custom fixed seed.
+
+it('should verify the randomInteger by using deterministic seeds', function () {
     const LENGTH = 2
 
     const LOWERBOUND = 27
@@ -71,4 +76,7 @@ describe('testing random-number generator', function () {
       assert(result < UPPERBOUND && result >= LOWERBOUND)
     }
   })
-})*/
+})
+*/
+
+})
