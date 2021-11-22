@@ -54,7 +54,6 @@ describe('testing random-number generator', function () {
     assert(randomInteger(23, 24) == 23)
 
     assert(randomInteger(1) == 0)
-
   })
 
   /*
