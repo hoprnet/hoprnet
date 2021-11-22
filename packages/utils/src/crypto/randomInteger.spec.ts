@@ -52,6 +52,9 @@ describe('testing random-number generator', function () {
     assert.throws(() => randomInteger(0))
 */
     assert(randomInteger(23, 24) == 23)
+
+    assert(randomInteger(1) == 0)
+
   })
 
   /*

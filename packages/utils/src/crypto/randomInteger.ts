@@ -13,9 +13,9 @@ function nextRandomFullWidth(): bigint {
 }
 
 /**
- * Maximum random integer that can be generated using randomInteger function.
+ * Maximum random big integer that can be generated using randomInteger function.
  */
-export const MAX_RANDOM_INTEGER = (1n << BIT_WIDTH) - 1n
+export const MAX_RANDOM_BIGINTEGER = (1n << BIT_WIDTH) - 1n
 
 /**
  * Internal function generating random integer in { 0,1,2,... bound-1 }.
@@ -24,9 +24,9 @@ export const MAX_RANDOM_INTEGER = (1n << BIT_WIDTH) - 1n
  *
  * NOTE: The maximum bit length of a number that can be generated using this function
  * is fixed to 64 bits.
- * @param bound Maximum number that can be generated.
+ * @param bound Maximum non-negative number that can be generated. Maximum possible bound is MAX_RANDOM_BIGINTEGER.
  */
-function randomBoundedInteger(bound: number): number {
+function randomBoundedBigInteger(bound: bigint): bigint {
   /* -- Here's the original explanation of the optimized method by Stephen Canon: --
    *
    * Everyone knows that generating an unbiased random integer in a range
@@ -79,7 +79,7 @@ function randomBoundedInteger(bound: number): number {
    * If the test fails, we do not reject the sample, throwing away the bits
    * we have already consumed from the random source; instead we increase i
    * by a convenient amount, computing more bits of the product. This is the
-   * criticial improvement; while Lemire has a probability of 1/2 to reject
+   * critical improvement; while Lemire has a probability of 1/2 to reject
    * for each word consumed in the worst case, we have a probability of
    * terminating of 1/2 for each _bit_ consumed. This reduces the worst-case
    * expected number of random bits required from O(log₂(upperBound)) to
@@ -119,21 +119,37 @@ function randomBoundedInteger(bound: number): number {
    * don't think anyone has described how to attain it previously.
    */
 
-  const bnBound = BigInt(bound) > MAX_RANDOM_INTEGER ? MAX_RANDOM_INTEGER : BigInt(bound)
+  if (bound < 0n) bound = 0n
+
+  const bnBound = bound > MAX_RANDOM_BIGINTEGER ? MAX_RANDOM_BIGINTEGER : bound
 
   // 2's complement
-  const uboundNeg = MAX_RANDOM_INTEGER - bnBound + 1n
+  const uboundNeg = MAX_RANDOM_BIGINTEGER - bnBound + 1n
 
   const res = bnBound * nextRandomFullWidth()
   const resHi = res >> BIT_WIDTH
 
   // Early-out
-  if ((res & MAX_RANDOM_INTEGER) <= uboundNeg) return Number(resHi)
+  if ((res & MAX_RANDOM_BIGINTEGER) <= uboundNeg) return resHi
 
   const newRnd = (bnBound * nextRandomFullWidth()) >> BIT_WIDTH
   const carry = ((resHi + newRnd) >> BIT_WIDTH) & 1n
 
-  return Number(resHi + carry)
+  return resHi + carry
+}
+
+/**
+ * Maximum random integer that can be generated using randomInteger function.
+ */
+export const MAX_RANDOM_INTEGER = Number.MAX_SAFE_INTEGER
+
+/**
+ * A convenience function, supporting less precise type Number.
+ * @param bound Maximum non-negative number that can be generated. Maximum bound is currently MAX_RANDOM_INTEGER.
+ */
+function randomBoundedInteger(bound: number): number {
+  const bnBound = BigInt(Math.min(Math.max(0, bound), MAX_RANDOM_INTEGER))
+  return Number(randomBoundedBigInteger(bnBound))
 }
 
 /**
