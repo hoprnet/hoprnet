@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { randomInteger } from './randomInteger'
+import { randomInteger, randomBigInteger } from './randomInteger'
 
 describe('testing random-number generator', function () {
   let ATTEMPTS = 10000
@@ -10,6 +10,17 @@ describe('testing random-number generator', function () {
       result = randomInteger(end)
 
       assert(0 <= result, result + ' gte 0')
+      assert(result < end, result + ' lt ' + end)
+    }
+  })
+
+  it(`should output generate bigint values between [0, end)`, function () {
+    let result: bigint
+    let end = BigInt(Number.MAX_SAFE_INTEGER) + 10024n
+    for (let i = 0; i < ATTEMPTS; i++) {
+      result = randomBigInteger(end)
+
+      assert(0n <= result, result + ' gte 0')
       assert(result < end, result + ' lt ' + end)
     }
   })
@@ -25,59 +36,37 @@ describe('testing random-number generator', function () {
     }
   })
 
-  /*
-  it('should throw error for falsy interval input', function () {
-    assert.throws(() => randomInteger(2, 1))
+  it(`should output bigint values between [start, end) with start > 0`, function () {
+    let result: bigint
+    let start = BigInt(Number.MAX_SAFE_INTEGER) + 253n
+    let end = BigInt(Number.MAX_SAFE_INTEGER) + 73111n
+    for (let i = 0; i < ATTEMPTS; i++) {
+      result = randomBigInteger(start, end)
 
-    assert.throws(() => randomInteger(2 ** 32))
-
-    assert.throws(() => randomInteger(-1))
-
-    assert.throws(() => randomInteger(-1, -2))
+      assert(start <= result && result < end)
+    }
   })
-  */
 
   it('should yield correct values for edge cases', function () {
-    /*
-    const MAX_INTEGER = 2 ** 31
-
-    assert(randomInteger(0, MAX_INTEGER, new Uint8Array(4).fill(0xff)) == MAX_INTEGER - 1)
-
-    assert.throws(() => randomInteger(0, MAX_INTEGER + 1, new Uint8Array(4).fill(0xff)))
-
-    assert(randomInteger(0, 2 ** 24, new Uint8Array(4).fill(0xff)) == 2 ** 24 - 1)
-
-    assert(randomInteger(0, 1) == 0)
-
-    assert.throws(() => randomInteger(0))
-*/
     assert(randomInteger(23, 24) == 23)
 
     assert(randomInteger(1) == 0)
+
+    assert.throws(() => randomInteger(-1), Error(`invalid range`))
+
+    // Number.MAX_SAFE_INTEGER * 2 is strictly greater than Number.MAX_SAFE_INTEGER
+    // due to increased exponent in IEEE754 representation
+    assert.throws(() => randomInteger(0, Number.MAX_SAFE_INTEGER * 2), Error(`invalid range`))
   })
 
-  /*
+  it('should yield correct values for bigint edge cases', function () {
+    assert(
+      randomBigInteger(BigInt(Number.MAX_SAFE_INTEGER) + 23n, BigInt(Number.MAX_SAFE_INTEGER) + 24n) ==
+        BigInt(Number.MAX_SAFE_INTEGER) + 23n
+    )
 
-NOTE: This test has been removed, because once we started using CSPRNG in randomInteger,
- we can no longer inject custom fixed seed.
+    assert(randomBigInteger(1n) == 0n)
 
-it('should verify the randomInteger by using deterministic seeds', function () {
-    const LENGTH = 2
-
-    const LOWERBOUND = 27
-    const UPPERBOUND = 480
-    const bytes = new Uint8Array(LENGTH).fill(0)
-
-    const ONE = new Uint8Array(LENGTH).fill(0)
-    ONE[ONE.length - 1] = 1
-
-    for (let i = 0; i < ATTEMPTS; i++) {
-      u8aAdd(true, bytes, ONE)
-
-      let result = randomInteger(LOWERBOUND, UPPERBOUND, bytes)
-      assert(result < UPPERBOUND && result >= LOWERBOUND)
-    }
+    assert.throws(() => randomBigInteger(-1n), Error(`invalid range`))
   })
-})
-*/
 })
