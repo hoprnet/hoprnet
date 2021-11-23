@@ -4,7 +4,7 @@ import PeerId from 'peer-id'
 import { utils } from 'ethers'
 import { UnreleasedTokens } from './utils'
 
-const unreleasedTokenInput: UnreleasedTokens = require('./unreleasedTokens.json')
+const unreleasedTokenInput: UnreleasedTokens = require('../unreleasedTokens.json')
 const unreleasedTokenInputs: UnreleasedTokens[] = [
   { ...unreleasedTokenInput },
   { ...unreleasedTokenInput, link: {} },

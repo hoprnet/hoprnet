@@ -1,19 +1,21 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.83.0-next.76",
+  "version": "1.84.0-next.0",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
-  "bin": "lib/index.js",
+  "bin": {
+    "hopr-cover-traffic-daemon": "lib/index.js",
+    "hopr-cover-traffic-daemon-dashboard": "lib/dashboard.js"
+  },
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -p . && yarn build:copy",
-    "build:copy": "cp ./src/unreleasedTokens.json ./lib",
+    "build": "yarn clean && tsc -p .",
     "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
@@ -36,11 +38,11 @@
   "devDependencies": {
     "@types/blessed": "0.1.19",
     "@types/rimraf": "3.0.2",
-    "@types/yargs": "17.0.7",
+    "@types/yargs": "17.0.5",
     "mocha": "9.1.3",
     "rimraf": "3.0.2",
     "typedoc": "0.22.9",
-    "typedoc-plugin-markdown": "3.11.6",
+    "typedoc-plugin-markdown": "3.11.7",
     "typescript": "4.5.2"
   },
   "mocha": {

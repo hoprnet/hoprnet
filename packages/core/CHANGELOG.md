@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `node hopr <id>` spawns a HOPR node at port _9091 + <id>_
 - crawling: crawling is not block anymore, leads to faster crawling
 - heartbeat: every connection uses its own timer now
+- `randomInteger` function is now cryptographically safe
 
 ### Fixed
 
