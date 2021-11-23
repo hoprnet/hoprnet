@@ -30,7 +30,7 @@
   ],
   "dependencies": {
     "@openzeppelin/contracts": "4.3.3",
-    "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
+    "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@4.3.3"
   },
   "devDependencies": {
     "@ethersproject/wallet": "5.5.0",
