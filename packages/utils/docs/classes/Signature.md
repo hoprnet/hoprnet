@@ -39,7 +39,7 @@
 
 #### Defined in
 
-[types/primitives.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L195)
+[types/primitives.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L199)
 
 ## Properties
 
@@ -61,7 +61,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L261)
+[types/primitives.ts:265](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L265)
 
 ## Methods
 
@@ -75,7 +75,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:235](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L235)
+[types/primitives.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L239)
 
 ___
 
@@ -93,7 +93,7 @@ serialized signature to use within Ethereum
 
 #### Defined in
 
-[types/primitives.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L246)
+[types/primitives.ts:250](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L250)
 
 ___
 
@@ -107,7 +107,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L257)
+[types/primitives.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L261)
 
 ___
 
@@ -128,7 +128,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:253](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L253)
+[types/primitives.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L257)
 
 ___
 
@@ -149,7 +149,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L230)
+[types/primitives.ts:234](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L234)
 
 ___
 
@@ -169,7 +169,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:201](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L201)
+[types/primitives.ts:205](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L205)
 
 ___
 
@@ -194,4 +194,4 @@ deserialized Ethereum signature
 
 #### Defined in
 
-[types/primitives.ts:219](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L219)
+[types/primitives.ts:223](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L223)

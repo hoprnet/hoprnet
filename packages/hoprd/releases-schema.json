@@ -34,7 +34,7 @@
             "default": false
           }
         },
-        "required": ["id", "git_ref", "environment_id", "deprecated"],
+        "required": ["id", "git_ref", "environment_id"],
         "additionalProperties": false
       }
     }

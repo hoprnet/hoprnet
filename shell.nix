@@ -16,6 +16,7 @@ mkShell {
   name = "hoprnet";
   buildInputs = [
     ## base
+    envsubst
 
     ## node, minimum recommended version is v16, see README for more details
     nodejs-16_x # v16.5.0
