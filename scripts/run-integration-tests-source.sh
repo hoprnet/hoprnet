@@ -220,6 +220,9 @@ log "\tnode7"
 log "\t\tdata dir: ${node7_dir} (will be removed)"
 log "\t\tlog: ${node7_log}"
 log "\t\tid: ${node7_id}"
+log "\tct_node1"
+log "\t\tdata dir: ${ct_node1_dir} (will be removed)"
+log "\t\tlog: ${ct_node1_log}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -289,20 +292,20 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
-declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
+# declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
 # }}}
 
-log "CT node1 address: ${ct_node1_address}"
+# log "CT node1 address: ${ct_node1_address}"
 
 log "Funding nodes"
 
 #  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+HOPR_ENVIRONMENT_ID=hardhat-localhost2 yarn workspace @hoprnet/hopr-ethereum exec "hardhat faucet" \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \
   --network hardhat \
-  --address "${ct_node1_address}" \
+  # --address "${ct_node1_address}" \
   --password "${password}"
 # }}}
 
