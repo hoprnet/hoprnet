@@ -1192,9 +1192,9 @@ __metadata:
     secp256k1: ^4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.8
-    typedoc-plugin-markdown: 3.11.6
-    typescript: 4.4.4
+    typedoc: 0.22.9
+    typedoc-plugin-markdown: 3.11.7
+    typescript: 4.5.2
   languageName: unknown
   linkType: soft
 
@@ -1232,7 +1232,7 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.9
-    typedoc-plugin-markdown: 3.11.6
+    typedoc-plugin-markdown: 3.11.7
     typescript: 4.5.2
   languageName: unknown
   linkType: soft
@@ -1251,9 +1251,9 @@ __metadata:
     mocha: 9.1.3
     peer-id: 0.15.3
     rimraf: 3.0.2
-    typedoc: 0.22.8
-    typedoc-plugin-markdown: 3.11.6
-    typescript: 4.4.4
+    typedoc: 0.22.9
+    typedoc-plugin-markdown: 3.11.7
+    typescript: 4.5.2
     yargs: 17.2.1
   bin:
     hopr-cover-traffic-daemon: lib/index.js
@@ -1289,9 +1289,9 @@ __metadata:
     ts-generator: 0.1.1
     ts-node: 10.4.0
     typechain: 6.0.2
-    typedoc: 0.22.8
-    typedoc-plugin-markdown: 3.11.6
-    typescript: 4.4.4
+    typedoc: 0.22.9
+    typedoc-plugin-markdown: 3.11.7
+    typescript: 4.5.2
   languageName: unknown
   linkType: soft
 
@@ -1363,7 +1363,7 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.9
-    typedoc-plugin-markdown: 3.11.6
+    typedoc-plugin-markdown: 3.11.7
     typescript: 4.5.2
   languageName: unknown
   linkType: soft
@@ -1404,9 +1404,9 @@ __metadata:
     strip-ansi: 6.0.1
     tiny-hashes: ^1.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.8
-    typedoc-plugin-markdown: 3.11.6
-    typescript: 4.4.4
+    typedoc: 0.22.9
+    typedoc-plugin-markdown: 3.11.7
+    typescript: 4.5.2
     ws: 8.2.3
     yargs: 17.2.1
   bin:
@@ -17275,31 +17275,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc-plugin-markdown@npm:3.11.6":
-  version: 3.11.6
-  resolution: "typedoc-plugin-markdown@npm:3.11.6"
+"typedoc-plugin-markdown@npm:3.11.7":
+  version: 3.11.7
+  resolution: "typedoc-plugin-markdown@npm:3.11.7"
   dependencies:
     handlebars: ^4.7.7
   peerDependencies:
     typedoc: ">=0.22.0"
-  checksum: 0e7d24ff808a7583c203ab889f1c4d0344f0ce51e0d9d2ff55711253e5d5734a1d406bda157fa5a55b2b20b1691eb4b50b5512128c4ae6f1f256c6787e6541b6
-  languageName: node
-  linkType: hard
-
-"typedoc@npm:0.22.8":
-  version: 0.22.8
-  resolution: "typedoc@npm:0.22.8"
-  dependencies:
-    glob: ^7.2.0
-    lunr: ^2.3.9
-    marked: ^3.0.8
-    minimatch: ^3.0.4
-    shiki: ^0.9.12
-  peerDependencies:
-    typescript: 4.0.x || 4.1.x || 4.2.x || 4.3.x || 4.4.x
-  bin:
-    typedoc: bin/typedoc
-  checksum: c54929f219f6663b55ce1314742467d621371c6e063cd41ec79bc5c2e30ddf2736d0ca5e32b22d5a1775e7ff60a6c0bc8d10d929c4955cdc90c681fa4612dcb6
+  checksum: ae21f898edf3d68a33d723ca149bb6d81485bc63bad1eb215f0af28c56672b5cfb329bf2c7a4e9e3b9215a46afaf306238d481abca6f6d9f1f4e84f1b6a698cd
   languageName: node
   linkType: hard
 
@@ -17327,16 +17310,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:4.4.4":
-  version: 4.4.4
-  resolution: "typescript@npm:4.4.4"
-  bin:
-    tsc: bin/tsc
-    tsserver: bin/tsserver
-  checksum: 89ecb8436bb48ef5594d49289f5f89103071716b6e4844278f4fb3362856e31203e187a9c76d205c3f0b674d221a058fd28310dbcbcf5d95e9a57229bb5203f1
-  languageName: node
-  linkType: hard
-
 "typescript@npm:4.5.2":
   version: 4.5.2
   resolution: "typescript@npm:4.5.2"
@@ -17344,16 +17317,6 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: 74f9ce65d532bdf5d0214b3f60cf37992180023388c87a11ee6f838a803067ef0b63c600fa501b0deb07f989257dce1e244c9635ed79feca40bbccf6e0aa1ebc
-  languageName: node
-  linkType: hard
-
-"typescript@patch:typescript@4.4.4#~builtin<compat/typescript>":
-  version: 4.4.4
-  resolution: "typescript@patch:typescript@npm%3A4.4.4#~builtin<compat/typescript>::version=4.4.4&hash=ddd1e8"
-  bin:
-    tsc: bin/tsc
-    tsserver: bin/tsserver
-  checksum: bd629ad0da4a15d79aaad56baf3ee7d96f6a181760d430ae77f8c5325df7bffd9edee57544a3970e3651e8b796fe03a5838a7eb39c6d46cc3866c0b23d36a0dd
   languageName: node
   linkType: hard
 
