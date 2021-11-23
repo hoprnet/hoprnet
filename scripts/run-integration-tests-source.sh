@@ -299,7 +299,7 @@ log "CT node1 address: ${ct_node1_address}"
 log "Funding nodes"
 
 #  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost2 yarn workspace @hoprnet/hopr-ethereum exec "hardhat faucet" \
+HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum exec "hardhat faucet" \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \
