@@ -209,6 +209,11 @@ describe('test Signature primitive', function () {
     assert.strictEqual(s.recovery, recovery1)
   })
 
+  it('malformed signatures should fail', function () {
+    assert.throws(() => new Signature(new Uint8Array(32), 0))
+    assert.throws(() => new Signature(new Uint8Array(64), 20))
+  })
+
   it('should create Signature from message', function () {
     const s = Signature.create(utils.arrayify(message1), utils.arrayify(privateKey))
 

@@ -196,6 +196,9 @@ export class Signature {
     if (signature.length !== SIGNATURE_LENGTH) {
       throw new Error('Incorrect size Uint8Array for signature')
     }
+    if (![0, 1].includes(recovery)) {
+      throw new Error('Recovery must be either 1 or 0, got ${recovery}')
+    }
   }
 
   static deserialize(arr: Uint8Array): Signature {
