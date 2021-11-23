@@ -145,3 +145,9 @@ async function main() {
 }
 
 main()
+  .then((_result) => {
+    console.log('Funding process succeeded')
+  })
+  .catch((err) => {
+    console.log(`Error during script execution: ${err}`)
+  })
