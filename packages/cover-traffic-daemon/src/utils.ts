@@ -75,14 +75,14 @@ export const stakeFor = (p: PublicKey, state: State): BN => {
   const currentBlockNumber = state.block.toNumber()
 
   return Object.values(unreleasedTokens.link)
-  [linkedAccountsIndex].map((nodeAddress) => {
-    const scheduleIndex = unreleasedTokens.allocation[nodeAddress].findIndex(
-      (schedule) => schedule.lowerBlock <= currentBlockNumber && currentBlockNumber < schedule.upperBlock
-    )
-    return scheduleIndex < 0
-      ? new BN('0')
-      : new BN(unreleasedTokens.allocation[nodeAddress][scheduleIndex].unreleased)
-  })
+    [linkedAccountsIndex].map((nodeAddress) => {
+      const scheduleIndex = unreleasedTokens.allocation[nodeAddress].findIndex(
+        (schedule) => schedule.lowerBlock <= currentBlockNumber && currentBlockNumber < schedule.upperBlock
+      )
+      return scheduleIndex < 0
+        ? new BN('0')
+        : new BN(unreleasedTokens.allocation[nodeAddress][scheduleIndex].unreleased)
+    })
     .reduce(addBN, new BN('0'))
     .add(totalChannelBalanceFor(p, state))
 }
