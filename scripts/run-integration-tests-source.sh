@@ -220,6 +220,9 @@ log "\tnode7"
 log "\t\tdata dir: ${node7_dir} (will be removed)"
 log "\t\tlog: ${node7_log}"
 log "\t\tid: ${node7_id}"
+log "\tct_node1"
+log "\t\tdata dir: ${ct_node1_dir} (will be removed)"
+log "\t\tlog: ${ct_node1_log}"
 # }}}
 
 # --- Check all resources we need are free {{{
