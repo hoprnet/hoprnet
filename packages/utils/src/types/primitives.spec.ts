@@ -230,11 +230,17 @@ describe('test Signature primitive', function () {
   })
 
   it('should correctly serialize & deserialize', function () {
-    const s1 = Signature.deserialize(new Signature(utils.arrayify(signature1), recovery1).serialize())
+    const serialized1 = new Signature(utils.arrayify(signature1), recovery1).serialize()
+    assert.strictEqual(serialized1.length, Signature.SIZE)
+
+    const s1 = Signature.deserialize(serialized1)
     assert.strictEqual(s1.recovery, 0)
     assert(s1.verify(utils.arrayify(message1), PublicKey.fromString(publicKey)))
 
-    const s2 = Signature.deserialize(new Signature(utils.arrayify(signature2), recovery2).serialize())
+    const serialized2 = new Signature(utils.arrayify(signature2), recovery2).serialize()
+    assert.strictEqual(serialized2.length, Signature.SIZE)
+
+    const s2 = Signature.deserialize(serialized2)
     assert.strictEqual(s2.recovery, 1)
     assert(s2.verify(utils.arrayify(message2), PublicKey.fromString(publicKey)))
   })
