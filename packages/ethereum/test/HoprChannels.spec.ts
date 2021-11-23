@@ -2,14 +2,7 @@ import type { Wallet } from '@ethersproject/wallet'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import BN from 'bn.js'
-import {
-  HoprToken__factory,
-  ChannelsMock__factory,
-  HoprChannels__factory,
-  HoprChannels,
-  HoprToken,
-  ChannelsMock
-} from '../src/types'
+import type { HoprChannels, HoprToken, ChannelsMock } from '../src/types'
 import { increaseTime } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './constants'
 import {
@@ -198,9 +191,15 @@ const useFixtures = deployments.createFixture(
 
     // run migrations
     const contracts = await deployments.fixture()
-    const token = HoprToken__factory.connect(contracts['HoprToken'].address, ethers.provider)
-    const channels = HoprChannels__factory.connect(contracts['HoprChannels'].address, ethers.provider)
-    const mockChannels = await new ChannelsMock__factory(deployer).deploy(token.address, 0)
+    const token = (await ethers.getContractFactory('HoprToken')).attach(contracts['HoprToken'].address) as HoprToken
+
+    const channels = (await ethers.getContractFactory('HoprChannels')).attach(
+      contracts['HoprChannels'].address
+    ) as HoprChannels
+
+    const mockChannels = (await (
+      await ethers.getContractFactory('ChannelsMock', deployer)
+    ).deploy(token.address, 0)) as ChannelsMock
 
     // create deployer the minter
     const minterRole = await token.MINTER_ROLE()
@@ -673,12 +672,12 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
 
   it('should fail to initialize channel closure A->0', async function () {
     await expect(
-      channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)
+      channels.connect(fixtures.accountA).initiateChannelClosure(ethers.constants.AddressZero)
     ).to.be.revertedWith('destination must not be empty')
   })
 
   it('should fail to finalize channel closure when is not pending', async function () {
-    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
+    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'channel must be pending to close'
     )
   })
@@ -733,15 +732,15 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
   })
 
   it('should fail to finalize channel closure', async function () {
-    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_A.address)).to.be.revertedWith(
+    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_A.address)).to.be.revertedWith(
       'source and destination must not be the same'
     )
 
     await expect(
-      channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ethers.constants.AddressZero)
+      channels.connect(fixtures.accountA).finalizeChannelClosure(ethers.constants.AddressZero)
     ).to.be.revertedWith('destination must not be empty')
 
-    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
+    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'closureTime must be before now'
     )
   })
