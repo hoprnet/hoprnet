@@ -3,7 +3,6 @@
  */
 import type PeerId from 'peer-id'
 import type LibP2P from 'libp2p'
-import type { PromiseValue } from '../typescript'
 import type { Address } from 'libp2p/src/peer-store/address-book'
 import type { TimeoutOpts } from '../async'
 
@@ -17,7 +16,7 @@ const logError = debug(`hopr-core:libp2p:error`)
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 10000
 
-type DHTResponse = PromiseValue<ReturnType<LibP2P.PeerRoutingModule['findPeer']>>
+type DHTResponse = Awaited<ReturnType<LibP2P.PeerRoutingModule['findPeer']>>
 
 export type DialOpts = {
   timeout?: number
@@ -35,7 +34,7 @@ export enum DialStatus {
 export type DialResponse =
   | {
       status: DialStatus.SUCCESS
-      resp: PromiseValue<ReturnType<LibP2P['dialProtocol']>>
+      resp: Awaited<ReturnType<LibP2P['dialProtocol']>>
     }
   | {
       status: DialStatus.TIMEOUT
@@ -68,7 +67,7 @@ async function doDial(
   }
 ): Promise<DialResponse> {
   let err: any
-  let struct: PromiseValue<ReturnType<LibP2P['dialProtocol']>> | null
+  let struct: Awaited<ReturnType<LibP2P['dialProtocol']>> | null
 
   let addresses = (libp2p.peerStore.get(destination)?.addresses ?? []).map((addr) => addr.multiaddr.toString())
 
