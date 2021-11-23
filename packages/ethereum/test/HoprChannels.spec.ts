@@ -53,7 +53,7 @@ export const redeemArgs = (ticket: AcknowledgedTicket): Parameters<HoprChannels[
   ticket.response.toHex(),
   ticket.ticket.amount.toHex(),
   ticket.ticket.winProb.toHex(),
-  ticket.ticket.signature.serializeEthereum()
+  ticket.ticket.signature.serialize()
 ]
 
 export const validateChannel = (actual, expected) => {
@@ -559,7 +559,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
         TICKET_AB_WIN.ticket.response.toHex(),
         TICKET_AB_WIN.ticket.ticket.amount.toHex(),
         TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
-        TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
+        TICKET_AB_WIN.ticket.ticket.signature.serialize()
       )
     ).to.be.revertedWith('redemptions must be in order')
 
@@ -572,7 +572,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
         TICKET_AB_WIN.ticket.response.toHex(),
         TICKET_AB_WIN.ticket.ticket.amount.toHex(),
         TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
-        TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
+        TICKET_AB_WIN.ticket.ticket.signature.serialize()
       )
     ).to.be.revertedWith('ticket epoch must match')
   })
