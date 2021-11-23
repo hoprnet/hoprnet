@@ -20,6 +20,7 @@
 - [serialize](Address.md#serialize)
 - [sortPair](Address.md#sortpair)
 - [toHex](Address.md#tohex)
+- [toString](Address.md#tostring)
 - [createMock](Address.md#createmock)
 - [deserialize](Address.md#deserialize)
 - [fromString](Address.md#fromstring)
@@ -72,7 +73,7 @@
 
 #### Defined in
 
-[types/primitives.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L134)
+[types/primitives.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L138)
 
 ___
 
@@ -92,7 +93,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L130)
+[types/primitives.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L134)
 
 ___
 
@@ -112,7 +113,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L138)
+[types/primitives.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L142)
 
 ___
 
@@ -146,7 +147,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L142)
+[types/primitives.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L146)
 
 ___
 
@@ -164,6 +165,20 @@ ___
 
 ___
 
+### toString
+
+▸ **toString**(): `string`
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[types/primitives.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L130)
+
+___
+
 ### createMock
 
 ▸ `Static` **createMock**(): [`Address`](Address.md)
@@ -174,7 +189,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L146)
+[types/primitives.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L150)
 
 ___
 

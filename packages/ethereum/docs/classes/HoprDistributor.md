@@ -255,14 +255,14 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `AllocationAdded` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
-| `AllocationAdded(address,uint128,string)` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
-| `Claimed` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
-| `Claimed(address,uint128,string)` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], `Object`\> |
-| `OwnershipTransferred` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `OwnershipTransferred(address,address)` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `ScheduleAdded` | (`durations?`: ``null``, `percents?`: ``null``, `name?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`BigNumber`[], `BigNumber`[], `string`], `Object`\> |
-| `ScheduleAdded(uint128[],uint128[],string)` | (`durations?`: ``null``, `percents?`: ``null``, `name?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`BigNumber`[], `BigNumber`[], `string`], `Object`\> |
+| `AllocationAdded` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], { `account`: `string` ; `amount`: `BigNumber` ; `scheduleName`: `string`  }\> |
+| `AllocationAdded(address,uint128,string)` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], { `account`: `string` ; `amount`: `BigNumber` ; `scheduleName`: `string`  }\> |
+| `Claimed` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], { `account`: `string` ; `amount`: `BigNumber` ; `scheduleName`: `string`  }\> |
+| `Claimed(address,uint128,string)` | (`account?`: `string`, `amount?`: ``null``, `scheduleName?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`, `string`], { `account`: `string` ; `amount`: `BigNumber` ; `scheduleName`: `string`  }\> |
+| `OwnershipTransferred` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `newOwner`: `string` ; `previousOwner`: `string`  }\> |
+| `OwnershipTransferred(address,address)` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `newOwner`: `string` ; `previousOwner`: `string`  }\> |
+| `ScheduleAdded` | (`durations?`: ``null``, `percents?`: ``null``, `name?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`BigNumber`[], `BigNumber`[], `string`], { `durations`: `BigNumber`[] ; `name`: `string` ; `percents`: `BigNumber`[]  }\> |
+| `ScheduleAdded(uint128[],uint128[],string)` | (`durations?`: ``null``, `percents?`: ``null``, `name?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`BigNumber`[], `BigNumber`[], `string`], { `durations`: `BigNumber`[] ; `name`: `string` ; `percents`: `BigNumber`[]  }\> |
 
 #### Overrides
 

@@ -434,13 +434,14 @@ class Hopr extends EventEmitter {
       return
     }
 
-    const currentChannels = await this.getAllChannels()
+    const currentChannels: ChannelEntry[] | undefined = await this.getAllChannels()
     verbose('Channels obtained', currentChannels)
 
-    if (!currentChannels) {
-      log('not enough channels to iterate over')
+    if (currentChannels === undefined) {
+      log('invalid channels retrieved from database')
       return
     }
+
     for (const channel of currentChannels) {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
@@ -511,7 +512,7 @@ class Hopr extends EventEmitter {
     verbose('Stopping checking timeout')
     clearTimeout(this.checkTimeout)
     verbose('Stopping heartbeat & indexer')
-    await Promise.all([this.heartbeat.stop(), await this.chain.stop()])
+    await Promise.all([this.heartbeat.stop(), this.chain.stop()])
     verbose('Stoping database & libp2p', this.db)
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 

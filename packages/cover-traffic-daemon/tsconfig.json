@@ -2,10 +2,9 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "lib",
-    "rootDir": "src",
-    "resolveJsonModule": true
+    "rootDir": "src"
   },
-  "include": ["src/**/*.ts", "src/unreleasedTokens.json"],
+  "include": ["src/**/*.ts"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",
