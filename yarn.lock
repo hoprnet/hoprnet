@@ -1332,7 +1332,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": 4.1.1
     "@types/mocha": 9.0.0
-    "@types/pino": 6.3.12
+    "@types/pino": 7.0.4
     abort-controller: ~3.0.0
     bignumber.js: ^9.0.1
     bl: 5.0.0
@@ -2553,34 +2553,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/pino-pretty@npm:*":
-  version: 4.7.3
-  resolution: "@types/pino-pretty@npm:4.7.3"
+"@types/pino@npm:7.0.4":
+  version: 7.0.4
+  resolution: "@types/pino@npm:7.0.4"
   dependencies:
-    "@types/node": "*"
-    "@types/pino": 6.3
-  checksum: 40fe67e73d26242d1f741ba62bd57aa4ce34842376878137f16befde3df0dd5ee39c30bc89da3d5e99848f69b00b73010863a740fd469585e0852ea656cb5b7b
-  languageName: node
-  linkType: hard
-
-"@types/pino-std-serializers@npm:*":
-  version: 2.4.1
-  resolution: "@types/pino-std-serializers@npm:2.4.1"
-  dependencies:
-    "@types/node": "*"
-  checksum: a156e25882db9aade2576dbe6414379efcdd4fad24211d3f22f20e0cd4bee569215799ee5cd9b2b15282f18461a8a54573ff42bf6bee5d35b72513be2f78bdec
-  languageName: node
-  linkType: hard
-
-"@types/pino@npm:6.3, @types/pino@npm:6.3.12":
-  version: 6.3.12
-  resolution: "@types/pino@npm:6.3.12"
-  dependencies:
-    "@types/node": "*"
-    "@types/pino-pretty": "*"
-    "@types/pino-std-serializers": "*"
-    sonic-boom: ^2.1.0
-  checksum: 801735146669312d02459781e5180220630eaef643da36dc5a9a97520e7ecc3da7270f31a86fcdcb1dc835073c9143fc628024ba5e3a0ea7cbb86aada4897709
+    pino: "*"
+  checksum: 6c8e60e221019ed435505223623a093f3cfcc68ae7215c1d95245e6634e81afe4f64cf1939f4c6de7de5855852ecf1e2511f7916d0050be65c5acba18106314c
   languageName: node
   linkType: hard
 
@@ -13895,24 +13873,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pino@npm:^6.3.2":
-  version: 6.13.3
-  resolution: "pino@npm:6.13.3"
-  dependencies:
-    fast-redact: ^3.0.0
-    fast-safe-stringify: ^2.0.8
-    fastify-warning: ^0.2.0
-    flatstr: ^1.0.12
-    pino-std-serializers: ^3.1.0
-    quick-format-unescaped: ^4.0.3
-    sonic-boom: ^1.0.2
-  bin:
-    pino: bin.js
-  checksum: a580decd47a1c8b32a846ba1cb478087b523636d697bd4c57833d10b3f2b35c7d06739715ad9a291b41caf002b8d1bbf98674bfb3e99989fd41b7d934cca861c
-  languageName: node
-  linkType: hard
-
-"pino@npm:^7.0.0":
+"pino@npm:*, pino@npm:^7.0.0":
   version: 7.4.0
   resolution: "pino@npm:7.4.0"
   dependencies:
@@ -13930,6 +13891,23 @@ __metadata:
   bin:
     pino: bin.js
   checksum: c61bb43e7a5661a22d710624ecacc54bf1e57ccd84c42edc6151beccd92dbd3cace60f2c2511eda713fd53eba5e96de0e2ed703637bdab3ecc9e02fdd4b757ff
+  languageName: node
+  linkType: hard
+
+"pino@npm:^6.3.2":
+  version: 6.13.3
+  resolution: "pino@npm:6.13.3"
+  dependencies:
+    fast-redact: ^3.0.0
+    fast-safe-stringify: ^2.0.8
+    fastify-warning: ^0.2.0
+    flatstr: ^1.0.12
+    pino-std-serializers: ^3.1.0
+    quick-format-unescaped: ^4.0.3
+    sonic-boom: ^1.0.2
+  bin:
+    pino: bin.js
+  checksum: a580decd47a1c8b32a846ba1cb478087b523636d697bd4c57833d10b3f2b35c7d06739715ad9a291b41caf002b8d1bbf98674bfb3e99989fd41b7d934cca861c
   languageName: node
   linkType: hard
 
@@ -15926,7 +15904,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"sonic-boom@npm:^2.1.0, sonic-boom@npm:^2.2.1":
+"sonic-boom@npm:^2.2.1":
   version: 2.3.1
   resolution: "sonic-boom@npm:2.3.1"
   dependencies:
