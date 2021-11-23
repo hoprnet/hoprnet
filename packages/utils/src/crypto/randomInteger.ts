@@ -168,7 +168,7 @@ export function randomInteger(start: number, end?: number): number {
     _start = BigInt(start)
   }
 
-  if (_end + _start > MAX_RANDOM_INTEGER) {
+  if (_end > MAX_RANDOM_INTEGER) {
     throw Error('invalid range')
   }
 

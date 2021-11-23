@@ -54,7 +54,9 @@ describe('testing random-number generator', function () {
 
     assert.throws(() => randomInteger(-1), Error(`invalid range`))
 
-    assert.throws(() => randomInteger(1, Number.MAX_SAFE_INTEGER), Error(`invalid range`))
+    // Number.MAX_SAFE_INTEGER * 2 is strictly greater than Number.MAX_SAFE_INTEGER
+    // due to increased exponent in IEEE754 representation
+    assert.throws(() => randomInteger(0, Number.MAX_SAFE_INTEGER * 2), Error(`invalid range`))
   })
 
   it('should yield correct values for bigint edge cases', function () {
