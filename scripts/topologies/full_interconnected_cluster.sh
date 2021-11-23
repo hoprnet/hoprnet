@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# prevent souring of this script, only allow execution
+# prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -15,7 +15,7 @@ source "${mydir}/../utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5>"
+  msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5> <node_api_6>"
   msg
   msg "Required environment variables"
   msg "------------------------------"
@@ -33,6 +33,7 @@ test -z "${2:-}" && { msg "Missing <node_api_2>"; usage; exit 1; }
 test -z "${3:-}" && { msg "Missing <node_api_3>"; usage; exit 1; }
 test -z "${4:-}" && { msg "Missing <node_api_4>"; usage; exit 1; }
 test -z "${5:-}" && { msg "Missing <node_api_5>"; usage; exit 1; }
+test -z "${6:-}" && { msg "Missing <node_api_6>"; usage; exit 1; }
 test -z "${HOPRD_API_TOKEN:-}" && { msg "Missing HOPRD_API_TOKEN"; usage; exit 1; }
 
 declare api1="${1}"
@@ -40,6 +41,7 @@ declare api2="${2}"
 declare api3="${3}"
 declare api4="${4}"
 declare api5="${5}"
+declare api6="${6}"
 declare api_token=${HOPRD_API_TOKEN}
 
 # $1 = endpoint
@@ -50,7 +52,7 @@ declare api_token=${HOPRD_API_TOKEN}
 # $4 = OPTIONAL: step time between retries in seconds, defaults to 40 seconds (xDAI 5s/block)
 # $5 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
 # priority than wait time, defaults to 0
-run_command(){
+run_command() {
   local result now
   local endpoint="${1}"
   local hopr_cmd="${2}"
@@ -129,13 +131,14 @@ validate_node_balance_gt0() {
   fi
 }
 
-log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}"
+log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}"
 
 validate_node_eth_address "${api1}"
 validate_node_eth_address "${api2}"
 validate_node_eth_address "${api3}"
 validate_node_eth_address "${api4}"
 validate_node_eth_address "${api5}"
+validate_node_eth_address "${api6}"
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
@@ -143,25 +146,28 @@ validate_node_balance_gt0 "${api2}"
 validate_node_balance_gt0 "${api3}"
 validate_node_balance_gt0 "${api4}"
 validate_node_balance_gt0 "${api5}"
+validate_node_balance_gt0 "${api6}"
 log "Nodes are funded"
 
-declare addr1 addr2 addr3 addr4 addr5 result
+declare addr1 addr2 addr3 addr4 addr5 addr6 result
 addr1="$(get_hopr_address "${api1}")"
 addr2="$(get_hopr_address "${api2}")"
 addr3="$(get_hopr_address "${api3}")"
 addr4="$(get_hopr_address "${api4}")"
 addr5="$(get_hopr_address "${api5}")"
+addr6="$(get_hopr_address "${api6}")"
 log "hopr addr1: ${addr1}"
 log "hopr addr2: ${addr2}"
 log "hopr addr3: ${addr3}"
 log "hopr addr4: ${addr4}"
 log "hopr addr5: ${addr5}"
+log "hopr addr6: ${addr6}"
 
 log "Check peers"
 result=$(run_command ${api1} "peers" 'peers have announced themselves' 600)
 log "-- ${result}"
 
-for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
+for node in ${addr2} ${addr3} ${addr4} ${addr5} ${addr6}; do
   log "Node 1 ping other node ${node}"
   result=$(run_command ${api1} "ping ${node}" "Pong received in:" 600)
   log "-- ${result}"
@@ -169,29 +175,34 @@ done
 
 log "Opening channels in background to parallelize operations"
 
-for addr in ${addr2} ${addr3} ${addr4} ${addr5}; do
+for addr in ${addr2} ${addr3} ${addr4} ${addr5} ${addr6}; do
   log "Node ${addr1} open channel to node ${addr}"
   run_command "${api1}" "open ${addr} 0.1" "Successfully opened channel" 600 &
 done
 
-for addr in ${addr1} ${addr3} ${addr4} ${addr5}; do
+for addr in ${addr1} ${addr3} ${addr4} ${addr5} ${addr6}; do
   log "Node ${addr2} open channel to node ${addr}"
   run_command "${api2}" "open ${addr} 0.1" "Successfully opened channel" 600 &
 done
 
-for addr in ${addr1} ${addr2} ${addr4} ${addr5}; do
+for addr in ${addr1} ${addr2} ${addr4} ${addr5} ${addr6}; do
   log "Node ${addr3} open channel to node ${addr}"
   run_command "${api3}" "open ${addr} 0.1" "Successfully opened channel" 600 &
 done
 
-for addr in ${addr1} ${addr2} ${addr3} ${addr5}; do
+for addr in ${addr1} ${addr2} ${addr3} ${addr5} ${addr6}; do
   log "Node ${addr4} open channel to node ${addr}"
   run_command "${api4}" "open ${addr} 0.1" "Successfully opened channel" 600 &
 done
 
-for addr in ${addr1} ${addr2} ${addr3} ${addr4}; do
+for addr in ${addr1} ${addr2} ${addr3} ${addr4} ${addr6}; do
   log "Node ${addr5} open channel to node ${addr}"
   run_command "${api5}" "open ${addr} 0.1" "Successfully opened channel" 600 &
+done
+
+for addr in ${addr1} ${addr2} ${addr3} ${addr4} ${addr5}; do
+  log "Node ${addr6} open channel to node ${addr}"
+  run_command "${api6}" "open ${addr} 0.1" "Successfully opened channel" 600 &
 done
 
 log "Wait for all operations to finish"

@@ -35,8 +35,8 @@
     "tuttlingen": {
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
-      "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
-      "channels_contract_address": "0x6f3999E1Ca72b6BB396E46aD454f5ADEC783b035",
+      "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+      "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
       "tags": ["production"]
     }
   },
@@ -54,7 +54,7 @@
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
       "chain_id": 100,
       "live": true,
-      "gas_price": "1 gwei",
+      "gas_price": "2 gwei",
       "gas_multiplier": 1.1,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
