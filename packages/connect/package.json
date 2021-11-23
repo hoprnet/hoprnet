@@ -76,13 +76,6 @@
       "ts-node/register"
     ]
   },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120,
-    "trailingComma": "none"
-  },
   "publishConfig": {
     "access": "public"
   },
