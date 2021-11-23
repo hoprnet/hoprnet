@@ -225,10 +225,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `InterfaceImplementerSet` | (`account?`: `string`, `interfaceHash?`: `BytesLike`, `implementer?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `InterfaceImplementerSet(address,bytes32,address)` | (`account?`: `string`, `interfaceHash?`: `BytesLike`, `implementer?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `ManagerChanged` | (`account?`: `string`, `newManager?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `ManagerChanged(address,address)` | (`account?`: `string`, `newManager?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
+| `InterfaceImplementerSet` | (`account?`: `string`, `interfaceHash?`: `BytesLike`, `implementer?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], { `account`: `string` ; `implementer`: `string` ; `interfaceHash`: `string`  }\> |
+| `InterfaceImplementerSet(address,bytes32,address)` | (`account?`: `string`, `interfaceHash?`: `BytesLike`, `implementer?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], { `account`: `string` ; `implementer`: `string` ; `interfaceHash`: `string`  }\> |
+| `ManagerChanged` | (`account?`: `string`, `newManager?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `account`: `string` ; `newManager`: `string`  }\> |
+| `ManagerChanged(address,address)` | (`account?`: `string`, `newManager?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `account`: `string` ; `newManager`: `string`  }\> |
 
 #### Overrides
 

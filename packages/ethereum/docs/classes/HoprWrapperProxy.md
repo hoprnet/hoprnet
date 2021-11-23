@@ -228,10 +228,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `FowardedFrom` | (`from?`: ``null``, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `FowardedFrom(address,uint256)` | (`from?`: ``null``, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `FowardedTo` | (`to?`: ``null``, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `FowardedTo(address,uint256)` | (`to?`: ``null``, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
+| `FowardedFrom` | (`from?`: ``null``, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], { `amount`: `BigNumber` ; `from`: `string`  }\> |
+| `FowardedFrom(address,uint256)` | (`from?`: ``null``, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], { `amount`: `BigNumber` ; `from`: `string`  }\> |
+| `FowardedTo` | (`to?`: ``null``, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], { `amount`: `BigNumber` ; `to`: `string`  }\> |
+| `FowardedTo(address,uint256)` | (`to?`: ``null``, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], { `amount`: `BigNumber` ; `to`: `string`  }\> |
 
 #### Overrides
 

@@ -1913,7 +1913,7 @@ ___
 
 ### iterateHash
 
-▸ **iterateHash**(`seed`, `hashFunc`, `iterations`, `stepSize`, `hint?`): `Promise`<`Object`\>
+▸ **iterateHash**(`seed`, `hashFunc`, `iterations`, `stepSize`, `hint?`): `Promise`<{ `hash`: `Uint8Array` ; `intermediates`: [`Intermediate`](interfaces/Intermediate.md)[]  }\>
 
 #### Parameters
 
@@ -1927,7 +1927,7 @@ ___
 
 #### Returns
 
-`Promise`<`Object`\>
+`Promise`<{ `hash`: `Uint8Array` ; `intermediates`: [`Intermediate`](interfaces/Intermediate.md)[]  }\>
 
 #### Defined in
 
