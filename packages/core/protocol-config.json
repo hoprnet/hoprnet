@@ -54,7 +54,7 @@
       "description": "The xDai chain is a stable payments EVM (Ethereum Virtual Machine) blockchain designed for fast and inexpensive transactions",
       "chain_id": 100,
       "live": true,
-      "gas_price": "1 gwei",
+      "gas_price": "2 gwei",
       "gas_multiplier": 1.1,
       "default_provider": "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet",
       "native_token_name": "xDAI",
