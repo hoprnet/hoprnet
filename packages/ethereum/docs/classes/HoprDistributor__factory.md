@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:447
+packages/ethereum/src/types/factories/HoprDistributor__factory.ts:447
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:490
+packages/ethereum/src/types/factories/HoprDistributor__factory.ts:490
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:489
+packages/ethereum/src/types/factories/HoprDistributor__factory.ts:489
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:483
+packages/ethereum/src/types/factories/HoprDistributor__factory.ts:483
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:486
+packages/ethereum/src/types/factories/HoprDistributor__factory.ts:486
 
 ___
 
@@ -190,7 +190,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:457
+packages/ethereum/src/types/factories/HoprDistributor__factory.ts:457
 
 ___
 
@@ -217,7 +217,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:470
+packages/ethereum/src/types/factories/HoprDistributor__factory.ts:470
 
 ___
 
@@ -238,7 +238,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:494
+packages/ethereum/src/types/factories/HoprDistributor__factory.ts:494
 
 ___
 
@@ -252,7 +252,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/HoprDistributor__factory.ts:491
+packages/ethereum/src/types/factories/HoprDistributor__factory.ts:491
 
 ___
 

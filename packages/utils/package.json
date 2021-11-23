@@ -1,30 +1,26 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.83.0-next.20",
+  "version": "1.84.0-next.0",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
-    "prepublishOnly": "yarn build",
-    "docs:generate": "yarn typedoc",
-    "docs:watch": "yarn typedoc --watch"
+    "prepublishOnly": "tsc -p ./tsconfig.npm.json",
+    "docs:generate": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "engines": {
     "node": "14 || 16"
   },
   "files": [
-    "lib",
-    "!**/*.spec.ts",
-    "!**/*.spec.d.ts",
-    "!**/*.spec.js",
-    "!**/*.spec.js.map"
+    "lib"
   ],
   "dependencies": {
     "abort-controller": "~3.0.0",
@@ -35,7 +31,9 @@
     "debug": "^4.3.2",
     "ethers": "5.5.1",
     "futoin-hkdf": "~1.4.2",
+    "hjson": "^3.2.2",
     "it-pipe": "^1.1.0",
+    "jsonschema": "^1.4.0",
     "leveldown": "6.1.0",
     "levelup": "5.1.1",
     "libp2p": "0.33.0",
@@ -61,11 +59,11 @@
     "mocha": "9.1.3",
     "rewiremock": "3.14.3",
     "rimraf": "3.0.2",
-    "sinon": "11.1.2",
+    "sinon": "12.0.1",
     "ts-node": "10.4.0",
-    "typedoc": "0.22.7",
-    "typedoc-plugin-markdown": "3.11.3",
-    "typescript": "4.4.4"
+    "typedoc": "0.22.9",
+    "typedoc-plugin-markdown": "3.11.7",
+    "typescript": "4.5.2"
   },
   "mocha": {
     "extension": [

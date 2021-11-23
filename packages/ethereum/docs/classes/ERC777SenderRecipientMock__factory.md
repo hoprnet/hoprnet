@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:370
+packages/ethereum/src/types/factories/ERC777SenderRecipientMock__factory.ts:370
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:397
+packages/ethereum/src/types/factories/ERC777SenderRecipientMock__factory.ts:397
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:396
+packages/ethereum/src/types/factories/ERC777SenderRecipientMock__factory.ts:396
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:390
+packages/ethereum/src/types/factories/ERC777SenderRecipientMock__factory.ts:390
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:393
+packages/ethereum/src/types/factories/ERC777SenderRecipientMock__factory.ts:393
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:380
+packages/ethereum/src/types/factories/ERC777SenderRecipientMock__factory.ts:380
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:385
+packages/ethereum/src/types/factories/ERC777SenderRecipientMock__factory.ts:385
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:401
+packages/ethereum/src/types/factories/ERC777SenderRecipientMock__factory.ts:401
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ERC777SenderRecipientMock__factory.ts:398
+packages/ethereum/src/types/factories/ERC777SenderRecipientMock__factory.ts:398
 
 ___
 

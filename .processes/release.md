@@ -12,7 +12,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
   - [Testing phases](#testing-phases)
     - [Tech team testing](#tech-team-testing)
     - [HOPR team testing](#hopr-team-testing)
-    - [Community Ambassador testing](#community-ambassador-testing)
+    - [Ambassador testing](#ambassador-testing)
   - [Release promotion](#release-promotion)
   - [On a new chain](#on-a-new-chain)
   - [On a new release](#on-a-new-release)
@@ -40,7 +40,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 - Internal releases are more frequent and their goal is to test new features and bug fixes.
 - There should be no public involvement unless the [internal release](#internal-release) is promoted to a [public release](#public-release).
 - All releases start as an [internal release](#internal-release) release and may be promoted to a [public release](#public-release), see [release promotion](#release-promotion).
-- When an internal release is created, one of the [tech ambassadors](./development.md#ambassadors) is assigned to oversee the release cycle, this includes:
+- When an internal release is created, one of the [representatives](./development.md#representatives) is assigned to oversee the release cycle, this includes:
   - notifies the HOPR team that the [internal release](#internal-release) has been created in element channel `releases`
   - [creating release](#release-cycle)
   - [testing release](#testing-phases)
@@ -69,11 +69,11 @@ Testing phases occur only when a release is queued and prioritized during [epic 
 
 For every phase completed, release owner must update the release's PR with the current testing phase status.
 
-| Phase name                   | Description                                                            |
-| ---------------------------- | ---------------------------------------------------------------------- |
-| tech team testing            | First phase, testing by tech team members only                         |
-| HOPR team testing            | Second phase, testing by available HOPR team members                   |
-| community ambassador testing | Third (optional) phase, testing with the help of community ambassadors |
+| Phase name         | Description                                                  |
+| ------------------ | ------------------------------------------------------------ |
+| tech team testing  | First phase, testing by tech team members only               |
+| HOPR team testing  | Second phase, testing by available HOPR team members         |
+| ambassador testing | Third (optional) phase, testing with the help of ambassadors |
 
 ### Tech team testing
 
@@ -86,7 +86,7 @@ For every phase completed, release owner must update the release's PR with the c
 - Occurs after [Tech team testing](#tech-team-testing) is succesful.
 - With the help of a [changelog](#release-cycle), test HOPRd.
 
-### Community Ambassador testing
+### Ambassador testing
 
 A third and final phase of testing is to include ambassadors.
 This is optional in the possibility we want to gather more data points and/or a specific feature requires larger network topology.
@@ -151,8 +151,9 @@ particular branch to deploy on every change.
 
    - create new environment in `scripts/environment.sh`
    - update image to point to `latest-<release>` in `packages/avado/Dockerfile`
-   - `packages/avado/docker-compose.yml`
+   - update image to point to new version in `packages/avado/docker-compose.yml`
    - add an entry to `CHANGELOG.md`
+   - add any chain specific changes
 
 2. The information about the release, how to test and what commands to run, are
    then shared within our `#release` channel. On the `#testing` channel, members are expected
@@ -168,8 +169,7 @@ particular branch to deploy on every change.
   from `master` have preference
 - revert changes in `packages/avado/Dockerfile`
 - revert changes in `packages/avado/docker-compose.yml`
-- revert any other changes related to the chain
-- add an entry to `CHANGELOG.md`
+- revert any chain specific changes
 - bump the package versions to the next preminor version:
   `yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version preminor --preid=next`
 - revert changes made to Avado configuration files as part of the initial release creation
@@ -206,13 +206,11 @@ The following are a series of manual tasks that are needed to be executed for th
 
 - [ ] Deploy a set of `$release` CT nodes for our testnet using our **`cover-traffic` deployment script**.
 
-- [ ] Deploy a set of `$release` cloud nodes for our testnet to support DEADR and be used as relayers (to be removed after https://github.com/hoprnet/hoprnet/issues/2537 is fixed).
-
 - [ ] Deploy a set of `$release` cloud nodes for our testnet with a full topology connected to feed event data for our leaderboard using our **`topology` deployment script**.
 
 - [ ] Tag a distribution manually $release on npm and on Docker Hub.
 
-  1. `npm login`, `npm dist add @hoprnet/hoprd@$version $mountain/$city`
+  1. `npm login`, `npm dist-tag add @hoprnet/hoprd@$version $mountain/$city`
   2. `docker login`, `docker tag gcr.io/hoprassociation/hoprd:latest hopr/hoprd:$city/$mountain`
 
 - [ ] Create a DNS alias for each node (cloud, cover-traffic, topology), to be accessed via our `hoprnet.link` domain (e.g. ct-1-$release.hoprnet.link)
@@ -233,9 +231,7 @@ The following are a series of manual tasks that are needed to be executed for th
 
 ```
 CT_PRIV_KEY=14e6...a6a5 \
-HOPRD_INFURA_KEY=51d4...caf6 \
-HOPRD_PROVIDER=https://provider-proxy.hoprnet.workers.dev/matic_rio \
-./scripts/setup-ct-gcloud-cluster.sh cover-traffic-node-01
+  ./scripts/setup-ct-gcloud-cluster.sh ${release_name}-cover-traffic
 ```
 
 #### `topology` deployment script
@@ -243,9 +239,6 @@ HOPRD_PROVIDER=https://provider-proxy.hoprnet.workers.dev/matic_rio \
 ```
 HOPRD_PERFORM_CLEANUP=false \
 FUNDING_PRIV_KEY=0xa77a...21b8 \
-HOPRD_INFURA_KEY=51d4...caf6 \
-HOPRD_PROVIDER=https://polygon.infura.io/v3/51d4...caf6 \
-HOPRD_TOKEN_CONTRACT="0x6F80d1a3AB9006548c2fBb180879b87364D63Bf7" \
 HOPRD_SHOW_PRESTART_INFO=true \
-./scripts/setup-gcloud-cluster.sh matic-testnet-01 gcr.io/hoprassociation/hoprd:latest `pwd`/scripts/topologies/full_interconnected_cluster.sh
+  ./scripts/setup-gcloud-cluster.sh tuttlingen `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```

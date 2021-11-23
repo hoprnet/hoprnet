@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import deployERC1820Registry from '../deploy/01_ERC1820Registry'
-import type { HoprToken } from '../types'
+import type { HoprToken } from '../src/types'
 
 const useFixtures = deployments.createFixture(async (hre) => {
   const [deployer, userA] = await ethers.getSigners()

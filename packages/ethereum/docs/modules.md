@@ -95,10 +95,6 @@
 - [Networks](modules.md#networks)
 - [PublicNetworks](modules.md#publicnetworks)
 
-### Variables
-
-- [networks](modules.md#networks)
-
 ### Functions
 
 - [getContractData](modules.md#getcontractdata)
@@ -119,7 +115,7 @@
 
 #### Defined in
 
-[packages/ethereum/index.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/index.ts#L10)
+[packages/ethereum/src/index.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L9)
 
 ___
 
@@ -129,7 +125,7 @@ ___
 
 #### Defined in
 
-[packages/ethereum/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/index.ts#L8)
+[packages/ethereum/src/index.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L7)
 
 ___
 
@@ -144,7 +140,7 @@ production = our current production chain
 
 #### Defined in
 
-[packages/ethereum/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L12)
+[packages/ethereum/src/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/constants.ts#L10)
 
 ___
 
@@ -154,51 +150,41 @@ ___
 
 #### Defined in
 
-[packages/ethereum/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L13)
+[packages/ethereum/src/constants.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/constants.ts#L11)
 
 ___
 
 ### Networks
 
-Ƭ **Networks**: ``"hardhat"`` \| ``"localhost"`` \| [`PublicNetworks`](modules.md#publicnetworks)
+Ƭ **Networks**: ``"hardhat"`` \| [`PublicNetworks`](modules.md#publicnetworks)
 
 #### Defined in
 
-[packages/ethereum/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L4)
+[packages/ethereum/src/constants.ts:2](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/constants.ts#L2)
 
 ___
 
 ### PublicNetworks
 
-Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"`` \| ``"mumbai"`` \| ``"polygon"``
+Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"``
 
 #### Defined in
 
-[packages/ethereum/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L3)
-
-## Variables
-
-### networks
-
-• **networks**: { [network in PublicNetworks]: Object }
-
-#### Defined in
-
-[packages/ethereum/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L15)
+[packages/ethereum/src/constants.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/constants.ts#L1)
 
 ## Functions
 
 ### getContractData
 
-▸ `Const` **getContractData**(`network`, `contract`, `environmentId?`): [`ContractData`](modules.md#contractdata)
+▸ `Const` **getContractData**(`network`, `environmentId`, `contract`): [`ContractData`](modules.md#contractdata)
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `network` | [`Networks`](modules.md#networks) | `undefined` |
-| `contract` | [`ContractNames`](modules.md#contractnames) | `undefined` |
-| `environmentId` | `string` | `'default'` |
+| Name | Type |
+| :------ | :------ |
+| `network` | `string` |
+| `environmentId` | `string` |
+| `contract` | [`ContractNames`](modules.md#contractnames) |
 
 #### Returns
 
@@ -206,4 +192,4 @@ ___
 
 #### Defined in
 
-[packages/ethereum/index.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/index.ts#L16)
+[packages/ethereum/src/index.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L15)

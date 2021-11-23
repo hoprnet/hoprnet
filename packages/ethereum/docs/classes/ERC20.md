@@ -168,7 +168,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:191
+packages/ethereum/src/types/ERC20.d.ts:191
 
 ___
 
@@ -207,7 +207,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:260
+packages/ethereum/src/types/ERC20.d.ts:260
 
 ___
 
@@ -219,10 +219,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `owner`: `string` ; `spender`: `string` ; `value`: `BigNumber`  }\> |
+| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `owner`: `string` ; `spender`: `string` ; `value`: `BigNumber`  }\> |
+| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
 
 #### Overrides
 
@@ -230,7 +230,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:222
+packages/ethereum/src/types/ERC20.d.ts:222
 
 ___
 
@@ -255,7 +255,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:131
+packages/ethereum/src/types/ERC20.d.ts:131
 
 ___
 
@@ -269,7 +269,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:129
+packages/ethereum/src/types/ERC20.d.ts:129
 
 ___
 
@@ -294,7 +294,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:291
+packages/ethereum/src/types/ERC20.d.ts:291
 
 ___
 
@@ -432,7 +432,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:185
+packages/ethereum/src/types/ERC20.d.ts:185
 
 ___
 
@@ -454,7 +454,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:162
+packages/ethereum/src/types/ERC20.d.ts:162
 
 ___
 
@@ -478,7 +478,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:90
+packages/ethereum/src/types/ERC20.d.ts:90
 
 ___
 
@@ -499,7 +499,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:177
+packages/ethereum/src/types/ERC20.d.ts:177
 
 ___
 
@@ -523,7 +523,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:89
+packages/ethereum/src/types/ERC20.d.ts:89
 
 ___
 
@@ -541,7 +541,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:91
+packages/ethereum/src/types/ERC20.d.ts:91
 
 ___
 
@@ -645,7 +645,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:93
+packages/ethereum/src/types/ERC20.d.ts:93
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -665,7 +665,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:116
+packages/ethereum/src/types/ERC20.d.ts:116
 
 ___
 
@@ -697,7 +697,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:96
+packages/ethereum/src/types/ERC20.d.ts:96
 
 ▸ **off**(`eventName`, `listener`): [`ERC20`](ERC20.md)
 
@@ -718,7 +718,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:117
+packages/ethereum/src/types/ERC20.d.ts:117
 
 ___
 
@@ -750,7 +750,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:100
+packages/ethereum/src/types/ERC20.d.ts:100
 
 ▸ **on**(`eventName`, `listener`): [`ERC20`](ERC20.md)
 
@@ -771,7 +771,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:118
+packages/ethereum/src/types/ERC20.d.ts:118
 
 ___
 
@@ -803,7 +803,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:104
+packages/ethereum/src/types/ERC20.d.ts:104
 
 ▸ **once**(`eventName`, `listener`): [`ERC20`](ERC20.md)
 
@@ -824,7 +824,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:119
+packages/ethereum/src/types/ERC20.d.ts:119
 
 ___
 
@@ -857,7 +857,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:123
+packages/ethereum/src/types/ERC20.d.ts:123
 
 ___
 
@@ -888,7 +888,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:112
+packages/ethereum/src/types/ERC20.d.ts:112
 
 ▸ **removeAllListeners**(`eventName?`): [`ERC20`](ERC20.md)
 
@@ -908,7 +908,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:121
+packages/ethereum/src/types/ERC20.d.ts:121
 
 ___
 
@@ -940,7 +940,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:108
+packages/ethereum/src/types/ERC20.d.ts:108
 
 ▸ **removeListener**(`eventName`, `listener`): [`ERC20`](ERC20.md)
 
@@ -961,7 +961,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:120
+packages/ethereum/src/types/ERC20.d.ts:120
 
 ___
 
@@ -981,7 +981,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:168
+packages/ethereum/src/types/ERC20.d.ts:168
 
 ___
 
@@ -1003,7 +1003,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:179
+packages/ethereum/src/types/ERC20.d.ts:179
 
 ___
 
@@ -1026,7 +1026,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/ERC20.d.ts:170
+packages/ethereum/src/types/ERC20.d.ts:170
 
 ___
 

@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/LegacyERC20__factory.ts:53
+packages/ethereum/src/types/factories/LegacyERC20__factory.ts:53
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/LegacyERC20__factory.ts:53
 
 #### Defined in
 
-packages/ethereum/types/factories/LegacyERC20__factory.ts:57
+packages/ethereum/src/types/factories/LegacyERC20__factory.ts:57
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/LegacyERC20__factory.ts:54
+packages/ethereum/src/types/factories/LegacyERC20__factory.ts:54

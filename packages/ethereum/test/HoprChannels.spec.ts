@@ -2,7 +2,7 @@ import type { Wallet } from '@ethersproject/wallet'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import BN from 'bn.js'
-import type { HoprChannels, HoprToken, ChannelsMock } from '../types'
+import type { HoprChannels, HoprToken, ChannelsMock } from '../src/types'
 import { increaseTime } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './constants'
 import {

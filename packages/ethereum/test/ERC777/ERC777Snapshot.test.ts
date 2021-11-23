@@ -1,4 +1,4 @@
-import type { ERC777SnapshotMock } from '../../types'
+import type { ERC777SnapshotMock } from '../../src/types'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import { advanceBlock } from '../utils'

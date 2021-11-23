@@ -1,7 +1,7 @@
 import type { PromiseValue } from '@hoprnet/hopr-utils'
 import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
-import type { PermittableToken, HoprToken, HoprWrapper } from '../types'
+import type { PermittableToken, HoprToken, HoprWrapper } from '../src/types'
 import deployERC1820Registry from '../deploy/01_ERC1820Registry'
 
 const useFixtures = deployments.createFixture(async (hre) => {

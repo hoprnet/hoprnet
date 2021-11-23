@@ -158,7 +158,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:105
+packages/ethereum/src/types/IERC777Sender.d.ts:105
 
 ___
 
@@ -192,7 +192,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:119
+packages/ethereum/src/types/IERC777Sender.d.ts:119
 
 ___
 
@@ -206,7 +206,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:117
+packages/ethereum/src/types/IERC777Sender.d.ts:117
 
 ___
 
@@ -226,7 +226,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:83
+packages/ethereum/src/types/IERC777Sender.d.ts:83
 
 ___
 
@@ -240,7 +240,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:81
+packages/ethereum/src/types/IERC777Sender.d.ts:81
 
 ___
 
@@ -260,7 +260,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:131
+packages/ethereum/src/types/IERC777Sender.d.ts:131
 
 ___
 
@@ -400,7 +400,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:42
+packages/ethereum/src/types/IERC777Sender.d.ts:42
 
 ___
 
@@ -424,7 +424,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:41
+packages/ethereum/src/types/IERC777Sender.d.ts:41
 
 ___
 
@@ -442,7 +442,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:43
+packages/ethereum/src/types/IERC777Sender.d.ts:43
 
 ___
 
@@ -546,7 +546,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:45
+packages/ethereum/src/types/IERC777Sender.d.ts:45
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -566,7 +566,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:68
+packages/ethereum/src/types/IERC777Sender.d.ts:68
 
 ___
 
@@ -598,7 +598,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:48
+packages/ethereum/src/types/IERC777Sender.d.ts:48
 
 ▸ **off**(`eventName`, `listener`): [`IERC777Sender`](IERC777Sender.md)
 
@@ -619,7 +619,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:69
+packages/ethereum/src/types/IERC777Sender.d.ts:69
 
 ___
 
@@ -651,7 +651,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:52
+packages/ethereum/src/types/IERC777Sender.d.ts:52
 
 ▸ **on**(`eventName`, `listener`): [`IERC777Sender`](IERC777Sender.md)
 
@@ -672,7 +672,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:70
+packages/ethereum/src/types/IERC777Sender.d.ts:70
 
 ___
 
@@ -704,7 +704,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:56
+packages/ethereum/src/types/IERC777Sender.d.ts:56
 
 ▸ **once**(`eventName`, `listener`): [`IERC777Sender`](IERC777Sender.md)
 
@@ -725,7 +725,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:71
+packages/ethereum/src/types/IERC777Sender.d.ts:71
 
 ___
 
@@ -758,7 +758,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:75
+packages/ethereum/src/types/IERC777Sender.d.ts:75
 
 ___
 
@@ -789,7 +789,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:64
+packages/ethereum/src/types/IERC777Sender.d.ts:64
 
 ▸ **removeAllListeners**(`eventName?`): [`IERC777Sender`](IERC777Sender.md)
 
@@ -809,7 +809,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:73
+packages/ethereum/src/types/IERC777Sender.d.ts:73
 
 ___
 
@@ -841,7 +841,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:60
+packages/ethereum/src/types/IERC777Sender.d.ts:60
 
 ▸ **removeListener**(`eventName`, `listener`): [`IERC777Sender`](IERC777Sender.md)
 
@@ -862,7 +862,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:72
+packages/ethereum/src/types/IERC777Sender.d.ts:72
 
 ___
 
@@ -888,7 +888,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IERC777Sender.d.ts:95
+packages/ethereum/src/types/IERC777Sender.d.ts:95
 
 ___
 

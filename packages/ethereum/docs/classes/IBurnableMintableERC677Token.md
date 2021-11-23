@@ -180,7 +180,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:317
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:317
 
 ___
 
@@ -225,7 +225,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:420
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:420
 
 ___
 
@@ -237,10 +237,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer(address,address,uint256,bytes)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``, `data?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`], `Object`\> |
+| `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `owner`: `string` ; `spender`: `string` ; `value`: `BigNumber`  }\> |
+| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `owner`: `string` ; `spender`: `string` ; `value`: `BigNumber`  }\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
+| `Transfer(address,address,uint256,bytes)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``, `data?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`], { `data`: `string` ; `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
 
 #### Overrides
 
@@ -248,7 +248,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:381
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:381
 
 ___
 
@@ -279,7 +279,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:185
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:185
 
 ___
 
@@ -293,7 +293,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:183
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:183
 
 ___
 
@@ -324,7 +324,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:487
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:487
 
 ___
 
@@ -462,7 +462,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:311
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:311
 
 ___
 
@@ -484,7 +484,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:252
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:252
 
 ___
 
@@ -508,7 +508,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:144
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:144
 
 ___
 
@@ -529,7 +529,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:297
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:297
 
 ___
 
@@ -550,7 +550,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:286
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:286
 
 ___
 
@@ -572,7 +572,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:291
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:291
 
 ___
 
@@ -596,7 +596,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:143
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:143
 
 ___
 
@@ -618,7 +618,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:299
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:299
 
 ___
 
@@ -636,7 +636,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:145
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:145
 
 ___
 
@@ -707,7 +707,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:267
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:267
 
 ___
 
@@ -762,7 +762,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:147
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:147
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -782,7 +782,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:170
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:170
 
 ___
 
@@ -804,7 +804,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:280
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:280
 
 ___
 
@@ -836,7 +836,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:150
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:150
 
 ▸ **off**(`eventName`, `listener`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -857,7 +857,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:171
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:171
 
 ___
 
@@ -889,7 +889,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:154
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:154
 
 ▸ **on**(`eventName`, `listener`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -910,7 +910,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:172
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:172
 
 ___
 
@@ -942,7 +942,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:158
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:158
 
 ▸ **once**(`eventName`, `listener`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -963,7 +963,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:173
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:173
 
 ___
 
@@ -996,7 +996,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:177
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:177
 
 ___
 
@@ -1027,7 +1027,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:166
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:166
 
 ▸ **removeAllListeners**(`eventName?`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -1047,7 +1047,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:175
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:175
 
 ___
 
@@ -1079,7 +1079,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:162
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:162
 
 ▸ **removeListener**(`eventName`, `listener`): [`IBurnableMintableERC677Token`](IBurnableMintableERC677Token.md)
 
@@ -1100,7 +1100,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:174
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:174
 
 ___
 
@@ -1120,7 +1120,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:258
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:258
 
 ___
 
@@ -1142,7 +1142,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:305
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:305
 
 ___
 
@@ -1165,7 +1165,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:273
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:273
 
 ___
 
@@ -1188,7 +1188,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/IBurnableMintableERC677Token.d.ts:260
+packages/ethereum/src/types/IBurnableMintableERC677Token.d.ts:260
 
 ___
 

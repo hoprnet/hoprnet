@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import { PromiseValue, durations } from '@hoprnet/hopr-utils'
 import { toSolPercent, increaseTime } from './utils'
-import type { HoprToken, HoprDistributor } from '../types'
+import type { HoprToken, HoprDistributor } from '../src/types'
 import deployERC1820Registry from '../deploy/01_ERC1820Registry'
 
 const SCHEDULE_UNSET = 'SCHEDULE_UNSET'

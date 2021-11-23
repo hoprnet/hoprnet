@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/ReentrancyGuard__factory.ts:21
+packages/ethereum/src/types/factories/ReentrancyGuard__factory.ts:21
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/ReentrancyGuard__factory.ts:21
 
 #### Defined in
 
-packages/ethereum/types/factories/ReentrancyGuard__factory.ts:25
+packages/ethereum/src/types/factories/ReentrancyGuard__factory.ts:25
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/ReentrancyGuard__factory.ts:22
+packages/ethereum/src/types/factories/ReentrancyGuard__factory.ts:22

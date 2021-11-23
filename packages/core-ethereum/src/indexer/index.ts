@@ -22,6 +22,7 @@ import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } from './types'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import { utils } from 'ethers'
+import { INDEXER_TIMEOUT } from '../constants'
 
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
@@ -340,6 +341,19 @@ class Indexer extends EventEmitter {
 
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
+
+    let prevState
+    try {
+      prevState = await this.db.getChannel(channel.getId())
+    } catch (e) {
+      // Channel is new
+    }
+
+    if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
+      log('channel was closed')
+      this.onChannelClosed(channel)
+    }
+
     this.emit('channel-update', channel)
     log('channel-update for channel %s', channel)
 
@@ -354,6 +368,11 @@ class Indexer extends EventEmitter {
         }
       }
     }
+  }
+
+  private async onChannelClosed(channel: ChannelEntry) {
+    this.db.deleteAcknowledgedTicketsFromChannel(channel)
+    this.emit('channel-closed', channel)
   }
 
   private indexEvent(indexerEvent: IndexerEvents, txHash: string[]) {
@@ -414,10 +433,11 @@ class Indexer extends EventEmitter {
   }
 
   public async resolvePendingTransaction(eventType: IndexerEvents, tx: string): Promise<string> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const listener = (txHash: string[]) => {
         const indexed = txHash.find((emitted) => emitted === tx)
         if (indexed) {
+          clearTimeout(timeoutObj)
           this.removeListener(eventType, listener)
           log('listener %s on %s is removed', eventType, tx)
           resolve(tx)
@@ -425,6 +445,12 @@ class Indexer extends EventEmitter {
       }
       this.addListener(eventType, listener)
       log('listener %s on %s is added', eventType, tx)
+
+      const timeoutObj = setTimeout(() => {
+        this.removeListener(eventType, listener)
+        log('listener %s on %s timed out and thus removed', eventType, tx)
+        reject(tx)
+      }, INDEXER_TIMEOUT)
     })
   }
 }

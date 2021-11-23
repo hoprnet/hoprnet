@@ -220,7 +220,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:725
+packages/ethereum/src/types/HoprToken.d.ts:725
 
 ___
 
@@ -285,7 +285,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:1117
+packages/ethereum/src/types/HoprToken.d.ts:1117
 
 ___
 
@@ -297,26 +297,26 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `AuthorizedOperator` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `AuthorizedOperator(address,address)` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `Burned` | (`operator?`: `string`, `from?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
-| `Burned(address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `from?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
-| `Minted` | (`operator?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
-| `Minted(address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
-| `RevokedOperator` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `RevokedOperator(address,address)` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `RoleAdminChanged` | (`role?`: `BytesLike`, `previousAdminRole?`: `BytesLike`, `newAdminRole?`: `BytesLike`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `RoleAdminChanged(bytes32,bytes32,bytes32)` | (`role?`: `BytesLike`, `previousAdminRole?`: `BytesLike`, `newAdminRole?`: `BytesLike`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `RoleGranted` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `RoleGranted(bytes32,address,address)` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `RoleRevoked` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `RoleRevoked(bytes32,address,address)` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], `Object`\> |
-| `Sent` | (`operator?`: `string`, `from?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
-| `Sent(address,address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `from?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
-| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `owner`: `string` ; `spender`: `string` ; `value`: `BigNumber`  }\> |
+| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `owner`: `string` ; `spender`: `string` ; `value`: `BigNumber`  }\> |
+| `AuthorizedOperator` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `operator`: `string` ; `tokenHolder`: `string`  }\> |
+| `AuthorizedOperator(address,address)` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `operator`: `string` ; `tokenHolder`: `string`  }\> |
+| `Burned` | (`operator?`: `string`, `from?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], { `amount`: `BigNumber` ; `data`: `string` ; `from`: `string` ; `operator`: `string` ; `operatorData`: `string`  }\> |
+| `Burned(address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `from?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], { `amount`: `BigNumber` ; `data`: `string` ; `from`: `string` ; `operator`: `string` ; `operatorData`: `string`  }\> |
+| `Minted` | (`operator?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], { `amount`: `BigNumber` ; `data`: `string` ; `operator`: `string` ; `operatorData`: `string` ; `to`: `string`  }\> |
+| `Minted(address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], { `amount`: `BigNumber` ; `data`: `string` ; `operator`: `string` ; `operatorData`: `string` ; `to`: `string`  }\> |
+| `RevokedOperator` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `operator`: `string` ; `tokenHolder`: `string`  }\> |
+| `RevokedOperator(address,address)` | (`operator?`: `string`, `tokenHolder?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `operator`: `string` ; `tokenHolder`: `string`  }\> |
+| `RoleAdminChanged` | (`role?`: `BytesLike`, `previousAdminRole?`: `BytesLike`, `newAdminRole?`: `BytesLike`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], { `newAdminRole`: `string` ; `previousAdminRole`: `string` ; `role`: `string`  }\> |
+| `RoleAdminChanged(bytes32,bytes32,bytes32)` | (`role?`: `BytesLike`, `previousAdminRole?`: `BytesLike`, `newAdminRole?`: `BytesLike`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], { `newAdminRole`: `string` ; `previousAdminRole`: `string` ; `role`: `string`  }\> |
+| `RoleGranted` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], { `account`: `string` ; `role`: `string` ; `sender`: `string`  }\> |
+| `RoleGranted(bytes32,address,address)` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], { `account`: `string` ; `role`: `string` ; `sender`: `string`  }\> |
+| `RoleRevoked` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], { `account`: `string` ; `role`: `string` ; `sender`: `string`  }\> |
+| `RoleRevoked(bytes32,address,address)` | (`role?`: `BytesLike`, `account?`: `string`, `sender?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`], { `account`: `string` ; `role`: `string` ; `sender`: `string`  }\> |
+| `Sent` | (`operator?`: `string`, `from?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], { `amount`: `BigNumber` ; `data`: `string` ; `from`: `string` ; `operator`: `string` ; `operatorData`: `string` ; `to`: `string`  }\> |
+| `Sent(address,address,address,uint256,bytes,bytes)` | (`operator?`: `string`, `from?`: `string`, `to?`: `string`, `amount?`: ``null``, `data?`: ``null``, `operatorData?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], { `amount`: `BigNumber` ; `data`: `string` ; `from`: `string` ; `operator`: `string` ; `operatorData`: `string` ; `to`: `string`  }\> |
+| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
 
 #### Overrides
 
@@ -324,7 +324,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:887
+packages/ethereum/src/types/HoprToken.d.ts:887
 
 ___
 
@@ -375,7 +375,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:400
+packages/ethereum/src/types/HoprToken.d.ts:400
 
 ___
 
@@ -389,7 +389,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:398
+packages/ethereum/src/types/HoprToken.d.ts:398
 
 ___
 
@@ -440,7 +440,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:1281
+packages/ethereum/src/types/HoprToken.d.ts:1281
 
 ___
 
@@ -502,7 +502,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:565
+packages/ethereum/src/types/HoprToken.d.ts:565
 
 ___
 
@@ -522,7 +522,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:567
+packages/ethereum/src/types/HoprToken.d.ts:567
 
 ___
 
@@ -618,7 +618,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:569
+packages/ethereum/src/types/HoprToken.d.ts:569
 
 ___
 
@@ -640,7 +640,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:577
+packages/ethereum/src/types/HoprToken.d.ts:577
 
 ___
 
@@ -662,7 +662,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:583
+packages/ethereum/src/types/HoprToken.d.ts:583
 
 ___
 
@@ -686,7 +686,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:359
+packages/ethereum/src/types/HoprToken.d.ts:359
 
 ___
 
@@ -707,7 +707,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:589
+packages/ethereum/src/types/HoprToken.d.ts:589
 
 ___
 
@@ -728,7 +728,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:594
+packages/ethereum/src/types/HoprToken.d.ts:594
 
 ___
 
@@ -750,7 +750,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:596
+packages/ethereum/src/types/HoprToken.d.ts:596
 
 ___
 
@@ -772,7 +772,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:602
+packages/ethereum/src/types/HoprToken.d.ts:602
 
 ___
 
@@ -796,7 +796,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:358
+packages/ethereum/src/types/HoprToken.d.ts:358
 
 ___
 
@@ -816,7 +816,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:608
+packages/ethereum/src/types/HoprToken.d.ts:608
 
 ___
 
@@ -836,7 +836,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:610
+packages/ethereum/src/types/HoprToken.d.ts:610
 
 ___
 
@@ -854,7 +854,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:360
+packages/ethereum/src/types/HoprToken.d.ts:360
 
 ___
 
@@ -924,7 +924,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:612
+packages/ethereum/src/types/HoprToken.d.ts:612
 
 ___
 
@@ -946,7 +946,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:614
+packages/ethereum/src/types/HoprToken.d.ts:614
 
 ___
 
@@ -967,7 +967,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:620
+packages/ethereum/src/types/HoprToken.d.ts:620
 
 ___
 
@@ -989,7 +989,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:625
+packages/ethereum/src/types/HoprToken.d.ts:625
 
 ___
 
@@ -1009,7 +1009,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:631
+packages/ethereum/src/types/HoprToken.d.ts:631
 
 ___
 
@@ -1031,7 +1031,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:633
+packages/ethereum/src/types/HoprToken.d.ts:633
 
 ___
 
@@ -1053,7 +1053,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:639
+packages/ethereum/src/types/HoprToken.d.ts:639
 
 ___
 
@@ -1108,7 +1108,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:362
+packages/ethereum/src/types/HoprToken.d.ts:362
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -1128,7 +1128,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:385
+packages/ethereum/src/types/HoprToken.d.ts:385
 
 ___
 
@@ -1152,7 +1152,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:645
+packages/ethereum/src/types/HoprToken.d.ts:645
 
 ___
 
@@ -1172,7 +1172,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:653
+packages/ethereum/src/types/HoprToken.d.ts:653
 
 ___
 
@@ -1204,7 +1204,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:365
+packages/ethereum/src/types/HoprToken.d.ts:365
 
 ▸ **off**(`eventName`, `listener`): [`HoprToken`](HoprToken.md)
 
@@ -1225,7 +1225,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:386
+packages/ethereum/src/types/HoprToken.d.ts:386
 
 ___
 
@@ -1257,7 +1257,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:369
+packages/ethereum/src/types/HoprToken.d.ts:369
 
 ▸ **on**(`eventName`, `listener`): [`HoprToken`](HoprToken.md)
 
@@ -1278,7 +1278,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:387
+packages/ethereum/src/types/HoprToken.d.ts:387
 
 ___
 
@@ -1310,7 +1310,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:373
+packages/ethereum/src/types/HoprToken.d.ts:373
 
 ▸ **once**(`eventName`, `listener`): [`HoprToken`](HoprToken.md)
 
@@ -1331,7 +1331,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:388
+packages/ethereum/src/types/HoprToken.d.ts:388
 
 ___
 
@@ -1355,7 +1355,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:655
+packages/ethereum/src/types/HoprToken.d.ts:655
 
 ___
 
@@ -1380,7 +1380,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:663
+packages/ethereum/src/types/HoprToken.d.ts:663
 
 ___
 
@@ -1413,7 +1413,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:392
+packages/ethereum/src/types/HoprToken.d.ts:392
 
 ___
 
@@ -1444,7 +1444,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:381
+packages/ethereum/src/types/HoprToken.d.ts:381
 
 ▸ **removeAllListeners**(`eventName?`): [`HoprToken`](HoprToken.md)
 
@@ -1464,7 +1464,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:390
+packages/ethereum/src/types/HoprToken.d.ts:390
 
 ___
 
@@ -1496,7 +1496,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:377
+packages/ethereum/src/types/HoprToken.d.ts:377
 
 ▸ **removeListener**(`eventName`, `listener`): [`HoprToken`](HoprToken.md)
 
@@ -1517,7 +1517,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:389
+packages/ethereum/src/types/HoprToken.d.ts:389
 
 ___
 
@@ -1539,7 +1539,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:672
+packages/ethereum/src/types/HoprToken.d.ts:672
 
 ___
 
@@ -1560,7 +1560,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:678
+packages/ethereum/src/types/HoprToken.d.ts:678
 
 ___
 
@@ -1582,7 +1582,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:683
+packages/ethereum/src/types/HoprToken.d.ts:683
 
 ___
 
@@ -1605,7 +1605,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:689
+packages/ethereum/src/types/HoprToken.d.ts:689
 
 ___
 
@@ -1625,7 +1625,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:696
+packages/ethereum/src/types/HoprToken.d.ts:696
 
 ___
 
@@ -1645,7 +1645,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:698
+packages/ethereum/src/types/HoprToken.d.ts:698
 
 ___
 
@@ -1666,7 +1666,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:700
+packages/ethereum/src/types/HoprToken.d.ts:700
 
 ___
 
@@ -1687,7 +1687,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:705
+packages/ethereum/src/types/HoprToken.d.ts:705
 
 ___
 
@@ -1709,7 +1709,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:712
+packages/ethereum/src/types/HoprToken.d.ts:712
 
 ___
 
@@ -1732,7 +1732,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprToken.d.ts:718
+packages/ethereum/src/types/HoprToken.d.ts:718
 
 ___
 

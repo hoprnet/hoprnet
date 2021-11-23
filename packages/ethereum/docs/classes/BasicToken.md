@@ -162,7 +162,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:122
+packages/ethereum/src/types/BasicToken.d.ts:122
 
 ___
 
@@ -198,7 +198,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:154
+packages/ethereum/src/types/BasicToken.d.ts:154
 
 ___
 
@@ -210,8 +210,8 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
 
 #### Overrides
 
@@ -219,7 +219,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:134
+packages/ethereum/src/types/BasicToken.d.ts:134
 
 ___
 
@@ -241,7 +241,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:100
+packages/ethereum/src/types/BasicToken.d.ts:100
 
 ___
 
@@ -255,7 +255,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:98
+packages/ethereum/src/types/BasicToken.d.ts:98
 
 ___
 
@@ -277,7 +277,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:166
+packages/ethereum/src/types/BasicToken.d.ts:166
 
 ___
 
@@ -417,7 +417,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:59
+packages/ethereum/src/types/BasicToken.d.ts:59
 
 ___
 
@@ -438,7 +438,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:114
+packages/ethereum/src/types/BasicToken.d.ts:114
 
 ___
 
@@ -462,7 +462,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:58
+packages/ethereum/src/types/BasicToken.d.ts:58
 
 ___
 
@@ -480,7 +480,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:60
+packages/ethereum/src/types/BasicToken.d.ts:60
 
 ___
 
@@ -584,7 +584,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:62
+packages/ethereum/src/types/BasicToken.d.ts:62
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -604,7 +604,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:85
+packages/ethereum/src/types/BasicToken.d.ts:85
 
 ___
 
@@ -636,7 +636,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:65
+packages/ethereum/src/types/BasicToken.d.ts:65
 
 ▸ **off**(`eventName`, `listener`): [`BasicToken`](BasicToken.md)
 
@@ -657,7 +657,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:86
+packages/ethereum/src/types/BasicToken.d.ts:86
 
 ___
 
@@ -689,7 +689,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:69
+packages/ethereum/src/types/BasicToken.d.ts:69
 
 ▸ **on**(`eventName`, `listener`): [`BasicToken`](BasicToken.md)
 
@@ -710,7 +710,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:87
+packages/ethereum/src/types/BasicToken.d.ts:87
 
 ___
 
@@ -742,7 +742,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:73
+packages/ethereum/src/types/BasicToken.d.ts:73
 
 ▸ **once**(`eventName`, `listener`): [`BasicToken`](BasicToken.md)
 
@@ -763,7 +763,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:88
+packages/ethereum/src/types/BasicToken.d.ts:88
 
 ___
 
@@ -796,7 +796,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:92
+packages/ethereum/src/types/BasicToken.d.ts:92
 
 ___
 
@@ -827,7 +827,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:81
+packages/ethereum/src/types/BasicToken.d.ts:81
 
 ▸ **removeAllListeners**(`eventName?`): [`BasicToken`](BasicToken.md)
 
@@ -847,7 +847,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:90
+packages/ethereum/src/types/BasicToken.d.ts:90
 
 ___
 
@@ -879,7 +879,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:77
+packages/ethereum/src/types/BasicToken.d.ts:77
 
 ▸ **removeListener**(`eventName`, `listener`): [`BasicToken`](BasicToken.md)
 
@@ -900,7 +900,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:89
+packages/ethereum/src/types/BasicToken.d.ts:89
 
 ___
 
@@ -920,7 +920,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:112
+packages/ethereum/src/types/BasicToken.d.ts:112
 
 ___
 
@@ -942,7 +942,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BasicToken.d.ts:116
+packages/ethereum/src/types/BasicToken.d.ts:116
 
 ___
 

@@ -184,7 +184,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:346
+packages/ethereum/src/types/MintableToken.d.ts:346
 
 ___
 
@@ -231,7 +231,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:484
+packages/ethereum/src/types/MintableToken.d.ts:484
 
 ___
 
@@ -243,18 +243,18 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Mint` | (`to?`: `string`, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `Mint(address,uint256)` | (`to?`: `string`, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `MintFinished` | () => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[], `Object`\> |
-| `MintFinished()` | () => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[], `Object`\> |
-| `OwnershipRenounced` | (`previousOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`], `Object`\> |
-| `OwnershipRenounced(address)` | (`previousOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`], `Object`\> |
-| `OwnershipTransferred` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `OwnershipTransferred(address,address)` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], `Object`\> |
-| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Approval` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `owner`: `string` ; `spender`: `string` ; `value`: `BigNumber`  }\> |
+| `Approval(address,address,uint256)` | (`owner?`: `string`, `spender?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `owner`: `string` ; `spender`: `string` ; `value`: `BigNumber`  }\> |
+| `Mint` | (`to?`: `string`, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], { `amount`: `BigNumber` ; `to`: `string`  }\> |
+| `Mint(address,uint256)` | (`to?`: `string`, `amount?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], { `amount`: `BigNumber` ; `to`: `string`  }\> |
+| `MintFinished` | () => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[], {}\> |
+| `MintFinished()` | () => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[], {}\> |
+| `OwnershipRenounced` | (`previousOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`], { `previousOwner`: `string`  }\> |
+| `OwnershipRenounced(address)` | (`previousOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`], { `previousOwner`: `string`  }\> |
+| `OwnershipTransferred` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `newOwner`: `string` ; `previousOwner`: `string`  }\> |
+| `OwnershipTransferred(address,address)` | (`previousOwner?`: `string`, `newOwner?`: `string`) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`], { `newOwner`: `string` ; `previousOwner`: `string`  }\> |
+| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
 
 #### Overrides
 
@@ -262,7 +262,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:408
+packages/ethereum/src/types/MintableToken.d.ts:408
 
 ___
 
@@ -295,7 +295,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:216
+packages/ethereum/src/types/MintableToken.d.ts:216
 
 ___
 
@@ -309,7 +309,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:214
+packages/ethereum/src/types/MintableToken.d.ts:214
 
 ___
 
@@ -342,7 +342,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:550
+packages/ethereum/src/types/MintableToken.d.ts:550
 
 ___
 
@@ -480,7 +480,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:335
+packages/ethereum/src/types/MintableToken.d.ts:335
 
 ___
 
@@ -502,7 +502,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:284
+packages/ethereum/src/types/MintableToken.d.ts:284
 
 ___
 
@@ -526,7 +526,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:175
+packages/ethereum/src/types/MintableToken.d.ts:175
 
 ___
 
@@ -547,7 +547,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:311
+packages/ethereum/src/types/MintableToken.d.ts:311
 
 ___
 
@@ -571,7 +571,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:174
+packages/ethereum/src/types/MintableToken.d.ts:174
 
 ___
 
@@ -593,7 +593,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:305
+packages/ethereum/src/types/MintableToken.d.ts:305
 
 ___
 
@@ -611,7 +611,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:176
+packages/ethereum/src/types/MintableToken.d.ts:176
 
 ___
 
@@ -680,7 +680,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:317
+packages/ethereum/src/types/MintableToken.d.ts:317
 
 ___
 
@@ -702,7 +702,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:329
+packages/ethereum/src/types/MintableToken.d.ts:329
 
 ___
 
@@ -757,7 +757,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:178
+packages/ethereum/src/types/MintableToken.d.ts:178
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -777,7 +777,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:201
+packages/ethereum/src/types/MintableToken.d.ts:201
 
 ___
 
@@ -799,7 +799,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:299
+packages/ethereum/src/types/MintableToken.d.ts:299
 
 ___
 
@@ -819,7 +819,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:282
+packages/ethereum/src/types/MintableToken.d.ts:282
 
 ___
 
@@ -851,7 +851,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:181
+packages/ethereum/src/types/MintableToken.d.ts:181
 
 ▸ **off**(`eventName`, `listener`): [`MintableToken`](MintableToken.md)
 
@@ -872,7 +872,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:202
+packages/ethereum/src/types/MintableToken.d.ts:202
 
 ___
 
@@ -904,7 +904,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:185
+packages/ethereum/src/types/MintableToken.d.ts:185
 
 ▸ **on**(`eventName`, `listener`): [`MintableToken`](MintableToken.md)
 
@@ -925,7 +925,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:203
+packages/ethereum/src/types/MintableToken.d.ts:203
 
 ___
 
@@ -957,7 +957,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:189
+packages/ethereum/src/types/MintableToken.d.ts:189
 
 ▸ **once**(`eventName`, `listener`): [`MintableToken`](MintableToken.md)
 
@@ -978,7 +978,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:204
+packages/ethereum/src/types/MintableToken.d.ts:204
 
 ___
 
@@ -998,7 +998,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:321
+packages/ethereum/src/types/MintableToken.d.ts:321
 
 ___
 
@@ -1031,7 +1031,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:208
+packages/ethereum/src/types/MintableToken.d.ts:208
 
 ___
 
@@ -1062,7 +1062,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:197
+packages/ethereum/src/types/MintableToken.d.ts:197
 
 ▸ **removeAllListeners**(`eventName?`): [`MintableToken`](MintableToken.md)
 
@@ -1082,7 +1082,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:206
+packages/ethereum/src/types/MintableToken.d.ts:206
 
 ___
 
@@ -1114,7 +1114,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:193
+packages/ethereum/src/types/MintableToken.d.ts:193
 
 ▸ **removeListener**(`eventName`, `listener`): [`MintableToken`](MintableToken.md)
 
@@ -1135,7 +1135,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:205
+packages/ethereum/src/types/MintableToken.d.ts:205
 
 ___
 
@@ -1155,7 +1155,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:313
+packages/ethereum/src/types/MintableToken.d.ts:313
 
 ___
 
@@ -1175,7 +1175,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:290
+packages/ethereum/src/types/MintableToken.d.ts:290
 
 ___
 
@@ -1197,7 +1197,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:323
+packages/ethereum/src/types/MintableToken.d.ts:323
 
 ___
 
@@ -1220,7 +1220,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:292
+packages/ethereum/src/types/MintableToken.d.ts:292
 
 ___
 
@@ -1241,7 +1241,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/MintableToken.d.ts:341
+packages/ethereum/src/types/MintableToken.d.ts:341
 
 ___
 

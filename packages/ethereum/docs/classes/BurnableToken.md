@@ -164,7 +164,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:141
+packages/ethereum/src/types/BurnableToken.d.ts:141
 
 ___
 
@@ -201,7 +201,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:191
+packages/ethereum/src/types/BurnableToken.d.ts:191
 
 ___
 
@@ -213,10 +213,10 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `Burn` | (`burner?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `Burn(address,uint256)` | (`burner?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], `Object`\> |
-| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
-| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Burn` | (`burner?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], { `burner`: `string` ; `value`: `BigNumber`  }\> |
+| `Burn(address,uint256)` | (`burner?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `BigNumber`], { `burner`: `string` ; `value`: `BigNumber`  }\> |
+| `Transfer` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
+| `Transfer(address,address,uint256)` | (`from?`: `string`, `to?`: `string`, `value?`: ``null``) => [`TypedEventFilter`](../interfaces/TypedEventFilter.md)<[`string`, `string`, `BigNumber`], { `from`: `string` ; `to`: `string` ; `value`: `BigNumber`  }\> |
 
 #### Overrides
 
@@ -224,7 +224,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:155
+packages/ethereum/src/types/BurnableToken.d.ts:155
 
 ___
 
@@ -247,7 +247,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:109
+packages/ethereum/src/types/BurnableToken.d.ts:109
 
 ___
 
@@ -261,7 +261,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:107
+packages/ethereum/src/types/BurnableToken.d.ts:107
 
 ___
 
@@ -284,7 +284,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:208
+packages/ethereum/src/types/BurnableToken.d.ts:208
 
 ___
 
@@ -424,7 +424,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:68
+packages/ethereum/src/types/BurnableToken.d.ts:68
 
 ___
 
@@ -445,7 +445,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:133
+packages/ethereum/src/types/BurnableToken.d.ts:133
 
 ___
 
@@ -466,7 +466,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:128
+packages/ethereum/src/types/BurnableToken.d.ts:128
 
 ___
 
@@ -490,7 +490,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:67
+packages/ethereum/src/types/BurnableToken.d.ts:67
 
 ___
 
@@ -508,7 +508,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:69
+packages/ethereum/src/types/BurnableToken.d.ts:69
 
 ___
 
@@ -612,7 +612,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:71
+packages/ethereum/src/types/BurnableToken.d.ts:71
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -632,7 +632,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:94
+packages/ethereum/src/types/BurnableToken.d.ts:94
 
 ___
 
@@ -664,7 +664,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:74
+packages/ethereum/src/types/BurnableToken.d.ts:74
 
 ▸ **off**(`eventName`, `listener`): [`BurnableToken`](BurnableToken.md)
 
@@ -685,7 +685,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:95
+packages/ethereum/src/types/BurnableToken.d.ts:95
 
 ___
 
@@ -717,7 +717,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:78
+packages/ethereum/src/types/BurnableToken.d.ts:78
 
 ▸ **on**(`eventName`, `listener`): [`BurnableToken`](BurnableToken.md)
 
@@ -738,7 +738,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:96
+packages/ethereum/src/types/BurnableToken.d.ts:96
 
 ___
 
@@ -770,7 +770,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:82
+packages/ethereum/src/types/BurnableToken.d.ts:82
 
 ▸ **once**(`eventName`, `listener`): [`BurnableToken`](BurnableToken.md)
 
@@ -791,7 +791,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:97
+packages/ethereum/src/types/BurnableToken.d.ts:97
 
 ___
 
@@ -824,7 +824,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:101
+packages/ethereum/src/types/BurnableToken.d.ts:101
 
 ___
 
@@ -855,7 +855,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:90
+packages/ethereum/src/types/BurnableToken.d.ts:90
 
 ▸ **removeAllListeners**(`eventName?`): [`BurnableToken`](BurnableToken.md)
 
@@ -875,7 +875,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:99
+packages/ethereum/src/types/BurnableToken.d.ts:99
 
 ___
 
@@ -907,7 +907,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:86
+packages/ethereum/src/types/BurnableToken.d.ts:86
 
 ▸ **removeListener**(`eventName`, `listener`): [`BurnableToken`](BurnableToken.md)
 
@@ -928,7 +928,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:98
+packages/ethereum/src/types/BurnableToken.d.ts:98
 
 ___
 
@@ -948,7 +948,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:126
+packages/ethereum/src/types/BurnableToken.d.ts:126
 
 ___
 
@@ -970,7 +970,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/BurnableToken.d.ts:135
+packages/ethereum/src/types/BurnableToken.d.ts:135
 
 ___
 

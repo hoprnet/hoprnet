@@ -168,7 +168,7 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:169
+packages/ethereum/src/types/HoprForwarder.d.ts:169
 
 ___
 
@@ -207,7 +207,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:193
+packages/ethereum/src/types/HoprForwarder.d.ts:193
 
 ___
 
@@ -221,7 +221,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:191
+packages/ethereum/src/types/HoprForwarder.d.ts:191
 
 ___
 
@@ -246,7 +246,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:119
+packages/ethereum/src/types/HoprForwarder.d.ts:119
 
 ___
 
@@ -260,7 +260,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:117
+packages/ethereum/src/types/HoprForwarder.d.ts:117
 
 ___
 
@@ -285,7 +285,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:220
+packages/ethereum/src/types/HoprForwarder.d.ts:220
 
 ___
 
@@ -347,7 +347,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:146
+packages/ethereum/src/types/HoprForwarder.d.ts:146
 
 ___
 
@@ -367,7 +367,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:148
+packages/ethereum/src/types/HoprForwarder.d.ts:148
 
 ___
 
@@ -387,7 +387,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:150
+packages/ethereum/src/types/HoprForwarder.d.ts:150
 
 ___
 
@@ -407,7 +407,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:152
+packages/ethereum/src/types/HoprForwarder.d.ts:152
 
 ___
 
@@ -505,7 +505,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:78
+packages/ethereum/src/types/HoprForwarder.d.ts:78
 
 ___
 
@@ -529,7 +529,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:77
+packages/ethereum/src/types/HoprForwarder.d.ts:77
 
 ___
 
@@ -547,7 +547,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:79
+packages/ethereum/src/types/HoprForwarder.d.ts:79
 
 ___
 
@@ -651,7 +651,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:81
+packages/ethereum/src/types/HoprForwarder.d.ts:81
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -671,7 +671,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:104
+packages/ethereum/src/types/HoprForwarder.d.ts:104
 
 ___
 
@@ -703,7 +703,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:84
+packages/ethereum/src/types/HoprForwarder.d.ts:84
 
 ▸ **off**(`eventName`, `listener`): [`HoprForwarder`](HoprForwarder.md)
 
@@ -724,7 +724,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:105
+packages/ethereum/src/types/HoprForwarder.d.ts:105
 
 ___
 
@@ -756,7 +756,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:88
+packages/ethereum/src/types/HoprForwarder.d.ts:88
 
 ▸ **on**(`eventName`, `listener`): [`HoprForwarder`](HoprForwarder.md)
 
@@ -777,7 +777,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:106
+packages/ethereum/src/types/HoprForwarder.d.ts:106
 
 ___
 
@@ -809,7 +809,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:92
+packages/ethereum/src/types/HoprForwarder.d.ts:92
 
 ▸ **once**(`eventName`, `listener`): [`HoprForwarder`](HoprForwarder.md)
 
@@ -830,7 +830,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:107
+packages/ethereum/src/types/HoprForwarder.d.ts:107
 
 ___
 
@@ -863,7 +863,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:111
+packages/ethereum/src/types/HoprForwarder.d.ts:111
 
 ___
 
@@ -884,7 +884,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:154
+packages/ethereum/src/types/HoprForwarder.d.ts:154
 
 ___
 
@@ -915,7 +915,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:100
+packages/ethereum/src/types/HoprForwarder.d.ts:100
 
 ▸ **removeAllListeners**(`eventName?`): [`HoprForwarder`](HoprForwarder.md)
 
@@ -935,7 +935,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:109
+packages/ethereum/src/types/HoprForwarder.d.ts:109
 
 ___
 
@@ -967,7 +967,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:96
+packages/ethereum/src/types/HoprForwarder.d.ts:96
 
 ▸ **removeListener**(`eventName`, `listener`): [`HoprForwarder`](HoprForwarder.md)
 
@@ -988,7 +988,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:108
+packages/ethereum/src/types/HoprForwarder.d.ts:108
 
 ___
 
@@ -1014,7 +1014,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/HoprForwarder.d.ts:159
+packages/ethereum/src/types/HoprForwarder.d.ts:159
 
 ___
 

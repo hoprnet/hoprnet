@@ -1,0 +1,15 @@
+{
+  // Used to compile *all* packages at once by using
+  // Typescript Project references, see https://www.typescriptlang.org/docs/handbook/project-references.html
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/core-ethereum" },
+    { "path": "packages/cover-traffic-daemon" },
+    { "path": "packages/ethereum" },
+    { "path": "packages/hoprd" },
+    { "path": "packages/utils" },
+    { "path": "./tsconfig.scripts.json" },
+    { "path": "packages/ethereum/tsconfig.hardhat.json" }
+  ]
+}

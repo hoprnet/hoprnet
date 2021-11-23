@@ -31,7 +31,7 @@
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC1820Registry__factory.ts:229
+packages/ethereum/src/types/factories/IERC1820Registry__factory.ts:229
 
 ## Methods
 
@@ -52,7 +52,7 @@ packages/ethereum/types/factories/IERC1820Registry__factory.ts:229
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC1820Registry__factory.ts:233
+packages/ethereum/src/types/factories/IERC1820Registry__factory.ts:233
 
 ___
 
@@ -66,4 +66,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/IERC1820Registry__factory.ts:230
+packages/ethereum/src/types/factories/IERC1820Registry__factory.ts:230

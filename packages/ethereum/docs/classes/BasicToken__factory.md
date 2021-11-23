@@ -53,7 +53,7 @@ ContractFactory.constructor
 
 #### Defined in
 
-packages/ethereum/types/factories/BasicToken__factory.ts:94
+packages/ethereum/src/types/factories/BasicToken__factory.ts:94
 
 ## Properties
 
@@ -105,7 +105,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BasicToken__factory.ts:121
+packages/ethereum/src/types/factories/BasicToken__factory.ts:121
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BasicToken__factory.ts:120
+packages/ethereum/src/types/factories/BasicToken__factory.ts:120
 
 ## Methods
 
@@ -139,7 +139,7 @@ ContractFactory.attach
 
 #### Defined in
 
-packages/ethereum/types/factories/BasicToken__factory.ts:114
+packages/ethereum/src/types/factories/BasicToken__factory.ts:114
 
 ___
 
@@ -163,7 +163,7 @@ ContractFactory.connect
 
 #### Defined in
 
-packages/ethereum/types/factories/BasicToken__factory.ts:117
+packages/ethereum/src/types/factories/BasicToken__factory.ts:117
 
 ___
 
@@ -187,7 +187,7 @@ ContractFactory.deploy
 
 #### Defined in
 
-packages/ethereum/types/factories/BasicToken__factory.ts:104
+packages/ethereum/src/types/factories/BasicToken__factory.ts:104
 
 ___
 
@@ -211,7 +211,7 @@ ContractFactory.getDeployTransaction
 
 #### Defined in
 
-packages/ethereum/types/factories/BasicToken__factory.ts:109
+packages/ethereum/src/types/factories/BasicToken__factory.ts:109
 
 ___
 
@@ -232,7 +232,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BasicToken__factory.ts:125
+packages/ethereum/src/types/factories/BasicToken__factory.ts:125
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/types/factories/BasicToken__factory.ts:122
+packages/ethereum/src/types/factories/BasicToken__factory.ts:122
 
 ___
 
