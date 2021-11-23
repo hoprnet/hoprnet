@@ -1,7 +1,7 @@
 import { join } from 'path'
 
 export * from './constants'
-export * from './types'
+export type { HoprChannels, HoprToken } from './types'
 export type { TypedEventFilter, TypedEvent } from './types/common'
 
 export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'

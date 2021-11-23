@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import deployERC1820Registry from '../deploy/01_ERC1820Registry'
-import { HoprToken__factory } from '../src/types'
+import type { HoprToken } from '../src/types'
 
 const useFixtures = deployments.createFixture(async (hre) => {
   const [deployer, userA] = await ethers.getSigners()
@@ -10,7 +10,7 @@ const useFixtures = deployments.createFixture(async (hre) => {
   await deployERC1820Registry(hre, deployer)
 
   // deploy ChannelsMock
-  const token = await new HoprToken__factory(deployer).deploy()
+  const token = (await (await ethers.getContractFactory('HoprToken')).deploy()) as HoprToken
 
   // allow deployet to mint tokens
   await token.grantRole(await token.MINTER_ROLE(), deployer.address)
@@ -18,7 +18,7 @@ const useFixtures = deployments.createFixture(async (hre) => {
   return {
     deployer: deployer.address,
     token,
-    userA: userA.address
+    userA
   }
 })
 
@@ -45,7 +45,7 @@ describe('HoprToken', function () {
   it('should fail mint', async function () {
     const { token, userA } = await useFixtures()
 
-    await expect(token.connect(userA).mint(userA, 1, '0x00', '0x00')).to.be.revertedWith(
+    await expect(token.connect(userA).mint(userA.address, 1, '0x00', '0x00')).to.be.revertedWith(
       'caller does not have minter role'
     )
   })
