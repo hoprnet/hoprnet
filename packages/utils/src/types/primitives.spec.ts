@@ -244,5 +244,4 @@ describe('test Signature primitive', function () {
     assert.strictEqual(s2.recovery, 1)
     assert(s2.verify(utils.arrayify(message2), PublicKey.fromString(publicKey)))
   })
-
 })
