@@ -3,7 +3,7 @@ import NetworkPeerStore from './network-peers'
 import assert from 'assert'
 import { HEARTBEAT_INTERVAL, NETWORK_QUALITY_THRESHOLD } from '../constants'
 import sinon from 'sinon'
-import { fakePeerId } from '../test-utils'
+import { fakePeerId } from '../test-utils.spec'
 import PeerId from 'peer-id'
 import { Hash } from '@hoprnet/hopr-utils'
 

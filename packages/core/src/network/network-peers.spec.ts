@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { NETWORK_QUALITY_THRESHOLD, NETWORK_QUALITY_THRESHOLD as Q } from '../constants'
-import { fakePeerId, showBackoff } from '../test-utils'
+import { fakePeerId, showBackoff } from '../test-utils.spec'
 import PeerStore, { MAX_BACKOFF } from './network-peers'
 
 describe('test PeerStore', async function () {
