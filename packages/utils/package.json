@@ -49,7 +49,7 @@
   "devDependencies": {
     "@chainsafe/libp2p-noise": "4.1.1",
     "@types/mocha": "9.0.0",
-    "@types/pino": "6.3.11",
+    "@types/pino": "7.0.4",
     "bl": "5.0.0",
     "chai": "4.3.4",
     "libp2p": "0.33.0",
