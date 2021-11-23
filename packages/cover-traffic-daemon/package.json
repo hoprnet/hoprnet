@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.83.0-next.76",
+  "version": "1.83.0-next.79",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -12,8 +12,7 @@
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -p . && yarn build:copy",
-    "build:copy": "cp ./src/unreleasedTokens.json ./lib",
+    "build": "yarn clean && tsc -p",
     "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
@@ -23,7 +22,7 @@
   },
   "files": [
     "lib",
-    "default-environment.json"
+    "unreleasedTokens.json"
   ],
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
