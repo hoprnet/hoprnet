@@ -141,16 +141,7 @@ function randomBoundedBigInteger(bound: bigint): bigint {
 /**
  * Maximum random integer that can be generated using randomInteger function.
  */
-export const MAX_RANDOM_INTEGER = Number.MAX_SAFE_INTEGER
-
-/**
- * A convenience function, supporting less precise type Number.
- * @param bound Maximum non-negative number that can be generated. Maximum bound is currently MAX_RANDOM_INTEGER.
- */
-function randomBoundedInteger(bound: number): number {
-  const bnBound = BigInt(Math.min(Math.max(0, bound), MAX_RANDOM_INTEGER))
-  return Number(randomBoundedBigInteger(bnBound))
-}
+export const MAX_RANDOM_INTEGER = BigInt(Number.MAX_SAFE_INTEGER)
 
 /**
  * Returns a random value between `start` and `end`.
@@ -166,14 +157,38 @@ function randomBoundedInteger(bound: number): number {
  * @returns random number between @param start and @param end
  */
 export function randomInteger(start: number, end?: number): number {
+  let _start: bigint
+  let _end: bigint
+
   if (!end) {
-    end = start
-    start = 0
+    _end = BigInt(start)
+    _start = 0n
+  } else {
+    _end = BigInt(end)
+    _start = BigInt(start)
   }
 
-  if (end <= start || start < 0 || end > MAX_RANDOM_INTEGER) throw Error('invalid range')
+  if (_end + _start > MAX_RANDOM_INTEGER) {
+    throw Error('invalid range')
+  }
 
-  return start + randomBoundedInteger(end - start)
+  return Number(randomBigInteger(_start, _end))
+}
+
+/**
+ * same as randomInteger, but for BigInts
+ */
+export function randomBigInteger(start: bigint, end?: bigint): bigint {
+  if (!end) {
+    end = start
+    start = 0n
+  }
+
+  if (end <= start || start < 0n || end > MAX_RANDOM_BIGINTEGER) {
+    throw Error('invalid range')
+  }
+
+  return start + randomBoundedBigInteger(end - start)
 }
 
 export function randomChoice<T>(collection: T[]): T {
