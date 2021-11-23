@@ -1,8 +1,8 @@
 import type { ContractTransaction, UnsignedTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import { providers, utils, errors, Wallet, BigNumber, ethers } from 'ethers'
-import type { Networks, HoprToken, HoprChannels } from '@hoprnet/hopr-ethereum'
-import { networks, getContractData } from '@hoprnet/hopr-ethereum'
+import type { HoprToken, HoprChannels } from '@hoprnet/hopr-ethereum'
+import { getContractData } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Ticket,
