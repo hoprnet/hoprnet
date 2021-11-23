@@ -1260,7 +1260,6 @@ __metadata:
     yargs: 17.2.1
   bin:
     hopr-cover-traffic-daemon: lib/index.js
-    hopr-cover-traffic-daemon-dashboard: lib/dashboard.js
   languageName: unknown
   linkType: soft
 
@@ -1284,7 +1283,7 @@ __metadata:
     ethereum-waffle: 3.4.0
     ethers: 5.5.1
     hardhat: 2.6.8
-    hardhat-deploy: 0.9.5
+    hardhat-deploy: 0.9.8
     hardhat-gas-reporter: 1.0.4
     multiaddr: 10.0.1
     rimraf: 3.0.2
@@ -2517,9 +2516,9 @@ __metadata:
   linkType: hard
 
 "@types/node@npm:*, @types/node@npm:>=13.7.0":
-  version: 16.11.9
-  resolution: "@types/node@npm:16.11.9"
-  checksum: baec2e6471ee58fd1e9874e6f47ab95a918a0f46b42424392e4c13e3e07f078f8b72b6b48073b0b14f710ed66c5f1b2e497df43f28151000f11f5f299382cfe2
+  version: 16.11.10
+  resolution: "@types/node@npm:16.11.10"
+  checksum: 9c79419c5c3d92d5825bffa30f3668533f598d8b63a73ea7fc24e47f162bdbed92b0f8e4f4261cc3314b39cee050e303366d2aa154abc95c63a572a110b8c160
   languageName: node
   linkType: hard
 
@@ -6187,9 +6186,9 @@ __metadata:
   linkType: hard
 
 "electron-to-chromium@npm:^1.3.47, electron-to-chromium@npm:^1.3.723, electron-to-chromium@npm:^1.3.896":
-  version: 1.3.906
-  resolution: "electron-to-chromium@npm:1.3.906"
-  checksum: 087330249a424066cbdb882890164b3cb944f0ea293838a1445274428549e5b6c5edd25c353fed733d20d055ba276d4e3b069554b5e06ebfe511134c4f68cf87
+  version: 1.3.907
+  resolution: "electron-to-chromium@npm:1.3.907"
+  checksum: 789c60aa75a83d412254e88f60b9280e4627c655851b663e88f9f57c44429e7c0994cdd448c7aa6162170aaa535ac322fd86dd30db4c8d073107f47afab5e7b2
   languageName: node
   linkType: hard
 
@@ -8609,9 +8608,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hardhat-deploy@npm:0.9.5":
-  version: 0.9.5
-  resolution: "hardhat-deploy@npm:0.9.5"
+"hardhat-deploy@npm:0.9.8":
+  version: 0.9.8
+  resolution: "hardhat-deploy@npm:0.9.8"
   dependencies:
     "@ethersproject/abi": ^5.4.0
     "@ethersproject/abstract-signer": ^5.4.1
@@ -8638,7 +8637,7 @@ __metadata:
   peerDependencies:
     "@ethersproject/hardware-wallets": ^5.0.14
     hardhat: ^2.0.0
-  checksum: 1cd431bfce9bd605a7772c1659c9bd01f09f8edba0165bc3a78e02263d54878ef0359b78eebd521afc8950437a629dc60fcba9a16f79f7d98260c23e480a198a
+  checksum: f4d0389d17237d1fa47598088a2e77d8045dec0e7c74a050f5251e8bef823c7fa44a72899d26a3b61629da1f14722af6cc6036b9d0ea12beec5762b58fdc8454
   languageName: node
   linkType: hard
 
