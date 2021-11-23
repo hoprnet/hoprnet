@@ -199,15 +199,17 @@ export class Signature {
   }
 
   static deserialize(arr: Uint8Array): Signature {
-    const [s, preRecovery] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
-
-    const r = u8aToNumber(preRecovery) as number
-
-    if (![0, 1].includes(r)) {
-      throw Error(`Expected recovery to be 0 or 1. Got ${r}`)
+    if (arr.length !== SIGNATURE_LENGTH) {
+      throw new Error('Incorrect size Uint8Array for signature')
     }
 
-    return new Signature(s, r)
+    const arrCopy = new Uint8Array(arr)
+
+    // Read & clear the top-most bit in S
+    const recovery = (arrCopy[SIGNATURE_LENGTH/2] & 0x80) != 0 ? 1 : 0
+    arrCopy[SIGNATURE_LENGTH/2] &= 0x7f
+
+    return new Signature(arrCopy, recovery)
   }
 
   /**
@@ -233,10 +235,10 @@ export class Signature {
   }
 
   serialize(): Uint8Array {
-    return serializeToU8a([
-      [this.signature, SIGNATURE_LENGTH],
-      [Uint8Array.of(this.recovery), SIGNATURE_RECOVERY_LENGTH]
-    ])
+    const compressedSig = new Uint8Array(this.signature)
+    compressedSig[SIGNATURE_LENGTH/2] &= 0x7f
+    compressedSig[SIGNATURE_LENGTH/2] |= (this.recovery << 7)
+    return compressedSig
   }
 
   /**
@@ -258,7 +260,7 @@ export class Signature {
     return u8aToHex(this.serialize())
   }
 
-  static SIZE = SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
+  static SIZE = SIGNATURE_LENGTH
 }
 
 export class Balance {
