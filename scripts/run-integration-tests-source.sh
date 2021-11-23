@@ -291,10 +291,10 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
-# declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
+declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
 # }}}
 
-# log "CT node1 address: ${ct_node1_address}"
+log "CT node1 address: ${ct_node1_address}"
 
 log "Funding nodes"
 
@@ -304,7 +304,7 @@ HOPR_ENVIRONMENT_ID=hardhat-localhost2 yarn workspace @hoprnet/hopr-ethereum exe
   --identity-directory "${tmp}" \
   --use-local-identities \
   --network hardhat \
-  # --address "${ct_node1_address}" \
+  --address "${ct_node1_address}" \
   --password "${password}"
 # }}}
 
