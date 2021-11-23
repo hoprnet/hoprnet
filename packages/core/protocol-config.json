@@ -20,7 +20,7 @@
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
-      "channels_contract_address": "0xC3e3603c6210cDEe67B905cc3bF24A6416ab747B",
+      "channels_contract_address": "0x5553BAc619Cab16365028E6A810969652AE3b0f9",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "tags": ["development"]
     },
