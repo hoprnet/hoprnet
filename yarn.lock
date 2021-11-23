@@ -1380,7 +1380,7 @@ __metadata:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/body-parser": 1.19.1
-    "@types/yargs": 17.0.5
+    "@types/yargs": 17.0.7
     bn.js: 5.2.0
     body-parser: ^1.19.0
     bs58: ^4.0.1
@@ -2701,15 +2701,6 @@ __metadata:
   version: 20.2.1
   resolution: "@types/yargs-parser@npm:20.2.1"
   checksum: 1d039e64494a7a61ddd278349a3dc60b19f99ff0517425696e796f794e4252452b9d62178e69755ad03f439f9dc0c8c3d7b3a1201b3a24e134bac1a09fa11eaa
-  languageName: node
-  linkType: hard
-
-"@types/yargs@npm:17.0.5":
-  version: 17.0.5
-  resolution: "@types/yargs@npm:17.0.5"
-  dependencies:
-    "@types/yargs-parser": "*"
-  checksum: 2be02640c84471c66aec58cfd415432fab0973283909765aa3becbdb76b5874d4770fe7f376e77b98833d5cc9d9bc258a905adce68a0baec13d430c866fce3b5
   languageName: node
   linkType: hard
 
