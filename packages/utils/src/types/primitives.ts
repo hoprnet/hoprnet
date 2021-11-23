@@ -206,8 +206,8 @@ export class Signature {
     const arrCopy = new Uint8Array(arr)
 
     // Read & clear the top-most bit in S
-    const recovery = (arrCopy[SIGNATURE_LENGTH/2] & 0x80) != 0 ? 1 : 0
-    arrCopy[SIGNATURE_LENGTH/2] &= 0x7f
+    const recovery = (arrCopy[SIGNATURE_LENGTH / 2] & 0x80) != 0 ? 1 : 0
+    arrCopy[SIGNATURE_LENGTH / 2] &= 0x7f
 
     return new Signature(arrCopy, recovery)
   }
@@ -236,8 +236,8 @@ export class Signature {
 
   serialize(): Uint8Array {
     const compressedSig = new Uint8Array(this.signature)
-    compressedSig[SIGNATURE_LENGTH/2] &= 0x7f
-    compressedSig[SIGNATURE_LENGTH/2] |= (this.recovery << 7)
+    compressedSig[SIGNATURE_LENGTH / 2] &= 0x7f
+    compressedSig[SIGNATURE_LENGTH / 2] |= this.recovery << 7
     return compressedSig
   }
 

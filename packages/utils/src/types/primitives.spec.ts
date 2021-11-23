@@ -186,7 +186,6 @@ describe('test NativeBalance primitive', function () {
 })
 
 describe('test Signature primitive', function () {
-
   /* test with signature with recovery = 0 */
   const message1 = utils.keccak256(utils.toUtf8Bytes('hello'))
   const signature1 =
@@ -194,7 +193,8 @@ describe('test Signature primitive', function () {
   const recovery1 = 0
 
   /* test with signature with recovery = 1 */
-  const signature2 = '0x92f3745d95d33c79041e9c8d8c13ecacc468d4839745613aa531622b9f26827b7e2fb5d3cf4b53d52ff48a9434c5ff9009ea049f86f00f9aa7c0ae8a6b6cc7ec'
+  const signature2 =
+    '0x92f3745d95d33c79041e9c8d8c13ecacc468d4839745613aa531622b9f26827b7e2fb5d3cf4b53d52ff48a9434c5ff9009ea049f86f00f9aa7c0ae8a6b6cc7ec'
   const message2 = utils.keccak256(utils.toUtf8Bytes('blahblah_'))
   const recovery2 = 1
 
