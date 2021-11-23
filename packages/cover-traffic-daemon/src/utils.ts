@@ -5,7 +5,6 @@ import { PublicKey, ChannelEntry } from '@hoprnet/hopr-utils'
 import type { State, ChannelData, PersistedState } from './state'
 import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
 import { debug } from '@hoprnet/hopr-utils'
-import unreleasedTokensJSON from './unreleasedTokens.json'
 
 const log = debug('hopr:cover-traffic')
 
@@ -27,7 +26,7 @@ export type UnreleasedTokens = {
   allocation: Record<string, UnreleasedSchedule[]>
 }
 
-const unreleasedTokens: UnreleasedTokens = unreleasedTokensJSON
+const unreleasedTokens: UnreleasedTokens = require('./unreleasedTokens.json')
 
 export const addBN = (a: BN, b: BN): BN => a.add(b)
 export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().integerValue().toFixed(), 10)
@@ -76,14 +75,14 @@ export const stakeFor = (p: PublicKey, state: State): BN => {
   const currentBlockNumber = state.block.toNumber()
 
   return Object.values(unreleasedTokens.link)
-    [linkedAccountsIndex].map((nodeAddress) => {
-      const scheduleIndex = unreleasedTokens.allocation[nodeAddress].findIndex(
-        (schedule) => schedule.lowerBlock <= currentBlockNumber && currentBlockNumber < schedule.upperBlock
-      )
-      return scheduleIndex < 0
-        ? new BN('0')
-        : new BN(unreleasedTokens.allocation[nodeAddress][scheduleIndex].unreleased)
-    })
+  [linkedAccountsIndex].map((nodeAddress) => {
+    const scheduleIndex = unreleasedTokens.allocation[nodeAddress].findIndex(
+      (schedule) => schedule.lowerBlock <= currentBlockNumber && currentBlockNumber < schedule.upperBlock
+    )
+    return scheduleIndex < 0
+      ? new BN('0')
+      : new BN(unreleasedTokens.allocation[nodeAddress][scheduleIndex].unreleased)
+  })
     .reduce(addBN, new BN('0'))
     .add(totalChannelBalanceFor(p, state))
 }
