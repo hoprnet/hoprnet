@@ -24,6 +24,7 @@
 - [bumpCommitment](modules.md#bumpcommitment)
 - [createChainWrapper](modules.md#createchainwrapper)
 - [findCommitmentPreImage](modules.md#findcommitmentpreimage)
+- [initializeCommitment](modules.md#initializecommitment)
 
 ## Type aliases
 
@@ -43,7 +44,7 @@
 
 #### Defined in
 
-[packages/core-ethereum/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L7)
+[packages/core-ethereum/src/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L6)
 
 ___
 
@@ -53,7 +54,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L9)
+[packages/core-ethereum/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L8)
 
 ## Functions
 
@@ -80,23 +81,28 @@ ___
 
 ### createChainWrapper
 
-▸ **createChainWrapper**(`providerURI`, `privateKey`, `checkDuplicate?`): `Promise`<`Object`\>
+▸ **createChainWrapper**(`networkInfo`, `privateKey`, `checkDuplicate?`): `Promise`<{ `announce`: (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> ; `finalizeChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `fundChannel`: (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> ; `getBalance`: (`address`: `Address`) => `Promise`<`Balance`\> ; `getChannels`: () => `HoprChannels` ; `getGenesisBlock`: () => `number` ; `getInfo`: () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } ; `getLatestBlockNumber`: () => `Promise`<`number`\> ; `getNativeBalance`: (`address`: `Address`) => `Promise`<`NativeBalance`\> ; `getNativeTokenTransactionInBlock`: (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> ; `getPrivateKey`: () => `Uint8Array` ; `getPublicKey`: () => `PublicKey` ; `getWallet`: () => `Wallet` ; `initiateChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `openChannel`: (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<`string`\> ; `redeemTicket`: (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> ; `setCommitment`: (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> ; `subscribeBlock`: (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` ; `subscribeChannelEvents`: (`cb`: `any`) => `HoprChannels` ; `subscribeError`: (`cb`: `any`) => `void` ; `subscribeTokenEvents`: (`cb`: `any`) => `HoprToken` ; `unsubscribe`: () => `void` ; `updateConfirmedTransaction`: (`hash`: `string`) => `void` ; `waitUntilReady`: () => `Promise`<`Network`\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\>  }\>
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `providerURI` | `string` | `undefined` |
+| `networkInfo` | `Object` | `undefined` |
+| `networkInfo.chainId` | `number` | `undefined` |
+| `networkInfo.environment` | `string` | `undefined` |
+| `networkInfo.gasPrice?` | `number` | `undefined` |
+| `networkInfo.network` | `string` | `undefined` |
+| `networkInfo.provider` | `string` | `undefined` |
 | `privateKey` | `Uint8Array` | `undefined` |
 | `checkDuplicate` | `Boolean` | `true` |
 
 #### Returns
 
-`Promise`<`Object`\>
+`Promise`<{ `announce`: (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> ; `finalizeChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `fundChannel`: (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> ; `getBalance`: (`address`: `Address`) => `Promise`<`Balance`\> ; `getChannels`: () => `HoprChannels` ; `getGenesisBlock`: () => `number` ; `getInfo`: () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } ; `getLatestBlockNumber`: () => `Promise`<`number`\> ; `getNativeBalance`: (`address`: `Address`) => `Promise`<`NativeBalance`\> ; `getNativeTokenTransactionInBlock`: (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> ; `getPrivateKey`: () => `Uint8Array` ; `getPublicKey`: () => `PublicKey` ; `getWallet`: () => `Wallet` ; `initiateChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `openChannel`: (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<`string`\> ; `redeemTicket`: (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> ; `setCommitment`: (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> ; `subscribeBlock`: (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` ; `subscribeChannelEvents`: (`cb`: `any`) => `HoprChannels` ; `subscribeError`: (`cb`: `any`) => `void` ; `subscribeTokenEvents`: (`cb`: `any`) => `HoprToken` ; `unsubscribe`: () => `void` ; `updateConfirmedTransaction`: (`hash`: `string`) => `void` ; `waitUntilReady`: () => `Promise`<`Network`\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\>  }\>
 
 #### Defined in
 
-[packages/core-ethereum/src/ethereum.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L40)
+[packages/core-ethereum/src/ethereum.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L29)
 
 ___
 
@@ -118,3 +124,26 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/commitment.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L24)
+
+___
+
+### initializeCommitment
+
+▸ **initializeCommitment**(`db`, `channelId`, `getChainCommitment`, `setChainCommitment`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `db` | `HoprDB` |
+| `channelId` | `Hash` |
+| `getChainCommitment` | `GetCommitment` |
+| `setChainCommitment` | `SetCommitment` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core-ethereum/src/commitment.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L60)

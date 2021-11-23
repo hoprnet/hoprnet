@@ -1,48 +1,97 @@
 #!/usr/bin/env bash
 
-set -e #u
-shopt -s expand_aliases
-#set -o xtrace
+# prevent sourcing of this script, only allow execution
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
-source scripts/environments.sh
-source scripts/testnet.sh
-source scripts/cleanup.sh
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -Eeuo pipefail
 
-# ---- On Deployment -----
-#
-# This is run on pushes to master, or release/**
-#
-# ENV Variables:
-# - GITHUB_REF: ie. `/refs/heads/mybranch`
-# - RPC: provider address, ie `https://rpc-mainnet.matic.network`
-# - RPC_NETWORK: provider network id, e.g. xdai
-# - FUNDING_PRIV_KEY: funding private key, raw
-# - BS_PASSWORD: database password
+# set log id and use shared log function for readable logs
+declare mydir
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+declare -x HOPR_LOG_ID="deploy"
+source "${mydir}/utils.sh"
+source "${mydir}/testnet.sh"
 
-if [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "goerli" ]; then
-  RPC="https://goerli.infura.io/v3/${INFURA_KEY}"
-elif [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "xdai" ]; then
-  RPC="https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a/"
-elif [ -z "${RPC:-}" ] && [ "${RPC_NETWORK:-}" = "polygon" ]; then
-  RPC="https://provider-proxy.hoprnet.workers.dev/matic_rio"
-elif [ "${RPC_NETWORK:-}" != "xdai" ] && [ "${RPC_NETWORK:-}" != "goerli" ]; then
-  echo "Missing supported RPC_NETWORK"
-  exit 1
-fi
+declare branch cluster_size package_version docker_image
 
-# Get version from package.json if not already set
-if [ -z "${RELEASE:-}" ]; then
-  RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
-fi
+: ${HOPRD_API_TOKEN:?"env var missing"}
+: ${HOPRD_PASSWORD:?"env var missing"}
+: ${FUNDING_PRIV_KEY:?"env var missing"}
 
-# Get RELEASE_NAME, from environment
-get_environment
+branch=$(git rev-parse --abbrev-ref HEAD)
+cluster_size=3
+package_version=$(${mydir}/get-package-version.sh)
+docker_image="gcr.io/hoprassociation/hoprd"
+api_token="${HOPRD_API_TOKEN}"
+password="${HOPRD_PASSWORD}"
 
-TESTNET_NAME="$RELEASE_NAME-$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
-TESTNET_SIZE=3
+_jq() {
+  echo "$1" | base64 --decode | jq -r "$2"
+}
 
-echo "Cleaning up before deploy"
-cleanup
+echo "Looking for releases to deploy from branch ${branch}"
 
-echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes and image hoprd:$RELEASE"
-start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" "${RPC}"
+# iterate through releases and find entries which match to the current branch
+
+for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
+  if [[ "${branch}" =~ ${git_ref} ]]; then
+    for row in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | @base64"); do
+      declare release_id deprecated environment_id version_major version_minor docker_image_full
+
+      release_id=$(_jq "${row}" ".key")
+      deprecated=$(_jq "${row}" ".value.deprecated")
+      environment_id=$(_jq "${row}" ".value.environment_id")
+      version_major=$(_jq "${row}" ".value.version_major")
+      version_minor=$(_jq "${row}" ".value.version_minor")
+      docker_image_full="${docker_image}:${release_id}"
+
+      if [ "${deprecated}" == "true" ]; then
+        log "${release_id} deprecated, skipping deployment"
+        continue
+      fi
+
+      declare version_maj_min cluster_name
+      cluster_name="${release_id}"
+      if [ "${version_major}" != "null" ] && [ "${version_minor}" != "null" ]; then
+        version_maj_min="${version_major}.${version_minor}"
+        cluster_name="${cluster_name}-${version_maj_min//./-}"
+      else
+        version_maj_min=""
+      fi
+
+      cluster_template_name="${cluster_name}-${package_version//./-}"
+
+      log "deploying release ${release_id}"
+      log "\tversion: ${version_maj_min}"
+      log "\tenvironment ${environment_id}"
+      log "\tdocker image: ${docker_image_full}"
+      log "\tcluster name: ${cluster_name}"
+      log "\tcluster template name: ${cluster_template_name}"
+
+      gcloud_create_or_update_instance_template "${cluster_template_name}" \
+        "${docker_image_full}" \
+        "${environment_id}" \
+        "${api_token}" \
+        "${password}"
+
+      gcloud_create_or_update_managed_instance_group "${cluster_name}" \
+        ${cluster_size} \
+        "${cluster_template_name}"
+
+      # get IPs of VMs which run hoprd
+      declare node_ips
+      node_ips=$(gcloud_get_managed_instance_group_instances_ips "${cluster_name}")
+      declare node_ips_arr=( ${node_ips} )
+
+      # fund nodes
+      declare eth_address
+      for ip in ${node_ips}; do
+        wait_until_node_is_ready "${ip}"
+        eth_address=$(get_eth_address "${ip}")
+        fund_if_empty "${eth_address}" "${environment_id}"
+      done
+    done
+  fi
+done

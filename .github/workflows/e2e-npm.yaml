@@ -10,6 +10,7 @@ on:
   push:
     branches: ['master', 'release/**', 'debug-e2e-npm/**']
     paths-ignore:
+      - '.processes/**/*'
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
 

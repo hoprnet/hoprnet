@@ -1,13 +1,12 @@
 [@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / TypedEventFilter
 
-# Interface: TypedEventFilter<_EventArgsArray, _EventArgsObject\>
+# Interface: TypedEventFilter<_TEvent\>
 
 ## Type parameters
 
-| Name |
-| :------ |
-| `_EventArgsArray` |
-| `_EventArgsObject` |
+| Name | Type |
+| :------ | :------ |
+| `_TEvent` | extends [`TypedEvent`](TypedEvent.md) |
 
 ## Hierarchy
 

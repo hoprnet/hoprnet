@@ -4,7 +4,7 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 
 - [Development Processes](#development-processes)
   - [Legend](#legend)
-    - [Ambassadors](#ambassadors)
+    - [Representantives](#representantives)
     - [Trifecta](#trifecta)
   - [Daily updates](#daily-updates)
     - [Start of work](#start-of-work)
@@ -36,25 +36,28 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Project Owner       | A HOPR member which ensures epics prioritized are in line with both the short and long term vision of HOPR |
 | Process Facilitator | A HOPR member which ensures agreed processes are followed                                                  |
-| Ambassadors         | Two tech members elected to be the bridge between tech team and Project Owner                              |
-| Trifecta            | Ambassadors + Project Owner                                                                                |
+| Representantives    | Two tech members elected to be the bridge between tech team and Project Owner                              |
+| Trifecta            | Representantives + Project Owner                                                                           |
 | Issue tracker       | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
-### Ambassadors
+### Representantives
 
-Elected ambassadors are rotated every `2 months`.
+Each individual representantive is elected for a period of `3 months`. The periods are overlapped to create a staggered schedule during which new representatives can be guided by their co-representatives who have already served half of their election period. Previous representatives may be re-elected.
 
 Responsibilities:
 
 - to be the bridge between tech team and Project Owner
+- daily check for community created tasks in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
+- daily check for new [unreleased tokens](../UNRELEASED_TOKENS.md) emails send to `tech@hoprnet.org`
 
-_Current:_ [Tino](https://github.com/tolbrino), [Steve](https://github.com/nionis)
+_Current:_
 
-_Expiry:_ 5/11/21
+- [Tino](https://github.com/tolbrino) until 05/02/2022
+- [Steve](https://github.com/nionis) until 20/12/2021
 
 ### Trifecta
 
-Trifecta is made up by the [Ambassadors](#ambassadors) and Project Owner.
+Trifecta is made up by the [Representantives](#representantives) and Project Owner.
 
 Responsibilities:
 
@@ -63,7 +66,7 @@ Responsibilities:
 - [file alarm](#fire-alarm) management
 - [release](./release.md#internal-release) management
 
-_Current:_ [Ambassadors](#ambassadors), [Sebastian](https://github.com/SCBuergel)
+_Current:_ [Representantives](#representantives), [Sebastian](https://github.com/SCBuergel)
 
 ## Daily updates
 
@@ -133,6 +136,7 @@ tasks and PRs on Github. This includes but is not limited to:
 - updating and/or closing PRs to ensure only in-progress PRs are active
 - moving tasks on sprint boards to correct columns
 - [responding to issues created by externals](#external-issues)
+- delete stale/old branches which are not attached to a PR
 
 _Who:_ all tech members individually
 
@@ -140,7 +144,7 @@ _When:_ last day of the sprint or before a vacation
 
 #### External issues
 
-Newly created issues ([labelled as](#labels): `new issue`) may not all have been replied to, the [Ambassadors](#ambassadors) may reply or assign a tech member to follow up on the issue.
+Newly created issues ([labelled as](#labels): `new issue`) may not all have been replied to, the [Representantives](#representantives) may reply or assign a tech member to follow up on the issue.
 
 - closing duplicates
 - issues are properly labelled
@@ -161,33 +165,33 @@ _When:_ first day of the sprint
 
 The target of prioritization are issues marked as
 [epic](https://github.com/hoprnet/hoprnet/issues?q=is%3Aissue+is%3Aopen+label%3Aepic).
-Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/projects/9) which only contains epic issues.
+Priorities are captured on the [Roadmap](https://github.com/orgs/hoprnet/projects/15) which only contains epic issues.
 
 - epics are issues which encapsulate the work that need to be done for X feature/bug
 - epics are not bound by sprints and they can be long lived
-- closed epics are moved to `Acceptance`
-- epics within `Acceptance` column are accepted by [Trifecta](#trifecta) prior to the meeting
-  - unaccepted epics are moved back to `Next` column with a comment explaining why it wasn't accepted
+- closed epics are moved to `acceptance`
+- epics within `acceptance` column are accepted by [Trifecta](#trifecta) prior to the meeting
+  - unaccepted epics are moved back to `next` column with a comment explaining why it wasn't accepted
 - ensure newly created [epics](#issue-creation) are well created
   - must use the [epic issue template](../.github/ISSUE_TEMPLATE/epic.md)
 - adapt epic priorities
-- create new [Sprint](#sprint-planning) project
+- make an epic if necessary for issues created by community in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 
 #### The Roadmap columns
 
-- `Icebox` contains epics which require further specification or are specifically paused.
-- `Backlog` contains epics which are well specified but haven't been given any
+- `icebox` contains epics which require further specification or are specifically paused.
+- `backlog` contains epics which are well specified but haven't been given any
   priority to be worked on during the current sprint.
-- `Next` column contains epics which are given priority to be worked on during
+- `next` column contains epics which are given priority to be worked on during
   the current sprint. The priorities are descending from top to bottom. Priorites
   with hard deadlines must be marked with the label
   [deadline](https://github.com/hoprnet/hoprnet/labels/deadline) with more
   information on the deadline being available within the issue's description.
-- `Acceptance` column contains epics which were completed but require
+- `acceptance` column contains epics which were completed but require
   acceptance testing from an additional team member or outside person. When moving
-  issues into `Acceptance` the person who's input is required must be pinged
+  issues into `acceptance` the person who's input is required must be pinged
   directly.
-- `Done` column contains epics which were accepted. The column is cleaned up
+- `done` column contains epics which were accepted. The column is cleaned up
   as part of the `Task Grooming` phase.
 
 _Who:_ [Trifecta](#trifecta)
@@ -199,9 +203,9 @@ _When_: first day of a sprint
 The task planning follows the `Prioritization` and takes the priorities into
 account as much as possible.
 
-- Each sprint has its own taskboard, e.g. [Sprint 36-37](https://github.com/orgs/hoprnet/projects/11).
+- Tasks and PRs which are actively worked on are gathered on the [Taskboard](https://github.com/orgs/hoprnet/projects/15/views/10).
 - Epic issues are further refined into tasks which have clear definitions of work and done.
-- Ideally each team member has only one task assigned which is `in progress`.
+- Ideally each team member has only one task assigned which is in status `next`.
 - members which are coming back from vacation should already have tasks assigned to them.
 
 _Who:_ all tech members within a meeting
@@ -212,7 +216,7 @@ _When:_ first day of the sprint
 
 It's possible that throughout the planned sprint, we encounter a bag of issues that need to be resolved ASAP.
 
-1. As soon issue is detected, an [ambassador](#ambassadors) needs to take up the task of coordinating how the issue is tackled
+1. As soon issue is detected, a [representantive](#representantives) needs to take up the task of coordinating how the issue is tackled
 2. Member appointed then is responsible for finding the right member within the tech team that has the most knowledge on the current issue, let's say that's Alice
 3. Alice investigates issue and may ask other members for help
 4. Alice patches issue
@@ -319,12 +323,6 @@ See [Release Processes](./release.md)
 - `master`: In our case, `master` is a **prerelease** branch - tests _must_
   pass, and code _should_ be stable, but it is _acceptable_ to have issues.
 
-- `release/**`: On every [Milestone](https://github.com/hoprnet/hoprnet/milestones)
-  marked with a **PUBLIC RELEASE**, we cut a `release/**`
-  branch, using an internal name to identify the release. Official milestones
-  use a specific name with the codename of a mountain in Switzerland.
-  See [Release Processes](./release.md).
-
-- `<username>/feature-branch`: Work on epics _must_ be done within a feature branch
-  and the name of the feature branch _must_ be prefixed by the team member's Github
-  username (or an abbreviation) who got assigned to the epic.
+- `release/**`: On new internal release, we cut a `release/**`
+  branch, using an internal **city** name to identify the release.
+  See [Release Processes](./release.md) for more info.

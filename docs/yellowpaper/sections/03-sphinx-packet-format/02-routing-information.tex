@@ -3,10 +3,10 @@
 
 Each node on the path needs to know which is the next downstream node. Therefore, the sender $A$ generates routing information $\beta_i$ for $B$, $C$, and $D$, as well as a message $END$ to tell $Z$ that it is the final recipient of the message. Whilst the keys for $B$, $C$, and $D$ are given as a compressed elliptic, the $END$ message occurs as a distinguished prefix.
 
-In general, compression of elliptic curve points given as $(x,y)$ happens by taking the $x$-coordinate and the sign of $y$. If $y$ is above the $x$-axis, \texttt{0x02} is added, otherwise \texttt{0x03} is used. The $END$ message is given by \texttt{0x04} and is therefore easily distinguishable from public keys.
+In general, compression of elliptic curve points given as $(x,y)$ happens by taking the $x$-coordinate and the sign of $y$. If $y$ is above the $x$-axis, \texttt{0x02} is appended, otherwise \texttt{0x03} is used. The $END$ message is given by \texttt{0x04} and is therefore easily distinguishable from public keys.
 
 \begin{comment}
-The $END$ message is a distinguished prefix byte which is added to the final recipient's compressed public key. For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$.
+The $END$ message is a distinguished prefix byte which is appended to the final recipient's compressed public key. For ECDSA public key compression, only the $x$ coordinate is used and is prepended by $02$.
 
 The $y$ coordinate is extracted from $x$ by resolving the secp256k1 elliptic curve equation $Y^2=X^3+7$ \cite{secp}. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is $0\times02$ or $0\times03$, depending on that bit).
 \end{comment}

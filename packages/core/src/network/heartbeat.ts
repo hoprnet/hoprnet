@@ -3,7 +3,7 @@ import type PeerId from 'peer-id'
 import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
 import { randomInteger, limitConcurrency, u8aEquals, Hash, debug } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'
-import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../constants'
+import { HEARTBEAT_TIMEOUT } from '../constants'
 import { randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index'
@@ -13,19 +13,23 @@ const error = debug('hopr-core:heartbeat:error')
 
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
+  private protocolHeartbeat: string
 
   constructor(
     private networkPeers: NetworkPeerStore,
     subscribe: Subscribe,
     protected sendMessage: SendMessage,
-    private hangUp: (addr: PeerId) => Promise<void>
+    private hangUp: (addr: PeerId) => Promise<void>,
+    environmentId: string
   ) {
     const errHandler = (err: any) => {
       error(`Error while processing heartbeat request`, err)
     }
 
+    this.protocolHeartbeat = `hopr/${environmentId}/heartbeat`
+
     subscribe(
-      PROTOCOL_HEARTBEAT,
+      this.protocolHeartbeat,
       this.handleHeartbeatRequest.bind(this) as LibP2PHandlerFunction<Promise<Uint8Array>>,
       true,
       errHandler
@@ -45,7 +49,7 @@ export default class Heartbeat {
     const expectedResponse = Hash.create(challenge).serialize()
 
     try {
-      const pingResponse = await this.sendMessage(id, PROTOCOL_HEARTBEAT, challenge, true, {
+      const pingResponse = await this.sendMessage(id, this.protocolHeartbeat, challenge, true, {
         timeout: HEARTBEAT_TIMEOUT
       })
 

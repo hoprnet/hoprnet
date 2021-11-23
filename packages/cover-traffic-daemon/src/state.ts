@@ -35,8 +35,6 @@ export type PeerData = {
   multiaddrs: any // Multiaddress type
 }
 
-const DB = './ct.json'
-
 export class PersistedState {
   // Quick and dirty DB.
   // Caveats:
@@ -48,8 +46,8 @@ export class PersistedState {
    * Initiate the persisted state of the network attached to the CT node
    * @param update function that is called at every change of the state
    */
-  constructor(private update: (s: State) => void) {
-    if (fs.existsSync(DB)) {
+  constructor(private update: (s: State) => void, private db_path: string) {
+    if (fs.existsSync(this.db_path)) {
       this.load()
     } else {
       this._data = {
@@ -66,7 +64,7 @@ export class PersistedState {
    * Load the exisitng cover traffic state, where the path is defined in `DB`
    */
   load(): void {
-    const json = JSON.parse(fs.readFileSync(DB, 'utf8'))
+    const json = JSON.parse(fs.readFileSync(this.db_path, 'utf8'))
     this._data = {
       nodes: {},
       channels: {},
@@ -112,7 +110,7 @@ export class PersistedState {
   set(s: State): void {
     this._data = s
     fs.writeFileSync(
-      DB,
+      this.db_path,
       JSON.stringify({
         nodes: Object.values(s.nodes).map((n: PeerData) => ({
           id: n.id.toB58String(),

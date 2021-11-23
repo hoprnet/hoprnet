@@ -87,8 +87,12 @@
 | `publicKey` | `PublicKey` |
 | `privateKey` | `Uint8Array` |
 | `options?` | `Object` |
+| `options.chainId` | `number` |
+| `options.environment` | `string` |
+| `options.gasPrice?` | `number` |
 | `options.maxConfirmations?` | `number` |
-| `options.provider?` | `string` |
+| `options.network` | `string` |
+| `options.provider` | `string` |
 
 #### Overrides
 
@@ -106,7 +110,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L84)
+[packages/core-ethereum/src/index.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L91)
 
 ___
 
@@ -124,7 +128,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L125)
+[packages/core-ethereum/src/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L132)
 
 ___
 
@@ -142,7 +146,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L143)
+[packages/core-ethereum/src/index.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L150)
 
 ___
 
@@ -160,7 +164,7 @@ ___
 | `getBalance` | (`address`: `Address`) => `Promise`<`Balance`\> |
 | `getChannels` | () => `HoprChannels` |
 | `getGenesisBlock` | () => `number` |
-| `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `Networks`  } |
+| `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
 | `getLatestBlockNumber` | () => `Promise`<`number`\> |
 | `getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
@@ -327,7 +331,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L94)
+[packages/core-ethereum/src/index.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L101)
 
 ___
 
@@ -347,7 +351,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:164](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L164)
+[packages/core-ethereum/src/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L171)
 
 ___
 
@@ -468,7 +472,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:276](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L276)
+[packages/core-ethereum/src/index.ts:286](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L286)
 
 ___
 
@@ -490,7 +494,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:303](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L303)
+[packages/core-ethereum/src/index.ts:313](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L313)
 
 ___
 
@@ -510,7 +514,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L112)
+[packages/core-ethereum/src/index.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L119)
 
 ___
 
@@ -534,7 +538,7 @@ HOPR balance
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L130)
+[packages/core-ethereum/src/index.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L137)
 
 ___
 
@@ -577,7 +581,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L147)
+[packages/core-ethereum/src/index.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L154)
 
 ___
 
@@ -597,7 +601,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L108)
+[packages/core-ethereum/src/index.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L115)
 
 ___
 
@@ -611,7 +615,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L134)
+[packages/core-ethereum/src/index.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L141)
 
 ___
 
@@ -631,7 +635,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L116)
+[packages/core-ethereum/src/index.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L123)
 
 ___
 
@@ -645,7 +649,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L120)
+[packages/core-ethereum/src/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L127)
 
 ___
 
@@ -665,7 +669,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:267](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L267)
+[packages/core-ethereum/src/index.ts:277](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L277)
 
 ___
 
@@ -883,7 +887,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:284](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L284)
+[packages/core-ethereum/src/index.ts:294](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L294)
 
 ___
 
@@ -1028,7 +1032,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:174](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L174)
+[packages/core-ethereum/src/index.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L181)
 
 ___
 
@@ -1049,19 +1053,19 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:214](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L214)
+[packages/core-ethereum/src/index.ts:224](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L224)
 
 ___
 
 ### redeemTicketsInChannel
 
-▸ `Private` **redeemTicketsInChannel**(`source`): `Promise`<`void`\>
+▸ `Private` **redeemTicketsInChannel**(`channel`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `source` | `PublicKey` |
+| `channel` | [`ChannelEntry`](ChannelEntry.md) |
 
 #### Returns
 
@@ -1069,7 +1073,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L188)
+[packages/core-ethereum/src/index.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L195)
 
 ___
 
@@ -1261,7 +1265,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L151)
+[packages/core-ethereum/src/index.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L158)
 
 ___
 
@@ -1275,7 +1279,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L65)
+[packages/core-ethereum/src/index.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L72)
 
 ___
 
@@ -1291,7 +1295,7 @@ Stops the connector.
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L89)
+[packages/core-ethereum/src/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L96)
 
 ___
 
@@ -1305,7 +1309,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:124](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L124)
+[packages/core-ethereum/src/index.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L131)
 
 ___
 
@@ -1323,7 +1327,7 @@ ETH balance
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L142)
+[packages/core-ethereum/src/index.ts:149](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L149)
 
 ___
 
@@ -1337,7 +1341,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L160)
+[packages/core-ethereum/src/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L167)
 
 ___
 
@@ -1359,7 +1363,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L101)
+[packages/core-ethereum/src/index.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L108)
 
 ___
 
@@ -1548,7 +1552,7 @@ event or that is rejected if the `EventEmitter` emits `'error'` while waiting.
 The `Promise` will resolve with an array of all the arguments emitted to the
 given event.
 
-This method is intentionally generic and works with the web platform[EventTarget](https://dom.spec.whatwg.org/#interface-eventtarget) interface, which has no special`'error'` event
+This method is intentionally generic and works with the web platform [EventTarget](https://dom.spec.whatwg.org/#interface-eventtarget) interface, which has no special`'error'` event
 semantics and does not listen to the `'error'` event.
 
 ```js

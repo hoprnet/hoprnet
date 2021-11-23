@@ -64,14 +64,15 @@ describe(`database tests`, function () {
       new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE))),
       pubKey
     )
-    await db.storeUnacknowledgedTicket(halfKeyChallenge, unAck)
+    await db.storePendingAcknowledgement(halfKeyChallenge, false, unAck)
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
 
-    const ticket = await db.getUnacknowledgedTicket(halfKeyChallenge)
-    assert(ticket != null)
+    const pending = await db.getPendingAcknowledgement(halfKeyChallenge)
+
+    assert(pending.isMessageSender == false)
 
     const ack = new AcknowledgedTicket(
-      ticket.ticket,
+      pending.ticket.ticket,
       new Response(Uint8Array.from(randomBytes(Hash.SIZE))),
       new Hash(Uint8Array.from(randomBytes(Hash.SIZE))),
       pubKey
@@ -125,5 +126,19 @@ describe(`database tests`, function () {
     const fromDb = await db.getCurrentCommitment(DUMMY_CHANNEL)
 
     assert(fromDb.eq(DUMMY_COMMITMENT))
+  })
+
+  it('should store rejected tickets statistics', async function () {
+    assert.equal(await db.getRejectedTicketsCount(), 0)
+    assert((await db.getRejectedTicketsValue()).toBN().isZero())
+
+    const amount = new BN(1)
+
+    await db.markRejected({
+      amount: new Balance(amount)
+    } as Ticket)
+
+    assert.equal(await db.getRejectedTicketsCount(), 1)
+    assert((await db.getRejectedTicketsValue()).toBN().eq(amount))
   })
 })

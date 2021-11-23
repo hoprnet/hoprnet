@@ -17,7 +17,7 @@ import {
   Hash
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
-import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
+import { CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
@@ -51,7 +51,14 @@ export default class HoprEthereum extends EventEmitter {
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
-    private options?: { provider?: string; maxConfirmations?: number }
+    private options?: {
+      provider: string
+      maxConfirmations?: number
+      chainId: number
+      gasPrice?: number
+      network: string
+      environment: string
+    }
   ) {
     super()
     this.indexer = new Indexer(
@@ -68,7 +75,7 @@ export default class HoprEthereum extends EventEmitter {
     }
 
     const _start = async (): Promise<HoprEthereum> => {
-      this.chain = await createChainWrapper(this.options.provider || PROVIDER_DEFAULT_URI, this.privateKey)
+      this.chain = await createChainWrapper(this.options, this.privateKey)
       await this.chain.waitUntilReady()
       await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
@@ -177,7 +184,7 @@ export default class HoprEthereum extends EventEmitter {
     }
     const _redeemAll = async () => {
       for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
-        await this.redeemTicketsInChannel(ce.source)
+        await this.redeemTicketsInChannel(ce)
       }
       this.redeemingAll = undefined
     }
@@ -185,16 +192,19 @@ export default class HoprEthereum extends EventEmitter {
     return this.redeemingAll
   }
 
-  private async redeemTicketsInChannel(source: PublicKey) {
+  private async redeemTicketsInChannel(channel: ChannelEntry) {
+    if (!channel.destination.eq(this.getPublicKey())) {
+      throw new Error('Cannot redeem ticket in channel that isnt to us')
+    }
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
-    const tickets = await this.db.getAcknowledgedTickets({ signer: source })
-    log(`redeeming ${tickets.length} tickets from ${source.toB58String()}`)
+    const tickets = await this.db.getAcknowledgedTickets({ channel })
+    log(`redeeming ${tickets.length} tickets from ${channel.source.toB58String()}`)
     try {
       for (const ticket of tickets) {
         log('redeeming ticket', ticket)
-        const result = await this.redeemTicket(source, ticket)
+        const result = await this.redeemTicket(channel.source, ticket)
         if (result.status !== 'SUCCESS') {
           log('Error redeeming ticket', result)
           // We need to abort as tickets require ordered redemption.
@@ -207,7 +217,7 @@ export default class HoprEthereum extends EventEmitter {
       // be inspecting this same promise.
       log('Error when redeeming tickets, aborting', e)
     }
-    log(`redemption of tickets from ${source.toB58String()} is complete`)
+    log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
   }
 
   // Private as out of order redemption will break things - redeem all at once.
@@ -315,6 +325,7 @@ export {
   ChannelEntry,
   Indexer,
   createChainWrapper,
+  initializeCommitment,
   findCommitmentPreImage,
   bumpCommitment,
   INDEXER_BLOCK_RANGE,

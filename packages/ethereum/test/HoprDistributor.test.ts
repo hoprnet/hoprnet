@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import { PromiseValue, durations } from '@hoprnet/hopr-utils'
 import { toSolPercent, increaseTime } from './utils'
-import { HoprToken__factory, HoprDistributor__factory } from '../types'
+import type { HoprToken, HoprDistributor } from '../src/types'
 import deployERC1820Registry from '../deploy/01_ERC1820Registry'
 
 const SCHEDULE_UNSET = 'SCHEDULE_UNSET'
@@ -20,8 +20,10 @@ const useFixtures = deployments.createFixture(async (hre, ops: { startTime?: str
 
   await deployERC1820Registry(hre, owner)
 
-  const token = await new HoprToken__factory(owner).deploy()
-  const distributor = await new HoprDistributor__factory(owner).deploy(token.address, startTime, maxMintAmount)
+  const token = (await (await ethers.getContractFactory('HoprToken')).deploy()) as HoprToken
+  const distributor = (await (
+    await ethers.getContractFactory('HoprDistributor')
+  ).deploy(token.address, startTime, maxMintAmount)) as HoprDistributor
 
   await token.grantRole(await token.MINTER_ROLE(), distributor.address)
 

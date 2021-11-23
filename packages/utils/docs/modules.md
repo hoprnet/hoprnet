@@ -7,6 +7,7 @@
 ### Enumerations
 
 - [ChannelStatus](enums/ChannelStatus.md)
+- [DialStatus](enums/DialStatus.md)
 
 ### Classes
 
@@ -50,9 +51,12 @@
 - [Network](modules.md#network)
 - [PRGParameters](modules.md#prgparameters)
 - [PRPParameters](modules.md#prpparameters)
+- [PendingAckowledgement](modules.md#pendingackowledgement)
 - [PromiseValue](modules.md#promisevalue)
 - [TimeoutOpts](modules.md#timeoutopts)
 - [U8aAndSize](modules.md#u8aandsize)
+- [WaitingAsRelayer](modules.md#waitingasrelayer)
+- [WaitingAsSender](modules.md#waitingassender)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 
@@ -68,6 +72,8 @@
 - [LINK\_LOCAL\_NETWORKS](modules.md#link_local_networks)
 - [LOOPBACK\_ADDRS](modules.md#loopback_addrs)
 - [MAX\_AUTO\_CHANNELS](modules.md#max_auto_channels)
+- [MAX\_RANDOM\_BIGINTEGER](modules.md#max_random_biginteger)
+- [MAX\_RANDOM\_INTEGER](modules.md#max_random_integer)
 - [MINIMUM\_REASONABLE\_CHANNEL\_STAKE](modules.md#minimum_reasonable_channel_stake)
 - [MIN\_NATIVE\_BALANCE](modules.md#min_native_balance)
 - [MULTI\_ADDR\_MAX\_LENGTH](modules.md#multi_addr_max_length)
@@ -108,6 +114,7 @@
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
 - [deserializeKeyPair](modules.md#deserializekeypair)
 - [dial](modules.md#dial)
+- [expandVars](modules.md#expandvars)
 - [forwardTransform](modules.md#forwardtransform)
 - [gcd](modules.md#gcd)
 - [generateChannelId](modules.md#generatechannelid)
@@ -139,15 +146,18 @@
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 - [limitConcurrency](modules.md#limitconcurrency)
+- [loadJson](modules.md#loadjson)
 - [localAddressesFirst](modules.md#localaddressesfirst)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
 - [oneAtATime](modules.md#oneatatime)
 - [parseHosts](modules.md#parsehosts)
 - [parseJSON](modules.md#parsejson)
+- [pendingAcknowledgement](modules.md#pendingacknowledgement)
 - [pickVersion](modules.md#pickversion)
 - [preVerify](modules.md#preverify)
 - [privKeyToPeerId](modules.md#privkeytopeerid)
 - [pubKeyToPeerId](modules.md#pubkeytopeerid)
+- [randomBigInteger](modules.md#randombiginteger)
 - [randomChoice](modules.md#randomchoice)
 - [randomFloat](modules.md#randomfloat)
 - [randomInteger](modules.md#randominteger)
@@ -158,8 +168,10 @@
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
+- [startResourceUsageLogger](modules.md#startresourceusagelogger)
 - [stringToU8a](modules.md#stringtou8a)
 - [timeoutAfter](modules.md#timeoutafter)
+- [timer](modules.md#timer)
 - [toLengthPrefixedU8a](modules.md#tolengthprefixedu8a)
 - [toNetworkPrefix](modules.md#tonetworkprefix)
 - [toU8a](modules.md#tou8a)
@@ -174,7 +186,7 @@
 - [u8aToNumber](modules.md#u8atonumber)
 - [u8aToNumberOrBigInt](modules.md#u8atonumberorbigint)
 - [u8aXOR](modules.md#u8axor)
-- [unacknowledgedTicketKey](modules.md#unacknowledgedticketkey)
+- [validateData](modules.md#validatedata)
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
 - [validatePoRHint](modules.md#validateporhint)
 - [validatePoRResponse](modules.md#validateporresponse)
@@ -249,11 +261,11 @@ ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `status`: ``"E_ABORTED"``  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
+Ƭ **DialResponse**: { `resp`: [`PromiseValue`](modules.md#promisevalue)<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  }
 
 #### Defined in
 
-[libp2p/dialHelper.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L25)
+[libp2p/dialHelper.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L35)
 
 ___
 
@@ -375,6 +387,16 @@ ___
 
 ___
 
+### PendingAckowledgement
+
+Ƭ **PendingAckowledgement**: [`WaitingAsSender`](modules.md#waitingassender) \| [`WaitingAsRelayer`](modules.md#waitingasrelayer)
+
+#### Defined in
+
+[db.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L70)
+
+___
+
 ### PromiseValue
 
 Ƭ **PromiseValue**<`T`\>: `T` extends `PromiseLike`<infer U\> ? `U` : `T`
@@ -417,6 +439,39 @@ ___
 #### Defined in
 
 [u8a/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L20)
+
+___
+
+### WaitingAsRelayer
+
+Ƭ **WaitingAsRelayer**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `isMessageSender` | ``false`` |
+| `ticket` | [`UnacknowledgedTicket`](classes/UnacknowledgedTicket.md) |
+
+#### Defined in
+
+[db.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L65)
+
+___
+
+### WaitingAsSender
+
+Ƭ **WaitingAsSender**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `isMessageSender` | ``true`` |
+
+#### Defined in
+
+[db.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L61)
 
 ___
 
@@ -568,6 +623,30 @@ ___
 
 ___
 
+### MAX\_RANDOM\_BIGINTEGER
+
+• **MAX\_RANDOM\_BIGINTEGER**: `bigint`
+
+Maximum random big integer that can be generated using randomInteger function.
+
+#### Defined in
+
+[crypto/randomInteger.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L18)
+
+___
+
+### MAX\_RANDOM\_INTEGER
+
+• **MAX\_RANDOM\_INTEGER**: `bigint`
+
+Maximum random integer that can be generated using randomInteger function.
+
+#### Defined in
+
+[crypto/randomInteger.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L144)
+
+___
+
 ### MINIMUM\_REASONABLE\_CHANNEL\_STAKE
 
 • **MINIMUM\_REASONABLE\_CHANNEL\_STAKE**: `BN`
@@ -604,7 +683,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L8)
+[crypto/por/index.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L9)
 
 ___
 
@@ -1012,7 +1091,7 @@ information for each relayer
 
 #### Defined in
 
-[crypto/por/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L46)
+[crypto/por/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L47)
 
 ___
 
@@ -1045,7 +1124,7 @@ the challenge for the first ticket sent to the first relayer
 
 #### Defined in
 
-[crypto/por/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L20)
+[crypto/por/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L21)
 
 ___
 
@@ -1078,7 +1157,7 @@ ___
 
 #### Defined in
 
-[debug.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/debug.ts#L14)
+[process/debug.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/debug.ts#L14)
 
 ___
 
@@ -1103,7 +1182,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L111)
+[crypto/por/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L112)
 
 ___
 
@@ -1131,7 +1210,7 @@ ___
 
 ▸ **deriveAckKeyShare**(`secret`): [`HalfKey`](classes/HalfKey.md)
 
-Comutes the key share that is embedded in the acknowledgement
+Computes the key share that is embedded in the acknowledgement
 for a packet and thereby unlocks the incentive for the previous
 relayer for transforming and delivering the packet
 
@@ -1203,7 +1282,30 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L151)
+[libp2p/dialHelper.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L170)
+
+___
+
+### expandVars
+
+▸ **expandVars**(`input`, `vars`): `string`
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `input` | `string` | a string containing templated references to environment variables e.g. 'foo ${bar}' |
+| `vars` | `Object` | a key-value vars storage object, e.g. { 'bar': 'bar_value' } |
+
+#### Returns
+
+`string`
+
+a string with variables resolved to the actual values
+
+#### Defined in
+
+[utils.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L19)
 
 ___
 
@@ -1811,7 +1913,7 @@ ___
 
 ### iterateHash
 
-▸ **iterateHash**(`seed`, `hashFunc`, `iterations`, `stepSize`, `hint?`): `Promise`<`Object`\>
+▸ **iterateHash**(`seed`, `hashFunc`, `iterations`, `stepSize`, `hint?`): `Promise`<{ `hash`: `Uint8Array` ; `intermediates`: [`Intermediate`](interfaces/Intermediate.md)[]  }\>
 
 #### Parameters
 
@@ -1825,7 +1927,7 @@ ___
 
 #### Returns
 
-`Promise`<`Object`\>
+`Promise`<{ `hash`: `Uint8Array` ; `intermediates`: [`Intermediate`](interfaces/Intermediate.md)[]  }\>
 
 #### Defined in
 
@@ -1932,6 +2034,32 @@ ___
 #### Defined in
 
 [collection/promise-pool.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/promise-pool.ts#L1)
+
+___
+
+### loadJson
+
+▸ **loadJson**(`file_path`): `any`
+
+loads JSON data from file
+
+**`throws`** if unable to open the file the JSON data is malformed
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `file_path` | `string` | json file to load |
+
+#### Returns
+
+`any`
+
+object parsed from JSON data
+
+#### Defined in
+
+[utils.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L34)
 
 ___
 
@@ -2042,6 +2170,26 @@ Parse JSON while recovering all Buffer elements
 
 ___
 
+### pendingAcknowledgement
+
+▸ `Const` **pendingAcknowledgement**(`halfKey`): `Uint8Array`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `halfKey` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+
+#### Returns
+
+`Uint8Array`
+
+#### Defined in
+
+[db.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L31)
+
+___
+
 ### pickVersion
 
 ▸ `Const` **pickVersion**(`full_version`): `string`
@@ -2092,7 +2240,7 @@ to create it and the challenge for the next relayer.
 
 #### Defined in
 
-[crypto/por/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L82)
+[crypto/por/index.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L83)
 
 ___
 
@@ -2146,6 +2294,29 @@ Using `libsecp256k1` directly does not work.
 
 ___
 
+### randomBigInteger
+
+▸ **randomBigInteger**(`start`, `end?`): `bigint`
+
+same as randomInteger, but for BigInts
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `start` | `bigint` |
+| `end?` | `bigint` |
+
+#### Returns
+
+`bigint`
+
+#### Defined in
+
+[crypto/randomInteger.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L181)
+
+___
+
 ### randomChoice
 
 ▸ **randomChoice**<`T`\>(`collection`): `T`
@@ -2168,7 +2339,7 @@ ___
 
 #### Defined in
 
-[crypto/randomInteger.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L85)
+[crypto/randomInteger.ts:194](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L194)
 
 ___
 
@@ -2188,25 +2359,24 @@ ___
 
 ### randomInteger
 
-▸ **randomInteger**(`start`, `end?`, `_seed?`): `number`
+▸ **randomInteger**(`start`, `end?`): `number`
 
 Returns a random value between `start` and `end`.
 
 **`example`**
 ```
-randomInteger(3) // result in { 0, 1, 2, 3 }
-randomInteger(0, 3) // result in { 0, 1, 2, 3 }
-randomInteger(7, 9) // result in { 7, 8, 9 }
-randomInteger(8, 8) == 8
+randomInteger(3) // result in { 0, 1, 2}
+randomInteger(0, 3) // result in { 0, 1, 2 }
+randomInteger(7, 9) // result in { 7, 8 }
 ```
+The maximum number generated by this function is MAX_RANDOM_INTEGER.
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `start` | `number` | start of the interval |
-| `end?` | `number` | end of the interval inclusive |
-| `_seed?` | `Uint8Array` | - |
+| `start` | `number` | start of the interval (inclusive). Must be non-negative. |
+| `end?` | `number` | end of the interval (not inclusive). Must not exceed MAX_RANDOM_INTEGER. |
 
 #### Returns
 
@@ -2216,7 +2386,7 @@ random number between @param start and @param end
 
 #### Defined in
 
-[crypto/randomInteger.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L18)
+[crypto/randomInteger.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L159)
 
 ___
 
@@ -2431,6 +2601,41 @@ ___
 
 ___
 
+### startResourceUsageLogger
+
+▸ **startResourceUsageLogger**(`log`, `ms?`): () => `void`
+
+Creates a resource logger and provides a function to stop it.
+
+#### Parameters
+
+| Name | Type | Default value | Description |
+| :------ | :------ | :------ | :------ |
+| `log` | `LogType` | `undefined` | logs resource stat strings |
+| `ms` | `number` | `60_000` | interval to redo the measurement |
+
+#### Returns
+
+`fn`
+
+a function that stop the resource logger
+
+▸ (): `void`
+
+Creates a resource logger and provides a function to stop it.
+
+##### Returns
+
+`void`
+
+a function that stop the resource logger
+
+#### Defined in
+
+[process/resourceLogger.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/resourceLogger.ts#L17)
+
+___
+
 ### stringToU8a
 
 ▸ **stringToU8a**(`str`, `length?`): `Uint8Array`
@@ -2484,6 +2689,26 @@ ___
 #### Defined in
 
 [async/timeout.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/timeout.ts#L5)
+
+___
+
+### timer
+
+▸ **timer**(`fn`): `number`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `fn` | () => `void` |
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[utils.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L6)
 
 ___
 
@@ -2823,23 +3048,29 @@ Apply an XOR on a list of arrays.
 
 ___
 
-### unacknowledgedTicketKey
+### validateData
 
-▸ `Const` **unacknowledgedTicketKey**(`halfKey`): `Uint8Array`
+▸ **validateData**(`data`, `schema`): `void`
+
+validates JSON data against JSON schema
+prints errors to the console and throws in case of non-conforming
+
+**`throws`**
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `halfKey` | [`HalfKeyChallenge`](classes/HalfKeyChallenge.md) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `data` | `any` | parsed JSON data |
+| `schema` | `any` | parsed JSON schema for the data |
 
 #### Returns
 
-`Uint8Array`
+`void`
 
 #### Defined in
 
-[db.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L30)
+[utils.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L46)
 
 ___
 
@@ -2861,7 +3092,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L127)
+[crypto/por/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L128)
 
 ___
 
@@ -2883,7 +3114,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L137)
+[crypto/por/index.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L138)
 
 ___
 
@@ -2904,7 +3135,7 @@ ___
 
 #### Defined in
 
-[crypto/por/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L132)
+[crypto/por/index.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L133)
 
 ___
 

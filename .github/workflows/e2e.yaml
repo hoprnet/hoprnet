@@ -54,7 +54,8 @@ jobs:
         with:
           name: hopr-e2e-source-node-logs
           path: |
-            /tmp/hopr-*-node*.log
+            /tmp/hopr-source-node-*.log
+            /tmp/hopr-source-hardhat-rpc.log
 
       - name: Upload node logs (macOS)
         uses: actions/upload-artifact@v2
@@ -62,7 +63,8 @@ jobs:
         with:
           name: hopr-e2e-source-node-logs
           path: |
-            /var/tmp/hopr-*-node*.log
+            /var/tmp/hopr-source-node-*.log
+            /var/tmp/hopr-source-hardhat-rpc.log
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}

@@ -45,14 +45,14 @@ wait_for_port "${insecure_admin_port}" "${host}"
 
 declare http_status_code
 
-log "REST API should reject authentication without token"
+log "REST API should reject authentication with invalid token"
 http_status_code=$(curl -H "X-Auth-Token: bad-token" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${http_status_code} -ne 403 ]; then
   log "⛔️ Expected 403 http status code, got ${http_status_code}"
   exit 1
 fi
 
-log "REST API should reject authentication with invalid token"
+log "REST API should reject authentication without token"
 http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${http_status_code} -ne 403 ]; then
   log "⛔️ Expected 403 http status code, got ${http_status_code}"
