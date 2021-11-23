@@ -344,7 +344,7 @@ ___
 
 ### closeChannel
 
-▸ **closeChannel**(`counterparty`): `Promise`<`Object`\>
+▸ **closeChannel**(`counterparty`): `Promise`<{ `receipt`: `string` ; `status`: `ChannelStatus`  }\>
 
 #### Parameters
 
@@ -354,7 +354,7 @@ ___
 
 #### Returns
 
-`Promise`<`Object`\>
+`Promise`<{ `receipt`: `string` ; `status`: `ChannelStatus`  }\>
 
 #### Defined in
 
@@ -769,11 +769,11 @@ ___
 
 ### getTicketStatistics
 
-▸ **getTicketStatistics**(): `Promise`<`Object`\>
+▸ **getTicketStatistics**(): `Promise`<{ `losing`: `number` ; `neglected`: `number` ; `pending`: `number` ; `redeemed`: `number` ; `redeemedValue`: `Balance` ; `rejected`: `number` ; `rejectedValue`: `Balance` ; `unredeemed`: `number` = ack.length; `unredeemedValue`: `Balance` ; `winProportion`: `number`  }\>
 
 #### Returns
 
-`Promise`<`Object`\>
+`Promise`<{ `losing`: `number` ; `neglected`: `number` ; `pending`: `number` ; `redeemed`: `number` ; `redeemedValue`: `Balance` ; `rejected`: `number` ; `rejectedValue`: `Balance` ; `unredeemed`: `number` = ack.length; `unredeemedValue`: `Balance` ; `winProportion`: `number`  }\>
 
 #### Defined in
 
@@ -1097,7 +1097,7 @@ ___
 
 ### openChannel
 
-▸ **openChannel**(`counterparty`, `amountToFund`): `Promise`<`Object`\>
+▸ **openChannel**(`counterparty`, `amountToFund`): `Promise`<{ `channelId`: `Hash`  }\>
 
 Open a payment channel
 
@@ -1110,7 +1110,7 @@ Open a payment channel
 
 #### Returns
 
-`Promise`<`Object`\>
+`Promise`<{ `channelId`: `Hash`  }\>
 
 #### Defined in
 
@@ -1134,7 +1134,7 @@ ___
 
 ### ping
 
-▸ **ping**(`destination`): `Promise`<`Object`\>
+▸ **ping**(`destination`): `Promise`<{ `info`: `string` ; `latency`: `number`  }\>
 
 Ping a node.
 
@@ -1146,7 +1146,7 @@ Ping a node.
 
 #### Returns
 
-`Promise`<`Object`\>
+`Promise`<{ `info`: `string` ; `latency`: `number`  }\>
 
 latency
 
@@ -1536,11 +1536,11 @@ ___
 
 ### smartContractInfo
 
-▸ **smartContractInfo**(): `Promise`<`Object`\>
+▸ **smartContractInfo**(): `Promise`<{ `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `string`  }\>
 
 #### Returns
 
-`Promise`<`Object`\>
+`Promise`<{ `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `string`  }\>
 
 #### Defined in
 

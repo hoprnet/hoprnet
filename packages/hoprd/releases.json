@@ -1,8 +1,7 @@
 {
   "master-goerli": {
     "git_ref": "^master$",
-    "environment_id": "master-goerli",
-    "default": true
+    "environment_id": "master-goerli"
   },
   "tuttlingen": {
     "git_ref": "^release/tuttlingen$",
@@ -12,12 +11,10 @@
   },
   "debug-goerli": {
     "git_ref": "^debug-deploy/.*",
-    "environment_id": "debug-goerli",
-    "default": true
+    "environment_id": "debug-goerli"
   },
   "integration-test": {
     "git_ref": "^integration/.*",
-    "environment_id": "master-goerli",
-    "default": true
+    "environment_id": "master-goerli"
   }
 }

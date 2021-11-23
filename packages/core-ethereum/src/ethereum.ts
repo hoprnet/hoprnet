@@ -234,10 +234,12 @@ export async function createChainWrapper(
         nonceLock.releaseLock()
         throw err
       }
-    } else {
-      const populatedTx = await token.populateTransaction.transfer(recipient, amount)
-      return (await sendTransaction(checkDuplicate, populatedTx, token.transfer, recipient, amount)).hash
     }
+
+    // withdraw HOPR
+    const populatedTx = await token.populateTransaction.transfer(recipient, amount)
+    const transaction = await sendTransaction(checkDuplicate, populatedTx, token.transfer, recipient, amount)
+    return transaction.hash
   }
 
   async function fundChannel(

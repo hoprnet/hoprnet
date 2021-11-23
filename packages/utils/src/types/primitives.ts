@@ -127,6 +127,10 @@ export class Address {
     return ethers.utils.getAddress(u8aToHex(this.arr, false))
   }
 
+  toString(): string {
+    return this.toHex()
+  }
+
   eq(b: Address) {
     return u8aEquals(this.arr, b.serialize())
   }
@@ -261,24 +265,58 @@ export class Signature {
   static SIZE = SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
 }
 
-export class Balance {
-  constructor(private bn: BN) {}
+abstract class BalanceBase {
+  //Uint256
+  static readonly SIZE: number = 32
+  static readonly DECIMALS: number = 18
+  abstract readonly symbol: string
 
-  static get SYMBOL(): string {
-    return `txHOPR`
-  }
+  constructor(protected bn: BN) {}
 
-  static get DECIMALS(): number {
-    return 18
-  }
+  abstract add(b: BalanceBase): BalanceBase
+  abstract sub(b: BalanceBase): BalanceBase
 
   public toBN(): BN {
     return this.bn
   }
 
   public toHex(): string {
-    return `0x${this.bn.toString('hex', 2 * Balance.SIZE)}`
+    return `0x${this.bn.toString('hex', 2 * BalanceBase.SIZE)}`
   }
+
+  public lt(b: BalanceBase): boolean {
+    return this.toBN().lt(b.toBN())
+  }
+
+  public gt(b: BalanceBase): boolean {
+    return this.toBN().gt(b.toBN())
+  }
+
+  public gte(b: BalanceBase): boolean {
+    return this.toBN().gte(b.toBN())
+  }
+
+  public lte(b: BalanceBase): boolean {
+    return this.toBN().lte(b.toBN())
+  }
+
+  public serialize(): Uint8Array {
+    return new Uint8Array(this.bn.toBuffer('be', BalanceBase.SIZE))
+  }
+
+  public toString(): string {
+    return this.bn.toString()
+  }
+
+  public toFormattedString(): string {
+    const str = moveDecimalPoint(this.toString(), BalanceBase.DECIMALS * -1)
+    return `${str} ${this.symbol}`
+  }
+}
+
+export class Balance extends BalanceBase {
+  static SYMBOL: string = 'txHOPR'
+  readonly symbol: string = Balance.SYMBOL
 
   public add(b: Balance): Balance {
     return new Balance(this.bn.add(b.toBN()))
@@ -288,29 +326,8 @@ export class Balance {
     return new Balance(this.bn.sub(b.toBN()))
   }
 
-  public lt(b: Balance): boolean {
-    return this.toBN().lt(b.toBN())
-  }
-
-  public gt(b: Balance): boolean {
-    return this.toBN().gt(b.toBN())
-  }
-
-  static deserialize(arr: Uint8Array) {
+  static deserialize(arr: Uint8Array): Balance {
     return new Balance(new BN(arr))
-  }
-
-  public serialize(): Uint8Array {
-    return new Uint8Array(this.bn.toBuffer('be', Balance.SIZE))
-  }
-
-  public toFormattedString(): string {
-    return moveDecimalPoint(this.bn.toString(), Balance.DECIMALS * -1) + ' ' + Balance.SYMBOL
-  }
-
-  static get SIZE(): number {
-    // Uint256
-    return 32
   }
 
   static ZERO(): Balance {
@@ -318,39 +335,22 @@ export class Balance {
   }
 }
 
-export class NativeBalance {
-  constructor(private bn: BN) {}
+export class NativeBalance extends BalanceBase {
+  static SYMBOL: string = 'xDAI'
+  readonly symbol: string = NativeBalance.SYMBOL
 
-  static get SYMBOL(): string {
-    return `xDAI`
+  public add(b: NativeBalance): NativeBalance {
+    return new NativeBalance(this.bn.add(b.toBN()))
   }
 
-  static get DECIMALS(): number {
-    return 18
+  public sub(b: NativeBalance): NativeBalance {
+    return new NativeBalance(this.bn.sub(b.toBN()))
   }
 
-  public toHex(): string {
-    return `0x${this.bn.toString('hex', 2 * NativeBalance.SIZE)}`
-  }
-
-  static deserialize(arr: Uint8Array) {
+  static deserialize(arr: Uint8Array): NativeBalance {
     return new NativeBalance(new BN(arr))
   }
-
-  public toBN(): BN {
-    return this.bn
-  }
-
-  public serialize(): Uint8Array {
-    return new Uint8Array(this.bn.toBuffer('be', NativeBalance.SIZE))
-  }
-
-  public toFormattedString(): string {
-    return moveDecimalPoint(this.bn.toString(), NativeBalance.DECIMALS * -1) + ' ' + NativeBalance.SYMBOL
-  }
-
-  static get SIZE(): number {
-    // Uint256
-    return 32
+  static ZERO(): NativeBalance {
+    return new NativeBalance(new BN('0'))
   }
 }
