@@ -31,6 +31,7 @@
     "bignumber.js": "9.0.1",
     "bn.js": "5.2.0",
     "peer-id": "0.15.3",
+    "restana": "4.9.2",
     "yargs": "17.2.1"
   },
   "devDependencies": {
