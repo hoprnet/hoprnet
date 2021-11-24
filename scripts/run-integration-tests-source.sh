@@ -138,7 +138,7 @@ function setup_node() {
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
-  
+
   log "Additional args: \"${additional_args}\""
 
   # Set NODE_ENV=development to rebuild hopr-admin next files
@@ -178,7 +178,7 @@ function setup_ct_node() {
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
   log "Additional args: \"${additional_args}\""
-  
+
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
     --privateKey "${ct_private_key}" \
     --dbFile "${ct_db_file}" \
@@ -291,7 +291,7 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
-declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
+declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
 # }}}
 
 log "CT node1 address: ${ct_node1_address}"
