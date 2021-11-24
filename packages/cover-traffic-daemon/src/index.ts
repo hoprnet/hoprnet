@@ -117,7 +117,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   node.indexer.on('peer', peerUpdate)
   node.indexer.on('block', (blockNumber) => data.setBlock(new BN(blockNumber.toString())))
 
-  log(`Address: ${selfAddr.toHex()}`)
+  console.log(`Address: ${selfAddr.toHex()}`)
 
   log('waiting for node to be funded')
   await node.waitForFunds()
