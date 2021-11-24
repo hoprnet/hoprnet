@@ -186,48 +186,62 @@ describe('test NativeBalance primitive', function () {
 })
 
 describe('test Signature primitive', function () {
-  const message = utils.keccak256(utils.toUtf8Bytes('hello'))
-  const signature =
+  /* test with signature with recovery = 0 */
+  const message1 = utils.keccak256(utils.toUtf8Bytes('hello'))
+  const signature1 =
     '0x583ced30525d3b0663c223c834b80c4662043f7a2aa4f001354a2858f517571b08d65c7340e9067a0dcc18b3529ac2aab3dc3067621607b1268b645923cf003f'
-  const recovery = 0
+  const recovery1 = 0
 
-  it('should have a size of 65', function () {
-    assert.strictEqual(Signature.SIZE, 65)
+  /* test with signature with recovery = 1 */
+  const signature2 =
+    '0x92f3745d95d33c79041e9c8d8c13ecacc468d4839745613aa531622b9f26827b7e2fb5d3cf4b53d52ff48a9434c5ff9009ea049f86f00f9aa7c0ae8a6b6cc7ec'
+  const message2 = utils.keccak256(utils.toUtf8Bytes('blahblah_'))
+  const recovery2 = 1
+
+  it('should have a size of 64', function () {
+    assert.strictEqual(Signature.SIZE, 64)
   })
 
   it('should create Signature from Uint8Array and number', function () {
-    const s = new Signature(utils.arrayify(signature), recovery)
+    const s = new Signature(utils.arrayify(signature1), recovery1)
 
-    assert.strictEqual(utils.hexlify(s.signature), signature)
-    assert.strictEqual(s.recovery, recovery)
+    assert.strictEqual(utils.hexlify(s.signature), signature1)
+    assert.strictEqual(s.recovery, recovery1)
+  })
+
+  it('malformed signatures should fail', function () {
+    assert.throws(() => new Signature(new Uint8Array(32), 0))
+    assert.throws(() => new Signature(new Uint8Array(64), 20))
   })
 
   it('should create Signature from message', function () {
-    const s = Signature.create(utils.arrayify(message), utils.arrayify(privateKey))
+    const s = Signature.create(utils.arrayify(message1), utils.arrayify(privateKey))
 
-    assert.strictEqual(utils.hexlify(s.signature), signature)
-    assert.strictEqual(s.recovery, recovery)
+    assert.strictEqual(utils.hexlify(s.signature), signature1)
+    assert.strictEqual(s.recovery, recovery1)
   })
 
   it('should verify Signature', function () {
-    const s = new Signature(utils.arrayify(signature), recovery)
+    const s1 = new Signature(utils.arrayify(signature1), recovery1)
+    assert(s1.verify(utils.arrayify(message1), PublicKey.fromString(publicKey)))
 
-    assert(s.verify(utils.arrayify(message), PublicKey.fromString(publicKey)))
+    const s2 = new Signature(utils.arrayify(signature2), recovery2)
+    assert(s2.verify(utils.arrayify(message2), PublicKey.fromString(publicKey)))
   })
 
   it('should correctly serialize & deserialize', function () {
-    const s = Signature.deserialize(new Signature(utils.arrayify(signature), recovery).serialize())
+    const serialized1 = new Signature(utils.arrayify(signature1), recovery1).serialize()
+    assert.strictEqual(serialized1.length, Signature.SIZE)
 
-    assert(s.verify(utils.arrayify(message), PublicKey.fromString(publicKey)))
-  })
+    const s1 = Signature.deserialize(serialized1)
+    assert.strictEqual(s1.recovery, 0)
+    assert(s1.verify(utils.arrayify(message1), PublicKey.fromString(publicKey)))
 
-  it('should serialize and deserialize for Ethereum', function () {
-    const s = Signature.deserialize(new Signature(utils.arrayify(signature), recovery).serialize())
+    const serialized2 = new Signature(utils.arrayify(signature2), recovery2).serialize()
+    assert.strictEqual(serialized2.length, Signature.SIZE)
 
-    assert(Signature.deserializeEthereum(s.serializeEthereum()).toHex() === s.toHex())
-
-    assert.throws(() => Signature.deserialize(s.serializeEthereum()))
-
-    assert.throws(() => Signature.deserializeEthereum(s.serialize()))
+    const s2 = Signature.deserialize(serialized2)
+    assert.strictEqual(s2.recovery, 1)
+    assert(s2.verify(utils.arrayify(message2), PublicKey.fromString(publicKey)))
   })
 })

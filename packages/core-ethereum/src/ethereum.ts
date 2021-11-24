@@ -342,7 +342,7 @@ export async function createChainWrapper(
       ackTicket.response.toHex(),
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
-      ticket.signature.serializeEthereum()
+      ticket.signature.serialize()
     )
 
     const transaction = await sendTransaction(
@@ -356,7 +356,7 @@ export async function createChainWrapper(
       ackTicket.response.toHex(),
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
-      ticket.signature.serializeEthereum()
+      ticket.signature.serialize()
     )
     return transaction.hash
   }
