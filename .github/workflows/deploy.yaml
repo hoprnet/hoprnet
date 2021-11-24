@@ -196,7 +196,7 @@ jobs:
           git pull origin "${branch}" --rebase
 
       - name: Build Docker image
-        run: ./scripts/build-docker.sh -p cover-traffic-daemon
+        run: ./scripts/build-docker.sh -p hopr-cover-traffic-daemon
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
