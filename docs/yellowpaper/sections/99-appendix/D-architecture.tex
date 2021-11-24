@@ -54,8 +54,8 @@
 
         % Ethereum
         \begin{scope}[shift={(0.5*\coreWidth+\otherNodeOffset,0)}]
-            \draw (1.05,\connectHeight+\padding+1.35) node {\includegraphics[width=40pt]{images/ethereum.pdf}};
-            \draw[dashed] (0,0) rectangle (\ethereumWidth,\connectHeight+2.5+2*\padding);
+            \draw[dashed] (0,0) rectangle (\ethereumWidth,2*\connectHeight+2*\padding);
+            \path (0,\connectHeight+2*\padding) rectangle (\connectWidth,2*\connectHeight+2*\padding) node[midway] {\tiny{Ethereum}};
             \draw (\padding,\padding) rectangle (\ethereumWidth-\padding,\connectHeight+\padding) node[midway] {\tiny{hopr-ethereum}};
         \end{scope}
 
