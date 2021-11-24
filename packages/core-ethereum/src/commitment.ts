@@ -4,9 +4,9 @@
 //
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
-import {iterateHash, recoverIteratedHash, HoprDB, Hash, ChannelEntry, u8aConcat} from '@hoprnet/hopr-utils'
+import { iterateHash, recoverIteratedHash, HoprDB, Hash, ChannelEntry, u8aConcat } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
-import {deriveCommitmentSeed} from "@hoprnet/hopr-utils/lib/crypto/commitment/keyDerivation";
+import { deriveCommitmentSeed } from '@hoprnet/hopr-utils/lib/crypto/commitment/keyDerivation'
 
 const log = debug('hopr-core-ethereum:commitment')
 
@@ -43,7 +43,12 @@ export async function bumpCommitment(db: HoprDB, channelId: Hash) {
 type GetCommitment = () => Promise<Hash>
 type SetCommitment = (commitment: Hash) => Promise<string>
 
-async function createCommitmentChain(db: HoprDB, channelId: Hash, channelMasterKey: Uint8Array, setChainCommitment: SetCommitment): Promise<void> {
+async function createCommitmentChain(
+  db: HoprDB,
+  channelId: Hash,
+  channelMasterKey: Uint8Array,
+  setChainCommitment: SetCommitment
+): Promise<void> {
   const seed = new Hash(channelMasterKey)
   const { intermediates, hash } = await iterateHash(
     seed.serialize(),
