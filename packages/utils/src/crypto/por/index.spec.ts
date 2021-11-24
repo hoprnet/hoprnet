@@ -9,9 +9,9 @@ import {
 } from '.'
 import { Response } from '../../types'
 import { randomBytes } from 'crypto'
-import { SECRET_LENGTH } from './constants'
 import { deriveAckKeyShare } from './keyDerivation'
 import assert from 'assert'
+import { SECRET_LENGTH } from './constants'
 
 describe('PoR - proof of relay', function () {
   it('generate PoR string, preVerify, validate', function () {

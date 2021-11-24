@@ -4,7 +4,7 @@ import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
-import { debug } from './debug'
+import { debug } from './process'
 import { Hash, u8aConcat, Address, Intermediate, Ticket, generateChannelId } from '.'
 import {
   AcknowledgedTicket,
@@ -355,6 +355,7 @@ export class HoprDB {
   }
 
   public close() {
+    log('Closing database', this.db)
     return this.db.close()
   }
 

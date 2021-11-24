@@ -14,8 +14,8 @@ Contains the source code for the [yellowpaper](./yellowpaper.pdf?raw=true) of [h
 - LaTeX
 
 ```sh
-apt install -y git make
-apt install -y texlive texlive-latex-extra texlive-science texlive-bibtex-extra
+apt install -y git
+apt install -y texlive texlive-latex-extra texlive-science texlive-bibtex-extra latexmk
 ```
 
 - "LaTeX Workshop" in VSCode

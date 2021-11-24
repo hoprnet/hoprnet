@@ -7,7 +7,7 @@ Path selection, see section \ref{sec:path-selection}, results in a list $n_0, \d
 
 Having this knowledge allows the creator of the packet to perform an offline Diffie-Hellman key exchange with each of the mix nodes $n_0 , \dots , n_r$ and the destination $dest$, resulting in shared secrets $s_0, \dots , s_r$ and $s_{dest}$.
 
-To provide perfect forward secrecy and thereby minimize the risk of key corruption, the sender first samples a random value $x \in \mathbb{F}$ and derives $\alpha_0 = x \cdot G$. It further derives blinding factor $b_0$ as $b_0 = \mathsf{KDF}(\alpha_0, x \cdot Y_0)$ where $\mathsf{KDF}(salt, secret)$ is a key derivation function, see appendix \ref{appendix:keyderivation}, and $Y_0 = y_0 \cdot G$ is the public key of the first relayer $n_0$. The sender then derives the shared secret as $s_0 = x \cdot b_0 \cdot Y_0$. Hence, deriving the shared secret $s_0$ requires the knowledge of the sender's field element $\alpha_0 = x \cdot G$ as well as the receivers' field element $x \cdot b_0 \cdot Y_0$.
+To provide perfect forward secrecy and thereby minimize the risk of key corruption, the sender first samples a random value $x \in \mathbb{F}$ and derives $\alpha_0 = x \cdot G$. It further derives blinding factor $b_0$ as $b_0 = \mathsf{KDF}(\alpha_0, x \cdot Y_0)$ where $\mathsf{KDF}(salt, secret)$ is a key derivation function, see appendix \ref{appendix:keyderivation}, and derives the shared secret as $s_0 = x \cdot b_0 \cdot Y_0$. Hence, deriving the shared secret $s_0$ requires the knowledge of the sender's field element $\alpha_0 = x \cdot G$ as well as the receivers' field element $x \cdot b_0 \cdot Y_0$.
 
 The first relayer $n_0$ is then able to compute $s_0$ by first deriving $x \cdot Y_0$ as
 
@@ -30,7 +30,7 @@ Since each $s_{i+1}$ depends on $b_{i+1}$ and therefore on all $\alpha_0, \dots 
 The following example shows the key extraction process for a sender $A$, three mix nodes $B,C,D$ and a receiver $Z$.
 
 \begin{align*}
-    (\alpha_B,b_B,s_B) & = (x \cdot G,\textsf{KDF}(\alpha_B, y_B \cdot \alpha_B), y_B \cdot \alpha_B )                       \\
+    (\alpha_B,b_B,s_B) & = (x \cdot G,\textsf{KDF}(\alpha_B, y_B \cdot \alpha_B), y_B \cdot \alpha_B )                   \\
     (\alpha_C,b_C,s_C) & = (x \cdot b_B \cdot G,\textsf{KDF}(\alpha_C, y_C \cdot \alpha_C), y_C \cdot \alpha_C )             \\
     (\alpha_D,b_D,s_D) & = (x \cdot b_B \ b_C \cdot G,\textsf{KDF}(\alpha_D, y_D \cdot \alpha_D), y_D \cdot \alpha_D )       \\
     (\alpha_Z,b_Z,s_Z) & = (x \cdot b_B \ b_C \ b_D \cdot G,\textsf{KDF}(\alpha_Z, y_Z \cdot \alpha_Z), y_Z \cdot \alpha_Z ) \\

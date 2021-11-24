@@ -1,5 +1,5 @@
 import { durations } from '../time'
-import { debug } from '../debug'
+import { debug } from '../process'
 
 const log = debug('hopr:utils:retry')
 

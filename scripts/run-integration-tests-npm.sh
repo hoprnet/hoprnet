@@ -15,30 +15,47 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [<npm_package_version>]"
+  msg "Usage: $0 [-h|--help] [-v|--package-version <npm_package_version>] [-s|--skip-cleanup]"
   msg
-  msg "\twhere <npm_package_version> uses the most recent Git tag as default"
-  msg
-  msg "\tThe cleanup process can be skipped by setting the environment variable HOPRD_SKIP_CLEANUP to 'true'."
+  msg "If <npm_package_version> is not given, the local version of hoprd will be packaged and tested."
+  msg "The cleanup process can be skipped by using '--skip-cleanup'."
   msg
 }
 
-# return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
-
 # verify and set parameters
-declare npm_package_version
-declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
-
-# we rely on Git tags so need to fetch the tags in case they are not present
-git fetch --unshallow --tags || :
-npm_package_version=${1:-$(git describe --tags --abbrev=0)}
-# remove prefix 'v' if it exists
-npm_package_version=${npm_package_version#v}
-
 declare wait_delay=2
 declare wait_max_wait=1000
 declare cwd=`pwd`
+declare npm_package_version=""
+declare skip_cleanup="false"
+
+while (( "$#" )); do
+  case "$1" in
+    -h|--help)
+      # return early with help info when requested
+      usage
+      exit 0
+      ;;
+    -v|--package-version)
+      npm_package_version="$2"
+      # remove prefix 'v' if it exists
+      npm_package_version=${npm_package_version#v}
+      shift 2
+      ;;
+    -s|--skip-cleanup)
+      skip_cleanup="true"
+      shift
+      ;;
+    -*|--*=)
+      usage
+      exit 1
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
 
 if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   wait_delay=10
@@ -60,6 +77,7 @@ declare node3_dir="${tmp}/${node_prefix}-3"
 declare node4_dir="${tmp}/${node_prefix}-4"
 declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
+declare node7_dir="${tmp}/${node_prefix}-7"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -67,6 +85,7 @@ declare node3_log="${node3_dir}.log"
 declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
+declare node7_log="${node7_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
@@ -74,6 +93,7 @@ declare node3_id="${node3_dir}.id"
 declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
+declare node7_id="${node7_dir}.id"
 
 declare password="e2e-test"
 
@@ -91,9 +111,12 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${npm_install_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 19091 19092 19093 19094 19095 19096; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
+
+  log "Remove default environment setting"
+  rm -f "${mydir}/../packages/hoprd/default-environment.json"
 
   exit $EXIT_CODE
 }
@@ -108,8 +131,7 @@ fi
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
-# $7 = npm package version
-# $8 = OPTIONAL: additions args to hoprd
+# $7 = OPTIONAL: additions args to hoprd
 function setup_node() {
   local rest_port=${1}
   local node_port=${2}
@@ -117,8 +139,7 @@ function setup_node() {
   local dir=${4}
   local log=${5}
   local id=${6}
-  local version=${7}
-  local additional_args=${8:-""}
+  local additional_args=${7:-""}
 
   log "Run node ${id} on rest port ${rest_port}"
 
@@ -126,17 +147,9 @@ function setup_node() {
     log "Additional args: \"${additional_args}\""
   fi
 
-  # move into work dir before we proceed to use yarn
-  mkdir -p "${npm_install_dir}"
+  install_npm_packages
   cd "${npm_install_dir}"
 
-  npm install @hoprnet/hoprd@${version}
-
-  # Copies local deployment information to npm install directory
-  # Fixme: copy also other environments
-  log "Copying deployment information to npm directory (${npm_install_dir})"
-  cp -R ${cwd}/packages/ethereum/deployments/default/localhost ${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/default
-  
   DEBUG="hopr*" npx hoprd \
     --admin \
     --adminHost "127.0.0.1" \
@@ -148,7 +161,6 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="${password}" \
-    --provider=http://127.0.0.1:8545/ \
     --rest \
     --restPort "${rest_port}" \
     --testAnnounceLocalAddresses \
@@ -161,8 +173,54 @@ function setup_node() {
   cd "${cwd}"
 }
 
+function create_npm_package() {
+  local lib="${1}"
+  yarn workspace @hoprnet/${lib} pack
+  mv ${mydir}/../packages/${lib#hopr-}/package.tgz "${tmp}/${lib}-package.tgz"
+}
+
+function install_npm_packages() {
+  if [ -d "${npm_install_dir}" ]; then
+    # noop. already setup
+    :
+  else
+    # move into work dir before we proceed
+    mkdir -p "${npm_install_dir}"
+    cd "${npm_install_dir}"
+
+    if [ -n "${npm_package_version}" ]; then
+      npm install @hoprnet/hoprd@${npm_package_version}
+    else
+      npm install ${tmp}/hoprd-package.tgz
+      npm install ${tmp}/hopr-ethereum-package.tgz
+      npm install ${tmp}/hopr-core-ethereum-package.tgz
+      npm install ${tmp}/hopr-core-package.tgz
+      npm install ${tmp}/hopr-utils-package.tgz
+    fi
+
+    # Copies local deployment information to npm install directory
+    # Fixme: copy also other environments
+    # need to mirror contract data because of hardhat-deploy node only writing to localhost
+    log "Copying deployment information to npm directory (${npm_install_dir})"
+    cp -R \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
+    cp -R \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+    cp -R \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+      "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost"
+    cp -R \
+      "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+      "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost2"
+  fi
+}
+
 # --- Log test info {{{
-log "Using NPM package version: ${npm_package_version}"
+if [ -n "${npm_package_version}" ]; then
+  log "Using NPM package version: ${npm_package_version}"
+fi
 log "Test files and directories"
 log "\thardhat"
 log "\t\tlog: ${hardhat_rpc_log}"
@@ -192,6 +250,10 @@ log "\tnode6"
 log "\t\tdata dir: ${node6_dir} (will be removed)"
 log "\t\tlog: ${node6_log}"
 log "\t\tid: ${node6_id}"
+log "\tnode7"
+log "\t\tdata dir: ${node7_dir} (will be removed)"
+log "\t\tlog: ${node7_log}"
+log "\t\tid: ${node7_id}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -202,36 +264,56 @@ ensure_port_is_free 13303
 ensure_port_is_free 13304
 ensure_port_is_free 13305
 ensure_port_is_free 13306
+ensure_port_is_free 13307
 ensure_port_is_free 19091
 ensure_port_is_free 19092
 ensure_port_is_free 19093
 ensure_port_is_free 19094
 ensure_port_is_free 19095
 ensure_port_is_free 19096
+ensure_port_is_free 19097
 # }}}
 
-# --- Cleanup old deployments to localhost {{{
-log "Removing artifacts from old deployments to localhost"
-rm -Rfv packages/ethereum/deployments/*/localhost
+# --- Cleanup old contract deployments {{{
+log "Removing artifacts from old contract deployments"
+rm -Rfv \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
+  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2" \
+  "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost" \
+  "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost2"
+# }}}
+
+#  --- Create packages if needed --- {{{
+if [ -z "${npm_package_version}" ]; then
+  create_npm_package "hopr-core"
+  create_npm_package "hopr-utils"
+  create_npm_package "hopr-ethereum"
+  create_npm_package "hopr-core-ethereum"
+  # set default environment
+  echo '{"id": "hardhat-localhost"}' > "${mydir}/../packages/hoprd/default-environment.json"
+  create_npm_package "hoprd"
+fi
 # }}}
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-DEVELOPMENT=true yarn workspace @hoprnet/hopr-ethereum hardhat node \
+HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server" 
+wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
 log "Hardhat node started (127.0.0.1:8545)"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "${npm_package_version}"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "${npm_package_version}" "--testNoAuthentication"
-setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "${npm_package_version}"
-setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${npm_package_version}"
-setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${npm_package_version}"
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${npm_package_version}" "--run \"info;balance\""
+setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
+setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
+setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
+setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
+setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
+setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+# should not be able to talk to the rest
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2"
 # }}}
 
 #  --- Wait until started --- {{{
@@ -242,14 +324,15 @@ wait_for_regex ${node3_log} "using blockchain address"
 wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
+wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 #  --- Fund nodes --- {{{
-yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \
-  --network localhost \
+  --network hardhat \
   --password "${password}"
 # }}}
 
@@ -260,6 +343,7 @@ wait_for_regex ${node3_log} "STARTED NODE"
 wait_for_regex ${node4_log} "STARTED NODE"
 wait_for_regex ${node5_log} "STARTED NODE"
 # no need to wait for node 6 since that will stop right away
+wait_for_port 19097 "127.0.0.1" "${node7_log}"
 # }}}
 
 # --- Run security tests --- {{{
@@ -269,12 +353,12 @@ ${mydir}/../test/security-test.sh \
 
 # --- Run test --- {{{
 ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305"
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
-grep -E "^HOPR Balance: +10 txHOPR$" "${node6_log}"
-grep -E "^ETH Balance: +1 xDAI$" "${node6_log}"
-grep -E "^Running on: localhost$" "${node6_log}"
+grep -E "HOPR Balance: +10 txHOPR" "${node6_log}"
+grep -E "ETH Balance: +1 xDAI" "${node6_log}"
+grep -E "Running on: hardhat" "${node6_log}"
 # }}}

@@ -1,15 +1,8 @@
 import type { ContractTransaction, UnsignedTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
-import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
-import {
-  Networks,
-  networks,
-  getContractData,
-  HoprToken,
-  HoprChannels,
-  HoprToken__factory,
-  HoprChannels__factory
-} from '@hoprnet/hopr-ethereum'
+import { providers, utils, errors, Wallet, BigNumber, ethers } from 'ethers'
+import type { HoprToken, HoprChannels } from '@hoprnet/hopr-ethereum'
+import { getContractData } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Ticket,
@@ -18,8 +11,7 @@ import {
   NativeBalance,
   Hash,
   PublicKey,
-  durations,
-  PromiseValue
+  durations
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
@@ -29,31 +21,39 @@ import { TX_CONFIRMATION_WAIT } from './constants'
 
 const log = debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
-const knownNetworks = Object.entries(networks).map(([name, data]) => ({
-  name: name as Networks,
-  ...data
-}))
 
 export type Receipt = string
-export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>
+export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
-export async function createChainWrapper(providerURI: string, privateKey: Uint8Array, checkDuplicate: Boolean = true) {
-  const provider = providerURI.startsWith('http')
-    ? new providers.StaticJsonRpcProvider(providerURI)
-    : new providers.WebSocketProvider(providerURI)
+export async function createChainWrapper(
+  networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
+  privateKey: Uint8Array,
+  checkDuplicate: Boolean = true
+) {
+  const provider = networkInfo.provider.startsWith('http')
+    ? new providers.StaticJsonRpcProvider(networkInfo.provider)
+    : new providers.WebSocketProvider(networkInfo.provider)
   const wallet = new Wallet(privateKey).connect(provider)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()
-  const chainId = await provider.getNetwork().then((res) => res.chainId)
-  const networkInfo = knownNetworks.find((info) => info.chainId === chainId)
-  // get network's name by looking into our known networks
-  const network: Networks = networkInfo?.name || 'localhost'
+  const providerChainId = await provider.getNetwork().then((res) => res.chainId)
 
-  const hoprTokenDeployment = getContractData(network, 'HoprToken')
-  const hoprChannelsDeployment = getContractData(network, 'HoprChannels')
+  // ensure chain id matches our expectation
+  if (networkInfo.chainId !== providerChainId) {
+    throw Error(`Providers chain id ${providerChainId} does not match ${networkInfo.chainId}`)
+  }
 
-  const token = HoprToken__factory.connect(hoprTokenDeployment.address, wallet)
-  const channels = HoprChannels__factory.connect(hoprChannelsDeployment.address, wallet)
+  const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
+  const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
+
+  const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, wallet) as HoprToken
+
+  const channels = new ethers.Contract(
+    hoprChannelsDeployment.address,
+    hoprChannelsDeployment.abi,
+    wallet
+  ) as HoprChannels
+
   const genesisBlock = (await provider.getTransaction(hoprChannelsDeployment.transactionHash)).blockNumber
   const channelClosureSecs = await channels.secsClosure()
 
@@ -109,7 +109,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     ...rest: Parameters<T>
   ): Promise<ContractTransaction | { hash: string }> {
     const gasLimit = 400e3
-    const gasPrice = networkInfo?.gas ?? (await provider.getGasPrice())
+    const gasPrice = networkInfo.gasPrice ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
@@ -234,10 +234,12 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         nonceLock.releaseLock()
         throw err
       }
-    } else {
-      const populatedTx = await token.populateTransaction.transfer(recipient, amount)
-      return (await sendTransaction(checkDuplicate, populatedTx, token.transfer, recipient, amount)).hash
     }
+
+    // withdraw HOPR
+    const populatedTx = await token.populateTransaction.transfer(recipient, amount)
+    const transaction = await sendTransaction(checkDuplicate, populatedTx, token.transfer, recipient, amount)
+    return transaction.hash
   }
 
   async function fundChannel(
@@ -339,7 +341,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       ackTicket.response.toHex(),
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
-      ticket.signature.serializeEthereum()
+      ticket.signature.serialize()
     )
 
     const transaction = await sendTransaction(
@@ -353,7 +355,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       ackTicket.response.toHex(),
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
-      ticket.signature.serializeEthereum()
+      ticket.signature.serialize()
     )
     return transaction.hash
   }
@@ -421,7 +423,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     getPrivateKey: () => utils.arrayify(wallet.privateKey),
     getPublicKey: () => PublicKey.fromString(utils.computePublicKey(wallet.publicKey, true)),
     getInfo: () => ({
-      network,
+      network: networkInfo.network,
       hoprTokenAddress: hoprTokenDeployment.address,
       hoprChannelsAddress: hoprChannelsDeployment.address,
       channelClosureSecs

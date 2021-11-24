@@ -57,10 +57,25 @@ if [[ "${version_type}" = "prerelease" ]]; then
   fi
 fi
 
-echo "Creating new version ${current_version} + ${version_type}"
+log "get default environment id"
+
+declare environment_id
+for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
+  if [[ "${branch}" =~ ${git_ref} ]]; then
+    environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | .key")
+    # if no default is set we take the first entry
+    if [ -z "${environment_id}" ]; then
+      environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .key" | sed q)
+    fi
+    break
+  fi
+done
+: ${environment_id:?"Could not read value for default environment id"}
+
+log "creating new version ${current_version} + ${version_type}"
 
 # create new version in each package
-yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version ${version_type} --preid=next
+yarn workspaces foreach -piv --topological-dev --exclude hoprnet exec -- npm version ${version_type} --preid=next
 declare new_version
 new_version=$(${mydir}/get-package-version.sh)
 
@@ -85,5 +100,16 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
     yarn config set npmAuthToken "${NODE_AUTH_TOKEN:-}"
   fi
-  yarn workspaces foreach -piv --no-private --topological-dev npm publish --access public
+
+  # set default environments
+  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
+  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+
+  # pack and publish packages
+  yarn workspaces foreach -piv --topological-dev --exclude hoprnet npm publish --access public
+
+  # delete default environments
+  rm -f \
+    "${mydir}/../packages/hoprd/default-environment.json" \
+    "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
 fi

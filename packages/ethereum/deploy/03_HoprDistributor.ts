@@ -1,6 +1,6 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import type { DeploymentTypes } from '../constants'
+import type { DeploymentTypes } from '../src/constants'
 import { durations } from '@hoprnet/hopr-utils'
 import { ethers } from 'ethers'
 
@@ -42,5 +42,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 // this smart contract should not be redeployed on a production network
 main.skip = async (env) => !!env.network.tags.production
+main.dependencies = ['preDeploy', 'HoprToken']
+main.tags = ['HoprDistributor']
 
 export default main

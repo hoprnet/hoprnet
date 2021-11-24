@@ -1,12 +1,13 @@
 [@hoprnet/hopr-ethereum](../README.md) / [Exports](../modules.md) / TypedEvent
 
-# Interface: TypedEvent<EventArgs\>
+# Interface: TypedEvent<TArgsArray, TArgsObject\>
 
 ## Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgs` | extends `Result` |
+| `TArgsArray` | extends `any`[] = `any` |
+| `TArgsObject` | `any` |
 
 ## Hierarchy
 
@@ -58,7 +59,7 @@ ___
 
 ### args
 
-• **args**: `EventArgs`
+• **args**: `TArgsArray` & `TArgsObject`
 
 #### Overrides
 
@@ -66,7 +67,7 @@ Event.args
 
 #### Defined in
 
-packages/ethereum/types/common.d.ts:11
+packages/ethereum/src/types/common.ts:11
 
 ___
 

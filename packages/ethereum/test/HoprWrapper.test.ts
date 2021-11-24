@@ -1,7 +1,6 @@
-import type { PromiseValue } from '@hoprnet/hopr-utils'
 import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
-import { PermittableToken__factory, HoprToken__factory, HoprWrapper__factory } from '../types'
+import type { PermittableToken, HoprToken, HoprWrapper } from '../src/types'
 import deployERC1820Registry from '../deploy/01_ERC1820Registry'
 
 const useFixtures = deployments.createFixture(async (hre) => {
@@ -12,11 +11,16 @@ const useFixtures = deployments.createFixture(async (hre) => {
   await deployERC1820Registry(hre, deployer)
 
   // deploy xHOPR
-  const xHOPR = await new PermittableToken__factory(deployer).deploy('xHOPR Token', 'xHOPR', 18, network.chainId)
+  const xHOPR = (await (
+    await ethers.getContractFactory('PermittableToken')
+  ).deploy('xHOPR Token', 'xHOPR', 18, network.chainId)) as PermittableToken
+
   // deploy wxHOPR
-  const wxHOPR = await new HoprToken__factory(deployer).deploy()
+  const wxHOPR = (await (await ethers.getContractFactory('HoprToken')).deploy()) as HoprToken
   // deploy wrapper
-  const wrapper = await new HoprWrapper__factory(deployer).deploy(xHOPR.address, wxHOPR.address)
+  const wrapper = (await (
+    await ethers.getContractFactory('HoprWrapper')
+  ).deploy(xHOPR.address, wxHOPR.address)) as HoprWrapper
 
   // allow wrapper to mint wxHOPR required for swapping
   await wxHOPR.grantRole(await wxHOPR.MINTER_ROLE(), wrapper.address)
@@ -34,7 +38,7 @@ const useFixtures = deployments.createFixture(async (hre) => {
 })
 
 describe('HoprWrapper', function () {
-  let f: PromiseValue<ReturnType<typeof useFixtures>>
+  let f: Awaited<ReturnType<typeof useFixtures>>
 
   before(async function () {
     f = await useFixtures()
@@ -80,8 +84,9 @@ describe('HoprWrapper', function () {
   })
 
   it('should fail when sending an unknown "xHOPR" token', async function () {
-    const PermittableToken = (await ethers.getContractFactory('PermittableToken')) as PermittableToken__factory
-    const token = await PermittableToken.deploy('Unknown Token', '?', 18, (await ethers.provider.getNetwork()).chainId)
+    const token = (await (
+      await ethers.getContractFactory('PermittableToken')
+    ).deploy('Unknown Token', '?', 18, (await ethers.provider.getNetwork()).chainId)) as PermittableToken
     await token.mint(f.userA.address, 100)
 
     await expect(token.connect(f.userA).transferAndCall(f.wrapper.address, 10, ethers.constants.HashZero)).to.be
@@ -89,8 +94,7 @@ describe('HoprWrapper', function () {
   })
 
   it('should fail when sending an unknown "wxHOPR" token', async function () {
-    const Token = (await ethers.getContractFactory('HoprToken')) as HoprToken__factory
-    const token = await Token.deploy()
+    const token = (await (await ethers.getContractFactory('HoprToken')).deploy()) as HoprToken
     await token.grantRole(await token.MINTER_ROLE(), f.deployer.address)
     await token.mint(f.userA.address, 100, ethers.constants.HashZero, ethers.constants.HashZero)
 

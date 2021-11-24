@@ -9,6 +9,7 @@ import Cookies from 'js-cookie'
 import { render } from 'react-dom'
 
 const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
+const gitHash = process.env.NEXT_PUBLIC_GIT_COMMIT
 
 class TokenInput extends React.Component {
   constructor(props) {
@@ -76,7 +77,7 @@ export default function Home() {
       </Head>
 
       <Logo onClick={() => setShowConnected(!showConnected)} />
-      <h1>HOPR Logs</h1>
+      <h1>HOPR Logs - {gitHash ? gitHash : '*'}</h1>
 
       <Logs messages={messages} connecting={connecting} authRequired={authFailed} />
 

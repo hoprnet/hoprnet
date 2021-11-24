@@ -1,10 +1,16 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import { HoprToken__factory } from '../types'
+import { HoprToken } from '../src/types'
 import { utils, constants } from 'ethers'
 
+const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
+
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, network, getNamedAccounts } = hre
+  const { ethers, deployments, network, getNamedAccounts, environment } = hre
+
+  const environmentConfig = PROTOCOL_CONFIG.environments[environment]
+  const mintedTokenReceiver = environmentConfig['minted_token_receiver_address']
+
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
 
   const result = await deployments.deploy('HoprToken', {
@@ -13,7 +19,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   })
 
   if (network.tags.testing || network.tags.development) {
-    const hoprToken = new HoprToken__factory(deployer).attach(result.address)
+    const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(result.address) as HoprToken
     const MINTER_ROLE = await hoprToken.MINTER_ROLE()
     const isDeployerMinter = await hoprToken.hasRole(MINTER_ROLE, deployer.address)
 
@@ -22,23 +28,34 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (!isDeployerMinter) {
       console.log('Granting MINTER role to', deployer.address)
       const grantRoleTx = hoprToken.grantRole(MINTER_ROLE, deployer.address)
-      if (network.tags.development) await (await grantRoleTx).wait(10)
-      else await grantRoleTx
+      if (network.tags.development) {
+        await (await grantRoleTx).wait(10)
+      } else {
+        await grantRoleTx
+      }
 
-      console.log('Minting tokens to', deployer.address)
-      const mintTx = hoprToken.mint(
-        '0x2402da10A6172ED018AEEa22CA60EDe1F766655C',
-        utils.parseEther('130000000'),
-        constants.HashZero,
-        constants.HashZero
-      )
-      if (network.tags.development) await (await mintTx).wait(10)
-      else await mintTx
+      if (mintedTokenReceiver) {
+        console.log('Minting tokens to', mintedTokenReceiver)
+        const mintTx = hoprToken.mint(
+          mintedTokenReceiver,
+          utils.parseEther('130000000'),
+          constants.HashZero,
+          constants.HashZero
+        )
+
+        if (network.tags.development) {
+          await (await mintTx).wait(10)
+        } else {
+          await mintTx
+        }
+      }
     }
   }
 }
 
 // this smart contract should not be redeployed on a production network
 main.skip = async (env) => !!env.network.tags.production
+main.dependencies = ['preDeploy']
+main.tags = ['HoprToken']
 
 export default main

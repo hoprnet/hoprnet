@@ -1,0 +1,11 @@
+{
+  // Use special tsconfig when running hardhat,
+  // makes sure that `src` folder is not built
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["type-extension.ts", "hardhat.config.ts", "tasks", "test", "deploy", "src"],
+  "references": [{ "path": "../utils" }]
+}

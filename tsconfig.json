@@ -1,4 +1,6 @@
 {
+  // Base tsconfig file to define common settings such as
+  // compile target and compiler options
   "ts-node": {
     // No need to check types again after running 'yarn build'
     "transpileOnly": true
@@ -13,7 +15,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "sourceMap": true,
-    "forceConsistentCasingInFileNames": true
-  },
-  "exclude": ["node_modules"]
+    "forceConsistentCasingInFileNames": true,
+    "composite": true,
+    "declarationMap": true
+  }
 }

@@ -1,4 +1,4 @@
-import type { HardhatRuntimeEnvironment, HardhatConfig, SolcUserConfig } from 'hardhat/types'
+import type { HardhatRuntimeEnvironment, HardhatConfig, SolcUserConfig, HardhatUserConfig } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
 // load hardhat plugins
@@ -9,78 +9,90 @@ import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
-// rest
-import { HardhatUserConfig, task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
-import { networks, NetworkTag } from './constants'
-import fs from 'fs'
+import { utils } from 'ethers'
 
-const {
-  DEPLOYER_WALLET_PRIVATE_KEY,
-  ETHERSCAN_KEY,
-  INFURA_KEY,
-  DEVELOPMENT = false,
-  ENVIRONMENT_ID = 'default'
-} = process.env
-const GAS_MULTIPLIER = 1.1
+// Import typescript file directly since hopr-utils has probably not been built yet
+import { expandVars } from '../utils/src/utils'
+
+// rest
+import { task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
+import { writeFileSync, realpathSync } from 'fs'
+
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
+
+const PROTOCOL_CONFIG = require('../core/protocol-config.json')
 
 extendConfig((config: HardhatConfig) => {
   config.etherscan.apiKey = ETHERSCAN_KEY
 })
 
 extendEnvironment((hre: HardhatRuntimeEnvironment) => {
-  hre.environment = ENVIRONMENT_ID
+  hre.environment = HOPR_ENVIRONMENT_ID
 })
 
-const hardhatConfig: HardhatUserConfig = {
-  defaultNetwork: 'hardhat',
-  networks: {
-    // hardhat-deploy cannot run deployments if the network is not hardhat
-    // we use an ENV variable (which is specified in our NPM script)
-    // to let hardhat know we want to run hardhat in 'development' mode
-    // this essentially enables mining, see below
-    hardhat: {
-      live: false,
-      tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
-      saveDeployments: true,
-      mining: DEVELOPMENT
-        ? {
-            auto: true, // every transaction will trigger a new block (without this deployments fail)
-            interval: [1000, 3000] // mine new block every 1 - 3s
-          }
-        : undefined
-    },
-    goerli: {
-      ...networks.goerli,
-      live: true,
-      tags: ['staging'] as NetworkTag[],
-      gasMultiplier: GAS_MULTIPLIER + 0.3, // Görli has been failing lately with underpriced txs
-      url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
-      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-    },
-    xdai: {
-      ...networks.xdai,
-      live: true,
-      tags: ['development'] as NetworkTag[],
-      gasMultiplier: GAS_MULTIPLIER,
-      url: `https://provider-proxy.hoprnet.workers.dev/xdai_mainnet`,
-      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-    },
-    mumbai: {
-      ...networks.mumbai,
-      live: true,
-      tags: ['development'] as NetworkTag[],
-      gasMultiplier: GAS_MULTIPLIER,
-      url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
-      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
-    },
-    polygon: {
-      ...networks.polygon,
-      live: true,
-      tags: ['development'] as NetworkTag[],
-      url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
-      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+// For reference on how the configuration is structured refer to:
+//
+// https://hardhat.org/hardhat-network/reference/#config
+// https://github.com/wighawag/hardhat-deploy/blob/master/README.md
+function networkToHardhatNetwork(name: String, input: any): any {
+  let cfg: any = {
+    chainId: input.chain_id,
+    gasMultiplier: input.gas_multiplier,
+    live: input.live,
+    tags: input.tags,
+    // used by hardhat-deploy
+    saveDeployments: true,
+    mining: undefined
+  }
+
+  if (input.gas_price) {
+    const parsedGasPrice = input.gas_price.split(' ')
+    if (parsedGasPrice.length > 1) {
+      cfg.gasPrice = Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
+    } else {
+      cfg.gasPrice = Number(parsedGasPrice[0])
     }
-  },
+  }
+
+  if (name !== 'hardhat') {
+    try {
+      cfg.url = expandVars(input.default_provider, process.env)
+    } catch (_) {
+      cfg.url = 'invalid_url'
+    }
+  }
+
+  if (input.live) {
+    cfg.accounts = DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
+    cfg.companionNetworks = {}
+  }
+
+  // we enable auto-mine only in development networks
+  if (HOPR_HARDHAT_TAG) {
+    cfg.tags = [HOPR_HARDHAT_TAG]
+  }
+  if (cfg.tags.indexOf('development') >= 0) {
+    cfg.mining = {
+      auto: true, // every transaction will trigger a new block (without this deployments fail)
+      interval: [1000, 3000] // mine new block every 1 - 3s
+    }
+  }
+  return cfg
+}
+
+const networks = {}
+
+const environment = PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] || {}
+
+for (const [networkId, network] of Object.entries(PROTOCOL_CONFIG.networks)) {
+  // environment could be undefined at this point
+  network['tags'] = environment.tags || []
+  const hardhatNetwork = networkToHardhatNetwork(networkId, network)
+  networks[networkId] = hardhatNetwork
+}
+
+const hardhatConfig: HardhatUserConfig = {
+  networks,
   namedAccounts: {
     deployer: 0
   },
@@ -100,10 +112,11 @@ const hardhatConfig: HardhatUserConfig = {
     tests: './test',
     cache: './hardhat/cache',
     artifacts: './hardhat/artifacts',
-    deployments: `./deployments/${ENVIRONMENT_ID}`
+    // used by hardhat-deploy
+    deployments: `./deployments/${HOPR_ENVIRONMENT_ID}`
   },
   typechain: {
-    outDir: './types',
+    outDir: './src/types',
     target: 'ethers-v5'
   },
   gasReporter: {
@@ -212,7 +225,7 @@ subtask('flat:get-flattened-sources', 'Returns all contracts and their dependenc
     flattened = flattened.trim()
     if (output) {
       console.log('Writing to', output)
-      fs.writeFileSync(output, flattened)
+      writeFileSync(output, flattened)
       return ''
     }
     return flattened
@@ -222,7 +235,7 @@ subtask('flat:get-dependency-graph')
   .addOptionalParam('files', undefined, undefined, types.any)
   .setAction(async ({ files }, { run }) => {
     const sourcePaths =
-      files === undefined ? await run('compile:solidity:get-source-paths') : files.map((f) => fs.realpathSync(f))
+      files === undefined ? await run('compile:solidity:get-source-paths') : files.map((f: string) => realpathSync(f))
 
     const sourceNames = await run('compile:solidity:get-source-names', {
       sourcePaths
