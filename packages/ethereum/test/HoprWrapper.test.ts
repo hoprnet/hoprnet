@@ -1,4 +1,3 @@
-import type { PromiseValue } from '@hoprnet/hopr-utils'
 import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import type { PermittableToken, HoprToken, HoprWrapper } from '../src/types'
@@ -39,7 +38,7 @@ const useFixtures = deployments.createFixture(async (hre) => {
 })
 
 describe('HoprWrapper', function () {
-  let f: PromiseValue<ReturnType<typeof useFixtures>>
+  let f: Awaited<ReturnType<typeof useFixtures>>
 
   before(async function () {
     f = await useFixtures()
