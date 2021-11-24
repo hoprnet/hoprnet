@@ -3,8 +3,8 @@
 
 Nodes in the HOPR network receive incentives for providing services that allow others to achieve privacy. The HOPR protocol incentivizes nodes for transforming and delivering mixnet packets. To turn this into a trustless solution, HOPR uses a custom \nameref{sec:incentives:proofofrelay} scheme which makes the nodes' work verifiable. Incentives are handled by a micropayment scheme based on \lcnameref{sec:incentives:probabilistic}. This requires the issuer of incentives to not know whether a specific incentive lead to a payout or not. The receiver of an incentive therefore deposits in advance an iterated \lcnameref{sec:incentives:commitment} to the smart contract and reveals its openings whenever claiming an incentive.
 
-\input{sections/05-incentives/01-behavior.tex}
-\input{sections/05-incentives/02-proof-of-relay.tex}
-\input{sections/05-incentives/03-probabilistic-payments.tex}
-\input{sections/05-incentives/04-commitment.tex}
-\input{sections/05-incentives/05-payment-channel-management.tex}
+\subimport{}{01-behavior.tex}
+\subimport{}{02-proof-of-relay.tex}
+\subimport{}{03-probabilistic-payments.tex}
+\subimport{}{04-commitment.tex}
+\subimport{}{05-payment-channel-management.tex}

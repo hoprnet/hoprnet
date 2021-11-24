@@ -1,0 +1,22 @@
+\section{Definition and Notation}
+
+HOPR makes use of the \href{https://en.bitcoin.it/wiki/Secp256k1}{secp256k1} curvee, used in Bitcoin and Etherem, to create signatures and derive shared keys
+
+\begin{comment}
+\subsection{Implementation choices}
+
+HOPR employs the following cryptographic primitives:
+
+\begin{itemize}
+    \item \textbf{Cyclic group} HOPR's Sphinx implementation uses an elliptic curve group on the secp256k1 curve. Operations are therefore performed on the elliptic curve.
+
+    \item \textbf{Hash function} HOPR uses the BLAKE2s hash function, a cryptographic hash function faster than SHA-2 and SHA-3, yet at least as secure as SHA-3. It produces digests of 32 bytes.
+
+    \item \textbf{MAC} HOPR uses HMAC based on the BLAKE2s hash function.
+
+    \item \textbf{Encryption scheme} HOPR uses the LIONESS \cite{lionesspaper} implementation, using BLAKE2s as a hash function and ChaCha20 as a stream cipher.
+
+    \item \textbf{Padding} The original Sphinx paper uses a sequence of 0s for padding. However, this allows the last mix node in the path to infer information about the length of the path and the final destination, hence breaking one of the security properties promised by Sphinx. In order to prevent this attack, HOPR replaces the 0-padding with randomized padding for the final mix node when $v<r$. This ensures the exit node cannot identify where the padding starts and thus will not be able to determine the path length. In the case where $v=r$ there is no need to add padding as the length of the path is the maximum length, and thus no additional information is being revealed.
+
+\end{itemize}
+\end{comment}
