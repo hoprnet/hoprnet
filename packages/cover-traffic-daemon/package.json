@@ -7,16 +7,13 @@
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
-  "bin": {
-    "hopr-cover-traffic-daemon": "lib/index.js",
-    "hopr-cover-traffic-daemon-dashboard": "lib/dashboard.js"
-  },
+  "bin": "lib/index.js",
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "coverage": "nyc --reporter=html mocha",
     "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -p .",
+    "build": "yarn clean && tsc -p",
     "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
@@ -26,7 +23,7 @@
   },
   "files": [
     "lib",
-    "default-environment.json"
+    "unreleasedTokens.json"
   ],
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
