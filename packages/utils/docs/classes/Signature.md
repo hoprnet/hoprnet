@@ -2,6 +2,15 @@
 
 # Class: Signature
 
+Class used to represent an ECDSA signature.
+
+The methods serialize()/deserialize() are used to convert the signature
+to/from 64-byte compressed representation as given by EIP-2098 (https://eips.ethereum.org/EIPS/eip-2098).
+This compressed signature format is supported by OpenZeppelin.
+
+Internally this class still maintains representation using `(r,s)` tuple and `v` parity component separate
+as this makes interop with the underlying ECDSA library simpler.
+
 ## Table of contents
 
 ### Constructors
@@ -17,12 +26,10 @@
 ### Methods
 
 - [serialize](Signature.md#serialize)
-- [serializeEthereum](Signature.md#serializeethereum)
 - [toHex](Signature.md#tohex)
 - [verify](Signature.md#verify)
 - [create](Signature.md#create)
 - [deserialize](Signature.md#deserialize)
-- [deserializeEthereum](Signature.md#deserializeethereum)
 
 ## Constructors
 
@@ -39,7 +46,7 @@
 
 #### Defined in
 
-[types/primitives.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L199)
+[types/primitives.ts:209](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L209)
 
 ## Properties
 
@@ -57,11 +64,11 @@ ___
 
 ### SIZE
 
-▪ `Static` **SIZE**: `number`
+▪ `Static` **SIZE**: `number` = `SIGNATURE_LENGTH`
 
 #### Defined in
 
-[types/primitives.ts:265](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L265)
+[types/primitives.ts:252](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L252)
 
 ## Methods
 
@@ -75,25 +82,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L239)
-
-___
-
-### serializeEthereum
-
-▸ **serializeEthereum**(): `Uint8Array`
-
-Replaces recovery value by Ethereum-specific values 27/28
-
-#### Returns
-
-`Uint8Array`
-
-serialized signature to use within Ethereum
-
-#### Defined in
-
-[types/primitives.ts:250](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L250)
+[types/primitives.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L237)
 
 ___
 
@@ -107,7 +96,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L261)
+[types/primitives.ts:248](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L248)
 
 ___
 
@@ -128,7 +117,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L257)
+[types/primitives.ts:244](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L244)
 
 ___
 
@@ -149,7 +138,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:234](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L234)
+[types/primitives.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L232)
 
 ___
 
@@ -169,29 +158,4 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:205](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L205)
-
-___
-
-### deserializeEthereum
-
-▸ `Static` **deserializeEthereum**(`arr`): [`Signature`](Signature.md)
-
-Deserializes Ethereum-specific signature with
-non-standard recovery values 27 and 28
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `arr` | `Uint8Array` | serialized Ethereum signature |
-
-#### Returns
-
-[`Signature`](Signature.md)
-
-deserialized Ethereum signature
-
-#### Defined in
-
-[types/primitives.ts:223](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L223)
+[types/primitives.ts:218](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L218)
