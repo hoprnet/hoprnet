@@ -94,7 +94,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     })
     server.listen(port, hostname, (err?: Error) => {
       if (err) throw err
-      log(`Healthcheck server on ${hostname} listening on port ${port}`)
+      console.log(`Healthcheck server on ${hostname} listening on port ${port}`)
     })
   }
 
