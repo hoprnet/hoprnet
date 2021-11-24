@@ -2613,7 +2613,7 @@ a function that stop the resource logger
 
 #### Defined in
 
-[process/resourceLogger.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/resourceLogger.ts#L17)
+[process/resourceLogger.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/resourceLogger.ts#L23)
 
 ___
 
