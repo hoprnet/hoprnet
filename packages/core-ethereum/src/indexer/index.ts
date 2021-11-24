@@ -145,7 +145,7 @@ class Indexer extends EventEmitter {
       this.status = 'stopped'
       this.emit('status', 'stopped')
       log(chalk.red('Failed to restart: %s', err.message))
-      throw err;
+      throw err
     }
   }
 
