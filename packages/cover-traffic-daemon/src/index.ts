@@ -161,8 +161,8 @@ if (require.main === module) {
   main((state: State) => {
     console.log(
       `CT: State update:` +
-      `${Object.keys(state.nodes).length} nodes, ` +
-      `${Object.keys(state.channels).length} channels`
+        `${Object.keys(state.nodes).length} nodes, ` +
+        `${Object.keys(state.channels).length} channels`
     )
   })
 }
