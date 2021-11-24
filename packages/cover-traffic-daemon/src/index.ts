@@ -125,8 +125,8 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   await node.start()
   log('node is running')
 
-  log(node.getVersion())
-  log(node.smartContractInfo())
+  console.log(node.getVersion())
+  console.log(node.smartContractInfo())
 
   const channels = await node.getChannelsFrom(selfAddr)
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))
@@ -161,8 +161,8 @@ if (require.main === module) {
   main((state: State) => {
     console.log(
       `CT: State update:` +
-        `${Object.keys(state.nodes).length} nodes, ` +
-        `${Object.keys(state.channels).length} channels`
+      `${Object.keys(state.nodes).length} nodes, ` +
+      `${Object.keys(state.channels).length} channels`
     )
   })
 }
