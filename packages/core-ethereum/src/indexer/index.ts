@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { debug } from '@hoprnet/hopr-utils'
+import { debug, retryWithBackoff } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -88,7 +88,7 @@ class Indexer extends EventEmitter {
     })
     this.chain.subscribeError((error: any) => {
       log(chalk.red(`etherjs error: ${error}`))
-      this.restart()
+      retryWithBackoff(() => this.restart())
     })
 
     this.chain.subscribeChannelEvents((e) => {
@@ -144,8 +144,8 @@ class Indexer extends EventEmitter {
     } catch (err) {
       this.status = 'stopped'
       this.emit('status', 'stopped')
-
       log(chalk.red('Failed to restart: %s', err.message))
+      throw err;
     }
   }
 
