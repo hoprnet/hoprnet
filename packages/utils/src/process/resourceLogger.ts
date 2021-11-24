@@ -11,7 +11,10 @@ function createResourceLog(log: LogType) {
   // reported as Bytes
   const usedMemoryMB = memoryUsage().rss / 1024 / 1024
 
-  log(`Process stats: mem ${usedMemoryMB.toPrecision(1)} MB (max: ${maxUsedMemoryMB.toPrecision(1)} MB) ` + `cputime: ${usedCpuSec.toPrecision(1)} sec`)
+  log(
+    `Process stats: mem ${usedMemoryMB.toPrecision(1)} MB (max: ${maxUsedMemoryMB.toPrecision(1)} MB) ` +
+      `cputime: ${usedCpuSec.toPrecision(1)} sec`
+  )
 }
 
 /**
