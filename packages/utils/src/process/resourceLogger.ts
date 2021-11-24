@@ -5,13 +5,13 @@ type LogType = (msg: string) => void | Promise<void>
 function createResourceLog(log: LogType) {
   const resourcesUsed = resourceUsage()
   // reported as KiloBytes
-  const maxUsedMemory = resourcesUsed.maxRSS / 1024
+  const maxUsedMemoryMB = resourcesUsed.maxRSS / 1024
   // reported in microseconds
-  const usedCpu = resourcesUsed.userCPUTime / 1000 / 1000
+  const usedCpuSec = resourcesUsed.userCPUTime / 1000 / 1000
   // reported as Bytes
-  const usedMemory = memoryUsage().rss / 1024 / 1024
+  const usedMemoryMB = memoryUsage().rss / 1024 / 1024
 
-  log(`Process stats: mem ${usedMemory.toPrecision(1)} MB (max: ${maxUsedMemory.toPrecision(1)} MB) ` + `cputime: ${usedCpu.toPrecision(1)} sec`)
+  log(`Process stats: mem ${usedMemoryMB.toPrecision(1)} MB (max: ${maxUsedMemoryMB.toPrecision(1)} MB) ` + `cputime: ${usedCpuSec.toPrecision(1)} sec`)
 }
 
 /**
