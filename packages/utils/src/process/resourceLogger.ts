@@ -3,9 +3,15 @@ import { memoryUsage, resourceUsage } from 'process'
 type LogType = (msg: string) => void | Promise<void>
 
 function createResourceLog(log: LogType) {
-  const used = memoryUsage()
-  const usage = resourceUsage()
-  log(`Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` + `cputime: ${usage.userCPUTime}`)
+  const resourcesUsed = resourceUsage()
+  // reported as KiloBytes
+  const maxUsedMemory = resourcesUsed.maxRSS / 1024
+  // reported in microseconds
+  const usedCpu = resourcesUsed.userCPUTime / 1000 / 1000
+  // reported as Bytes
+  const usedMemory = memoryUsage().rss / 1024 / 1024
+
+  log(`Process stats: mem ${usedMemory.toPrecision(1)} MB (max: ${maxUsedMemory.toPrecision(1)} MB) ` + `cputime: ${usedCpu.toPrecision(1)} sec`)
 }
 
 /**
