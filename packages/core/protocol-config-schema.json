@@ -1,0 +1,91 @@
+{
+  "type": "object",
+  "properties": {
+    "environments": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9-]+$": {
+          "type": "string",
+          "properties": {
+            "network_id": {
+              "type": "string"
+            },
+            "channel_contract_deploy_block": {
+              "type": "integer"
+            },
+            "token_contract_address": {
+              "type": "string"
+            },
+            "channels_contract_address": {
+              "type": "string"
+            },
+            "minted_token_receiver_address": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "network_id",
+            "channel_contract_deploy_block",
+            "token_contract_address",
+            "channels_contract_address",
+            "tags"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "networks": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9]+$": {
+          "type": "string",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "live": {
+              "type": "boolean"
+            },
+            "chain_id": {
+              "type": "integer"
+            },
+            "gas_price": {
+              "type": "string",
+              "description": "Gas price as either 'auto', a number '11' or a value which should be converted like '1 gwei'."
+            },
+            "gas_multiplier": {
+              "type": "number"
+            },
+            "default_provider": {
+              "type": "string"
+            },
+            "native_token_name": {
+              "type": "string"
+            },
+            "hopr_token_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "chain_id",
+            "default_provider",
+            "description",
+            "gas_multiplier",
+            "hopr_token_name",
+            "native_token_name"
+          ],
+          "additionalProperties": false
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["environments", "networks"]
+}

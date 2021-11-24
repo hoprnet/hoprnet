@@ -1,4 +1,4 @@
-import type { ERC777SnapshotMock__factory, ERC777SnapshotMock } from '../../types'
+import type { ERC777SnapshotMock } from '../../src/types'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import { advanceBlock } from '../utils'
@@ -6,14 +6,15 @@ import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
 
 const useFixtures = deployments.createFixture(async (hre) => {
   const [initialHolder, recipient, other] = await ethers.getSigners()
-  const HoprTokenFactory = (await hre.ethers.getContractFactory('ERC777SnapshotMock')) as ERC777SnapshotMock__factory
 
   await deployERC1820Registry(hre, initialHolder)
 
   const name = 'My Token'
   const symbol = 'MTKN'
   const initialSupply = '100'
-  const token = await HoprTokenFactory.deploy(name, symbol, initialHolder.address, initialSupply)
+  const token = (await (
+    await hre.ethers.getContractFactory('ERC777SnapshotMock')
+  ).deploy(name, symbol, initialHolder.address, initialSupply)) as ERC777SnapshotMock
 
   const initialMintBlock = await ethers.provider.getBlockNumber()
 

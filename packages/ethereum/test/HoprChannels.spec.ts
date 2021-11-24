@@ -2,14 +2,7 @@ import type { Wallet } from '@ethersproject/wallet'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import BN from 'bn.js'
-import {
-  HoprToken__factory,
-  ChannelsMock__factory,
-  HoprChannels__factory,
-  HoprChannels,
-  HoprToken,
-  ChannelsMock
-} from '../types'
+import type { HoprChannels, HoprToken, ChannelsMock } from '../src/types'
 import { increaseTime } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './constants'
 import {
@@ -29,7 +22,6 @@ import {
   generateChannelId,
   ChannelStatus
 } from '@hoprnet/hopr-utils'
-import type { PromiseValue } from '@hoprnet/hopr-utils'
 import { BigNumber, utils } from 'ethers'
 import type { providers } from 'ethers'
 
@@ -53,7 +45,7 @@ export const redeemArgs = (ticket: AcknowledgedTicket): Parameters<HoprChannels[
   ticket.response.toHex(),
   ticket.ticket.amount.toHex(),
   ticket.ticket.winProb.toHex(),
-  ticket.ticket.signature.serializeEthereum()
+  ticket.ticket.signature.serialize()
 ]
 
 export const validateChannel = (actual, expected) => {
@@ -198,9 +190,15 @@ const useFixtures = deployments.createFixture(
 
     // run migrations
     const contracts = await deployments.fixture()
-    const token = HoprToken__factory.connect(contracts['HoprToken'].address, ethers.provider)
-    const channels = HoprChannels__factory.connect(contracts['HoprChannels'].address, ethers.provider)
-    const mockChannels = await new ChannelsMock__factory(deployer).deploy(token.address, 0)
+    const token = (await ethers.getContractFactory('HoprToken')).attach(contracts['HoprToken'].address) as HoprToken
+
+    const channels = (await ethers.getContractFactory('HoprChannels')).attach(
+      contracts['HoprChannels'].address
+    ) as HoprChannels
+
+    const mockChannels = (await (
+      await ethers.getContractFactory('ChannelsMock', deployer)
+    ).deploy(token.address, 0)) as ChannelsMock
 
     // create deployer the minter
     const minterRole = await token.MINTER_ROLE()
@@ -311,7 +309,7 @@ describe('funding HoprChannel without announcements', function () {
 })
 
 describe('funding HoprChannel catches failures', function () {
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>, channels: HoprChannels, accountA: Wallet
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>, channels: HoprChannels, accountA: Wallet
   before(async function () {
     // All of these tests revert, so we can rely on stateless single fixture.
     fixtures = await useFixtures()
@@ -466,7 +464,7 @@ describe('funding a HoprChannel success', function () {
 
 describe('with single funded HoprChannels: AB: 70', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
 
   beforeEach(async function () {
     fixtures = await useFixtures()
@@ -492,7 +490,7 @@ describe('with single funded HoprChannels: AB: 70', function () {
 
 describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
   let blockTimestamp: number
 
   beforeEach(async function () {
@@ -559,7 +557,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
         TICKET_AB_WIN.ticket.response.toHex(),
         TICKET_AB_WIN.ticket.ticket.amount.toHex(),
         TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
-        TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
+        TICKET_AB_WIN.ticket.ticket.signature.serialize()
       )
     ).to.be.revertedWith('redemptions must be in order')
 
@@ -572,7 +570,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
         TICKET_AB_WIN.ticket.response.toHex(),
         TICKET_AB_WIN.ticket.ticket.amount.toHex(),
         TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
-        TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
+        TICKET_AB_WIN.ticket.ticket.signature.serialize()
       )
     ).to.be.revertedWith('ticket epoch must match')
   })
@@ -673,12 +671,12 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
 
   it('should fail to initialize channel closure A->0', async function () {
     await expect(
-      channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)
+      channels.connect(fixtures.accountA).initiateChannelClosure(ethers.constants.AddressZero)
     ).to.be.revertedWith('destination must not be empty')
   })
 
   it('should fail to finalize channel closure when is not pending', async function () {
-    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
+    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'channel must be pending to close'
     )
   })
@@ -686,7 +684,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
 
 describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
   let token: HoprToken
 
   beforeEach(async function () {
@@ -733,15 +731,15 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
   })
 
   it('should fail to finalize channel closure', async function () {
-    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_A.address)).to.be.revertedWith(
+    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_A.address)).to.be.revertedWith(
       'source and destination must not be the same'
     )
 
     await expect(
-      channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ethers.constants.AddressZero)
+      channels.connect(fixtures.accountA).finalizeChannelClosure(ethers.constants.AddressZero)
     ).to.be.revertedWith('destination must not be empty')
 
-    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
+    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'closureTime must be before now'
     )
   })
@@ -749,7 +747,7 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
 
 describe('with a closed channel', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
 
   beforeEach(async function () {
     fixtures = await useFixtures()
@@ -781,8 +779,8 @@ describe('with a closed channel', function () {
 
 describe('with a reopened channel', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
-  let TICKET_AB_WIN_RECYCLED: PromiseValue<ReturnType<typeof createTicket>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
+  let TICKET_AB_WIN_RECYCLED: Awaited<ReturnType<typeof createTicket>>
 
   beforeEach(async function () {
     fixtures = await useFixtures()

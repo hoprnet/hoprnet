@@ -20,8 +20,8 @@ import {
   Hash,
   PRICE_PER_PACKET
 } from '@hoprnet/hopr-utils'
+import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import { PROTOCOL_STRING } from '../../constants'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
@@ -183,7 +183,19 @@ describe('packet acknowledgement', function () {
 
     await dbs[0].storePendingAcknowledgement(ackChallenge, true)
 
-    subscribeToAcknowledgements(libp2pSelf.subscribe, dbs[0], SELF, () => ackReceived.resolve())
+    subscribeToAcknowledgements(
+      libp2pSelf.subscribe,
+      dbs[0],
+      SELF,
+      (receivedAckChallenge: HalfKeyChallenge) => {
+        if (receivedAckChallenge.eq(ackChallenge)) {
+          ackReceived.resolve()
+        }
+      },
+      () => {},
+      () => {},
+      'protocolAck'
+    )
 
     const ackKey = deriveAckKeyShare(secrets[0])
     const ackMessage = AcknowledgementChallenge.create(ackChallenge, SELF)
@@ -201,7 +213,8 @@ describe('packet acknowledgement', function () {
       } as any,
       SELF,
       libp2pCounterparty.send as any,
-      COUNTERPARTY
+      COUNTERPARTY,
+      'protocolAck'
     )
 
     await ackReceived.promise
@@ -220,7 +233,17 @@ describe('packet acknowledgement', function () {
 
     const ackReceived = defer<void>()
 
-    subscribeToAcknowledgements(libp2pRelay0.subscribe, dbs[1], RELAY0, () => ackReceived.resolve())
+    subscribeToAcknowledgements(
+      libp2pRelay0.subscribe,
+      dbs[1],
+      RELAY0,
+      () => {},
+      () => {
+        ackReceived.resolve()
+      },
+      () => {},
+      'protocolAck'
+    )
 
     const interaction = new TestingForwardInteraction(
       libp2pRelay0.subscribe,
@@ -229,19 +252,22 @@ describe('packet acknowledgement', function () {
       () => {
         throw Error(`Node is not supposed to receive message`)
       },
-      dbs[1]
+      dbs[1],
+      'protocolMsg',
+      'protocolAck'
     )
 
     interaction.useMockMixer()
 
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
-    libp2pCounterparty.subscribe(PROTOCOL_STRING, (msg: Uint8Array) => {
+    libp2pCounterparty.subscribe('protocolMsg', (msg: Uint8Array) => {
       sendAcknowledgement(
         Packet.deserialize(msg, COUNTERPARTY, RELAY0),
         RELAY0,
         libp2pCounterparty.send as any,
-        COUNTERPARTY
+        COUNTERPARTY,
+        'protocolAck'
       )
     })
 
@@ -294,7 +320,15 @@ describe('packet relaying interaction', function () {
         receive = console.log
       }
 
-      const interaction = new TestingForwardInteraction(subscribe, send as any, pId, receive, dbs[index])
+      const interaction = new TestingForwardInteraction(
+        subscribe,
+        send as any,
+        pId,
+        receive,
+        dbs[index],
+        'protocolMsg',
+        'protocolAck'
+      )
       interaction.useMockMixer()
 
       if (pId.equals(SELF)) {

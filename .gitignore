@@ -30,3 +30,11 @@ packages/utils/lib/types/
 !.yarn/sdks
 !.yarn/versions
 .pnp.*
+
+# Typescript build info resulting from Typescript Project References
+# see https://www.typescriptlang.org/docs/handbook/project-references.html
+**/*.tsbuildinfo
+
+# used only in release and should not be tracked
+packages/hoprd/default-environment.json
+packages/cover-traffic-daemon/default-environment.json

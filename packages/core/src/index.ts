@@ -1,7 +1,7 @@
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
-const MPLEX = require('libp2p-mplex')
+import MPLEX from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 
@@ -21,21 +21,25 @@ import PeerId from 'peer-id'
 import {
   PublicKey,
   Balance,
-  Address,
-  ChannelEntry,
-  NativeBalance,
-  Hash,
-  DialOpts,
   HoprDB,
   libp2pSubscribe,
   libp2pSendMessage,
   isSecp256k1PeerId,
-  AcknowledgedTicket,
   ChannelStatus,
   MIN_NATIVE_BALANCE,
-  u8aConcat
+  u8aConcat,
+  isMultiaddrLocal
 } from '@hoprnet/hopr-utils'
-import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
+import type {
+  LibP2PHandlerFunction,
+  AcknowledgedTicket,
+  ChannelEntry,
+  NativeBalance,
+  Address,
+  DialOpts,
+  Hash,
+  HalfKeyChallenge
+} from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import type { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -57,6 +61,7 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
 import { localAddressesFirst, AddressSorter, retryWithBackoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
+import type { ResolvedEnvironment } from './environment'
 
 const log = debug(`hopr-core`)
 const verbose = debug('hopr-core:verbose')
@@ -71,26 +76,27 @@ type PeerStoreAddress = {
   multiaddrs: Multiaddr[]
 }
 
-export type HoprOptions = {
-  provider: string
-  announce?: boolean
-  dbPath?: string
-  createDbIfNotExist?: boolean
-  forceCreateDB?: boolean
-  password?: string
-  connector?: HoprCoreEthereum
-  strategy?: ChannelStrategy
-  hosts?: {
-    ip4?: NetOptions
-    ip6?: NetOptions
-  }
-  // You almost certainly want this to be false, this is so we can test with
-  // local testnets, and announce 127.0.0.1 addresses.
-  announceLocalAddresses?: boolean
-
-  // when true, addresses will be sorted local first
-  // when false, addresses will be sorted public first
-  preferLocalAddresses?: boolean
+export class HoprOptions {
+  constructor(
+    public environment: ResolvedEnvironment,
+    public announce?: boolean,
+    public dbPath?: string,
+    public createDbIfNotExist?: boolean,
+    public forceCreateDB?: boolean,
+    public password?: string,
+    public connector?: HoprCoreEthereum,
+    public strategy?: ChannelStrategy,
+    public hosts?: {
+      ip4?: NetOptions
+      ip6?: NetOptions
+    },
+    // You almost certainly want this to be false, this is so we can test with
+    // local testnets, and announce 127.0.0.1 addresses.
+    public announceLocalAddresses?: boolean,
+    // when true, addresses will be sorted local first
+    // when false, addresses will be sorted public first
+    public preferLocalAddresses?: boolean
+  ) {}
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -126,10 +132,8 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private db: HoprDB
-  private paymentChannels: HoprCoreEthereum
   private addressSorter: AddressSorter
-  private publicNodesEmitter: HoprConnectOptions['publicNodes']
+  private environment: ResolvedEnvironment
 
   public indexer: Indexer
 
@@ -141,24 +145,20 @@ class Hopr extends EventEmitter {
    * @param options
    * @param provider
    */
-  public constructor(private id: PeerId, private options: HoprOptions) {
+  public constructor(
+    private id: PeerId,
+    private db: HoprDB,
+    private chain: HoprCoreEthereum,
+    private options: HoprOptions,
+    private publicNodesEmitter: HoprConnectOptions['publicNodes'] = new EventEmitter()
+  ) {
     super()
 
     if (!id.privKey || !isSecp256k1PeerId(id)) {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
-    this.db = new HoprDB(
-      PublicKey.fromPrivKey(id.privKey.marshal()),
-      options.createDbIfNotExist,
-      VERSION,
-      options.dbPath,
-      options.forceCreateDB
-    )
-    this.paymentChannels = new HoprCoreEthereum(this.db, PublicKey.fromPeerId(this.id), this.id.privKey.marshal(), {
-      provider: this.options.provider
-    })
-
-    this.publicNodesEmitter = new EventEmitter()
+    this.environment = options.environment
+    log(`using environment: ${this.environment.id}`)
 
     if (this.options.preferLocalAddresses) {
       this.addressSorter = localAddressesFirst
@@ -169,11 +169,12 @@ class Hopr extends EventEmitter {
       this.addressSorter = (x) => x
       log('Addresses are sorted by default')
     }
-    this.indexer = this.paymentChannels.indexer // TODO temporary
+    this.indexer = this.chain.indexer // TODO temporary
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
-    return await this.paymentChannels.start()
+    log('Starting on-chain payment channel from Hopr class via "startedPaymentChannels"')
+    return await this.chain.start()
   }
 
   /**
@@ -201,7 +202,10 @@ class Hopr extends EventEmitter {
    */
   public async start() {
     this.status = 'INITIALIZING'
-    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
+    log('Starting hopr node...')
+    const balance = await this.getNativeBalance()
+    verbose('Retrieve node balance', balance.toBN().lte(MIN_NATIVE_BALANCE), MIN_NATIVE_BALANCE)
+    if (!balance || balance.toBN().lte(MIN_NATIVE_BALANCE)) {
       throw new Error('Cannot start node without a funded wallet')
     }
 
@@ -230,7 +234,10 @@ class Hopr extends EventEmitter {
         transport: {
           HoprConnect: {
             initialNodes,
-            publicNodes: this.publicNodesEmitter
+            publicNodes: this.publicNodesEmitter,
+            // Tells hopr-connect to treat local and private addresses
+            // as public addresses
+            __useLocalAddresses: this.options.announceLocalAddresses
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
@@ -290,21 +297,40 @@ class Hopr extends EventEmitter {
 
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup)
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id)
 
     const ethereum = await this.startedPaymentChannels()
 
-    subscribeToAcknowledgements(subscribe, this.db, this.getId(), (ack) => {
-      ethereum.emit('ticket:win', ack)
-      this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
-    })
+    const protocolMsg = `hopr/${this.environment.id}/msg`
+    const protocolAck = `hopr/${this.environment.id}/ack`
+
+    subscribeToAcknowledgements(
+      subscribe,
+      this.db,
+      this.getId(),
+      (ackChallenge: HalfKeyChallenge) => {
+        this.emit('message-acknowledged:' + ackChallenge.toHex())
+      },
+      (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
+      // TODO: automatically reinitialize commitments
+      () => {},
+      protocolAck
+    )
 
     ethereum.on('ticket:win', (ack) => {
       this.onWinningTicket(ack)
     })
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), onMessage, this.db)
+    this.forward = new PacketForwardInteraction(
+      subscribe,
+      sendMessage,
+      this.getId(),
+      onMessage,
+      this.db,
+      protocolMsg,
+      protocolAck
+    )
 
     await this.announce(this.options.announce)
     log('announcing done, starting heartbeat')
@@ -322,7 +348,10 @@ class Hopr extends EventEmitter {
     log(`Available under the following addresses:`)
     libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
     this.maybeLogProfilingToGCloud()
-    this.periodicCheck()
+    this.checkTimeout = setTimeout(() => {
+      log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
+      this.periodicCheck()
+    }, this.strategy.tickInterval)
   }
 
   private maybeLogProfilingToGCloud() {
@@ -405,12 +434,19 @@ class Hopr extends EventEmitter {
       return
     }
 
-    const currentChannels = await this.getAllChannels()
+    const currentChannels: ChannelEntry[] | undefined = await this.getAllChannels()
+    verbose('Channels obtained', currentChannels)
+
+    if (currentChannels === undefined) {
+      log('invalid channels retrieved from database')
+      return
+    }
+
     for (const channel of currentChannels) {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
 
-    let balance
+    let balance: Balance
     try {
       balance = await this.getBalance()
     } catch (e) {
@@ -473,9 +509,11 @@ class Hopr extends EventEmitter {
    */
   public async stop(): Promise<void> {
     this.status = 'DESTROYED'
+    verbose('Stopping checking timeout')
     clearTimeout(this.checkTimeout)
-    await Promise.all([this.heartbeat.stop(), (await this.startedPaymentChannels()).stop()])
-
+    verbose('Stopping heartbeat & indexer')
+    await Promise.all([this.heartbeat.stop(), this.chain.stop()])
+    verbose('Stoping database & libp2p', this.db)
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
     // Give the operating system some extra time to close the sockets
@@ -645,13 +683,13 @@ class Hopr extends EventEmitter {
       return 'Node has not started yet'
     }
     const connected = this.networkPeers.debugLog()
-    const announced = await this.paymentChannels.indexer.getAnnouncedAddresses()
+    const announced = await this.chain.indexer.getAnnouncedAddresses()
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
   }
 
-  private async periodicCheck() {
+  public async periodicCheck() {
     log('periodic check', this.status)
     if (this.status != 'RUNNING') {
       return
@@ -660,29 +698,56 @@ class Hopr extends EventEmitter {
       log('strategy tick took longer than 10 secs')
     }, 10000)
     try {
+      log('Triggering tick channel strategy')
       await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
     }
+    log('Clearing out logging timeout.')
     clearTimeout(logTimeout)
-
-    this.checkTimeout = setTimeout(() => this.periodicCheck(), this.strategy.tickInterval)
+    log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
+    this.checkTimeout = setTimeout(() => {
+      log('Triggering again periodCheck')
+      this.periodicCheck()
+    }, this.strategy.tickInterval)
   }
 
-  private async announce(includeRouting: boolean = false): Promise<void> {
+  /**
+   * Announces address of node on-chain to be reachable by other nodes.
+   * @dev Promise resolves before own announcment appears in the indexer
+   * @param includeRouting publish routable address if true
+   * @returns Promise that resolves once announce transaction has been published
+   */
+  private async announce(includeRouting = false): Promise<void> {
     const chain = await this.startedPaymentChannels()
-    const multiaddrs = await this.getAnnouncedAddresses()
 
-    const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
-    const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
+    let isRoutableAddress = false
+    let addrToAnnounce: Multiaddr
 
-    const p2p = new Multiaddr('/p2p/' + this.getId().toB58String())
+    if (includeRouting) {
+      const multiaddrs = await this.getAnnouncedAddresses()
 
-    const addrToAnnounce = ip4 ?? ip6 ?? p2p
-    const isRoutableAddress = (ip4 ?? ip6) != undefined
+      const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
+      const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
 
+      // Prefer IPv4 addresses over IPv6 addresses, if any
+      addrToAnnounce = ip4 ?? ip6
+
+      // Submit P2P address if IPv4 or IPv6 address is not routable because link-locale, reserved or private address
+      // except if testing locally, e.g. as part of an integration test
+      if (addrToAnnounce == undefined || (isMultiaddrLocal(addrToAnnounce) && !this.options.preferLocalAddresses)) {
+        addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
+      } else {
+        isRoutableAddress = true
+      }
+    } else {
+      addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
+    }
+
+    // Check if there was a previous annoucement from us
     const ownAccount = await chain.getAccount(await this.getEthereumAddress())
 
+    // Do not announce if our last is equal to what we intend to announce
     if (ownAccount?.multiAddr?.equals(addrToAnnounce)) {
       log(`intended address has already been announced, nothing to do`)
       return
@@ -718,6 +783,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getNativeBalance(): Promise<NativeBalance> {
+    verbose('Requesting native balance from node.')
     const chain = await this.startedPaymentChannels()
     return await chain.getNativeBalance(true)
   }
@@ -744,7 +810,7 @@ class Hopr extends EventEmitter {
   ): Promise<{
     channelId: Hash
   }> {
-    const ethereum = this.paymentChannels
+    const ethereum = this.chain
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const myAvailableTokens = await ethereum.getBalance(true)
@@ -962,7 +1028,10 @@ class Hopr extends EventEmitter {
   }
 }
 
-export { Hopr as default, LibP2P }
+export default Hopr
 export * from './constants'
+export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
+export type { ProtocolConfig, Network, ResolvedEnvironment } from './environment'
+export { resolveEnvironment, supportedEnvironments } from './environment'

@@ -1,12 +1,13 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import type { UnsignedTransaction, BigNumber, providers } from 'ethers'
-import type { HoprToken } from '../types'
+import type { HoprToken } from '../src/types'
 
 import { utils, constants } from 'ethers'
 import { deserializeKeyPair, PublicKey, hasB58String } from '@hoprnet/hopr-utils'
-import { getContractData, Networks } from '..'
+import { getContractData } from '../src'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
+import { ethers } from 'hardhat'
 
 /**
  * Takes an array of transactions, signs them and
@@ -16,7 +17,9 @@ import { join } from 'path'
  */
 async function send(signer: providers.JsonRpcSigner, txparams: UnsignedTransaction): Promise<void> {
   try {
-    await signer.sendTransaction(txparams)
+    const tx = await signer.sendTransaction(txparams)
+    const txReceipt = await tx.wait()
+    console.log(`Funding transaction included on-chain in block #${txReceipt.blockNumber}`)
   } catch (err) {
     console.log(`Error: ${err}`)
   }
@@ -114,19 +117,22 @@ type CLIOPts = {
 /**
  * Faucets HOPR and ETH tokens to a local account with HOPR
  */
-async function main(opts: CLIOPts, { ethers, network }: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
-  if (network.tags.development) {
-    console.error('🌵 Faucet is only valid in a development network')
-    return
+async function main(
+  opts: CLIOPts,
+  { network, environment }: HardhatRuntimeEnvironment,
+  _runSuper: RunSuperFunction<any>
+) {
+  if (!network.tags.development) {
+    throw Error('Faucet is only valid in a development network')
   }
 
   let hoprTokenAddress: string
   try {
-    const contract = getContractData(network.name as Networks, 'HoprToken')
+    const contract = getContractData(network.name, environment, 'HoprToken')
     hoprTokenAddress = contract.address
-  } catch {
-    console.error('⛓  You need to ensure the network deployed the contracts')
-    return
+  } catch (error) {
+    console.error('You need to ensure the network deployed the contracts')
+    throw error
   }
 
   const identities: string[] = []
@@ -153,7 +159,6 @@ async function main(opts: CLIOPts, { ethers, network }: HardhatRuntimeEnvironmen
     throw Error(`Could not get any usable addresses.`)
   }
 
-  const signer = ethers.provider.getSigner()
   const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(hoprTokenAddress) as HoprToken
 
   const txs: UnsignedTransaction[] = []
@@ -162,6 +167,12 @@ async function main(opts: CLIOPts, { ethers, network }: HardhatRuntimeEnvironmen
       ...(await createTransaction(hoprToken, identity, utils.parseEther('1.0'), utils.parseEther('10.0'), network.name))
     )
   }
+
+  // we use a custom ethers provider here instead of the ethers object from the
+  // hre which is managed by hardhat-ethers, because that one seems to
+  // run its own in-memory hardhat instance, which is undesirable
+  const provider = new ethers.providers.JsonRpcProvider()
+  const signer = provider.getSigner()
 
   for (const tx of txs) {
     await send(signer, tx)
