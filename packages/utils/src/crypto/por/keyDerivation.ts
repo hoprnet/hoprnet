@@ -1,4 +1,4 @@
-import {expand} from 'futoin-hkdf'
+import { expand } from 'futoin-hkdf'
 import { privateKeyVerify } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
 import { HalfKey } from '../../types'
