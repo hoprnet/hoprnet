@@ -4,9 +4,9 @@
 //
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
-import { iterateHash, recoverIteratedHash, HoprDB, Hash } from '@hoprnet/hopr-utils'
-import { randomBytes } from 'crypto'
+import {iterateHash, recoverIteratedHash, HoprDB, Hash, ChannelEntry, u8aConcat} from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
+import {deriveCommitmentSeed} from "@hoprnet/hopr-utils/lib/crypto/commitment/keyDerivation";
 
 const log = debug('hopr-core-ethereum:commitment')
 
@@ -43,8 +43,8 @@ export async function bumpCommitment(db: HoprDB, channelId: Hash) {
 type GetCommitment = () => Promise<Hash>
 type SetCommitment = (commitment: Hash) => Promise<string>
 
-async function createCommitmentChain(db: HoprDB, channelId: Hash, setChainCommitment: SetCommitment): Promise<void> {
-  const seed = new Hash(Uint8Array.from(randomBytes(Hash.SIZE))) // TODO seed off privKey + channel
+async function createCommitmentChain(db: HoprDB, channelId: Hash, channelMasterKey: Uint8Array, setChainCommitment: SetCommitment): Promise<void> {
+  const seed = new Hash(channelMasterKey)
   const { intermediates, hash } = await iterateHash(
     seed.serialize(),
     hashFunction,
@@ -59,12 +59,15 @@ async function createCommitmentChain(db: HoprDB, channelId: Hash, setChainCommit
 
 export async function initializeCommitment(
   db: HoprDB,
-  channelId: Hash,
+  privateKey: Uint8Array,
+  channelEntry: ChannelEntry,
   getChainCommitment: GetCommitment,
   setChainCommitment: SetCommitment
 ) {
+  const channelId = channelEntry.getId()
   const dbContainsAlready = (await db.getCommitment(channelId, 0)) != undefined
   const chainCommitment = await getChainCommitment()
+
   if (chainCommitment && dbContainsAlready) {
     try {
       await findCommitmentPreImage(db, channelId) // throws if not found
@@ -74,5 +77,9 @@ export async function initializeCommitment(
     }
   }
   log(`reinitializing (db: ${dbContainsAlready}, chain: ${chainCommitment}})`)
-  await createCommitmentChain(db, channelId, setChainCommitment)
+
+  // Information identifying this channel
+  // TODO: Add contract address, chain id, ...etc.
+  const channelInfo = u8aConcat(channelEntry.channelEpoch.serialize(), channelId.serialize())
+  await createCommitmentChain(db, channelId, deriveCommitmentSeed(privateKey, channelInfo), setChainCommitment)
 }

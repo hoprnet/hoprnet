@@ -43,6 +43,7 @@ const RELAY2 = privKeyToPeerId(stringToU8a('0xdb7e3e8fcac4c817aa4cecee1d6e2b4d53
 const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc'))
 
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
+const selfPrivateKey = new Uint8Array(SECRET_LENGTH).fill(0)
 
 /**
  * Creates a mocked network to send and receive acknowledgements and packets
@@ -120,7 +121,8 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       // Set a commitment if we are the destination
       await initializeCommitment(
         dbs[index],
-        previousChannel.getId(),
+        selfPrivateKey,
+        previousChannel,
         (): any => {},
         (): any => {}
       )

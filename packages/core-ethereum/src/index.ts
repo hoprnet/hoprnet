@@ -175,7 +175,7 @@ export default class HoprEthereum extends EventEmitter {
       return this.indexer.resolvePendingTransaction('channel-updated', tx)
     }
     const getCommitment = async () => (await this.db.getChannel(c.getId())).commitment
-    initializeCommitment(this.db, c.getId(), getCommitment, setCommitment)
+    await initializeCommitment(this.db, this.privateKey, c, getCommitment, setCommitment)
   }
 
   public async redeemAllTickets(): Promise<void> {
