@@ -1,0 +1,46 @@
+\subsection{On-chain Commitment}
+\label{sec:incentives:commitment}
+
+As seen in previous section \ref{sec:incentives:probabilistic}, ticket luck relies on two sources of entropy, one provided by the ticket issuer and one provided by the recipient. This section focuses on the entropy provided by the ticket recipient.
+
+The entropy need be kept hidden until the ticket gets redeemed. In addition, the ticket recipient must not be able to change the entropy just before redeeming a ticket turn previously losing tickets into winners. Furthermore, as redeeming the ticket reveals the entropy and thus loses its value, it need to be reset with every ticket redemption. Last but not least, the mechanism must be feasible to implement it within Ethereum.
+
+To match the aforementioned properties, HOPR uses an iterated on-chain commitment scheme that is initialized once the channel is opened. The scheme is iterative, so by revealing a commitment, the ticket recipient sets the upcoming commitment and the smart contract keeps this value for the next ticket redemption.
+
+\paragraph{Commitment scheme}
+\label{sec:incentives:commitment:scheme}
+
+The commitment scheme in HOPR is a tuple of three algorithms, $(\mathsf{KeyGen}, \mathsf{Commit}, \mathsf{Open})$. \textsf{KeyGen} takes a security parameter and returns a seed $x$. \textsf{Commit} takes $x$ and produces the commitment as $ cm = Commit(x) $. \textsf{Open} takes a commitment $cm$ and $r$ and fails if $x$ does not fit to $cm$, otherwise it return $1$.
+
+The commitment scheme is called binding if it is infeasible for an adversary to find a value $x' \ne x$ such that $\mathsf{Open}(cm, x') = 1$. It is called hiding if is infeasible for an adversary to derive the commited value $x$ from $cm$.
+
+The iterated commitment scheme is computed as
+
+$$ comm_i = keccak256 ^i (x) = keccak256 ^{i-1} (keccak256 (x)) \quad \text{for} \ i > 0$$
+
+where $comm_0 = x$ and thus servers as a master secret. The value $x$ is chosen randomly by the ticket recipient, hence due to the pseudorandomness of the utilized cryptographic hash function, for every $i > 0$, the resulting value $comm_i = keccak256(comm_{i-1})$ is pseudorandom as well and therefore infeasible to predict by the ticket issuer.
+
+The algorithm \textsf{Open} is therefore quite simple as it solely checks that
+
+$$ comm_i = keccak256 (\widetilde{comm_{i-1}}) $$
+
+\paragraph{Commitment phase}
+\label{sec:incentives:commitment:commitmentphase}
+
+Once a node is the destination of a payment channel, it samples a master key $comm_0 \in \{0, 1\}^{32}$ and computes $comm_n = keccak256^n(comm_0)$ and submits a transaction that stores $comm_n$ on-chain within the payment channel. The value $n > 0$ is chosen by the ticket recipient and should reflect the amount of tickets that are expected to be sent using this channel.
+
+Obviously, the ticket recipient can run out of openings after redeeming a huge amount of tickets - or losing the master secret $x$. Therefore, the ticket recipient has the opportunity to renew the stored on-chain commitment. As this would allow the recipient to alter the opening to a more pleasant value just before redeeming a ticket, i.e. to turn a previously losing ticket into a winning one. Therefore, each payment channel includes a counter that gets increased on every renewal.
+
+$$ channel.ticketEpoch = channel.ticketEpoch + 1 $$
+
+Increasing that counter invalidates all previously issued tickets, hence there is no incentive for the ticket recipient to renew it more than necessary.
+
+\paragraph{Opening phase}
+
+In order to redeem a ticket, the ticket recipient must reveal the opening $comm_{i-1}$ to the current commitment $comm_i$ stored within the smart contract.
+
+The smart contract therefore checks that
+
+$$ channel.commitment = keccak256 (\widetilde{comm_{i-1}}) $$
+
+If the values match, the smart contract sets $channel.commitment = comm_{i-1}$, hence the ticket recipient needs to reveal $comm_{i-2}$ to redeem the next ticket.

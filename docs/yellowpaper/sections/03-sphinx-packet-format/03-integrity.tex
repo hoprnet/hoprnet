@@ -1,9 +1,0 @@
-\subsubsection{Integrity check}
-\label{sec:sphinx:integrity}
-
-The integrity check allows the node to verify whether or not the header has been modified. By using the derived shared secret $s_i$, each node is able to recompute the authentication tag and check the integrity of the received packet as follows:
-\begin{align}
-    \gamma_i & =HMAC(s_i,\beta_i)
-    \label{eq:6}
-\end{align}
-$B$ computes the keyed hash of the encrypted routing information $\beta_0$ and compares with the integrity tag $\gamma_0$ attached in the packet header. If the integrity check fails, it is assumed the header has been tampered with and the packet is dropped. Otherwise, the mix node proceeds to the unblinding step. The HOPR packet header contains one integrity tag $\gamma_i$ for each node along the path as visualized in Figure \ref{fig:packetDetails}.

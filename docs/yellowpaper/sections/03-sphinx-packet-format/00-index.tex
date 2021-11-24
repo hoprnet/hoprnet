@@ -1,7 +1,7 @@
 \section{Sphinx Packet Format}
 \label{sec:sphinx}
 
-HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route data packets in order to ensure sender and recipient unlinkability. The Sphinx packet format determines how mixnet packets are created and transformed before relaying them to the next downstream node in a way that does not leak path information to relayers or other parties. Each Sphinx packet consists of two parts, a header and an onion-encrypted payload:
+HOPR uses the Sphinx packet format \cite{sphinxpaper} to encapsulate and route data packets its final recipient while achieving sender and recipient unlinkability. The Sphinx packet format determines how mixnet packets are created and transformed. This happens in a way that does not leak path information to relayers or other parties eavesdropping the communication. A Sphinx packet consists of two parts, a header and an onion-encrypted payload:
 
 \begin{figure}[H]
     \centering
@@ -46,13 +46,16 @@ $\alpha_i$ is the group elements which, when combined with the nodes’ public k
 $s_i$ are the DH shared secrets, $b_i$ are the blinding factors.
 \end{comment}
 
-\input{sections/03-sphinx-packet-format/01-key-derivation.tex}
-\input{sections/03-sphinx-packet-format/02-routing-information.tex}
-\input{sections/03-sphinx-packet-format/03-integrity.tex}
-\input{sections/03-sphinx-packet-format/04-unblinding.tex}
-\input{sections/03-sphinx-packet-format/05-shifting.tex}
+\input{sections/03-sphinx-packet-format/01-key-exchange.tex}
+\input{sections/03-sphinx-packet-format/02-replay-protection.tex}
+\input{sections/03-sphinx-packet-format/03-routing-information.tex}
+\input{sections/03-sphinx-packet-format/04-shifting.tex}
+\input{sections/03-sphinx-packet-format/05-integrity.tex}
 \input{sections/03-sphinx-packet-format/06-payload-transformation.tex}
+\input{sections/03-sphinx-packet-format/07-shorter-paths.tex}
 
+
+\begin{comment}
 \subsection{Implementation choices}
 
 HOPR employs the following cryptographic primitives:
@@ -69,3 +72,4 @@ HOPR employs the following cryptographic primitives:
     \item \textbf{Padding} The original Sphinx paper uses a sequence of 0s for padding. However, this allows the last mix node in the path to infer information about the length of the path and the final destination, hence breaking one of the security properties promised by Sphinx. In order to prevent this attack, HOPR replaces the 0-padding with randomized padding for the final mix node when $v<r$. This ensures the exit node cannot identify where the padding starts and thus will not be able to determine the path length. In the case where $v=r$ there is no need to add padding as the length of the path is the maximum length, and thus no additional information is being revealed.
 
 \end{itemize}
+\end{comment}

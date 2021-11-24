@@ -1,0 +1,32 @@
+\subsection{Ticket Validation}
+\label{sec:tickets:validation}
+
+Tickets are used to convince its recipient that it will receive the promised incentive, once the challenge is solved. As ticket issuance happens without any on-chain interaction, it is the duty of the recipient to decide whether it accepts the ticket or resuses it.
+
+Ticket validation runs through two states: receiving the ticket without knowing the response to the given challenge stated as $ticket.challenge$, \lcnameref{sec:tickets:validation:locked}, and once the response is known, \lcnameref{sec:tickets:validation:unlocked}.
+
+\paragraph{Validation of Locked Tickets}
+\label{sec:tickets:validation:locked}
+
+Due to the lack of a response to the stated challenge, the node is neither able to decide whether the ticket is going to be a win nor claim it on-chain to receive the incentives. Nevertheless, the node can use the embedded information to validate the ticket economically. Therefore, the node at first extracts the winning probability as
+
+$$ticket.winProb = \frac{ticket.invWinProb}{2^{256} - 1} $$
+
+which leads $ value(ticket) = ticket.value \cdot ticket.invWinProb $. If the node considers $value(ticket)$ inappropriate, i.e. because it does match the expected amount, or if winning probability is set too high or too low, it should refuse the ticket.
+
+As ticket issuance happens without any on-chain interaction and thus, there is no guarantee that there is any payment channel at all and that this payment channel has enough tokens Locked. Therefore, the recipient needs to check that before considering a ticket valid. In addition, there might be previous tickets, denoted as $stored$, that are not yet redeemed. Hence, the recipient needs to check that
+
+$$ channel.amount \le value(ticket) + \sum_{t \ \in \ stored} value(t)$$
+
+In addtion, as tickets are issued using an ongoing serial number, the recipient must check that $ticket_i.index > \max(ticket_{i-1}.index,0)$ and refuse the ticket otherwise.
+
+It remains to show that the ticket issuer indeed knows any $response$ that solves $ticket.challenge$. This is especially relevant if the ticket issuer was given the challenge by a third party, i.e. the creator of a mixnet packet. For this section, this specific topic is out scope and covered in section on \lcnameref{sec:incentives:proofofrelay}.
+
+\paragraph{Validation of Unlocked Tickets}
+\label{sec:tickets:validation:unlocked}
+
+Once the $response$ to $ticket.challenge$ is known, i.e. after receiving a packet acknowledgement, the node is able determine whether the ticket is going to be a winner. To check this, the node first computes the next $opening$ to the current value $commitment$ stored in the smart contract and checks whether
+
+$$ \mathsf{keccak256} ( \ \mathsf{keccak256}(ticketData) \ || \ solution \ || \ opening \ ) < ticket.winProb $$
+
+If true, the node can consider the ticket to be a winner and store it for later use. In case the ticket turned out to be a loss, there is no added value to it and the node can safely drop it. Note that losing tickets are an integral part of the mechanism and do not reduce the average payout to the ticket recipient. This is the case because $value(ticket)$ is given by the expected value and hence the asymptotic payout does not change.
