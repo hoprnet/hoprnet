@@ -102,7 +102,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/ethereum.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L29)
+[packages/core-ethereum/src/ethereum.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L28)
 
 ___
 
