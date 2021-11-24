@@ -13,5 +13,5 @@ export function deriveCommitmentSeed(privateKey: Uint8Array, channelInfo: Uint8A
 
     const key = expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(privateKey), SECRET_LENGTH, HASH_KEY_COMMITMENT_SEED)
 
-    return createHmac(HASH_ALGORITHM, key).update(channelInfo).digest()
+    return new Uint8Array(createHmac(HASH_ALGORITHM, key).update(channelInfo).digest().buffer)
 }
