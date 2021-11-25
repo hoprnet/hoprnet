@@ -1192,7 +1192,7 @@ __metadata:
     secp256k1: ^4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.9
+    typedoc: 0.22.10
     typedoc-plugin-markdown: 3.11.7
     typescript: 4.5.2
   languageName: unknown
@@ -1231,7 +1231,7 @@ __metadata:
     secp256k1: ~4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.9
+    typedoc: 0.22.10
     typedoc-plugin-markdown: 3.11.7
     typescript: 4.5.2
   languageName: unknown
@@ -1255,7 +1255,7 @@ __metadata:
     peer-id: 0.15.3
     restana: 4.9.2
     rimraf: 3.0.2
-    typedoc: 0.22.9
+    typedoc: 0.22.10
     typedoc-plugin-markdown: 3.11.7
     typescript: 4.5.2
     yargs: 17.2.1
@@ -1292,7 +1292,7 @@ __metadata:
     ts-generator: 0.1.1
     ts-node: 10.4.0
     typechain: 6.0.4
-    typedoc: 0.22.9
+    typedoc: 0.22.10
     typedoc-plugin-markdown: 3.11.7
     typescript: 4.5.2
   languageName: unknown
@@ -1365,7 +1365,7 @@ __metadata:
     secp256k1: ^4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.9
+    typedoc: 0.22.10
     typedoc-plugin-markdown: 3.11.7
     typescript: 4.5.2
   languageName: unknown
@@ -1407,7 +1407,7 @@ __metadata:
     strip-ansi: 6.0.1
     tiny-hashes: ^1.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.9
+    typedoc: 0.22.10
     typedoc-plugin-markdown: 3.11.7
     typescript: 4.5.2
     ws: 8.3.0
@@ -17255,9 +17255,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.22.9":
-  version: 0.22.9
-  resolution: "typedoc@npm:0.22.9"
+"typedoc@npm:0.22.10":
+  version: 0.22.10
+  resolution: "typedoc@npm:0.22.10"
   dependencies:
     glob: ^7.2.0
     lunr: ^2.3.9
@@ -17265,10 +17265,10 @@ __metadata:
     minimatch: ^3.0.4
     shiki: ^0.9.12
   peerDependencies:
-    typescript: 4.0.x || 4.1.x || 4.2.x || 4.3.x || 4.4.x
+    typescript: 4.0.x || 4.1.x || 4.2.x || 4.3.x || 4.4.x || 4.5.x
   bin:
     typedoc: bin/typedoc
-  checksum: a9728074a357fd48fdcbd661ced298f37e2f5b366e5eb921cf06767eabf87fada30ffe791059272e2336cb1d02f1034116a72ca6f159df811906eb82e03071e3
+  checksum: 404932ae8e62d1507209d50b635d9d5cefead344e7e84e2d21fc84741fb739e011dcffcf335d6d4e2a31fe45910757b27f11678f6ae5b89514d2f291fe41884e
   languageName: node
   linkType: hard
 
