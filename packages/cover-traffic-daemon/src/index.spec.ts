@@ -18,7 +18,7 @@ describe('cover-traffic daemon', async function () {
 
   beforeEach(function () {
     data = sampleData
-    stubLibp2p();
+    stubLibp2p()
     node = new Hopr(mockPeerId, dbMock, chainMock, sampleOptions)
   })
 

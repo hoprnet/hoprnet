@@ -49,5 +49,5 @@ chain.start = sinon.fake(() => {
   }
 })
 
-const chainMock = chain;
+const chainMock = chain
 export { chainMock }

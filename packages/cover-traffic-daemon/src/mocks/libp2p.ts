@@ -2,9 +2,9 @@ import LibP2P from 'libp2p'
 import ConnectionManager from 'libp2p/src/connection-manager'
 import PeerStore from 'libp2p/src/peer-store'
 import AddressManager from 'libp2p/src/address-manager'
-import { debug } from "@hoprnet/hopr-utils"
-import { NAMESPACE, mockPeerId, sampleMultiaddrs, samplePeerId } from "./constants"
-import sinon from 'sinon';
+import { debug } from '@hoprnet/hopr-utils'
+import { NAMESPACE, mockPeerId, sampleMultiaddrs, samplePeerId } from './constants'
+import sinon from 'sinon'
 
 const libp2pLogger = debug(`${NAMESPACE}:libp2p`)
 let libp2p: LibP2P
