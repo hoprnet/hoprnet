@@ -10,8 +10,8 @@ import chalk from 'chalk'
 import { TCPConnection, Listener } from './base'
 import { WebRTCUpgrader } from './webrtc'
 import { Relay } from './relay'
-import { Discovery } from './discovery'
 import { Filter } from './filter'
+import { Discovery } from './discovery'
 
 import type { PublicNodesEmitter, PeerStoreType, DialOptions } from './types'
 
