@@ -14,6 +14,6 @@
     // Hardhat environment within ethereum packages
     { "path": "packages/ethereum/tsconfig.hardhat.json" },
     // Hopr-connect e2e tests
-    { "path": "packages/connect/tsconfig.e2e-tests.json" }
+    { "path": "packages/connect/tests" }
   ]
 }

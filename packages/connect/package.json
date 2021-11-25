@@ -19,7 +19,7 @@
     "lib"
   ],
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.e2e-tests.tsbuildinfo",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tests/tsconfig.tsbuildinfo",
     "build": "yarn clean && tsc -p .",
     "test": "mocha --parallel --full-trace",
     "prepublishOnly": "yarn clean && tsc -p ./tsconfig.npm.json"

@@ -1,11 +1,15 @@
-# setup paths
-# find usable tmp dir
-declare tmp="/tmp"
-[[ -d "${tmp}" && -L "${tmp}" ]] && tmp="/var/tmp"
-[[ -d "${tmp}" && -L "${tmp}" ]] && {
-  msg "Neither /tmp or /var/tmp can be used for writing logs"
-  exit 1
-}
+#!/usr/bin/env bash
+
+# prevent execution of this script, only allow execution
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
+
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -Eeuo pipefail
+
+source "${mydir}/../utils.sh"
+
+declare tmp=$(find_tmp_dir)
 
 function free_port() {
   local port="${1}"
@@ -32,13 +36,13 @@ function cleanup() {
 trap cleanup SIGINT SIGTERM ERR EXIT
 
 function start_node() {
-  declare filename=${1}
-  declare log_file=${2}
-  declare script=${3}
-  declare rest_args=${@:4}
+  local filename=${1}
+  local log_file=${2}
+  local script=${3}
+  local rest_args=${@:4}
 
   DEBUG=flow:hopr-connect*,hopr-connect*,simple-peer \
-    yarn ts-node "${mydir}/../../packages/connect/${filename}" \
+    yarn ts-node packages/connect/${filename} \
     ${rest_args} \
     --script "${script}" > "${log_file}" \
     2>&1 &

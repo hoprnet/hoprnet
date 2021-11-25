@@ -7,8 +7,8 @@ import { NOISE } from '@chainsafe/libp2p-noise'
 
 const MPLEX = require('libp2p-mplex')
 
-import HoprConnect from '../src'
-import type { HoprConnectOptions } from '../src'
+import HoprConnect from '@hoprnet/hopr-connect'
+import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
 import { Multiaddr } from 'multiaddr'
 import pipe from 'it-pipe'
 import yargs from 'yargs/yargs'

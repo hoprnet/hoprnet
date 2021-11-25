@@ -183,4 +183,17 @@ function expect_file_content() {
   fi
 }
 
+function find_tmp_dir() {
+  local tmp="/tmp"
+  if [[ -d "${tmp}" && -h "${tmp}" ]]; then
+    tmp="/var/tmp"
+  fi
+
+  if [[ -d "${tmp}" && -h "${tmp}" ]]; then
+    msg "Neither /tmp or /var/tmp can be used for writing logs"; 
+    exit 1;
+  fi
+  echo ${tmp}
+}
+
 setup_colors

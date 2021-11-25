@@ -7,10 +7,13 @@ test "$?" -eq "0" && {
   exit 1
 }
 
-# set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)
+
+# set log id and use shared log function for readable logs
 declare HOPR_LOG_ID="hopr-connect-test"
+
+# Setup environment and load useful utils
 source "${mydir}/../utils.sh"
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden

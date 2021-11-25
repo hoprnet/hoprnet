@@ -14,6 +14,7 @@ source "${mydir}/../utils.sh"
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
 
+# Setup connect test environment and load test utils
 source "${mydir}/common.sh"
 
 setup "reconnect"
