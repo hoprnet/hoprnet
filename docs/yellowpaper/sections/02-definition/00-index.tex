@@ -1,6 +1,18 @@
 \section{Definition and Notation}
 
-HOPR makes use of the \href{https://en.bitcoin.it/wiki/Secp256k1}{secp256k1} curvee, used in Bitcoin and Etherem, to create signatures and derive shared keys
+HOPR uses elliptic-curve public-key cryptography to process packets and incentives. Operations are done using using the \href{https://en.bitcoin.it/wiki/Secp256k1}{secp256k1} curve, so on-chain and off-chain identities are identical.
+
+If not otherwise stated, $\cdot$ means multiplication of a scalar with a point on the elliptic curve and $G$ refers to the standard base point stated on Bitcoin's \href{https://en.bitcoin.it/wiki/Secp256k1}{wiki page}.
+
+Points on the curve are given by tuples $(x,y) \in \mathbb{F}_p \times \mathbb{F}_p$ over the finite field $\mathbb{F}_p$ where $p = 2^{255} - 2^{32} - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1$.
+
+$ || $ means bit-wise concatenation, hence $\mathsf{0xaf} \ || \ \mathsf{0xfe}$ becomes $\mathsf{0xaffe}$.
+
+$\oplus$ means bit-wise XOR, hence $a \oplus b = (a \land \lnot b) \lor (\lnot a \land b)$
+
+If not otherwise stated, public keys are denoted capitalized and private keys use lower-case identifiers, both employing the ECDSA signature system, hence a public key $Y_i = y_i \cdot G$.
+
+If not otherwise stated, strings are serialized using UTF-8 encoding.
 
 \begin{comment}
 \subsection{Implementation choices}
