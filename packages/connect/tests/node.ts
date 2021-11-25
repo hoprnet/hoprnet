@@ -17,7 +17,7 @@ import type PeerId from 'peer-id'
 import type { WriteStream } from 'fs'
 import type { PeerStoreType, Stream } from '../src/types'
 
-const TEST_PROTOCOL = '/hopr-connect/test/0.0.1'
+const TEST_PROTOCOL = '/hopr-connect/test/0.1.0'
 
 function encodeMsg(msg: string): Uint8Array {
   return new TextEncoder().encode(msg)
