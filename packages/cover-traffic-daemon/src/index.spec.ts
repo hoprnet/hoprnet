@@ -3,13 +3,16 @@ import PeerId from 'peer-id'
 import Hopr from '@hoprnet/hopr-core'
 import { HoprOptions } from '@hoprnet/hopr-core'
 import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
-import { debug, privKeyToPeerId, HoprDB, NativeBalance, AccountEntry, Address } from '@hoprnet/hopr-utils'
+import { debug, privKeyToPeerId, HoprDB, NativeBalance, AccountEntry, Address, PublicKey, wait } from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
 import BN from 'bn.js'
 import ConnectionManager from 'libp2p/src/connection-manager'
 import PeerStore from 'libp2p/src/peer-store'
 import { Multiaddr } from 'multiaddr'
 import AddressManager from 'libp2p/src/address-manager'
+
+import { PersistedState } from './state'
+import { CoverTrafficStrategy } from './strategy'
 
 const namespace = 'hopr:test:cover-traffic'
 const log = debug(namespace)
@@ -20,12 +23,13 @@ describe('cover-traffic daemon', async function () {
   const samplePeerId = PeerId.createFromB58String('16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7')
   const sampleMultiaddrs = new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${samplePeerId.toB58String()}`)
 
-  let node: Hopr, libp2p: LibP2P, indexer: Indexer
+  let node: Hopr, libp2p: LibP2P, indexer: Indexer, data: PersistedState
   let peerId: PeerId, db: HoprDB, chain: HoprCoreEthereum, options: HoprOptions
   beforeEach(function () {
     peerId = privKeyToPeerId(privateKey)
     options = { environment: { id: '1' } } as unknown as HoprOptions
     db = sinon.createStubInstance(HoprDB)
+    data = sinon.createStubInstance(PersistedState)
 
     const dbLogger = debug(namespace + ':db')
     db.close = () => {
@@ -97,9 +101,12 @@ describe('cover-traffic daemon', async function () {
     sinon.restore()
   })
   it('should run and stop properly', async function () {
-    log('starting stubbed cover-traffic daemon')
+    log('starting stubbed hopr node')
     await node.start()
-    log('completed stubbed cover-traffic')
+    log('completed stubbed hopr node, starting cover-traffic strategy')
+    node.setChannelStrategy(new CoverTrafficStrategy(PublicKey.fromPeerId(peerId), node, data))
+    log('completed strategy, waiting for 200 ms w/o crashing')
+    await wait(200)
     log('Starting node stop process')
     await node.stop()
     log('Stopped node succesfully')
