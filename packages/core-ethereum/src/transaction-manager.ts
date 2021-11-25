@@ -1,3 +1,4 @@
+import { TransactionRequest } from '@ethersproject/abstract-provider'
 import { debug } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'ethers'
 import { isDeepStrictEqual } from 'util'
@@ -38,6 +39,22 @@ class TranscationManager {
    * confirmed transactions
    */
   public readonly confirmed = new Map<string, Transaction>()
+
+  /**
+   * Return all the pending transactions
+   * @returns Array of transaction hashes
+   */
+  public getAllPendingTxs(): TransactionRequest[] {
+    // pending tx hashes
+    const pendingTxHash = Array.from(this.pending.keys());
+    return pendingTxHash.length === 0 ? [] : pendingTxHash.map(txHash => {
+      const {to, data, value} = this.payloads.get(txHash);
+      const {nonce, gasPrice} = this. pending.get(txHash)
+      return {
+        to, data, value, nonce, gasPrice
+      }
+    })
+  }
 
   /**
    * Return pending and mined transactions

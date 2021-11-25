@@ -31,8 +31,8 @@ export async function createChainWrapper(
   checkDuplicate: Boolean = true
 ) {
   const provider = networkInfo.provider.startsWith('http')
-    ? new providers.StaticJsonRpcProvider(networkInfo.provider)
-    : new providers.WebSocketProvider(networkInfo.provider)
+  ? new providers.StaticJsonRpcProvider(networkInfo.provider)
+  : new providers.WebSocketProvider(networkInfo.provider)
   const wallet = new Wallet(privateKey).connect(provider)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()
@@ -428,7 +428,8 @@ export async function createChainWrapper(
       hoprChannelsAddress: hoprChannelsDeployment.address,
       channelClosureSecs
     }),
-    updateConfirmedTransaction: (hash: string) => transactions.moveToConfirmed(hash)
+    updateConfirmedTransaction: (hash: string) => transactions.moveToConfirmed(hash),
+    getAllPendingTransactionRequests: () => transactions.getAllPendingTxs()
   }
 
   return api

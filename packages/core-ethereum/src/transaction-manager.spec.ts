@@ -94,4 +94,19 @@ describe('transaction-manager', function () {
     expect(Array.from(transactionManager.confirmed.keys())).to.not.include(txs[0][0])
     expect(Array.from(transactionManager.confirmed.keys())).to.not.include(txs[1][0])
   })
+
+  it('should getAllPendingTxs', function () {
+    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
+    const allPendingTx = transactionManager.getAllPendingTxs()
+
+    expect(allPendingTx.length).to.equal(1)
+    expect(allPendingTx.pop()).to.equal({
+      to: PAYLOAD.to,
+      data: PAYLOAD.data,
+      value: PAYLOAD.value,
+      nonce: TX[1].nonce,
+      gasPrice: TX[1].gasPrice
+    })
+  })
+  
 })
