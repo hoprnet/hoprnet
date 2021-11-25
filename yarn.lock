@@ -1150,26 +1150,48 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@hoprnet/hopr-connect@npm:0.2.45":
-  version: 0.2.45
-  resolution: "@hoprnet/hopr-connect@npm:0.2.45"
+"@hoprnet/hopr-connect@workspace:packages/connect":
+  version: 0.0.0-use.local
+  resolution: "@hoprnet/hopr-connect@workspace:packages/connect"
   dependencies:
-    "@hoprnet/hopr-utils": 1.83.0-next.27
-    abortable-iterator: ^3.0.0
+    "@chainsafe/libp2p-noise": 4.1.1
+    "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@types/bl": 5.0.2
+    "@types/chai": 4.2.22
+    "@types/chai-spies": 1.0.3
+    "@types/debug": 4.1.7
+    "@types/mocha": 9.0.0
+    "@types/node": 16.11.6
+    "@types/simple-peer": 9.11.3
+    "@types/yargs": 17.0.7
+    abortable-iterator: 3.0.0
     bl: ^5.0
+    chai: 4.3.4
+    chai-spies: 1.0.0
     debug: ^4.3.2
     heap-js: ^2.1.6
     it-handshake: ^2.0.0
+    it-pair: 1.0.0
+    it-pipe: 1.1.0
+    it-pushable: 1.4.2
+    libp2p: 0.33.0
+    libp2p-interfaces: 1.1.0
+    libp2p-mplex: 0.10.4
+    mocha: 9.1.3
     multiaddr: ^10.0.0
     multihashes: ^4.0.3
     peer-id: ~0.15.3
-    simple-peer: 9.11
+    prettier: 2.4.1
+    rimraf: 3.0.2
+    simple-peer: 9.11.0
     stream-to-it: ^0.2.4
+    ts-node: 10.4.0
+    typescript: 4.5.2
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
-  checksum: 52afbd113350c2c756490aad3ec16864e357ab00c9d85ddcb94cad4aacd5f90237f33d7e455e800a49d16a27dd79625fa45c767c1c8ddccdda6c58f97eefd771
-  languageName: node
-  linkType: hard
+    yargs: 17.2.1
+  languageName: unknown
+  linkType: soft
 
 "@hoprnet/hopr-core-ethereum@workspace:packages/core-ethereum":
   version: 0.0.0-use.local
@@ -1204,7 +1226,7 @@ __metadata:
   dependencies:
     "@chainsafe/libp2p-noise": ^4.1.1
     "@google-cloud/profiler": 4.1.5
-    "@hoprnet/hopr-connect": 0.2.45
+    "@hoprnet/hopr-connect": "workspace:packages/connect"
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
@@ -1297,34 +1319,6 @@ __metadata:
     typescript: 4.5.2
   languageName: unknown
   linkType: soft
-
-"@hoprnet/hopr-utils@npm:1.83.0-next.27":
-  version: 1.83.0-next.27
-  resolution: "@hoprnet/hopr-utils@npm:1.83.0-next.27"
-  dependencies:
-    abort-controller: ~3.0.0
-    bignumber.js: ^9.0.1
-    bn.js: 5.2.0
-    bs58: ^4.0.1
-    chalk: ^4.1.2
-    debug: ^4.3.2
-    ethers: 5.5.1
-    futoin-hkdf: ~1.4.2
-    it-pipe: ^1.1.0
-    leveldown: 6.1.0
-    levelup: 5.1.1
-    libp2p: 0.33.0
-    libp2p-crypto: 0.20.0
-    memdown: 6.1.1
-    multiaddr: ^10.0.0
-    multihashes: ~4.0.1
-    peer-id: 0.15.3
-    pino: ^7.0.0
-    pino-logflare: ^0.3.12
-    secp256k1: ^4.0.2
-  checksum: 1dbf87438a0e04ea7e04d03ed386907c6d5a7dacb784048bcec7d89c0b0aafd160b477061992d2964e64f46316c3c688b311072d22e052d64e794093a68b2a97
-  languageName: node
-  linkType: hard
 
 "@hoprnet/hopr-utils@workspace:packages/utils":
   version: 0.0.0-use.local
@@ -2338,6 +2332,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/bl@npm:5.0.2":
+  version: 5.0.2
+  resolution: "@types/bl@npm:5.0.2"
+  dependencies:
+    "@types/node": "*"
+    "@types/readable-stream": "*"
+  checksum: 5fcdf594ab775fc221bbe9d62e6d597db2c9cec294ea337f65682b968cc6a21c9106b411cb3971f4140eedc4a3a72f12e9b748ccab1658d0e14c2838654168cd
+  languageName: node
+  linkType: hard
+
 "@types/blessed@npm:0.1.19":
   version: 0.1.19
   resolution: "@types/blessed@npm:0.1.19"
@@ -2384,6 +2388,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/chai-spies@npm:1.0.3":
+  version: 1.0.3
+  resolution: "@types/chai-spies@npm:1.0.3"
+  dependencies:
+    "@types/chai": "*"
+  checksum: f88b1a021c1f6c37259adf4268b00401431633027995725a49c44658b0fedf7ec09aa4e26e59fdf6564df0767a0b105b26a4a9c8a7c6acaf9ba417b06a4c9c70
+  languageName: node
+  linkType: hard
+
 "@types/chai@npm:*, @types/chai@npm:4.2.22":
   version: 4.2.22
   resolution: "@types/chai@npm:4.2.22"
@@ -2413,6 +2426,15 @@ __metadata:
   version: 1.4.2
   resolution: "@types/console-log-level@npm:1.4.2"
   checksum: 58465fb5d46287bdf67ef80c73bbc172ef7fbebe774ac7bd44c3cc3d8d78b9eab1122a3643e943c22f31dbd4bab22f21a8ee1aa95b0e996003a9b749dc02fde2
+  languageName: node
+  linkType: hard
+
+"@types/debug@npm:4.1.7":
+  version: 4.1.7
+  resolution: "@types/debug@npm:4.1.7"
+  dependencies:
+    "@types/ms": "*"
+  checksum: 0a7b89d8ed72526858f0b61c6fd81f477853e8c4415bb97f48b1b5545248d2ae389931680b94b393b993a7cfe893537a200647d93defe6d87159b96812305adc
   languageName: node
   linkType: hard
 
@@ -2506,6 +2528,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/ms@npm:*":
+  version: 0.7.31
+  resolution: "@types/ms@npm:0.7.31"
+  checksum: daadd354aedde024cce6f5aa873fefe7b71b22cd0e28632a69e8b677aeb48ae8caa1c60e5919bb781df040d116b01cb4316335167a3fc0ef6a63fa3614c0f6da
+  languageName: node
+  linkType: hard
+
 "@types/node-fetch@npm:^2.5.5":
   version: 2.5.12
   resolution: "@types/node-fetch@npm:2.5.12"
@@ -2520,6 +2549,13 @@ __metadata:
   version: 16.11.10
   resolution: "@types/node@npm:16.11.10"
   checksum: 9c79419c5c3d92d5825bffa30f3668533f598d8b63a73ea7fc24e47f162bdbed92b0f8e4f4261cc3314b39cee050e303366d2aa154abc95c63a572a110b8c160
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:16.11.6":
+  version: 16.11.6
+  resolution: "@types/node@npm:16.11.6"
+  checksum: 6e19634766ff589d3d2f361c2196b671f8f133cdadc5ad347a621c360d8994b6c4fbccfb2ad9c60c588c593831a96497c9c6b77d2b7e91be723384b94f6368e7
   languageName: node
   linkType: hard
 
@@ -2576,6 +2612,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/readable-stream@npm:*":
+  version: 2.3.12
+  resolution: "@types/readable-stream@npm:2.3.12"
+  dependencies:
+    "@types/node": "*"
+    safe-buffer: "*"
+  checksum: e4f645bc9c3683780ce2e1ed8a7749c801aded4c27d4e93493b5f2cf51200c0d1cc23f9a186f7fd8b417b17ba499d93e1a6ac85db4e31aeb3af5389695dc9cb1
+  languageName: node
+  linkType: hard
+
 "@types/resolve@npm:^0.0.8":
   version: 0.0.8
   resolution: "@types/resolve@npm:0.0.8"
@@ -2624,6 +2670,15 @@ __metadata:
   version: 7.3.9
   resolution: "@types/semver@npm:7.3.9"
   checksum: 60bfcfdfa7f937be2c6f4b37ddb6714fb0f27b05fe4cbdfdd596a97d35ed95d13ee410efdd88e72a66449d0384220bf20055ab7d6b5df10de4990fbd20e5cbe0
+  languageName: node
+  linkType: hard
+
+"@types/simple-peer@npm:9.11.3":
+  version: 9.11.3
+  resolution: "@types/simple-peer@npm:9.11.3"
+  dependencies:
+    "@types/node": "*"
+  checksum: a1305522a86d01170edbc937668b85312c26bf55e6753a3999627c57af52dc2773bd57f0ef72246092d96f4e97bcdb2520891e0fdd8be6eb98edf251a925a189
   languageName: node
   linkType: hard
 
@@ -2723,7 +2778,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"abortable-iterator@npm:^3.0.0":
+"abortable-iterator@npm:3.0.0, abortable-iterator@npm:^3.0.0":
   version: 3.0.0
   resolution: "abortable-iterator@npm:3.0.0"
   dependencies:
@@ -4764,6 +4819,15 @@ __metadata:
   peerDependencies:
     chai: ">= 2.1.2 < 5"
   checksum: 7262868a5b51a12af4e432838ddf97a893109266a505808e1868ba63a12de7ee1166e9d43b5c501a190c377c1b11ecb9ff8e093c89f097ad96c397e8ec0f8d6a
+  languageName: node
+  linkType: hard
+
+"chai-spies@npm:1.0.0":
+  version: 1.0.0
+  resolution: "chai-spies@npm:1.0.0"
+  peerDependencies:
+    chai: "*"
+  checksum: c3a319d5671cf381029f2745e6330f897de4486e574b0d4fb92e6835268b0139f107295c8abf083949659a6a35dc6c8aa4ac0dc78db0aa16602a4987282b646a
   languageName: node
   linkType: hard
 
@@ -10140,7 +10204,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pair@npm:^1.0.0":
+"it-pair@npm:1.0.0, it-pair@npm:^1.0.0":
   version: 1.0.0
   resolution: "it-pair@npm:1.0.0"
   dependencies:
@@ -10160,14 +10224,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pipe@npm:^1.0.1, it-pipe@npm:^1.1.0":
+"it-pipe@npm:1.1.0, it-pipe@npm:^1.0.1, it-pipe@npm:^1.1.0":
   version: 1.1.0
   resolution: "it-pipe@npm:1.1.0"
   checksum: d653078f1543851f55070e38426dbbebad1303e9adde5238e4192b8b38ac7e4a1dcc149ccf3e4269759d1cbdd00be98b346fc8db81117c81017f09577f050e8e
   languageName: node
   linkType: hard
 
-"it-pushable@npm:^1.4.0, it-pushable@npm:^1.4.1, it-pushable@npm:^1.4.2":
+"it-pushable@npm:1.4.2, it-pushable@npm:^1.4.0, it-pushable@npm:^1.4.1, it-pushable@npm:^1.4.2":
   version: 1.4.2
   resolution: "it-pushable@npm:1.4.2"
   dependencies:
@@ -11057,6 +11121,27 @@ __metadata:
     uint8arrays: ^3.0.0
     ursa-optional: ^0.10.1
   checksum: d533395309cff7ebad3584e6ea3c34f35aa7eb0eb53a8e0914005bb8b0c7cbc5d4a3ee37ac3f941d642a9ced0bc5c7fdbae6458e2b2452d35726895df93761ea
+  languageName: node
+  linkType: hard
+
+"libp2p-interfaces@npm:1.1.0":
+  version: 1.1.0
+  resolution: "libp2p-interfaces@npm:1.1.0"
+  dependencies:
+    abort-controller: ^3.0.0
+    abortable-iterator: ^3.0.0
+    debug: ^4.3.1
+    err-code: ^3.0.1
+    it-length-prefixed: ^5.0.2
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
+    libp2p-crypto: ^0.19.5
+    multiaddr: ^10.0.0
+    multiformats: ^9.1.2
+    peer-id: ^0.15.0
+    protobufjs: ^6.10.2
+    uint8arrays: ^3.0.0
+  checksum: 0d4c9353425ff24bb72f5271245c205e61eceb9377410d624321e6a7f6def3f84d24ca4e34f9f7fea861ae84c3d41dae05288a1743aed9667605ff8e31b7b15f
   languageName: node
   linkType: hard
 
@@ -15199,17 +15284,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"safe-buffer@npm:*, safe-buffer@npm:^5.0.1, safe-buffer@npm:^5.1.0, safe-buffer@npm:^5.1.1, safe-buffer@npm:^5.1.2, safe-buffer@npm:^5.2.0, safe-buffer@npm:^5.2.1, safe-buffer@npm:~5.2.0":
+  version: 5.2.1
+  resolution: "safe-buffer@npm:5.2.1"
+  checksum: b99c4b41fdd67a6aaf280fcd05e9ffb0813654894223afb78a31f14a19ad220bba8aba1cb14eddce1fcfb037155fe6de4e861784eb434f7d11ed58d1e70dd491
+  languageName: node
+  linkType: hard
+
 "safe-buffer@npm:5.1.2, safe-buffer@npm:~5.1.0, safe-buffer@npm:~5.1.1":
   version: 5.1.2
   resolution: "safe-buffer@npm:5.1.2"
   checksum: f2f1f7943ca44a594893a852894055cf619c1fbcb611237fc39e461ae751187e7baf4dc391a72125e0ac4fb2d8c5c0b3c71529622e6a58f46b960211e704903c
-  languageName: node
-  linkType: hard
-
-"safe-buffer@npm:^5.0.1, safe-buffer@npm:^5.1.0, safe-buffer@npm:^5.1.1, safe-buffer@npm:^5.1.2, safe-buffer@npm:^5.2.0, safe-buffer@npm:^5.2.1, safe-buffer@npm:~5.2.0":
-  version: 5.2.1
-  resolution: "safe-buffer@npm:5.2.1"
-  checksum: b99c4b41fdd67a6aaf280fcd05e9ffb0813654894223afb78a31f14a19ad220bba8aba1cb14eddce1fcfb037155fe6de4e861784eb434f7d11ed58d1e70dd491
   languageName: node
   linkType: hard
 
@@ -15643,7 +15728,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"simple-peer@npm:9.11":
+"simple-peer@npm:9.11.0":
   version: 9.11.0
   resolution: "simple-peer@npm:9.11.0"
   dependencies:
