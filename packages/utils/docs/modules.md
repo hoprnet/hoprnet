@@ -1111,7 +1111,7 @@ ___
 
 ### debug
 
-▸ `Const` **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `any`
+▸ `Const` **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `void`
 
 #### Parameters
 
@@ -1123,7 +1123,7 @@ ___
 
 `fn`
 
-▸ (`message`, ...`parameters`): `any`
+▸ (`message`, ...`parameters`): `void`
 
 ##### Parameters
 
@@ -1134,7 +1134,7 @@ ___
 
 ##### Returns
 
-`any`
+`void`
 
 #### Defined in
 
