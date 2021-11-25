@@ -9,7 +9,7 @@ As a result of the packet creation and its transformation, the sender is able to
 
 $$s_i^{master} \longleftarrow \mathsf{extract}(s_i, 33, pubKey)$$
 
-By adding their own public key $pubKey$ as a salt, each node derives a unique $s_i^{master}$ for each $s_i$.
+By adding their own compressed public key $pubKey$ as a salt, each node derives a unique $s_i^{master}$ for each $s_i$.
 
 \subsection{Expansion}
 
@@ -18,19 +18,23 @@ Each subkey $s_i^{sub}$ is used for one purpose, such as keying the \textit{pseu
 $$s_i^{sub} \longleftarrow \mathsf{expand}(s_i^{master}, length(purpose), hashKey(purpose))$$
 
 \begin{center}
-    \begin{tabular}{|c | c| c | l |}
-        \hline
-        Usage                           & Purpose         & Length   & Hash Key (UTF-8)                \\
-        \hline
-        \hline
-        \multirow{3}{*}{SPHINX packet}  & PRG             & 32       & \texttt{HASH\_KEY\_PRG}         \\
-                                        & PRP             & 128 + 64 & \texttt{HASH\_KEY\_PRP}         \\
-                                        & Packet tag      & 32       & \texttt{HASH\_KEY\_PACKET\_TAG} \\
-        \hline
-        \multirow{2}{*}{Proof of Relay} & acknowledgement & 32*      & \texttt{HASH\_KEY\_ACK\_KEY}    \\
-                                        & ownKey          & 32*      & \texttt{HASH\_KEY\_OWN\_KEY}    \\
+    \begin{tabular}{c | c|  c | c | l |}
+        \cline{2-5}
+                                             & Usage           & Name      & Length   & Hash Key (UTF-8)                \\
+        \cline{2-5}
+        \noalign{\smallskip}
+        \cline{2-5}
+        \multirow{4}{*}{\rotatebox{90}{\shortstack{SPHINX                                                               \\packet}}} & PRG             & $s^{prg}$ & 32       & \texttt{HASH\_KEY\_PRG}         \\
+                                             & PRP             & $s^{prp}$ & 128 + 64 & \texttt{HASH\_KEY\_PRP}         \\
+                                             & Packet tag      & $s^{tag}$ & 32       & \texttt{HASH\_KEY\_PACKET\_TAG} \\
+                                             & Blinding        & $s^{bl}$  & 32 + 12  & \texttt{HASH\_KEY\_BLINDING}    \\
+        \cline{2-5}
+        \noalign{\smallskip}
+        \cline{2-5}
+        \multirow{2}{*}{\rotatebox{90}{PoR}} & acknowledgement & $s^{ack}$ & 32*      & \texttt{HASH\_KEY\_ACK\_KEY}    \\
+                                             & ownKey          & $s^{own}$ & 32*      & \texttt{HASH\_KEY\_OWN\_KEY}    \\
 
-        \hline
+        \cline{2-5}
     \end{tabular}
 \end{center}
 

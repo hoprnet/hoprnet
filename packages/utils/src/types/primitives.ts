@@ -2,8 +2,8 @@ import { utils, ethers } from 'ethers'
 import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify, ecdsaRecover } from 'secp256k1'
 import { moveDecimalPoint } from '../math'
-import { u8aToHex, u8aEquals, stringToU8a, u8aConcat, serializeToU8a, u8aToNumber, u8aSplit } from '../u8a'
-import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
+import { u8aToHex, u8aEquals, stringToU8a, u8aConcat } from '../u8a'
+import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH } from '../constants'
 import PeerId from 'peer-id'
 import { pubKeyToPeerId } from '../libp2p'
 
@@ -195,63 +195,50 @@ export class Hash {
   }
 }
 
+/**
+ * Class used to represent an ECDSA signature.
+ *
+ * The methods serialize()/deserialize() are used to convert the signature
+ * to/from 64-byte compressed representation as given by EIP-2098 (https://eips.ethereum.org/EIPS/eip-2098).
+ * This compressed signature format is supported by OpenZeppelin.
+ *
+ * Internally this class still maintains representation using `(r,s)` tuple and `v` parity component separate
+ * as this makes interop with the underlying ECDSA library simpler.
+ */
 export class Signature {
   constructor(readonly signature: Uint8Array, readonly recovery: number) {
     if (signature.length !== SIGNATURE_LENGTH) {
       throw new Error('Incorrect size Uint8Array for signature')
     }
+    if (![0, 1].includes(recovery)) {
+      throw new Error('Recovery must be either 1 or 0, got ${recovery}')
+    }
   }
 
   static deserialize(arr: Uint8Array): Signature {
-    const [s, preRecovery] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
-
-    const r = u8aToNumber(preRecovery) as number
-
-    if (![0, 1].includes(r)) {
-      throw Error(`Expected recovery to be 0 or 1. Got ${r}`)
+    if (arr.length !== SIGNATURE_LENGTH) {
+      throw new Error('Incorrect size Uint8Array for signature')
     }
 
-    return new Signature(s, r)
+    const arrCopy = new Uint8Array(arr)
+
+    // Read & clear the top-most bit in S
+    const recovery = (arrCopy[SIGNATURE_LENGTH / 2] & 0x80) != 0 ? 1 : 0
+    arrCopy[SIGNATURE_LENGTH / 2] &= 0x7f
+
+    return new Signature(arrCopy, recovery)
   }
 
-  /**
-   * Deserializes Ethereum-specific signature with
-   * non-standard recovery values 27 and 28
-   * @param arr serialized Ethereum signature
-   * @returns deserialized Ethereum signature
-   */
-  static deserializeEthereum(arr: Uint8Array): Signature {
-    const [s, preRecovery] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
-
-    const r = u8aToNumber(preRecovery) as number
-
-    if (![27, 28].includes(r)) {
-      throw Error(`Expected recovery to be 27 or 28. Got ${r}`)
-    }
-
-    return new Signature(s, r - 27)
-  }
   static create(msg: Uint8Array, privKey: Uint8Array): Signature {
     const result = ecdsaSign(msg, privKey)
     return new Signature(result.signature, result.recid)
   }
 
   serialize(): Uint8Array {
-    return serializeToU8a([
-      [this.signature, SIGNATURE_LENGTH],
-      [Uint8Array.of(this.recovery), SIGNATURE_RECOVERY_LENGTH]
-    ])
-  }
-
-  /**
-   * Replaces recovery value by Ethereum-specific values 27/28
-   * @returns serialized signature to use within Ethereum
-   */
-  serializeEthereum(): Uint8Array {
-    return serializeToU8a([
-      [this.signature, SIGNATURE_LENGTH],
-      [Uint8Array.of(this.recovery + 27), SIGNATURE_RECOVERY_LENGTH]
-    ])
+    const compressedSig = new Uint8Array(this.signature)
+    compressedSig[SIGNATURE_LENGTH / 2] &= 0x7f
+    compressedSig[SIGNATURE_LENGTH / 2] |= this.recovery << 7
+    return compressedSig
   }
 
   verify(msg: Uint8Array, pubKey: PublicKey): boolean {
@@ -262,7 +249,7 @@ export class Signature {
     return u8aToHex(this.serialize())
   }
 
-  static SIZE = SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
+  static SIZE = SIGNATURE_LENGTH
 }
 
 abstract class BalanceBase {

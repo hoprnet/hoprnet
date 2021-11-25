@@ -1,0 +1,14 @@
+\subsection{Heartbeat}
+HOPR nodes use a heartbeat mechanism to estimate the availability of nodes in the network. Nodes keep scores of each other that measure their health. They utilize a exponential backoff to efficiently measure health scores.
+
+\subsubsection{Health Score}
+Each node keeps a score of all other nodes and increases that score if it has been observed online and decreases if it could not be reached. Each node that has an funded outgoing payment channel is initially listed with $healthScore = 0.2$. Responding to a \textit{ping} with a \textit{pong} packet or sending its own \textit{ping} increases a node's score by 0.1. Not responding to a \textit{ping} reduces the node's score by 0.1. The minimal node score is 0 and the maximal score is 1. Nodes with a $healthScore \ge healthThreshold$ considered online and utilized in paths, nodes with lower scores are omitted. The default $healthThreshold$ is $0.5$.
+
+\subsubsection{Exponential Backoff}
+Since the network status can change abruptly, e.g., due to electricity outages or unstable network links, availability needs to be measured frequently on an ongoing basis. On the other hand, it does not make sense to constantly probe nodes that are known to be offline. To provide a dynamic trade-off for both cases, HOPR utilizes a heartbeat with exponential backoff, the time until the next \textit{ping} is sent to a node increases with the number of failed ping attempts $n_{fail}$ since the last sucessful attempt or the network start. A successful response to \textit{ping} resets the backoff timer.
+
+$$ t_{bo} = {t_{base}}^{{f_{bo}}^{n_{fail}}} $$
+
+where $t_{bo}$ is the backoff time, $t_{base} = 2s$ is the initial backoff time and $f_{bo} = 1.5$.
+
+The maximal backoff time of 512 seconds corresponds to $n_{fail} = 5$.
