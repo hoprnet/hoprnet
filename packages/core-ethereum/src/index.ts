@@ -21,7 +21,7 @@ import { CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
-import {initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo} from './commitment'
+import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
 
 const log = debug('hopr-core-ethereum')
 

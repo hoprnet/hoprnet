@@ -14,8 +14,8 @@ import {
   toU8a,
   u8aConcat
 } from '@hoprnet/hopr-utils'
-import {deriveCommitmentSeed} from '@hoprnet/hopr-utils/lib/crypto/commitment/keyDerivation'
-import {toUtf8Bytes} from "ethers/lib/utils";
+import { deriveCommitmentSeed } from '@hoprnet/hopr-utils/lib/crypto/commitment/keyDerivation'
+import { toUtf8Bytes } from 'ethers/lib/utils'
 
 const log = debug('hopr-core-ethereum:commitment')
 
@@ -73,22 +73,21 @@ async function createCommitmentChain(
 
 export class ChannelCommitmentInfo {
   constructor(
-      public readonly channelEntry: ChannelEntry,
-      public readonly chainId: number,
-      public readonly contractAddress: string
-  ) { }
+    public readonly channelEntry: ChannelEntry,
+    public readonly chainId: number,
+    public readonly contractAddress: string
+  ) {}
 
   public createInitialCommitmentSeed(nodePrivateKey: Uint8Array): Uint8Array {
     const channelSeedInfo = u8aConcat(
-        this.channelEntry.channelEpoch.serialize(),
-        toU8a(this.chainId, 4),
-        this.channelEntry.getId().serialize(),
-        toUtf8Bytes(this.contractAddress)
+      this.channelEntry.channelEpoch.serialize(),
+      toU8a(this.chainId, 4),
+      this.channelEntry.getId().serialize(),
+      toUtf8Bytes(this.contractAddress)
     )
 
     return deriveCommitmentSeed(nodePrivateKey, channelSeedInfo)
   }
-
 }
 
 export async function initializeCommitment(
@@ -111,5 +110,10 @@ export async function initializeCommitment(
     }
   }
   log(`reinitializing (db: ${dbContainsAlready}, chain: ${chainCommitment}})`)
-  await createCommitmentChain(db, channelId, channelInfo.createInitialCommitmentSeed(nodePrivateKey), setChainCommitment)
+  await createCommitmentChain(
+    db,
+    channelId,
+    channelInfo.createInitialCommitmentSeed(nodePrivateKey),
+    setChainCommitment
+  )
 }
