@@ -4,8 +4,8 @@ on:
   push:
     branches: ['**']
     paths: 
-      - 'scripts/connect/*''
-      - 'packages/connect/**/*''
+      - 'scripts/connect/*'
+      - 'packages/connect/**/*'
 
 jobs:
   integration-test:
