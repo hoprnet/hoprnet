@@ -25,6 +25,7 @@ import assert from 'assert'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
+import {ChannelCommitmentInfo} from "@hoprnet/hopr-core-ethereum/lib/commitment";
 
 const SECRET_LENGTH = 32
 
@@ -122,7 +123,7 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       await initializeCommitment(
         dbs[index],
         selfPrivateKey,
-        previousChannel,
+        new ChannelCommitmentInfo(previousChannel, 1, "fakeaddress"),
         (): any => {},
         (): any => {}
       )

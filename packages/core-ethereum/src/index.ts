@@ -21,7 +21,7 @@ import { CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
-import { initializeCommitment, findCommitmentPreImage, bumpCommitment } from './commitment'
+import {initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo} from './commitment'
 
 const log = debug('hopr-core-ethereum')
 
@@ -175,7 +175,9 @@ export default class HoprEthereum extends EventEmitter {
       return this.indexer.resolvePendingTransaction('channel-updated', tx)
     }
     const getCommitment = async () => (await this.db.getChannel(c.getId())).commitment
-    await initializeCommitment(this.db, this.privateKey, c, getCommitment, setCommitment)
+
+    const cci = new ChannelCommitmentInfo(c, this.options.chainId, this.smartContractInfo().hoprChannelsAddress)
+    await initializeCommitment(this.db, this.privateKey, cci, getCommitment, setCommitment)
   }
 
   public async redeemAllTickets(): Promise<void> {
