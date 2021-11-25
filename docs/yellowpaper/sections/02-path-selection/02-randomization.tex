@@ -1,8 +1,0 @@
-\subsection{Randomization Stake as Edge Weights}
-The path selection algorithm outlined below uses edge weights that determine likelihood of randomly choosing a specific edge. The edge weights are initialized with the payment channel balance and the payment channel topology. The more tokens a node stakes to an outgoing payment channel, the more likely the edge is selected on a path, hence the more likely the connected nodes are chosen as relayers by other nodes.
-
-Since this initialization step based on channel stake is entirely deterministic and potential adversaries could thus deduce the path of an individual packet from public information, each node score is randomized by multiplying it with a random number, $0 \le r_i \le 1$. Over long time scales, the expectation value of the weight is still proportional to the channels's score and thus provides a predictable Schelling point.
-
-$$ weight(n_i) := balance(n_i) * r_i$$
-
-Note that the random numbers are assigned once at the beginning of the process and reassigned upon the selection of a subsequent packet.

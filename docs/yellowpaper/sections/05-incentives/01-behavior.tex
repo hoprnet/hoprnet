@@ -1,6 +1,0 @@
-\subsection{Incentivized Behavior}
-\label{sec:incentives:behavior}
-
-Relaying a mixnet packet requires computation to transform it such that it can either get sent to the next downstream node $n_{i+1}$ or forwarded to the user. In case the packet is relayed, the relayer needs to establish a connection to node $n_{i+1}$ and cache the transformed mixnet packet for a short period of time until it is able to deliver it - or drop the transformed packet because node $n_{i+1}$ appeared to be unreachable.
-
-Transforming and delivering packets are those mechanisms that are most crucial to keep the HOPR network running, therefore they are incentivized by the protocol. On the other hand, receiving a packet is not incentivized.
