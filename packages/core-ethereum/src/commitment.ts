@@ -71,6 +71,10 @@ async function createCommitmentChain(
   log('commitment chain initialized')
 }
 
+/**
+ * Simple class encapsulating channel information
+ * used to generate the initial channel commitment.
+ */
 export class ChannelCommitmentInfo {
   constructor(
     public readonly channelEntry: ChannelEntry,
@@ -78,6 +82,11 @@ export class ChannelCommitmentInfo {
     public readonly contractAddress: string
   ) {}
 
+  /**
+   * Generate the initial commitment seed using this channel information and the given
+   * private node key.
+   * @param nodePrivateKey Local node private key.
+   */
   public createInitialCommitmentSeed(nodePrivateKey: Uint8Array): Uint8Array {
     const channelSeedInfo = u8aConcat(
       this.channelEntry.channelEpoch.serialize(),
