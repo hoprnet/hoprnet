@@ -3,7 +3,16 @@ import PeerId from 'peer-id'
 import Hopr from '@hoprnet/hopr-core'
 import { HoprOptions } from '@hoprnet/hopr-core'
 import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
-import { debug, privKeyToPeerId, HoprDB, NativeBalance, AccountEntry, Address, PublicKey, wait } from '@hoprnet/hopr-utils'
+import {
+  debug,
+  privKeyToPeerId,
+  HoprDB,
+  NativeBalance,
+  AccountEntry,
+  Address,
+  PublicKey,
+  wait
+} from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
 import BN from 'bn.js'
 import ConnectionManager from 'libp2p/src/connection-manager'
