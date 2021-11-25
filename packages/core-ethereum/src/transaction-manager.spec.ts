@@ -108,5 +108,4 @@ describe('transaction-manager', function () {
       gasPrice: TX[1].gasPrice
     })
   })
-  
 })

@@ -27,8 +27,7 @@ import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
 const ANNOUNCEMENT = 'Announcement'
-const backoffOption: Parameters<typeof retryWithBackoff>[1] = {maxDelay: MAX_TRANSACTION_BACKOFF}
-
+const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -88,25 +87,28 @@ class Indexer extends EventEmitter {
     this.chain.subscribeBlock((b) => {
       this.onNewBlock(b)
     })
-    
+
     this.chain.subscribeError((error: any) => {
       log(chalk.red(`etherjs error: ${error}`))
       // if provider connection issue
-      console.log("code", error.code, errors.SERVER_ERROR)
-      if ([error?.code, String(error)].includes(errors.SERVER_ERROR) ||
-      [error?.code, String(error)].includes(errors.TIMEOUT)) {
-        console.log(chalk.blue("code error falls here", this.chain.getAllPendingTransactionRequests().length))
+      console.log('code', error.code, errors.SERVER_ERROR)
+      if (
+        [error?.code, String(error)].includes(errors.SERVER_ERROR) ||
+        [error?.code, String(error)].includes(errors.TIMEOUT)
+      ) {
+        console.log(chalk.blue('code error falls here', this.chain.getAllPendingTransactionRequests().length))
         if (this.chain.getAllPendingTransactionRequests().length > 0) {
-          const wallet = this.chain.getWallet();
+          const wallet = this.chain.getWallet()
           retryWithBackoff(
-            () => Promise.allSettled(
-              [...this.chain.getAllPendingTransactionRequests().map(request => wallet.sendTransaction(request)),
-              this.restart()]
-            ),
+            () =>
+              Promise.allSettled([
+                ...this.chain.getAllPendingTransactionRequests().map((request) => wallet.sendTransaction(request)),
+                this.restart()
+              ]),
             backoffOption
           )
         } else {
-          retryWithBackoff(() => this.restart(),backoffOption)
+          retryWithBackoff(() => this.restart(), backoffOption)
         }
       }
     })
