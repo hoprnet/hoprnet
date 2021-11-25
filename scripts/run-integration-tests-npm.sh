@@ -193,11 +193,14 @@ function install_npm_packages() {
     else
       # Some Node installations seems to miss node-pre-gyp
       npm install node-pre-gyp
+      # Install modules according to their dependencies
+      # @dev only works when cleaning node_modules afterwards,
+      #      otherwise NPM might use outdated packages
       npm install ${tmp}/hopr-utils-package.tgz
       npm install ${tmp}/hopr-connect-package.tgz
-      npm install ${tmp}/hopr-core-package.tgz
       npm install ${tmp}/hopr-ethereum-package.tgz
       npm install ${tmp}/hopr-core-ethereum-package.tgz
+      npm install ${tmp}/hopr-core-package.tgz
       npm install ${tmp}/hoprd-package.tgz
     fi
 
