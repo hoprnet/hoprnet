@@ -55,11 +55,11 @@ type SetCommitment = (commitment: Hash) => Promise<string>
 async function createCommitmentChain(
   db: HoprDB,
   channelId: Hash,
-  channelMasterKey: Uint8Array,
+  initialCommitmentSeed: Uint8Array,
   setChainCommitment: SetCommitment
 ): Promise<void> {
   const { intermediates, hash } = await iterateHash(
-    channelMasterKey,
+    initialCommitmentSeed,
     hashFunction,
     TOTAL_ITERATIONS,
     DB_ITERATION_BLOCK_SIZE
