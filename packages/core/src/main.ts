@@ -23,8 +23,13 @@ const log = debug(`hopr-core:create-hopr`)
  * @param publicNodesEmitter:PublicNodesEmitter Event emitter for all public nodes.
  * @returns {Hopr} - HOPR node
  */
-export async function createLibp2pInstance(peerId: PeerId, options: HoprOptions, initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[], publicNodesEmitter: PublicNodesEmitter): Promise<LibP2P> {
-  let addressSorter: AddressSorter;
+export async function createLibp2pInstance(
+  peerId: PeerId,
+  options: HoprOptions,
+  initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
+  publicNodesEmitter: PublicNodesEmitter
+): Promise<LibP2P> {
+  let addressSorter: AddressSorter
   if (options.preferLocalAddresses) {
     addressSorter = localAddressesFirst
     log('Preferring local addresses')

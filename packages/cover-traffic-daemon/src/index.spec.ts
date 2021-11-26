@@ -14,7 +14,6 @@ import { mockPeerId } from './mocks/constants'
 const namespace = 'hopr:test:cover-traffic'
 const log = debug(namespace)
 
-
 describe('cover-traffic daemon', async function () {
   let node: Hopr, data: PersistedState
 
