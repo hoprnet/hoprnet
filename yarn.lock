@@ -1174,7 +1174,7 @@ __metadata:
     it-pair: 1.0.0
     it-pipe: 1.1.0
     it-pushable: 1.4.2
-    libp2p: 0.33.0
+    libp2p: 0.34.0
     libp2p-interfaces: 1.1.0
     libp2p-mplex: 0.10.4
     mocha: 9.1.3
@@ -1240,7 +1240,7 @@ __metadata:
     heap-js: ^2.1.6
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.33.0
+    libp2p: 0.34.0
     libp2p-kad-dht: 0.25.0
     libp2p-mplex: 0.10.4
     libp2p-tcp: 0.17.2
@@ -1342,7 +1342,7 @@ __metadata:
     jsonschema: ^1.4.0
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.33.0
+    libp2p: 0.34.0
     libp2p-crypto: 0.20.0
     libp2p-kad-dht: 0.25.0
     libp2p-mplex: 0.10.4
@@ -11251,9 +11251,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.33.0":
-  version: 0.33.0
-  resolution: "libp2p@npm:0.33.0"
+"libp2p@npm:0.34.0":
+  version: 0.34.0
+  resolution: "libp2p@npm:0.34.0"
   dependencies:
     "@motrix/nat-api": ^0.3.1
     "@vascosantos/moving-average": ^1.1.0
@@ -11306,7 +11306,7 @@ __metadata:
     varint: ^6.0.0
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: efe2f3899fa3b180401a61d71307091ec49cfaf592105274e8a9fbfd48d05374fac4fca242b7342b6f62b345650be490a3f4d108259a23ab3491675ee7c5668d
+  checksum: 9476cd8ec19d1f091ec5c4764e57f173c0a856d78b654ebe1cb136cf34359bb64c466e699129c126f32bb4186f28abf1aca750b5351064f0f979303120acf3ed
   languageName: node
   linkType: hard
 
