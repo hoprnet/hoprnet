@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.84.0-next.19",
+  "version": "1.84.0-next.22",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -39,7 +39,7 @@
     "@nomiclabs/hardhat-etherscan": "2.1.8",
     "@nomiclabs/hardhat-solhint": "2.0.0",
     "@nomiclabs/hardhat-waffle": "2.0.1",
-    "@typechain/ethers-v5": "8.0.4",
+    "@typechain/ethers-v5": "8.0.5",
     "@typechain/hardhat": "3.0.0",
     "bn.js": "5.2.0",
     "chai": "4.3.4",

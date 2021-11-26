@@ -78,7 +78,8 @@ if [ -z "${releases}" ] && [ "${force:-}" != "true" ]; then
   exit 1
 fi
 
-cd "${mydir}/../packages/${package}"
+# go into package directory, make sure to remove prefix when needed
+cd "${mydir}/../packages/${package#hopr-}"
 
 gcloud builds submit --config cloudbuild.yaml \
   --substitutions=_PACKAGE_VERSION=${package_version},_IMAGE_VERSION=${image_version},_DOCKER_IMAGE=${docker_image}
