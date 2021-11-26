@@ -3,6 +3,7 @@
 HOPR is build as a decentralized network, hence there is no gatekeeper and nodes need to organize themselves. This goes together with the absence of a central view of the network. It is therefore the duty of each node to maintain a local view of the network.
 
 \paragraph{NAT Traversal}
+
 It is expected that many, if not most, of the nodes in the HOPR network operate behind one or more network address translation mechanisms (NAT). Due to this, it is for most nodes unlikely to establish a direct connection to other nodes without the help of third-parties. To solve this, all nodes in the network offer relay services to other nodes such by having this means of communication,
 nodes can exchange connection information and are thus able to bypass NATs.
 
@@ -31,6 +32,8 @@ Relayed connections use a relay that forwards the communication to the destinati
 \paragraph{Peer Discovery}
 
 Newly connected nodes are lacking information about existing nodes in the network and thus need the help of others who help them discover the rest of the network. Within the HOPR network, this is done using so-called entry nodes who behave like normal nodes but publish their connection information on-chain. Nodes who join the network have therefore the opportunity to fetch Ethereum blocks and scan them for node announcments.
+
+The HOPR network decides two types of announcements: with a routable address and without
 
 Apart from the altruistic benefit to the network, It is expected that announcing on-chain does not immediately lead to direct payout. But since \lcnameref{sec:path-selection} is based on availability, nodes that announce themselves and also have a good availability are chosen more likely as a relayer which increases their rewards.
 
