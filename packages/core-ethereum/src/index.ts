@@ -2,7 +2,7 @@ import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import {debug, privKeyToPeerId} from '@hoprnet/hopr-utils'
+import { debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import {
   AcknowledgedTicket,
   PublicKey,
@@ -177,8 +177,12 @@ export default class HoprEthereum extends EventEmitter {
     const getCommitment = async () => (await this.db.getChannel(c.getId())).commitment
 
     // Get all channel information required to build the initial commitment
-    const cci = new ChannelCommitmentInfo(this.options.chainId,
-        this.smartContractInfo().hoprChannelsAddress, c.getId(), c.channelEpoch)
+    const cci = new ChannelCommitmentInfo(
+      this.options.chainId,
+      this.smartContractInfo().hoprChannelsAddress,
+      c.getId(),
+      c.channelEpoch
+    )
 
     await initializeCommitment(this.db, privKeyToPeerId(this.privateKey), cci, getCommitment, setCommitment)
   }

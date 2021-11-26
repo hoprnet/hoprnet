@@ -1,13 +1,8 @@
 import assert from 'assert'
 import { bumpCommitment, ChannelCommitmentInfo, findCommitmentPreImage, initializeCommitment } from './commitment'
 import sinon from 'sinon'
-import {
-  Hash,
-  HoprDB, privKeyToPeerId,
-  stringToU8a,
-  UINT256
-} from '@hoprnet/hopr-utils'
-import PeerId from "peer-id";
+import { Hash, HoprDB, privKeyToPeerId, stringToU8a, UINT256 } from '@hoprnet/hopr-utils'
+import PeerId from 'peer-id'
 
 describe('commitment', function () {
   let fakeSet, fakeGet, fakeDB
@@ -19,10 +14,10 @@ describe('commitment', function () {
     fakeDB = HoprDB.createMock()
     fakeKey = privKeyToPeerId(stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775'))
     fakeCommInfo = new ChannelCommitmentInfo(
-        1,
-        'fakeaddress',
-        new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1)),
-        UINT256.fromString('1')
+      1,
+      'fakeaddress',
+      new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1)),
+      UINT256.fromString('1')
     )
   })
 

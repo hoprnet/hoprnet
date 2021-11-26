@@ -4,15 +4,7 @@
 //
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
-import {
-  debug,
-  Hash,
-  HoprDB,
-  iterateHash,
-  recoverIteratedHash,
-  toU8a,
-  u8aConcat, UINT256
-} from '@hoprnet/hopr-utils'
+import { debug, Hash, HoprDB, iterateHash, recoverIteratedHash, toU8a, u8aConcat, UINT256 } from '@hoprnet/hopr-utils'
 import { deriveCommitmentSeed } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 

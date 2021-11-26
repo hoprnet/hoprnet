@@ -119,7 +119,12 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       // Store channel entry at destination
       await dbs[index].updateChannel(previousChannel.getId(), previousChannel)
 
-      const channelInfo = new ChannelCommitmentInfo(1, 'fakeaddress', previousChannel.getId(), previousChannel.channelEpoch)
+      const channelInfo = new ChannelCommitmentInfo(
+        1,
+        'fakeaddress',
+        previousChannel.getId(),
+        previousChannel.channelEpoch
+      )
       // Set a commitment if we are the destination
       await initializeCommitment(
         dbs[index],
