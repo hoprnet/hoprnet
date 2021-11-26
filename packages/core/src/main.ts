@@ -8,7 +8,7 @@ import PeerId from 'peer-id'
 import { debug } from '@hoprnet/hopr-utils'
 import Hopr, { HoprOptions, VERSION } from '.'
 import { getAddrs } from './identity'
-import { HoprConnect, HoprConnectOptions } from '@hoprnet/hopr-connect'
+import HoprConnect, { HoprConnectOptions } from '@hoprnet/hopr-connect'
 import { Multiaddr } from 'multiaddr'
 import { PublicNodesEmitter } from '@hoprnet/hopr-connect/lib/types'
 
