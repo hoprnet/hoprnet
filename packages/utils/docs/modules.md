@@ -1111,7 +1111,7 @@ ___
 
 ### debug
 
-▸ `Const` **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `any`
+▸ `Const` **debug**(`namespace`): (`message`: `any`, ...`parameters`: `any`[]) => `void`
 
 #### Parameters
 
@@ -1123,7 +1123,7 @@ ___
 
 `fn`
 
-▸ (`message`, ...`parameters`): `any`
+▸ (`message`, ...`parameters`): `void`
 
 ##### Parameters
 
@@ -1134,7 +1134,7 @@ ___
 
 ##### Returns
 
-`any`
+`void`
 
 #### Defined in
 
@@ -2613,7 +2613,7 @@ a function that stop the resource logger
 
 #### Defined in
 
-[process/resourceLogger.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/resourceLogger.ts#L17)
+[process/resourceLogger.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/resourceLogger.ts#L26)
 
 ___
 

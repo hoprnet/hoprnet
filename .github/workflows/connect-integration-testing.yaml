@@ -1,0 +1,56 @@
+name: HOPR Connect integration tests
+
+on:
+  push:
+    branches: ['**']
+    paths: 
+      - 'scripts/connect/*'
+      - 'packages/connect/**/*'
+      - '.github/workflows/connect-integration-testing.yaml'
+
+jobs:
+  integration-test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        node-version: [16]
+        os: ['ubuntu-latest', 'macos-latest']
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: |
+          yarn install
+
+      - name: Build
+        run: |
+          yarn build
+
+      - name: Test
+        run: ./scripts/connect/integration-test.sh
+
+      - name: Upload node logs (Linux)
+        uses: actions/upload-artifact@v2
+        if: ${{ always() && runner.os == 'Linux' }}
+        with:
+          name: hopr-e2e-source-node-logs
+          path: |
+            /tmp/hopr-connect-*.log
+
+
+      - name: Upload node logs (macOS)
+        uses: actions/upload-artifact@v2
+        if: ${{ always() && runner.os == 'macOS' }}
+        with:
+          name: hopr-e2e-source-node-logs
+          path: |
+            /var/tmp/hopr-connect-*.log
