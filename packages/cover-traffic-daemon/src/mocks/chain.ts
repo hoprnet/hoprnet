@@ -1,6 +1,5 @@
 import { AccountEntry, debug, NativeBalance } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
-import sinon from 'sinon'
 import BN from 'bn.js'
 import { NAMESPACE, sampleAddress, sampleMultiaddrs } from './constants'
 
@@ -9,17 +8,17 @@ const chainLogger = debug(`${NAMESPACE}:chain`)
 let indexer: Indexer
 let chain: HoprCoreEthereum
 
-chain = sinon.createStubInstance(HoprCoreEthereum)
+chain = {} as unknown as HoprCoreEthereum
 chain.indexer = indexer
-
-// @TODO: Use better (ie typed) way to overload stub
-chain.start = sinon.fake(() => {
+chain.stop = () => {
+  chainLogger('On-chain stop instance method was called.')
+  return Promise.resolve()
+}
+chain.start = () => {
   chainLogger('On-chain instance start method was called.')
-  return {
+  return Promise.resolve({
     getNativeBalance: () => {
       chainLogger('getNativeBalance method was called')
-      // Adding a value of >0 to register node has been funded.
-      // @TODO: Pick a more relevant value.
       return Promise.resolve(new NativeBalance(new BN('10000000000000000000')))
     },
     getPublicKey: () => {
@@ -46,8 +45,8 @@ chain.start = sinon.fake(() => {
       on: (event: string) => chainLogger(`Indexer on handler top of chain called with event "${event}"`),
       off: (event: string) => chainLogger(`Indexer off handler top of chain called with event "${event}`)
     }
-  }
-})
+  } as unknown as HoprCoreEthereum)
+}
 
 const chainMock = chain
 export { chainMock }
