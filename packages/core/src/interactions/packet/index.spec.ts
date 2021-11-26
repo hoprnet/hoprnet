@@ -25,7 +25,7 @@ import assert from 'assert'
 import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
-import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum/lib/commitment'
+import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
 
 const SECRET_LENGTH = 32
 
