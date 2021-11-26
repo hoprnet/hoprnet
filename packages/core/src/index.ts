@@ -91,7 +91,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) {}
+  ) { }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -242,7 +242,7 @@ class Hopr extends EventEmitter {
       includeReply: boolean,
       opts: DialOpts
     ) => libp2pSendMessage(this.libp2p, dest, protocol, msg, includeReply, opts) as any
-
+    verbose('LIBP2p instance', this.libp2p.hangUp)
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id)
@@ -261,7 +261,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => {},
+      () => { },
       protocolAck
     )
 
@@ -293,8 +293,12 @@ class Hopr extends EventEmitter {
     log('# STARTED NODE')
     log('ID', this.getId().toB58String())
     log('Protocol version', VERSION)
-    log(`Available under the following addresses:`)
-    libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    if (libp2p.multiaddrs !== undefined) {
+      log(`Available under the following addresses:`)
+      libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    } else {
+      log(`No multiaddrs has been registered.`)
+    }
     this.maybeLogProfilingToGCloud()
     this.checkTimeout = setTimeout(() => {
       log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)

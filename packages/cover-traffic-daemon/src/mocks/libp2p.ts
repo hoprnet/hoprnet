@@ -4,29 +4,39 @@ import PeerStore from 'libp2p/src/peer-store'
 import AddressManager from 'libp2p/src/address-manager'
 import { debug } from '@hoprnet/hopr-utils'
 import { NAMESPACE, mockPeerId, sampleMultiaddrs, samplePeerId } from './constants'
-import sinon from 'sinon'
 
 const libp2pLogger = debug(`${NAMESPACE}:libp2p`)
 let libp2p: LibP2P
 
-libp2p = sinon.createStubInstance(LibP2P)
+libp2p = {} as unknown as LibP2P
 libp2p._options = Object.assign({}, libp2p._options, {
   addresses: {
     announceFilter: () => [sampleMultiaddrs]
   }
 })
-libp2p.connectionManager = sinon.createStubInstance(ConnectionManager)
-libp2p.connectionManager.on = sinon.fake((event: string) => {
+libp2p.start = () => {
+  libp2pLogger(`Libp2p start method called`)
+  return Promise.resolve();
+}
+libp2p.stop = () => {
+  libp2pLogger(`Libp2p stop method called`)
+  return Promise.resolve();
+}
+libp2p.handle = () => {
+  libp2pLogger(`Libp2 handle method called`)
+}
+libp2p.hangUp = () => {
+  libp2pLogger(`Libp2 hangUp method called`)
+  return Promise.resolve();
+}
+libp2p.connectionManager = {} as unknown as ConnectionManager
+libp2p.connectionManager.on = (event: string) => {
   libp2pLogger(`Connection manager event handler called with event "${event}"`)
-})
+  return libp2p.connectionManager;
+}
 libp2p.peerStore = new PeerStore({ peerId: samplePeerId })
 libp2p.addressManager = new AddressManager(mockPeerId, { announce: [sampleMultiaddrs.toString()] })
 
-function stubLibp2p() {
-  sinon.stub(LibP2P, 'create').callsFake(() => {
-    libp2pLogger('libp2p stub started')
-    return Promise.resolve(libp2p)
-  })
-}
 
-export { stubLibp2p }
+const libp2pMock = libp2p
+export { libp2pMock }
