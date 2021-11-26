@@ -93,8 +93,8 @@ class Indexer extends EventEmitter {
       // if provider connection issue
       if (
         [error?.code, String(error)].includes(errors.SERVER_ERROR) ||
-        [error?.code, String(error)].includes(errors.TIMEOUT)||
-        [error?.code, String(error)].includes("ECONNRESET")
+        [error?.code, String(error)].includes(errors.TIMEOUT) ||
+        [error?.code, String(error)].includes('ECONNRESET')
       ) {
         log(chalk.blue('code error falls here', this.chain.getAllPendingTransactionRequests().length))
         if (this.chain.getAllPendingTransactionRequests().length > 0) {
