@@ -472,7 +472,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:286](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L286)
+[packages/core-ethereum/src/index.ts:295](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L295)
 
 ___
 
@@ -494,7 +494,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:313](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L313)
+[packages/core-ethereum/src/index.ts:322](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L322)
 
 ___
 
@@ -669,7 +669,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:277](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L277)
+[packages/core-ethereum/src/index.ts:286](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L286)
 
 ___
 
@@ -887,7 +887,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:294](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L294)
+[packages/core-ethereum/src/index.ts:303](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L303)
 
 ___
 
@@ -1032,7 +1032,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L181)
+[packages/core-ethereum/src/index.ts:190](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L190)
 
 ___
 
@@ -1053,7 +1053,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:224](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L224)
+[packages/core-ethereum/src/index.ts:233](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L233)
 
 ___
 
@@ -1073,7 +1073,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L195)
+[packages/core-ethereum/src/index.ts:204](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L204)
 
 ___
 
