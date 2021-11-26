@@ -231,7 +231,7 @@ The following are a series of manual tasks that are needed to be executed for th
 
 ```
 CT_PRIV_KEY=14e6...a6a5 \
-  ./scripts/setup-ct-gcloud-cluster.sh ${release_name}-cover-traffic
+  ./scripts/setup-ct-gcloud-cluster.sh ${release_name}
 ```
 
 #### `topology` deployment script

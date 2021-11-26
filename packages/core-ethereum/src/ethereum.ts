@@ -11,8 +11,7 @@ import {
   NativeBalance,
   Hash,
   PublicKey,
-  durations,
-  PromiseValue
+  durations
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
@@ -24,7 +23,7 @@ const log = debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
 
 export type Receipt = string
-export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>
+export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
 export async function createChainWrapper(
   networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
@@ -342,7 +341,7 @@ export async function createChainWrapper(
       ackTicket.response.toHex(),
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
-      ticket.signature.serializeEthereum()
+      ticket.signature.serialize()
     )
 
     const transaction = await sendTransaction(
@@ -356,7 +355,7 @@ export async function createChainWrapper(
       ackTicket.response.toHex(),
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
-      ticket.signature.serializeEthereum()
+      ticket.signature.serialize()
     )
     return transaction.hash
   }

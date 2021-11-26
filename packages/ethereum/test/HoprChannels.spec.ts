@@ -22,7 +22,6 @@ import {
   generateChannelId,
   ChannelStatus
 } from '@hoprnet/hopr-utils'
-import type { PromiseValue } from '@hoprnet/hopr-utils'
 import { BigNumber, utils } from 'ethers'
 import type { providers } from 'ethers'
 
@@ -46,7 +45,7 @@ export const redeemArgs = (ticket: AcknowledgedTicket): Parameters<HoprChannels[
   ticket.response.toHex(),
   ticket.ticket.amount.toHex(),
   ticket.ticket.winProb.toHex(),
-  ticket.ticket.signature.serializeEthereum()
+  ticket.ticket.signature.serialize()
 ]
 
 export const validateChannel = (actual, expected) => {
@@ -310,7 +309,7 @@ describe('funding HoprChannel without announcements', function () {
 })
 
 describe('funding HoprChannel catches failures', function () {
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>, channels: HoprChannels, accountA: Wallet
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>, channels: HoprChannels, accountA: Wallet
   before(async function () {
     // All of these tests revert, so we can rely on stateless single fixture.
     fixtures = await useFixtures()
@@ -465,7 +464,7 @@ describe('funding a HoprChannel success', function () {
 
 describe('with single funded HoprChannels: AB: 70', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
 
   beforeEach(async function () {
     fixtures = await useFixtures()
@@ -491,7 +490,7 @@ describe('with single funded HoprChannels: AB: 70', function () {
 
 describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
   let blockTimestamp: number
 
   beforeEach(async function () {
@@ -558,7 +557,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
         TICKET_AB_WIN.ticket.response.toHex(),
         TICKET_AB_WIN.ticket.ticket.amount.toHex(),
         TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
-        TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
+        TICKET_AB_WIN.ticket.ticket.signature.serialize()
       )
     ).to.be.revertedWith('redemptions must be in order')
 
@@ -571,7 +570,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
         TICKET_AB_WIN.ticket.response.toHex(),
         TICKET_AB_WIN.ticket.ticket.amount.toHex(),
         TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
-        TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
+        TICKET_AB_WIN.ticket.ticket.signature.serialize()
       )
     ).to.be.revertedWith('ticket epoch must match')
   })
@@ -685,7 +684,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
 
 describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
   let token: HoprToken
 
   beforeEach(async function () {
@@ -748,7 +747,7 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
 
 describe('with a closed channel', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
 
   beforeEach(async function () {
     fixtures = await useFixtures()
@@ -780,8 +779,8 @@ describe('with a closed channel', function () {
 
 describe('with a reopened channel', function () {
   let channels: HoprChannels
-  let fixtures: PromiseValue<ReturnType<typeof useFixtures>>
-  let TICKET_AB_WIN_RECYCLED: PromiseValue<ReturnType<typeof createTicket>>
+  let fixtures: Awaited<ReturnType<typeof useFixtures>>
+  let TICKET_AB_WIN_RECYCLED: Awaited<ReturnType<typeof createTicket>>
 
   beforeEach(async function () {
     fixtures = await useFixtures()

@@ -12,3 +12,7 @@ lib
 
 # CT database
 ct.json
+
+# coverage
+.nyc_output
+coverage
