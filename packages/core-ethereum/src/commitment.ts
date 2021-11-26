@@ -58,9 +58,8 @@ async function createCommitmentChain(
   channelMasterKey: Uint8Array,
   setChainCommitment: SetCommitment
 ): Promise<void> {
-  const seed = new Hash(channelMasterKey)
   const { intermediates, hash } = await iterateHash(
-    seed.serialize(),
+    channelMasterKey,
     hashFunction,
     TOTAL_ITERATIONS,
     DB_ITERATION_BLOCK_SIZE
