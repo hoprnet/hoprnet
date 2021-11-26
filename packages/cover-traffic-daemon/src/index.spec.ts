@@ -27,7 +27,7 @@ describe('cover-traffic daemon', async function () {
     }
     data = sampleData
     stubLibp2p()
-    log('Mocked chain', chainMock);
+    log('Mocked chain', chainMock)
     node = new Hopr(mockPeerId, dbMock, chainMock, sampleOptions)
   })
 
