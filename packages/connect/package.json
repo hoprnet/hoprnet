@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-connect",
-  "version": "1.83.0-next.76",
+  "version": "1.83.0-next.78",
   "description": "A libp2p-complaint transport module that handles NAT traversal by using WebRTC",
   "repository": "https://github.com/hoprnet/hopr-connect.git",
   "homepage": "https://github.com/hoprnet/hopr-connect",
@@ -19,7 +19,7 @@
     "lib"
   ],
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.e2e-tests.tsbuildinfo",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tests/tsconfig.tsbuildinfo",
     "build": "yarn clean && tsc -p .",
     "test": "mocha --parallel --full-trace",
     "prepublishOnly": "yarn clean && tsc -p ./tsconfig.npm.json"
@@ -46,7 +46,7 @@
     "@types/chai-spies": "1.0.3",
     "@types/debug": "4.1.7",
     "@types/mocha": "9.0.0",
-    "@types/node": "16.11.6",
+    "@types/node": "16.11.10",
     "@types/simple-peer": "9.11.3",
     "@types/yargs": "17.0.7",
     "abortable-iterator": "3.0.0",
@@ -59,7 +59,7 @@
     "libp2p-interfaces": "1.1.0",
     "libp2p-mplex": "0.10.4",
     "mocha": "9.1.3",
-    "prettier": "2.4.1",
+    "prettier": "2.5.0",
     "rimraf": "3.0.2",
     "ts-node": "10.4.0",
     "typescript": "4.5.2",

@@ -1,7 +1,6 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import type BL from 'bl'
-import type { PromiseValue } from '@hoprnet/hopr-utils'
 
 type Suffix = 'PublicNode'
 type AddEventName = `add${Suffix}`
@@ -54,6 +53,6 @@ export type Stream<T = StreamType> = {
   source: AsyncGenerator<T, void>
 }
 
-export type StreamResult = PromiseValue<ReturnType<Stream['source']['next']>>
+export type StreamResult = Awaited<ReturnType<Stream['source']['next']>>
 
 export type DialOptions = { signal?: AbortSignal }

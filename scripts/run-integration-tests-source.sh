@@ -53,9 +53,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
 fi
 
 # find usable tmp dir
-declare tmp="/tmp"
-[[ -d "${tmp}" && -h "${tmp}" ]] && tmp="/var/tmp"
-[[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
+declare tmp="$(find_tmp_dir)"
 
 declare node_prefix="hopr-source-node"
 
