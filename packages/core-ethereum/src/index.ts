@@ -2,7 +2,7 @@ import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import { debug } from '@hoprnet/hopr-utils'
+import {debug, privKeyToPeerId} from '@hoprnet/hopr-utils'
 import {
   AcknowledgedTicket,
   PublicKey,
@@ -176,8 +176,11 @@ export default class HoprEthereum extends EventEmitter {
     }
     const getCommitment = async () => (await this.db.getChannel(c.getId())).commitment
 
-    const cci = new ChannelCommitmentInfo(c, this.options.chainId, this.smartContractInfo().hoprChannelsAddress)
-    await initializeCommitment(this.db, this.privateKey, cci, getCommitment, setCommitment)
+    // Get all channel information required to build the initial commitment
+    const cci = new ChannelCommitmentInfo(this.options.chainId,
+        this.smartContractInfo().hoprChannelsAddress, c.getId(), c.channelEpoch)
+
+    await initializeCommitment(this.db, privKeyToPeerId(this.privateKey), cci, getCommitment, setCommitment)
   }
 
   public async redeemAllTickets(): Promise<void> {
@@ -325,6 +328,7 @@ export default class HoprEthereum extends EventEmitter {
 
 export {
   ChannelEntry,
+  ChannelCommitmentInfo,
   Indexer,
   createChainWrapper,
   initializeCommitment,

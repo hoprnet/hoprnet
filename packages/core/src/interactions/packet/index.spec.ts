@@ -44,7 +44,6 @@ const RELAY2 = privKeyToPeerId(stringToU8a('0xdb7e3e8fcac4c817aa4cecee1d6e2b4d53
 const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc'))
 
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
-const selfPrivateKey = new Uint8Array(SECRET_LENGTH).fill(0)
 
 /**
  * Creates a mocked network to send and receive acknowledgements and packets
@@ -103,6 +102,7 @@ function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
  */
 async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Promise<void> {
   let previousChannel: ChannelEntry
+
   for (const [index, peerId] of nodes.entries()) {
     dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
 
@@ -119,11 +119,12 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       // Store channel entry at destination
       await dbs[index].updateChannel(previousChannel.getId(), previousChannel)
 
+      const channelInfo = new ChannelCommitmentInfo(1, 'fakeaddress', previousChannel.getId(), previousChannel.channelEpoch)
       // Set a commitment if we are the destination
       await initializeCommitment(
         dbs[index],
-        selfPrivateKey,
-        new ChannelCommitmentInfo(previousChannel, 1, 'fakeaddress'),
+        SELF,
+        channelInfo,
         (): any => {},
         (): any => {}
       )

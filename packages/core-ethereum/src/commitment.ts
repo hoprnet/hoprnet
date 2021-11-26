@@ -5,17 +5,16 @@
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
 import {
-  ChannelEntry,
   debug,
   Hash,
   HoprDB,
   iterateHash,
   recoverIteratedHash,
   toU8a,
-  u8aConcat
+  u8aConcat, UINT256
 } from '@hoprnet/hopr-utils'
-import { deriveCommitmentSeed } from '@hoprnet/hopr-utils/lib/crypto/commitment/keyDerivation'
-import { toUtf8Bytes } from 'ethers/lib/utils'
+import { deriveCommitmentSeed } from '@hoprnet/hopr-utils'
+import PeerId from 'peer-id'
 
 const log = debug('hopr-core-ethereum:commitment')
 
@@ -76,42 +75,51 @@ async function createCommitmentChain(
  */
 export class ChannelCommitmentInfo {
   constructor(
-    public readonly channelEntry: ChannelEntry,
     public readonly chainId: number,
-    public readonly contractAddress: string
+    public readonly contractAddress: string,
+    public readonly channelId: Hash,
+    public readonly channelEpoch: UINT256
   ) {}
 
   /**
    * Generate the initial commitment seed using this channel information and the given
    * private node key.
-   * @param nodePrivateKey Local node private key.
+   * All members need to be specified (non-null).
+   * @param peerId Local node ID.
    */
-  public createInitialCommitmentSeed(nodePrivateKey: Uint8Array): Uint8Array {
+  public createInitialCommitmentSeed(peerId: PeerId): Uint8Array {
+    if (peerId.privKey == null) {
+      throw Error('Invalid peerId')
+    }
+
+    if (this.channelEpoch == null || this.channelId == null) {
+      throw Error('Missing channelEpoch or channelId')
+    }
+
     const channelSeedInfo = u8aConcat(
-      this.channelEntry.channelEpoch.serialize(),
+      this.channelEpoch.serialize(),
       toU8a(this.chainId, 4),
-      this.channelEntry.getId().serialize(),
-      toUtf8Bytes(this.contractAddress)
+      this.channelId.serialize(),
+      new TextEncoder().encode(this.contractAddress)
     )
 
-    return deriveCommitmentSeed(nodePrivateKey, channelSeedInfo)
+    return deriveCommitmentSeed(peerId.privKey.marshal(), channelSeedInfo)
   }
 }
 
 export async function initializeCommitment(
   db: HoprDB,
-  nodePrivateKey: Uint8Array,
+  peerId: PeerId,
   channelInfo: ChannelCommitmentInfo,
   getChainCommitment: GetCommitment,
   setChainCommitment: SetCommitment
 ) {
-  const channelId = channelInfo.channelEntry.getId()
-  const dbContainsAlready = (await db.getCommitment(channelId, 0)) != undefined
+  const dbContainsAlready = (await db.getCommitment(channelInfo.channelId, 0)) != undefined
   const chainCommitment = await getChainCommitment()
 
   if (chainCommitment && dbContainsAlready) {
     try {
-      await findCommitmentPreImage(db, channelId) // throws if not found
+      await findCommitmentPreImage(db, channelInfo.channelId) // throws if not found
       return
     } catch (e) {
       log(`Secret is found but failed to find preimage, reinitializing.. ${e.message}`)
@@ -120,8 +128,8 @@ export async function initializeCommitment(
   log(`reinitializing (db: ${dbContainsAlready}, chain: ${chainCommitment}})`)
   await createCommitmentChain(
     db,
-    channelId,
-    channelInfo.createInitialCommitmentSeed(nodePrivateKey),
+    channelInfo.channelId,
+    channelInfo.createInitialCommitmentSeed(peerId),
     setChainCommitment
   )
 }
