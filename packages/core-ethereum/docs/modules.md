@@ -6,6 +6,7 @@
 
 ### Classes
 
+- [ChannelCommitmentInfo](classes/ChannelCommitmentInfo.md)
 - [ChannelEntry](classes/ChannelEntry.md)
 - [Indexer](classes/Indexer.md)
 - [default](classes/default.md)
@@ -129,14 +130,15 @@ ___
 
 ### initializeCommitment
 
-▸ **initializeCommitment**(`db`, `channelId`, `getChainCommitment`, `setChainCommitment`): `Promise`<`void`\>
+▸ **initializeCommitment**(`db`, `peerId`, `channelInfo`, `getChainCommitment`, `setChainCommitment`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `db` | `HoprDB` |
-| `channelId` | `Hash` |
+| `peerId` | `PeerId` |
+| `channelInfo` | [`ChannelCommitmentInfo`](classes/ChannelCommitmentInfo.md) |
 | `getChainCommitment` | `GetCommitment` |
 | `setChainCommitment` | `SetCommitment` |
 
@@ -146,4 +148,4 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/commitment.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L60)
+[packages/core-ethereum/src/commitment.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L102)

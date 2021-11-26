@@ -89,6 +89,7 @@
 - [PUBLIC\_KEY\_LENGTH](modules.md#public_key_length)
 - [RESERVED\_ADDRS](modules.md#reserved_addrs)
 - [SECP256K1\_CONSTANTS](modules.md#secp256k1_constants)
+- [SECRET\_LENGTH](modules.md#secret_length)
 - [SIGNATURE\_LENGTH](modules.md#signature_length)
 - [SIGNATURE\_RECOVERY\_LENGTH](modules.md#signature_recovery_length)
 - [SUGGESTED\_BALANCE](modules.md#suggested_balance)
@@ -111,6 +112,7 @@
 - [decodePoRBytes](modules.md#decodeporbytes)
 - [defer](modules.md#defer)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
+- [deriveCommitmentSeed](modules.md#derivecommitmentseed)
 - [deserializeKeyPair](modules.md#deserializekeypair)
 - [dial](modules.md#dial)
 - [expandVars](modules.md#expandvars)
@@ -560,7 +562,7 @@ ___
 
 #### Defined in
 
-[constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L15)
+[constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L16)
 
 ___
 
@@ -600,7 +602,7 @@ ___
 
 #### Defined in
 
-[constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L19)
+[constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L20)
 
 ___
 
@@ -634,7 +636,7 @@ ___
 
 #### Defined in
 
-[constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L17)
+[constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L18)
 
 ___
 
@@ -644,7 +646,7 @@ ___
 
 #### Defined in
 
-[constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L22)
+[constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L23)
 
 ___
 
@@ -654,7 +656,7 @@ ___
 
 #### Defined in
 
-[constants.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L11)
+[constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L12)
 
 ___
 
@@ -704,7 +706,7 @@ ___
 
 #### Defined in
 
-[constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L13)
+[constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L14)
 
 ___
 
@@ -800,13 +802,23 @@ Several ECDSA on secp256k1 related constants
 
 ___
 
+### SECRET\_LENGTH
+
+• **SECRET\_LENGTH**: ``32``
+
+#### Defined in
+
+[constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L8)
+
+___
+
 ### SIGNATURE\_LENGTH
 
 • **SIGNATURE\_LENGTH**: ``64``
 
 #### Defined in
 
-[constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L8)
+[constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
 
 ___
 
@@ -816,7 +828,7 @@ ___
 
 #### Defined in
 
-[constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
+[constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L10)
 
 ___
 
@@ -826,7 +838,7 @@ ___
 
 #### Defined in
 
-[constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L26)
+[constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L27)
 
 ___
 
@@ -836,7 +848,7 @@ ___
 
 #### Defined in
 
-[constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L23)
+[constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L24)
 
 ___
 
@@ -1208,6 +1220,29 @@ relayer for transforming and delivering the packet
 #### Defined in
 
 [crypto/por/keyDerivation.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/keyDerivation.ts#L31)
+
+___
+
+### deriveCommitmentSeed
+
+▸ **deriveCommitmentSeed**(`privateKey`, `channelInfo`): `Uint8Array`
+
+Derives the initial commitment seed on a newly opened channel.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `privateKey` | `Uint8Array` | Node private key. |
+| `channelInfo` | `Uint8Array` | Additional information identifying the channel. |
+
+#### Returns
+
+`Uint8Array`
+
+#### Defined in
+
+[crypto/commitment/keyDerivation.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/commitment/keyDerivation.ts#L12)
 
 ___
 
