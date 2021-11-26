@@ -1,4 +1,3 @@
-import sinon from 'sinon'
 import { PersistedState } from '../state'
 
-export const sampleData = sinon.createStubInstance(PersistedState)
+export const sampleData = {} as unknown as PersistedState
