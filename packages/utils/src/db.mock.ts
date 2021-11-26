@@ -1,7 +1,6 @@
-import { debug, HoprDB } from '@hoprnet/hopr-utils'
-import { NAMESPACE } from './constants'
+import { debug, HoprDB } from '.'
 
-const dbLogger = debug(`${NAMESPACE}:db`)
+const dbLogger = debug(`hopr:mocks:db`)
 
 let db: HoprDB
 db = {} as unknown as HoprDB

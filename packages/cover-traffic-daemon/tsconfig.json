@@ -4,7 +4,7 @@
     "outDir": "lib",
     "rootDir": "src"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "../core/src/index.mock.ts", "../core/src/libp2p.mock.ts"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",

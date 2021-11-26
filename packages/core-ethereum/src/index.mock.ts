@@ -1,20 +1,21 @@
-import { AccountEntry, debug, NativeBalance } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum, { Indexer } from '@hoprnet/hopr-core-ethereum'
+import { AccountEntry, Address, debug, NativeBalance } from '@hoprnet/hopr-utils'
+import HoprCoreEthereum, { Indexer } from '.'
 import BN from 'bn.js'
-import { NAMESPACE, sampleAddress, sampleMultiaddrs } from './constants'
+import PeerId from 'peer-id'
+import { Multiaddr } from 'multiaddr'
 
-const chainLogger = debug(`${NAMESPACE}:chain`)
+export const sampleAddress = Address.fromString('0x55CfF15a5159239002D57C591eF4ACA7f2ACAfE6')
+export const samplePeerId = PeerId.createFromB58String('16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7')
+export const sampleMultiaddrs = new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${samplePeerId.toB58String()}`)
 
-let indexer: Indexer
-let chain: HoprCoreEthereum
-
-chain = {} as unknown as HoprCoreEthereum
-chain.indexer = indexer
-chain.stop = () => {
+const chainLogger = debug(`hopr:mocks:chain`)
+const chainMock = {} as unknown as HoprCoreEthereum
+chainMock.indexer = {} as unknown as Indexer
+chainMock.stop = () => {
   chainLogger('On-chain stop instance method was called.')
   return Promise.resolve()
 }
-chain.start = () => {
+chainMock.start = () => {
   chainLogger('On-chain instance start method was called.')
   return Promise.resolve({
     getNativeBalance: () => {
@@ -48,5 +49,4 @@ chain.start = () => {
   } as unknown as HoprCoreEthereum)
 }
 
-const chainMock = chain
 export { chainMock }

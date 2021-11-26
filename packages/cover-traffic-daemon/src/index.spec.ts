@@ -1,19 +1,19 @@
 import LibP2P from 'libp2p'
 import Hopr from '@hoprnet/hopr-core'
-import { debug, PublicKey, wait } from '@hoprnet/hopr-utils'
+import { debug, PublicKey, wait, dbMock, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
-import { sampleOptions } from './mocks/core'
-import { dbMock } from './mocks/db'
 import { sampleData } from './state.mock'
-import { chainMock } from './mocks/chain'
-import { libp2pMock } from './mocks/libp2p'
-import { mockPeerId } from './mocks/constants'
+import { sampleOptions } from '@hoprnet/hopr-core'
+import { chainMock } from '@hoprnet/hopr-core-ethereum'
+import { libp2pMock } from '@hoprnet/hopr-core'
 
 const namespace = 'hopr:test:cover-traffic'
 const log = debug(namespace)
 
+const privateKey = '0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332'
+const mockPeerId = privKeyToPeerId(privateKey)
 
 describe('cover-traffic daemon', async function () {
   let node: Hopr, data: PersistedState
@@ -25,9 +25,9 @@ describe('cover-traffic daemon', async function () {
         return Promise.resolve(libp2pMock)
       })
     }
-
     data = sampleData
     stubLibp2p()
+    log('Mocked chain', chainMock);
     node = new Hopr(mockPeerId, dbMock, chainMock, sampleOptions)
   })
 

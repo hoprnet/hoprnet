@@ -153,6 +153,7 @@ class Hopr extends EventEmitter {
     }
     this.environment = options.environment
     log(`using environment: ${this.environment.id}`)
+    log(`chain instance:`, this.chain);
     this.indexer = this.chain.indexer // TODO temporary
   }
 
@@ -987,3 +988,5 @@ export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
 export type { ProtocolConfig, Network, ResolvedEnvironment } from './environment'
 export { resolveEnvironment, supportedEnvironments } from './environment'
+export { libp2pMock } from './libp2p.mock'
+export { sampleOptions } from './index.mock'
