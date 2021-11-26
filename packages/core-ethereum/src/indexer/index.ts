@@ -91,12 +91,12 @@ class Indexer extends EventEmitter {
     this.chain.subscribeError((error: any) => {
       log(chalk.red(`etherjs error: ${error}`))
       // if provider connection issue
-      console.log('code', error.code, errors.SERVER_ERROR)
       if (
         [error?.code, String(error)].includes(errors.SERVER_ERROR) ||
-        [error?.code, String(error)].includes(errors.TIMEOUT)
+        [error?.code, String(error)].includes(errors.TIMEOUT)||
+        [error?.code, String(error)].includes("ECONNRESET")
       ) {
-        console.log(chalk.blue('code error falls here', this.chain.getAllPendingTransactionRequests().length))
+        log(chalk.blue('code error falls here', this.chain.getAllPendingTransactionRequests().length))
         if (this.chain.getAllPendingTransactionRequests().length > 0) {
           const wallet = this.chain.getWallet()
           retryWithBackoff(

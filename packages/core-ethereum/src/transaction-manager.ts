@@ -47,19 +47,17 @@ class TranscationManager {
   public getAllPendingTxs(): TransactionRequest[] {
     // pending tx hashes
     const pendingTxHash = Array.from(this.pending.keys())
-    return pendingTxHash.length === 0
-      ? []
-      : pendingTxHash.map((txHash) => {
-          const { to, data, value } = this.payloads.get(txHash)
-          const { nonce, gasPrice } = this.pending.get(txHash)
-          return {
-            to,
-            data,
-            value,
-            nonce,
-            gasPrice
-          }
-        })
+    return pendingTxHash.map((txHash) => {
+      const { to, data, value } = this.payloads.get(txHash)
+      const { nonce, gasPrice } = this.pending.get(txHash)
+      return {
+        to,
+        data,
+        value,
+        nonce,
+        gasPrice
+      }
+    })
   }
 
   /**
