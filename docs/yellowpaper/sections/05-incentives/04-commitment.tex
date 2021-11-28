@@ -10,7 +10,7 @@ To match the aforementioned properties, HOPR uses an iterated on-chain commitmen
 \paragraph{Commitment scheme}
 \label{sec:incentives:commitment:scheme}
 
-The commitment scheme in HOPR is a tuple of three algorithms, $(\mathsf{KeyGen}, \mathsf{Commit}, \mathsf{Open})$. \textsf{KeyGen} takes a security parameter and returns a seed $x$. \textsf{Commit} takes $x$ and produces the commitment as $ cm = Commit(x) $. \textsf{Open} takes a commitment $cm$ and $r$ and fails if $x$ does not fit to $cm$, otherwise it return $1$.
+The commitment scheme in HOPR is a tuple of three algorithms, $(\mathsf{KeyGen}, \mathsf{Commit}, \mathsf{Open})$. \textsf{KeyGen} takes security parameters and returns a seed $x$. \textsf{Commit} takes $x$ and produces the commitment as $ cm = Commit(x) $. \textsf{Open} takes a commitment $cm$ and $r$ and fails if $x$ does not fit to $cm$, otherwise it return $1$.
 
 The commitment scheme is called binding if it is infeasible for an adversary to find a value $x' \ne x$ such that $\mathsf{Open}(cm, x') = 1$. It is called hiding if is infeasible for an adversary to derive the commited value $x$ from $cm$.
 
@@ -18,7 +18,23 @@ The iterated commitment scheme is computed as
 
 $$ comm_i = keccak256 ^i (x) = keccak256 ^{i-1} (keccak256 (x)) \quad \text{for} \ i > 0$$
 
-where $comm_0 = x$ and thus servers as a master secret. The value $x$ is chosen randomly by the ticket recipient, hence due to the pseudorandomness of the utilized cryptographic hash function, for every $i > 0$, the resulting value $comm_i = keccak256(comm_{i-1})$ is pseudorandom as well and therefore infeasible to predict by the ticket issuer.
+where $comm_0 = x$ and thus serves as a master secret.
+To generate this initial master secret, the private key of the ticket recipient, network and channel specific information are used by the \textsf{KeyGen} algorithm as follows.
+
+Firstly, a new commitment specific key $s_{commit}$ is derived from the node's $privateKey$ :
+
+$$ s_{commit} \longleftarrow \mathsf{KDF.expand}(privateKey, 32, \texttt{HASH\_KEY\_COMMITMENT\_SEED})$$
+
+See Appendix for details on \textsf{KDF.expand}.
+
+Finally, the 256-bit initial commitment seed $comm_0$ is derived using a \texttt{BLAKE2s}-based $\mathsf{HMAC}(key, input)$ :
+
+$$ comm_0 = \mathsf{HMAC}(s_{commit}, channelEpoch || chainId || channelId || contractAddress)$$
+
+where $||$ denotes bit string concatenation.
+
+Since the above transformation is dependent on the ticket recipient's private key, the resulting value $comm_0$ is unpredictable for the ticket issuer and
+hence also for every $i > 0$, the subsequent values of $comm_i = keccak256(comm_{i-1})$ are pseudorandom and infeasible to predict by the ticket issuer.
 
 The algorithm \textsf{Open} is therefore quite simple as it solely checks that
 
@@ -27,9 +43,14 @@ $$ comm_i = keccak256 (\widetilde{comm_{i-1}}) $$
 \paragraph{Commitment phase}
 \label{sec:incentives:commitment:commitmentphase}
 
-Once a node is the destination of a payment channel, it samples a master key $comm_0 \in \{0, 1\}^{32}$ and computes $comm_n = keccak256^n(comm_0)$ and submits a transaction that stores $comm_n$ on-chain within the payment channel. The value $n > 0$ is chosen by the ticket recipient and should reflect the amount of tickets that are expected to be sent using this channel.
+Once a node is the destination of a payment channel, it generates the initial master key $comm_0$ using \textsf{KeyGen} and computes $comm_n = keccak256^n(comm_0)$ and submits a transaction that stores $comm_n$ on-chain within the payment channel.
+The value $n > 0$ is chosen by the ticket recipient and should reflect the amount of tickets that are expected to be sent using this channel.
 
-Obviously, the ticket recipient can run out of openings after redeeming a huge amount of tickets - or losing the master secret $x$. Therefore, the ticket recipient has the opportunity to renew the stored on-chain commitment. As this would allow the recipient to alter the opening to a more pleasant value just before redeeming a ticket, i.e. to turn a previously losing ticket into a winning one. Therefore, each payment channel includes a counter that gets increased on every renewal.
+Obviously, the ticket recipient can run out of openings after redeeming a huge amount of tickets.
+Therefore, the ticket recipient has the opportunity to renew the stored on-chain commitment.
+% NOTE: Does the following still apply? Is still possible for the recipient to alter to a more pleasant value?
+As this would allow the recipient to alter the opening to a more pleasant value just before redeeming a ticket, i.e.\ to turn a previously losing ticket into a winning one.
+Therefore, each payment channel includes a counter that gets increased on every renewal.
 
 $$ channel.ticketEpoch = channel.ticketEpoch + 1 $$
 
