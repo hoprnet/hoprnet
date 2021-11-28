@@ -1,6 +1,7 @@
 \section{Peer-to-peer Mechanisms}
+\label{sec:p2p}
 
-HOPR is designed as a decentralized network, hence there is no central coordinator and nodes need to interact with each other directly to organize the operation of the network. This causes various challenges: starting with the absense of a complete overview of the network, so nodes need to deal with incomplete information. Some nodes reside on publicly exposed hosts whilst others are hidden behind one or more network address translation mechanisms (NATs). It is expected that especially those nodes which are run by end users and therefore mostly use the HOPR network to send and receive messages, are subject of churn. For that reason, it becomes necessary to continuously measure the nodes' availability.
+HOPR is designed as a decentralized network, hence there is no central coordinator and nodes need to interact with each other directly to organize the operation of the network. This causes various challenges: starting with the absense of a complete overview of the network, such that nodes need to operate with incomplete information about the nodes. In addition, it is expected that some nodes reside on publicly exposed hosts whilst others are hidden behind one or more network address translation mechanisms (NATs), hence it is necessary to traverse NATs in order to establish direct connections. Last but not least, nodes who are run by end users and which are therefore mostly used to send and receive messages, join and leave the network as they like to, hence the network need to deal with a significant amount of churn and nodes need to maintain an overview about other nodes' availability.
 
 \import{}{01-addressing.tex}
 \import{}{02-nat-traversal.tex}

@@ -1,24 +1,25 @@
 \subsection{Addressing}
+\label{sec:p2p:addressing}
 
-The ECDSA public key acts as a unique identifier for each node in the network. It is structured using \href{https://github.com/multiformats/multiformats}{multiformats} by Protocol Labs and encoded using \href{https://en.bitcoin.it/wiki/Base58Check_encoding}{Base58} encoding, known from Bitcoin. The structure is given by the multiformats prefix \textsf{0x002508021221} and the compressed ECDSA public key, leading to an identifier $id$ of 39 bytes and
+Each node possesses an ECDSA public key which acts as a unique identifier in the netork. The identifier is structured using \href{https://github.com/multiformats/multiformats}{multiformats} by Protocol Labs and encoded using \href{https://en.bitcoin.it/wiki/Base58Check_encoding}{Base58} encoding, known from Bitcoin. This leads to the multiformats prefix \textsf{0x002508021221} which is concatenated to the compressed ECDSA public key, yielding to an identifier $id$ of 39 bytes given by
 
 \begin{center}
     $id = base58.encode(\mathsf{0x002508021221} \ || \ \mathsf{pubKey})$
 \end{center}
 
-Identifiers distinguish nodes from each other, whereas addresses allow nodes to establish a connection to each other. HOPR distinguishes two types of addresses: direct addresses and relay addresses. Both address types are structured using \href{https://github.com/multiformats/multiaddr}{multiaddr} by Protocol Labs.
+Identifiers distinguish nodes from each other, whereas addresses allow nodes to establish a connection to each other. HOPR distinguishes two types of addresses: \textit{direct addresses} and \textit{relay addresses}. Both address types are structured using the \href{https://github.com/multiformats/multiaddr}{multiaddr} standard by Protocol Labs.
 
 \paragraph{Direct Addresses}
 
-Each nodes that is able to listen directly to a TCP socket determines its own direct addresses. These include its local IP address, e.g. \textsf{127.0.0.1}, its local IP address, e.g. \textsf{192.168.0.2} as well as, if available, its public IP address, e.g. \textsf{1.2.3.4}. A node with identifier $id$ and public IP address \textsf{1.2.3.4} listening to TCP port $9091$ has the addr
+Nodes that are able to gain control over a TCP socket can have one or more direct address which are determined by their network adapter. The addresses include the loopback IP address, e.g. \textsf{127.0.0.1}, the local IP address, e.g. \textsf{192.168.0.2} as well as, if available, the public IP address, e.g. \textsf{1.2.3.4}. A node with identifier $id$ and public IP address \textsf{1.2.3.4} listening to TCP port $9091$ has the addr
 
 \begin{center}
-    \textsf{/ip4/1.2.3.4/tcp/9091/}\textless$id$\textgreater{}
+    $addr = \mathsf{/ip4/1.2.3.4/tcp/9091/}\text{\textless$id$\textgreater{}}$
 \end{center}
 
 \paragraph{Relay Addresses}
 
-As many consumer routers hide connected nodes due to security concerns, and the scarcity of IPv4 addresses, behind a NAT, these nodes cannot reach each other directly because they do not know how to bypass the other party's NAT mechanism.
+Due to security concern and the scarcity of IPv4 addresses, many consumer routers hide connected nodes behind a NAT, such that other nodes have a hard time establishing a direct connection to these nodes. To solve this issue, nodes keep a connection to selected relay nodes and publish \textit{relay addresses} to tell others who want to establish a direct connection which relay node to connect if they cannot reach them directly. Once the relayed connection has been established, nodes can exchange signalling information and determine how to connect directly.
 
 \begin{figure}[H]
     \centering
@@ -74,13 +75,15 @@ As many consumer routers hide connected nodes due to security concerns, and the 
             }
     \end{tikzpicture}
     \label{fig:successful-nat-traversal}
-    \caption{Successful NAT traversal between A and B after exchanging connection information.}
+    \caption{Successful NAT traversal between A and B after exchanging signalling information.}
 \end{figure}
 
-To circumvent this problem, HOPR nodes can also dial each other using \textit{relay addresses}. Each node therefore maintains a list of usable relays which can be used to establish a relayed connection through the relay to the node, yielding addresses like
+A relay address includes the identifier $relayId$ of the relay to which the node need to connect first and the identifier $id$ of the final destination.
 
 \begin{center}
     \textsf{/p2p/}\textless\textsf{$relayId$}\textgreater\textsf{/p2p-circuit/p2p/}\textless{}\textsf{$id$}\textgreater{}
 \end{center}
 
-where $relayId$ is the identifier of the utilized relay and $id$ is the identifier of the node. Another node who intends to connect to the node with identifier $id$ first connects to the node with identifier $relayId$. This needs to happen by using a direct address. Once the connection has been established, it asks the node with $relayId$ to extend the connection to node with $id$.
+Relay nodes come with a limited capacity of relay slots and depending on the geographical proximity, it becomes clear that some relay nodes suit better than other. Hence, at startup, each node first retrieves a list of potential relay nodes, see \lcnameref{sec:p2p:peer-discovery} for more information, and tries to register a relay slot with the most promising ones and announces the list of relay addresses in the network.
+
+Hence, whenever another node is unable to connect directly, it first connects to one of the published relay nodes and asks them to extend the connection to the intended node.
