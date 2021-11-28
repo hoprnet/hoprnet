@@ -1,7 +1,7 @@
 \subsection{Addressing}
 \label{sec:p2p:addressing}
 
-Each node possesses an ECDSA public key which acts as a unique identifier in the netork. The identifier is structured using \href{https://github.com/multiformats/multiformats}{multiformats} by Protocol Labs and encoded using \href{https://en.bitcoin.it/wiki/Base58Check_encoding}{Base58} encoding, known from Bitcoin. This leads to the multiformats prefix \textsf{0x002508021221} which is concatenated to the compressed ECDSA public key, yielding to an identifier $id$ of 39 bytes given by
+Each node possesses an ECDSA public key which acts as a unique identifier in the netork. The identifier is structured using \href{https://github.com/multiformats/multiformats}{multiformats} by Protocol Labs and encoded using \href{https://en.bitcoin.it/wiki/Base58Check_encoding}{Base58} encoding, known from Bitcoin. This leads to the multiformats prefix \textsf{0x002508021221} which is concatenated to the compressed ECDSA public key, yielding an identifier $id$ of 39 bytes and a string representation given by
 
 \begin{center}
     $id = base58.encode(\mathsf{0x002508021221} \ || \ \mathsf{pubKey})$
