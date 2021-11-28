@@ -1,46 +1,13 @@
 \section{Peer-to-peer Mechanisms}
 
-HOPR is build as a decentralized network, hence there is no gatekeeper and nodes need to organize themselves. This goes together with the absence of a central view of the network. It is therefore the duty of each node to maintain a local view of the network.
+HOPR is designed as a decentralized network, hence there is no central coordinator and nodes need to interact with each other directly to organize the operation of the network. This causes various challenges: starting with the absense of a complete overview of the network, so nodes need to deal with incomplete information. Some nodes reside on publicly exposed hosts whilst others are hidden behind one or more network address translation mechanisms (NATs). It is expected that especially those nodes which are run by end users and therefore mostly use the HOPR network to send and receive messages, are subject of churn. For that reason, it becomes necessary to continuously measure the nodes' availability.
 
-\paragraph{NAT Traversal}
+\import{}{01-addressing.tex}
+\import{}{02-nat-traversal.tex}
+\import{}{03-peer-discovery.tex}
+\import{}{04-availability.tex}
 
-It is expected that many, if not most, of the nodes in the HOPR network operate behind one or more network address translation mechanisms (NAT). Due to this, it is for most nodes unlikely to establish a direct connection to other nodes without the help of third-parties. To solve this, all nodes in the network offer relay services to other nodes such by having this means of communication,
-nodes can exchange connection information and are thus able to bypass NATs.
 
-Nodes who are running behind a public IP address are asked to announce themselves on-chain.
 
-% NAT Traversal
 
-\paragraph{Addressing}
 
-Nodes establish direct connection using TCP.
-
-\begin{center}
-    \textsf{/ip4/1.2.3.4/tcp/}\textless\textsf{PeerId}\textgreater{}
-\end{center}
-
-Relayed connections use a relay that forwards the communication to the destination
-
-\begin{center}
-    \textsf{/p2p/}\textless\textsf{RelayId}\textgreater\textsf{/p2p-circuit/p2p/}\textless{}\textsf{PeerId}\textgreater{}
-\end{center}
-% - base58 encoding
-% - public key
-% - multiaddr
-% - direct addresses
-
-\paragraph{Peer Discovery}
-
-Newly connected nodes are lacking information about existing nodes in the network and thus need the help of others who help them discover the rest of the network. Within the HOPR network, this is done using so-called entry nodes who behave like normal nodes but publish their connection information on-chain. Nodes who join the network have therefore the opportunity to fetch Ethereum blocks and scan them for node announcments.
-
-The HOPR network decides two types of announcements: with a routable address and without
-
-Apart from the altruistic benefit to the network, It is expected that announcing on-chain does not immediately lead to direct payout. But since \lcnameref{sec:path-selection} is based on availability, nodes that announce themselves and also have a good availability are chosen more likely as a relayer which increases their rewards.
-
-Announcing on a public blockchain comes with the property that a potentail adversary who attempts to run an eclipse attack against a newly connected node also needs to provide a sound and fake blockchain which is assumed to be hard. Hence, the attacker is unable to withhold entry nodes but nevertheless, it is able to spam the victim with connection information about collaborating nodes.
-
-In addition to blockchain announcements, nodes participate in a DHT and thereby get in touch with those nodes that have not announced themselves on-chain with a routable address.
-
-\paragraph{Availability Measurement}
-
-Heartbeat ...
