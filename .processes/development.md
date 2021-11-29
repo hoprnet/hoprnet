@@ -157,6 +157,22 @@ In `Retrospective` we aim to summarize the results of the last spring, in order 
 - what went worse than expected
 - lessons learned
 
+The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows this schedule:
+
+1. Everybody secretly adds hidden items to `What Went Well` column.
+2. The moderator reveals the `What Went Well` column.
+3. Everybody has ~30 secs to speak about their items.
+4. Everybody secretly adds hidden items to `Problems` column.
+5. The moderator reveals `Problems` column.
+6. Everybody has ~30 secs to speak about their items.
+7. Everybody is given 3 votes to vote on the items in the `Problems` category. Voting is hidden.
+8. The moderator stops the voting and the most voted items bubble up.
+9. The moderator takes 3 top items from the `Problems` category and creates an `Action Item` in the third column out of it with the help of the team. Each `Action Item`:
+ - defines `What` has to be done
+ - defines `When` it has to be completed
+ - defines `Who` is responsible for completing it
+ - must be created as an issue in the repository to be trackable
+
 _Who:_ all tech members within a meeting
 
 _When:_ first day of the sprint
