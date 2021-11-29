@@ -107,9 +107,9 @@ class Indexer extends EventEmitter {
               ]),
             backoffOption
           )
-        } else {
-          retryWithBackoff(() => this.restart(), backoffOption)
         }
+      } else {
+        retryWithBackoff(() => this.restart(), backoffOption)
       }
     })
 

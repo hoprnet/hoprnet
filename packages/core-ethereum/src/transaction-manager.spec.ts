@@ -100,7 +100,7 @@ describe('transaction-manager', function () {
     const allPendingTx = transactionManager.getAllPendingTxs()
 
     expect(allPendingTx.length).to.equal(1)
-    expect(allPendingTx.pop()).to.equal({
+    expect(allPendingTx.pop()).to.eql({
       to: PAYLOAD.to,
       data: PAYLOAD.data,
       value: PAYLOAD.value,
