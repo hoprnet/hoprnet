@@ -5,7 +5,7 @@ At HOPR we create and use multiple Ethereum addresses that are under the control
 Here are some of these wallets:
 
 | Wallet Address                               | Alias                              | Description                                                                       |
-| -------------------------------------------- | ---------------------------------  | --------------------------------------------------------------------------------- |
+| -------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
 | `0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5` | Dev Deployer                       | Used for deploying testnet or demo contracts across our network.                  |
 | `0x1A387b5103f28bc6601d085A3dDC878dEE631A56` | Dev Minter                         | Used as user granted `mint`ing access to our test contracts in our network.       |
 | `0x34465FE0B25089Fc9D3a6D33e19F652e45B175e0` | Alice                              | Used as first user for interacting with some of our contracts (e.g. `HOPRBoost`)  |
@@ -13,7 +13,7 @@ Here are some of these wallets:
 | `0x7dB59a3c1e8505845F4a8BF373fD2Cff42037eBd` | Dev External                       | limited access wallet granted to external/community members                       |
 | `0xD7682Ef1180f5Fc496CF6981e4854738a57c593E` | NFT Minter                         | Used for minting NFTs when `mint`ing role is given. It renounces it shortly after |
 | `0x4f50ab4e931289344a57f2fe4bbd10546a6fdc17` | HOPR Association Gnosis Wallet     | Used for paying services to all different parties involved with HOPR Association  |
-| `0x5E1c4e7004B7411bA27Dc354330fab31147DFeF1` | HOPR Asociation xDAI Gnosis Wallet | Same as “HOPR Association Gnosis Wallet” wallet but on the xDAI network           | 
+| `0x5E1c4e7004B7411bA27Dc354330fab31147DFeF1` | HOPR Asociation xDAI Gnosis Wallet | Same as “HOPR Association Gnosis Wallet” wallet but on the xDAI network           |
 | `0x752af2bf9dbbc1105a83d2ca1ee8f1046d85b702` | HOPR Association Gnosis Safe       | Used to represent the HOPR Association DAO and hold treasury of trading fees      |
 | `0xE9131488563776DE7FEa238d6112c5dA46be9a9F` | HOPR Association xDAI Gnosis Safe  | Same as “HOPR Association Gnosis Safe” wallet but on the xDAI network             |
 | `0x2D8E358487FeDa42629274CE041F98629Bf65cF3` | HOPR DAO main net Gnosis Safe      | Used to ratify actions on behalf of HOPR's DAO and holding Uniswap Liquidity fees |
