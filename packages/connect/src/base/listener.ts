@@ -4,7 +4,7 @@ import { createSocket } from 'dgram'
 import type { RemoteInfo, Socket as UDPSocket } from 'dgram'
 
 import { once, EventEmitter } from 'events'
-import { PeerStoreType, PublicNodesEmitter, DialOptions } from '../types'
+import type { PeerStoreType, PublicNodesEmitter, DialOptions } from '../types'
 import Debug from 'debug'
 import { green, red } from 'chalk'
 import { networkInterfaces } from 'os'
@@ -12,12 +12,8 @@ import type { NetworkInterfaceInfo } from 'os'
 
 import AbortController from 'abort-controller'
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, CODE_UDP, RELAY_CONTACT_TIMEOUT } from '../constants'
-import type Connection from 'libp2p-interfaces/src/connection/connection'
-import type {
-  MultiaddrConnection,
-  Upgrader,
-  Listener as InterfaceListener
-} from 'libp2p-interfaces/src/transport/types'
+import type { Connection } from 'libp2p-interfaces/connection'
+import type { MultiaddrConnection, Upgrader, Listener as InterfaceListener } from 'libp2p-interfaces/transport'
 
 import type PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'

@@ -479,7 +479,7 @@ describe('relay connection - stream error propagation', function () {
       counterparty: Bob
     })
 
-    const sourcePromise = AliceRelay.source.next()
+    const sourcePromise = (AliceRelay.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next()
 
     await assert.rejects(
       alice.sink(
@@ -535,6 +535,9 @@ describe('relay connection - stream error propagation', function () {
       counterparty: Bob
     })
 
-    await assert.rejects(alice.source.next(), Error(errorInSource))
+    await assert.rejects(
+      (alice.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next(),
+      Error(errorInSource)
+    )
   })
 })

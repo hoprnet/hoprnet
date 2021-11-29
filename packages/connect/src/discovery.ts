@@ -1,4 +1,4 @@
-import { PeerDiscovery } from 'libp2p-interfaces/src/peer-discovery/types'
+import type { PeerDiscovery } from 'libp2p-interfaces/peer-discovery'
 import { EventEmitter } from 'events'
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
