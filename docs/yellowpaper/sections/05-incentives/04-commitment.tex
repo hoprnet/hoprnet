@@ -33,7 +33,7 @@ $$ comm_0 = \mathsf{HMAC}(s_{commit}, channelEpoch || chainId || channelId || co
 
 where $||$ denotes bit string concatenation.
 
-Since the above transformation is dependent on the ticket recipient's private key, the resulting value $comm_0$ is unpredictable for the ticket issuer and
+Since the above transformation is dependent on the ticket recipient's private key, the resulting value of $comm_0$ is unpredictable for the ticket issuer and
 hence also for every $i > 0$, the subsequent values of $comm_i = keccak256(comm_{i-1})$ are pseudorandom and infeasible to predict by the ticket issuer.
 
 The algorithm \textsf{Open} is therefore quite simple as it solely checks that
