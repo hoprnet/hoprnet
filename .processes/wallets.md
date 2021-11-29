@@ -16,9 +16,9 @@ Here are some of these wallets:
 | `0x5E1c4e7004B7411bA27Dc354330fab31147DFeF1` | HOPR Asociation xDAI Gnosis Wallet | Same as “HOPR Association Gnosis Wallet” wallet but on the xDAI network           |
 | `0x752af2bf9dbbc1105a83d2ca1ee8f1046d85b702` | HOPR Association Gnosis Safe       | Same as “HOPR Association Gnosis Wallet” wallet but using the new Gnosis Safe     |
 | `0xE9131488563776DE7FEa238d6112c5dA46be9a9F` | HOPR Association xDAI Gnosis Safe  | Same as “HOPR Association Gnosis Safe” wallet but on the xDAI network             |
-| `0x2D8E358487FeDa42629274CE041F98629Bf65cF3` | HOPR DAO main net Gnosis Safe      | Used to ratify actions on behalf of HOPR's DAO and holding Uniswap Liquidity fees|
-| `0x8f7a2AbbC8741572427e3426538cD516A41102f3` | HOPR Deployer                      | Main net minter account & HOPR Association and DAO multisig representative       |
-| `0x5AB4f2a41DEb3B925B23a3f7E00F206BED18ABB3` | Multisig #1                        | HOPR Association representative #1 (both Gnosis Wallet + Gnosis Safe             |
+| `0x2D8E358487FeDa42629274CE041F98629Bf65cF3` | HOPR DAO main net Gnosis Safe      | Used to ratify actions on behalf of HOPR's DAO and holding Uniswap Liquidity fees |
+| `0x8f7a2AbbC8741572427e3426538cD516A41102f3` | HOPR Deployer                      | Main net minter account & HOPR Association and DAO multisig representative        |
+| `0x5AB4f2a41DEb3B925B23a3f7E00F206BED18ABB3` | Multisig #1                        | HOPR Association representative #1 (both Gnosis Wallet + Gnosis Safe              |
 | `0x93bC372b4cC142dA75a365C5cB45be996347bfeC` | Multisig #2                        | HOPR Association representative #2 (only Gnosis Safe)                             |
 | `0x50677B7e720102c5126e17f4485149208d3fce71` | Multisig #3                        | HOPR Association representative #3 (only Gnosis Wallet)                           |
 
