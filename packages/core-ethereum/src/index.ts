@@ -22,6 +22,7 @@ import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
+import { chainMock } from './index.mock'
 
 const log = debug('hopr-core-ethereum')
 
@@ -334,6 +335,7 @@ export {
   ChannelEntry,
   ChannelCommitmentInfo,
   Indexer,
+  chainMock,
   createChainWrapper,
   initializeCommitment,
   findCommitmentPreImage,
