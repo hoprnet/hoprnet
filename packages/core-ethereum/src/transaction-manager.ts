@@ -28,6 +28,10 @@ class TranscationManager {
    */
   public readonly payloads = new Map<string, TransactionPayload>()
   /**
+   * transaction requests, before signing
+   */
+  public readonly queuing = new Map<string, Transaction>()
+  /**
    * pending transactions
    */
   public readonly pending = new Map<string, Transaction>()
@@ -41,15 +45,15 @@ class TranscationManager {
   public readonly confirmed = new Map<string, Transaction>()
 
   /**
-   * Return all the pending transactions
+   * Return all the queuing transactions
    * @returns Array of transaction hashes
    */
-  public getAllPendingTxs(): TransactionRequest[] {
-    // pending tx hashes
-    const pendingTxHash = Array.from(this.pending.keys())
-    return pendingTxHash.map((txHash) => {
+  public getAllQueuingTxs(): TransactionRequest[] {
+    // queuing tx hashes
+    const queuingTxHash = Array.from(this.queuing.keys())
+    return queuingTxHash.map((txHash) => {
       const { to, data, value } = this.payloads.get(txHash)
-      const { nonce, gasPrice } = this.pending.get(txHash)
+      const { nonce, gasPrice } = this.queuing.get(txHash)
       return {
         to,
         data,
@@ -93,27 +97,41 @@ class TranscationManager {
     }
 
     const hash = Array.from(this.payloads.keys())[index]
-    if (!this.mined.get(hash) && BigNumber.from(this.pending.get(hash).gasPrice).lt(BigNumber.from(gasPrice))) {
+    if (!this.mined.get(hash) && BigNumber.from((this.pending.get(hash) ?? this.queuing.get(hash)).gasPrice).lt(BigNumber.from(gasPrice))) {
       return [false, hash]
     }
     return [true, hash]
   }
 
   /**
-   * Adds transaction in pending
+   * Adds queuing transaction
    * @param hash transaction hash
    * @param transaction object
    */
-  public addToPending(
+  public addToQueuing(
     hash: string,
     transaction: Omit<Transaction, 'createdAt'>,
     transactionPayload: TransactionPayload
   ): void {
-    if (this.pending.has(hash)) return
+    if (this.queuing.has(hash)) return
 
-    log('Adding pending transaction %s %i', hash, transaction.nonce)
+    log('Adding queuing transaction %s %i', hash, transaction.nonce)
     this.payloads.set(hash, transactionPayload)
-    this.pending.set(hash, { nonce: transaction.nonce, createdAt: this._getTime(), gasPrice: transaction.gasPrice })
+    this.queuing.set(hash, { nonce: transaction.nonce, createdAt: 0, gasPrice: transaction.gasPrice })
+  }
+
+  /**
+   * Moves transaction from queuing to pending
+   * @param hash transaction hash
+   */
+  public moveFromQueuingToPending(
+    hash: string
+  ): void {
+    if (!this.queuing.has(hash)) return
+
+    log('Moving transaction to pending %s', hash)
+    this.pending.set(hash, {...this.queuing.get(hash), createdAt: this._getTime()})
+    this.queuing.delete(hash)
   }
 
   /**

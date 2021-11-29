@@ -96,13 +96,13 @@ class Indexer extends EventEmitter {
         [error?.code, String(error)].includes(errors.TIMEOUT) ||
         [error?.code, String(error)].includes('ECONNRESET')
       ) {
-        log(chalk.blue('code error falls here', this.chain.getAllPendingTransactionRequests().length))
-        if (this.chain.getAllPendingTransactionRequests().length > 0) {
+        log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
+        if (this.chain.getAllQueuingTransactionRequests().length > 0) {
           const wallet = this.chain.getWallet()
           retryWithBackoff(
             () =>
               Promise.allSettled([
-                ...this.chain.getAllPendingTransactionRequests().map((request) => wallet.sendTransaction(request)),
+                ...this.chain.getAllQueuingTransactionRequests().map((request) => wallet.sendTransaction(request)),
                 this.restart()
               ]),
             backoffOption

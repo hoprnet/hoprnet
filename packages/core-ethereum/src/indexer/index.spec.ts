@@ -149,7 +149,14 @@ const createChainMock = (
     getChannels: () => hoprChannels,
     getWallet: () => account ?? fixtures.ACCOUNT_A,
     setCommitment: (counterparty: Address, commitment: Hash) =>
-      hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex())
+      hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex()),
+    getAllQueuingTransactionRequests: () => [{
+      to: fixtures.ACCOUNT_B,
+      data: '0x',
+      value: 0,
+      nonce: 0,
+      gasPrice: 1
+    }]
   } as unknown as ChainWrapper
 }
 
@@ -291,6 +298,26 @@ describe('test indexer', function () {
     await indexer.start(chain, 0)
 
     provider.emit('error', new Error('MOCK'))
+
+    assert.strictEqual(indexer.status, 'stopped')
+
+    const started = defer<void>()
+    indexer.on('status', (status: string) => {
+      if (status === 'started') started.resolve()
+    })
+    await started.promise
+    assert.strictEqual(indexer.status, 'started')
+  })
+
+  it('should handle provider error and resend queuing transactions', async function () {
+    const { indexer, provider, chain } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+    })
+
+    await indexer.start(chain, 0)
+
+    provider.emit('error', new Error('ECONNRESET'))
 
     assert.strictEqual(indexer.status, 'stopped')
 
