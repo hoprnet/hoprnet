@@ -153,10 +153,6 @@ Newly created issues ([labelled as](#labels): `new issue`) may not all have been
 
 In `Retrospective` we aim to summarize the results of the last spring, in order to help us identify and fix issues in our processes and company culture.
 
-- what went better than expected
-- what went worse than expected
-- lessons learned
-
 The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows this schedule:
 
 1. Everybody secretly adds hidden items to `What Went Well` column.
