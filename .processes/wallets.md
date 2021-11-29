@@ -11,8 +11,12 @@ Here are some of these wallets:
 | `0x34465FE0B25089Fc9D3a6D33e19F652e45B175e0` | Alice        | Used as first user for interacting with some of our contracts (e.g. `HOPRBoost`)  |
 | `0x2402da10A6172ED018AEEa22CA60EDe1F766655C` | Dev Bank     | `all-hands` wallet used by all HOPR team members to fund nodes or other accounts. |
 | `0x7dB59a3c1e8505845F4a8BF373fD2Cff42037eBd` | Dev External | limited access wallet granted to external/community members                       |
-
----
+| `0xD7682Ef1180f5Fc496CF6981e4854738a57c593E` | NFT Minter   | Used for minting NFTs when `mint`ing role is given. It renounces it shortly after |
+| `0x4f50ab4e931289344a57f2fe4bbd10546a6fdc17` | HOPR Wallet  | Used for paying services to all different parties involved with HOPR Association  |
+| `0x752af2bf9dbbc1105a83d2ca1ee8f1046d85b702` | HOPR DAO     | Used to represent the HOPR Association DAO and hold treasury of trading fees      |
+| `0x5AB4f2a41DEb3B925B23a3f7E00F206BED18ABB3` | Multisig #1  | HOPR Association representative #1 (both dao + wallet signer)                     |
+| `0x93bC372b4cC142dA75a365C5cB45be996347bfeC` | Multisig #2  | HOPR Association representative #2 (only wallet signer)                           |
+| `0x50677B7e720102c5126e17f4485149208d3fce71` | Multisig #3  | HOPR Association representative #3 (only dao signer)                              |
 
 There are some additional wallets used for testing, that had been label `[ Unknown ]`. They will be handled in https://github.com/hoprnet/hoprnet/issues/2893.
 
