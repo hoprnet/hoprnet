@@ -4,11 +4,15 @@ At HOPR we create and use multiple Ethereum addresses that are under the control
 
 Here are some of these wallets:
 
-- `0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5` (codename: Deployer)
-- `0x1A387b5103f28bc6601d085A3dDC878dEE631A56` (codename: Minter)
-- `0x34465FE0B25089Fc9D3a6D33e19F652e45B175e0` (codename: Alice)
-- `0x2402da10A6172ED018AEEa22CA60EDe1F766655C` (codename: Dev Bank)
-- `0x7dB59a3c1e8505845F4a8BF373fD2Cff42037eBd` (codename: Dev External)
+| Wallet Address | Alias | Description
+---|---|---
+`0xA18732DC751BE0dB04157eb92C92BA9d0fC09FC5` | Deployer | Used for deploying contracts across our network.
+`0x1A387b5103f28bc6601d085A3dDC878dEE631A56` | Minter | Used as user granted `mint`ing access to various contracts in our network.
+`0x34465FE0B25089Fc9D3a6D33e19F652e45B175e0` | Alice | Used as first user for interacting with some of our contracts (e.g. `HOPRBoost`)
+`0x2402da10A6172ED018AEEa22CA60EDe1F766655C` | Dev Bank | `all-hands` wallet used by all HOPR team members to fund nodes or other accounts.
+`0x7dB59a3c1e8505845F4a8BF373fD2Cff42037eBd` | Dev External | limited access wallet granted to external/community members
+---
+
 
 There are some additional wallets used for testing, that had been label `[ Unknown ]`. They will be handled in https://github.com/hoprnet/hoprnet/issues/2893.
 
