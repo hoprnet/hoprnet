@@ -123,7 +123,7 @@ describe('relay connection', function () {
       assert.fail(`Stream should be closed`)
     }
 
-    for await (const _msg of relayShaker.stream.source) {
+    for await (const _msg of relayShaker.stream.source as AsyncIterable<StreamType>) {
       assert.fail(`Stream should be closed`)
     }
 
@@ -165,7 +165,7 @@ describe('relay connection', function () {
 
     relayShaker.rest()
 
-    for await (const _msg of relayShaker.stream.source) {
+    for await (const _msg of relayShaker.stream.source as AsyncIterable<StreamType>) {
       assert.fail(`Stream must have ended`)
     }
 
