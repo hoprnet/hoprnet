@@ -209,13 +209,14 @@ At the moment we DO NOT HAVE backward compatibility between releases.
 We attempt to provide instructions on how to migrate your tokens between releases.
 
 1. Set your automatic channel strategy to `MANUAL`.
-2. Close all open payment channels.
-3. Once all payment channels have closed, withdraw your funds to an external
+2. Redeem all unredeemed tickets.
+3. Close all open payment channels.
+4. Once all payment channels have closed, withdraw your funds to an external
    wallet.
-4. Run `info` and take note of the **network name**.
-5. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` and `.db` folders.
-6. Launch new `HOPRd` instance using latest release, this will create new `.hopr-identity` and `.db` folders, observe the account address.
-7. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
+5. Run `info` and take note of the **network name**.
+6. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` folder.
+7. Launch new `HOPRd` instance using latest release, observe the account address.
+8. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
 
 ## Develop
 
