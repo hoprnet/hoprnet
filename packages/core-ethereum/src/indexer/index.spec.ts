@@ -150,13 +150,15 @@ const createChainMock = (
     getWallet: () => account ?? fixtures.ACCOUNT_A,
     setCommitment: (counterparty: Address, commitment: Hash) =>
       hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex()),
-    getAllQueuingTransactionRequests: () => [{
-      to: fixtures.ACCOUNT_B,
-      data: '0x',
-      value: 0,
-      nonce: 0,
-      gasPrice: 1
-    }]
+    getAllQueuingTransactionRequests: () => [
+      {
+        to: fixtures.ACCOUNT_B,
+        data: '0x',
+        value: 0,
+        nonce: 0,
+        gasPrice: 1
+      }
+    ]
   } as unknown as ChainWrapper
 }
 

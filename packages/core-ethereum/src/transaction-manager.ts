@@ -97,7 +97,10 @@ class TranscationManager {
     }
 
     const hash = Array.from(this.payloads.keys())[index]
-    if (!this.mined.get(hash) && BigNumber.from((this.pending.get(hash) ?? this.queuing.get(hash)).gasPrice).lt(BigNumber.from(gasPrice))) {
+    if (
+      !this.mined.get(hash) &&
+      BigNumber.from((this.pending.get(hash) ?? this.queuing.get(hash)).gasPrice).lt(BigNumber.from(gasPrice))
+    ) {
       return [false, hash]
     }
     return [true, hash]
@@ -124,13 +127,11 @@ class TranscationManager {
    * Moves transaction from queuing to pending
    * @param hash transaction hash
    */
-  public moveFromQueuingToPending(
-    hash: string
-  ): void {
+  public moveFromQueuingToPending(hash: string): void {
     if (!this.queuing.has(hash)) return
 
     log('Moving transaction to pending %s', hash)
-    this.pending.set(hash, {...this.queuing.get(hash), createdAt: this._getTime()})
+    this.pending.set(hash, { ...this.queuing.get(hash), createdAt: this._getTime() })
     this.queuing.delete(hash)
   }
 

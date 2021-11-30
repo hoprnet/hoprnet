@@ -105,8 +105,8 @@ export async function createChainWrapper(
   async function sendTransaction<T extends BaseContract>(
     checkDuplicate: Boolean,
     contract: T,
-    method: keyof T["functions"],
-    ...rest: Parameters<T["functions"][keyof T["functions"]]>
+    method: keyof T['functions'],
+    ...rest: Parameters<T['functions'][keyof T['functions']]>
   ): Promise<Partial<ContractTransaction>> {
     const gasLimit = 400e3
     const gasPrice = networkInfo.gasPrice ?? (await provider.getGasPrice())
@@ -120,12 +120,12 @@ export async function createChainWrapper(
       nonce
     })
 
-    // breakdown steps in ethersjs 
+    // breakdown steps in ethersjs
     // https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L122
-    // 1. omit this._checkProvider("sendTransaction"); 
+    // 1. omit this._checkProvider("sendTransaction");
     // 2. populate transaction
     const tx = await contract.populateTransaction[method as string](...rest)
-    const populatedTx = await wallet.populateTransaction({...tx, gasLimit, gasPrice, nonce})
+    const populatedTx = await wallet.populateTransaction({ ...tx, gasLimit, gasPrice, nonce })
     const essentialTxPayload: TransactionPayload = {
       to: populatedTx.to,
       data: populatedTx.data as string,
@@ -150,7 +150,7 @@ export async function createChainWrapper(
       }
 
       // 3. sign transaction
-      const signedTx = await wallet.signTransaction(populatedTx);
+      const signedTx = await wallet.signTransaction(populatedTx)
       // compute tx hash and save to initiated tx list in tx manager
       const initiatedHash = utils.keccak256(signedTx)
       transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
@@ -283,23 +283,13 @@ export async function createChainWrapper(
   }
 
   async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const transaction = await sendTransaction(
-      checkDuplicate,
-      channels,
-      'finalizeChannelClosure',
-      counterparty.toHex()
-    )
+    const transaction = await sendTransaction(checkDuplicate, channels, 'finalizeChannelClosure', counterparty.toHex())
     return transaction.hash
     // TODO: catch race-condition
   }
 
   async function initiateChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const transaction = await sendTransaction(
-      checkDuplicate,
-      channels,
-      'initiateChannelClosure',
-      counterparty.toHex()
-    )
+    const transaction = await sendTransaction(checkDuplicate, channels, 'initiateChannelClosure', counterparty.toHex())
     return transaction.hash
     // TODO: catch race-condition
   }
