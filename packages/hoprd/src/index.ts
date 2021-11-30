@@ -194,10 +194,11 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 function addUnhandledPromiseRejectionHandler() {
-  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  require( 'trace-unhandled/register' );
+  /*process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason)
     process.exit(1)
-  })
+  })*/
 }
 
 async function main() {
