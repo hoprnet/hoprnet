@@ -160,6 +160,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
     this._sinkSwitchPromise = defer<void>()
     this._sourceSwitchPromise = defer<void>()
 
+    this._sourceIterator = (this._stream.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
+
     this.source = this.createSource()
 
     // Auto-start sink stream and declare variable in advance
@@ -191,7 +193,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection<Stream
     }
 
     sinkCreator = this._stream.sink(this.sinkFunction())
-    this._sourceIterator = (this._stream.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
 
     // catch errors that occur before attaching a sink source stream
     sinkCreator.catch((err) => this.error('sink error thrown before sink attach', err.message))

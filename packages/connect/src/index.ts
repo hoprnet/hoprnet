@@ -8,8 +8,8 @@ import type { Upgrader, Transport, ConnectionHandler } from 'libp2p-interfaces/t
 import type { default as libp2p } from 'libp2p'
 import chalk from 'chalk'
 import { TCPConnection, Listener } from './base'
-import type { WebRTCUpgrader } from './webrtc'
-import type { Relay } from './relay'
+import { WebRTCUpgrader } from './webrtc'
+import { Relay } from './relay'
 import { Filter } from './filter'
 import { Discovery } from './discovery'
 
