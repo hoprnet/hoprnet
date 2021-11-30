@@ -912,7 +912,7 @@ class Hopr extends EventEmitter {
     const ethereum = await this.startedPaymentChannels()
 
     try {
-      return ethereum.withdraw(currency, recipient, amount)
+      return await ethereum.withdraw(currency, recipient, amount)
     } catch (err) {
       await this.isOutOfFunds(err)
       throw new Error(`Failed to withdraw: ${err}`)
