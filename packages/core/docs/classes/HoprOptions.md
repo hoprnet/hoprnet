@@ -48,7 +48,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L80)
+[packages/core/src/index.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L75)
 
 ## Properties
 
