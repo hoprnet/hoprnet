@@ -7,7 +7,7 @@ import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
 export const privateKey = '0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332'
-export const mockPeerId = privKeyToPeerId(privateKey)
+export const mockPeerId: PeerId = privKeyToPeerId(privateKey)
 export const samplePeerId = PeerId.createFromB58String('16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7')
 export const sampleMultiaddrs = new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${samplePeerId.toB58String()}`)
 
