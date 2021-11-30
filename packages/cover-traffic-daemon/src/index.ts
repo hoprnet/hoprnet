@@ -9,12 +9,11 @@ import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-u
 
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
+import setupHealthcheck from './healthcheck'
 
 import type PeerId from 'peer-id'
 import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
 import type { PeerData, State } from './state'
-import http from 'http'
-import restana from 'restana'
 
 const log = debug('hopr:cover-traffic')
 
@@ -85,17 +84,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   if (argv.healthCheckHost != null) {
-    const service = restana()
-    service.get('/healthcheck/v1/version', (_, res) => res.send(`CT node: ${node.getVersion()}`))
-    const hostname = argv.healthCheckHost
-    const port = argv.healthCheckPort
-    const server = http.createServer(service as any).on('error', (err) => {
-      throw err
-    })
-    server.listen(port, hostname, (err?: Error) => {
-      if (err) throw err
-      log(`Healthcheck server on ${hostname} listening on port ${port}`)
-    })
+    setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
   }
 
   const selfPub = PublicKey.fromPeerId(peerId)

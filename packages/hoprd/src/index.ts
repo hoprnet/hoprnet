@@ -10,6 +10,7 @@ import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments } from 
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 
 import setupAPI from './api'
+import setupHealthcheck from './healthcheck'
 import { AdminServer } from './admin'
 import { Commands } from './commands'
 import { LogStream } from './logs'
@@ -287,18 +288,7 @@ async function main() {
     }
 
     if (argv.healthCheck) {
-      const http = require('http')
-      const service = require('restana')()
-      service.get('/healthcheck/v1/version', (_, res) => res.send(node.getVersion()))
-      const hostname = argv.healthCheckHost
-      const port = argv.healthCheckPort
-      const server = http.createServer(service).on('error', (err) => {
-        throw err
-      })
-      server.listen(port, hostname, (err) => {
-        if (err) throw err
-        logs.log(`Healthcheck server on ${hostname} listening on port ${port}`)
-      })
+      setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
     }
 
     logs.log(`Node address: ${node.getId().toB58String()}`)
