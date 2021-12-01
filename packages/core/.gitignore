@@ -31,3 +31,7 @@ log.txt
 # Exclude coverage
 .nyc_output
 coverage
+
+# Exclude mocks build
+src/**.mock.**
+!src/**.mock.ts
