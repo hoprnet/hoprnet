@@ -140,10 +140,13 @@ class TranscationManager {
   }
 
   /**
-   * Moves transcation from pending or mined to confirmed
+   * Moves transcation from queuing or pending or mined to confirmed
    * @param hash transaction hash
    */
   public moveToConfirmed(hash: string): void {
+    if (this.queuing.has(hash)) {
+      this.moveFromQueuingToPending(hash)
+    }
     if (this.pending.has(hash)) {
       this.moveFromPendingToMined(hash)
     }
@@ -179,12 +182,13 @@ class TranscationManager {
   }
 
   /**
-   * Removed transcation from pending, mined and confirmed
+   * Removed transcation from queuing, pending, mined and confirmed
    * @param hash transaction hash
    */
   public remove(hash: string): void {
     log('Removing transaction %s', hash)
     this.payloads.delete(hash)
+    this.queuing.delete(hash)
     this.pending.delete(hash)
     this.mined.delete(hash)
     this.confirmed.delete(hash)
