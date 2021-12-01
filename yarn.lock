@@ -1175,7 +1175,7 @@ __metadata:
     it-pipe: 1.1.0
     it-pushable: 1.4.2
     libp2p: 0.33.0
-    libp2p-interfaces: 1.1.0
+    libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.4
     mocha: 9.1.3
     multiaddr: ^10.0.0
@@ -11105,7 +11105,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-crypto@npm:^0.19.0, libp2p-crypto@npm:^0.19.4, libp2p-crypto@npm:^0.19.5, libp2p-crypto@npm:^0.19.7":
+"libp2p-crypto@npm:^0.19.4, libp2p-crypto@npm:^0.19.5, libp2p-crypto@npm:^0.19.7":
   version: 0.19.7
   resolution: "libp2p-crypto@npm:0.19.7"
   dependencies:
@@ -11124,24 +11124,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-interfaces@npm:1.1.0":
-  version: 1.1.0
-  resolution: "libp2p-interfaces@npm:1.1.0"
+"libp2p-interfaces@npm:2.0.0":
+  version: 2.0.0
+  resolution: "libp2p-interfaces@npm:2.0.0"
   dependencies:
-    abort-controller: ^3.0.0
-    abortable-iterator: ^3.0.0
-    debug: ^4.3.1
-    err-code: ^3.0.1
-    it-length-prefixed: ^5.0.2
-    it-pipe: ^1.1.0
-    it-pushable: ^1.4.2
-    libp2p-crypto: ^0.19.5
     multiaddr: ^10.0.0
-    multiformats: ^9.1.2
-    peer-id: ^0.15.0
-    protobufjs: ^6.10.2
-    uint8arrays: ^3.0.0
-  checksum: 0d4c9353425ff24bb72f5271245c205e61eceb9377410d624321e6a7f6def3f84d24ca4e34f9f7fea861ae84c3d41dae05288a1743aed9667605ff8e31b7b15f
+    multiformats: ^9.4.10
+  checksum: 0c3c81cff6a74087c54f2d85222fe88dbac3a4c6a526b0964788eaa73bbb253bb7211d6bae2e2c68fa89ab5c8088d6e51ac1d1c91b21732a0e378998d096be80
   languageName: node
   linkType: hard
 
@@ -13828,7 +13817,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"peer-id@npm:0.15.4":
+"peer-id@npm:0.15.4, peer-id@npm:^0.15.0, peer-id@npm:^0.15.3, peer-id@npm:~0.15.3":
   version: 0.15.4
   resolution: "peer-id@npm:0.15.4"
   dependencies:
@@ -13841,22 +13830,6 @@ __metadata:
   bin:
     peer-id: src/bin.js
   checksum: ea17967de015ffec2fe1bab21583ae3713807a7ca0752694657032dcd9693305038b185d7faa55b51f3e4b833fbd238c35ae8e1199dccff89e40a9135e7d68ad
-  languageName: node
-  linkType: hard
-
-"peer-id@npm:^0.15.0, peer-id@npm:^0.15.3, peer-id@npm:~0.15.3":
-  version: 0.15.3
-  resolution: "peer-id@npm:0.15.3"
-  dependencies:
-    class-is: ^1.1.0
-    libp2p-crypto: ^0.19.0
-    minimist: ^1.2.5
-    multiformats: ^9.4.5
-    protobufjs: ^6.10.2
-    uint8arrays: ^3.0.0
-  bin:
-    peer-id: src/bin.js
-  checksum: 6ee7ef1b3e5ed1626121544e9811d5de4bbfea81b603005515d0983c1eb87f42bd11d9300458f223da4396ae6482e4497f7975d5965d10071f736f64629ffc2f
   languageName: node
   linkType: hard
 
@@ -14100,7 +14073,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier@npm:2.5.0":
+"prettier@npm:2.5.0, prettier@npm:^2.1.2":
   version: 2.5.0
   resolution: "prettier@npm:2.5.0"
   bin:
@@ -14115,15 +14088,6 @@ __metadata:
   bin:
     prettier: ./bin-prettier.js
   checksum: bc78219e0f8173a808f4c6c8e0a137dd8ebd4fbe013e63fe1a37a82b48612f17b8ae8e18a992adf802ee2cf7428f14f084e7c2846ca5759cf4013c6e54810e1f
-  languageName: node
-  linkType: hard
-
-"prettier@npm:^2.1.2":
-  version: 2.4.1
-  resolution: "prettier@npm:2.4.1"
-  bin:
-    prettier: bin-prettier.js
-  checksum: cc6830588b401b0d742862fe9c46bc9118204fb307c3abe0e49e95b35ed23629573807ffdf9cdd65289c252a0bb51fc0171437f6626ee36378dea80f0ee80b91
   languageName: node
   linkType: hard
 

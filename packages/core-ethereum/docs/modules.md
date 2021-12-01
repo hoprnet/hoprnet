@@ -19,6 +19,7 @@
 
 - [CONFIRMATIONS](modules.md#confirmations)
 - [INDEXER\_BLOCK\_RANGE](modules.md#indexer_block_range)
+- [chainMock](modules.md#chainmock)
 
 ### Functions
 
@@ -35,7 +36,7 @@
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L28)
+[packages/core-ethereum/src/index.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L29)
 
 ## Variables
 
@@ -56,6 +57,16 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L8)
+
+___
+
+### chainMock
+
+• **chainMock**: [`default`](classes/default.md)
+
+#### Defined in
+
+[packages/core-ethereum/src/index.mock.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.mock.ts#L12)
 
 ## Functions
 

@@ -123,7 +123,7 @@ describe('relay connection', function () {
       assert.fail(`Stream should be closed`)
     }
 
-    for await (const _msg of relayShaker.stream.source) {
+    for await (const _msg of relayShaker.stream.source as AsyncIterable<StreamType>) {
       assert.fail(`Stream should be closed`)
     }
 
@@ -165,7 +165,7 @@ describe('relay connection', function () {
 
     relayShaker.rest()
 
-    for await (const _msg of relayShaker.stream.source) {
+    for await (const _msg of relayShaker.stream.source as AsyncIterable<StreamType>) {
       assert.fail(`Stream must have ended`)
     }
 
@@ -479,7 +479,7 @@ describe('relay connection - stream error propagation', function () {
       counterparty: Bob
     })
 
-    const sourcePromise = AliceRelay.source.next()
+    const sourcePromise = (AliceRelay.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next()
 
     await assert.rejects(
       alice.sink(
@@ -535,6 +535,9 @@ describe('relay connection - stream error propagation', function () {
       counterparty: Bob
     })
 
-    await assert.rejects(alice.source.next(), Error(errorInSource))
+    await assert.rejects(
+      (alice.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next(),
+      Error(errorInSource)
+    )
   })
 })

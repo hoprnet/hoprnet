@@ -11,7 +11,7 @@ const verbose = Debug('hopr-connect:verbose:tcp')
 
 export const SOCKET_CLOSE_TIMEOUT = 1000
 
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
+import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
 
 import { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
@@ -22,9 +22,8 @@ import type { Stream, StreamType, DialOptions } from '../types'
 /**
  * Class to encapsulate TCP sockets
  */
-class TCPConnection implements MultiaddrConnection {
+class TCPConnection implements MultiaddrConnection<StreamType> {
   public localAddr: Multiaddr
-  // @ts-ignore
   public sink: Stream['sink']
   public source: Stream['source']
 

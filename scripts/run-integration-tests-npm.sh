@@ -69,7 +69,7 @@ declare tmp="/tmp"
 
 declare npm_install_dir="${tmp}/hopr-npm"
 
-declare node_prefix="hopr-npm"
+declare node_prefix="hopr-npm-node"
 
 declare node1_dir="${tmp}/${node_prefix}-1"
 declare node2_dir="${tmp}/${node_prefix}-2"

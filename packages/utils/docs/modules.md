@@ -96,6 +96,7 @@
 - [SUGGESTED\_NATIVE\_BALANCE](modules.md#suggested_native_balance)
 - [UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH](modules.md#uncompressed_public_key_length)
 - [b58StringRegex](modules.md#b58stringregex)
+- [dbMock](modules.md#dbmock)
 - [durations](modules.md#durations)
 
 ### Functions
@@ -871,6 +872,16 @@ Regular expresion used to match b58Strings
 #### Defined in
 
 [libp2p/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L25)
+
+___
+
+### dbMock
+
+• **dbMock**: [`HoprDB`](classes/HoprDB.md) = `db`
+
+#### Defined in
+
+[db.mock.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.mock.ts#L12)
 
 ___
 
