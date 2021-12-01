@@ -28,7 +28,6 @@ describe(`converting privKey to peerId`, function () {
   it('check incorrect private key size', function () {
     const incorrectPrivKey = new Uint8Array(1).fill(0)
 
-    console.log(u8aToHex(peerIdPrivKey))
     assert.throws(() => privKeyToPeerId(incorrectPrivKey))
   })
 })

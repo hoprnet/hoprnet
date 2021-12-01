@@ -69,7 +69,7 @@
     "extension": [
       "ts"
     ],
-    "spec": "src/libp2p/privKeyToPeerId.spec.ts",
+    "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
   },
   "stableVersion": "1.76.0-next.30"
