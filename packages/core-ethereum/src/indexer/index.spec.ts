@@ -17,7 +17,7 @@ const txRequest = {
   value: 0,
   nonce: 0,
   gasPrice: 1
-};
+}
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
   let latestBlockNumber = ops.latestBlockNumber ?? 0
@@ -309,7 +309,7 @@ describe('test indexer', function () {
     })
     await started.promise
     assert.strictEqual(indexer.status, 'started')
-  })  
+  })
 
   it('should handle provider error and resend queuing transactions', async function () {
     const { indexer, provider, chain } = await useFixtures({
