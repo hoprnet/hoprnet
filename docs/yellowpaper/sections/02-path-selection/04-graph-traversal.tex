@@ -1,0 +1,53 @@
+\subsection{Path selection}
+\label{sec:path-selection:graph-traversal}
+
+The HOPR network uses source-selected routing. This means a node must sample the entire path the mixnet packet will take before sending it to the first relayer.
+
+To achieve the aforementioned privacy guarantees, paths must include at least one intermediate node. However, using the Sphinx packet format (see Section \ref{sec:sphinx}) increases both the size of the header and the computation needed to generate it, which makes it possible for adversaries to distinguish packets on longer paths. Therefore, all nodes in the HOPR network are strongly encouraged to use a $targetLength$ of three. Packets with longer paths are dropped by relayers. It is possible but discouraged for nodes to use paths of one or two hops.
+
+Nodes can only be chosen once per path. For example, when choosing the third node in the path $A\rightarrow B$, if $A$ is found to be the only node with an open channel to $B$, the search will fail and a new path will be generated.
+
+The algorithm terminates once a path with $targetLength$ is found. To prevent the algorithm from visiting too many nodes, the number of iterations is bound by $maxIterations$ and the longest known path is returned if no path of length $targetLength$ was found.
+
+The default path selection algorithm is a best-first search of edges which got initialized with randomized payment channels stakes as outlined above. It omits paths that would contain loops and nodes with $healthScore < healthThreshold$ and paths that would be shorter than $targetLength$.
+
+\begin{algorithm}[H]
+    \SetAlgoNoLine
+    \DontPrintSemicolon
+    \KwIn{$\text{nodes} \ V, \text{edges} \ E$}
+    \;
+    $queue \leftarrow \mathbf{new} \ \mathsf{PriorityQueue}_{\textsf{pathWeight}}()$\;
+    $queue.addAll(\{ (x,y) \in E \ | \ x = self)$\;
+    $closed \leftarrow \emptyset$\;
+    $iterations \leftarrow 0$\;
+    \;
+    \While{$size(queue) > 0 \ \mathsf{and} \ iterations < maxIterations$}{
+        $path \leftarrow queue.peek()$\;
+        \If{$length(path) = targetLength$}{
+            \Return{$path$}
+        }
+        \;
+        $current \leftarrow last(path)$\;
+        $open \leftarrow \emptyset$\;
+        \;
+        \ForEach{$next \in \{ y \in V \ | \ (x,y) \in E \ \land \ x = current \}$}{
+            \If{$healthScore(next) \ge healthThreshold \ \mathbf{and} \ y \notin closed \ \mathbf{and} \ y \notin path$}{
+                $open.push(y)$\;
+            }
+        }
+        \;
+        \uIf{$size(open) = 0$} {
+            $queue.pop()$\;
+            $closed.add(current)$\;
+        }
+        \Else{
+            \ForEach{$node \in open$}{
+                $queue.push(\ (...path, node) \ )$\;
+            }
+        }
+        \;
+        $iterations \leftarrow iterations + 1$\;
+    }
+    \Return{$queue.peek()$}
+    \caption{Path selection}
+\end{algorithm}

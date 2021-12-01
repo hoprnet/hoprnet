@@ -70,19 +70,19 @@ npm install @hoprnet/hoprd@1.73
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `latest` tag represents the `master` branch, while the `latest-constantine` tag
+The `master-goerli` tag represents the `master` branch, while the `tuttlingen` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:latest-constantine
+docker pull gcr.io/hoprassociation/hoprd:tuttlingen
 ```
 
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:latest-constantine'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:tuttlingen'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -209,13 +209,14 @@ At the moment we DO NOT HAVE backward compatibility between releases.
 We attempt to provide instructions on how to migrate your tokens between releases.
 
 1. Set your automatic channel strategy to `MANUAL`.
-2. Close all open payment channels.
-3. Once all payment channels have closed, withdraw your funds to an external
+2. Redeem all unredeemed tickets.
+3. Close all open payment channels.
+4. Once all payment channels have closed, withdraw your funds to an external
    wallet.
-4. Run `info` and take note of the **network name**.
-5. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` and `.db` folders.
-6. Launch new `HOPRd` instance using latest release, this will create new `.hopr-identity` and `.db` folders, observe the account address.
-7. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
+5. Run `info` and take note of the **network name**.
+6. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` folder.
+7. Launch new `HOPRd` instance using latest release, observe the account address.
+8. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
 
 ## Develop
 
@@ -425,7 +426,7 @@ script to the creation script:
 ```sh
 ./scripts/setup-gcloud-cluster.sh \
   my-custom-cluster-without-name \
-  gcr.io/hoprassociation/hoprd:latest \
+  gcr.io/hoprassociation/hoprd:tuttlingen \
   `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
 

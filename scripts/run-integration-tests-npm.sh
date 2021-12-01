@@ -69,7 +69,7 @@ declare tmp="/tmp"
 
 declare npm_install_dir="${tmp}/hopr-npm"
 
-declare node_prefix="hopr-npm"
+declare node_prefix="hopr-npm-node"
 
 declare node1_dir="${tmp}/${node_prefix}-1"
 declare node2_dir="${tmp}/${node_prefix}-2"
@@ -108,7 +108,7 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${npm_install_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${npm_install_dir}"
 
   log "Cleaning up processes"
   for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097; do
@@ -191,11 +191,17 @@ function install_npm_packages() {
     if [ -n "${npm_package_version}" ]; then
       npm install @hoprnet/hoprd@${npm_package_version}
     else
-      npm install ${tmp}/hoprd-package.tgz
+      # Some Node installations seems to miss node-pre-gyp
+      npm install node-pre-gyp
+      # Install modules according to their dependencies
+      # @dev only works when cleaning node_modules afterwards,
+      #      otherwise NPM might use outdated packages
+      npm install ${tmp}/hopr-utils-package.tgz
+      npm install ${tmp}/hopr-connect-package.tgz
       npm install ${tmp}/hopr-ethereum-package.tgz
       npm install ${tmp}/hopr-core-ethereum-package.tgz
       npm install ${tmp}/hopr-core-package.tgz
-      npm install ${tmp}/hopr-utils-package.tgz
+      npm install ${tmp}/hoprd-package.tgz
     fi
 
     # Copies local deployment information to npm install directory
@@ -285,6 +291,7 @@ rm -Rfv \
 
 #  --- Create packages if needed --- {{{
 if [ -z "${npm_package_version}" ]; then
+  create_npm_package "hopr-connect"
   create_npm_package "hopr-core"
   create_npm_package "hopr-utils"
   create_npm_package "hopr-ethereum"

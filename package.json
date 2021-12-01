@@ -2,6 +2,7 @@
   "name": "hoprnet",
   "repository": "https://github.com/hoprnet/hoprnet",
   "workspaces": [
+    "packages/connect",
     "packages/core",
     "packages/core-ethereum",
     "packages/cover-traffic-daemon",
@@ -11,12 +12,16 @@
   ],
   "scripts": {
     "build": "yarn workspace @hoprnet/hopr-ethereum run build:sol:types && echo \"Building Typescript files\" && tsc --build tsconfig.build.json && yarn workspace @hoprnet/hoprd run buildAdmin",
+    "build:core": "yarn workspace @hoprnet/hopr-core run build",
+    "build:utils": "yarn workspace @hoprnet/hopr-utils run build",
+    "build:chain": "yarn workspace @hoprnet/hopr-core-ethereum run build",
     "build:yp": "yarn exec \"make -C docs/yellowpaper\"",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "yarn workspaces foreach -pv run test",
     "test:core": "yarn workspace @hoprnet/hopr-core run test",
     "test:hoprd": "yarn workspace @hoprnet/hoprd run test",
+    "test:ct": "yarn workspace @hoprnet/hopr-cover-traffic-daemon run test",
     "test:utils": "yarn workspace @hoprnet/hopr-utils run test",
     "test:contracts": "yarn workspace @hoprnet/hopr-ethereum run test",
     "run:network": "yarn workspace @hoprnet/hopr-ethereum run network",
@@ -35,7 +40,7 @@
   },
   "devDependencies": {
     "@ethersproject/cli": "5.5.0",
-    "prettier": "2.4.1",
+    "prettier": "2.5.0",
     "rimraf": "3.0.2",
     "ts-node": "10.4.0",
     "typescript": "4.5.2",
@@ -48,5 +53,5 @@
     "printWidth": 120,
     "trailingComma": "none"
   },
-  "packageManager": "yarn@3.1.0"
+  "packageManager": "yarn@3.1.1"
 }

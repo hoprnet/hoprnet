@@ -38,72 +38,25 @@ get_rpc() {
   local environment_id="${1}"
   local network_id=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".network_id")
   local unresolved_rpc=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".networks.\"${network_id}\".default_provider")
+
   echo "${unresolved_rpc}" | envsubst
 }
 
 # $1=account (hex)
-# $2=rpc
-wallet_balance() {
-  local address=${1}
-  local rpc=${2}
-
-  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('${rpc}').getBalance('${address}').then(b => formatEther(b))"
-}
-
-# $1=rpc
-funding_wallet_address() {
-  local rpc=${1}
-
-  # the value of FUNDING_PRIV_KEY must be prefixed with 0x
-  yarn run --silent ethers --rpc "${rpc}" --account ${FUNDING_PRIV_KEY} eval 'accounts[0].getAddress().then(a => a)'
-}
-
-# $1=account (hex)
-# $2=environment_id
-# $3=optional: hopr token contract
+# $2=environment
 fund_if_empty() {
   local address="${1}"
-  local environment_id="${2}"
-  local token_contract="${3:-}"
+  local environment="${2}"
 
-  local funding_address funding_balance balance
+  # start funding in parallel
+  PRIVATE_KEY="${FUNDING_PRIV_KEY}" ${mydir}/fund-address.ts \
+	  --environment ${environment} --address ${address} --target ${min_funds} &
 
-  local rpc=$(get_rpc "${environment_id}")
+  PRIVATE_KEY="${FUNDING_PRIV_KEY}" ${mydir}/fund-address.ts \
+	  --environment ${environment} --address ${address} --target ${min_funds_hopr} --erc20 &
 
-  funding_address=$(funding_wallet_address "${rpc}")
-
-  log "Checking balance of funding wallet ${funding_address} using RPC ${rpc}"
-  funding_balance="$(wallet_balance "${funding_address}" "${rpc}")"
-
-  if [ "${funding_balance}" == '0.0' ]; then
-    log "Wallet ${funding_address} has zero balance and cannot fund node ${address}"
-  else
-    log "Funding wallet ${funding_address} has enough funds: ${funding_balance}"
-    log "Checking balance of the wallet ${address} to be funded"
-    balance="$(wallet_balance "${address}" "${rpc}")"
-
-    log "Balance of ${address} is ${balance}"
-    if [ "${balance}" == '0.0' ]; then
-      # need to wait to make retries work
-      local ethers_opts="--rpc ${rpc} --account ${FUNDING_PRIV_KEY} --yes --wait"
-
-      # the funding might fail due to network issues and such, but we don't want to block the deployment on such occassions entirely
-      # thus, we continue anyway after retrying a few times
-
-      log "Funding account with native token -> ${address} ${min_funds}"
-      if ! try_cmd "yarn run --silent ethers send ${address} ${min_funds} ${ethers_opts}" 3 3; then
-        log "Funding account with native token -> ${address} ${min_funds} - FAILED"
-      fi
-
-      if [ -n "${token_contract}" ]; then
-        # at this point we assume that the account needs HOPR as well
-        log "Funding account with HOPR token -> ${address} ${min_funds_hopr}"
-        if ! try_cmd "yarn run --silent ethers send-token ${token_contract} ${address} ${min_funds_hopr} ${ethers_opts}" 3 3; then
-          log "Funding account with HOPR token -> ${address} ${min_funds_hopr} - FAILED"
-	fi
-      fi
-    fi
-  fi
+  # wait until both funding procedures have completed
+  wait
 }
 
 # $1=IP
@@ -111,10 +64,10 @@ fund_if_empty() {
 get_eth_address(){
   local ip=${1}
   local port=${2:-3001}
-  local cmd="curl ${ip}:${port}/api/v1/address/eth"
+  local cmd="curl --silent --max-time 5 ${ip}:${port}/api/v1/address/eth"
 
   # try every 5 seconds for 5 minutes
-  try_cmd "${cmd}" 30 5
+  try_cmd "${cmd}" 30 5 true
 }
 
 # $1=IP
@@ -122,10 +75,10 @@ get_eth_address(){
 get_hopr_address() {
   local ip=${1}
   local port=${2:-3001}
-  local cmd="curl ${ip}:${port}/api/v1/address/hopr"
+  local cmd="curl --silent --max-time 5 ${ip}:${port}/api/v1/address/hopr"
 
   # try every 5 seconds for 5 minutes
-  try_cmd "${cmd}" 30 5
+  try_cmd "${cmd}" 30 5 true
 }
 
 # $1=IP

@@ -2,8 +2,8 @@ import { utils, ethers } from 'ethers'
 import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify, ecdsaRecover } from 'secp256k1'
 import { moveDecimalPoint } from '../math'
-import { u8aToHex, u8aEquals, stringToU8a, u8aConcat, serializeToU8a, u8aToNumber, u8aSplit } from '../u8a'
-import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
+import { u8aToHex, u8aEquals, stringToU8a, u8aConcat } from '../u8a'
+import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH } from '../constants'
 import PeerId from 'peer-id'
 import { pubKeyToPeerId } from '../libp2p'
 
@@ -127,6 +127,10 @@ export class Address {
     return ethers.utils.getAddress(u8aToHex(this.arr, false))
   }
 
+  toString(): string {
+    return this.toHex()
+  }
+
   eq(b: Address) {
     return u8aEquals(this.arr, b.serialize())
   }
@@ -191,63 +195,50 @@ export class Hash {
   }
 }
 
+/**
+ * Class used to represent an ECDSA signature.
+ *
+ * The methods serialize()/deserialize() are used to convert the signature
+ * to/from 64-byte compressed representation as given by EIP-2098 (https://eips.ethereum.org/EIPS/eip-2098).
+ * This compressed signature format is supported by OpenZeppelin.
+ *
+ * Internally this class still maintains representation using `(r,s)` tuple and `v` parity component separate
+ * as this makes interop with the underlying ECDSA library simpler.
+ */
 export class Signature {
   constructor(readonly signature: Uint8Array, readonly recovery: number) {
     if (signature.length !== SIGNATURE_LENGTH) {
       throw new Error('Incorrect size Uint8Array for signature')
     }
+    if (![0, 1].includes(recovery)) {
+      throw new Error('Recovery must be either 1 or 0, got ${recovery}')
+    }
   }
 
   static deserialize(arr: Uint8Array): Signature {
-    const [s, preRecovery] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
-
-    const r = u8aToNumber(preRecovery) as number
-
-    if (![0, 1].includes(r)) {
-      throw Error(`Expected recovery to be 0 or 1. Got ${r}`)
+    if (arr.length !== SIGNATURE_LENGTH) {
+      throw new Error('Incorrect size Uint8Array for signature')
     }
 
-    return new Signature(s, r)
+    const arrCopy = new Uint8Array(arr)
+
+    // Read & clear the top-most bit in S
+    const recovery = (arrCopy[SIGNATURE_LENGTH / 2] & 0x80) != 0 ? 1 : 0
+    arrCopy[SIGNATURE_LENGTH / 2] &= 0x7f
+
+    return new Signature(arrCopy, recovery)
   }
 
-  /**
-   * Deserializes Ethereum-specific signature with
-   * non-standard recovery values 27 and 28
-   * @param arr serialized Ethereum signature
-   * @returns deserialized Ethereum signature
-   */
-  static deserializeEthereum(arr: Uint8Array): Signature {
-    const [s, preRecovery] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
-
-    const r = u8aToNumber(preRecovery) as number
-
-    if (![27, 28].includes(r)) {
-      throw Error(`Expected recovery to be 27 or 28. Got ${r}`)
-    }
-
-    return new Signature(s, r - 27)
-  }
   static create(msg: Uint8Array, privKey: Uint8Array): Signature {
     const result = ecdsaSign(msg, privKey)
     return new Signature(result.signature, result.recid)
   }
 
   serialize(): Uint8Array {
-    return serializeToU8a([
-      [this.signature, SIGNATURE_LENGTH],
-      [Uint8Array.of(this.recovery), SIGNATURE_RECOVERY_LENGTH]
-    ])
-  }
-
-  /**
-   * Replaces recovery value by Ethereum-specific values 27/28
-   * @returns serialized signature to use within Ethereum
-   */
-  serializeEthereum(): Uint8Array {
-    return serializeToU8a([
-      [this.signature, SIGNATURE_LENGTH],
-      [Uint8Array.of(this.recovery + 27), SIGNATURE_RECOVERY_LENGTH]
-    ])
+    const compressedSig = new Uint8Array(this.signature)
+    compressedSig[SIGNATURE_LENGTH / 2] &= 0x7f
+    compressedSig[SIGNATURE_LENGTH / 2] |= this.recovery << 7
+    return compressedSig
   }
 
   verify(msg: Uint8Array, pubKey: PublicKey): boolean {
@@ -258,27 +249,61 @@ export class Signature {
     return u8aToHex(this.serialize())
   }
 
-  static SIZE = SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
+  static SIZE = SIGNATURE_LENGTH
 }
 
-export class Balance {
-  constructor(private bn: BN) {}
+abstract class BalanceBase {
+  //Uint256
+  static readonly SIZE: number = 32
+  static readonly DECIMALS: number = 18
+  abstract readonly symbol: string
 
-  static get SYMBOL(): string {
-    return `txHOPR`
-  }
+  constructor(protected bn: BN) {}
 
-  static get DECIMALS(): number {
-    return 18
-  }
+  abstract add(b: BalanceBase): BalanceBase
+  abstract sub(b: BalanceBase): BalanceBase
 
   public toBN(): BN {
     return this.bn
   }
 
   public toHex(): string {
-    return `0x${this.bn.toString('hex', 2 * Balance.SIZE)}`
+    return `0x${this.bn.toString('hex', 2 * BalanceBase.SIZE)}`
   }
+
+  public lt(b: BalanceBase): boolean {
+    return this.toBN().lt(b.toBN())
+  }
+
+  public gt(b: BalanceBase): boolean {
+    return this.toBN().gt(b.toBN())
+  }
+
+  public gte(b: BalanceBase): boolean {
+    return this.toBN().gte(b.toBN())
+  }
+
+  public lte(b: BalanceBase): boolean {
+    return this.toBN().lte(b.toBN())
+  }
+
+  public serialize(): Uint8Array {
+    return new Uint8Array(this.bn.toBuffer('be', BalanceBase.SIZE))
+  }
+
+  public toString(): string {
+    return this.bn.toString()
+  }
+
+  public toFormattedString(): string {
+    const str = moveDecimalPoint(this.toString(), BalanceBase.DECIMALS * -1)
+    return `${str} ${this.symbol}`
+  }
+}
+
+export class Balance extends BalanceBase {
+  static SYMBOL: string = 'txHOPR'
+  readonly symbol: string = Balance.SYMBOL
 
   public add(b: Balance): Balance {
     return new Balance(this.bn.add(b.toBN()))
@@ -288,29 +313,8 @@ export class Balance {
     return new Balance(this.bn.sub(b.toBN()))
   }
 
-  public lt(b: Balance): boolean {
-    return this.toBN().lt(b.toBN())
-  }
-
-  public gt(b: Balance): boolean {
-    return this.toBN().gt(b.toBN())
-  }
-
-  static deserialize(arr: Uint8Array) {
+  static deserialize(arr: Uint8Array): Balance {
     return new Balance(new BN(arr))
-  }
-
-  public serialize(): Uint8Array {
-    return new Uint8Array(this.bn.toBuffer('be', Balance.SIZE))
-  }
-
-  public toFormattedString(): string {
-    return moveDecimalPoint(this.bn.toString(), Balance.DECIMALS * -1) + ' ' + Balance.SYMBOL
-  }
-
-  static get SIZE(): number {
-    // Uint256
-    return 32
   }
 
   static ZERO(): Balance {
@@ -318,39 +322,22 @@ export class Balance {
   }
 }
 
-export class NativeBalance {
-  constructor(private bn: BN) {}
+export class NativeBalance extends BalanceBase {
+  static SYMBOL: string = 'xDAI'
+  readonly symbol: string = NativeBalance.SYMBOL
 
-  static get SYMBOL(): string {
-    return `xDAI`
+  public add(b: NativeBalance): NativeBalance {
+    return new NativeBalance(this.bn.add(b.toBN()))
   }
 
-  static get DECIMALS(): number {
-    return 18
+  public sub(b: NativeBalance): NativeBalance {
+    return new NativeBalance(this.bn.sub(b.toBN()))
   }
 
-  public toHex(): string {
-    return `0x${this.bn.toString('hex', 2 * NativeBalance.SIZE)}`
-  }
-
-  static deserialize(arr: Uint8Array) {
+  static deserialize(arr: Uint8Array): NativeBalance {
     return new NativeBalance(new BN(arr))
   }
-
-  public toBN(): BN {
-    return this.bn
-  }
-
-  public serialize(): Uint8Array {
-    return new Uint8Array(this.bn.toBuffer('be', NativeBalance.SIZE))
-  }
-
-  public toFormattedString(): string {
-    return moveDecimalPoint(this.bn.toString(), NativeBalance.DECIMALS * -1) + ' ' + NativeBalance.SYMBOL
-  }
-
-  static get SIZE(): number {
-    // Uint256
-    return 32
+  static ZERO(): NativeBalance {
+    return new NativeBalance(new BN('0'))
   }
 }

@@ -26,7 +26,7 @@ export type UnreleasedTokens = {
   allocation: Record<string, UnreleasedSchedule[]>
 }
 
-const unreleasedTokens: UnreleasedTokens = require('./unreleasedTokens.json')
+const unreleasedTokens: UnreleasedTokens = require('../unreleasedTokens.json')
 
 export const addBN = (a: BN, b: BN): BN => a.add(b)
 export const sqrtBN = (a: BN): BN => new BN(new BigNumber(a.toString()).squareRoot().integerValue().toFixed(), 10)

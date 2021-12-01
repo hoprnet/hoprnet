@@ -22,7 +22,7 @@ export function deriveOwnKeyShare(secret: Uint8Array): HalfKey {
 }
 
 /**
- * Comutes the key share that is embedded in the acknowledgement
+ * Computes the key share that is embedded in the acknowledgement
  * for a packet and thereby unlocks the incentive for the previous
  * relayer for transforming and delivering the packet
  * @param secret shared secret with the creator of the packet

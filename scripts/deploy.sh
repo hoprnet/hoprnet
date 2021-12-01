@@ -38,7 +38,7 @@ echo "Looking for releases to deploy from branch ${branch}"
 for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
     for row in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | @base64"); do
-      declare release_id deprecated environment_id version_major version_minor docker_image_full token_contract_address
+      declare release_id deprecated environment_id version_major version_minor docker_image_full
 
       release_id=$(_jq "${row}" ".key")
       deprecated=$(_jq "${row}" ".value.deprecated")
@@ -46,7 +46,6 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       version_major=$(_jq "${row}" ".value.version_major")
       version_minor=$(_jq "${row}" ".value.version_minor")
       docker_image_full="${docker_image}:${release_id}"
-      token_contract_address=$(cat "${mydir}/../packages/core/protocol-config.json" | jq -r ".environments.\"${environment_id}\".token_contract_address")
 
       if [ "${deprecated}" == "true" ]; then
         log "${release_id} deprecated, skipping deployment"
@@ -91,7 +90,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       for ip in ${node_ips}; do
         wait_until_node_is_ready "${ip}"
         eth_address=$(get_eth_address "${ip}")
-        fund_if_empty "${eth_address}" "${environment_id}" "${token_contract_address}"
+        fund_if_empty "${eth_address}" "${environment_id}"
       done
     done
   fi

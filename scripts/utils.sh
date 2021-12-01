@@ -166,4 +166,34 @@ function wait_for_regex {
   done
 }
 
+# $1 = filename
+# $2 = expected content
+function expect_file_content() {
+  local filename="${1}"
+  local expected="${2}"
+  local actual="$(cat "${filename}")"
+
+  if [[ "${expected}" != "${actual}" ]]; then
+    log "⛔️ bad content for ${filename}"
+    log "expected: "
+    log "${expected}"
+    log "actual: "
+    log "${actual}"
+    exit 1
+  fi
+}
+
+function find_tmp_dir() {
+  local tmp="/tmp"
+  if [[ -d "${tmp}" && -h "${tmp}" ]]; then
+    tmp="/var/tmp"
+  fi
+
+  if [[ -d "${tmp}" && -h "${tmp}" ]]; then
+    msg "Neither /tmp or /var/tmp can be used for writing logs"; 
+    exit 1;
+  fi
+  echo ${tmp}
+}
+
 setup_colors

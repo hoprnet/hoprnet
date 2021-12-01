@@ -53,9 +53,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
 fi
 
 # find usable tmp dir
-declare tmp="/tmp"
-[[ -d "${tmp}" && -h "${tmp}" ]] && tmp="/var/tmp"
-[[ -d "${tmp}" && -h "${tmp}" ]] && { msg "Neither /tmp or /var/tmp can be used for writing logs"; exit 1; }
+declare tmp="$(find_tmp_dir)"
 
 declare node_prefix="hopr-source-node"
 
@@ -138,7 +136,7 @@ function setup_node() {
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
-  
+
   log "Additional args: \"${additional_args}\""
 
   # Set NODE_ENV=development to rebuild hopr-admin next files
@@ -178,7 +176,7 @@ function setup_ct_node() {
     additional_args="--environment hardhat-localhost ${additional_args}"
   fi
   log "Additional args: \"${additional_args}\""
-  
+
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
     --privateKey "${ct_private_key}" \
     --dbFile "${ct_db_file}" \
@@ -220,6 +218,9 @@ log "\tnode7"
 log "\t\tdata dir: ${node7_dir} (will be removed)"
 log "\t\tlog: ${node7_log}"
 log "\t\tid: ${node7_id}"
+log "\tct_node1"
+log "\t\tdata dir: ${ct_node1_dir} (will be removed)"
+log "\t\tlog: ${ct_node1_log}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -276,7 +277,6 @@ setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
 setup_ct_node "${ct_node1_log}" 20000
 # }}}
 
@@ -291,7 +291,7 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
-declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 2)
+declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
 # }}}
 
 log "CT node1 address: ${ct_node1_address}"

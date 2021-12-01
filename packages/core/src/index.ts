@@ -1,11 +1,6 @@
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
-import MPLEX from 'libp2p-mplex'
-import KadDHT from 'libp2p-kad-dht'
-import { NOISE } from '@chainsafe/libp2p-noise'
-
-const { HoprConnect } = require('@hoprnet/hopr-connect')
 import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
@@ -43,7 +38,6 @@ import type {
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import type { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
-import { getAddrs } from './identity'
 
 import EventEmitter from 'events'
 import {
@@ -60,8 +54,9 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
-import { localAddressesFirst, AddressSorter, retryWithBackoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
+import { retryWithBackoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
 import type { ResolvedEnvironment } from './environment'
+import { createLibp2pInstance } from './main'
 
 const log = debug(`hopr-core`)
 const verbose = debug('hopr-core:verbose')
@@ -132,7 +127,6 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private addressSorter: AddressSorter
   private environment: ResolvedEnvironment
 
   public indexer: Indexer
@@ -159,20 +153,12 @@ class Hopr extends EventEmitter {
     }
     this.environment = options.environment
     log(`using environment: ${this.environment.id}`)
-
-    if (this.options.preferLocalAddresses) {
-      this.addressSorter = localAddressesFirst
-      log('Preferring local addresses')
-    } else {
-      // Overwrite libp2p's default addressSorter to make
-      // sure it doesn't fail on HOPR-flavored addresses
-      this.addressSorter = (x) => x
-      log('Addresses are sorted by default')
-    }
+    log(`chain instance:`, this.chain)
     this.indexer = this.chain.indexer // TODO temporary
   }
 
   private async startedPaymentChannels(): Promise<HoprCoreEthereum> {
+    log('Starting on-chain payment channel from Hopr class via "startedPaymentChannels"')
     return await this.chain.start()
   }
 
@@ -201,7 +187,10 @@ class Hopr extends EventEmitter {
    */
   public async start() {
     this.status = 'INITIALIZING'
-    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
+    log('Starting hopr node...')
+    const balance = await this.getNativeBalance()
+    verbose('Retrieve node balance', balance.toBN().lte(MIN_NATIVE_BALANCE), MIN_NATIVE_BALANCE)
+    if (!balance || balance.toBN().lte(MIN_NATIVE_BALANCE)) {
       throw new Error('Cannot start node without a funded wallet')
     }
 
@@ -214,43 +203,7 @@ class Hopr extends EventEmitter {
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
     chain.on('peer', pushToRecentlyAnnouncedNodes)
 
-    const libp2p = await LibP2P.create({
-      peerId: this.id,
-      addresses: { listen: getAddrs(this.id, this.options).map((x) => x.toString()) },
-      // libp2p modules
-      modules: {
-        transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
-        streamMuxer: [MPLEX],
-        connEncryption: [NOISE],
-        dht: KadDHT
-      },
-      config: {
-        // @ts-ignore
-        protocolPrefix: 'hopr',
-        transport: {
-          HoprConnect: {
-            initialNodes,
-            publicNodes: this.publicNodesEmitter,
-            // Tells hopr-connect to treat local and private addresses
-            // as public addresses
-            __useLocalAddresses: this.options.announceLocalAddresses
-            // @dev Use these settings to simulate NAT behavior
-            // __noDirectConnections: true,
-            // __noWebRTCUpgrade: false
-          } as HoprConnectOptions
-        },
-        dht: {
-          enabled: true
-        },
-        relay: {
-          enabled: false
-        }
-      },
-      dialer: {
-        addressSorter: this.addressSorter,
-        maxDialsPerPeer: 100
-      }
-    })
+    const libp2p = await createLibp2pInstance(this.id, this.options, initialNodes, this.publicNodesEmitter)
 
     await libp2p.start()
     log('libp2p started')
@@ -290,7 +243,7 @@ class Hopr extends EventEmitter {
       includeReply: boolean,
       opts: DialOpts
     ) => libp2pSendMessage(this.libp2p, dest, protocol, msg, includeReply, opts) as any
-
+    verbose('LIBP2p instance', this.libp2p.hangUp)
     const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id)
@@ -341,10 +294,17 @@ class Hopr extends EventEmitter {
     log('# STARTED NODE')
     log('ID', this.getId().toB58String())
     log('Protocol version', VERSION)
-    log(`Available under the following addresses:`)
-    libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    if (libp2p.multiaddrs !== undefined) {
+      log(`Available under the following addresses:`)
+      libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    } else {
+      log(`No multiaddrs has been registered.`)
+    }
     this.maybeLogProfilingToGCloud()
-    this.periodicCheck()
+    this.checkTimeout = setTimeout(() => {
+      log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
+      this.periodicCheck()
+    }, this.strategy.tickInterval)
   }
 
   private maybeLogProfilingToGCloud() {
@@ -427,7 +387,14 @@ class Hopr extends EventEmitter {
       return
     }
 
-    const currentChannels = await this.getAllChannels()
+    const currentChannels: ChannelEntry[] | undefined = await this.getAllChannels()
+    verbose('Channels obtained', currentChannels)
+
+    if (currentChannels === undefined) {
+      log('invalid channels retrieved from database')
+      return
+    }
+
     for (const channel of currentChannels) {
       this.networkPeers.register(channel.destination.toPeerId()) // Make sure current channels are 'interesting'
     }
@@ -495,9 +462,11 @@ class Hopr extends EventEmitter {
    */
   public async stop(): Promise<void> {
     this.status = 'DESTROYED'
+    verbose('Stopping checking timeout')
     clearTimeout(this.checkTimeout)
-    await Promise.all([this.heartbeat.stop(), (await this.startedPaymentChannels()).stop()])
-
+    verbose('Stopping heartbeat & indexer')
+    await Promise.all([this.heartbeat.stop(), this.chain.stop()])
+    verbose('Stoping database & libp2p', this.db)
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
     // Give the operating system some extra time to close the sockets
@@ -673,7 +642,7 @@ class Hopr extends EventEmitter {
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
   }
 
-  private async periodicCheck() {
+  public async periodicCheck() {
     log('periodic check', this.status)
     if (this.status != 'RUNNING') {
       return
@@ -682,13 +651,18 @@ class Hopr extends EventEmitter {
       log('strategy tick took longer than 10 secs')
     }, 10000)
     try {
+      log('Triggering tick channel strategy')
       await this.tickChannelStrategy()
     } catch (e) {
       log('error in periodic check', e)
     }
+    log('Clearing out logging timeout.')
     clearTimeout(logTimeout)
-
-    this.checkTimeout = setTimeout(() => this.periodicCheck(), this.strategy.tickInterval)
+    log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
+    this.checkTimeout = setTimeout(() => {
+      log('Triggering again periodCheck')
+      this.periodicCheck()
+    }, this.strategy.tickInterval)
   }
 
   /**
@@ -762,6 +736,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getNativeBalance(): Promise<NativeBalance> {
+    verbose('Requesting native balance from node.')
     const chain = await this.startedPaymentChannels()
     return await chain.getNativeBalance(true)
   }
@@ -1013,3 +988,5 @@ export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
 export type { ProtocolConfig, Network, ResolvedEnvironment } from './environment'
 export { resolveEnvironment, supportedEnvironments } from './environment'
+export { libp2pMock } from './libp2p.mock'
+export { sampleOptions } from './index.mock'

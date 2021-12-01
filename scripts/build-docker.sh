@@ -15,7 +15,7 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-p|--package hoprd|cover-traffic-daemon] [-f|--force] [-n|--no-tags]"
+  msg "Usage: $0 [-h|--help] [-p|--package hoprd|hopr-cover-traffic-daemon] [-f|--force] [-n|--no-tags]"
   msg
   msg "Use -f to force a Docker build even though no environment can be found. This is useful for local testing. No additional docker tags will be applied though if no environment has been found which is in contrast to the normal execution of the script."
   msg
@@ -52,7 +52,7 @@ while (( "$#" )); do
   esac
 done
 
-if [ "${package:-}" != "hoprd" ] && [ "${package:-}" != "cover-traffic-daemon" ]; then
+if [ "${package:-}" != "hoprd" ] && [ "${package:-}" != "hopr-cover-traffic-daemon" ]; then
   msg "Error: unsupported package"
   usage
   exit 1
@@ -78,7 +78,8 @@ if [ -z "${releases}" ] && [ "${force:-}" != "true" ]; then
   exit 1
 fi
 
-cd "${mydir}/../packages/${package}"
+# go into package directory, make sure to remove prefix when needed
+cd "${mydir}/../packages/${package#hopr-}"
 
 gcloud builds submit --config cloudbuild.yaml \
   --substitutions=_PACKAGE_VERSION=${package_version},_IMAGE_VERSION=${image_version},_DOCKER_IMAGE=${docker_image}

@@ -355,6 +355,7 @@ export class HoprDB {
   }
 
   public close() {
+    log('Closing database', this.db)
     return this.db.close()
   }
 

@@ -2,24 +2,40 @@
 
 # Class: NativeBalance
 
+## Hierarchy
+
+- `BalanceBase`
+
+  ↳ **`NativeBalance`**
+
 ## Table of contents
 
 ### Constructors
 
 - [constructor](NativeBalance.md#constructor)
 
-### Accessors
+### Properties
 
+- [bn](NativeBalance.md#bn)
+- [symbol](NativeBalance.md#symbol)
 - [DECIMALS](NativeBalance.md#decimals)
 - [SIZE](NativeBalance.md#size)
 - [SYMBOL](NativeBalance.md#symbol)
 
 ### Methods
 
+- [add](NativeBalance.md#add)
+- [gt](NativeBalance.md#gt)
+- [gte](NativeBalance.md#gte)
+- [lt](NativeBalance.md#lt)
+- [lte](NativeBalance.md#lte)
 - [serialize](NativeBalance.md#serialize)
+- [sub](NativeBalance.md#sub)
 - [toBN](NativeBalance.md#tobn)
 - [toFormattedString](NativeBalance.md#toformattedstring)
 - [toHex](NativeBalance.md#tohex)
+- [toString](NativeBalance.md#tostring)
+- [ZERO](NativeBalance.md#zero)
 - [deserialize](NativeBalance.md#deserialize)
 
 ## Constructors
@@ -34,53 +50,197 @@
 | :------ | :------ |
 | `bn` | `BN` |
 
+#### Inherited from
+
+BalanceBase.constructor
+
 #### Defined in
 
-[types/primitives.ts:322](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L322)
+[types/primitives.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L261)
 
-## Accessors
+## Properties
+
+### bn
+
+• `Protected` **bn**: `BN`
+
+#### Inherited from
+
+BalanceBase.bn
+
+___
+
+### symbol
+
+• `Readonly` **symbol**: `string` = `NativeBalance.SYMBOL`
+
+#### Overrides
+
+BalanceBase.symbol
+
+#### Defined in
+
+[types/primitives.ts:327](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L327)
+
+___
 
 ### DECIMALS
 
-• `Static` `get` **DECIMALS**(): `number`
+▪ `Static` `Readonly` **DECIMALS**: `number` = `18`
 
-#### Returns
+#### Inherited from
 
-`number`
+BalanceBase.DECIMALS
 
 #### Defined in
 
-[types/primitives.ts:328](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L328)
+[types/primitives.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L258)
 
 ___
 
 ### SIZE
 
-• `Static` `get` **SIZE**(): `number`
+▪ `Static` `Readonly` **SIZE**: `number` = `32`
 
-#### Returns
+#### Inherited from
 
-`number`
+BalanceBase.SIZE
 
 #### Defined in
 
-[types/primitives.ts:352](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L352)
+[types/primitives.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L257)
 
 ___
 
 ### SYMBOL
 
-• `Static` `get` **SYMBOL**(): `string`
-
-#### Returns
-
-`string`
+▪ `Static` **SYMBOL**: `string` = `'xDAI'`
 
 #### Defined in
 
-[types/primitives.ts:324](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L324)
+[types/primitives.ts:326](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L326)
 
 ## Methods
+
+### add
+
+▸ **add**(`b`): [`NativeBalance`](NativeBalance.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `b` | [`NativeBalance`](NativeBalance.md) |
+
+#### Returns
+
+[`NativeBalance`](NativeBalance.md)
+
+#### Overrides
+
+BalanceBase.add
+
+#### Defined in
+
+[types/primitives.ts:329](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L329)
+
+___
+
+### gt
+
+▸ **gt**(`b`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `b` | `BalanceBase` |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+BalanceBase.gt
+
+#### Defined in
+
+[types/primitives.ts:278](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L278)
+
+___
+
+### gte
+
+▸ **gte**(`b`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `b` | `BalanceBase` |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+BalanceBase.gte
+
+#### Defined in
+
+[types/primitives.ts:282](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L282)
+
+___
+
+### lt
+
+▸ **lt**(`b`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `b` | `BalanceBase` |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+BalanceBase.lt
+
+#### Defined in
+
+[types/primitives.ts:274](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L274)
+
+___
+
+### lte
+
+▸ **lte**(`b`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `b` | `BalanceBase` |
+
+#### Returns
+
+`boolean`
+
+#### Inherited from
+
+BalanceBase.lte
+
+#### Defined in
+
+[types/primitives.ts:286](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L286)
+
+___
 
 ### serialize
 
@@ -90,9 +250,37 @@ ___
 
 `Uint8Array`
 
+#### Inherited from
+
+BalanceBase.serialize
+
 #### Defined in
 
-[types/primitives.ts:344](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L344)
+[types/primitives.ts:290](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L290)
+
+___
+
+### sub
+
+▸ **sub**(`b`): [`NativeBalance`](NativeBalance.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `b` | [`NativeBalance`](NativeBalance.md) |
+
+#### Returns
+
+[`NativeBalance`](NativeBalance.md)
+
+#### Overrides
+
+BalanceBase.sub
+
+#### Defined in
+
+[types/primitives.ts:333](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L333)
 
 ___
 
@@ -104,9 +292,13 @@ ___
 
 `BN`
 
+#### Inherited from
+
+BalanceBase.toBN
+
 #### Defined in
 
-[types/primitives.ts:340](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L340)
+[types/primitives.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L266)
 
 ___
 
@@ -118,9 +310,13 @@ ___
 
 `string`
 
+#### Inherited from
+
+BalanceBase.toFormattedString
+
 #### Defined in
 
-[types/primitives.ts:348](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L348)
+[types/primitives.ts:298](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L298)
 
 ___
 
@@ -132,9 +328,45 @@ ___
 
 `string`
 
+#### Inherited from
+
+BalanceBase.toHex
+
 #### Defined in
 
-[types/primitives.ts:332](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L332)
+[types/primitives.ts:270](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L270)
+
+___
+
+### toString
+
+▸ **toString**(): `string`
+
+#### Returns
+
+`string`
+
+#### Inherited from
+
+BalanceBase.toString
+
+#### Defined in
+
+[types/primitives.ts:294](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L294)
+
+___
+
+### ZERO
+
+▸ `Static` **ZERO**(): [`NativeBalance`](NativeBalance.md)
+
+#### Returns
+
+[`NativeBalance`](NativeBalance.md)
+
+#### Defined in
+
+[types/primitives.ts:340](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L340)
 
 ___
 
@@ -154,4 +386,4 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:336](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L336)
+[types/primitives.ts:337](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L337)

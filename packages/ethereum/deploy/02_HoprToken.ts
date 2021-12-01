@@ -1,6 +1,6 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import { HoprToken__factory } from '../src/types'
+import { HoprToken } from '../src/types'
 import { utils, constants } from 'ethers'
 
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
@@ -19,7 +19,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   })
 
   if (network.tags.testing || network.tags.development) {
-    const hoprToken = new HoprToken__factory(deployer).attach(result.address)
+    const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(result.address) as HoprToken
     const MINTER_ROLE = await hoprToken.MINTER_ROLE()
     const isDeployerMinter = await hoprToken.hasRole(MINTER_ROLE, deployer.address)
 
