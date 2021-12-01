@@ -13,7 +13,7 @@ export const sampleMultiaddrs = new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${samp
 const libp2pLogger = debug(`hopr:mocks:libp2p`)
 let libp2p: LibP2P
 
-libp2p = {} as any
+libp2p = {} as unknown as LibP2P
 libp2p._options = Object.assign({}, libp2p._options, {
   addresses: {
     announceFilter: () => [sampleMultiaddrs]
@@ -34,7 +34,7 @@ libp2p.hangUp = () => {
   libp2pLogger(`Libp2 hangUp method called`)
   return Promise.resolve()
 }
-libp2p.connectionManager = {} as any
+libp2p.connectionManager = {} as unknown as ConnectionManager
 libp2p.connectionManager.on = (event: string) => {
   libp2pLogger(`Connection manager event handler called with event "${event}"`)
   return libp2p.connectionManager
