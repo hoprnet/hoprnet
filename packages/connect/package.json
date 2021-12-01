@@ -46,7 +46,7 @@
     "@types/chai-spies": "1.0.3",
     "@types/debug": "4.1.7",
     "@types/mocha": "9.0.0",
-    "@types/node": "16.11.10",
+    "@types/node": "16.11.11",
     "@types/simple-peer": "9.11.3",
     "@types/yargs": "17.0.7",
     "abortable-iterator": "3.0.0",
