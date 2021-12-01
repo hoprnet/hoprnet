@@ -1,4 +1,5 @@
 import type LibP2P from 'libp2p'
+import ConnectionManager from 'libp2p/src/connection-manager'
 import PeerStore from 'libp2p/src/peer-store'
 import AddressManager from 'libp2p/src/address-manager'
 import { debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
