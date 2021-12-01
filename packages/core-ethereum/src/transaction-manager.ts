@@ -16,8 +16,12 @@ export type Transaction = {
 }
 
 /**
- * Keep track of pending, mined and confirmed transactions,
+ * Keep track of queuing, pending, mined and confirmed transactions,
  * and allows for pruning unnecessary data.
+ * After signing, a tx is `queuing`.
+ * After being broadcasted, a tx is `pending`.
+ * After being included in a block, a tx is `mined`.
+ * After passing the finality threshold, a tx is `confirmed`.
  * This class is mainly used by nonce-tracker which relies
  * on transcation-manager to keep an update to date view
  * on transactions.

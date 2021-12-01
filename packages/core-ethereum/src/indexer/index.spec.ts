@@ -1,4 +1,4 @@
-import type { providers as Providers, Wallet } from 'ethers'
+import { providers as Providers, Wallet } from 'ethers'
 import type { HoprChannels, HoprToken } from '@hoprnet/hopr-ethereum'
 import type { Event, TokenEvent } from './types'
 import type { ChainWrapper } from '../ethereum'
@@ -10,6 +10,14 @@ import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
 import { PARTY_A, PARTY_B } from '../fixtures'
 import { BigNumber } from 'ethers'
+
+const txRequest = {
+  to: fixtures.ACCOUNT_B.address,
+  data: '0x0',
+  value: 0,
+  nonce: 0,
+  gasPrice: 1
+};
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
   let latestBlockNumber = ops.latestBlockNumber ?? 0
@@ -150,13 +158,7 @@ const createChainMock = (
     getWallet: () => account ?? fixtures.ACCOUNT_A,
     setCommitment: (counterparty: Address, commitment: Hash) =>
       hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex()),
-    getAllQueuingTransactionRequests: () => [{
-      to: fixtures.ACCOUNT_B,
-      data: '0x',
-      value: 0,
-      nonce: 0,
-      gasPrice: 1
-    }]
+    getAllQueuingTransactionRequests: () => [txRequest]
   } as unknown as ChainWrapper
 }
 
@@ -307,7 +309,7 @@ describe('test indexer', function () {
     })
     await started.promise
     assert.strictEqual(indexer.status, 'started')
-  })
+  })  
 
   it('should handle provider error and resend queuing transactions', async function () {
     const { indexer, provider, chain } = await useFixtures({
@@ -316,7 +318,6 @@ describe('test indexer', function () {
     })
 
     await indexer.start(chain, 0)
-
     provider.emit('error', new Error('ECONNRESET'))
 
     assert.strictEqual(indexer.status, 'stopped')
