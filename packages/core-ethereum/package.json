@@ -25,6 +25,7 @@
   "dependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@sinonjs/referee": "^9.1.1",
     "async-mutex": "^0.3.2",
     "bn.js": "5.2.0",
     "chalk": "^4.1.2",
