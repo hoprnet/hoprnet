@@ -1,7 +1,6 @@
 import { privKeyToPeerId } from './privKeyToPeerId'
 import PeerId from 'peer-id'
 import assert from 'assert'
-import { u8aToHex } from '..'
 
 const peerIdPrivKey = Uint8Array.from([
   160, 134, 102, 188, 161, 54, 60, 176, 11, 84, 2, 187, 235, 109, 71, 246, 184, 66, 150, 243, 187, 160, 242, 249, 91,
