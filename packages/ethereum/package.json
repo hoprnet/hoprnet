@@ -12,7 +12,7 @@
     "build:tsc": "tsc -p .",
     "build:sol": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat compile",
     "build:sol:types": "echo \"Generating smart contract typings\" && TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat typechain",
-    "prepack": "rm -rf deployments/hardhat-localhost deployments/hardhat-localhost2 && ../../scripts/remove-tests.sh ethereum",
+    "prepack": "rm -rf deployments/hardhat-localhost deployments/hardhat-localhost2",
     "fund": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat fund",
     "faucet": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat faucet",
     "accounts": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat accounts",

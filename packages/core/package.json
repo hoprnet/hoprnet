@@ -20,7 +20,6 @@
     "coverage": "nyc --reporter=html mocha",
     "build": "yarn clean && tsc -p .",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
-    "prepack": "../../scripts/remove-tests.sh core",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },

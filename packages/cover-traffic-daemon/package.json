@@ -13,7 +13,6 @@
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "coverage": "nyc --reporter=html mocha",
     "dev": "yarn clean && tsc -w",
-    "prepack": "../../scripts/remove-tests.sh cover-traffic-daemon",
     "build": "yarn clean && tsc -p .",
     "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "yarn typedoc",
