@@ -168,10 +168,11 @@ The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows
 7. Everybody is given 3 votes to vote on the items in the `Problems` category. Voting is hidden.
 8. The moderator stops the voting and the most voted items bubble up.
 9. The moderator takes 3 top items from the `Problems` category and creates an `Action Item` in the third column out of it with the help of the team. Each `Action Item`:
- - defines `What` has to be done
- - defines `When` it has to be completed
- - defines `Who` is responsible for completing it
- - must be created as an issue in the repository to be trackable
+
+- defines `What` has to be done
+- defines `When` it has to be completed
+- defines `Who` is responsible for completing it
+- must be created as an issue in the repository to be trackable
 
 _Who:_ all tech members within a meeting
 
