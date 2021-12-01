@@ -253,7 +253,7 @@ rm -Rfv \
 log "Running hardhat local node"
 HOPR_ENVIRONMENT_ID="hardhat-localhost" \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum exec "hardhat node" \
+yarn workspace @hoprnet/hopr-ethereum hardhat node \
   --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
@@ -301,7 +301,7 @@ log "Funding nodes"
 #  --- Fund nodes --- {{{
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum exec "hardhat faucet" \
+yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \
