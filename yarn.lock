@@ -1178,9 +1178,9 @@ __metadata:
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.4
     mocha: 9.1.3
-    multiaddr: ^10.0.0
+    multiaddr: ^10.0.1
     multihashes: ^4.0.3
-    peer-id: ~0.15.3
+    peer-id: ~0.15.4
     prettier: 2.5.0
     rimraf: 3.0.2
     simple-peer: 9.11.0
@@ -1208,7 +1208,7 @@ __metadata:
     ethers: 5.5.1
     heap-js: ^2.1.6
     mocha: 9.1.3
-    multiaddr: ^10.0.0
+    multiaddr: ^10.0.1
     peer-id: 0.15.4
     rimraf: 3.0.2
     secp256k1: ^4.0.2
@@ -1246,9 +1246,9 @@ __metadata:
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.1.3
-    multiaddr: ^10.0.0
+    multiaddr: ^10.0.1
     nyc: 15.1.0
-    peer-id: ^0.15.3
+    peer-id: ^0.15.4
     rimraf: 3.0.2
     secp256k1: ~4.0.2
     sinon: 12.0.1
@@ -1344,12 +1344,12 @@ __metadata:
     levelup: 5.1.1
     libp2p: 0.34.0
     libp2p-crypto: 0.20.0
-    libp2p-kad-dht: 0.25.0
+    libp2p-kad-dht: 0.26.7
     libp2p-mplex: 0.10.4
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.1.3
-    multiaddr: ^10.0.0
+    multiaddr: ^10.0.1
     multihashes: ~4.0.1
     peer-id: 0.15.4
     pino: ^7.0.0
@@ -8956,7 +8956,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"heap@npm:0.2.6, heap@npm:~0.2.6":
+"heap@npm:0.2.6":
   version: 0.2.6
   resolution: "heap@npm:0.2.6"
   checksum: 1291b9b9efb5090d01c6d04a89c91ca6e0e0eb7f3694d8254f7a5effcc5ab9249bc3d16767b276645ffe86d9b2bbd82ed977f8988f55375e9f2a2c80647ebbdc
@@ -11107,7 +11107,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-crypto@npm:^0.19.4, libp2p-crypto@npm:^0.19.5, libp2p-crypto@npm:^0.19.7":
+"libp2p-crypto@npm:^0.19.4, libp2p-crypto@npm:^0.19.7":
   version: 0.19.7
   resolution: "libp2p-crypto@npm:0.19.7"
   dependencies:
@@ -11155,38 +11155,6 @@ __metadata:
     protobufjs: ^6.10.2
     uint8arrays: ^3.0.0
   checksum: 12a7449a3ebc5f0cccc928518141cde001da773ba36c9c784b6ace8c82ae32826755c309a7130b6564c8b082d3253a8346a94d351765f3573936db63097b939a
-  languageName: node
-  linkType: hard
-
-"libp2p-kad-dht@npm:0.25.0":
-  version: 0.25.0
-  resolution: "libp2p-kad-dht@npm:0.25.0"
-  dependencies:
-    datastore-core: ^6.0.7
-    debug: ^4.3.1
-    err-code: ^3.0.0
-    hashlru: ^2.3.0
-    heap: ~0.2.6
-    interface-datastore: ^6.0.2
-    it-first: ^1.0.4
-    it-length: ^1.0.3
-    it-length-prefixed: ^5.0.2
-    it-pipe: ^1.1.0
-    k-bucket: ^5.1.0
-    libp2p-crypto: ^0.19.5
-    libp2p-interfaces: ^1.0.0
-    libp2p-record: ^0.10.4
-    multiaddr: ^10.0.0
-    multiformats: ^9.4.5
-    p-map: ^4.0.0
-    p-queue: ^6.6.2
-    p-timeout: ^4.1.0
-    peer-id: ^0.15.0
-    protobufjs: ^6.10.2
-    streaming-iterables: ^6.0.0
-    uint8arrays: ^3.0.0
-    varint: ^6.0.0
-  checksum: 2ccccdf2cb41b8010d7aa61e3f54b635b5533c406619657bf0d85953eef076b80347500c001f52334b22cfec5f350af430df09402f5f99616bf0feb71476cf4b
   languageName: node
   linkType: hard
 
@@ -12294,7 +12262,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"multiaddr@npm:10.0.1, multiaddr@npm:^10.0.0":
+"multiaddr@npm:10.0.1, multiaddr@npm:^10.0.0, multiaddr@npm:^10.0.1":
   version: 10.0.1
   resolution: "multiaddr@npm:10.0.1"
   dependencies:
@@ -13566,13 +13534,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"p-timeout@npm:^4.1.0":
-  version: 4.1.0
-  resolution: "p-timeout@npm:4.1.0"
-  checksum: 321fec524c23a754e3f1487f2b0a5516fd32aba960d5610490eac56f8a0114b549a93f9919ffc05aa68956dc52e8330e0519f3ddf951d208d19c845f9cd778de
-  languageName: node
-  linkType: hard
-
 "p-try@npm:^1.0.0":
   version: 1.0.0
   resolution: "p-try@npm:1.0.0"
@@ -13860,7 +13821,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"peer-id@npm:0.15.4, peer-id@npm:^0.15.0, peer-id@npm:^0.15.3, peer-id@npm:^0.15.4, peer-id@npm:~0.15.3":
+"peer-id@npm:0.15.4, peer-id@npm:^0.15.0, peer-id@npm:^0.15.3, peer-id@npm:^0.15.4, peer-id@npm:~0.15.4":
   version: 0.15.4
   resolution: "peer-id@npm:0.15.4"
   dependencies:
