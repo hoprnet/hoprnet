@@ -1177,6 +1177,7 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@sinonjs/referee": ^9.1.1
     async-mutex: ^0.3.2
     bn.js: 5.2.0
     chai: 4.3.4
@@ -1969,6 +1970,19 @@ __metadata:
   dependencies:
     "@sinonjs/commons": ^1.7.0
   checksum: 09b5a158ce013a6c37613258bad79ca4efeb99b1f59c41c73cca36cac00b258aefcf46eeea970fccf06b989414d86fe9f54c1102272c0c3bdd51a313cea80949
+  languageName: node
+  linkType: hard
+
+"@sinonjs/referee@npm:^9.1.1":
+  version: 9.1.1
+  resolution: "@sinonjs/referee@npm:9.1.1"
+  dependencies:
+    "@sinonjs/commons": ^1.8.3
+    "@sinonjs/samsam": ^6.0.2
+    event-emitter: ^0.3.5
+    lodash.isarguments: ^3.1.0
+    util: ^0.12.3
+  checksum: 17c4981c33c3f1d134fb5310f0e184e324c4737c18bb809eb916cbb68562060230f90c78f800189f22c856539c29762355a9cd87ee0b4b1a2f630640debfede6
   languageName: node
   linkType: hard
 
@@ -6382,7 +6396,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"es5-ext@npm:^0.10.35, es5-ext@npm:^0.10.50":
+"es5-ext@npm:^0.10.35, es5-ext@npm:^0.10.50, es5-ext@npm:~0.10.14":
   version: 0.10.53
   resolution: "es5-ext@npm:0.10.53"
   dependencies:
@@ -7222,6 +7236,16 @@ __metadata:
   version: 0.5.0
   resolution: "eve-raphael@npm:0.5.0"
   checksum: 50a4bde612443563997faedcf2b1b815ad8c132081db3fb6510a297a459ae473d514cf50dfc04783953f060de63a9556c57b8121ecfa28e75204ecc9863f03f0
+  languageName: node
+  linkType: hard
+
+"event-emitter@npm:^0.3.5":
+  version: 0.3.5
+  resolution: "event-emitter@npm:0.3.5"
+  dependencies:
+    d: 1
+    es5-ext: ~0.10.14
+  checksum: 27c1399557d9cd7e0aa0b366c37c38a4c17293e3a10258e8b692a847dd5ba9fb90429c3a5a1eeff96f31f6fa03ccbd31d8ad15e00540b22b22f01557be706030
   languageName: node
   linkType: hard
 
@@ -11326,6 +11350,13 @@ __metadata:
   version: 4.4.2
   resolution: "lodash.get@npm:4.4.2"
   checksum: e403047ddb03181c9d0e92df9556570e2b67e0f0a930fcbbbd779370972368f5568e914f913e93f3b08f6d492abc71e14d4e9b7a18916c31fa04bd2306efe545
+  languageName: node
+  linkType: hard
+
+"lodash.isarguments@npm:^3.1.0":
+  version: 3.1.0
+  resolution: "lodash.isarguments@npm:3.1.0"
+  checksum: ae1526f3eb5c61c77944b101b1f655f846ecbedcb9e6b073526eba6890dc0f13f09f72e11ffbf6540b602caee319af9ac363d6cdd6be41f4ee453436f04f13b5
   languageName: node
   linkType: hard
 
@@ -17597,7 +17628,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"util@npm:0.12.4, util@npm:^0.12.0":
+"util@npm:0.12.4, util@npm:^0.12.0, util@npm:^0.12.3":
   version: 0.12.4
   resolution: "util@npm:0.12.4"
   dependencies:
