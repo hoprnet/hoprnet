@@ -153,6 +153,10 @@ Newly created issues ([labelled as](#labels): `new issue`) may not all have been
 
 In `Retrospective` we aim to summarize the results of the last spring, in order to help us identify and fix issues in our processes and company culture.
 
+For a `Retrospective` a moderator is chosen:
+1. If `Process Facilitator` is present, they are chosen.
+2. Otherwise, any member of `Trifecta` can self-declare themselves as a moderator.
+
 The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows this schedule:
 
 1. Everybody secretly adds hidden items to `What Went Well` column.
