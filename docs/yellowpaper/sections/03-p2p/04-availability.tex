@@ -10,7 +10,7 @@ Each node counts successful and unsuccessful \textit{PING} attempts and uses thi
 \subsubsection{Ping mechanism}
 \label{sec:p2p:ping-mechanism}
 
-Pinging a node means sampling a random 16 byte string $r$ and asking the counterparty to return $response = SHA256(r)$. If the received response does not match the expected value, the response is considered invalid since it might stem from a previous attempt.
+Ping messages are small messages that are sent in order to see if the destination is available. Each request should be unique in order to be able to clearly distinguish it from potential retransmissions, hence each ping request contains a random 16-byte string. To make sure that the destination has indeed processed the ping request, ping responses, ``\textit{PONG}'' messages, are considered valid if they include the SHA256 hash of $r$.
 
 \subsubsection{Health Score}
 \label{sec:p2p:health-score}

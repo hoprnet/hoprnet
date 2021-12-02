@@ -64,7 +64,7 @@ Hence, the crucial part is to provide the infrastructure to allow nodes to deter
 
 At startup, each node attempts to reserve a relay slot at several of the known relay nodes. Due to the dynamic port mapping, these nodes might be the only ones which are able to reach the node. It is therefore crucial, to preserve these connections.
 
-Once the connections to the relay nodes have been established, the node publishes relay addresses containing the relay to which it maintains a connection.
+Once the connections to the relay nodes have been established, the node publishes relay addresses to the DHT containing the relays to which it maintains a connection.
 
 When connecting to a new node, the initiator of the connection first fetches the direct addresses of the node and attempts to reach the destination. In case that does not work, the initiator queries the DHT to fetch relay addresses of the destination and recursively establishes a connection. Once the connection to the relay is open, the relay attempts to reach the destination. If that works, initiator and destination have a channel to exchange information. This channel is then used to transfer payload such as mixnet packets but also signalling information that might give parties the opportunity to upgrade to a direct connection using WebRTC. Once both parties found out how to connect directly, they route the traffic through the WebRTC connection. In case that is not possible, e.g. because both nodes are running behind bidirectional NATs, the relayed connection serves as fallback.
 
