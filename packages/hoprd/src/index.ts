@@ -195,7 +195,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 function addUnhandledPromiseRejectionHandler() {
-  if (NODE_ENV === "development") {
+  if (NODE_ENV === 'development') {
     require('trace-unhandled/register')
   }
   else {
