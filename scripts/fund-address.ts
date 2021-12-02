@@ -83,7 +83,7 @@ async function fundNative(chain, sender: string, receiver: string, targetBalance
   console.log(
     `transfer ${diff.toFormattedString()} from ${sender} to ${receiver} to top up ${balance.toFormattedString()}`
   )
-  await chain.withdraw('HOPR', receiver, diff.toString())
+  await chain.withdraw('NATIVE', receiver, diff.toString())
 }
 
 async function main() {

@@ -1,4 +1,4 @@
-import type { ContractTransaction, UnsignedTransaction } from 'ethers'
+import type { ContractTransaction, BaseContract } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import { providers, utils, errors, Wallet, BigNumber, ethers } from 'ethers'
 import type { HoprToken, HoprChannels } from '@hoprnet/hopr-ethereum'
@@ -102,12 +102,12 @@ export async function createChainWrapper(
    * @param rest contract arguments
    * @returns Promise of a ContractTransaction
    */
-  async function sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
+  async function sendTransaction<T extends BaseContract>(
     checkDuplicate: Boolean,
-    populatedTx: UnsignedTransaction,
-    method: T,
-    ...rest: Parameters<T>
-  ): Promise<ContractTransaction | { hash: string }> {
+    contract: T,
+    method: keyof T['functions'],
+    ...rest: Parameters<T['functions'][keyof T['functions']]>
+  ): Promise<Partial<ContractTransaction>> {
     const gasLimit = 400e3
     const gasPrice = networkInfo.gasPrice ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
@@ -120,6 +120,12 @@ export async function createChainWrapper(
       nonce
     })
 
+    // breakdown steps in ethersjs
+    // https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L122
+    // 1. omit this._checkProvider("sendTransaction");
+    // 2. populate transaction
+    const tx = await contract.populateTransaction[method as string](...rest)
+    const populatedTx = await wallet.populateTransaction({ ...tx, gasLimit, gasPrice, nonce })
     const essentialTxPayload: TransactionPayload = {
       to: populatedTx.to,
       data: populatedTx.data as string,
@@ -143,26 +149,22 @@ export async function createChainWrapper(
         // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
       }
 
-      // send transaction to our ethereum provider
-      // TODO: better type this, make it less hacky
-      transaction = await method(
-        ...[
-          ...rest,
-          {
-            gasLimit,
-            gasPrice,
-            nonce
-          }
-        ]
-      )
+      // 3. sign transaction
+      const signedTx = await wallet.signTransaction(populatedTx)
+      // compute tx hash and save to initiated tx list in tx manager
+      const initiatedHash = utils.keccak256(signedTx)
+      transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
+
+      // 4. send transaction to our ethereum provider
+      transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
       nonceLock.releaseLock()
-      throw Error('Could not send transaction')
+      throw error
     }
 
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
-    transactions.addToPending(transaction.hash, { nonce, gasPrice }, essentialTxPayload)
+    transactions.moveFromQueuingToPending(transaction.hash)
     nonceLock.releaseLock()
 
     try {
@@ -199,16 +201,11 @@ export async function createChainWrapper(
   }
 
   async function announce(multiaddr: Multiaddr): Promise<string> {
-    const populatedTx = await channels.populateTransaction.announce(
-      publicKey.toUncompressedPubKeyHex(),
-      multiaddr.bytes
-    )
-
     try {
       const confirmation = await sendTransaction(
-        true,
-        populatedTx,
-        channels.announce,
+        checkDuplicate,
+        channels,
+        'announce',
         publicKey.toUncompressedPubKeyHex(),
         multiaddr.bytes
       )
@@ -237,8 +234,7 @@ export async function createChainWrapper(
     }
 
     // withdraw HOPR
-    const populatedTx = await token.populateTransaction.transfer(recipient, amount)
-    const transaction = await sendTransaction(checkDuplicate, populatedTx, token.transfer, recipient, amount)
+    const transaction = await sendTransaction(checkDuplicate, token, 'transfer', recipient, amount)
     return transaction.hash
   }
 
@@ -251,18 +247,10 @@ export async function createChainWrapper(
     counterpartyFund: Balance
   ): Promise<Receipt> {
     const totalFund = myFund.toBN().add(counterpartyFund.toBN())
-    const populatedTx = await token.populateTransaction.send(
-      channels.address,
-      totalFund.toString(),
-      abiCoder.encode(
-        ['address', 'address', 'uint256', 'uint256'],
-        [me.toHex(), counterparty.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
-      )
-    )
     const transaction = await sendTransaction(
       checkDuplicate,
-      populatedTx,
-      token.send,
+      token,
+      'send',
       channels.address,
       totalFund.toString(),
       abiCoder.encode(
@@ -280,18 +268,10 @@ export async function createChainWrapper(
     counterparty: Address,
     amount: Balance
   ): Promise<Receipt> {
-    const populatedTx = await token.populateTransaction.send(
-      channels.address,
-      amount.toBN().toString(),
-      abiCoder.encode(
-        ['address', 'address', 'uint256', 'uint256'],
-        [me.toHex(), counterparty.toHex(), amount.toBN().toString(), '0']
-      )
-    )
     const transaction = await sendTransaction(
       checkDuplicate,
-      populatedTx,
-      token.send,
+      token,
+      'send',
       channels.address,
       amount.toBN().toString(),
       abiCoder.encode(
@@ -303,26 +283,13 @@ export async function createChainWrapper(
   }
 
   async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const populatedTx = await channels.populateTransaction.finalizeChannelClosure(counterparty.toHex())
-    const transaction = await sendTransaction(
-      checkDuplicate,
-      populatedTx,
-      channels.finalizeChannelClosure,
-      counterparty.toHex()
-    )
+    const transaction = await sendTransaction(checkDuplicate, channels, 'finalizeChannelClosure', counterparty.toHex())
     return transaction.hash
     // TODO: catch race-condition
   }
 
   async function initiateChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const populatedTx = await channels.populateTransaction.initiateChannelClosure(counterparty.toHex())
-
-    const transaction = await sendTransaction(
-      checkDuplicate,
-      populatedTx,
-      channels.initiateChannelClosure,
-      counterparty.toHex()
-    )
+    const transaction = await sendTransaction(checkDuplicate, channels, 'initiateChannelClosure', counterparty.toHex())
     return transaction.hash
     // TODO: catch race-condition
   }
@@ -333,21 +300,10 @@ export async function createChainWrapper(
     ackTicket: AcknowledgedTicket,
     ticket: Ticket
   ): Promise<Receipt> {
-    const populatedTx = await channels.populateTransaction.redeemTicket(
-      counterparty.toHex(),
-      ackTicket.preImage.toHex(),
-      ackTicket.ticket.epoch.serialize(),
-      ackTicket.ticket.index.serialize(),
-      ackTicket.response.toHex(),
-      ticket.amount.toBN().toString(),
-      ticket.winProb.toBN().toString(),
-      ticket.signature.serialize()
-    )
-
     const transaction = await sendTransaction(
       checkDuplicate,
-      populatedTx,
-      channels.redeemTicket,
+      channels,
+      'redeemTicket',
       counterparty.toHex(),
       ackTicket.preImage.toHex(),
       ackTicket.ticket.epoch.serialize(),
@@ -361,11 +317,10 @@ export async function createChainWrapper(
   }
 
   async function setCommitment(channels: HoprChannels, counterparty: Address, commitment: Hash): Promise<Receipt> {
-    const populatedTx = await channels.populateTransaction.bumpChannel(counterparty.toHex(), commitment.toHex())
     const transaction = await sendTransaction(
       checkDuplicate,
-      populatedTx,
-      channels.bumpChannel,
+      channels,
+      'bumpChannel',
       counterparty.toHex(),
       commitment.toHex()
     )
@@ -428,7 +383,8 @@ export async function createChainWrapper(
       hoprChannelsAddress: hoprChannelsDeployment.address,
       channelClosureSecs
     }),
-    updateConfirmedTransaction: (hash: string) => transactions.moveToConfirmed(hash)
+    updateConfirmedTransaction: (hash: string) => transactions.moveToConfirmed(hash),
+    getAllQueuingTransactionRequests: () => transactions.getAllQueuingTxs()
   }
 
   return api

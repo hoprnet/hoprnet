@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.84.0-next.30",
+  "version": "1.84.0-next.36",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -25,6 +25,7 @@
   "dependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@sinonjs/referee": "^9.1.1",
     "async-mutex": "^0.3.2",
     "bn.js": "5.2.0",
     "chalk": "^4.1.2",
