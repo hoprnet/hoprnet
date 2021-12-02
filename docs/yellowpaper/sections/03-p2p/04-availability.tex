@@ -15,14 +15,14 @@ Ping messages are small messages that are sent in order to see if the destinatio
 \subsubsection{Health Score}
 \label{sec:p2p:health-score}
 
-At startup, each node starts with a list of all nodes to which it has a funded outgoing payment channel, see section describing the \lcnameref{sec:incentives} for further details. Nodes on the list start with a initial health score of $0.2$. Whenever the node successfully pings a node on the list or the node passively gets pinged by that node, their health score increases by $0.1$ up to a maximum of $1.0$. Analogously, each unsuccessful attempt decreases the health score by $0.1$ down to $0$ which means that the node is considered offline.
+While running, each node maintains a list of ``interesting nodes'' from which it keeps measuring the availability. At startup, this list is initiated with all nodes to which the node has funded outgoing payment channel, see section describing the \lcnameref{sec:incentives} for further details. Nodes on the list start with a initial health score of $0.2$. Whenever the node successfully pings a node on the list or the node passively gets pinged by a node, their health score increases by $0.1$ up to a maximum of $1.0$. Analogously, each unsuccessful attempt decreases the health score by $0.1$ down to $0$ which means that the node is considered offline.
 
 Nodes with a health score greater than $0.5$ are expected to have a sufficiently high availability and can be used as a relay when sampling a mixnet path.
 
 \subsubsection{Exponential Backoff}
 \label{sec:p2p:exponential-backoff}
 
-Since the network status can change abruptly, e.g., due to electricity outages or unstable network links, availability needs to be measured frequently on an ongoing basis. On the other hand, it does not make sense to constantly probe nodes that are known to be offline. To provide a dynamic trade-off for both cases, HOPR utilizes a heartbeat with exponential backoff, the time until the next \textit{ping} is sent to a node increases with the number of failed ping attempts $n_{fail}$ since the last sucessful attempt or the network start. A successful response to \textit{ping} resets the backoff timer.
+To provide a dynamic trade-off for both cases, HOPR utilizes a heartbeat with exponential backoff, the time until the next \textit{ping} is sent to a node increases with the number of failed ping attempts $n_{fail}$ since the last sucessful attempt or the network start. A successful response to \textit{ping} resets the backoff timer.
 
 $$ t_{bo} = {t_{base}}^{{f_{bo}}^{n_{fail}}} $$
 
