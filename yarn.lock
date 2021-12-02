@@ -1175,7 +1175,7 @@ __metadata:
     it-pipe: 1.1.0
     it-pushable: 1.4.2
     libp2p: 0.34.0
-    libp2p-interfaces: 2.0.0
+    libp2p-interfaces: 2.0.2
     libp2p-mplex: 0.10.4
     mocha: 9.1.3
     multiaddr: ^10.0.1
@@ -1606,6 +1606,20 @@ __metadata:
   version: 12.0.3
   resolution: "@next/swc-win32-x64-msvc@npm:12.0.3"
   conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@noble/ed25519@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "@noble/ed25519@npm:1.3.0"
+  checksum: 4ec8c23ab0a0846a97268007190564ba452aae21076b797457167af12cdce4267034aa64f68271f985d4aed115efff8ab3e842a457c8c1934f0edf4c6b0bd23f
+  languageName: node
+  linkType: hard
+
+"@noble/secp256k1@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "@noble/secp256k1@npm:1.3.0"
+  checksum: 4bf5e2a905e0dacbf3b557da74e4073d208b8407f4e1fc95e244c17c6af686fd1870668d231b9f2e774091d72be79baf1c0e50f5ddc9db6fb82b206e23b9b335
   languageName: node
   linkType: hard
 
@@ -11161,13 +11175,41 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-interfaces@npm:2.0.0":
-  version: 2.0.0
-  resolution: "libp2p-interfaces@npm:2.0.0"
+"libp2p-crypto@npm:^0.21.0":
+  version: 0.21.0
+  resolution: "libp2p-crypto@npm:0.21.0"
   dependencies:
+    "@noble/ed25519": ^1.3.0
+    "@noble/secp256k1": ^1.3.0
+    err-code: ^3.0.1
+    iso-random-stream: ^2.0.0
+    multiformats: ^9.4.5
+    node-forge: ^0.10.0
+    protobufjs: ^6.11.2
+    uint8arrays: ^3.0.0
+  checksum: 8ef6258cff2ebacd11e3b64091e9e9d27e911cb8024ec8422f822ed389543c5ca21a15158d05d8bba02193ad9c81fcd58115a89769b7f8aea4f470b7872376cd
+  languageName: node
+  linkType: hard
+
+"libp2p-interfaces@npm:2.0.2":
+  version: 2.0.2
+  resolution: "libp2p-interfaces@npm:2.0.2"
+  dependencies:
+    abort-controller: ^3.0.0
+    abortable-iterator: ^3.0.0
+    debug: ^4.3.1
+    err-code: ^3.0.1
+    it-length-prefixed: ^5.0.2
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
+    libp2p-crypto: ^0.21.0
     multiaddr: ^10.0.0
-    multiformats: ^9.4.10
-  checksum: 0c3c81cff6a74087c54f2d85222fe88dbac3a4c6a526b0964788eaa73bbb253bb7211d6bae2e2c68fa89ab5c8088d6e51ac1d1c91b21732a0e378998d096be80
+    multiformats: ^9.1.2
+    p-queue: ^6.6.2
+    peer-id: ^0.16.0
+    protobufjs: ^6.10.2
+    uint8arrays: ^3.0.0
+  checksum: 9cb578eabdce69f1442d00fe09130ebfb2da0c0b9fa554a43356c7f3e0e29a37a0daf2375d60ad0f44a40c29a873fd511ec61ae2a8d48843c0927ea47d966bdd
   languageName: node
   linkType: hard
 
@@ -13876,6 +13918,19 @@ __metadata:
   bin:
     peer-id: src/bin.js
   checksum: ea17967de015ffec2fe1bab21583ae3713807a7ca0752694657032dcd9693305038b185d7faa55b51f3e4b833fbd238c35ae8e1199dccff89e40a9135e7d68ad
+  languageName: node
+  linkType: hard
+
+"peer-id@npm:^0.16.0":
+  version: 0.16.0
+  resolution: "peer-id@npm:0.16.0"
+  dependencies:
+    class-is: ^1.1.0
+    libp2p-crypto: ^0.21.0
+    multiformats: ^9.4.5
+    protobufjs: ^6.10.2
+    uint8arrays: ^3.0.0
+  checksum: 35dfb887c6f00789702214488e1f97dd1713ed77909b7f9be13b20003aed64cc444bf15e6bd845c01d47f424856acca7fa1f0501b785f5cb6e6707e3f05b9f41
   languageName: node
   linkType: hard
 
