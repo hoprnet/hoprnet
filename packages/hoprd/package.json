@@ -47,7 +47,7 @@
     "key-did-provider-ed25519": "^1.1.0",
     "key-did-resolver": "^1.2.1",
     "next": "12.0.3",
-    "peer-id": "0.15.4",
+    "peer-id": "0.16.0",
     "prop-types": "^15.7.2",
     "react": "17.0.2",
     "react-dom": "17.0.2",

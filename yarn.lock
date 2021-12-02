@@ -863,12 +863,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethersproject/networks@npm:5.5.0, @ethersproject/networks@npm:^5.5.0":
-  version: 5.5.0
-  resolution: "@ethersproject/networks@npm:5.5.0"
+"@ethersproject/networks@npm:5.5.1, @ethersproject/networks@npm:^5.5.0":
+  version: 5.5.1
+  resolution: "@ethersproject/networks@npm:5.5.1"
   dependencies:
     "@ethersproject/logger": ^5.5.0
-  checksum: cadf2280d29696dcf3e29fe62cdad350ccfc087e81b8dd2fb2b823e1a6c0e5f9e9fd0ccb52a290ea8af810b9c2f16f74f11b00fc34fc9d910bdeed0869089acf
+  checksum: 467861e394b4d1ea353b37d0ee4b2d5f5b3b99714ed7304db30503b370b9329986299162316f2bcec7b94fb9ac68817ca189cb2f6c783a5c6b03be192ac1c92a
   languageName: node
   linkType: hard
 
@@ -891,9 +891,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethersproject/providers@npm:5.5.0, @ethersproject/providers@npm:^5.4.4":
-  version: 5.5.0
-  resolution: "@ethersproject/providers@npm:5.5.0"
+"@ethersproject/providers@npm:5.5.1, @ethersproject/providers@npm:^5.4.4":
+  version: 5.5.1
+  resolution: "@ethersproject/providers@npm:5.5.1"
   dependencies:
     "@ethersproject/abstract-provider": ^5.5.0
     "@ethersproject/abstract-signer": ^5.5.0
@@ -914,7 +914,7 @@ __metadata:
     "@ethersproject/web": ^5.5.0
     bech32: 1.1.4
     ws: 7.4.6
-  checksum: 8f29dfd9ef48613ffd4820ee1e77991492291172f8b87af9952380ef49231ef61b86df6df903c1bb2a7cfedc998fc337ca61c219e8aa74eeee18f6ff8cc7ad8b
+  checksum: c2cf3fbf63cef1733416771ccd404c6b53ac47a44470a13d19f250f247ce8e8d5c75b90982d265bb0261a62260054ae9b9ced8323b4e9d9834e2798b19d62f38
   languageName: node
   linkType: hard
 
@@ -1039,16 +1039,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ethersproject/web@npm:5.5.0, @ethersproject/web@npm:^5.5.0":
-  version: 5.5.0
-  resolution: "@ethersproject/web@npm:5.5.0"
+"@ethersproject/web@npm:5.5.1, @ethersproject/web@npm:^5.5.0":
+  version: 5.5.1
+  resolution: "@ethersproject/web@npm:5.5.1"
   dependencies:
     "@ethersproject/base64": ^5.5.0
     "@ethersproject/bytes": ^5.5.0
     "@ethersproject/logger": ^5.5.0
     "@ethersproject/properties": ^5.5.0
     "@ethersproject/strings": ^5.5.0
-  checksum: 1e02916bc0a33aa567e9ecd01e6596d8dbc8b800a21f98e6fde4d32672a71076be464beb5a37b92d9747e5dfaabfca42f4d346cd12adbf246b8edd17d083c6d8
+  checksum: 4718efd7e78f69ccd069309d7d46de562a988ab3e01089e047259b714bbf958d917e86c57c1a6ec99724c4dfd0338bb6b3dc990597a1326f7199039e450bc73c
   languageName: node
   linkType: hard
 
@@ -1180,7 +1180,7 @@ __metadata:
     mocha: 9.1.3
     multiaddr: ^10.0.1
     multihashes: ^4.0.3
-    peer-id: ~0.15.4
+    peer-id: ~0.16.0
     prettier: 2.5.0
     rimraf: 3.0.2
     simple-peer: 9.11.0
@@ -1206,11 +1206,11 @@ __metadata:
     chai-as-promised: 7.1.1
     chalk: ^4.1.2
     debug: ^4.3.2
-    ethers: 5.5.1
+    ethers: 5.5.2
     heap-js: ^2.1.6
     mocha: 9.1.3
     multiaddr: ^10.0.1
-    peer-id: 0.15.4
+    peer-id: 0.16.0
     rimraf: 3.0.2
     secp256k1: ^4.0.2
     sinon: 12.0.1
@@ -1242,14 +1242,14 @@ __metadata:
     leveldown: 6.1.0
     levelup: 5.1.1
     libp2p: 0.35.0
-    libp2p-kad-dht: 0.26.7
+    libp2p-kad-dht: 0.27.1
     libp2p-mplex: 0.10.4
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.1.3
     multiaddr: ^10.0.1
     nyc: 15.1.0
-    peer-id: ^0.15.4
+    peer-id: ^0.16.0
     rimraf: 3.0.2
     secp256k1: ~4.0.2
     sinon: 12.0.1
@@ -1275,7 +1275,7 @@ __metadata:
     chai: 4.3.4
     mocha: 9.1.3
     nyc: 15.1.0
-    peer-id: 0.15.4
+    peer-id: 0.16.0
     restana: 4.9.2
     rimraf: 3.0.2
     typedoc: 0.22.10
@@ -1305,7 +1305,7 @@ __metadata:
     chai: 4.3.4
     dotenv: 10.0.0
     ethereum-waffle: 3.4.0
-    ethers: 5.5.1
+    ethers: 5.5.2
     hardhat: 2.7.0
     hardhat-deploy: 0.9.14
     hardhat-gas-reporter: 1.0.6
@@ -1336,7 +1336,7 @@ __metadata:
     chai: 4.3.4
     chalk: ^4.1.2
     debug: ^4.3.2
-    ethers: 5.5.1
+    ethers: 5.5.2
     futoin-hkdf: ~1.4.2
     hjson: ^3.2.2
     it-pipe: ^1.1.0
@@ -1345,14 +1345,14 @@ __metadata:
     levelup: 5.1.1
     libp2p: 0.35.0
     libp2p-crypto: 0.20.0
-    libp2p-kad-dht: 0.26.7
+    libp2p-kad-dht: 0.27.1
     libp2p-mplex: 0.10.4
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.1.3
     multiaddr: ^10.0.1
     multihashes: ~4.0.1
-    peer-id: 0.15.4
+    peer-id: 0.16.0
     pino: ^7.0.0
     pino-logflare: ^0.3.12
     rewiremock: 3.14.3
@@ -1390,7 +1390,7 @@ __metadata:
     key-did-resolver: ^1.2.1
     mocha: 9.1.3
     next: 12.0.3
-    peer-id: 0.15.4
+    peer-id: 0.16.0
     prop-types: ^15.7.2
     react: 17.0.2
     react-dom: 17.0.2
@@ -7231,9 +7231,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ethers@npm:5.5.1, ethers@npm:^5.0.1, ethers@npm:^5.0.2, ethers@npm:^5.4.7, ethers@npm:^5.5.0":
-  version: 5.5.1
-  resolution: "ethers@npm:5.5.1"
+"ethers@npm:5.5.2, ethers@npm:^5.0.1, ethers@npm:^5.0.2, ethers@npm:^5.4.7, ethers@npm:^5.5.0":
+  version: 5.5.2
+  resolution: "ethers@npm:5.5.2"
   dependencies:
     "@ethersproject/abi": 5.5.0
     "@ethersproject/abstract-provider": 5.5.1
@@ -7250,10 +7250,10 @@ __metadata:
     "@ethersproject/json-wallets": 5.5.0
     "@ethersproject/keccak256": 5.5.0
     "@ethersproject/logger": 5.5.0
-    "@ethersproject/networks": 5.5.0
+    "@ethersproject/networks": 5.5.1
     "@ethersproject/pbkdf2": 5.5.0
     "@ethersproject/properties": 5.5.0
-    "@ethersproject/providers": 5.5.0
+    "@ethersproject/providers": 5.5.1
     "@ethersproject/random": 5.5.0
     "@ethersproject/rlp": 5.5.0
     "@ethersproject/sha2": 5.5.0
@@ -7263,9 +7263,9 @@ __metadata:
     "@ethersproject/transactions": 5.5.0
     "@ethersproject/units": 5.5.0
     "@ethersproject/wallet": 5.5.0
-    "@ethersproject/web": 5.5.0
+    "@ethersproject/web": 5.5.1
     "@ethersproject/wordlists": 5.5.0
-  checksum: ee004e3e2f526c3dbaa432c08cd46c9483c7556797c40219ea5eacf0b5968351de05b83aa4b00743612a0df2f8dcd6028866ddd250e5226166824c6f035a0121
+  checksum: 5a1200b4db4dc4179c66488612864c18e42000ec18997ba5ea6c21c3c6a5e65de7ebea41926d15dbb195f9f49eb3b00335195be38b78a3468e47d2e9868b6645
   languageName: node
   linkType: hard
 
@@ -11194,31 +11194,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-interfaces@npm:^1.3.0":
-  version: 1.3.1
-  resolution: "libp2p-interfaces@npm:1.3.1"
-  dependencies:
-    abort-controller: ^3.0.0
-    abortable-iterator: ^3.0.0
-    debug: ^4.3.1
-    err-code: ^3.0.1
-    it-length-prefixed: ^5.0.2
-    it-pipe: ^1.1.0
-    it-pushable: ^1.4.2
-    libp2p-crypto: ^0.20.0
-    multiaddr: ^10.0.0
-    multiformats: ^9.1.2
-    p-queue: ^6.6.2
-    peer-id: ^0.15.4
-    protobufjs: ^6.10.2
-    uint8arrays: ^3.0.0
-  checksum: 12a7449a3ebc5f0cccc928518141cde001da773ba36c9c784b6ace8c82ae32826755c309a7130b6564c8b082d3253a8346a94d351765f3573936db63097b939a
-  languageName: node
-  linkType: hard
-
 "libp2p-interfaces@npm:^2.0.1":
-  version: 2.0.2
-  resolution: "libp2p-interfaces@npm:2.0.2"
+  version: 2.0.1
+  resolution: "libp2p-interfaces@npm:2.0.1"
   dependencies:
     abort-controller: ^3.0.0
     abortable-iterator: ^3.0.0
@@ -11234,13 +11212,13 @@ __metadata:
     peer-id: ^0.16.0
     protobufjs: ^6.10.2
     uint8arrays: ^3.0.0
-  checksum: 9cb578eabdce69f1442d00fe09130ebfb2da0c0b9fa554a43356c7f3e0e29a37a0daf2375d60ad0f44a40c29a873fd511ec61ae2a8d48843c0927ea47d966bdd
+  checksum: d54b80cc0c8084c41d66b27bff4ad6ccd9bcfc68d6606ea9722d95120165502cbddaf1e2fb8363ae32f2650348c8bc0a2e6f8b9dc9f633be91fe8e646aaba0da
   languageName: node
   linkType: hard
 
-"libp2p-kad-dht@npm:0.26.7":
-  version: 0.26.7
-  resolution: "libp2p-kad-dht@npm:0.26.7"
+"libp2p-kad-dht@npm:0.27.1":
+  version: 0.27.1
+  resolution: "libp2p-kad-dht@npm:0.27.1"
   dependencies:
     any-signal: ^2.1.2
     datastore-core: ^6.0.7
@@ -11259,8 +11237,8 @@ __metadata:
     it-pipe: ^1.1.0
     it-take: ^1.0.2
     k-bucket: ^5.1.0
-    libp2p-crypto: ^0.20.0
-    libp2p-interfaces: ^1.3.0
+    libp2p-crypto: ^0.21.0
+    libp2p-interfaces: ^2.0.1
     libp2p-record: ^0.10.4
     multiaddr: ^10.0.0
     multiformats: ^9.4.5
@@ -11268,14 +11246,14 @@ __metadata:
     p-defer: ^3.0.0
     p-map: ^4.0.0
     p-queue: ^6.6.2
-    peer-id: ^0.15.4
+    peer-id: ^0.16.0
     private-ip: ^2.3.3
     protobufjs: ^6.10.2
     streaming-iterables: ^6.0.0
     timeout-abort-controller: ^2.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: aa0ec9b622c1d22bf46e0c81b4bb2010d97806f49e99950f938816ed660c325281b1d254cab7e8e2ba16af10eda26b755068c76a1fb35f0dc7f6d4bc8702db22
+  checksum: 21661b9ee281bfb30c45bb31547337a7aa8a60aa34a2ad3a23303e0ba950ad210ea3a9703193e190dc2200ff0c5161342e760b52642e7d73269c54c0e12ded07
   languageName: node
   linkType: hard
 
@@ -13908,7 +13886,20 @@ __metadata:
   languageName: node
   linkType: hard
 
-"peer-id@npm:0.15.4, peer-id@npm:^0.15.3, peer-id@npm:^0.15.4, peer-id@npm:~0.15.4":
+"peer-id@npm:0.16.0, peer-id@npm:^0.16.0, peer-id@npm:~0.16.0":
+  version: 0.16.0
+  resolution: "peer-id@npm:0.16.0"
+  dependencies:
+    class-is: ^1.1.0
+    libp2p-crypto: ^0.21.0
+    multiformats: ^9.4.5
+    protobufjs: ^6.10.2
+    uint8arrays: ^3.0.0
+  checksum: 35dfb887c6f00789702214488e1f97dd1713ed77909b7f9be13b20003aed64cc444bf15e6bd845c01d47f424856acca7fa1f0501b785f5cb6e6707e3f05b9f41
+  languageName: node
+  linkType: hard
+
+"peer-id@npm:^0.15.3":
   version: 0.15.4
   resolution: "peer-id@npm:0.15.4"
   dependencies:
@@ -13921,19 +13912,6 @@ __metadata:
   bin:
     peer-id: src/bin.js
   checksum: ea17967de015ffec2fe1bab21583ae3713807a7ca0752694657032dcd9693305038b185d7faa55b51f3e4b833fbd238c35ae8e1199dccff89e40a9135e7d68ad
-  languageName: node
-  linkType: hard
-
-"peer-id@npm:^0.16.0":
-  version: 0.16.0
-  resolution: "peer-id@npm:0.16.0"
-  dependencies:
-    class-is: ^1.1.0
-    libp2p-crypto: ^0.21.0
-    multiformats: ^9.4.5
-    protobufjs: ^6.10.2
-    uint8arrays: ^3.0.0
-  checksum: 35dfb887c6f00789702214488e1f97dd1713ed77909b7f9be13b20003aed64cc444bf15e6bd845c01d47f424856acca7fa1f0501b785f5cb6e6707e3f05b9f41
   languageName: node
   linkType: hard
 
