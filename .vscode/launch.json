@@ -40,6 +40,16 @@
     {
       "type": "node",
       "request": "launch",
+      "name": "Test HOPR core Ethereum indexer",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/node_modules/.bin/mocha",
+      "args": ["--reporter=tap", "--full-trace", "--exit"],
+      "cwd": "${workspaceFolder}/packages/core-ethereum",
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
       "name": "Test HOPRd",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/node_modules/.bin/mocha",

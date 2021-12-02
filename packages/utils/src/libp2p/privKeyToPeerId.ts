@@ -17,6 +17,13 @@ const PRIVKEY_LENGTH = 32
  */
 export function privKeyToPeerId(privKey: Uint8Array | string): PeerId {
   if (typeof privKey === 'string') {
+    if (privKey.startsWith('0x')) {
+      privKey = privKey.slice(2)
+    }
+
+    if (privKey.length != PRIVKEY_LENGTH * 2) {
+      throw Error(`Incorrect private key size.`)
+    }
     privKey = stringToU8a(privKey, PRIVKEY_LENGTH)
   }
 

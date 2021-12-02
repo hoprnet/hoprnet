@@ -1,4 +1,6 @@
-import type { HandlerProps, Connection } from 'libp2p'
+import type { HandlerProps } from 'libp2p'
+import type { Connection } from 'libp2p-interfaces/connection'
+import type { ConnectionHandler } from 'libp2p-interfaces/transport'
 import type { Stream, DialOptions } from '../types'
 import type Libp2p from 'libp2p'
 import type PeerId from 'peer-id'
@@ -30,7 +32,7 @@ class Relay {
 
   constructor(
     public libp2p: Libp2p,
-    private connHandler: ((conn: Connection) => void) | undefined,
+    private connHandler: ConnectionHandler | undefined,
     private webRTCUpgrader?: WebRTCUpgrader,
     private __noWebRTCUpgrade?: boolean,
     private maxRelayedConnections: number = DEFAULT_MAX_RELAYED_CONNECTIONS,
@@ -207,7 +209,7 @@ class Relay {
         return
       }
 
-      newConn = await this.libp2p.upgrader.upgradeInbound(relayConnection as any)
+      newConn = (await this.libp2p.upgrader.upgradeInbound(relayConnection as any)) as any
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -231,13 +233,13 @@ class Relay {
 
     try {
       if (this.webRTCUpgrader != undefined) {
-        newConn = await this.libp2p.upgrader.upgradeInbound(
+        newConn = (await this.libp2p.upgrader.upgradeInbound(
           new WebRTCConnection(counterparty, this.libp2p.connectionManager, newStream, newStream.webRTC!.channel, {
             __noWebRTCUpgrade: this.__noWebRTCUpgrade
           }) as any
-        )
+        )) as any
       } else {
-        newConn = await this.libp2p.upgrader.upgradeInbound(newStream as any)
+        newConn = (await this.libp2p.upgrader.upgradeInbound(newStream as any)) as any
       }
     } catch (err) {
       error(err)
@@ -246,7 +248,7 @@ class Relay {
 
     // @TODO remove this
     this.libp2p.dialer._pendingDials?.get(counterparty.toB58String())?.destroy()
-    this.libp2p.connectionManager.connections?.set(counterparty.toB58String(), [newConn])
+    this.libp2p.connectionManager.connections?.set(counterparty.toB58String(), [newConn as any])
 
     this.connHandler?.(newConn)
   }

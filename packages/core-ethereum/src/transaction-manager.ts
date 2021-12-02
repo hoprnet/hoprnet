@@ -1,3 +1,4 @@
+import { TransactionRequest } from '@ethersproject/abstract-provider'
 import { debug } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'ethers'
 import { isDeepStrictEqual } from 'util'
@@ -15,8 +16,12 @@ export type Transaction = {
 }
 
 /**
- * Keep track of pending, mined and confirmed transactions,
+ * Keep track of queuing, pending, mined and confirmed transactions,
  * and allows for pruning unnecessary data.
+ * After signing, a tx is `queuing`.
+ * After being broadcasted, a tx is `pending`.
+ * After being included in a block, a tx is `mined`.
+ * After passing the finality threshold, a tx is `confirmed`.
  * This class is mainly used by nonce-tracker which relies
  * on transcation-manager to keep an update to date view
  * on transactions.
@@ -26,6 +31,10 @@ class TranscationManager {
    * transaction payloads
    */
   public readonly payloads = new Map<string, TransactionPayload>()
+  /**
+   * transaction requests, before signing
+   */
+  public readonly queuing = new Map<string, Transaction>()
   /**
    * pending transactions
    */
@@ -38,6 +47,26 @@ class TranscationManager {
    * confirmed transactions
    */
   public readonly confirmed = new Map<string, Transaction>()
+
+  /**
+   * Return all the queuing transactions
+   * @returns Array of transaction hashes
+   */
+  public getAllQueuingTxs(): TransactionRequest[] {
+    // queuing tx hashes
+    const queuingTxHash = Array.from(this.queuing.keys())
+    return queuingTxHash.map((txHash) => {
+      const { to, data, value } = this.payloads.get(txHash)
+      const { nonce, gasPrice } = this.queuing.get(txHash)
+      return {
+        to,
+        data,
+        value,
+        nonce,
+        gasPrice
+      }
+    })
+  }
 
   /**
    * Return pending and mined transactions
@@ -72,34 +101,52 @@ class TranscationManager {
     }
 
     const hash = Array.from(this.payloads.keys())[index]
-    if (!this.mined.get(hash) && BigNumber.from(this.pending.get(hash).gasPrice).lt(BigNumber.from(gasPrice))) {
+    if (
+      !this.mined.get(hash) &&
+      BigNumber.from((this.pending.get(hash) ?? this.queuing.get(hash)).gasPrice).lt(BigNumber.from(gasPrice))
+    ) {
       return [false, hash]
     }
     return [true, hash]
   }
 
   /**
-   * Adds transaction in pending
+   * Adds queuing transaction
    * @param hash transaction hash
    * @param transaction object
    */
-  public addToPending(
+  public addToQueuing(
     hash: string,
     transaction: Omit<Transaction, 'createdAt'>,
     transactionPayload: TransactionPayload
   ): void {
-    if (this.pending.has(hash)) return
+    if (this.queuing.has(hash)) return
 
-    log('Adding pending transaction %s %i', hash, transaction.nonce)
+    log('Adding queuing transaction %s %i', hash, transaction.nonce)
     this.payloads.set(hash, transactionPayload)
-    this.pending.set(hash, { nonce: transaction.nonce, createdAt: this._getTime(), gasPrice: transaction.gasPrice })
+    this.queuing.set(hash, { nonce: transaction.nonce, createdAt: 0, gasPrice: transaction.gasPrice })
   }
 
   /**
-   * Moves transcation from pending or mined to confirmed
+   * Moves transaction from queuing to pending
+   * @param hash transaction hash
+   */
+  public moveFromQueuingToPending(hash: string): void {
+    if (!this.queuing.has(hash)) return
+
+    log('Moving transaction to pending %s', hash)
+    this.pending.set(hash, { ...this.queuing.get(hash), createdAt: this._getTime() })
+    this.queuing.delete(hash)
+  }
+
+  /**
+   * Moves transcation from queuing or pending or mined to confirmed
    * @param hash transaction hash
    */
   public moveToConfirmed(hash: string): void {
+    if (this.queuing.has(hash)) {
+      this.moveFromQueuingToPending(hash)
+    }
     if (this.pending.has(hash)) {
       this.moveFromPendingToMined(hash)
     }
@@ -135,12 +182,13 @@ class TranscationManager {
   }
 
   /**
-   * Removed transcation from pending, mined and confirmed
+   * Removed transcation from queuing, pending, mined and confirmed
    * @param hash transaction hash
    */
   public remove(hash: string): void {
     log('Removing transaction %s', hash)
     this.payloads.delete(hash)
+    this.queuing.delete(hash)
     this.pending.delete(hash)
     this.mined.delete(hash)
     this.confirmed.delete(hash)
