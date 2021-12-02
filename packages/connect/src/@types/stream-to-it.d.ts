@@ -3,10 +3,12 @@ declare module 'stream-to-it' {
   type Writable = import('stream').Writable
   type Duplex = import('stream').Duplex
 
-  export function sink<T>(stream: Writable): (source: AsyncGenerator<T, T | void>) => Promise<void>
-  export function source<T>(stream: Readable): AsyncGenerator<T, T | void>
+  type SourceType<T> = AsyncIterable<T> | Iterable<T>
+
+  export function sink<T>(stream: Writable): (source: SourceType<T>) => Promise<void>
+  export function source<T>(stream: Readable): SourceType<T>
   export function duplex<T>(stream: Duplex): {
-    sink: (stream: AsyncGenerator<T, void>) => Promise<void>
-    source: AsyncGenerator<T, void>
+    sink: (source: SourceType<T>) => Promise<void>
+    source: SourceType<T>
   }
 }

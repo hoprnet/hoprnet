@@ -48,11 +48,13 @@ export interface PublicNodesEmitter {
 
 export type StreamType = Buffer | BL | Uint8Array
 
+type SourceType<T> = AsyncIterable<T> | Iterable<T>
+
 export type Stream<T = StreamType> = {
-  sink: (source: Stream['source']) => Promise<void>
-  source: AsyncGenerator<T, void>
+  sink: (source: SourceType<T>) => Promise<void>
+  source: SourceType<T>
 }
 
-export type StreamResult = Awaited<ReturnType<Stream['source']['next']>>
+export type StreamResult = IteratorResult<StreamType>
 
 export type DialOptions = { signal?: AbortSignal }

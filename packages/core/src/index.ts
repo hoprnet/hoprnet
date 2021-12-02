@@ -498,7 +498,16 @@ class Hopr extends EventEmitter {
       return addrs.filter((ma) => !ma.toString().includes('127.0.0.1')) // TODO - proper filtering
     }
 
-    return (await this.libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
+    let dhtResult: Awaited<ReturnType<LibP2P['peerRouting']['findPeer']>>
+
+    try {
+      dhtResult = await this.libp2p.peerRouting.findPeer(peer)
+    } catch (err) {
+      log(`Cannot find any announced addresses for peer ${peer.toB58String()} in the DHT.`)
+      return []
+    }
+
+    return dhtResult.multiaddrs
   }
 
   /**
@@ -908,15 +917,25 @@ class Hopr extends EventEmitter {
     return ethereum.getPublicKey().toAddress()
   }
 
+  /**
+   * Withdraw on-chain assets to a given address
+   * @param currency either native currency or HOPR tokens
+   * @param recipient the account where the assets should be transferred to
+   * @param amount how many tokens to be transferred
+   * @returns
+   */
   public async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     const ethereum = await this.startedPaymentChannels()
 
+    let result: string
     try {
-      return await ethereum.withdraw(currency, recipient, amount)
+      result = await ethereum.withdraw(currency, recipient, amount)
     } catch (err) {
       await this.isOutOfFunds(err)
       throw new Error(`Failed to withdraw: ${err}`)
     }
+
+    return result
   }
 
   /**

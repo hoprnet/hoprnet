@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { debug } from '@hoprnet/hopr-utils'
+import { debug, retryWithBackoff } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -21,12 +21,13 @@ import {
 import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } from './types'
 import { isConfirmedBlock, snapshotComparator } from './utils'
-import { utils } from 'ethers'
-import { INDEXER_TIMEOUT } from '../constants'
+import { errors, utils } from 'ethers'
+import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
 const ANNOUNCEMENT = 'Announcement'
+const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -86,9 +87,28 @@ class Indexer extends EventEmitter {
     this.chain.subscribeBlock((b) => {
       this.onNewBlock(b)
     })
+
     this.chain.subscribeError((error: any) => {
       log(chalk.red(`etherjs error: ${error}`))
-      this.restart()
+      // if provider connection issue
+      if (
+        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET'].some((err) => [error?.code, String(error)].includes(err))
+      ) {
+        log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
+        if (this.chain.getAllQueuingTransactionRequests().length > 0) {
+          const wallet = this.chain.getWallet()
+          retryWithBackoff(
+            () =>
+              Promise.allSettled([
+                ...this.chain.getAllQueuingTransactionRequests().map((request) => wallet.sendTransaction(request)),
+                this.restart()
+              ]),
+            backoffOption
+          )
+        }
+      } else {
+        retryWithBackoff(() => this.restart(), backoffOption)
+      }
     })
 
     this.chain.subscribeChannelEvents((e) => {
@@ -144,8 +164,8 @@ class Indexer extends EventEmitter {
     } catch (err) {
       this.status = 'stopped'
       this.emit('status', 'stopped')
-
       log(chalk.red('Failed to restart: %s', err.message))
+      throw err
     }
   }
 
