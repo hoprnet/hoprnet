@@ -1,16 +1,16 @@
 \subsection{Availability Measurement}
 \label{sec:p2p:availability}
 
-When learning about a new node, it remains unclear to the initiator of the connection whether this node is available or not. Since nodes might temporariliy or permanently leave the network, this also applies to already known nodes. Sending a mixnet packet requires a randomly sampled path through the network, it becomes necessary to estimate a nodes' availability and to provide a list of nodes the are expected to be online. Note that nodes cannot ping nodes just before they use them as a relay node because this would reveal the chosen path, hence nodes need to continuously and independently grow about the availability of other nodes.
+When learning about a new node, it remains unclear to the initiator of the connection whether this node is available or not. Since nodes might temporariliy or permanently leave the network, this also applies to already known nodes. Sending a mixnet packet requires a randomly sampled path through the network, it becomes necessary to estimate a nodes' availability and to provide a list of nodes the are expected to be online. Note that nodes cannot ping nodes just before they use them as a relay node because this would reveal the chosen path, hence nodes need to continuously and independently grow their view of availability of other nodes.
 
-Within the HOPR network, this achieved by using a heartbeat mechanism that combines active request and passive listening. A node is considered online if it replied to a \textit{PING} attempt with a correct \textit{PONG} response or if the has recently received a \textit{PING} attempt by that specific node.
+Within the HOPR network, this is achieved by using a heartbeat mechanism that continuously sends ping requests to other nodes. A node is considered online if it replied to a \textit{PING} attempt with a correct \textit{PONG} response or if the node has recently received a \textit{PING} request by that node.
 
-Each node counts successful and unsuccessful \textit{PING} attempts and creates a health for other nodes. To prevent from continuously probing offline nodes, the heartbeat mechanism increases the probing interval using an exponential backoff.
+Each node counts successful and unsuccessful \textit{PING} attempts and uses this information to create a health score for other nodes. To prevent from continuously probing offline nodes, the heartbeat mechanism increases the probing interval in case the node was not reachable.
 
-\subsection{Ping mechanism}
+\subsubsection{Ping mechanism}
 \label{sec:p2p:ping-mechanism}
 
-Pinging a node means sampling a random 16 byte string $r$ and asking the counterparty to return $response = SHA256(r)$. If the received response does not match the expected value, the response is considered invalid since the response might stem from a previous attempt.
+Pinging a node means sampling a random 16 byte string $r$ and asking the counterparty to return $response = SHA256(r)$. If the received response does not match the expected value, the response is considered invalid since it might stem from a previous attempt.
 
 \subsubsection{Health Score}
 \label{sec:p2p:health-score}
