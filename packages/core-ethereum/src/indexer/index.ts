@@ -473,6 +473,26 @@ class Indexer extends EventEmitter {
       }, INDEXER_TIMEOUT)
     })
   }
+
+  public createListener(eventType: IndexerEvents, tx: string): () => void {
+    const listener = (txHash: string[]) => {
+      const indexed = txHash.find((emitted) => emitted === tx)
+      if (indexed) {
+        clearTimeout(timeoutObj)
+        this.removeListener(eventType, listener)
+        log('listener %s on %s is removed', eventType, tx)
+      }
+    }
+    this.addListener(eventType, listener)
+    log('listener %s on %s is added', eventType, tx)
+
+    const timeoutObj = setTimeout(() => {
+      this.removeListener(eventType, listener)
+      log('listener %s on %s timed out and thus removed', eventType, tx)
+    }, INDEXER_TIMEOUT)
+
+    return () => this.removeListener(eventType, listener);
+  }
 }
 
 export default Indexer
