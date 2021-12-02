@@ -491,7 +491,7 @@ class Indexer extends EventEmitter {
       log('listener %s on %s timed out and thus removed', eventType, tx)
     }, INDEXER_TIMEOUT)
 
-    return () => this.removeListener(eventType, listener);
+    return () => this.removeListener(eventType, listener)
   }
 }
 
