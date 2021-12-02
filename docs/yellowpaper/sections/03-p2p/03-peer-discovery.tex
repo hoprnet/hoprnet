@@ -7,6 +7,6 @@ In addition, each node announces itself within the smart contract such that othe
 
 Apart from the altruistic benefit to the network if announcing as an entry node, it is expected that the announcement does not immediately lead to payout. But since \lcnameref{sec:path-selection} is based on availability, it becomes clear that nodes announce themselves on-chain and also have a good availability are chosen more likely as a relayer since they are well-known which thus increases their rewards.
 
-Announcing on a public blockchain comes with the property that a potentail adversary who attempts to run an eclipse attack against a newly connected node also needs to provide a sound and fake blockchain which is assumed to be hard. Hence, the attacker is unable to withhold entry nodes but nevertheless, but it is able to spam the victim with connection information about collaborating nodes.
+Announcing on a public blockchain comes with the property that a potential adversary who attempts to run an eclipse attack against a newly connected node also needs to provide a sound and fake blockchain which is assumed to be hard. Hence, the attacker is unable to withhold entry nodes but nevertheless, but it is able to spam the victim with connection information about collaborating nodes.
 
 Once nodes have established a connection to at least one of the entry nodes, they grow an understanding about those nodes who have not published a routable on-chain by using a DHT. Thereby, they also learn about relay addresses and use them to establish direct connections.
