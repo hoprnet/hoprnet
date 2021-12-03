@@ -195,11 +195,11 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 function addUnhandledPromiseRejectionHandler() {
-    require('trace-unhandled/register')
-    setLogger(msg => {
+  require('trace-unhandled/register')
+  setLogger(msg => {
         console.error( msg );
         process.exit(1);
-    })
+  })
 }
 
 async function main() {
