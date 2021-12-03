@@ -1,10 +1,21 @@
-<a name="1.81"></a>
+<a name="1.85"></a>
 
 ## Next
 
+---
+
+<a name="1.84"></a>
+
+## [1.84](https://github.com/hoprnet/hoprnet/compare/release/tuttlingen...hoprnet:release/prague) (2021-12-03)
+
+
 ### Changes
 
-- add better handler for unhandled Promise rejections ([#3037](https://github.com/hoprnet/hoprnet/pull/3037))
+- Add better handler for unhandled Promise rejections ([#3037](https://github.com/hoprnet/hoprnet/pull/3037))
+- Multiple bug fixes preventing crashes.
+- `randomInteger` function is now cryptographically safe
+- ECDSA signatures now use a more compact representation (64 instead 65 bytes)
+- Initial commitment seed is derived using node key and channel information
 
 ---
 
