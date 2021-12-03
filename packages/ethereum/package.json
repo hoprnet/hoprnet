@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.84.0-next.36",
+  "version": "1.84.0-next.39",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -45,7 +45,7 @@
     "chai": "4.3.4",
     "dotenv": "10.0.0",
     "ethereum-waffle": "3.4.0",
-    "ethers": "5.5.1",
+    "ethers": "5.5.2",
     "hardhat": "2.7.0",
     "hardhat-deploy": "0.9.14",
     "hardhat-gas-reporter": "1.0.6",
