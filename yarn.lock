@@ -1397,6 +1397,7 @@ __metadata:
     strip-ansi: 6.0.1
     swagger-ui-express: ^4.2.0
     tiny-hashes: ^1.0.1
+    trace-unhandled: 2.0.1
     ts-node: 10.4.0
     typedoc: 0.22.10
     typedoc-plugin-markdown: 3.11.7
@@ -9114,6 +9115,16 @@ __metadata:
   version: 2.3.0
   resolution: "hashlru@npm:2.3.0"
   checksum: 38b3559e6fb9d19fa731edc52d8d7e72cd378f708dcb01cecd4a6ba0c52f06d7d06d6277249f5c43d9915d8dda9be31adad768a379eef188db213c3f2b09278d
+  languageName: node
+  linkType: hard
+
+"haxec@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "haxec@npm:2.0.1"
+  dependencies:
+    foreground-child: ^2.0.0
+    spawn-wrap: ^2.0.0
+  checksum: 64ceb5d9c526d5f2134a74a653b6d3a93cbd197cda48313a0c9060e996e1e63ce95ba65d9eed78bcad75126ddae4850c29fdedc591b744c9e8c65f95b4e9dc2e
   languageName: node
   linkType: hard
 
@@ -17341,6 +17352,17 @@ __metadata:
   version: 0.0.3
   resolution: "tr46@npm:0.0.3"
   checksum: 726321c5eaf41b5002e17ffbd1fb7245999a073e8979085dacd47c4b4e8068ff5777142fc6726d6ca1fd2ff16921b48788b87225cbc57c72636f6efa8efbffe3
+  languageName: node
+  linkType: hard
+
+"trace-unhandled@npm:2.0.1":
+  version: 2.0.1
+  resolution: "trace-unhandled@npm:2.0.1"
+  dependencies:
+    haxec: ^2.0.1
+  bin:
+    trace-unhandled: bin.js
+  checksum: f33cb0fffa5204ca47b23a67b31d3c14e62daf1ce70f36f3be6db6253e6faf029f1f2720738310366de4a2188d6b8dd35ae841c7f5bb6f7d2bed6529814d9a20
   languageName: node
   linkType: hard
 

@@ -17,6 +17,7 @@ import { LogStream } from './logs'
 import { getIdentity } from './identity'
 
 import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import { setLogger } from 'trace-unhandled'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -195,8 +196,9 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 function addUnhandledPromiseRejectionHandler() {
-  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+  require('trace-unhandled/register')
+  setLogger((msg) => {
+    console.error(msg)
     process.exit(1)
   })
 }
