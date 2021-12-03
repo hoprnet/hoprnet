@@ -32,7 +32,6 @@
     "bn.js": "5.2.0",
     "express": "^4.17.1",
     "peer-id": "0.16.0",
-    "restana": "4.9.2",
     "yargs": "17.2.1"
   },
   "devDependencies": {
