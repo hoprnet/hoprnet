@@ -1164,7 +1164,7 @@ __metadata:
     it-pair: 1.0.0
     it-pipe: 1.1.0
     it-pushable: 1.4.2
-    libp2p: "robertkiel/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
+    libp2p: "hoprnet/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.4
     mocha: 9.1.3
@@ -1231,7 +1231,7 @@ __metadata:
     heap-js: ^2.1.6
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: "robertkiel/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
+    libp2p: "hoprnet/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
     libp2p-kad-dht: 0.27.1
     libp2p-mplex: 0.10.4
     libp2p-tcp: 0.17.2
@@ -1334,7 +1334,7 @@ __metadata:
     jsonschema: ^1.4.0
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: "robertkiel/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
+    libp2p: "hoprnet/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
     libp2p-crypto: 0.21.0
     libp2p-kad-dht: 0.27.1
     libp2p-mplex: 0.10.4
@@ -11476,9 +11476,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p@robertkiel/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad":
+"libp2p@hoprnet/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad":
   version: 0.35.0
-  resolution: "libp2p@https://github.com/robertkiel/js-libp2p.git#commit=bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
+  resolution: "libp2p@https://github.com/hoprnet/js-libp2p.git#commit=bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
   dependencies:
     "@motrix/nat-api": ^0.3.1
     "@vascosantos/moving-average": ^1.1.0
