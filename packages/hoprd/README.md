@@ -2,6 +2,13 @@
 
 Runs a HOPR Node and the HOPR Admin interface.
 
+When the Rest API is enabled, the node serves a Swagger UI to inspect and test
+the Rest API v2 at:
+
+http://localhost:3001/api/v2/_swagger
+
+NOTE: Hostname and port can be different, since they depend on the settings `--restHost` and `--restPort`.
+
 ## Usage
 
 ```

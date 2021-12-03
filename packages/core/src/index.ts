@@ -153,7 +153,6 @@ class Hopr extends EventEmitter {
     }
     this.environment = options.environment
     log(`using environment: ${this.environment.id}`)
-    log(`chain instance:`, this.chain)
     this.indexer = this.chain.indexer // TODO temporary
   }
 
