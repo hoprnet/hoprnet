@@ -1,12 +1,13 @@
 import express from 'express'
 import bodyParser from 'body-parser'
 
+import type { Application } from 'express'
 import type Hopr from '@hoprnet/hopr-core'
 
 import type { LogStream } from './../logs'
 import { Commands } from './../commands'
 
-export default function setupApiV1(service: Application, path: string, node: Hopr, logs: LogStream, options: any) {
+export default function setupApiV1(service: Application, urlPath: string, node: Hopr, logs: LogStream, options: any) {
   const router = express.Router()
 
   router.use(bodyParser.text({ type: '*/*' }))
@@ -41,5 +42,5 @@ export default function setupApiV1(service: Application, path: string, node: Hop
     res.send(response)
   })
 
-  service.use(path, router)
+  service.use(urlPath, router)
 }

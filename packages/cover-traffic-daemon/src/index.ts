@@ -83,10 +83,6 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }
 
-  if (argv.healthCheckHost != null) {
-    setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
-  }
-
   const selfPub = PublicKey.fromPeerId(peerId)
   const selfAddr = selfPub.toAddress()
   const data = new PersistedState(update, argv.dbFile)
@@ -110,6 +106,11 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
 
   log('waiting for node to be funded')
   await node.waitForFunds()
+
+  if (argv.healthCheckHost) {
+    setupHealthcheck(node, argv.healthCheckHost, argv.healthCheckPort)
+  }
+
   log('starting node ...')
   await node.start()
   log('node is running')
