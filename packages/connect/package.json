@@ -55,7 +55,7 @@
     "it-pair": "1.0.0",
     "it-pipe": "1.1.0",
     "it-pushable": "1.4.2",
-    "libp2p": "patch:libp2p@^0.35.0#../../patches/libp2p-0.35.0.patch",
+    "libp2p": "robertkiel/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad",
     "libp2p-interfaces": "2.0.0",
     "libp2p-mplex": "0.10.4",
     "mocha": "9.1.3",
