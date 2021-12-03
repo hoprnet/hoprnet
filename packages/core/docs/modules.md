@@ -42,6 +42,8 @@
 - [PACKET\_SIZE](modules.md#packet_size)
 - [PATH\_RANDOMNESS](modules.md#path_randomness)
 - [VERSION](modules.md#version)
+- [libp2pMock](modules.md#libp2pmock)
+- [sampleOptions](modules.md#sampleoptions)
 
 ### Functions
 
@@ -104,7 +106,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L102)
+[packages/core/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L97)
 
 ___
 
@@ -151,7 +153,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L117)
+[packages/core/src/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L112)
 
 ___
 
@@ -161,7 +163,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:104](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L104)
+[packages/core/src/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L99)
 
 ## Variables
 
@@ -333,6 +335,26 @@ ___
 
 [packages/core/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L8)
 
+___
+
+### libp2pMock
+
+• **libp2pMock**: `Libp2p` = `libp2p`
+
+#### Defined in
+
+[packages/core/src/libp2p.mock.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L46)
+
+___
+
+### sampleOptions
+
+• **sampleOptions**: [`HoprOptions`](classes/HoprOptions.md)
+
+#### Defined in
+
+[packages/core/src/index.mock.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.mock.ts#L3)
+
 ## Functions
 
 ### createHoprNode
@@ -352,7 +374,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L16)
+[packages/core/src/main.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L92)
 
 ___
 

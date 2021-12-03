@@ -1,7 +1,9 @@
 declare module 'it-handshake' {
+  type SourceType<T> = AsyncIterable<T> | Iterable<T>
+
   type Stream<T> = {
-    sink: (source: Stream<T>['source']) => Promise<void>
-    source: AsyncGenerator<T, void>
+    sink: (source: SourceType<T>) => Promise<void>
+    source: SourceType<T>
   }
 
   export type Handshake<T> = {

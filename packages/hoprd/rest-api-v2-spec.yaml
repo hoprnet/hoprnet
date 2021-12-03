@@ -1,0 +1,51 @@
+# spec: https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
+openapi: 3.0.3
+servers:
+  - url: /api/v2
+info:
+  description: |-
+    This Rest API enables developers to interact with a hoprd node programatically.
+  version: 2.0.0
+  title: HOPRd Rest API v2
+  contact:
+    email: tech@hoprnet.org
+  license:
+    name: GPL-3.0
+    url: 'https://github.com/hoprnet/hoprnet/blob/master/LICENSE'
+tags:
+  - name: nodeinfo
+    description: Information about the specific node instance
+
+# paths are defined at compile-time by the OpenAPI middleware
+paths: {}
+
+externalDocs:
+  description: Find out more about HOPR and HOPRd
+  url: 'http://docs.hoprnet.org'
+components:
+  schemas:
+    Address:
+      type: object
+      properties:
+        nativeAddress:
+          type: string
+          description: Blockchain-native account address
+        hoprAddress:
+          type: string
+          description: HOPR account address, also called PeerId
+      required:
+        - nativeAddress
+        - hoprAddress
+      example:
+        nativeAddress: '0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a'
+        hoprAddress: '16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar'
+    Version:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Node version
+      required:
+        - version
+      example:
+        version: '1.83.5'

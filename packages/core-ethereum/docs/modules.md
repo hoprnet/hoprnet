@@ -6,6 +6,7 @@
 
 ### Classes
 
+- [ChannelCommitmentInfo](classes/ChannelCommitmentInfo.md)
 - [ChannelEntry](classes/ChannelEntry.md)
 - [Indexer](classes/Indexer.md)
 - [default](classes/default.md)
@@ -18,6 +19,7 @@
 
 - [CONFIRMATIONS](modules.md#confirmations)
 - [INDEXER\_BLOCK\_RANGE](modules.md#indexer_block_range)
+- [chainMock](modules.md#chainmock)
 
 ### Functions
 
@@ -34,7 +36,7 @@
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L28)
+[packages/core-ethereum/src/index.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L29)
 
 ## Variables
 
@@ -55,6 +57,16 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L8)
+
+___
+
+### chainMock
+
+• **chainMock**: [`default`](classes/default.md)
+
+#### Defined in
+
+[packages/core-ethereum/src/index.mock.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.mock.ts#L12)
 
 ## Functions
 
@@ -81,7 +93,7 @@ ___
 
 ### createChainWrapper
 
-▸ **createChainWrapper**(`networkInfo`, `privateKey`, `checkDuplicate?`): `Promise`<{ `announce`: (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> ; `finalizeChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `fundChannel`: (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> ; `getBalance`: (`address`: `Address`) => `Promise`<`Balance`\> ; `getChannels`: () => `HoprChannels` ; `getGenesisBlock`: () => `number` ; `getInfo`: () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } ; `getLatestBlockNumber`: () => `Promise`<`number`\> ; `getNativeBalance`: (`address`: `Address`) => `Promise`<`NativeBalance`\> ; `getNativeTokenTransactionInBlock`: (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> ; `getPrivateKey`: () => `Uint8Array` ; `getPublicKey`: () => `PublicKey` ; `getWallet`: () => `Wallet` ; `initiateChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `openChannel`: (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<`string`\> ; `redeemTicket`: (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> ; `setCommitment`: (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> ; `subscribeBlock`: (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` ; `subscribeChannelEvents`: (`cb`: `any`) => `HoprChannels` ; `subscribeError`: (`cb`: `any`) => `void` ; `subscribeTokenEvents`: (`cb`: `any`) => `HoprToken` ; `unsubscribe`: () => `void` ; `updateConfirmedTransaction`: (`hash`: `string`) => `void` ; `waitUntilReady`: () => `Promise`<`Network`\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\>  }\>
+▸ **createChainWrapper**(`networkInfo`, `privateKey`, `checkDuplicate?`): `Promise`<{ `announce`: (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> ; `finalizeChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `fundChannel`: (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> ; `getAllQueuingTransactionRequests`: () => `TransactionRequest`[] ; `getBalance`: (`address`: `Address`) => `Promise`<`Balance`\> ; `getChannels`: () => `HoprChannels` ; `getGenesisBlock`: () => `number` ; `getInfo`: () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } ; `getLatestBlockNumber`: () => `Promise`<`number`\> ; `getNativeBalance`: (`address`: `Address`) => `Promise`<`NativeBalance`\> ; `getNativeTokenTransactionInBlock`: (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> ; `getPrivateKey`: () => `Uint8Array` ; `getPublicKey`: () => `PublicKey` ; `getWallet`: () => `Wallet` ; `initiateChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `openChannel`: (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<`string`\> ; `redeemTicket`: (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> ; `setCommitment`: (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> ; `subscribeBlock`: (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` ; `subscribeChannelEvents`: (`cb`: `any`) => `HoprChannels` ; `subscribeError`: (`cb`: `any`) => `void` ; `subscribeTokenEvents`: (`cb`: `any`) => `HoprToken` ; `unsubscribe`: () => `void` ; `updateConfirmedTransaction`: (`hash`: `string`) => `void` ; `waitUntilReady`: () => `Promise`<`Network`\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\>  }\>
 
 #### Parameters
 
@@ -98,7 +110,7 @@ ___
 
 #### Returns
 
-`Promise`<{ `announce`: (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> ; `finalizeChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `fundChannel`: (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> ; `getBalance`: (`address`: `Address`) => `Promise`<`Balance`\> ; `getChannels`: () => `HoprChannels` ; `getGenesisBlock`: () => `number` ; `getInfo`: () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } ; `getLatestBlockNumber`: () => `Promise`<`number`\> ; `getNativeBalance`: (`address`: `Address`) => `Promise`<`NativeBalance`\> ; `getNativeTokenTransactionInBlock`: (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> ; `getPrivateKey`: () => `Uint8Array` ; `getPublicKey`: () => `PublicKey` ; `getWallet`: () => `Wallet` ; `initiateChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `openChannel`: (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<`string`\> ; `redeemTicket`: (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> ; `setCommitment`: (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> ; `subscribeBlock`: (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` ; `subscribeChannelEvents`: (`cb`: `any`) => `HoprChannels` ; `subscribeError`: (`cb`: `any`) => `void` ; `subscribeTokenEvents`: (`cb`: `any`) => `HoprToken` ; `unsubscribe`: () => `void` ; `updateConfirmedTransaction`: (`hash`: `string`) => `void` ; `waitUntilReady`: () => `Promise`<`Network`\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\>  }\>
+`Promise`<{ `announce`: (`multiaddr`: `Multiaddr`) => `Promise`<`string`\> ; `finalizeChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `fundChannel`: (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<`string`\> ; `getAllQueuingTransactionRequests`: () => `TransactionRequest`[] ; `getBalance`: (`address`: `Address`) => `Promise`<`Balance`\> ; `getChannels`: () => `HoprChannels` ; `getGenesisBlock`: () => `number` ; `getInfo`: () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } ; `getLatestBlockNumber`: () => `Promise`<`number`\> ; `getNativeBalance`: (`address`: `Address`) => `Promise`<`NativeBalance`\> ; `getNativeTokenTransactionInBlock`: (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> ; `getPrivateKey`: () => `Uint8Array` ; `getPublicKey`: () => `PublicKey` ; `getWallet`: () => `Wallet` ; `initiateChannelClosure`: (`counterparty`: `Address`) => `Promise`<`string`\> ; `openChannel`: (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<`string`\> ; `redeemTicket`: (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<`string`\> ; `setCommitment`: (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<`string`\> ; `subscribeBlock`: (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` ; `subscribeChannelEvents`: (`cb`: `any`) => `HoprChannels` ; `subscribeError`: (`cb`: `any`) => `void` ; `subscribeTokenEvents`: (`cb`: `any`) => `HoprToken` ; `unsubscribe`: () => `void` ; `updateConfirmedTransaction`: (`hash`: `string`) => `void` ; `waitUntilReady`: () => `Promise`<`Network`\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<`string`\>  }\>
 
 #### Defined in
 
@@ -129,14 +141,15 @@ ___
 
 ### initializeCommitment
 
-▸ **initializeCommitment**(`db`, `channelId`, `getChainCommitment`, `setChainCommitment`): `Promise`<`void`\>
+▸ **initializeCommitment**(`db`, `peerId`, `channelInfo`, `getChainCommitment`, `setChainCommitment`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `db` | `HoprDB` |
-| `channelId` | `Hash` |
+| `peerId` | `PeerId` |
+| `channelInfo` | [`ChannelCommitmentInfo`](classes/ChannelCommitmentInfo.md) |
 | `getChainCommitment` | `GetCommitment` |
 | `setChainCommitment` | `SetCommitment` |
 
@@ -146,4 +159,4 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/commitment.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L60)
+[packages/core-ethereum/src/commitment.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/commitment.ts#L102)

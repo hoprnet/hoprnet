@@ -10,12 +10,14 @@ import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments } from 
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 
 import setupAPI from './api'
+import setupHealthcheck from './healthcheck'
 import { AdminServer } from './admin'
 import { Commands } from './commands'
 import { LogStream } from './logs'
 import { getIdentity } from './identity'
 
 import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import { setLogger } from 'trace-unhandled'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -194,8 +196,9 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 function addUnhandledPromiseRejectionHandler() {
-  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+  require('trace-unhandled/register')
+  setLogger((msg) => {
+    console.error(msg)
     process.exit(1)
   })
 }
@@ -287,18 +290,7 @@ async function main() {
     }
 
     if (argv.healthCheck) {
-      const http = require('http')
-      const service = require('restana')()
-      service.get('/healthcheck/v1/version', (_, res) => res.send(node.getVersion()))
-      const hostname = argv.healthCheckHost
-      const port = argv.healthCheckPort
-      const server = http.createServer(service).on('error', (err) => {
-        throw err
-      })
-      server.listen(port, hostname, (err) => {
-        if (err) throw err
-        logs.log(`Healthcheck server on ${hostname} listening on port ${port}`)
-      })
+      setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
     }
 
     logs.log(`Node address: ${node.getId().toB58String()}`)
@@ -306,7 +298,7 @@ async function main() {
     const ethAddr = (await node.getEthereumAddress()).toHex()
     const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
-    logs.log(`Node is not started, please fund this node ${ethAddr} with atleast ${fundsReq}`)
+    logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
 
     // 2.5 Await funding of wallet.
     await node.waitForFunds()

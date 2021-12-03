@@ -397,6 +397,9 @@ describe('webrtc connection - stream error propagation', function () {
       fakedWebRTCInstance
     )
 
-    await assert.rejects(conn.source.next(), Error(errorInSource))
+    await assert.rejects(
+      (conn.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next(),
+      Error(errorInSource)
+    )
   })
 })

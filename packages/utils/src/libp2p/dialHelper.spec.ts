@@ -95,7 +95,8 @@ describe('test dialHelper', function () {
     await peerA.stop()
   })
 
-  it('regular dial with DHT', async function () {
+  // Temporarily disabled
+  it.skip('regular dial with DHT', async function () {
     this.timeout(10e3)
     const peerA = await getNode(Alice, true)
     const peerB = await getNode(Bob, true)
