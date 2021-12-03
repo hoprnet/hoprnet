@@ -1232,7 +1232,7 @@ __metadata:
     leveldown: 6.1.0
     levelup: 5.1.1
     libp2p: "robertkiel/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
-    libp2p-kad-dht: 0.27.1
+    libp2p-kad-dht: 0.27.2
     libp2p-mplex: 0.10.4
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
@@ -1336,7 +1336,7 @@ __metadata:
     levelup: 5.1.1
     libp2p: "robertkiel/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
     libp2p-crypto: 0.21.0
-    libp2p-kad-dht: 0.27.1
+    libp2p-kad-dht: 0.27.2
     libp2p-mplex: 0.10.4
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
@@ -11376,9 +11376,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-kad-dht@npm:0.27.1":
-  version: 0.27.1
-  resolution: "libp2p-kad-dht@npm:0.27.1"
+"libp2p-kad-dht@npm:0.27.2":
+  version: 0.27.2
+  resolution: "libp2p-kad-dht@npm:0.27.2"
   dependencies:
     any-signal: ^2.1.2
     datastore-core: ^6.0.7
@@ -11413,7 +11413,7 @@ __metadata:
     timeout-abort-controller: ^2.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: 21661b9ee281bfb30c45bb31547337a7aa8a60aa34a2ad3a23303e0ba950ad210ea3a9703193e190dc2200ff0c5161342e760b52642e7d73269c54c0e12ded07
+  checksum: 5571fffba5ea0da3b3d6fc695fdc29f921ea29fccc566d44a091a14d7b0dc0bef44949a48a7ca7eb47a2f04f940d25ff5b7a518df76cdbf23afc123f24e9af77
   languageName: node
   linkType: hard
 
