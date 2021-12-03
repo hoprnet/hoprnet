@@ -1174,7 +1174,7 @@ __metadata:
     it-pair: 1.0.0
     it-pipe: 1.1.0
     it-pushable: 1.4.2
-    libp2p: 0.35.0
+    libp2p: "github:robertkiel/js-libp2p"
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.4
     mocha: 9.1.3
@@ -1241,7 +1241,7 @@ __metadata:
     heap-js: ^2.1.6
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.35.0
+    libp2p: "github:robertkiel/js-libp2p"
     libp2p-kad-dht: 0.27.1
     libp2p-mplex: 0.10.4
     libp2p-tcp: 0.17.2
@@ -1343,7 +1343,7 @@ __metadata:
     jsonschema: ^1.4.0
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.35.0
+    libp2p: "github:robertkiel/js-libp2p"
     libp2p-crypto: 0.21.0
     libp2p-kad-dht: 0.27.1
     libp2p-mplex: 0.10.4
@@ -11316,9 +11316,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.35.0":
+"libp2p@github:robertkiel/js-libp2p":
   version: 0.35.0
-  resolution: "libp2p@npm:0.35.0"
+  resolution: "libp2p@https://github.com/robertkiel/js-libp2p.git#commit=0bfefbdf25800e62b0d13177a55373896ca00b50"
   dependencies:
     "@motrix/nat-api": ^0.3.1
     "@vascosantos/moving-average": ^1.1.0
@@ -11371,7 +11371,7 @@ __metadata:
     varint: ^6.0.0
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: fdedd9fa45d0ec28e77109b64187dd0b768a07dc389b0b09365c30e3a37f25475456a20b551383249e26308e5b8deb4bbc6fcd1bcbf34737ccedf4c646a9cc35
+  checksum: 5d62fc831115de5e5c9ec9b498aecb906a2020a16bfc32cdd3555cc670eebd65c6eae100932e9eb50a560b202335c58385c30c5521970ec0ae529cd647af9b94
   languageName: node
   linkType: hard
 
