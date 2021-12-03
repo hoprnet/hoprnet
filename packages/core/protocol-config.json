@@ -38,6 +38,13 @@
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
       "tags": ["production"]
+    },
+    "prague": {
+      "network_id": "xdai",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "",
+      "channels_contract_address": "",
+      "tags": ["production"]
     }
   },
   "networks": {
