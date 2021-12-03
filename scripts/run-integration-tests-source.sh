@@ -252,8 +252,11 @@ rm -Rfv \
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat --show-stack-traces > \
+HOPR_ENVIRONMENT_ID="hardhat-localhost" \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat node \
+  --network hardhat \
+  --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
@@ -298,7 +301,9 @@ log "CT node1 address: ${ct_node1_address}"
 log "Funding nodes"
 
 #  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --identity-prefix "${node_prefix}" \
   --identity-directory "${tmp}" \
   --use-local-identities \

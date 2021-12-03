@@ -20,7 +20,6 @@
     "coverage": "nyc --reporter=html mocha",
     "build": "yarn clean && tsc -p .",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
-    "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -50,7 +49,7 @@
   },
   "devDependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
-    "@types/chai-as-promised": "7.1.4",
+    "@types/mocha": "9.0.0",
     "chai": "4.3.4",
     "chai-as-promised": "7.1.1",
     "libp2p-tcp": "0.17.2",
