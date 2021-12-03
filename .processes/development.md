@@ -287,6 +287,7 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 - All PR‘s must pass all status checks/tests before merging.
 - Releases can be merged back to `master`, but not always necessary.
 - When in conflict, chat and engage with the team.
+- When creating a PR, also update the changelog with a one liner high level summary.
 
 ### Workflow
 
