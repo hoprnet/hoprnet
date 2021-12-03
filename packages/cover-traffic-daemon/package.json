@@ -9,7 +9,7 @@
   "main": "lib/index.js",
   "bin": "lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "coverage": "nyc --reporter=html mocha",
     "dev": "yarn clean && tsc -w",

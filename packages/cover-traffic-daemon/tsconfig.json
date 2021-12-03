@@ -1,10 +1,11 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "lib",
-    "rootDir": "src"
+    "outDir": "./lib",
+    "rootDir": "./src"
   },
-  "include": ["src/**/*.ts", "../core/src/index.mock.ts", "../core/src/libp2p.mock.ts"],
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",
