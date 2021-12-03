@@ -228,7 +228,7 @@ yarn build    # Builds contracts, clients, etc
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network
 
 # workaround for a temp issue with local hardhat-network
-cp -R packages/ethereum/deployments/hardhat-localhost/localhost packages/ethereum/deployments/hardhat-localhost/hardhat
+cp -R packages/ethereum/deployments/hardhat-localhost/localhost/* packages/ethereum/deployments/hardhat-localhost/hardhat
 
 # running normal node alice (separate terminal)
 DEBUG="hopr*" yarn run:hoprd:alice --environment hardhat-localhost
