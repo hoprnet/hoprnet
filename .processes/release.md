@@ -144,37 +144,46 @@ particular branch to deploy on every change.
 
 ```
 
-1. On new release, there will be a code-freeze on `master` by creating a `release/**` branch
-   tracking `master`. Release specific changes will be done in this branch to trigger
-   this particular release, which requires to insert name and release version of the new milestone
-   in the files:
-
-   - create new environment in `scripts/environment.sh`
-   - update image to point to `latest-<release>` in `packages/avado/Dockerfile`
-   - update image to point to new version in `packages/avado/docker-compose.yml`
-   - add an entry to `CHANGELOG.md`
-   - add any chain specific changes
-
-2. The information about the release, how to test and what commands to run, are
-   then shared within our `#release` channel. On the `#testing` channel, members are expected
-   to run their own nodes (either AVADO or via their workstation) to participate in the release.
-
-3. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
+1. Create a release tracking issue on Github. Use previous issues as templates: https://github.com/hoprnet/hoprnet/issues/3044
+1. (on `master`) As a preparation for a release there should be a respective entry in `packages/hoprs/releases.json` and if needed in `packages/core/protocol-config.json`. If the entries are missing, create and merge them before starting the actual release process. This step can be done way in advance to plan environments and releases, too.
+2. (on `master`) Now create the release branch locally. E.g. doing `git checkout -b release/${RELEASE_NAME}`.
+3. (on `release/${RELEASE_NAME}`) Before pushing the branch to Github, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
+3.1. Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
+3.2. Change use of `master-goerli` in `packages/avado/Dockerfile` to the new release name. Changes should be committed locally. 
+3.3. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
+3.4. Copy contract deployment files from the old release. This can be done doing
+  ```
+  mkdir -p packages/ethereum/deployments/${RELEASE_NAME}/xdai
+  cp packages/ethereum/deployments/${OLD_RELEASE_NAME}/xdai/* packages/ethereum/deployments/${RELEASE_NAME}/xdai/
+  rm packages/ethereum/deployments/${RELEASE_NAME}/xdai/HoprChannels.json
+  ```
+  
+  NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
+  
+  Changes should be committed locally.
+4. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
+5. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
+6. (on `release/${RELEASE_NAME}`) Start a topology cluster using the script mentioned at the end of this document.
+7. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
+   You may use previous testnet pages as templates. Ensure all started nodes are documented.
+8. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
+   On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
+9. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
    Each of these merges will trigger a new release version, and re-build our infrastructure
-   for that version. Upon successfullly testing a release, the release branch may be merged back into
-   `master` by following these steps:
+   for that version. Upon successfullly testing a release
+10. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See the next section for details.
 
-- locally create a merge-back branch based on the release branch
-- merge the latest `master` branch into the merge-back branch, in case of conflicts changes
-  from `master` have preference
-- revert changes in `packages/avado/Dockerfile`
-- revert changes in `packages/avado/docker-compose.yml`
-- revert any chain specific changes
-- bump the package versions to the next preminor version:
-  `yarn workspaces foreach -piv --no-private --topological-dev exec -- npm version preminor --preid=next`
-- revert changes made to Avado configuration files as part of the initial release creation
-  a new release version, and re-build our infrastructure for that version. Upon successfullly
-  testing a release, merge it back to trigger a new pre-release version via our actions.
+Once the release testing has concluded, or if any signifant amount of patches were applied to the release branch, the release branch should be merged back into `master` again.
+   
+#### Release merge-back
+
+1. (on `release/${RELEASE_NAME}`) Create a PR branch off of the release branch: `git checkout -b merge-back-release-${RELEASE_NAME}`
+2. (on `merge-back-release-${RELEASE_NAME}`) Merge `master` into the branch: `git merge master`.
+   For an example of a merge-back, take a look at older releases: https://github.com/hoprnet/hoprnet/pull/2956
+   In case of conflicts (which is expected) changes from `master` have preference in the following cases:
+2.1. Revert changes in `packages/avado/docker-compose.yml`
+2.2. Revert any chain specific changes.
+2.3. Revert changes made to Avado configuration files as part of the initial release creation.
 
 ### Actions
 
