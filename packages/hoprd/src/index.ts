@@ -194,7 +194,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 function addUnhandledPromiseRejectionHandler() {
-    require('trace-unhandled/register')
+  require('trace-unhandled/register')
 }
 
 async function main() {
