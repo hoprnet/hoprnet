@@ -14,7 +14,6 @@ import { AdminServer } from './admin'
 import { Commands } from './commands'
 import { LogStream } from './logs'
 import { getIdentity } from './identity'
-import { NODE_ENV } from './env'
 
 import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
@@ -195,14 +194,7 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 function addUnhandledPromiseRejectionHandler() {
-  if (NODE_ENV === 'development') {
     require('trace-unhandled/register')
-  } else {
-    process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-      console.error('Unhandled Rejection at:', promise, 'reason:', reason)
-      process.exit(1)
-    })
-  }
 }
 
 async function main() {

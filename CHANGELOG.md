@@ -2,7 +2,8 @@
 
 ## Next
 
-None
+### Changes
+- add better handler for unhandled Promise rejections ([#3037](https://github.com/hoprnet/hoprnet/pull/3037))
 
 ---
 
