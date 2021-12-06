@@ -1,7 +1,17 @@
 import EventEmitter from 'events'
 import { providers as Providers, Wallet, BigNumber } from 'ethers'
 import type { HoprChannels, HoprToken } from '@hoprnet/hopr-ethereum'
-import { Address, ChannelEntry, Hash, HoprDB, generateChannelId, NativeBalance, SUGGESTED_NATIVE_BALANCE, debug, AccountEntry } from '@hoprnet/hopr-utils'
+import {
+  Address,
+  ChannelEntry,
+  Hash,
+  HoprDB,
+  generateChannelId,
+  NativeBalance,
+  SUGGESTED_NATIVE_BALANCE,
+  debug,
+  AccountEntry
+} from '@hoprnet/hopr-utils'
 
 import Indexer from '.'
 import type { ChainWrapper } from '../ethereum'
@@ -10,7 +20,6 @@ import * as fixtures from './fixtures'
 import { PARTY_A, PARTY_B } from '../fixtures'
 import { Multiaddr } from 'multiaddr'
 import BN from 'bn.js'
-
 
 //@TODO: Refactor this logger and mock outside of indexer
 const chainLogger = debug(`hopr:mocks:indexer-chain`)
@@ -151,7 +160,7 @@ const createChainMock = (
       hoprChannels.on('error', cb)
     },
     subscribeChannelEvents: (cb) => hoprChannels.on('*', cb),
-    start: () => { },
+    start: () => {},
     waitForPublicNodes: () => {
       chainLogger('On-chain request for existing public nodes.')
       return Promise.resolve([])
@@ -168,7 +177,7 @@ const createChainMock = (
     },
     subscribeTokenEvents: (cb) => hoprToken.on('*', cb),
     getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => [],
-    updateConfirmedTransaction: (_hash: string) => { },
+    updateConfirmedTransaction: (_hash: string) => {},
     unsubscribe: () => {
       provider.removeAllListeners()
       hoprChannels.removeAllListeners()
@@ -178,7 +187,13 @@ const createChainMock = (
     getWallet: () => account ?? fixtures.ACCOUNT_A,
     getAccount: () => {
       chainLogger('getAccount method was called')
-      return Promise.resolve(new AccountEntry(fixtures.PARTY_A.toAddress(), new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toB58String()}`), new BN('1')))
+      return Promise.resolve(
+        new AccountEntry(
+          fixtures.PARTY_A.toAddress(),
+          new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toB58String()}`),
+          new BN('1')
+        )
+      )
     },
     getPublicKey: () => fixtures.PARTY_A,
     setCommitment: (counterparty: Address, commitment: Hash) =>

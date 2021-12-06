@@ -8,7 +8,6 @@ import { PARTY_A, PARTY_B } from '../fixtures'
 import type { Event } from './types'
 import { useFixtures } from './index.mock'
 
-
 describe('test indexer', function () {
   it('should start indexer', async function () {
     const { indexer, chain } = await useFixtures()

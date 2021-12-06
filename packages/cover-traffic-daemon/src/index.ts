@@ -5,7 +5,15 @@ import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
 import { createHoprNode } from '@hoprnet/hopr-core'
-import { ChannelEntry, privKeyToPeerId, PublicKey, debug, resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-utils'
+import {
+  ChannelEntry,
+  privKeyToPeerId,
+  PublicKey,
+  debug,
+  resolveEnvironment,
+  supportedEnvironments,
+  ResolvedEnvironment
+} from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
