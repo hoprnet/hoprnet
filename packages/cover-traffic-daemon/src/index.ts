@@ -9,12 +9,11 @@ import { ChannelEntry, privKeyToPeerId, PublicKey, debug, resolveEnvironment, su
 
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
+import setupHealthcheck from './healthcheck'
 
 import type PeerId from 'peer-id'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type { PeerData, State } from './state'
-import http from 'http'
-import restana from 'restana'
 
 const log = debug('hopr:cover-traffic')
 
@@ -84,20 +83,6 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }
 
-  if (argv.healthCheckHost != null) {
-    const service = restana()
-    service.get('/healthcheck/v1/version', (_, res) => res.send(`CT node: ${node.getVersion()}`))
-    const hostname = argv.healthCheckHost
-    const port = argv.healthCheckPort
-    const server = http.createServer(service as any).on('error', (err) => {
-      throw err
-    })
-    server.listen(port, hostname, (err?: Error) => {
-      if (err) throw err
-      log(`Healthcheck server on ${hostname} listening on port ${port}`)
-    })
-  }
-
   const selfPub = PublicKey.fromPeerId(peerId)
   const selfAddr = selfPub.toAddress()
   const data = new PersistedState(update, argv.dbFile)
@@ -121,6 +106,11 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
 
   log('waiting for node to be funded')
   await node.waitForFunds()
+
+  if (argv.healthCheckHost) {
+    setupHealthcheck(node, argv.healthCheckHost, argv.healthCheckPort)
+  }
+
   log('starting node ...')
   await node.start()
   log('node is running')
