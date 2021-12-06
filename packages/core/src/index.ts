@@ -55,7 +55,7 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
 import { retryWithBackoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
-import type { ResolvedEnvironment } from './environment'
+import type { ResolvedEnvironment } from '@hoprnet/hopr-utils'
 import { createLibp2pInstance } from './main'
 
 const log = debug(`hopr-core`)
@@ -91,7 +91,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) {}
+  ) { }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -188,20 +188,24 @@ class Hopr extends EventEmitter {
   public async start() {
     this.status = 'INITIALIZING'
     log('Starting hopr node...')
-    const balance = await this.getNativeBalance()
+    verbose('Chain', this.chain)
+    // @TODO: Rename this.chain -> paymentChannels to avoid confusion.
+    const balance = await this.chain.getNativeBalance(false)
     verbose('Retrieve node balance', balance.toBN().lte(MIN_NATIVE_BALANCE), MIN_NATIVE_BALANCE)
+
     if (!balance || balance.toBN().lte(MIN_NATIVE_BALANCE)) {
       throw new Error('Cannot start node without a funded wallet')
     }
-
-    const chain = await this.startedPaymentChannels()
+    log('Node has enough to get started, continuing starting payment channels')
+    verbose('Starting HoprEthereum, which will trigger the indexer')
+    await this.chain.start()
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
 
-    const initialNodes = await chain.waitForPublicNodes()
+    const initialNodes = await this.chain.waitForPublicNodes()
 
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
-    chain.on('peer', pushToRecentlyAnnouncedNodes)
+    this.chain.on('peer', pushToRecentlyAnnouncedNodes)
 
     const libp2p = await createLibp2pInstance(this.id, this.options, initialNodes, this.publicNodesEmitter)
 
@@ -209,9 +213,9 @@ class Hopr extends EventEmitter {
     log('libp2p started')
     this.libp2p = libp2p
 
-    chain.indexer.on('peer', this.onPeerAnnouncement.bind(this))
-    chain.indexer.off('peer', pushToRecentlyAnnouncedNodes)
-    chain.indexer.on('channel-waiting-for-commitment', (c: ChannelEntry) => this.onChannelWaitingForCommitment(c))
+    this.chain.indexer.on('peer', this.onPeerAnnouncement.bind(this))
+    this.chain.indexer.off('peer', pushToRecentlyAnnouncedNodes)
+    this.chain.indexer.on('channel-waiting-for-commitment', (c: ChannelEntry) => this.onChannelWaitingForCommitment(c))
 
     recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
 
@@ -248,8 +252,6 @@ class Hopr extends EventEmitter {
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id)
 
-    const ethereum = await this.startedPaymentChannels()
-
     const protocolMsg = `hopr/${this.environment.id}/msg`
     const protocolAck = `hopr/${this.environment.id}/ack`
 
@@ -260,13 +262,13 @@ class Hopr extends EventEmitter {
       (ackChallenge: HalfKeyChallenge) => {
         this.emit('message-acknowledged:' + ackChallenge.toHex())
       },
-      (ack: AcknowledgedTicket) => ethereum.emit('ticket:win', ack),
+      (ack: AcknowledgedTicket) => this.chain.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => {},
+      () => { },
       protocolAck
     )
 
-    ethereum.on('ticket:win', (ack) => {
+    this.chain.on('ticket:win', (ack) => {
       this.onWinningTicket(ack)
     })
 
@@ -681,8 +683,6 @@ class Hopr extends EventEmitter {
    * @returns Promise that resolves once announce transaction has been published
    */
   private async announce(includeRouting = false): Promise<void> {
-    const chain = await this.startedPaymentChannels()
-
     let isRoutableAddress = false
     let addrToAnnounce: Multiaddr
 
@@ -707,7 +707,7 @@ class Hopr extends EventEmitter {
     }
 
     // Check if there was a previous annoucement from us
-    const ownAccount = await chain.getAccount(await this.getEthereumAddress())
+    const ownAccount = await this.chain.getAccount(await this.getEthereumAddress())
 
     // Do not announce if our last is equal to what we intend to announce
     if (ownAccount?.multiAddr?.equals(addrToAnnounce)) {
@@ -718,7 +718,7 @@ class Hopr extends EventEmitter {
     try {
       log(`announcing ${includeRouting && isRoutableAddress ? 'with' : 'without'} routing`)
 
-      await chain.announce(addrToAnnounce)
+      await this.chain.announce(addrToAnnounce)
     } catch (err) {
       log('announce failed')
       await this.isOutOfFunds(err)
@@ -913,8 +913,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getEthereumAddress(): Promise<Address> {
-    const ethereum = await this.startedPaymentChannels()
-    return ethereum.getPublicKey().toAddress()
+    return this.chain.getPublicKey().toAddress()
   }
 
   /**
@@ -1005,7 +1004,5 @@ export * from './constants'
 export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
-export type { ProtocolConfig, Network, ResolvedEnvironment } from './environment'
-export { resolveEnvironment, supportedEnvironments } from './environment'
 export { libp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'

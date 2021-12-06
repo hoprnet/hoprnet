@@ -6,8 +6,8 @@ import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
-import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
+import { NativeBalance, SUGGESTED_NATIVE_BALANCE, resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-utils'
 
 import setupAPI from './api'
 import { AdminServer } from './admin'
@@ -15,7 +15,7 @@ import { Commands } from './commands'
 import { LogStream } from './logs'
 import { getIdentity } from './identity'
 
-import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import type { HoprOptions } from '@hoprnet/hopr-core'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 

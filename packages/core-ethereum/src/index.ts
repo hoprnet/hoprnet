@@ -1,6 +1,6 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import type { ChainWrapper } from './ethereum'
+import { ChainWrapper, ChainWrapperSingleton } from './ethereum'
 import chalk from 'chalk'
 import { debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import {
@@ -23,25 +23,28 @@ import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
 import { chainMock } from './index.mock'
+import { useFixtures } from './indexer/index.mock'
 
 const log = debug('hopr-core-ethereum')
 
 export type RedeemTicketResponse =
   | {
-      status: 'SUCCESS'
-      receipt: string
-      ackTicket: AcknowledgedTicket
-    }
+    status: 'SUCCESS'
+    receipt: string
+    ackTicket: AcknowledgedTicket
+  }
   | {
-      status: 'FAILURE'
-      message: string
-    }
+    status: 'FAILURE'
+    message: string
+  }
   | {
-      status: 'ERROR'
-      error: Error | string
-    }
+    status: 'ERROR'
+    error: Error | string
+  }
 
+export type ChainStatus = 'UNINITIALIZED' | 'CREATING' | 'CREATED' | 'STARTING' | 'STOPPED'
 export default class HoprEthereum extends EventEmitter {
+  public status: ChainStatus = 'UNINITIALIZED'
   public indexer: Indexer
   private chain: ChainWrapper
   private started: Promise<HoprEthereum> | undefined
@@ -52,7 +55,7 @@ export default class HoprEthereum extends EventEmitter {
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
-    private options?: {
+    private options: {
       provider: string
       maxConfirmations?: number
       chainId: number
@@ -68,6 +71,12 @@ export default class HoprEthereum extends EventEmitter {
       this.options?.maxConfirmations ?? CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )
+    this.status = 'CREATING'
+    ChainWrapperSingleton.create(this.options, this.privateKey)
+      .then((chain: ChainWrapper) => {
+        this.status = 'CREATED'
+        this.chain = chain
+      })
   }
 
   async start(): Promise<HoprEthereum> {
@@ -76,7 +85,6 @@ export default class HoprEthereum extends EventEmitter {
     }
 
     const _start = async (): Promise<HoprEthereum> => {
-      this.chain = await createChainWrapper(this.options, this.privateKey)
       await this.chain.waitUntilReady()
       await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
@@ -87,6 +95,10 @@ export default class HoprEthereum extends EventEmitter {
     }
     this.started = _start()
     return this.started
+  }
+
+  public getChain(): ChainWrapper {
+    return this.chain;
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -306,7 +318,7 @@ export default class HoprEthereum extends EventEmitter {
     let c: ChannelEntry
     try {
       c = await this.db.getChannelTo(dest)
-    } catch {}
+    } catch { }
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }
@@ -341,5 +353,6 @@ export {
   findCommitmentPreImage,
   bumpCommitment,
   INDEXER_BLOCK_RANGE,
-  CONFIRMATIONS
+  CONFIRMATIONS,
+  useFixtures
 }

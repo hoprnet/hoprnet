@@ -1,5 +1,5 @@
 import { debug, HoprDB } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { useFixtures } from '@hoprnet/hopr-core-ethereum'
 import { expect } from 'chai'
 import PeerId from 'peer-id'
 import sinon from 'sinon'
@@ -13,19 +13,21 @@ describe('hopr core (instance)', async function () {
     peerId = await PeerId.create({ keyType: 'secp256k1', bits: 256 })
     options = { environment: { id: '1' } } as unknown as HoprOptions
     db = sinon.createStubInstance(HoprDB)
-    chain = sinon.createStubInstance(HoprCoreEthereum)
+    chain = (await useFixtures()).chain
   })
 
   afterEach(function () {
     sinon.restore()
   })
 
-  it('should be able to create a hopr node instance without crashing', async function () {
-    expect(() => {
+  it('should be able to start a hopr node instance without crashing', async function () {
+    expect(async () => {
       log('Creating hopr node...')
       const node = new Hopr(peerId, db, chain, options)
       log('Node created with Id', node.getId().toB58String())
-      expect(node instanceof Hopr)
+      expect(node instanceof Hopr, 'and have the right instance')
+      log('Starting node')
+      await node.start()
     }).to.not.throw()
   })
 })
