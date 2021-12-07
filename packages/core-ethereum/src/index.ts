@@ -24,6 +24,7 @@ import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
 import { chainMock } from './index.mock'
 import { useFixtures } from './indexer/index.mock'
+import { sampleChainOptions } from './ethereum.mock'
 
 const log = debug('hopr-core-ethereum')
 
@@ -354,5 +355,6 @@ export {
   bumpCommitment,
   INDEXER_BLOCK_RANGE,
   CONFIRMATIONS,
-  useFixtures
+  useFixtures,
+  sampleChainOptions
 }

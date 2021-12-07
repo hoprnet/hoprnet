@@ -7,7 +7,7 @@ import Indexer from '.'
 import type { ChainWrapper } from '../ethereum'
 import type { Event, TokenEvent } from './types'
 import * as fixtures from './fixtures'
-import { PARTY_A, PARTY_B } from '../fixtures'
+import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures'
 import { Multiaddr } from 'multiaddr'
 import BN from 'bn.js'
 
@@ -212,3 +212,5 @@ export const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?
     )
   }
 }
+
+export { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR }
