@@ -25,8 +25,6 @@ const abiCoder = new utils.AbiCoder()
 export type Receipt = string
 export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
-
-
 export async function createChainWrapper(
   networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
   privateKey: Uint8Array,

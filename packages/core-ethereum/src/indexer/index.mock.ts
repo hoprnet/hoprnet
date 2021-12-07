@@ -160,7 +160,7 @@ const createChainMock = (
       hoprChannels.on('error', cb)
     },
     subscribeChannelEvents: (cb) => hoprChannels.on('*', cb),
-    start: () => { },
+    start: () => {},
     waitUntilReady: () => {
       chainLogger('Await on chain readyness')
       return Promise.resolve()
@@ -185,7 +185,7 @@ const createChainMock = (
     },
     subscribeTokenEvents: (cb) => hoprToken.on('*', cb),
     getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => [],
-    updateConfirmedTransaction: (_hash: string) => { },
+    updateConfirmedTransaction: (_hash: string) => {},
     unsubscribe: () => {
       provider.removeAllListeners()
       hoprChannels.removeAllListeners()
