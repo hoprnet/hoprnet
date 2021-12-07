@@ -1231,7 +1231,7 @@ __metadata:
     leveldown: 6.1.0
     levelup: 5.1.1
     libp2p: "hoprnet/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
-    libp2p-kad-dht: 0.27.2
+    libp2p-kad-dht: 0.27.3
     libp2p-mplex: 0.10.5
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
@@ -1335,7 +1335,7 @@ __metadata:
     levelup: 5.1.1
     libp2p: "hoprnet/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad"
     libp2p-crypto: 0.21.0
-    libp2p-kad-dht: 0.27.2
+    libp2p-kad-dht: 0.27.3
     libp2p-mplex: 0.10.5
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
@@ -11330,9 +11330,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-kad-dht@npm:0.27.2":
-  version: 0.27.2
-  resolution: "libp2p-kad-dht@npm:0.27.2"
+"libp2p-kad-dht@npm:0.27.3":
+  version: 0.27.3
+  resolution: "libp2p-kad-dht@npm:0.27.3"
   dependencies:
     any-signal: ^2.1.2
     datastore-core: ^6.0.7
@@ -11367,7 +11367,7 @@ __metadata:
     timeout-abort-controller: ^2.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: 5571fffba5ea0da3b3d6fc695fdc29f921ea29fccc566d44a091a14d7b0dc0bef44949a48a7ca7eb47a2f04f940d25ff5b7a518df76cdbf23afc123f24e9af77
+  checksum: 96d3dd07922e5e5f2223922e7a7d66fb0556ae1eba1584661d4dd982cef92d90245e4d3c1302f8efb1db6105fc8fec75307da359081c8e350a7108cff3b8b99b
   languageName: node
   linkType: hard
 
