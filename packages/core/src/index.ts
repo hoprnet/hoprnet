@@ -91,7 +91,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) {}
+  ) { }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -187,7 +187,6 @@ class Hopr extends EventEmitter {
   public async start() {
     this.status = 'INITIALIZING'
     log('Starting hopr node...')
-    verbose('Chain', this.chain)
     // @TODO: Rename this.chain -> paymentChannels to avoid confusion.
     const balance = await this.chain.getNativeBalance(false)
     verbose('Retrieve node balance', balance.toBN().lte(MIN_NATIVE_BALANCE), MIN_NATIVE_BALANCE)
@@ -263,7 +262,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => this.chain.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => {},
+      () => { },
       protocolAck
     )
 

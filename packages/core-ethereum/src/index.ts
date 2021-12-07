@@ -1,6 +1,6 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import { ChainWrapper, ChainWrapperSingleton } from './ethereum'
+import { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import { debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import {
@@ -25,23 +25,24 @@ import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCo
 import { chainMock } from './index.mock'
 import { useFixtures } from './indexer/index.mock'
 import { sampleChainOptions } from './ethereum.mock'
+import ChainWrapperSingleton from './chain'
 
 const log = debug('hopr-core-ethereum')
 
 export type RedeemTicketResponse =
   | {
-      status: 'SUCCESS'
-      receipt: string
-      ackTicket: AcknowledgedTicket
-    }
+    status: 'SUCCESS'
+    receipt: string
+    ackTicket: AcknowledgedTicket
+  }
   | {
-      status: 'FAILURE'
-      message: string
-    }
+    status: 'FAILURE'
+    message: string
+  }
   | {
-      status: 'ERROR'
-      error: Error | string
-    }
+    status: 'ERROR'
+    error: Error | string
+  }
 
 export type ChainStatus = 'UNINITIALIZED' | 'CREATING' | 'CREATED' | 'STARTING' | 'STOPPED'
 export default class HoprEthereum extends EventEmitter {
@@ -63,7 +64,7 @@ export default class HoprEthereum extends EventEmitter {
       gasPrice?: number
       network: string
       environment: string
-    }
+    },
   ) {
     super()
     this.indexer = new Indexer(
@@ -73,7 +74,9 @@ export default class HoprEthereum extends EventEmitter {
       INDEXER_BLOCK_RANGE
     )
     this.status = 'CREATING'
+    log('Ready to call singleton wrapper', ChainWrapperSingleton)
     ChainWrapperSingleton.create(this.options, this.privateKey).then((chain: ChainWrapper) => {
+      log('Chain instance created or passed via singleton')
       this.status = 'CREATED'
       this.chain = chain
     })
@@ -318,7 +321,7 @@ export default class HoprEthereum extends EventEmitter {
     let c: ChannelEntry
     try {
       c = await this.db.getChannelTo(dest)
-    } catch {}
+    } catch { }
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }
@@ -347,6 +350,7 @@ export {
   ChannelEntry,
   ChannelCommitmentInfo,
   Indexer,
+  ChainWrapperSingleton,
   chainMock,
   createChainWrapper,
   initializeCommitment,

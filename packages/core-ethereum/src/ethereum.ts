@@ -19,27 +19,13 @@ import TransactionManager, { TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants'
 
-const log = debug('hopr:core-ethereum:chain-operations')
+const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
 
 export type Receipt = string
 export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
-export class ChainWrapperSingleton {
-  private static instance: ChainWrapper
-  private constructor() {}
-  public static async create(
-    networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
-    privateKey: Uint8Array,
-    checkDuplicate: Boolean = true
-  ): Promise<ChainWrapper> {
-    log('Receiving create request for hopr-ethereum with `networkInfo`', networkInfo)
-    if (!ChainWrapperSingleton.instance) {
-      ChainWrapperSingleton.instance = await createChainWrapper(networkInfo, privateKey, checkDuplicate)
-    }
-    return ChainWrapperSingleton.instance
-  }
-}
+
 
 export async function createChainWrapper(
   networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
@@ -49,6 +35,7 @@ export async function createChainWrapper(
   const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
+  log('Provider obtained from options', provider)
   const wallet = new Wallet(privateKey).connect(provider)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()
