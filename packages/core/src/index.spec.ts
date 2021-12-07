@@ -14,7 +14,7 @@ describe('hopr core (instance)', async function () {
   let peerId: PeerId, db: HoprDB, connector: HoprEthereum, options: HoprOptions
   beforeEach(async function () {
     log('Before each hook starting by setting up chain fixture')
-    const { chain } = (await useFixtures())
+    const { chain } = await useFixtures()
     log('ChainWrapper obtained from fixtures')
     sinon.stub(ChainWrapperSingleton, 'create').callsFake(() => {
       log('chainwrapper singleton stub started')
