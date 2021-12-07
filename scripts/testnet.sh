@@ -49,10 +49,11 @@ fund_if_empty() {
   local environment="${2}"
 
   # start funding in parallel
-  PRIVATE_KEY="${FUNDING_PRIV_KEY}" ${mydir}/fund-address.ts \
+  # we need to use yarn explicitely to ensure packages can be resolved properly
+  PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
 	  --environment ${environment} --address ${address} --target ${min_funds} &
 
-  PRIVATE_KEY="${FUNDING_PRIV_KEY}" ${mydir}/fund-address.ts \
+  PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
 	  --environment ${environment} --address ${address} --target ${min_funds_hopr} --erc20 &
 
   # wait until both funding procedures have completed
