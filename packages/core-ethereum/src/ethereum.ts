@@ -102,12 +102,12 @@ export async function createChainWrapper(
    * @param rest contract arguments
    * @returns Promise of a ContractTransaction
    */
-  async function sendTransaction<T extends BaseContract>(
+  async function sendTransaction<Contract extends BaseContract>(
     checkDuplicate: Boolean,
-    contract: T,
-    method: keyof T['functions'],
-    ...rest: Parameters<T['functions'][keyof T['functions']]>
-  ): Promise<Partial<ContractTransaction>> {
+    contract: Contract,
+    method: keyof Contract['functions'],
+    ...rest: Parameters<Contract['functions'][keyof Contract['functions']]>
+  ): Promise<Partial<ContractTransaction> | undefined> {
     const gasLimit = 400e3
     const gasPrice = networkInfo.gasPrice ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
@@ -127,7 +127,8 @@ export async function createChainWrapper(
     const tx = await contract.populateTransaction[method as string](...rest)
     const populatedTx = await wallet.populateTransaction({ ...tx, gasLimit, gasPrice, nonce })
     const essentialTxPayload: TransactionPayload = {
-      to: populatedTx.to,
+      // address of the contract
+      to: populatedTx.to as string,
       data: populatedTx.data as string,
       value: BigNumber.from(populatedTx.value ?? 0)
     }
@@ -188,7 +189,9 @@ export async function createChainWrapper(
 
         // if this hash is already known and we already have it included in
         // pending we can safely ignore this
-        if (isAlreadyKnownErr && transactions.pending.has(transaction.hash)) return
+        if (isAlreadyKnownErr && transactions.pending.has(transaction.hash)) {
+          return undefined
+        }
 
         // this transaction was not confirmed so we just remove it
         transactions.remove(transaction.hash)
@@ -200,19 +203,21 @@ export async function createChainWrapper(
     return transaction
   }
 
-  async function announce(multiaddr: Multiaddr): Promise<string> {
+  async function announce(multiaddr: Multiaddr): Promise<string | undefined> {
+    let confirmation: ReturnType<typeof sendTransaction>
     try {
-      const confirmation = await sendTransaction(
+      confirmation = await sendTransaction(
         checkDuplicate,
         channels,
         'announce',
         publicKey.toUncompressedPubKeyHex(),
         multiaddr.bytes
       )
-      return confirmation.hash
     } catch {
       throw new Error('Fatal error, announce transaction failed')
     }
+
+    return confirmation?.hash
   }
 
   async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -234,7 +239,11 @@ export async function createChainWrapper(
     }
 
     // withdraw HOPR
-    const transaction = await sendTransaction(checkDuplicate, token, 'transfer', recipient, amount)
+    let transaction: ReturnType<typeof sendTransaction>
+    try {
+      transaction = await sendTransaction(checkDuplicate, token, 'transfer', recipient, amount)
+    } catch (err) {}
+    const
     return transaction.hash
   }
 
