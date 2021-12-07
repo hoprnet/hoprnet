@@ -5,6 +5,53 @@ Newly connected nodes are lacking information about existing nodes in the networ
 
 In addition, each node announces itself within the smart contract such that other nodes can about the existence the newly connected node. This step is necessary for all nodes because all nodes nodes need to maintain a mapping between Ethereum addresses and public key in order to construct mixnet packets, see section \ref{sec:sphinx}, and to handle incentives for relaying packets, see \ref{sec:incentives}. HOPR thereby destinguishes two types of announcements: routable addresses of nodes who act as entry nodes and non-routable addresses that solely contain the nodes' public key.
 
+\begin{figure}[H]
+    \centering
+
+    \begin{tikzpicture}
+        \def\one{0.6}
+        \def\nodeWidth{8}
+        \def\nodeWidthMinusPadding{7.8}
+        \def\nodeHeight{\one}
+        \def\padding{0.1}
+        \def\numberOfRelays{3} % +1
+
+        % Routable address
+        \path (0,0) rectangle (\nodeWidth,\nodeHeight) node [midway,text width=\nodeWidth cm] {\strut{}Routable address};
+
+        \begin{scope}[shift={(0,-0.6)}]
+            \draw (\nodeWidth/2,\nodeHeight) -- (0,\nodeHeight) -- (0,0) -- (\nodeWidth/2-\padding,0);
+            \draw (\nodeWidth/2+\padding,\nodeHeight) -- (\nodeWidth,\nodeHeight) -- (\nodeWidth,0) -- (\nodeWidth/2,0);
+        \end{scope}
+        \path (0,0) rectangle (\nodeWidth,\nodeHeight) node [midway,text width=\nodeWidthMinusPadding cm,align=right] {\strut{}Public key};
+        \path[shift={(0,-0.6)}] (0,0) rectangle (\nodeWidth,\nodeHeight) node[midway,text width=\nodeWidthMinusPadding cm] {/ip4/1.2.3.4/tcp/9091} node[midway,text width=\nodeWidthMinusPadding cm,align=right] {/p2p/\textless{}id\textgreater{}};
+
+        \draw (\nodeWidth/2,0) -- (\nodeWidth/2-\padding,-\nodeHeight);
+        \draw (\nodeWidth/2+\padding,0) -- (\nodeWidth/2,-\nodeHeight);
+
+        % Relay addresses
+        \begin{scope}[shift={(0,-1.5)}]
+            \path (0,0) rectangle (\nodeWidth,\nodeHeight) node [midway,text width=\nodeWidth cm] {\strut{}Relay addresses};
+
+            \foreach \i in{0,...,\numberOfRelays} {
+                    \draw[shift={(0,-\one-\i*\one)}] (0,0) rectangle (\nodeWidth,\nodeHeight) node[midway,text width=\nodeWidthMinusPadding cm] {/p2p/\textless{}relay$_\i$\textgreater{}/p2p-circuit/p2p/\textless{}id\textgreater{}};
+                }
+        \end{scope}
+
+        % Direct addresses
+        \begin{scope}[shift={(0,-3.0-\one*\numberOfRelays)}]
+            \path (0,0) rectangle (\nodeWidth,\nodeHeight) node [midway,text width=\nodeWidth cm] {\strut{}Direct addresses};
+
+            \draw[shift={(0,-\one)}] (0,0) rectangle (\nodeWidth,\nodeHeight) node[midway,text width=\nodeWidthMinusPadding cm] {/ip4/192.168.0.2/tcp/9091};
+            \draw[shift={(0,-2*\one)}] (0,0) rectangle (\nodeWidth,\nodeHeight) node[midway,text width=\nodeWidthMinusPadding cm] {/ip4/127.0.0.1/tcp/9091};
+        \end{scope}
+
+        \draw[decoration={brace,raise=5pt,mirror},decorate] (0,-1.05) -- node[left=5pt] {\rotatebox{90}{\small{\shortstack{announced within\\the DHT}}}} (0,-4.2-\one*\numberOfRelays);
+
+        \draw[decoration={brace,raise=5pt},decorate] (\nodeWidth,0.6) -- node[right=5pt] {\rotatebox{90}{\small{\shortstack{announced\\on-chain}}}} (\nodeWidth,-0.6);
+    \end{tikzpicture}
+\end{figure}
+
 Apart from the altruistic benefit to the network if announcing as an entry node, it is expected that the announcement does not immediately lead to payout. But since \lcnameref{sec:path-selection} is based on availability, it becomes clear that nodes announce themselves on-chain and also have a good availability are chosen more likely as a relayer since they are well-known which thus increases their rewards.
 
 Announcing on a public blockchain comes with the property that a potential adversary who attempts to run an eclipse attack against a newly connected node also needs to provide a sound and fake blockchain which is assumed to be hard. Hence, the attacker is unable to withhold entry nodes but nevertheless, but it is able to spam the victim with connection information about collaborating nodes.
