@@ -51,7 +51,7 @@
     "@types/pino": "7.0.4",
     "bl": "5.0.0",
     "chai": "4.3.4",
-    "libp2p": "robertkiel/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad",
+    "libp2p": "hoprnet/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad",
     "libp2p-kad-dht": "0.27.2",
     "libp2p-mplex": "0.10.5",
     "libp2p-tcp": "0.17.2",
