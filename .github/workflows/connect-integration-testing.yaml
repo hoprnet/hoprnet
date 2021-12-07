@@ -3,11 +3,13 @@ name: HOPR Connect integration tests
 on:
   push:
     branches: ['**']
-    paths: 
-      - 'scripts/connect/*'
-      - 'packages/connect/**/*'
-      - '.github/workflows/connect-integration-testing.yaml'
-
+    paths-ignore: 
+      - '.processes/**/*'
+      - 'docs/**/*'
+      - 'packages/*/docs/**/*'
+      - 'packages/**/*'
+      - '!packages/connect/**/*'
+      
 jobs:
   integration-test:
     runs-on: ${{ matrix.os }}
