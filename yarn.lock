@@ -390,9 +390,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@chainsafe/libp2p-noise@npm:4.1.1, @chainsafe/libp2p-noise@npm:^4.1.1":
-  version: 4.1.1
-  resolution: "@chainsafe/libp2p-noise@npm:4.1.1"
+"@chainsafe/libp2p-noise@npm:5.0.0, @chainsafe/libp2p-noise@npm:^5.0.0":
+  version: 5.0.0
+  resolution: "@chainsafe/libp2p-noise@npm:5.0.0"
   dependencies:
     "@stablelib/chacha20poly1305": ^1.0.1
     "@stablelib/hkdf": ^1.0.1
@@ -404,11 +404,10 @@ __metadata:
     it-pair: ^1.0.0
     it-pb-rpc: ^0.1.11
     it-pipe: ^1.1.0
-    libp2p-crypto: ^0.19.7
-    peer-id: ^0.15.3
+    peer-id: ^0.16.0
     protobufjs: ^6.11.2
     uint8arrays: ^3.0.0
-  checksum: 97f3d4fe97b460129149395851c09dbbf8d8be711f889b01725ba8330c45fddb7c31e0bc930b57284bb3c7299d07e2e5c2bdf82953266964b294e03bb5545196
+  checksum: 8af67b39b9ff6741a6ebea7ed8118b3e765302324cf451ce2df033a75fb6d1e5973e01d46d2b47b4721f4ce85867dd0487c7ca05e9b2d161c8e7d6b38339e097
   languageName: node
   linkType: hard
 
@@ -1144,7 +1143,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:packages/connect"
   dependencies:
-    "@chainsafe/libp2p-noise": 4.1.1
+    "@chainsafe/libp2p-noise": 5.0.0
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/bl": 5.0.2
     "@types/chai": 4.2.22
@@ -1215,7 +1214,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-core@workspace:packages/core"
   dependencies:
-    "@chainsafe/libp2p-noise": ^4.1.1
+    "@chainsafe/libp2p-noise": ^5.0.0
     "@google-cloud/profiler": 4.1.5
     "@hoprnet/hopr-connect": "workspace:packages/connect"
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
@@ -1316,7 +1315,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-utils@workspace:packages/utils"
   dependencies:
-    "@chainsafe/libp2p-noise": 4.1.1
+    "@chainsafe/libp2p-noise": 5.0.0
     "@types/mocha": 9.0.0
     "@types/pino": 7.0.4
     abort-controller: ~3.0.0
@@ -3375,7 +3374,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"asn1.js@npm:^5.0.1, asn1.js@npm:^5.2.0":
+"asn1.js@npm:^5.2.0":
   version: 5.4.1
   resolution: "asn1.js@npm:5.4.1"
   dependencies:
@@ -10891,13 +10890,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"keypair@npm:^1.0.1, keypair@npm:^1.0.4":
-  version: 1.0.4
-  resolution: "keypair@npm:1.0.4"
-  checksum: 7c91627416ac43ce81013310cdf8a8f92b17a22b64066b21db96446da62414563783ebbfa822ead74de380ee9e7885d267f5f8c31528127ca8437ef690a5cdba
-  languageName: node
-  linkType: hard
-
 "keyv@npm:^3.0.0":
   version: 3.1.0
   resolution: "keyv@npm:3.1.0"
@@ -11303,44 +11295,6 @@ __metadata:
     protobufjs: ^6.11.2
     uint8arrays: ^3.0.0
   checksum: 8ef6258cff2ebacd11e3b64091e9e9d27e911cb8024ec8422f822ed389543c5ca21a15158d05d8bba02193ad9c81fcd58115a89769b7f8aea4f470b7872376cd
-  languageName: node
-  linkType: hard
-
-"libp2p-crypto@npm:^0.19.7":
-  version: 0.19.7
-  resolution: "libp2p-crypto@npm:0.19.7"
-  dependencies:
-    err-code: ^3.0.1
-    is-typedarray: ^1.0.0
-    iso-random-stream: ^2.0.0
-    keypair: ^1.0.1
-    multiformats: ^9.4.5
-    node-forge: ^0.10.0
-    pem-jwk: ^2.0.0
-    protobufjs: ^6.11.2
-    secp256k1: ^4.0.0
-    uint8arrays: ^3.0.0
-    ursa-optional: ^0.10.1
-  checksum: d533395309cff7ebad3584e6ea3c34f35aa7eb0eb53a8e0914005bb8b0c7cbc5d4a3ee37ac3f941d642a9ced0bc5c7fdbae6458e2b2452d35726895df93761ea
-  languageName: node
-  linkType: hard
-
-"libp2p-crypto@npm:^0.20.0":
-  version: 0.20.0
-  resolution: "libp2p-crypto@npm:0.20.0"
-  dependencies:
-    err-code: ^3.0.1
-    iso-random-stream: ^2.0.0
-    keypair: ^1.0.4
-    multiformats: ^9.4.5
-    noble-ed25519: ^1.2.6
-    noble-secp256k1: ^1.2.10
-    node-forge: ^0.10.0
-    pem-jwk: ^2.0.0
-    protobufjs: ^6.11.2
-    uint8arrays: ^3.0.0
-    ursa-optional: ^0.10.1
-  checksum: 54a0c8b530c5bd13162e1826c804367c86dd2aaf2150f80fd71ee99845a3fea1b335861bd1452b2996d87bc65f3010149532477d4c4891138f41a920018692b7
   languageName: node
   linkType: hard
 
@@ -12659,7 +12613,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nan@npm:^2.14.0, nan@npm:^2.14.2":
+"nan@npm:^2.14.0":
   version: 2.15.0
   resolution: "nan@npm:2.15.0"
   dependencies:
@@ -12908,20 +12862,6 @@ __metadata:
     just-extend: ^4.0.2
     path-to-regexp: ^1.7.0
   checksum: e3843cc125163ce99b7fb0328edf427b981be32c6c719684582cf0a46fb5206173835a9a14dedac3c4833e415ab0e0493f9f4d4163572a3a0c95db39b093166d
-  languageName: node
-  linkType: hard
-
-"noble-ed25519@npm:^1.2.6":
-  version: 1.2.6
-  resolution: "noble-ed25519@npm:1.2.6"
-  checksum: 36bd4983abca56e820a9f57e15aa0232959f7191de4675fd8212b8fa15d7d4a0bd9c5093b6131f9afa0ca5639fac96ea15659368d50970070d8b76cc28fd1aec
-  languageName: node
-  linkType: hard
-
-"noble-secp256k1@npm:^1.2.10":
-  version: 1.2.14
-  resolution: "noble-secp256k1@npm:1.2.14"
-  checksum: 5e8cfab31455d0bfd55a371b2d8e405cef1b25c92be7a0f7b559381204a85c6bd2455af5cc46d9523aaf775e6f3d30b3ce0911dfe19d8bcd5dc8f7b4afe98074
   languageName: node
   linkType: hard
 
@@ -14155,33 +14095,6 @@ __metadata:
     protobufjs: ^6.10.2
     uint8arrays: ^3.0.0
   checksum: 35dfb887c6f00789702214488e1f97dd1713ed77909b7f9be13b20003aed64cc444bf15e6bd845c01d47f424856acca7fa1f0501b785f5cb6e6707e3f05b9f41
-  languageName: node
-  linkType: hard
-
-"peer-id@npm:^0.15.3":
-  version: 0.15.4
-  resolution: "peer-id@npm:0.15.4"
-  dependencies:
-    class-is: ^1.1.0
-    libp2p-crypto: ^0.20.0
-    minimist: ^1.2.5
-    multiformats: ^9.4.5
-    protobufjs: ^6.10.2
-    uint8arrays: ^3.0.0
-  bin:
-    peer-id: src/bin.js
-  checksum: ea17967de015ffec2fe1bab21583ae3713807a7ca0752694657032dcd9693305038b185d7faa55b51f3e4b833fbd238c35ae8e1199dccff89e40a9135e7d68ad
-  languageName: node
-  linkType: hard
-
-"pem-jwk@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "pem-jwk@npm:2.0.0"
-  dependencies:
-    asn1.js: ^5.0.1
-  bin:
-    pem-jwk: ./bin/pem-jwk.js
-  checksum: 63516b8ba44989bd68d1c7f8ee97ba1d965d0b63ef560ba784f1a19f88ee1f89b4bf7fcc9e5dc8f44dd0374acf874be0bf44c8cbcfe09dac11fd21137224b16d
   languageName: node
   linkType: hard
 
@@ -15736,7 +15649,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"secp256k1@npm:^4.0.0, secp256k1@npm:^4.0.1, secp256k1@npm:^4.0.2, secp256k1@npm:~4.0.2":
+"secp256k1@npm:^4.0.1, secp256k1@npm:^4.0.2, secp256k1@npm:~4.0.2":
   version: 4.0.2
   resolution: "secp256k1@npm:4.0.2"
   dependencies:
@@ -17941,17 +17854,6 @@ __metadata:
     punycode: 1.3.2
     querystring: 0.2.0
   checksum: 50d100d3dd2d98b9fe3ada48cadb0b08aa6be6d3ac64112b867b56b19be4bfcba03c2a9a0d7922bfd7ac17d4834e88537749fe182430dfd9b68e520175900d90
-  languageName: node
-  linkType: hard
-
-"ursa-optional@npm:^0.10.1":
-  version: 0.10.2
-  resolution: "ursa-optional@npm:0.10.2"
-  dependencies:
-    bindings: ^1.5.0
-    nan: ^2.14.2
-    node-gyp: latest
-  checksum: fd7b246352750fd5032e058ab14220e389bc08bd98d72e9d9f01ac443390435ac354735fb67739d57bb505bfdaeeb2359cd7b8c5d57abc9b82b16455d1be09a3
   languageName: node
   linkType: hard
 

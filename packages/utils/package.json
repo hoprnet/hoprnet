@@ -46,7 +46,7 @@
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
-    "@chainsafe/libp2p-noise": "4.1.1",
+    "@chainsafe/libp2p-noise": "5.0.0",
     "@types/mocha": "9.0.0",
     "@types/pino": "7.0.4",
     "bl": "5.0.0",
