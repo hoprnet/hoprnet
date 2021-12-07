@@ -4,6 +4,7 @@ import express from 'express'
 import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
+import PeerId from 'peer-id'
 
 import type { Application } from 'express'
 import type Hopr from '@hoprnet/hopr-core'
@@ -38,7 +39,13 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
     // path to generated HTTP operations
     paths: path.join(relPath, 'lib/api/v2/paths'),
     // since we pass the spec directly we don't need to expose it via HTTP
-    exposeApiDocs: false
+    exposeApiDocs: false,
+    // we use custom formats for particular internal data types
+    customFormats: {
+      peerId: (input) => {
+        return !!PeerId.createFromB58String(input)
+      }
+    }
   })
 
   // hook up the Swagger UI for our API spec
