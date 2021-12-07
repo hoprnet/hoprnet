@@ -20,7 +20,7 @@ describe('hopr core (instance)', async function () {
       log('chainwrapper singleton stub started')
       return Promise.resolve(chain)
     })
-    log('ChainWrapperSingleton create stubbed', ChainWrapperSingleton.create);
+    log('ChainWrapperSingleton create stubbed', ChainWrapperSingleton.create)
     peerId = await PeerId.create({ keyType: 'secp256k1', bits: 256 })
     options = { environment: { id: '1' } } as unknown as HoprOptions
     db = sinon.createStubInstance(HoprDB)

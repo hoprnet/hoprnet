@@ -1,11 +1,11 @@
-import { ChainWrapper, createChainWrapper } from "./ethereum"
+import { ChainWrapper, createChainWrapper } from './ethereum'
 import { debug } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr:core-ethereum:chain')
 
 export default class ChainWrapperSingleton {
   private static instance: ChainWrapper
-  private constructor() { }
+  private constructor() {}
   public static async create(
     networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
     privateKey: Uint8Array,
