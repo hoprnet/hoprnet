@@ -14334,7 +14334,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier@npm:2.5.1":
+"prettier@npm:2.5.1, prettier@npm:^2.1.2":
   version: 2.5.1
   resolution: "prettier@npm:2.5.1"
   bin:
@@ -14349,15 +14349,6 @@ __metadata:
   bin:
     prettier: ./bin-prettier.js
   checksum: bc78219e0f8173a808f4c6c8e0a137dd8ebd4fbe013e63fe1a37a82b48612f17b8ae8e18a992adf802ee2cf7428f14f084e7c2846ca5759cf4013c6e54810e1f
-  languageName: node
-  linkType: hard
-
-"prettier@npm:^2.1.2":
-  version: 2.5.0
-  resolution: "prettier@npm:2.5.0"
-  bin:
-    prettier: bin-prettier.js
-  checksum: aad1b35b73e7c14596d389d90977a83dad0db689ba5802a0ef319c357b7867f55b885db197972aa6a56c30f53088c9f8e0d7f7930ae074c275a4e9cbe091d21d
   languageName: node
   linkType: hard
 
