@@ -30,18 +30,18 @@ const log = debug('hopr-core-ethereum')
 
 export type RedeemTicketResponse =
   | {
-    status: 'SUCCESS'
-    receipt: string
-    ackTicket: AcknowledgedTicket
-  }
+      status: 'SUCCESS'
+      receipt: string
+      ackTicket: AcknowledgedTicket
+    }
   | {
-    status: 'FAILURE'
-    message: string
-  }
+      status: 'FAILURE'
+      message: string
+    }
   | {
-    status: 'ERROR'
-    error: Error | string
-  }
+      status: 'ERROR'
+      error: Error | string
+    }
 
 export type ChainStatus = 'UNINITIALIZED' | 'CREATING' | 'CREATED' | 'STARTING' | 'STOPPED'
 export default class HoprEthereum extends EventEmitter {
@@ -73,11 +73,10 @@ export default class HoprEthereum extends EventEmitter {
       INDEXER_BLOCK_RANGE
     )
     this.status = 'CREATING'
-    ChainWrapperSingleton.create(this.options, this.privateKey)
-      .then((chain: ChainWrapper) => {
-        this.status = 'CREATED'
-        this.chain = chain
-      })
+    ChainWrapperSingleton.create(this.options, this.privateKey).then((chain: ChainWrapper) => {
+      this.status = 'CREATED'
+      this.chain = chain
+    })
   }
 
   async start(): Promise<HoprEthereum> {
@@ -99,7 +98,7 @@ export default class HoprEthereum extends EventEmitter {
   }
 
   public getChain(): ChainWrapper {
-    return this.chain;
+    return this.chain
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -319,7 +318,7 @@ export default class HoprEthereum extends EventEmitter {
     let c: ChannelEntry
     try {
       c = await this.db.getChannelTo(dest)
-    } catch { }
+    } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }

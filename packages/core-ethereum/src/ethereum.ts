@@ -26,8 +26,8 @@ export type Receipt = string
 export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
 export class ChainWrapperSingleton {
-  private static instance: ChainWrapper;
-  private constructor() { }
+  private static instance: ChainWrapper
+  private constructor() {}
   public static async create(
     networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
     privateKey: Uint8Array,
@@ -35,9 +35,9 @@ export class ChainWrapperSingleton {
   ): Promise<ChainWrapper> {
     log('Receiving create request for hopr-ethereum with `networkInfo`', networkInfo)
     if (!ChainWrapperSingleton.instance) {
-      ChainWrapperSingleton.instance = await createChainWrapper(networkInfo, privateKey, checkDuplicate);
+      ChainWrapperSingleton.instance = await createChainWrapper(networkInfo, privateKey, checkDuplicate)
     }
-    return ChainWrapperSingleton.instance;
+    return ChainWrapperSingleton.instance
   }
 }
 
