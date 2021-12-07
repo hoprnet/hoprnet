@@ -215,7 +215,9 @@ class Hopr extends EventEmitter {
 
     this.connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
     this.connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
-    this.connector.indexer.on('channel-waiting-for-commitment', (c: ChannelEntry) => this.onChannelWaitingForCommitment(c))
+    this.connector.indexer.on('channel-waiting-for-commitment', (c: ChannelEntry) =>
+      this.onChannelWaitingForCommitment(c)
+    )
 
     recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
 

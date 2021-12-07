@@ -17,7 +17,7 @@ describe(`HoprEthereum`, function () {
     })
     sinon.stub(Indexer, 'prototype').callsFake(() => {
       log('indexer constructor started')
-      return indexer;
+      return indexer
     })
   })
   it('should instantiate a new class w/o any issues', function () {

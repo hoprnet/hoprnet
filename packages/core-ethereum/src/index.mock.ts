@@ -13,7 +13,7 @@ const connectorLogger = debug(`hopr:mocks:connector`)
 const connectorMock = {
   start: () => {
     connectorLogger('starting connector called.')
-    return {} as unknown as HoprEthereum;
+    return {} as unknown as HoprEthereum
   },
   stop: () => {
     connectorLogger('stopping connector called.')
@@ -48,6 +48,5 @@ const connectorMock = {
     off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`)
   }
 } as unknown as HoprCoreEthereum
-
 
 export { connectorMock }

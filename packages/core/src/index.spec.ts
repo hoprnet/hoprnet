@@ -27,8 +27,6 @@ describe('hopr core (instance)', async function () {
     expect(node instanceof Hopr)
     log('Starting node')
     await node.start()
-    return expect(
-      node.stop()
-    ).to.not.eventually.rejected
+    return expect(node.stop()).to.not.eventually.rejected
   })
 })
