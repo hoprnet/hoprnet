@@ -15,7 +15,7 @@ describe('hopr core (instance)', async function () {
   beforeEach(async function () {
     sinon.stub(ChainWrapperSingleton, 'create').callsFake(async () => {
       log('chainwrapper singleton stub started')
-      const { chain } = (await useFixtures())
+      const { chain } = await useFixtures()
       return Promise.resolve(chain)
     })
     peerId = await PeerId.create({ keyType: 'secp256k1', bits: 256 })
