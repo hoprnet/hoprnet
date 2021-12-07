@@ -22,7 +22,7 @@ import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
-import { chainMock } from './index.mock'
+import { connectorMock } from './index.mock'
 import { useFixtures } from './indexer/index.mock'
 import { sampleChainOptions } from './ethereum.mock'
 import ChainWrapperSingleton from './chain'
@@ -162,7 +162,10 @@ export default class HoprEthereum extends EventEmitter {
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
-  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.publicKey.toAddress())
+  private uncachedGetNativeBalance = () => {
+    log('Chain [inside cached hopr-ethereum]', this.chain)
+    return this.chain.getNativeBalance(this.publicKey.toAddress())
+  }
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
     this.uncachedGetNativeBalance,
     PROVIDER_CACHE_TTL
@@ -351,7 +354,8 @@ export {
   ChannelCommitmentInfo,
   Indexer,
   ChainWrapperSingleton,
-  chainMock,
+  ChainWrapper,
+  connectorMock,
   createChainWrapper,
   initializeCommitment,
   findCommitmentPreImage,
