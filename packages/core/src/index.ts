@@ -57,7 +57,7 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
 import { retryWithBackoff, durations, isErrorOutOfFunds } from '@hoprnet/hopr-utils'
-import type { ResolvedEnvironment } from '@hoprnet/hopr-utils'
+import type { ResolvedEnvironment } from './environment'
 import { createLibp2pInstance } from './main'
 
 const log = debug(`hopr-core`)
@@ -93,7 +93,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) {}
+  ) { }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -266,7 +266,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => {},
+      () => { },
       protocolAck
     )
 
@@ -1001,5 +1001,6 @@ export * from './constants'
 export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
+export { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from './environment'
 export { libp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'

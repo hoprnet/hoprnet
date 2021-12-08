@@ -4,15 +4,12 @@ import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import { createHoprNode } from '@hoprnet/hopr-core'
+import { createHoprNode, resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 import {
   ChannelEntry,
   privKeyToPeerId,
   PublicKey,
   debug,
-  resolveEnvironment,
-  supportedEnvironments,
-  ResolvedEnvironment
 } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'

@@ -20,6 +20,7 @@
     "lint:fix": "prettier --write .",
     "test": "yarn workspaces foreach -pv run test",
     "test:core": "yarn workspace @hoprnet/hopr-core run test",
+    "test:connector": "yarn workspace @hoprnet/hopr-core-ethereum run test",
     "test:hoprd": "yarn workspace @hoprnet/hoprd run test",
     "test:ct": "yarn workspace @hoprnet/hopr-cover-traffic-daemon run test",
     "test:utils": "yarn workspace @hoprnet/hopr-utils run test",
