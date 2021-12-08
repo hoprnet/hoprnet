@@ -194,7 +194,11 @@ export async function createChainWrapper(
 
         // if this hash is already known and we already have it included in
         // pending we can safely ignore this
-        if (isAlreadyKnownErr && transactions.pending.has(transaction.hash)) return
+        if (isAlreadyKnownErr && transactions.pending.has(transaction.hash)) {
+          return {
+            hash: transaction.hash
+          }
+        }
 
         // this transaction was not confirmed so we just remove it
         transactions.remove(transaction.hash)
