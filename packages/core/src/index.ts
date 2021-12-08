@@ -37,7 +37,7 @@ import type {
   Hash,
   HalfKeyChallenge
 } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { ChainStatus } from '@hoprnet/hopr-core-ethereum'
 import type { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
@@ -651,6 +651,10 @@ class Hopr extends EventEmitter {
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
+  }
+
+  public getConnectorStatus(): ChainStatus {
+    return this.connector.status
   }
 
   public async periodicCheck() {

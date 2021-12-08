@@ -282,6 +282,22 @@ async function main() {
     logs.log('Creating HOPR Node')
     node = createHoprNode(peerId, options)
     logs.logStatus('PENDING')
+    logs.log(`Waiting for on-chain connector to connect to provider.`,)
+    await new Promise<void>((resolve) => {
+      let interval;
+      const fn = () => {
+        if (node.getConnectorStatus() === 'CREATED') {
+          logs.log(`Connector has been created successfully: ${node.getConnectorStatus()}`)
+          resolve()
+          clearInterval(interval)
+        } else {
+          logs.log(`Connector needs more time for creating: ${node.getConnectorStatus()}`)
+        }
+      }
+      fn()
+      interval = setInterval(fn, 2000)
+    })
+    logs.log('Connector has been loaded properly.')
     node.on('hopr:message', logMessageToNode)
 
     // 2.1 start all monitoring services
