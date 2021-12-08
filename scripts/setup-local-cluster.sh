@@ -13,14 +13,19 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="setup-local-cluster"
 source "${mydir}/utils.sh"
 
-usage() {
-  msg
-  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>]"
-  msg
-}
-
 # verify and set parameters
 declare api_token="^^LOCAL-testing-123^^"
+declare myne_chat_url="http://app.myne.chat"
+declare init_script=""
+
+usage() {
+  msg
+  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>]"
+  msg
+  msg "<api_token> is set to '${api_token}' by default"
+  msg "<myne_chat_url> is set to '${myne_chat_url}' by default"
+  msg "<init_script> is empty by default, expected to be path to a script which is called with all node API endpoints as parameters"
+}
 
 while (( "$#" )); do
   case "$1" in
@@ -31,6 +36,16 @@ while (( "$#" )); do
       ;;
     -t|--api-token)
       api_token="${2}"
+      shift
+      shift
+      ;;
+    -m|--myne-chat-url)
+      myne_chat_url="${2}"
+      shift
+      shift
+      ;;
+    -i|--init-script)
+      init_script="${2}"
       shift
       shift
       ;;
@@ -246,24 +261,35 @@ wait_for_regex ${node5_log} "STARTED NODE"
 
 log "All nodes came up online"
 
+# --- Call init script--- {{{
+if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
+  log "Calling init script ${init_script}"
+  HOPRD_API_TOKEN="${api_token}" \
+    "${init_script}" localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305
+fi
+# }}}
+
 log "Node port info"
 log "\tnode1"
-log "\t\tRest API: http://localhost:13301/api/v2/_swagger"
-log "\t\tAdmin UI: http://localhost:19501/"
-log "\t\tMyne Chat: http://app.myne.chat/?endpoint=http://${api_token}:localhost:13301"
+log "\t\tRest API:\thttp://localhost:13301/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19501/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13301&wsEndpoint=ws://${api_token}@localhost:19501"
 log "\tnode2"
-log "\t\tRest API: http://localhost:13302/api/v2/_swagger"
-log "\t\tAdmin UI: http://localhost:19502/"
-log "\t\tMyne Chat: http://app.myne.chat/?endpoint=http://${api_token}:localhost:13302"
+log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19502/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13302&wsEndpoint=ws://${api_token}@localhost:19502"
 log "\tnode3"
-log "\t\tRest API: http://localhost:13303/api/v2/_swagger"
-log "\t\tAdmin UI: http://localhost:19504/"
-log "\t\tMyne Chat: http://app.myne.chat/?endpoint=http://${api_token}:localhost:13303"
+log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19504/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13303&wsEndpoint=ws://${api_token}@localhost:19503"
 log "\tnode4"
-log "\t\tRest API: http://localhost:13304/api/v2/_swagger"
-log "\t\tAdmin UI: http://localhost:19504/"
-log "\t\tMyne Chat: http://app.myne.chat/?endpoint=http://${api_token}:localhost:13304"
+log "\t\tRest API:\thttp://localhost:13304/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19504/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13304&wsEndpoint=ws://${api_token}@localhost:19504"
 log "\tnode5"
-log "\t\tRest API: http://localhost:13305/api/v2/_swagger"
-log "\t\tAdmin UI: http://localhost:19505/"
-log "\t\tMyne Chat: http://app.myne.chat/?endpoint=http://${api_token}:localhost:13305"
+log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19505/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13305&wsEndpoint=ws://${api_token}@localhost:19505"
+
+log "Terminating this script will clean up the running local cluster"
+wait
