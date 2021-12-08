@@ -2,6 +2,9 @@
 
 ## Next
 
+### Changes
+- Update ping to use Blake2s instead of SHA256 for response computation (([#3037](https://github.com/hoprnet/hoprnet/pull/3080)))
+
 ---
 
 <a name="1.84"></a>
