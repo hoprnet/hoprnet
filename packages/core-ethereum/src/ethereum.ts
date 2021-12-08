@@ -106,7 +106,7 @@ export async function createChainWrapper(
     checkDuplicate: Boolean,
     contract: T,
     method: keyof T['functions'],
-    handleTxListener: (tx: string) => void,
+    handleTxListener: (tx: string) => Promise<string>,
     ...rest: Parameters<T['functions'][keyof T['functions']]>
   ): Promise<Partial<ContractTransaction>> {
     const gasLimit = 400e3
@@ -134,7 +134,7 @@ export async function createChainWrapper(
     }
     log('essentialTxPayload %o', essentialTxPayload)
 
-    let removeListener;
+    let listenerPromise;
     try {
       if (checkDuplicate) {
         const [checkedDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
@@ -157,13 +157,14 @@ export async function createChainWrapper(
       const initiatedHash = utils.keccak256(signedTx)
       transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
       // with let indexer to listen to the tx
-      removeListener = handleTxListener(initiatedHash)
+      listenerPromise = handleTxListener(initiatedHash).catch(err => {
+        log(`Failed to resolve indexer listener ${err}`)
+      })
       // 4. send transaction to our ethereum provider
       transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
       nonceLock.releaseLock()
-      removeListener()
       throw error
     }
 
@@ -177,7 +178,7 @@ export async function createChainWrapper(
         transactions.moveFromPendingToMined(hash)
       })
     } catch (error) {
-      removeListener()
+      log(error)
       const isRevertedErr = [error?.code, String(error)].includes(errors.CALL_EXCEPTION)
       const isAlreadyKnownErr =
         [error?.code, String(error)].includes(errors.NONCE_EXPIRED) ||
@@ -201,11 +202,11 @@ export async function createChainWrapper(
 
       throw error
     }
-
+    await listenerPromise
     return transaction
   }
 
-  async function announce(multiaddr: Multiaddr, txHandler: (tx: string) => void): Promise<string> {
+  async function announce(multiaddr: Multiaddr, txHandler: (tx: string) => Promise<string>): Promise<string> {
     try {
       const confirmation = await sendTransaction(
         checkDuplicate,
@@ -216,12 +217,13 @@ export async function createChainWrapper(
         multiaddr.bytes
       )
       return confirmation.hash
-    } catch {
+    } catch (error) {
+      log(error)
       throw new Error('Fatal error, announce transaction failed')
     }
   }
 
-  async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string, txHandler: (tx: string) => void): Promise<string> {
+  async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string, txHandler: (tx: string) => Promise<string>): Promise<string> {
     if (currency === 'NATIVE') {
       const nonceLock = await nonceTracker.getNonceLock(address)
       try {
@@ -251,7 +253,7 @@ export async function createChainWrapper(
     counterparty: Address,
     myFund: Balance,
     counterpartyFund: Balance,
-    txHandler: (tx: string) => void
+    txHandler: (tx: string) => Promise<string>
   ): Promise<Receipt> {
     const totalFund = myFund.toBN().add(counterpartyFund.toBN())
     const transaction = await sendTransaction(
@@ -275,7 +277,7 @@ export async function createChainWrapper(
     me: Address,
     counterparty: Address,
     amount: Balance,
-    txHandler: (tx: string) => void
+    txHandler: (tx: string) => Promise<string>
   ): Promise<Receipt> {
     const transaction = await sendTransaction(
       checkDuplicate,
@@ -292,13 +294,13 @@ export async function createChainWrapper(
     return transaction.hash
   }
 
-  async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address, txHandler: (tx: string) => void): Promise<Receipt> {
+  async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address, txHandler: (tx: string) => Promise<string>): Promise<Receipt> {
     const transaction = await sendTransaction(checkDuplicate, channels, 'finalizeChannelClosure', txHandler, counterparty.toHex())
     return transaction.hash
     // TODO: catch race-condition
   }
 
-  async function initiateChannelClosure(channels: HoprChannels, counterparty: Address, txHandler: (tx: string) => void): Promise<Receipt> {
+  async function initiateChannelClosure(channels: HoprChannels, counterparty: Address, txHandler: (tx: string) => Promise<string>): Promise<Receipt> {
     const transaction = await sendTransaction(checkDuplicate, channels, 'initiateChannelClosure', txHandler, counterparty.toHex())
     return transaction.hash
     // TODO: catch race-condition
@@ -309,7 +311,7 @@ export async function createChainWrapper(
     counterparty: Address,
     ackTicket: AcknowledgedTicket,
     ticket: Ticket,
-    txHandler: (tx: string) => void
+    txHandler: (tx: string) => Promise<string>
   ): Promise<Receipt> {
     const transaction = await sendTransaction(
       checkDuplicate,
@@ -328,7 +330,7 @@ export async function createChainWrapper(
     return transaction.hash
   }
 
-  async function setCommitment(channels: HoprChannels, counterparty: Address, commitment: Hash, txHandler: (tx: string) => void): Promise<Receipt> {
+  async function setCommitment(channels: HoprChannels, counterparty: Address, commitment: Hash, txHandler: (tx: string) => Promise<string>): Promise<Receipt> {
     const transaction = await sendTransaction(
       checkDuplicate,
       channels,
@@ -359,17 +361,17 @@ export async function createChainWrapper(
     getNativeTokenTransactionInBlock: (blockNumber: number, isOutgoing: boolean = true) =>
       getNativeTokenTransactionInBlock(blockNumber, isOutgoing),
     announce,
-    withdraw: (currency: 'NATIVE' | 'HOPR', recipient: string, amount: string, txHandler: (tx: string) => void) => withdraw(currency, recipient, amount, txHandler),
-    fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance, txHandler: (tx: string) => void) =>
+    withdraw: (currency: 'NATIVE' | 'HOPR', recipient: string, amount: string, txHandler: (tx: string) => Promise<string>) => withdraw(currency, recipient, amount, txHandler),
+    fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance, txHandler: (tx: string) => Promise<string>) =>
       fundChannel(token, channels, me, counterparty, myTotal, theirTotal, txHandler),
-    openChannel: (me: Address, counterparty: Address, amount: Balance, txHandler: (tx: string) => void) =>
+    openChannel: (me: Address, counterparty: Address, amount: Balance, txHandler: (tx: string) => Promise<string>) =>
       openChannel(token, channels, me, counterparty, amount, txHandler),
-    finalizeChannelClosure: (counterparty: Address, txHandler: (tx: string) => void) => finalizeChannelClosure(channels, counterparty, txHandler),
-    initiateChannelClosure: (counterparty: Address, txHandler: (tx: string) => void) => initiateChannelClosure(channels, counterparty, txHandler),
-    redeemTicket: (counterparty: Address, ackTicket: AcknowledgedTicket, ticket: Ticket, txHandler: (tx: string) => void) =>
+    finalizeChannelClosure: (counterparty: Address, txHandler: (tx: string) => Promise<string>) => finalizeChannelClosure(channels, counterparty, txHandler),
+    initiateChannelClosure: (counterparty: Address, txHandler: (tx: string) => Promise<string>) => initiateChannelClosure(channels, counterparty, txHandler),
+    redeemTicket: (counterparty: Address, ackTicket: AcknowledgedTicket, ticket: Ticket, txHandler: (tx: string) => Promise<string>) =>
       redeemTicket(channels, counterparty, ackTicket, ticket, txHandler),
     getGenesisBlock: () => genesisBlock,
-    setCommitment: (counterparty: Address, comm: Hash, txHandler: (tx: string) => void) => setCommitment(channels, counterparty, comm, txHandler),
+    setCommitment: (counterparty: Address, comm: Hash, txHandler: (tx: string) => Promise<string>) => setCommitment(channels, counterparty, comm, txHandler),
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber: async () => provider.getBlockNumber(), // TODO: use indexer when it's done syncing

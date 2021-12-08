@@ -126,7 +126,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   log('node is running')
 
   log(node.getVersion())
-  log(node.smartContractInfo())
+  log(await node.smartContractInfo())
 
   const channels = await node.getChannelsFrom(selfAddr)
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))

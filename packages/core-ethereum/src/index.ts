@@ -109,8 +109,8 @@ export default class HoprEthereum extends EventEmitter {
     return this.chain.withdraw(currency, recipient, amount, (tx: string) => this.setTxHandler(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx))
   }
 
-  public setTxHandler (evt: IndexerEvents, tx: string): () => void {
-    return this.indexer.createListener(evt, tx);
+  public setTxHandler (evt: IndexerEvents, tx: string): Promise<string>{
+    return this.indexer.resolvePendingTransaction(evt, tx);
   }
 
   public getOpenChannelsFrom(p: PublicKey) {

@@ -116,6 +116,8 @@ export class CoverTrafficStrategy extends SaneDefaults {
           // handle waiting for commitment stalls
           log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toB58String())
           toClose.push(openChannel.destination)
+        } else {
+          log('Unknown error in sending traffic')
         }
       }
     } else {
