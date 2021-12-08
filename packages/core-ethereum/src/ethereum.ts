@@ -317,7 +317,7 @@ export async function createChainWrapper(
       checkDuplicate,
       channels,
       'redeemTicket',
-      txHandler, 
+      txHandler,
       counterparty.toHex(),
       ackTicket.preImage.toHex(),
       ackTicket.ticket.epoch.serialize(),
@@ -335,7 +335,7 @@ export async function createChainWrapper(
       checkDuplicate,
       channels,
       'bumpChannel',
-      txHandler, 
+      txHandler,
       counterparty.toHex(),
       commitment.toHex()
     )
