@@ -134,18 +134,10 @@ run_command(){
   fi
 }
 
-get_eth_address(){
-  curl --silent "$1/api/v1/address/eth"
-}
-
-get_hopr_address(){
-  curl --silent "$1/api/v1/address/hopr"
-}
-
 validate_node_eth_address() {
   local ETH_ADDRESS IS_VALID_ETH_ADDRESS
 
-  ETH_ADDRESS="$(get_eth_address $1)"
+  ETH_ADDRESS="$(get_native_address $1)"
   if [ -z "$ETH_ADDRESS" ]; then
     log "could not derive ETH_ADDRESS from first parameter $1"
     exit 1

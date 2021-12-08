@@ -261,32 +261,47 @@ wait_for_regex ${node5_log} "STARTED NODE"
 
 log "All nodes came up online"
 
+declare endpoints="localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305"
+
 # --- Call init script--- {{{
 if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
   log "Calling init script ${init_script}"
   HOPRD_API_TOKEN="${api_token}" \
-    "${init_script}" localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305
+    "${init_script}" ${endpoints}
 fi
+# }}}
+
+# --- Get peer ids for reporting --- {{{
+declare -a peers
+for endpoint in ${endpoints}; do
+  declare peer="$(get_hopr_address "${endpoint}")"
+  peers+=(${peer})
+done
 # }}}
 
 log "Node port info"
 log "\tnode1"
+log "\t\tPeer Id:\t${peers[0]}"
 log "\t\tRest API:\thttp://localhost:13301/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19501/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13301&wsEndpoint=ws://${api_token}@localhost:19501"
 log "\tnode2"
+log "\t\tPeer Id:\t${peers[1]}"
 log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19502/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13302&wsEndpoint=ws://${api_token}@localhost:19502"
 log "\tnode3"
+log "\t\tPeer Id:\t${peers[2]}"
 log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19504/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13303&wsEndpoint=ws://${api_token}@localhost:19503"
 log "\tnode4"
+log "\t\tPeer Id:\t${peers[3]}"
 log "\t\tRest API:\thttp://localhost:13304/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19504/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13304&wsEndpoint=ws://${api_token}@localhost:19504"
 log "\tnode5"
+log "\t\tPeer Id:\t${peers[4]}"
 log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19505/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13305&wsEndpoint=ws://${api_token}@localhost:19505"

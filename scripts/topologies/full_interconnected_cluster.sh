@@ -80,44 +80,38 @@ run_command() {
   fi
 }
 
-get_eth_address(){
-  curl --silent "$1/api/v1/address/eth"
-}
+# $1 = endpoint
+validate_node_native_address() {
+  local native_address is_valid_native_address
+  local endpoint="${1}"
 
-get_hopr_address(){
-  curl --silent "$1/api/v1/address/hopr"
-}
-
-validate_node_eth_address() {
-  local ETH_ADDRESS IS_VALID_ETH_ADDRESS
-
-  ETH_ADDRESS="$(get_eth_address $1)"
-  if [ -z "$ETH_ADDRESS" ]; then
-    log "could not derive ETH_ADDRESS from first parameter $1"
+  native_address="$(get_native_address $1)"
+  if [ -z "${native_address}" ]; then
+    log "-- could not derive native address from endpoint ${endpoint}"
     exit 1
   fi
 
-  IS_VALID_ETH_ADDRESS="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS'))")"
-  if [ "$IS_VALID_ETH_ADDRESS" == "false" ]; then
-    log "⛔️ Node returns an invalid address ETH_ADDRESS: $ETH_ADDRESS derived from $1"
+  is_valid_native_address="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('${native_address}'))")"
+  if [ "${is_valid_native_address}" == "false" ]; then
+    log "--⛔️ Node returns an invalidddress: ${native_address} derived from endpoint ${endpoint}"
     exit 1
   fi
-  echo "$ETH_ADDRESS"
+
+  echo "${native_address}"
 }
 
 # TODO better validation
+# $1 = endpoint
 validate_node_balance_gt0() {
-  local balance eth_balance hopr_balance
+  local balance native_balance hopr_balance
 
   balance="$(run_command ${1} "balance")"
-  eth_balance="$(echo -e "$balance" | grep -c " xDAI" || true)"
+  native_balance="$(echo -e "$balance" | grep -c " xDAI" || true)"
   hopr_balance="$(echo -e "$balance" | grep -c " txHOPR" || true)"
 
-  if [[ "$eth_balance" != "0" && "$hopr_balance" != "Hopr Balance: 0 txHOPR" ]]; then
-    log "$1 is funded"
-  else
-    log "⛔️ $1 Node has an invalid balance: $eth_balance, $hopr_balance"
-    log "$balance"
+  if [[ "$native_balance" = "0" || "$hopr_balance" = "Hopr Balance: 0 txHOPR" ]]; then
+    log "-- $1 Node has an invalid balance: $native_balance, $hopr_balance"
+    log "-- $balance"
     exit 1
   fi
 }
@@ -125,9 +119,9 @@ validate_node_balance_gt0() {
 log "Using endpoints: ${endpoints}"
 
 for endpoint in ${endpoints}; do
-  log "Validate ETH address for ${endpoint}"
-  validate_node_eth_address "${endpoint}"
-  log "Validate ETH address for ${endpoint} - OK"
+  log "Validate native address for ${endpoint}"
+  declare address="$(validate_node_native_address "${endpoint}")"
+  log "Validate native address for ${endpoint} - OK ${address}"
 done
 
 for endpoint in ${endpoints}; do
@@ -146,7 +140,7 @@ done
 
 declare endpoints_arr=( ${endpoints} )
 log "Check peers announcements"
-result=$(run_command ${endpoints[1]} "peers" 'peers have announced themselves' 600)
+result=$(run_command ${endpoints_arr[1]} "peers" 'peers have announced themselves' 600)
 log "-- ${result}"
 
 for endpoint in ${endpoints}; do
