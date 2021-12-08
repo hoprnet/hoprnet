@@ -2,7 +2,12 @@ import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
 import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
 import { randomInteger, limitConcurrency, u8aEquals, debug } from '@hoprnet/hopr-utils'
-import { HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'
+import {
+  HEARTBEAT_INTERVAL,
+  HEARTBEAT_TIMEOUT,
+  HEARTBEAT_INTERVAL_VARIANCE,
+  MAX_PARALLEL_CONNECTIONS
+} from '../constants'
 import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index'
