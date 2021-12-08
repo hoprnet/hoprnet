@@ -279,21 +279,21 @@ setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--envi
 setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000
 # }}}
 
-log "Waiting for nodes startup"
-
-#  --- Wait until started --- {{{
-# Wait until node has recovered its private key
-wait_for_regex ${node1_log} "using blockchain address"
-wait_for_regex ${node2_log} "using blockchain address"
-wait_for_regex ${node3_log} "using blockchain address"
-wait_for_regex ${node4_log} "using blockchain address"
-wait_for_regex ${node5_log} "using blockchain address"
-wait_for_regex ${node6_log} "using blockchain address"
-wait_for_regex ${node7_log} "using blockchain address"
 declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
-# }}}
-
 log "CT node1 address: ${ct_node1_address}"
+
+log "Waiting for connector"
+
+#  --- Wait until created --- {{{
+# Wait until node has created the blockchain connector
+wait_for_regex ${node1_log} "connector chain created"
+wait_for_regex ${node2_log} "connector chain created"
+wait_for_regex ${node3_log} "connector chain created"
+wait_for_regex ${node4_log} "connector chain created"
+wait_for_regex ${node5_log} "connector chain created"
+wait_for_regex ${node6_log} "connector chain created"
+wait_for_regex ${node7_log} "connector chain created"
+# }}}
 
 log "Funding nodes"
 
@@ -305,6 +305,19 @@ HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hard
   --network hardhat \
   --address "${ct_node1_address}" \
   --password "${password}"
+# }}}
+
+log "Waiting for nodes startup"
+
+#  --- Wait until started --- {{{
+# Wait until node has recovered its private key
+wait_for_regex ${node1_log} "using blockchain address"
+wait_for_regex ${node2_log} "using blockchain address"
+wait_for_regex ${node3_log} "using blockchain address"
+wait_for_regex ${node4_log} "using blockchain address"
+wait_for_regex ${node5_log} "using blockchain address"
+wait_for_regex ${node6_log} "using blockchain address"
+wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 log "Waiting for port binding"

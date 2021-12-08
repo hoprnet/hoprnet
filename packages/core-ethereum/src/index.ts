@@ -76,7 +76,8 @@ export default class HoprEthereum extends EventEmitter {
     this.status = 'CREATING'
     log('Ready to call singleton wrapper', ChainWrapperSingleton)
     ChainWrapperSingleton.create(this.options, this.privateKey).then((chain: ChainWrapper) => {
-      log('Chain instance created or passed via singleton')
+      // Debug log used in e2e integration tests, please don't change
+      log(`connector chain created`)
       this.status = 'CREATED'
       this.chain = chain
     })
