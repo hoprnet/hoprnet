@@ -158,7 +158,7 @@ function wait_for_regex {
     if [ -f ${file} ]; then
       local res=$(grep -E "${regex}" "${file}" || echo "")
       if [ -n "${res}" ]; then
-        return 0
+        break
       fi
     fi
     sleep ${delay}
