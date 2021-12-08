@@ -17,10 +17,6 @@ const error = debug('hopr-core:heartbeat:error')
 
 const PING_HASH_ALGORITHM = 'blake2s256'
 
-function calculatePingResponse(challenge: Uint8Array): Uint8Array {
-  return Uint8Array.from(createHash(PING_HASH_ALGORITHM).update(challenge).digest())
-}
-
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
   private protocolHeartbeat: string
@@ -49,14 +45,14 @@ export default class Heartbeat {
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
     this.networkPeers.register(remotePeer)
     log('beat')
-    return Promise.resolve(calculatePingResponse(msg))
+    return Promise.resolve(Heartbeat.calculatePingResponse(msg))
   }
 
   public async pingNode(id: PeerId): Promise<boolean> {
     log('ping', id.toB58String())
 
     const challenge = randomBytes(16)
-    const expectedResponse = calculatePingResponse(challenge)
+    const expectedResponse = Heartbeat.calculatePingResponse(challenge)
 
     try {
       const pingResponse = await this.sendMessage(id, this.protocolHeartbeat, challenge, true, {
@@ -111,6 +107,10 @@ export default class Heartbeat {
   public stop() {
     clearTimeout(this.timeout)
     log(`Heartbeat stopped`)
+  }
+
+  public static calculatePingResponse(challenge: Uint8Array): Uint8Array {
+    return Uint8Array.from(createHash(PING_HASH_ALGORITHM).update(challenge).digest())
   }
 
   public async __forTestOnly_checkNodes() {
