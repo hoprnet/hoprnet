@@ -7,10 +7,7 @@ import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
 import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
-import {
-  NativeBalance,
-  SUGGESTED_NATIVE_BALANCE,
-} from '@hoprnet/hopr-utils'
+import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 import setupAPI from './api'
