@@ -11,10 +11,10 @@ export const POST: Operation = [
     const recipient: PeerId = PeerId.createFromB58String(req.body.recipient)
 
     try {
-    await req.context.node.sendMessage(message, recipient, path)
-    res.status(204).send()
+      await req.context.node.sendMessage(message, recipient, path)
+      res.status(204).send()
     } catch (err) {
-    res.status(422).json({error: err.message})
+      res.status(422).json({ error: err.message })
     }
   }
 ]
@@ -37,11 +37,10 @@ POST.apiDoc = {
             recipient: {
               description: 'The recipient HOPR peer id, to which the message is sent.',
               type: 'string',
-                format: 'peerId',
+              format: 'peerId'
             },
             path: {
-              description:
-                'The path is ordered list of peer ids through which the message should be sent. ',
+              description: 'The path is ordered list of peer ids through which the message should be sent. ',
               type: 'array',
               default: [],
               items: {
