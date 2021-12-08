@@ -10,9 +10,18 @@
       "name": "Launch HOPRd (localhost)",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/packages/hoprd/src/index.ts",
-      "args": ["--admin", "--init", "--rest", "--password='d3f4uL+%'", "--testNoAuthentication", "--data=/tmp/debug", "--identity=/tmp/debug-identity", "--environment='hardhat-localhost'"],
+      "args": [
+        "--admin",
+        "--init",
+        "--rest",
+        "--password='d3f4uL+%'",
+        "--testNoAuthentication",
+        "--data=/tmp/debug",
+        "--identity=/tmp/debug-identity",
+        "--environment='hardhat-localhost'"
+      ],
       "env": {
-        "DEBUG":"hopr*",
+        "DEBUG": "hopr*"
       },
       "console": "integratedTerminal",
       "outFiles": ["${workspaceFolder}/packages/**/*.js"]
