@@ -4,7 +4,7 @@
 
 ### Changes
 
-- Update ping to use Blake2s instead of SHA256 for response computation (([#3037](https://github.com/hoprnet/hoprnet/pull/3080)))
+- Update ping to use Blake2s instead of SHA256 for response computation (([#3080](https://github.com/hoprnet/hoprnet/pull/3080)))
 
 ---
 
