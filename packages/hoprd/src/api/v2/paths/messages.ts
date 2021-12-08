@@ -7,12 +7,15 @@ export const parameters = []
 export const POST: Operation = [
   async (req, res, _next) => {
     const message = encode([req.body.body])
-    let path = req.body.path
-    const recipient: PeerId = path.pop()
+    const path = req.body.path
+    const recipient: PeerId = PeerId.createFromB58String(req.body.recipient)
 
+    try {
     await req.context.node.sendMessage(message, recipient, path)
-
     res.status(204).send()
+    } catch (err) {
+    res.status(422).json({error: err.message})
+    }
   }
 ]
 
@@ -31,11 +34,16 @@ POST.apiDoc = {
               description: 'The message body which should be sent.',
               type: 'string'
             },
+            recipient: {
+              description: 'The recipient HOPR peer id, to which the message is sent.',
+              type: 'string',
+                format: 'peerId',
+            },
             path: {
               description:
-                'The path is ordered list of peer ids through which the message should be sent. ' +
-                'The last path element is the receiver of the message.',
+                'The path is ordered list of peer ids through which the message should be sent. ',
               type: 'array',
+              default: [],
               items: {
                 description: 'A valid HOPR peer id',
                 type: 'string',
@@ -45,7 +53,7 @@ POST.apiDoc = {
               }
             }
           },
-          required: ['body', 'path']
+          required: ['body', 'recipient']
         }
       }
     }

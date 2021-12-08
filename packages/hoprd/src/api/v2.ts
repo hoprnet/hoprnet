@@ -43,7 +43,12 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
     // we use custom formats for particular internal data types
     customFormats: {
       peerId: (input) => {
-        return !!PeerId.createFromB58String(input)
+        try {
+          // this call will throw if the input is no peer id
+          return !!PeerId.createFromB58String(input)
+        } catch (_err) {
+          return false
+        }
       }
     }
   })
