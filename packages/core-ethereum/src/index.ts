@@ -111,8 +111,8 @@ export default class HoprEthereum extends EventEmitter {
     )
   }
 
-  public setTxHandler (evt: IndexerEvents, tx: string): Promise<string>{
-    return this.indexer.resolvePendingTransaction(evt, tx);
+  public setTxHandler(evt: IndexerEvents, tx: string): Promise<string> {
+    return this.indexer.resolvePendingTransaction(evt, tx)
   }
 
   public getOpenChannelsFrom(p: PublicKey) {
