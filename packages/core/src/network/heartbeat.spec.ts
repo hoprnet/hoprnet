@@ -5,7 +5,6 @@ import { HEARTBEAT_INTERVAL, NETWORK_QUALITY_THRESHOLD } from '../constants'
 import sinon from 'sinon'
 import { fakePeerId } from '../test-utils.spec'
 import PeerId from 'peer-id'
-import { Hash } from '@hoprnet/hopr-utils'
 
 class TestingHeartbeat extends Heartbeat {
   public setSendMessage(sendMessage: Heartbeat['sendMessage']) {
@@ -19,7 +18,7 @@ describe('unit test heartbeat', async () => {
   let peers: NetworkPeerStore
   let clock: any
 
-  let send = sinon.fake((_id: any, _proto: any, challenge: Uint8Array) => [Hash.create(challenge).serialize()])
+  let send = sinon.fake((_id: any, _proto: any, challenge: Uint8Array) => [Heartbeat.calculatePingResponse(challenge)])
   let subscribe = sinon.fake()
 
   beforeEach(async () => {
@@ -97,7 +96,7 @@ describe('unit test heartbeat', async () => {
         if (id.equals(chris.id)) {
           return Promise.reject()
         }
-        return [Hash.create(challenge).serialize()]
+        return [Heartbeat.calculatePingResponse(challenge)]
       })
     )
 
