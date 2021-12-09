@@ -5,6 +5,7 @@ The HOPR Association _tech_ members and [Project Owner](./development.md#legend)
 1. [Development Process](./development.md)
 2. [Release Process](./release.md)
 3. [Community Process](./community.md)
+4. [Wallets Process](./wallets.md)
 
 ## Processes
 
