@@ -274,7 +274,7 @@ fi
 # --- Get peer ids for reporting --- {{{
 declare -a peers
 for endpoint in ${endpoints}; do
-  declare peer="$(get_hopr_address "${endpoint}")"
+  declare peer="$(get_hopr_address "${api_token}@${endpoint}")"
   peers+=(${peer})
 done
 # }}}
@@ -284,27 +284,27 @@ log "\tnode1"
 log "\t\tPeer Id:\t${peers[0]}"
 log "\t\tRest API:\thttp://localhost:13301/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19501/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13301&wsEndpoint=ws://${api_token}@localhost:19501"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13301&wsEndpoint=ws://localhost:19501&securityToken=${api_token}"
 log "\tnode2"
 log "\t\tPeer Id:\t${peers[1]}"
 log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19502/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13302&wsEndpoint=ws://${api_token}@localhost:19502"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13302&wsEndpoint=ws://localhost:19502&securityToken=${api_token}"
 log "\tnode3"
 log "\t\tPeer Id:\t${peers[2]}"
 log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19504/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13303&wsEndpoint=ws://${api_token}@localhost:19503"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13303&wsEndpoint=ws://localhost:19503&securityToken=${api_token}"
 log "\tnode4"
 log "\t\tPeer Id:\t${peers[3]}"
 log "\t\tRest API:\thttp://localhost:13304/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19504/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13304&wsEndpoint=ws://${api_token}@localhost:19504"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13304&wsEndpoint=ws://localhost:19504&securityToken=${api_token}"
 log "\tnode5"
 log "\t\tPeer Id:\t${peers[4]}"
 log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19505/"
-log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://${api_token}@localhost:13305&wsEndpoint=ws://${api_token}@localhost:19505"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
 
 log "Terminating this script will clean up the running local cluster"
 wait

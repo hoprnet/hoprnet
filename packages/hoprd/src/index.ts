@@ -219,8 +219,11 @@ async function main() {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
       let [decoded, time] = decode(msg) as [Buffer, Buffer]
-      logs.log('Message:', decoded.toString())
-      logs.log('Latency:', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+      logs.log(`Message: ${decoded.toString()}`)
+      logs.log(`Latency: ${Date.now() - parseInt(time.toString('hex'), 16)}ms`)
+
+      // also send it tagged as message for apps to use
+      logs.logMessage(decoded.toString())
     } catch (err) {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())

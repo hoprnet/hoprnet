@@ -1,12 +1,12 @@
 import { Operation } from 'express-openapi'
-import { encode } from 'rlp'
 import PeerId from 'peer-id'
+import { encodeMessage } from '../../../commands/utils'
 
 export const parameters = []
 
 export const POST: Operation = [
   async (req, res, _next) => {
-    const message = encode([req.body.body])
+    const message = encodeMessage(req.body.body)
     const path = req.body.path
     const recipient: PeerId = PeerId.createFromB58String(req.body.recipient)
 

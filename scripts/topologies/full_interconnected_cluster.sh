@@ -85,7 +85,7 @@ validate_node_native_address() {
   local native_address is_valid_native_address
   local endpoint="${1}"
 
-  native_address="$(get_native_address $1)"
+  native_address="$(get_native_address "${api_token}@${endpoint}")"
   if [ -z "${native_address}" ]; then
     log "-- could not derive native address from endpoint ${endpoint}"
     exit 1
@@ -133,7 +133,7 @@ done
 declare -A peers
 for endpoint in ${endpoints}; do
   log "Get peer id for ${endpoint}"
-  declare peer="$(get_hopr_address "${endpoint}")"
+  declare peer="$(get_hopr_address "${api_token}@${endpoint}")"
   peers["${endpoint}"]="${peer}"
   log "Get peer id for ${endpoint} - OK ${peer}"
 done

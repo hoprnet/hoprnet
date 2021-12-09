@@ -1,12 +1,13 @@
 import process from 'process'
 import path from 'path'
 import express from 'express'
+import cors from 'cors'
 import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import PeerId from 'peer-id'
 
-import type { Application } from 'express'
+import type { Application, Request } from 'express'
 import type Hopr from '@hoprnet/hopr-core'
 
 import type { LogStream } from './../logs'
@@ -14,9 +15,12 @@ import type { LogStream } from './../logs'
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
-export default function setupApiV2(service: Application, urlPath: string, node: Hopr, logs: LogStream, _options: any) {
+export default function setupApiV2(service: Application, urlPath: string, node: Hopr, logs: LogStream, options: any) {
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
+
+  // enable all CORS requests
+  service.use(urlPath, cors())
 
   // assign internal objects to each requests so they can be accessed within
   // handlers
@@ -49,6 +53,40 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
         } catch (_err) {
           return false
         }
+      }
+    },
+    securityHandlers: {
+      // TODO: We assume the handlers are always called in order. This isn't a
+      // given and might change in the future. Thus, they should be made order-erindependent.
+      keyScheme: function (req: Request, _scopes, _securityDefinition) {
+        const apiToken = req.get('x-auth-token') || ''
+
+        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
+          // because this is not the last auth check, we just indicate that
+          // the authentication failed so the auth chain can continue
+          return false
+        }
+
+        // successfully authenticated, will stop the auth chain and proceed with the request
+        return true
+      },
+      passwordScheme: function (req: Request, _scopes, _securityDefinition) {
+        const authEncoded = req.get('authorization').replace('Basic ', '') || ''
+        // we only expect a single value here, instead of the usual user:password
+        const [apiToken, _] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
+
+        if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
+          // because this is the last auth check, we must throw the appropriate
+          // error to be sent back to the user
+          throw {
+            status: 403,
+            challenge: 'Basic realm=hoprd',
+            message: 'You must authenticate to access hoprd.'
+          }
+        }
+
+        // successfully authenticated
+        return true
       }
     }
   })
