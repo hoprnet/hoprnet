@@ -99,13 +99,19 @@ export function createHoprNode(peerId: PeerId, options: HoprOptions, automaticCh
   )
   const provider = expandVars(options.environment.network.default_provider, process.env)
   log(`using provider URL: ${provider}`)
-  const chain = new HoprEthereum(db, PublicKey.fromPeerId(peerId), peerId.privKey.marshal(), {
-    chainId: options.environment.network.chain_id,
-    environment: options.environment.id,
-    gasPrice: options.environment.network.gasPrice,
-    network: options.environment.network.id,
-    provider
-  }, automaticChainCreation)
+  const chain = new HoprEthereum(
+    db,
+    PublicKey.fromPeerId(peerId),
+    peerId.privKey.marshal(),
+    {
+      chainId: options.environment.network.chain_id,
+      environment: options.environment.id,
+      gasPrice: options.environment.network.gasPrice,
+      network: options.environment.network.id,
+      provider
+    },
+    automaticChainCreation
+  )
   const node = new Hopr(peerId, db, chain, options)
   return node
 }

@@ -93,7 +93,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) { }
+  ) {}
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -266,7 +266,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => { },
+      () => {},
       protocolAck
     )
 
@@ -654,10 +654,10 @@ class Hopr extends EventEmitter {
   }
 
   public subscribeOnConnector(event: string, callback: () => void): void {
-    this.connector.on(event, callback);
+    this.connector.on(event, callback)
   }
   public emitOnConnector(event: string): void {
-    this.connector.emit(event);
+    this.connector.emit(event)
   }
 
   public async periodicCheck() {

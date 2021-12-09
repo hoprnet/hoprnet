@@ -31,18 +31,18 @@ const log = debug('hopr-core-ethereum')
 
 export type RedeemTicketResponse =
   | {
-    status: 'SUCCESS'
-    receipt: string
-    ackTicket: AcknowledgedTicket
-  }
+      status: 'SUCCESS'
+      receipt: string
+      ackTicket: AcknowledgedTicket
+    }
   | {
-    status: 'FAILURE'
-    message: string
-  }
+      status: 'FAILURE'
+      message: string
+    }
   | {
-    status: 'ERROR'
-    error: Error | string
-  }
+      status: 'ERROR'
+      error: Error | string
+    }
 
 export type ChainOptions = {
   provider: string
@@ -86,7 +86,7 @@ export default class HoprEthereum extends EventEmitter {
   }
 
   private async createChain(): Promise<void> {
-    this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey);
+    this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
     // Debug log used in e2e integration tests, please don't change
     log(`connector chain created`)
     // Emit event to make sure connector is aware the chain was created properly.
@@ -335,7 +335,7 @@ export default class HoprEthereum extends EventEmitter {
     let c: ChannelEntry
     try {
       c = await this.db.getChannelTo(dest)
-    } catch { }
+    } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }

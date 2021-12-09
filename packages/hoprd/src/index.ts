@@ -344,7 +344,6 @@ async function main() {
     logs.log(`Ready to request on-chain connector to connect to provider.`)
     node.subscribeOnConnector('connector:created', () => node.emit('hopr:connector:created'))
     node.emitOnConnector('connector:create')
-
   } catch (e) {
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
