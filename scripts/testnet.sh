@@ -15,7 +15,10 @@ source "${mydir}/utils.sh"
 source "${mydir}/gcloud.sh"
 source "${mydir}/dns.sh"
 
-declare min_funds=0.01291
+# Native (e.g. XDAI)
+declare min_funds=0.1
+
+# HOPR tokens
 declare min_funds_hopr=0.5
 
 # $1=role (ie. node-4)
