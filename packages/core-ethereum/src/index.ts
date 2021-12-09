@@ -31,19 +31,27 @@ const log = debug('hopr-core-ethereum')
 
 export type RedeemTicketResponse =
   | {
-      status: 'SUCCESS'
-      receipt: string
-      ackTicket: AcknowledgedTicket
-    }
+    status: 'SUCCESS'
+    receipt: string
+    ackTicket: AcknowledgedTicket
+  }
   | {
-      status: 'FAILURE'
-      message: string
-    }
+    status: 'FAILURE'
+    message: string
+  }
   | {
-      status: 'ERROR'
-      error: Error | string
-    }
+    status: 'ERROR'
+    error: Error | string
+  }
 
+export type ChainOptions = {
+  provider: string
+  maxConfirmations?: number
+  chainId: number
+  gasPrice?: number
+  network: string
+  environment: string
+}
 export type ChainStatus = 'UNINITIALIZED' | 'CREATING' | 'CREATED' | 'STARTING' | 'STOPPED'
 export default class HoprEthereum extends EventEmitter {
   public status: ChainStatus = 'UNINITIALIZED'
@@ -57,14 +65,7 @@ export default class HoprEthereum extends EventEmitter {
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
-    private options: {
-      provider: string
-      maxConfirmations?: number
-      chainId: number
-      gasPrice?: number
-      network: string
-      environment: string
-    }
+    private options: ChainOptions
   ) {
     super()
     this.indexer = new Indexer(
@@ -325,7 +326,7 @@ export default class HoprEthereum extends EventEmitter {
     let c: ChannelEntry
     try {
       c = await this.db.getChannelTo(dest)
-    } catch {}
+    } catch { }
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }
