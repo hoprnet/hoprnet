@@ -1,4 +1,4 @@
-import { ChainOptions } from ".";
+import { ChainOptions } from '.'
 
 export const sampleChainOptions: ChainOptions = {
   chainId: 1337,
