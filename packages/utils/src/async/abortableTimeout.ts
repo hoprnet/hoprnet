@@ -9,7 +9,7 @@ export type TimeoutOpts = {
 }
 
 export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
-  fn: (opts: TimeoutOpts) => Promise<Result>,
+  fn: (opts: Required<TimeoutOpts>) => Promise<Result>,
   abortMsg: AbortMsg,
   timeoutMsg: TimeoutMsg,
   opts: TimeoutOpts
