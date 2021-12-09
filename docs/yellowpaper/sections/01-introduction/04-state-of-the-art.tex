@@ -1,10 +1,10 @@
 \subsection{State of the Art}
 \label{sec:intro:stateoftheart}
 
-HOPR has been built on top of, or as a reaction to, various technologies and research projects which try to meet some or all of the design ethos and security goals outlined above. These technologies and research projects can be broadly divided into two groups: (1) \lcnameref{sec:privacyprotocols} which attempt to hide user information; (2) \lcnameref{sec:l2protocols} which allow systems to perform micro-payments via the Ethereum blockchain. The following sections present the state of the art for each of these groups.
+HOPR has been built on top of, or as a reaction to, various technologies and research projects which try to meet some or all of the design ethos and security goals outlined above. These technologies and research projects can be broadly divided into three groups: (1) \lcnameref{sec:intro:stateoftheart:privacyprotocols} which attempt to hide user information; (2) \lcnameref{sec:intro:stateoftheart:l2protocols} which allow systems to perform micro-payments via the Ethereum blockchain, as well as (3) \lcnameref{sec:intro:stateoftheart:p2pnetworks} which allow nodes to interact with each other directly without requiring a central coordinator. The following sections present the state of the art for each of these groups.
 
 \subsubsection{Anonymous Communication Protocols}
-\label{sec:privacyprotocols}
+\label{sec:intro:stateoftheart:privacyprotocols}
 
 \paragraph{Virtual Private Networks}(\textit{VPNs}) are point-to-point overlay networks used to create secure connections over an otherwise untrusted network, such as the internet \cite{venkateswaran_2001}. Clients receive a public IP address from the VPN endpoint, which is then used for all outgoing communication. Since this public IP address can be almost anywhere in the world, VPNs are often used to bypass censorship \cite{hobbs_roberts_2018} and geolocalization blocks. However, VPNs provide dubious privacy, since clients must trust the VPN endpoint. The endpoint provider has full access to users' connection and communication metadata, since they control all communication going through it. In addition, VPN endpoints are often a single point of failure, since they are provided as centralized services. Both factors are major weaknesses when considering VPNs for privacy-preserving communication.
 
@@ -21,14 +21,14 @@ The Invisible Internet Project (\textit{I2P}) is an implementation of onion rout
 
 \begin{itemize}
 
-    \item \textbf{Packet switched instead of circuit switched}
-          Tor allocates connection to long-lived circuits; this allocation does not change until either the connection or the circuit closes. In contrast, routers in I2P maintain multiple tunnels per destination. This significantly increases scalability and failure resistance since packets are used in parallel.
+  \item \textbf{Packet switched instead of circuit switched}
+        Tor allocates connection to long-lived circuits; this allocation does not change until either the connection or the circuit closes. In contrast, routers in I2P maintain multiple tunnels per destination. This significantly increases scalability and failure resistance since packets are used in parallel.
 
-    \item \textbf{Unidirectional tunnels}
-          Employing unidirectional rather than bidirectional tunnels makes deanonymization harder, because tunnel participants see half as much data and need two sets of peers to be profiled.
+  \item \textbf{Unidirectional tunnels}
+        Employing unidirectional rather than bidirectional tunnels makes deanonymization harder, because tunnel participants see half as much data and need two sets of peers to be profiled.
 
-    \item \textbf{Peer profiles instead of directory authorities}
-          I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
+  \item \textbf{Peer profiles instead of directory authorities}
+        I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
 \end{itemize}
 
 Despite these improvements, I2P is vulnerable to eclipse attacks since no I2P router has a full view of the global network (similar to other peer-to-peer networks). Like Tor, I2P only provides protection against local adversaries, making it vulnerable to timing, intersection, and traffic analysis attacks. I2P has also been shown to be vulnerable to Sybil and predecessor attacks, in spite of various countermeasures implemented to thwart these.
@@ -40,7 +40,7 @@ The application of cover traffic provides metadata protection from global networ
 Loopix \cite{loopix} is another research project which uses cover traffic to resist traffic analysis while still achieving low latency. To achieve this, Loopix employs a mixing strategy called \textit{Poisson mix}. Poisson mix nodes independently delay packets, making packets unlinkable via timing analysis.
 
 \subsubsection{Layer-2 Scalability Protocols}
-\label{sec:l2protocols}
+\label{sec:intro:stateoftheart:l2protocols}
 
 Blockchain technology (mostly public blockchains like Bitcoin and Ethereum) suffers from a major scalability issue: every node in the network needs to process every transaction, validate them, and store a copy of the entire chain state. Thus the number of transactions cannot exceed that of a single node. For Ethereum, this is currently around 30 transactions per second.
 
@@ -56,9 +56,16 @@ The Raiden network \cite{raiden} is a layer-2 payment solution for the Ethereum 
 We present in the following a comparison table (from the Loopix paper) between different anonymous communication systems.
 
 \begin{figure}[H]
-    \centering
-    \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/state-of-the-art.png}
-    \caption{Comparison between anonymous communication systems}
-    \label{fig:Comparison between anonymous communication systems}
+  \centering
+  \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/state-of-the-art.png}
+  \caption{Comparison between anonymous communication systems}
+  \label{fig:Comparison between anonymous communication systems}
 \end{figure}
 \end{comment}
+
+\subsubsection{P2P Networks}
+\label{sec:intro:stateoftheart:p2pnetworks}
+
+% DHT 
+
+% NAT Traversal

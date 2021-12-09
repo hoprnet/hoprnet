@@ -1,20 +1,11 @@
 \subsection{Peer Discovery}
 \label{sec:p2p:peer-discovery}
 
-Newly connected nodes are lacking information about existing nodes in the network and thus need the help of others to introduce them to the rest of the network. This is done using a smart contract which acts as a Schelling point holding a list of entry nodes.
+Newly connected nodes are lacking information about existing nodes in the network and thus need the help of others to introduce them to the rest of the network. This is done using entry nodes that are announced within the smart contract which creates a Schelling point for new nodes and allows them to connect to other nodes in the network.
 
-Once a node intends to join the network, it first fetches
+By default, each node that joins the network also announces itself within the smart contract. Nodes that chose to act as an entry node, e.g. because they have a public IP address, publish a routable address whilst other nodes solely publish their public key. Thereby, each node receives a list of all nodes that are currently part of the network or have been part it and is thus able to link on-chain events of other nodes, such as opening of payment channels, to off-chain HOPR addresses. Since there is no announcement if a node leaves the network, the list does not provide any information regarding the nodes' availability.
 
-
-it first establishes a connection with the entry nodes and receives information about other nodes in the network.
-
-To get the most recent announcements as well as past ones, nodes either need to run their own Ethereum node or connect to a Web3 provider.
-
-creates a secondary channel and
-
-to which new nodes can connect to and learn about other nodes in the network. At startup, nodes need either run their own Ethereum node a or connect to a Web3 provider to fetch a list of nodes that have announced themselves as entry nodes.
-
-In addition, each node announces itself within the smart contract such that other nodes can about the existence the newly connected node. This step is necessary for all nodes because all nodes nodes need to maintain a mapping between Ethereum addresses and public key in order to construct mixnet packets, see section \ref{sec:sphinx}, and to handle incentives for relaying packets, see \ref{sec:incentives}. HOPR thereby destinguishes two types of announcements: routable addresses of nodes who act as entry nodes and non-routable addresses that solely contain the nodes' public key.
+Apart from the smart contract, all nodes in the network share addresses of each other in a Kademlia \cite{kademlia} distributed hash table (DHT). Once a node has established a connection to one of the entry nodes, it connects to the DHT and publishes additional addresses, see figure \ref{fig:address-announcement}. This includes first of all relay addresses since they are subject of change due to the availability of the utilized relay nodes, as well as additional direct addresses that help nodes to connect to other nodes running in the same local network or on the same machine.
 
 \begin{figure}[H]
     \centering
@@ -62,10 +53,10 @@ In addition, each node announces itself within the smart contract such that othe
 
         \draw[decoration={brace,raise=5pt},decorate] (\nodeWidth,0.6) -- node[right=5pt] {\rotatebox{90}{\small{\shortstack{announced\\on-chain}}}} (\nodeWidth,-0.6);
     \end{tikzpicture}
+    \caption{Address announcment within the HOPR network.}
+    \label{fig:address-announcement}
 \end{figure}
 
-Apart from the altruistic benefit to the network if announcing as an entry node, it is expected that the announcement does not immediately lead to payout. But since \lcnameref{sec:path-selection} is based on availability, it becomes clear that nodes announce themselves on-chain and also have a good availability are chosen more likely as a relayer since they are well-known which thus increases their rewards.
+Apart from the altruistic benefit to the network when announcing as an entry node, it is expected that the announcement does not immediately lead to payout. Nevertheless, since the \lcnameref{sec:path-selection} mechanism prefers nodes with higher availability, it is that well-known entry nodes with a good availability are chosen more likely as a relayer which thus increases their rewards on a longer term.
 
-Announcing on a public blockchain comes with the property that a potential adversary who attempts to run an eclipse attack against a newly connected node also needs to provide a sound and fake blockchain which is assumed to be hard. Hence, the attacker is unable to withhold entry nodes but nevertheless, but it is able to spam the victim with connection information about collaborating nodes.
-
-Once nodes have established a connection to at least one of the entry nodes, they grow an understanding about those nodes who have not published a routable on-chain by using a DHT. Thereby, they also learn about relay addresses and use them to establish direct connections.
+Using announcments on a public blockchain comes with the property that a potential adversary who attempts to run an eclipse attack against a newly connected node also needs to provide a sound and fake blockchain which is assumed to be hard. Hence, the attacker is unable to withhold entry nodes but nevertheless, but it is able to spam the victim with connection information about collaborating nodes.
