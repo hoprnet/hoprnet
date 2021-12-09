@@ -89,7 +89,7 @@ export async function createLibp2pInstance(
  * @param options:HoprOptions - Required options to create node
  * @returns {Hopr} - HOPR node
  */
-export function createHoprNode(peerId: PeerId, options: HoprOptions): Hopr {
+export function createHoprNode(peerId: PeerId, options: HoprOptions, automaticChainCreation = true): Hopr {
   const db = new HoprDB(
     PublicKey.fromPrivKey(peerId.privKey.marshal()),
     options.createDbIfNotExist,
@@ -105,7 +105,7 @@ export function createHoprNode(peerId: PeerId, options: HoprOptions): Hopr {
     gasPrice: options.environment.network.gasPrice,
     network: options.environment.network.id,
     provider
-  })
+  }, automaticChainCreation)
   const node = new Hopr(peerId, db, chain, options)
   return node
 }

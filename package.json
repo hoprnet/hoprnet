@@ -13,6 +13,7 @@
   "scripts": {
     "build": "yarn workspace @hoprnet/hopr-ethereum run build:sol:types && echo \"Building Typescript files\" && tsc --build tsconfig.build.json && yarn workspace @hoprnet/hoprd run buildAdmin",
     "build:core": "yarn workspace @hoprnet/hopr-core run build",
+    "build:core:all": "yarn workspaces foreach -ptv --include @hoprnet/hopr-core --include @hoprnet/hopr-core-ethereum run build",
     "build:hoprd": "yarn workspace @hoprnet/hoprd run build",
     "build:utils": "yarn workspace @hoprnet/hopr-utils run build",
     "build:chain": "yarn workspace @hoprnet/hopr-core-ethereum run build",
@@ -20,6 +21,7 @@
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "yarn workspaces foreach -pv run test",
+    "test:without:transport": "yarn workspaces foreach -pv --exclude @hoprnet/hopr-connect run test",
     "test:core": "yarn workspace @hoprnet/hopr-core run test",
     "test:connector": "yarn workspace @hoprnet/hopr-core-ethereum run test",
     "test:hoprd": "yarn workspace @hoprnet/hoprd run test",
