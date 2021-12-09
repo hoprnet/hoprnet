@@ -71,9 +71,9 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
         return true
       },
       passwordScheme: function (req: Request, _scopes, _securityDefinition) {
-        const authEncoded = req.get('authorization').replace('Basic ', '') || ''
+        const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
         // we only expect a single value here, instead of the usual user:password
-        const [apiToken, _] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
+        const [apiToken, ..._rest] = decodeURI(Buffer.from(authEncoded, 'base64').toString('binary')).split(':')
 
         if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
           // because this is the last auth check, we must throw the appropriate

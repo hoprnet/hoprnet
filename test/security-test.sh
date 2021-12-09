@@ -89,7 +89,7 @@ if [ ${http_status_code} -ne 200 ]; then
 fi
 
 log "REST API v2 should reject authentication with invalid basic auth credentials"
-http_status_code=$(curl --basic --user "${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
+http_status_code=$(curl --basic --user "${bad_token}:" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
 if [ ${http_status_code} -ne 403 ]; then
   log "⛔️ Expected 403 http status code, got ${http_status_code}"
   exit 1
@@ -103,7 +103,7 @@ if [ ${http_status_code} -ne 403 ]; then
 fi
 
 log "REST API v2 should accept authentication with valid basic auth credentials"
-http_status_code=$(curl --basic --user "${api_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
+http_status_code=$(curl --basic --user "${api_token}:" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
 if [ ${http_status_code} -ne 200 ]; then
   log "⛔️ Expected 200 http status code, got ${http_status_code}"
   exit 1

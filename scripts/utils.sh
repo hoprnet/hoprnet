@@ -221,4 +221,26 @@ get_hopr_address() {
   echo $(echo ${result} | jq -r ".hoprAddress")
 }
 
+# $1 = endpoint
+# $1 = api token
+validate_native_address() {
+  local native_address is_valid_native_address
+  local endpoint="${1}"
+  local api_token="${2}"
+
+  native_address="$(get_native_address "${api_token}@${endpoint}")"
+  if [ -z "${native_address}" ]; then
+    log "-- could not derive native address from endpoint ${endpoint}"
+    exit 1
+  fi
+
+  is_valid_native_address="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('${native_address}'))")"
+  if [ "${is_valid_native_address}" == "false" ]; then
+    log "--⛔️ Node returns an invalidddress: ${native_address} derived from endpoint ${endpoint}"
+    exit 1
+  fi
+
+  echo "${native_address}"
+}
+
 setup_colors

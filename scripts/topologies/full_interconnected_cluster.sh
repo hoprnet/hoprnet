@@ -80,26 +80,6 @@ run_command() {
   fi
 }
 
-# $1 = endpoint
-validate_node_native_address() {
-  local native_address is_valid_native_address
-  local endpoint="${1}"
-
-  native_address="$(get_native_address "${api_token}@${endpoint}")"
-  if [ -z "${native_address}" ]; then
-    log "-- could not derive native address from endpoint ${endpoint}"
-    exit 1
-  fi
-
-  is_valid_native_address="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('${native_address}'))")"
-  if [ "${is_valid_native_address}" == "false" ]; then
-    log "--⛔️ Node returns an invalidddress: ${native_address} derived from endpoint ${endpoint}"
-    exit 1
-  fi
-
-  echo "${native_address}"
-}
-
 # TODO better validation
 # $1 = endpoint
 validate_node_balance_gt0() {
@@ -120,7 +100,7 @@ log "Using endpoints: ${endpoints}"
 
 for endpoint in ${endpoints}; do
   log "Validate native address for ${endpoint}"
-  declare address="$(validate_node_native_address "${endpoint}")"
+  declare address="$(validate_native_address "${endpoint}" "${api_token}")"
   log "Validate native address for ${endpoint} - OK ${address}"
 done
 

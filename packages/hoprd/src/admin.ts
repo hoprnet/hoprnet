@@ -70,7 +70,7 @@ export class AdminServer {
       this.logs.error(`failed parsing cookies`, e)
     }
 
-    if (!cookies || cookies['X-Auth-Token'] !== this.apiToken || cookies['x-auth-token'] !== this.apiToken) {
+    if (!cookies || (cookies['X-Auth-Token'] !== this.apiToken && cookies['x-auth-token'] !== this.apiToken)) {
       this.logs.log('ws client failed authentication')
       return false
     }

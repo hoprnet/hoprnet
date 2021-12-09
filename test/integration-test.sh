@@ -17,6 +17,10 @@ usage() {
   msg
   msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5> <node_api_6> <node_api_7>"
   msg
+  msg "Required environment variables"
+  msg "------------------------------"
+  msg
+  msg "HOPRD_API_TOKEN\t\t\tused as api token for all nodes"
 }
 
 # return early with help info when requested
@@ -30,6 +34,7 @@ test -z "${4:-}" && { msg "Missing 4th parameter"; usage; exit 1; }
 test -z "${5:-}" && { msg "Missing 5th parameter"; usage; exit 1; }
 test -z "${6:-}" && { msg "Missing 6th parameter"; usage; exit 1; }
 test -z "${7:-}" && { msg "Missing 7th parameter"; usage; exit 1; }
+test -z "${HOPRD_API_TOKEN:-}" && { msg "Missing HOPRD_API_TOKEN"; usage; exit 1; }
 
 declare api1="${1}"
 declare api2="${2}"
@@ -38,6 +43,7 @@ declare api4="${4}"
 declare api5="${5}"
 declare api6="${6}"
 declare api7="${7}"
+declare api_token=${HOPRD_API_TOKEN}
 
 # $1 = endpoint
 # $2 = recipient peer id
@@ -59,7 +65,7 @@ send_message(){
   local step_time=${6:-25}
   local end_time_ns=${7:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl -m ${step_time} --connect-timeout ${step_time} --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v2/messages -o /dev/null -w '%{http_code}' --data "
+  local cmd="curl -m ${step_time} --connect-timeout ${step_time} --silent -X POST --header X-Auth-Token:${api_token} --url ${endpoint}/api/v2/messages -o /dev/null -w '%{http_code}' --data "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -106,7 +112,7 @@ run_command(){
   local step_time=${5:-25}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl -m ${step_time} --connect-timeout ${step_time} --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v1/command --data "
+  local cmd="curl -m ${step_time} --connect-timeout ${step_time} --silent -X POST --header X-Auth-Token:${api_token} --url ${endpoint}/api/v1/command --data "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -134,23 +140,6 @@ run_command(){
   fi
 }
 
-validate_node_eth_address() {
-  local ETH_ADDRESS IS_VALID_ETH_ADDRESS
-
-  ETH_ADDRESS="$(get_native_address $1)"
-  if [ -z "$ETH_ADDRESS" ]; then
-    log "could not derive ETH_ADDRESS from first parameter $1"
-    exit 1
-  fi
-
-  IS_VALID_ETH_ADDRESS="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS'))")"
-  if [ "$IS_VALID_ETH_ADDRESS" == "false" ]; then
-    log "⛔️ Node returns an invalid address ETH_ADDRESS: $ETH_ADDRESS derived from $1"
-    exit 1
-  fi
-  echo "$ETH_ADDRESS"
-}
-
 # TODO better validation
 validate_node_balance_gt0() {
   local balance eth_balance hopr_balance
@@ -170,13 +159,13 @@ validate_node_balance_gt0() {
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
 
-validate_node_eth_address "${api1}"
-validate_node_eth_address "${api2}"
-validate_node_eth_address "${api3}"
-validate_node_eth_address "${api4}"
-validate_node_eth_address "${api5}"
+validate_native_address "${api1}" "${api_token}"
+validate_native_address "${api2}" "${api_token}"
+validate_native_address "${api3}" "${api_token}"
+validate_native_address "${api4}" "${api_token}"
+validate_native_address "${api5}" "${api_token}"
 # we don't need node6 because it's short-living
-validate_node_eth_address "${api7}"
+validate_native_address "${api7}" "${api_token}"
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
@@ -189,13 +178,13 @@ validate_node_balance_gt0 "${api7}"
 log "Nodes are funded"
 
 declare addr1 addr2 addr3 addr4 addr5 result
-addr1="$(get_hopr_address "${api1}")"
-addr2="$(get_hopr_address "${api2}")"
-addr3="$(get_hopr_address "${api3}")"
-addr4="$(get_hopr_address "${api4}")"
-addr5="$(get_hopr_address "${api5}")"
+addr1="$(get_hopr_address "${api_token}@${api1}")"
+addr2="$(get_hopr_address "${api_token}@${api2}")"
+addr3="$(get_hopr_address "${api_token}@${api3}")"
+addr4="$(get_hopr_address "${api_token}@${api4}")"
+addr5="$(get_hopr_address "${api_token}@${api5}")"
 # we don't need node6 because it's short-living
-addr7="$(get_hopr_address "${api7}")"
+addr7="$(get_hopr_address "${api_token}@${api7}")"
 
 log "hopr addr1: ${addr1}"
 log "hopr addr2: ${addr2}"
