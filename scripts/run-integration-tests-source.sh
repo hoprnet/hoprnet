@@ -165,12 +165,14 @@ function setup_node() {
 # $1 = node log file
 # $2 = private key, must be hex string of length 66
 # $3 = health check port
-# $4 = OPTIONAL: additional args to ct daemon
+# $4 = data directory
+# $5 = OPTIONAL: additional args to ct daemon
 function setup_ct_node() {
   local log=${1}
   local private_key=${2}
   local health_check_port=${3}
-  local additional_args=${4:-""}
+  local dir=${4}
+  local additional_args=${5:-""}
 
   log "Run CT node -> ${log}"
 
@@ -182,7 +184,8 @@ function setup_ct_node() {
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
     --privateKey "${private_key}" \
     --dbFile "${ct_db_file}" \
-    --healthCheckHost "127.0.0.1" \
+    --data="${dir}" \
+    --healthCheck \
     --healthCheckPort "${health_check_port}" \
     ${additional_args} \
      > "${log}" 2>&1 &
@@ -280,7 +283,7 @@ setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
-setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000
+setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
 # }}}
 
 log "Waiting for nodes startup"
@@ -346,5 +349,5 @@ grep -E "Running on: hardhat" "${node6_log}"
 
 # -- CT test {{{
 ${mydir}/../test/ct-test.sh \
-  "${ct_node1_log}" "127.0.0.01" 20000
+  "${ct_node1_log}" "127.0.0.1" 20000
 # }}}

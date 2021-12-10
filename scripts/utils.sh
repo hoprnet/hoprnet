@@ -153,16 +153,19 @@ function wait_for_regex {
   local file="${1}"
   local regex="${2}"
   local delay="${delay:-1.0}"
+  local res
 
   while true; do
     if [ -f ${file} ]; then
-      local res=$(grep -E "${regex}" "${file}" || echo "")
+      res=$(grep -E "${regex}" "${file}" || echo "")
       if [ -n "${res}" ]; then
         break
       fi
     fi
     sleep ${delay}
   done
+
+  echo "${res}"
 }
 
 # $1 = filename
