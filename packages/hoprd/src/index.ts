@@ -7,7 +7,7 @@ import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
 import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
-import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import { NativeBalance, SUGGESTED_NATIVE_BALANCE, debug } from '@hoprnet/hopr-utils'
 import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 import setupAPI from './api'
@@ -25,6 +25,9 @@ const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 export type DefaultEnvironment = {
   id?: string
 }
+
+const namespace = 'hoprd:main'
+const stdoutLog = debug(namespace)
 
 function defaultEnvironment(): string {
   try {
@@ -204,12 +207,13 @@ function addUnhandledPromiseRejectionHandler() {
   })
 }
 
-async function main() {
+export async function main() {
   // Starting with Node.js 15, undhandled promise rejections terminate the
   // process with a non-zero exit code, which makes debugging quite difficult.
   // Therefore adding a promise rejection handler to make sure that the origin of
   // the rejected promise can be detected.
   addUnhandledPromiseRejectionHandler()
+  stdoutLog('Starting hoprd...')
 
   let node: Hopr
   let logs = new LogStream(argv.forwardLogs)
@@ -261,6 +265,7 @@ async function main() {
     await adminServer.setup()
   }
 
+  stdoutLog('Starting to process environment:', argv.environment)
   const environment = resolveEnvironment(argv.environment)
   let options = await generateNodeOptions(environment)
   if (argv.dryRun) {
@@ -367,5 +372,3 @@ async function main() {
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)
 }
-
-main()
