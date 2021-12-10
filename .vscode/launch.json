@@ -8,9 +8,7 @@
       "type": "node",
       "request": "launch",
       "name": "Launch HOPRd (localhost)",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/packages/hoprd/src/index.ts",
       "args": [
         "--admin",
@@ -26,17 +24,13 @@
         "DEBUG": "hopr*"
       },
       "console": "integratedTerminal",
-      "outFiles": [
-        "${workspaceFolder}/packages/**/lib/*.js"
-      ]
+      "outFiles": ["${workspaceFolder}/packages/**/lib/*.js"]
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Launch HOPR Cover Traffic node",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/packages/cover-traffic-daemon/src/index.ts",
       "args": [
         "--privateKey",
@@ -44,121 +38,72 @@
         "--environment",
         "master-xdai"
       ],
-      "outFiles": [
-        "${workspaceFolder}/**/*.js"
-      ]
+      "outFiles": ["${workspaceFolder}/**/*.js"]
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Test HOPR Cover Traffic daemon",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/node_modules/.bin/mocha",
-      "args": [
-        "--reporter=tap",
-        "--full-trace",
-        "--exit"
-      ],
+      "args": ["--reporter=tap", "--full-trace", "--exit"],
       "cwd": "${workspaceFolder}/packages/cover-traffic-daemon",
-      "outFiles": [
-        "${workspaceFolder}/**/*.js"
-      ]
+      "outFiles": ["${workspaceFolder}/**/*.js"]
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Test HOPR core",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/node_modules/.bin/mocha",
       "console": "integratedTerminal",
-      "args": [
-        "--reporter=tap",
-        "--full-trace",
-        "--exit"
-      ],
+      "args": ["--reporter=tap", "--full-trace", "--exit"],
       "cwd": "${workspaceFolder}/packages/core",
-      "outFiles": [
-        "${workspaceFolder}/**/*.js"
-      ]
+      "outFiles": ["${workspaceFolder}/**/*.js"]
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Test HOPR core-ethereum",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/node_modules/.bin/mocha",
-      "args": [
-        "--reporter=tap",
-        "--full-trace",
-        "--exit"
-      ],
+      "args": ["--reporter=tap", "--full-trace", "--exit"],
       "cwd": "${workspaceFolder}/packages/core-ethereum",
-      "outFiles": [
-        "${workspaceFolder}/**/*.js"
-      ]
+      "outFiles": ["${workspaceFolder}/**/*.js"]
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Test HOPRd",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/node_modules/.bin/mocha",
-      "args": [
-        "--reporter=tap",
-        "--full-trace",
-        "--exit"
-      ],
+      "args": ["--reporter=tap", "--full-trace", "--exit"],
       "cwd": "${workspaceFolder}/packages/hoprd",
-      "outFiles": [
-        "${workspaceFolder}/packages/hoprd/lib/*.js"
-      ]
+      "outFiles": ["${workspaceFolder}/packages/hoprd/lib/*.js"]
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Test HOPRd (instance)",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/node_modules/.bin/mocha",
-      "args": [
-        "--reporter=tap",
-        "--full-trace",
-        "--exit",
-        "--grep=HOPRd"
-      ],
+      "args": ["--reporter=tap", "--full-trace", "--exit", "--grep=HOPRd"],
       "env": {
         "DEBUG": "hopr*"
       },
       "cwd": "${workspaceFolder}/packages/hoprd",
       "console": "integratedTerminal",
-      "outFiles": [
-        "${workspaceFolder}/packages/hoprd/**/*.{ts,js}"
-      ]
+      "outFiles": ["${workspaceFolder}/packages/hoprd/**/*.{ts,js}"]
     },
     {
       "type": "node",
       "request": "launch",
       "name": "Test HOPR contracts",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/node_modules/.bin/hardhat",
-      "args": [
-        "test"
-      ],
+      "args": ["test"],
       "cwd": "${workspaceFolder}/packages/ethereum",
-      "outFiles": [
-        "${workspaceFolder}/packages/ethereum/**/*.{ts,js}"
-      ]
+      "outFiles": ["${workspaceFolder}/packages/ethereum/**/*.{ts,js}"]
     }
   ]
 }
