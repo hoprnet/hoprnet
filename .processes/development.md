@@ -40,7 +40,7 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 | Trifecta            | Representantives + Project Owner                                                                           |
 | Issue tracker       | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
-### Representantives
+### Representatives
 
 Each individual representantive is elected for a period of `3 months`. The periods are overlapped to create a staggered schedule during which new representatives can be guided by their co-representatives who have already served half of their election period. Previous representatives may be re-elected.
 
@@ -53,7 +53,7 @@ Responsibilities:
 _Current:_
 
 - [Tino](https://github.com/tolbrino) until 05/02/2022
-- [Steve](https://github.com/nionis) until 20/12/2021
+- [Robert](https://github.com/robertkiel) until 04/03/2022
 
 ### Trifecta
 
