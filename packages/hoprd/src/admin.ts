@@ -49,8 +49,8 @@ export class AdminServer {
       try {
         // NB: We use a placeholder domain since req.url only passes query params
         const url = new URL(`https://hoprnet.org${req.url}`)
-        const apiToken = (url.searchParams && url.searchParams.get('apiToken')) || ''
-        if (encodeURI(apiToken) == this.apiToken) {
+        const apiToken = url.searchParams?.get('apiToken') || ''
+        if (decodeURI(apiToken) == this.apiToken) {
           this.logs.log('ws client connected [ authentication ENABLED ]')
           return true
         }
