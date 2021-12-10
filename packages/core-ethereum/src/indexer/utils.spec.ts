@@ -1,5 +1,6 @@
 import { expect } from 'chai'
-import { snapshotComparator, isConfirmedBlock } from './utils'
+import { UNIT_TEST_MAX_CONFIRMATIONS } from '../fixtures'
+import { snapshotComparator, isConfirmedBlock, getConfirmedBlockNumberOrUndefined } from './utils'
 
 describe('test snapshotComparator', function () {
   const EVENT_1_0_0 = {
@@ -79,5 +80,34 @@ describe('test isConfirmedBlock', function () {
 
   it('should be true when blockNumber=5 onChainBlockNumber=10 maxConf=5', function () {
     expect(isConfirmedBlock(5, 10, 5)).to.be.true
+  })
+})
+
+describe('test getConfirmedBlockNumberOrUndefined', function () {
+  describe('test getConfirmedBlockNumberOrUndefined (undefined)', function () {
+    // Test provider + indexer works properly
+    const processedBlocks = [undefined, 0, 1];
+    const fromBlocks = [0, 1];
+    processedBlocks.forEach((processedBlock) => {
+      fromBlocks.forEach((fromBlock) => {
+      it(`should return undefined when from block is ${fromBlock} processed block is ${processedBlock}`, async function () {
+        expect(getConfirmedBlockNumberOrUndefined(fromBlock, processedBlock, UNIT_TEST_MAX_CONFIRMATIONS)).to.eql(undefined)
+        })
+      })
+    })
+  })
+
+  describe('test getConfirmedBlockNumberOrUndefined (number)', function () {
+    // Test provider + indexer works properly
+    const processedBlocks = [undefined, 0, 1, 2];
+    const fromBlocks = [2, 3, 4];
+    processedBlocks.forEach((processedBlock) => {
+      fromBlocks.forEach((fromBlock) => {
+      it(`should return undefined when from block is ${fromBlock} processed block is ${processedBlock}`, async function () {
+        const shouldResult = Math.max(fromBlock - UNIT_TEST_MAX_CONFIRMATIONS, processedBlock ?? 0)
+        expect(getConfirmedBlockNumberOrUndefined(fromBlock, processedBlock, UNIT_TEST_MAX_CONFIRMATIONS)).to.eql(shouldResult)
+        })
+      })
+    })
   })
 })

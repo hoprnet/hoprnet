@@ -12,3 +12,5 @@ export const CHANNEL_ID = '0x6e454104cde7f1c088b14c3ead07945f6f2c1ce72fef4171a76
 
 export const SECRET_1 = new Hash(stringToU8a('0xb8b37f62ec82443e5b5557c5a187fe3686790620cc04c06187c48f8636caac89'))
 export const SECRET_2 = new Hash(stringToU8a('0x294549f8629f0eeb2b8e01aca491f701f5386a9662403b485c4efe7d447dfba3'))
+
+export const UNIT_TEST_MAX_CONFIRMATIONS = 2

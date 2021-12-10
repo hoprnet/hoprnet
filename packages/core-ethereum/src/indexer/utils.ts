@@ -33,3 +33,27 @@ export const isConfirmedBlock = (
 ): boolean => {
   return blockNumber + maxConfirmations <= onChainBlockNumber
 }
+
+/**
+ * Convert the unconfirmed block number to the block number with acceptable finality
+ * @param blockNumber block number of the unconfirmed block
+ * @param confirmedBlockNumber block number of the known confirmed block
+ * @param maxConfirmations block finality
+ */
+export const getConfirmedBlockNumberOrUndefined = (
+  blockNumber: number,
+  confirmedBlockNumber: number | undefined,
+  maxConfirmations: number
+): number | undefined => {
+  if (blockNumber < maxConfirmations) {
+    return undefined
+  } 
+  
+  const block = blockNumber - maxConfirmations
+  
+  if (block < confirmedBlockNumber) {
+    return confirmedBlockNumber ?? 0
+  } else {
+    return block
+  }
+}

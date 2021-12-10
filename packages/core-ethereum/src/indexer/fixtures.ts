@@ -58,7 +58,7 @@ export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B.toAddress(),
 
 export const OPENED_EVENT = {
   event: 'ChannelUpdated',
-  transactionHash: '',
+  transactionHash: '0x',
   blockNumber: 2,
   transactionIndex: 0,
   logIndex: 0,

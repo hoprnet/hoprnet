@@ -36,6 +36,7 @@ const acknowledgedTicketKey = (challenge: EthereumChallenge, channelEpoch: UINT2
 }
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('latestBlockNumber')
+const LATEST_PROCESSED_BLOCK_NUMBER_KEY = encoder.encode('latestProcessedBlockNumber')
 const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('latestConfirmedSnapshot')
 const ACCOUNT_PREFIX = encoder.encode('account-')
 const CHANNEL_PREFIX = encoder.encode('channel-')
@@ -406,6 +407,15 @@ export class HoprDB {
 
   async updateLatestBlockNumber(blockNumber: BN): Promise<void> {
     await this.put(LATEST_BLOCK_NUMBER_KEY, blockNumber.toBuffer())
+  }
+
+  async getLatestProcessedBlockNumber(): Promise<number | undefined> {
+    if (!(await this.has(LATEST_PROCESSED_BLOCK_NUMBER_KEY))) return undefined
+    return new BN(await this.get(LATEST_PROCESSED_BLOCK_NUMBER_KEY)).toNumber()
+  }
+
+  async updateLatestProcessedBlockNumber(blockNumber: number): Promise<void> {
+    await this.put(LATEST_PROCESSED_BLOCK_NUMBER_KEY, new BN(blockNumber).toBuffer())
   }
 
   async getLatestConfirmedSnapshotOrUndefined(): Promise<Snapshot | undefined> {

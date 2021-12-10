@@ -7,8 +7,9 @@ import type { HoprToken, HoprChannels, TypedEventFilter } from '@hoprnet/hopr-et
  */
 type extractEventArgs<Type> = Type extends TypedEventFilter<infer A> ? A : null
 
-export type EventNames = keyof HoprChannels['filters']
-export type Event<T extends EventNames> = extractEventArgs<ReturnType<Pick<HoprChannels['filters'], T>[T]>>
+export type ChannelEventNames = keyof HoprChannels['filters']
+export type ChannelEvent<T extends ChannelEventNames> = extractEventArgs<ReturnType<Pick<HoprChannels['filters'], T>[T]>>
 export type TokenEventNames = keyof HoprToken['filters']
 export type TokenEvent<T extends TokenEventNames> = extractEventArgs<ReturnType<Pick<HoprToken['filters'], T>[T]>>
+export type Event<T extends ChannelEventNames | TokenEventNames> = T extends ChannelEventNames ? ChannelEvent<T> : T extends TokenEventNames ? TokenEvent<T> : unknown
 export type IndexerEvents = 'announce' | 'withdraw-hopr' | 'withdraw-native' | 'channel-updated'
