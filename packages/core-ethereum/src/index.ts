@@ -52,9 +52,8 @@ export type ChainOptions = {
   network: string
   environment: string
 }
-export type ChainStatus = 'UNINITIALIZED' | 'CREATING' | 'CREATED' | 'STARTING' | 'STOPPED'
+
 export default class HoprEthereum extends EventEmitter {
-  public status: ChainStatus = 'UNINITIALIZED'
   public indexer: Indexer
   private chain: ChainWrapper
   private started: Promise<HoprEthereum> | undefined
@@ -65,7 +64,8 @@ export default class HoprEthereum extends EventEmitter {
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
-    private options: ChainOptions
+    private options: ChainOptions,
+    protected automaticChainCreation = true
   ) {
     super()
     this.indexer = new Indexer(
@@ -74,14 +74,23 @@ export default class HoprEthereum extends EventEmitter {
       this.options?.maxConfirmations ?? CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )
-    this.status = 'CREATING'
-    log('Ready to call singleton wrapper', ChainWrapperSingleton)
-    ChainWrapperSingleton.create(this.options, this.privateKey).then((chain: ChainWrapper) => {
-      // Debug log used in e2e integration tests, please don't change
-      log(`connector chain created`)
-      this.status = 'CREATED'
-      this.chain = chain
-    })
+    // In some cases, we want to make sure the chain within the connector is not triggered
+    // automatically but instead via an event. This is the case for `hoprd`, where we need
+    // to get notified after ther chain was properly created, and we can't get setup the
+    // listeners before the node was actually created.
+    if (automaticChainCreation) {
+      this.createChain()
+    } else {
+      this.once('connector:create', this.createChain)
+    }
+  }
+
+  private async createChain(): Promise<void> {
+    this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
+    // Debug log used in e2e integration tests, please don't change
+    log(`connector chain created`)
+    // Emit event to make sure connector is aware the chain was created properly.
+    this.emit('connector:created')
   }
 
   async start(): Promise<HoprEthereum> {

@@ -38,7 +38,6 @@ import type {
   HalfKeyChallenge
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import type { ChainStatus } from '@hoprnet/hopr-core-ethereum'
 import type { Indexer } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
@@ -654,8 +653,11 @@ class Hopr extends EventEmitter {
     \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
   }
 
-  public getConnectorStatus(): ChainStatus {
-    return this.connector.status
+  public subscribeOnConnector(event: string, callback: () => void): void {
+    this.connector.on(event, callback)
+  }
+  public emitOnConnector(event: string): void {
+    this.connector.emit(event)
   }
 
   public async periodicCheck() {
