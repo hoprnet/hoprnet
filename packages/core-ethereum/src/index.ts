@@ -81,7 +81,7 @@ export default class HoprEthereum extends EventEmitter {
     if (automaticChainCreation) {
       this.createChain()
     } else {
-      this.on('connector:create', this.createChain)
+      this.once('connector:create', this.createChain)
     }
   }
 
