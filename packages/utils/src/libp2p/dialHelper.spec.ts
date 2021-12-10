@@ -94,7 +94,6 @@ describe('test dialHelper', function () {
     await peerA.stop()
   })
 
-  // Temporarily disabled
   it('regular dial with DHT', async function () {
     this.timeout(10e3)
     const peerA = await getNode(Alice, true)
