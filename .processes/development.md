@@ -177,7 +177,7 @@ The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows
 
 _Who:_ all tech members within a meeting
 
-_When:_ first day of the sprint
+_When:_ last day of the sprint
 
 ### Epic Prioritization
 
