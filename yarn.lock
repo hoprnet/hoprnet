@@ -1404,7 +1404,7 @@ __metadata:
     yamljs: ^0.3.0
     yargs: 17.2.1
   bin:
-    hoprd: lib/index.js
+    hoprd: lib/main.js
   languageName: unknown
   linkType: soft
 

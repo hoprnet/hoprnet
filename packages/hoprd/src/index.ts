@@ -44,7 +44,7 @@ const argv = yargs(process.argv.slice(2))
     string: true,
     describe: 'Environment id which the node shall run on',
     choices: supportedEnvironments().map((env) => env.id),
-    default: defaultEnvironment()
+    default: defaultEnvironment() || 'hardhat-localhost'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
