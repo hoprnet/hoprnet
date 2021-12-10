@@ -84,7 +84,10 @@ async function attemptDial(
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal: opts.signal })
   } catch (err) {
-    logError(`Error while dialing ${destination.toB58String()} directly.`, err)
+    logError(`Error while dialing ${destination.toB58String()} directly.`)
+    if (err?.message) {
+      logError(`Dial error: ${err.message}`)
+    }
   }
 
   // Libp2p's return types tend to change every now and then
@@ -117,7 +120,10 @@ async function queryDHT(
     // Let libp2p populate its internal peerStore with fresh addresses
     dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
-    logError(`Error while querying the DHT for ${destination.toB58String()}.`, err)
+    logError(`Error while querying the DHT for ${destination.toB58String()}.`)
+    if (err?.message) {
+      logError(`DHT error: ${err.message}`)
+    }
   }
 
   // Libp2p's return types tend to change every now and then
