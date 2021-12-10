@@ -31,11 +31,17 @@ async function getNode(id: PeerId, withDHT = false): Promise<Libp2p> {
       connEncryption: [NOISE],
       dht: withDHT ? KadDHT : undefined
     },
+    metrics: {
+      enabled: false
+    },
     config: {
       dht: {
         enabled: withDHT
       },
       nat: {
+        enabled: false
+      },
+      relay: {
         enabled: false
       }
     }
