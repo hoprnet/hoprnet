@@ -47,10 +47,10 @@ export const getConfirmedBlockNumberOrUndefined = (
 ): number | undefined => {
   if (blockNumber < maxConfirmations) {
     return undefined
-  } 
-  
+  }
+
   const block = blockNumber - maxConfirmations
-  
+
   if (block < confirmedBlockNumber) {
     return confirmedBlockNumber ?? 0
   } else {

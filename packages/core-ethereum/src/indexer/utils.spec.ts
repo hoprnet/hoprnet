@@ -86,12 +86,14 @@ describe('test isConfirmedBlock', function () {
 describe('test getConfirmedBlockNumberOrUndefined', function () {
   describe('test getConfirmedBlockNumberOrUndefined (undefined)', function () {
     // Test provider + indexer works properly
-    const processedBlocks = [undefined, 0, 1];
-    const fromBlocks = [0, 1];
+    const processedBlocks = [undefined, 0, 1]
+    const fromBlocks = [0, 1]
     processedBlocks.forEach((processedBlock) => {
       fromBlocks.forEach((fromBlock) => {
-      it(`should return undefined when from block is ${fromBlock} processed block is ${processedBlock}`, async function () {
-        expect(getConfirmedBlockNumberOrUndefined(fromBlock, processedBlock, UNIT_TEST_MAX_CONFIRMATIONS)).to.eql(undefined)
+        it(`should return undefined when from block is ${fromBlock} processed block is ${processedBlock}`, async function () {
+          expect(getConfirmedBlockNumberOrUndefined(fromBlock, processedBlock, UNIT_TEST_MAX_CONFIRMATIONS)).to.eql(
+            undefined
+          )
         })
       })
     })
@@ -99,13 +101,15 @@ describe('test getConfirmedBlockNumberOrUndefined', function () {
 
   describe('test getConfirmedBlockNumberOrUndefined (number)', function () {
     // Test provider + indexer works properly
-    const processedBlocks = [undefined, 0, 1, 2];
-    const fromBlocks = [2, 3, 4];
+    const processedBlocks = [undefined, 0, 1, 2]
+    const fromBlocks = [2, 3, 4]
     processedBlocks.forEach((processedBlock) => {
       fromBlocks.forEach((fromBlock) => {
-      it(`should return undefined when from block is ${fromBlock} processed block is ${processedBlock}`, async function () {
-        const shouldResult = Math.max(fromBlock - UNIT_TEST_MAX_CONFIRMATIONS, processedBlock ?? 0)
-        expect(getConfirmedBlockNumberOrUndefined(fromBlock, processedBlock, UNIT_TEST_MAX_CONFIRMATIONS)).to.eql(shouldResult)
+        it(`should return undefined when from block is ${fromBlock} processed block is ${processedBlock}`, async function () {
+          const shouldResult = Math.max(fromBlock - UNIT_TEST_MAX_CONFIRMATIONS, processedBlock ?? 0)
+          expect(getConfirmedBlockNumberOrUndefined(fromBlock, processedBlock, UNIT_TEST_MAX_CONFIRMATIONS)).to.eql(
+            shouldResult
+          )
         })
       })
     })

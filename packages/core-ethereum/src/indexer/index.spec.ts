@@ -91,7 +91,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<ChannelEventNames>[] }
     }
 
     async queryFilter(_filter, fromBlock, toBlock) {
-      return pastEvents.filter(e => e.blockNumber >= fromBlock && e.blockNumber <= toBlock)
+      return pastEvents.filter((e) => e.blockNumber >= fromBlock && e.blockNumber <= toBlock)
     }
   }
 
@@ -105,8 +105,10 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<ChannelEventNames>[] }
       hoprChannels.emit('*', event)
     },
     reorg(blockNumber: number) {
-      const indexes = pastEvents.map((pe, i) => {if (pe.blockNumber === blockNumber) return i} )
-      indexes.forEach(i => pastEvents.splice(i, 1))
+      const indexes = pastEvents.map((pe, i) => {
+        if (pe.blockNumber === blockNumber) return i
+      })
+      indexes.forEach((i) => pastEvents.splice(i, 1))
     }
   }
 }
@@ -222,13 +224,13 @@ describe('test indexer', function () {
         latestBlockNumber: 4,
         pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
       })
-  
+
       await indexer.start(chain, 0)
-  
+
       provider.emit('error', new Error('MOCK'))
-  
+
       assert.strictEqual(indexer.status, 'stopped')
-  
+
       const started = defer<void>()
       indexer.on('status', (status: string) => {
         if (status === 'started') started.resolve()
@@ -236,18 +238,18 @@ describe('test indexer', function () {
       await started.promise
       assert.strictEqual(indexer.status, 'started')
     })
-  
+
     it('should handle provider error and resend queuing transactions', async function () {
       const { indexer, provider, chain } = await useFixtures({
         latestBlockNumber: 4,
         pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
       })
-  
+
       await indexer.start(chain, 0)
       provider.emit('error', new Error('ECONNRESET'))
-  
+
       assert.strictEqual(indexer.status, 'stopped')
-  
+
       const started = defer<void>()
       indexer.on('status', (status: string) => {
         if (status === 'started') started.resolve()
@@ -255,17 +257,17 @@ describe('test indexer', function () {
       await started.promise
       assert.strictEqual(indexer.status, 'started')
     })
-  
+
     it('should contract error by restarting', async function () {
       const { indexer, hoprChannels, chain } = await useFixtures({
         latestBlockNumber: 4,
         pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
       })
-  
+
       await indexer.start(chain, 0)
-  
+
       hoprChannels.emit('error', new Error('MOCK'))
-  
+
       const started = defer<void>()
       indexer.on('status', (status: string) => {
         if (status === 'started') started.resolve()
@@ -277,24 +279,26 @@ describe('test indexer', function () {
 
   describe('Process right blocks', function () {
     // When provider starts with the following block number, indexer should process latestBlock - UNIT_TEST_MAX_CONFIRMATIONS
-    const providerStarterArray = [0, 1, 2, 3, 4];
-    providerStarterArray.forEach(latestBlockNumber => {
+    const providerStarterArray = [0, 1, 2, 3, 4]
+    providerStarterArray.forEach((latestBlockNumber) => {
       it(`should process right blocks when provider starts from ${latestBlockNumber}`, async function () {
         const advance = 3 // number of blocks to advance
         const genesisBlock = 0
-        const { indexer, newBlock, chain, provider} = await useFixtures({
+        const { indexer, newBlock, chain, provider } = await useFixtures({
           latestBlockNumber
         })
 
-        const shouldProviderBlocks = Array.from({length: advance}, (_v, i) => latestBlockNumber + i + 1)
+        const shouldProviderBlocks = Array.from({ length: advance }, (_v, i) => latestBlockNumber + i + 1)
         // [emit the last processed past block number (if applicable), and confirmed block number from all the new blocks]
-        const shouldIndexerBlocks = [latestBlockNumber, ...shouldProviderBlocks].map(v => v - UNIT_TEST_MAX_CONFIRMATIONS).filter(v => v >= 0)
+        const shouldIndexerBlocks = [latestBlockNumber, ...shouldProviderBlocks]
+          .map((v) => v - UNIT_TEST_MAX_CONFIRMATIONS)
+          .filter((v) => v >= 0)
         const providerPromise = defer<void>()
         const indexerPromise = defer<void>()
         const indexerProcessedPromise = defer<void>()
-        const providerBlocks = [];
-        const indexerBlocks = [];
-        const indexerProcessedBlocks = [];
+        const providerBlocks = []
+        const indexerBlocks = []
+        const indexerProcessedBlocks = []
         provider.on('block', (blockNumber: number) => {
           providerBlocks.push(blockNumber)
           if (providerBlocks.length === shouldProviderBlocks.length) providerPromise.resolve()
@@ -323,7 +327,7 @@ describe('test indexer', function () {
     })
 
     it('should catch re-orged events', async function () {
-      const { indexer, newBlock, COMMITTED_CHANNEL, chain, db, newEvent} = await useFixtures({
+      const { indexer, newBlock, COMMITTED_CHANNEL, chain, db, newEvent } = await useFixtures({
         latestBlockNumber: 1,
         pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
       })
@@ -332,15 +336,15 @@ describe('test indexer', function () {
       indexer.on('block-processed', (blockNumber: number) => {
         if (blockNumber === 2) blockMined.resolve()
       })
-      
+
       await indexer.start(chain, 0) // genesisBlock: 0
-      newBlock()  // block nr. 2 => settle block nr. 0
-      newBlock()  // block nr. 3 => settle block nr. 1
+      newBlock() // block nr. 2 => settle block nr. 0
+      newBlock() // block nr. 3 => settle block nr. 1
       // block nr.2 gets re-orged. Missing events are included
       newEvent(fixtures.OPENED_EVENT)
       newEvent(fixtures.COMMITTED_EVENT)
       // reorg(fixtures.OPENED_EVENT.blockNumber)
-      newBlock()  // block nr. 4 => settle block nr. 2
+      newBlock() // block nr. 4 => settle block nr. 2
 
       await blockMined.promise
 
@@ -349,14 +353,19 @@ describe('test indexer', function () {
     })
 
     it('should ignore re-orged events', async function () {
-      const { indexer, newBlock, COMMITTED_CHANNEL, chain, db, reorg} = await useFixtures({
+      const { indexer, newBlock, COMMITTED_CHANNEL, chain, db, reorg } = await useFixtures({
         latestBlockNumber: 2,
-        pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT]
+        pastEvents: [
+          fixtures.PARTY_A_INITIALIZED_EVENT,
+          fixtures.PARTY_B_INITIALIZED_EVENT,
+          fixtures.OPENED_EVENT,
+          fixtures.COMMITTED_EVENT
+        ]
       })
 
       const blockMined = defer<void>()
       const blockProcessed = defer<void>()
-      const eventsCaught = [];  // save the number of listened events into an array.
+      const eventsCaught = [] // save the number of listened events into an array.
       indexer.on('block-processed', (blockNumber: number) => {
         if (blockNumber === 2) blockMined.resolve()
       })
@@ -365,10 +374,10 @@ describe('test indexer', function () {
         if (blockNumber === 4) blockProcessed.resolve()
       })
       await indexer.start(chain, 0) // genesisBlock: 0
-      newBlock()  // block nr. 3 => settle block nr. 1
+      newBlock() // block nr. 3 => settle block nr. 1
       // block nr.2 gets re-orged. Some events are missing
       reorg(fixtures.OPENED_EVENT.blockNumber)
-      newBlock()  // block nr. 4 => settle block nr. 2
+      newBlock() // block nr. 4 => settle block nr. 2
       await Promise.all([blockProcessed.promise, blockMined.promise])
 
       // Heard events should be an array of zeros
@@ -413,16 +422,16 @@ describe('test indexer', function () {
         latestBlockNumber: 1,
         pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
       })
-      
+
       const blockMined = defer<void>()
       indexer.on('block-processed', (blockNumber: number) => {
         if (blockNumber === 2) blockMined.resolve()
       })
       await indexer.start(chain, 0)
       newEvent(fixtures.OPENED_EVENT) // in block number 2
-      newBlock()  // block nr.2 => settle block nr. 0
-      newBlock()  // block nr.3 => settle block nr. 1
-      newBlock()  // block nr.4 => settle block nr. 2
+      newBlock() // block nr.2 => settle block nr. 0
+      newBlock() // block nr.3 => settle block nr. 1
+      newBlock() // block nr.4 => settle block nr. 2
       await blockMined.promise
 
       const channel = await db.getChannel(OPENED_CHANNEL.getId())
@@ -601,7 +610,7 @@ describe('test indexer', function () {
       newEvent(fixtures.OPENED_EVENT)
       newBlock() // block nr. 4 => settle block nr. 2
       await blockMined.promise
-      
+
       indexer.on('block-processed', (blockNumber: number) => {
         if (blockNumber === 4) blockMined.resolve()
       })

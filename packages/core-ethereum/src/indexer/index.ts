@@ -25,7 +25,7 @@ import { errors, utils } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 
 const log = debug('hopr-core-ethereum:indexer')
-const getSyncPercentage = (n: number, max: number) => n === 0 && max === 0 ? '100.00' : ((n * 100) / max).toFixed(2)
+const getSyncPercentage = (n: number, max: number) => (n === 0 && max === 0 ? '100.00' : ((n * 100) / max).toFixed(2))
 const ANNOUNCEMENT = 'Announcement'
 const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
@@ -79,8 +79,8 @@ class Indexer extends EventEmitter {
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     // no need to query before HoprChannels existed
     // if `latestProcessedBlock` is undefined (DB is empty, `fromBlock` is this.genesisBlock)
-    const fromBlock = latestProcessedBlock > this.genesisBlock ? latestProcessedBlock : this.genesisBlock//getConfirmedBlockNumberOrUndefined(latestSavedBlock, this.genesisBlock, this.maxConfirmations)
-    const toBlock =  getConfirmedBlockNumberOrUndefined(latestOnChainBlock, fromBlock, this.maxConfirmations)
+    const fromBlock = latestProcessedBlock > this.genesisBlock ? latestProcessedBlock : this.genesisBlock //getConfirmedBlockNumberOrUndefined(latestSavedBlock, this.genesisBlock, this.maxConfirmations)
+    const toBlock = getConfirmedBlockNumberOrUndefined(latestOnChainBlock, fromBlock, this.maxConfirmations)
 
     log(
       'Starting to index from block %d, sync progress %d%',
@@ -95,15 +95,24 @@ class Indexer extends EventEmitter {
       const confirmedBlockNumber = getConfirmedBlockNumberOrUndefined(b, this.processedBlock, this.maxConfirmations)
       if (confirmedBlockNumber !== undefined) {
         // // extend the list of confirmed events
-        const channelEvents = await this.chain.getChannels().queryFilter('*' as any, confirmedBlockNumber, confirmedBlockNumber)
-        const tokenEvents = await this.chain.getToken().queryFilter('*' as any, confirmedBlockNumber, confirmedBlockNumber)
-        
-        // // TODO: Improvements: check transaction-manager's pending list and search for/settle those hashes. 
+        const channelEvents = await this.chain
+          .getChannels()
+          .queryFilter('*' as any, confirmedBlockNumber, confirmedBlockNumber)
+        const tokenEvents = await this.chain
+          .getToken()
+          .queryFilter('*' as any, confirmedBlockNumber, confirmedBlockNumber)
+
+        // // TODO: Improvements: check transaction-manager's pending list and search for/settle those hashes.
         this.confirmedEvents.addAll(channelEvents)
-        this.confirmedEvents.addAll(tokenEvents.filter(e => e.event === 'Transfer' &&
-        (e.topics[1] === utils.hexZeroPad(this.address.toHex(), 32) ||
-          e.topics[2] === utils.hexZeroPad(this.address.toHex(), 32))))
-        // TODO: Improvements: check transaction-manager's pending list and search for/settle those hashes. 
+        this.confirmedEvents.addAll(
+          tokenEvents.filter(
+            (e) =>
+              e.event === 'Transfer' &&
+              (e.topics[1] === utils.hexZeroPad(this.address.toHex(), 32) ||
+                e.topics[2] === utils.hexZeroPad(this.address.toHex(), 32))
+          )
+        )
+        // TODO: Improvements: check transaction-manager's pending list and search for/settle those hashes.
         // This new block markes a previous block
         // (blockNumber - this.maxConfirmations) is final.
         // Confirm native token transactions in that previous block.
@@ -239,8 +248,7 @@ class Indexer extends EventEmitter {
       try {
         // TODO: wildcard is supported but not properly typed
         events = await this.chain.getChannels().queryFilter('*' as any, fromBlock, toBlock)
-        // TODO: Improvements: check transaction-manager's pending list and search for/settle those hashes. 
-
+        // TODO: Improvements: check transaction-manager's pending list and search for/settle those hashes.
       } catch (error) {
         failedCount++
 
@@ -252,7 +260,7 @@ class Indexer extends EventEmitter {
       }
 
       this.confirmedEvents.addAll(events) // add events to the `confirmedEvents` heap
-      await this.processBlock(toBlock)  // FIXME: advance confirmed block to `toBlock`
+      await this.processBlock(toBlock) // FIXME: advance confirmed block to `toBlock`
       failedCount = 0
       fromBlock = toBlock + 1
 
@@ -289,9 +297,7 @@ class Indexer extends EventEmitter {
   private async processBlock(blockNumber: number): Promise<void> {
     let lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
     // check confirmed events and process them
-    while (
-      this.confirmedEvents.length > 0
-    ) {
+    while (this.confirmedEvents.length > 0) {
       const event = this.confirmedEvents.pop()
       log('Processing event %s %s %s', event.event, blockNumber, this.maxConfirmations)
       // FIXME: compare snapshot page
@@ -318,7 +324,7 @@ class Indexer extends EventEmitter {
       // FIXME: import transaction manager and update thru tx manager
       this.chain.updateConfirmedTransaction(event.transactionHash as string)
       log('Event name %s and hash %s', eventName, event.transactionHash)
-      
+
       try {
         if (eventName === ANNOUNCEMENT) {
           await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
@@ -374,10 +380,10 @@ class Indexer extends EventEmitter {
     this.indexEvent('channel-updated', [event.transactionHash])
     log('channel-updated for hash %s', event.transactionHash)
     const channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
-    
+
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
-    
+
     let prevState
     try {
       prevState = await this.db.getChannel(channel.getId())
