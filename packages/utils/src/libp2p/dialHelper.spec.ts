@@ -5,7 +5,7 @@ import { dial as dialHelper, DialStatus } from './dialHelper'
 import { privKeyToPeerId } from './privKeyToPeerId'
 import TCP from 'libp2p-tcp'
 import KadDHT from 'libp2p-kad-dht'
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 import assert from 'assert'
 import { Multiaddr } from 'multiaddr'
 import pipe from 'it-pipe'
@@ -88,8 +88,7 @@ describe('test dialHelper', function () {
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
-    assert(result.status === DialStatus.DIAL_ERROR, `Should print dial error`)
-    assert(result.dhtContacted == true, `Should contact DHT`)
+    assert(result.status === DialStatus.DHT_ERROR, `Must return dht error`)
 
     // Shutdown node
     await peerA.stop()
@@ -97,7 +96,7 @@ describe('test dialHelper', function () {
 
   // Temporarily disabled
   it('regular dial with DHT', async function () {
-    this.timeout(15e3)
+    this.timeout(10e3)
     const peerA = await getNode(Alice, true)
     const peerB = await getNode(Bob, true)
     const peerC = await getNode(Chris, true)
@@ -146,7 +145,8 @@ describe('test dialHelper', function () {
       peerRouting: {
         // Array with length > 0
         _routers: [undefined],
-        findPeer: () => Promise.resolve(undefined)
+        findPeer: () =>
+          Promise.resolve({ id: Bob, multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`)] })
       },
       dialProtocol: () => Promise.resolve(undefined),
       peerStore: {
@@ -160,10 +160,10 @@ describe('test dialHelper', function () {
             })
           }
 
-          return { addresses: multiaddrs }
+          return { addresses: multiaddrs } as any
         }
       }
-    } as any
+    }
 
     peerStore.add(new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`))
 
@@ -181,7 +181,7 @@ describe('test dialHelper', function () {
         // Array with length > 0
         _routers: [undefined],
         // Call rejects asynchronously
-        findPeer: () => new Promise((_, reject) => setImmediate(reject))
+        findPeer: () => new Promise<any>((_, reject) => setImmediate(reject))
       },
       dialProtocol: () => Promise.resolve(undefined),
       peerStore: {
@@ -195,18 +195,18 @@ describe('test dialHelper', function () {
             })
           }
 
-          return { addresses: multiaddrs }
+          // Libp2p's return value has more properties but
+          // dialHelper only uses the Multiaddresses
+          return { addresses: multiaddrs } as any
         }
       }
-    } as any
+    }
 
     peerStore.add(new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`))
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
-    assert(result.status === DialStatus.DIAL_ERROR)
-    // assert(result.error === 'No new addresses after contacting the DHT')
-    assert(result.dhtContacted == true)
+    assert(result.status === DialStatus.DHT_ERROR)
   })
 
   it('DHT does not lead to better addresses', async function () {
@@ -215,10 +215,11 @@ describe('test dialHelper', function () {
       peerRouting: {
         // Array with length > 0
         _routers: [undefined],
-        findPeer: () => {
-          return {
+        findPeer: (id: PeerId) => {
+          return Promise.resolve({
+            id,
             multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${Bob.toB58String()}`)]
-          }
+          })
         }
       },
       dialProtocol: () => Promise.resolve(undefined),
@@ -233,10 +234,12 @@ describe('test dialHelper', function () {
             })
           }
 
-          return { addresses: multiaddrs }
+          // Libp2p's return value has more properties but
+          // dialHelper only uses the Multiaddresses
+          return { addresses: multiaddrs } as any
         }
       }
-    } as any
+    }
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
