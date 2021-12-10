@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.85.0-next.9",
+  "version": "1.85.0-next.17",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -13,7 +13,6 @@
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc",
-    "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -38,6 +37,7 @@
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
+    "@types/mocha": "9.0.0",
     "chai": "4.3.4",
     "chai-as-promised": "7.1.1",
     "mocha": "9.1.3",

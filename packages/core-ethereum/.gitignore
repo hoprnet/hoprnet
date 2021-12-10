@@ -1,8 +1,5 @@
 # Exclude node.js stuff
-**/node_modules
-
-# Exclude keys
-.env
+node_modules
 
 # Exclude yarn stuff
 yarn-error.log
@@ -10,12 +7,8 @@ yarn-error.log
 # Exclude OSX stuff
 **/.DS_Store
 
-# typechain types generated
-src/contracts
-
 # Typescript builds
 lib
-test.mocha.js
 
 # Exclude any built npm packages
 *.tgz

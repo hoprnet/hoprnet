@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.85.0-next.9",
+  "version": "1.85.0-next.17",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -20,7 +20,6 @@
     "coverage": "nyc --reporter=html mocha",
     "build": "yarn clean && tsc -p .",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
-    "prepublishOnly": "tsc -p ./tsconfig.npm.json",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -41,7 +40,7 @@
     "heap-js": "^2.1.6",
     "leveldown": "6.1.0",
     "levelup": "5.1.1",
-    "libp2p": "hoprnet/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad",
+    "libp2p": "hoprnet/js-libp2p#c30b85b30e50fe822961c25c5f64a150551b4781",
     "libp2p-kad-dht": "0.27.3",
     "libp2p-mplex": "0.10.5",
     "multiaddr": "^10.0.1",
@@ -51,6 +50,7 @@
   "devDependencies": {
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum",
     "@types/chai-as-promised": "7.1.4",
+    "@types/mocha": "9.0.0",
     "chai": "4.3.4",
     "chai-as-promised": "7.1.1",
     "libp2p-tcp": "0.17.2",
