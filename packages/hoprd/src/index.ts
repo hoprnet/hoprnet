@@ -58,15 +58,15 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('rest', {
     boolean: true,
-    describe: 'Run a rest interface on localhost:3001, requires --apiToken',
+    describe: 'Expose the Rest API on localhost:3001, requires --apiToken',
     default: false
   })
   .option('restHost', {
-    describe: 'Updates the host for the rest server',
+    describe: 'Set host IP to which the Rest API server will bind',
     default: 'localhost'
   })
   .option('restPort', {
-    describe: 'Updates the port for the rest server',
+    describe: 'Set host port to which the Rest API server will bind',
     default: 3001
   })
   .option('healthCheck', {

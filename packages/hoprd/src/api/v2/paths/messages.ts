@@ -1,5 +1,6 @@
 import { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
+import { PublicKey } from '@hoprnet/hopr-utils'
 import { encodeMessage } from '../../../commands/utils'
 
 export const parameters = []
@@ -7,7 +8,7 @@ export const parameters = []
 export const POST: Operation = [
   async (req, res, _next) => {
     const message = encodeMessage(req.body.body)
-    const path = req.body.path
+    const path: PublicKey[] = req.body.path.map((peer) => PublicKey.fromPeerId(PeerId.createFromB58String(peer)))
     const recipient: PeerId = PeerId.createFromB58String(req.body.recipient)
 
     try {

@@ -6,7 +6,6 @@ test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; 
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
-set -x
 
 # set log id and use shared log function for readable logs
 declare mydir
@@ -66,7 +65,7 @@ send_message(){
   local step_time=${6:-25}
   local end_time_ns=${7:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl -m ${step_time} --connect-timeout ${step_time} -s -H \"X-Auth-Token: ${api_token}\" -H \"Content-Type: application/json\" --url ${endpoint}/api/v2/messages -o /dev/null -w '%{http_code}' -d "
+  local cmd="curl -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${endpoint}/api/v2/messages -o /dev/null -w %{http_code} -d "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -113,7 +112,7 @@ run_command(){
   local step_time=${5:-25}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl -m ${step_time} --connect-timeout ${step_time} -s -H \"X-Auth-Token: ${api_token}\" --url ${endpoint}/api/v1/command -d "
+  local cmd="curl -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} --url ${endpoint}/api/v1/command -d "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -297,5 +296,5 @@ done
 
 for i in `seq 1 10`; do
   log "Node 1 send message to node 5"
-  send_message "${api1}" "${addr5}" "hello, world"" 600
+  send_message "${api1}" "${addr5}" "hello, world" "" 600
 done
