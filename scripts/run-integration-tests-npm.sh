@@ -323,17 +323,6 @@ setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run 
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2"
 # }}}
 
-#  --- Wait until created --- {{{
-# Wait until node has created the blockchain connector
-wait_for_regex ${node1_log} "connector chain created"
-wait_for_regex ${node2_log} "connector chain created"
-wait_for_regex ${node3_log} "connector chain created"
-wait_for_regex ${node4_log} "connector chain created"
-wait_for_regex ${node5_log} "connector chain created"
-wait_for_regex ${node6_log} "connector chain created"
-wait_for_regex ${node7_log} "connector chain created"
-# }}}
-
 #  --- Fund nodes --- {{{
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --identity-prefix "${node_prefix}" \

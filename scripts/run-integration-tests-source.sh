@@ -282,19 +282,6 @@ setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f
 declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
 log "CT node1 address: ${ct_node1_address}"
 
-log "Waiting for connector"
-
-#  --- Wait until created --- {{{
-# Wait until node has created the blockchain connector
-wait_for_regex ${node1_log} "connector chain created"
-wait_for_regex ${node2_log} "connector chain created"
-wait_for_regex ${node3_log} "connector chain created"
-wait_for_regex ${node4_log} "connector chain created"
-wait_for_regex ${node5_log} "connector chain created"
-wait_for_regex ${node6_log} "connector chain created"
-wait_for_regex ${node7_log} "connector chain created"
-# }}}
-
 log "Funding nodes"
 
 #  --- Fund nodes --- {{{
