@@ -10,8 +10,6 @@ import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
 import { PARTY_A, PARTY_B, UNIT_TEST_MAX_CONFIRMATIONS } from '../fixtures'
 import { BigNumber } from 'ethers'
-import { getConfirmedBlockNumberOrUndefined } from './utils'
-import { expect } from 'chai'
 
 const txRequest = {
   to: fixtures.ACCOUNT_B.address,
@@ -353,7 +351,7 @@ describe('test indexer', function () {
     })
 
     it('should ignore re-orged events', async function () {
-      const { indexer, newBlock, COMMITTED_CHANNEL, chain, db, reorg } = await useFixtures({
+      const { indexer, newBlock, chain, reorg } = await useFixtures({
         latestBlockNumber: 2,
         pastEvents: [
           fixtures.PARTY_A_INITIALIZED_EVENT,
