@@ -4,7 +4,7 @@ import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import { createHoprNode, resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
@@ -12,7 +12,7 @@ import { CoverTrafficStrategy } from './strategy'
 import setupHealthcheck from './healthcheck'
 
 import type PeerId from 'peer-id'
-import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import type { HoprOptions } from '@hoprnet/hopr-core'
 import type { PeerData, State } from './state'
 
 const log = debug('hopr:cover-traffic')
