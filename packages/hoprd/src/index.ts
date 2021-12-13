@@ -59,15 +59,15 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('rest', {
     boolean: true,
-    describe: 'Run a rest interface on localhost:3001, requires --apiToken',
+    describe: 'Expose the Rest API on localhost:3001, requires --apiToken',
     default: false
   })
   .option('restHost', {
-    describe: 'Updates the host for the rest server',
+    describe: 'Set host IP to which the Rest API server will bind',
     default: 'localhost'
   })
   .option('restPort', {
-    describe: 'Updates the port for the rest server',
+    describe: 'Set host port to which the Rest API server will bind',
     default: 3001
   })
   .option('healthCheck', {
@@ -220,8 +220,11 @@ async function main() {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
       let [decoded, time] = decode(msg) as [Buffer, Buffer]
-      logs.log('Message:', decoded.toString())
-      logs.log('Latency:', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+      logs.log(`Message: ${decoded.toString()}`)
+      logs.log(`Latency: ${Date.now() - parseInt(time.toString('hex'), 16)}ms`)
+
+      // also send it tagged as message for apps to use
+      logs.logMessage(decoded.toString())
     } catch (err) {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())

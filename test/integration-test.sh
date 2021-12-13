@@ -17,6 +17,10 @@ usage() {
   msg
   msg "Usage: $0 <node_api_1> <node_api_2> <node_api_3> <node_api_4> <node_api_5> <node_api_6> <node_api_7>"
   msg
+  msg "Required environment variables"
+  msg "------------------------------"
+  msg
+  msg "HOPRD_API_TOKEN\t\t\tused as api token for all nodes"
 }
 
 # return early with help info when requested
@@ -30,6 +34,7 @@ test -z "${4:-}" && { msg "Missing 4th parameter"; usage; exit 1; }
 test -z "${5:-}" && { msg "Missing 5th parameter"; usage; exit 1; }
 test -z "${6:-}" && { msg "Missing 6th parameter"; usage; exit 1; }
 test -z "${7:-}" && { msg "Missing 7th parameter"; usage; exit 1; }
+test -z "${HOPRD_API_TOKEN:-}" && { msg "Missing HOPRD_API_TOKEN"; usage; exit 1; }
 
 declare api1="${1}"
 declare api2="${2}"
@@ -38,6 +43,56 @@ declare api4="${4}"
 declare api5="${5}"
 declare api6="${6}"
 declare api7="${7}"
+declare api_token=${HOPRD_API_TOKEN}
+
+# $1 = endpoint
+# $2 = recipient peer id
+# $3 = message
+# $4 = OPTIONAL: peers in the message path
+# $5 = OPTIONAL: maximum wait time in seconds during which we busy try
+# afterwards we fail, defaults to 0
+# $6 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds
+# (8 blocks with 1-3 s/block in ganache)
+# $7 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
+# priority than wait time, defaults to 0
+send_message(){
+  local result now
+  local endpoint="${1}"
+  local recipient="${2}"
+  local msg="${3}"
+  local peers="${4}"
+  local wait_time=${5:-0}
+  local step_time=${6:-25}
+  local end_time_ns=${7:-0}
+  # no timeout set since the test execution environment should cancel the test if it takes too long
+  local cmd="curl -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${endpoint}/api/v2/messages -o /dev/null -w %{http_code} -d "
+
+  # if no end time was given we need to calculate it once
+  if [ ${end_time_ns} -eq 0 ]; then
+    now=$(node -e "console.log(process.hrtime.bigint().toString());")
+    # need to calculate in nanoseconds
+    ((end_time_ns=now+wait_time*1000000000))
+  fi
+
+  local path=$(echo ${peers} | tr -d '\n' | jq -R -s 'split(" ")')
+  local message='{"body":"'${msg}'","path":'${path}',"recipient":"'${recipient}'"}'
+  result=$(${cmd} "${message}")
+
+  # we fail if the HTTP status code is anything but 204
+  if [ "${result}" = "204" ]; then
+    echo "${result}"
+  else
+    now=$(node -e "console.log(process.hrtime.bigint().toString());")
+    if [ ${end_time_ns} -lt ${now} ]; then
+      log "${RED}send_message (${cmd} \"${message}\") FAILED, received: ${result}${NOFORMAT}"
+      exit 1
+    else
+      log "${YELLOW}send_message (${cmd} \"${message}\") FAILED, retrying in ${step_time} seconds${NOFORMAT}"
+      sleep ${step_time}
+      send_message "${endpoint}" "${recipient}" "${msg}" "${peers}" "${wait_time}" "${step_time}" "${end_time_ns}"
+    fi
+  fi
+}
 
 # $1 = endpoint
 # $2 = Hopr command
@@ -57,7 +112,7 @@ run_command(){
   local step_time=${5:-25}
   local end_time_ns=${6:-0}
   # no timeout set since the test execution environment should cancel the test if it takes too long
-  local cmd="curl -m ${step_time} --connect-timeout ${step_time} --silent -X POST --header X-Auth-Token:e2e-API-token^^ --url ${endpoint}/api/v1/command --data "
+  local cmd="curl -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} --url ${endpoint}/api/v1/command -d "
 
   # if no end time was given we need to calculate it once
   if [ ${end_time_ns} -eq 0 ]; then
@@ -85,31 +140,6 @@ run_command(){
   fi
 }
 
-get_eth_address(){
-  curl --silent "$1/api/v1/address/eth"
-}
-
-get_hopr_address(){
-  curl --silent "$1/api/v1/address/hopr"
-}
-
-validate_node_eth_address() {
-  local ETH_ADDRESS IS_VALID_ETH_ADDRESS
-
-  ETH_ADDRESS="$(get_eth_address $1)"
-  if [ -z "$ETH_ADDRESS" ]; then
-    log "could not derive ETH_ADDRESS from first parameter $1"
-    exit 1
-  fi
-
-  IS_VALID_ETH_ADDRESS="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS'))")"
-  if [ "$IS_VALID_ETH_ADDRESS" == "false" ]; then
-    log "⛔️ Node returns an invalid address ETH_ADDRESS: $ETH_ADDRESS derived from $1"
-    exit 1
-  fi
-  echo "$ETH_ADDRESS"
-}
-
 # TODO better validation
 validate_node_balance_gt0() {
   local balance eth_balance hopr_balance
@@ -129,13 +159,13 @@ validate_node_balance_gt0() {
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
 
-validate_node_eth_address "${api1}"
-validate_node_eth_address "${api2}"
-validate_node_eth_address "${api3}"
-validate_node_eth_address "${api4}"
-validate_node_eth_address "${api5}"
+validate_native_address "${api1}" "${api_token}"
+validate_native_address "${api2}" "${api_token}"
+validate_native_address "${api3}" "${api_token}"
+validate_native_address "${api4}" "${api_token}"
+validate_native_address "${api5}" "${api_token}"
 # we don't need node6 because it's short-living
-validate_node_eth_address "${api7}"
+validate_native_address "${api7}" "${api_token}"
 log "ETH addresses exist"
 
 validate_node_balance_gt0 "${api1}"
@@ -148,13 +178,13 @@ validate_node_balance_gt0 "${api7}"
 log "Nodes are funded"
 
 declare addr1 addr2 addr3 addr4 addr5 result
-addr1="$(get_hopr_address "${api1}")"
-addr2="$(get_hopr_address "${api2}")"
-addr3="$(get_hopr_address "${api3}")"
-addr4="$(get_hopr_address "${api4}")"
-addr5="$(get_hopr_address "${api5}")"
+addr1="$(get_hopr_address "${api_token}@${api1}")"
+addr2="$(get_hopr_address "${api_token}@${api2}")"
+addr3="$(get_hopr_address "${api_token}@${api3}")"
+addr4="$(get_hopr_address "${api_token}@${api4}")"
+addr5="$(get_hopr_address "${api_token}@${api5}")"
 # we don't need node6 because it's short-living
-addr7="$(get_hopr_address "${api7}")"
+addr7="$(get_hopr_address "${api_token}@${api7}")"
 
 log "hopr addr1: ${addr1}"
 log "hopr addr2: ${addr2}"
@@ -257,12 +287,14 @@ for i in `seq 1 10`; do
   run_command "${api5}" "send ${addr1},${addr2} 'hello, world'" "Could not send message" 600
 done
 
+# for the last send tests we use Rest API v2 instead of the older command-based Rest API v1
+
 for i in `seq 1 10`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
-  run_command "${api1}" "send ${addr2},${addr3},${addr4},${addr5} 'hello, world'" "Message sent" 600
+  send_message "${api1}" "${addr5}" "hello, world" "${addr2} ${addr3} ${addr4}" 600
 done
 
 for i in `seq 1 10`; do
   log "Node 1 send message to node 5"
-  run_command "${api1}" "send ,${addr5} 'hello, world'" "Message sent" 600
+  send_message "${api1}" "${addr5}" "hello, world" "" 600
 done

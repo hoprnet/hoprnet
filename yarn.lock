@@ -1366,6 +1366,7 @@ __metadata:
     "@ceramicnetwork/stream-tile": ^1.2.0
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
+    "@types/cors": ^2
     "@types/mocha": 9.0.0
     "@types/yargs": 17.0.7
     bn.js: 5.2.0
@@ -1374,6 +1375,7 @@ __metadata:
     chalk: ^4.1.2
     check-password-strength: ^2.0.3
     cookie: ^0.4.1
+    cors: ^2.8.5
     debug: ^4.3.2
     dids: ^2.4.0
     express: ^4.17.1
@@ -2420,6 +2422,13 @@ __metadata:
   version: 1.4.2
   resolution: "@types/console-log-level@npm:1.4.2"
   checksum: 58465fb5d46287bdf67ef80c73bbc172ef7fbebe774ac7bd44c3cc3d8d78b9eab1122a3643e943c22f31dbd4bab22f21a8ee1aa95b0e996003a9b749dc02fde2
+  languageName: node
+  linkType: hard
+
+"@types/cors@npm:^2":
+  version: 2.8.12
+  resolution: "@types/cors@npm:2.8.12"
+  checksum: 8c45f112c7d1d2d831b4b266f2e6ed33a1887a35dcbfe2a18b28370751fababb7cd045e745ef84a523c33a25932678097bf79afaa367c6cb3fa0daa7a6438257
   languageName: node
   linkType: hard
 
@@ -5568,7 +5577,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cors@npm:^2.8.1":
+"cors@npm:^2.8.1, cors@npm:^2.8.5":
   version: 2.8.5
   resolution: "cors@npm:2.8.5"
   dependencies:

@@ -64,28 +64,6 @@ fund_if_empty() {
 }
 
 # $1=IP
-# $2=optional: port, defaults to 3001
-get_eth_address(){
-  local ip=${1}
-  local port=${2:-3001}
-  local cmd="curl --silent --max-time 5 ${ip}:${port}/api/v1/address/eth"
-
-  # try every 5 seconds for 5 minutes
-  try_cmd "${cmd}" 30 5 true
-}
-
-# $1=IP
-# $2=optional: port, defaults to 3001
-get_hopr_address() {
-  local ip=${1}
-  local port=${2:-3001}
-  local cmd="curl --silent --max-time 5 ${ip}:${port}/api/v1/address/hopr"
-
-  # try every 5 seconds for 5 minutes
-  try_cmd "${cmd}" 30 5 true
-}
-
-# $1=IP
 # $2=Hopr command
 # $3=optional: port
 run_command(){
@@ -184,7 +162,7 @@ start_testnode() {
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
   wait_until_node_is_ready ${ip}
-  eth_address=$(get_eth_address "${ip}")
+  eth_address=$(get_native_address "${ip}:3001")
   fund_if_empty "${eth_address}" "${environment_id}"
 }
 

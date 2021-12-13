@@ -153,17 +153,19 @@ function wait_for_regex {
   local file="${1}"
   local regex="${2}"
   local delay="${delay:-1.0}"
+  local res
 
   while true; do
     if [ -f ${file} ]; then
-      local res=$(grep -E "${regex}" "${file}" || echo "")
-      if [[ "${res}" != "" ]]; then
-        echo "${res}"
-        return 0
+      res=$(grep -E "${regex}" "${file}" || echo "")
+      if [ -n "${res}" ]; then
+        break
       fi
     fi
     sleep ${delay}
   done
+
+  echo "${res}"
 }
 
 # $1 = filename
@@ -185,6 +187,7 @@ function expect_file_content() {
 
 function find_tmp_dir() {
   local tmp="/tmp"
+
   if [[ -d "${tmp}" && -h "${tmp}" ]]; then
     tmp="/var/tmp"
   fi
@@ -193,7 +196,54 @@ function find_tmp_dir() {
     msg "Neither /tmp or /var/tmp can be used for writing logs"; 
     exit 1;
   fi
+
   echo ${tmp}
+}
+
+# $1 = optional: endpoint, defaults to http://localhost:3001
+get_native_address(){
+  local endpoint=${1:-localhost:3001}
+  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/address"
+
+  # try every 5 seconds for 5 minutes
+  local result
+  result=$(try_cmd "${cmd}" 30 5 true)
+
+  echo $(echo ${result} | jq -r ".nativeAddress")
+}
+
+# $1 = optional: endpoint, defaults to http://localhost:3001
+get_hopr_address() {
+  local endpoint=${1:-localhost:3001}
+  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/address"
+
+  # try every 5 seconds for 5 minutes
+  local result
+  result=$(try_cmd "${cmd}" 30 5 true)
+
+  echo $(echo ${result} | jq -r ".hoprAddress")
+}
+
+# $1 = endpoint
+# $1 = api token
+validate_native_address() {
+  local native_address is_valid_native_address
+  local endpoint="${1}"
+  local api_token="${2}"
+
+  native_address="$(get_native_address "${api_token}@${endpoint}")"
+  if [ -z "${native_address}" ]; then
+    log "-- could not derive native address from endpoint ${endpoint}"
+    exit 1
+  fi
+
+  is_valid_native_address="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('${native_address}'))")"
+  if [ "${is_valid_native_address}" == "false" ]; then
+    log "--⛔️ Node returns an invalidddress: ${native_address} derived from endpoint ${endpoint}"
+    exit 1
+  fi
+
+  echo "${native_address}"
 }
 
 setup_colors
