@@ -1163,7 +1163,7 @@ __metadata:
     it-pair: 1.0.0
     it-pipe: 1.1.0
     it-pushable: 1.4.2
-    libp2p: "hoprnet/js-libp2p#c30b85b30e50fe822961c25c5f64a150551b4781"
+    libp2p: 0.35.3
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.5
     mocha: 9.1.3
@@ -1233,7 +1233,7 @@ __metadata:
     heap-js: ^2.1.6
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: "hoprnet/js-libp2p#c30b85b30e50fe822961c25c5f64a150551b4781"
+    libp2p: 0.35.3
     libp2p-kad-dht: 0.27.3
     libp2p-mplex: 0.10.5
     libp2p-tcp: 0.17.2
@@ -1335,7 +1335,7 @@ __metadata:
     jsonschema: ^1.4.0
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: "hoprnet/js-libp2p#c30b85b30e50fe822961c25c5f64a150551b4781"
+    libp2p: 0.35.3
     libp2p-crypto: 0.21.0
     libp2p-kad-dht: 0.27.3
     libp2p-mplex: 0.10.5
@@ -1444,20 +1444,6 @@ __metadata:
   bin:
     node-pre-gyp: bin/node-pre-gyp
   checksum: bb6ac315e71649a7991f3a01bc576ef38345c66b58736d756508896fe75f3002bfaaabba76e3a9a9820b2e2e90c751fbdce480dcabe688940722f214eb679617
-  languageName: node
-  linkType: hard
-
-"@motrix/nat-api@npm:^0.3.1":
-  version: 0.3.2
-  resolution: "@motrix/nat-api@npm:0.3.2"
-  dependencies:
-    async: ^3.2.0
-    debug: ^4.3.1
-    default-gateway: ^6.0.3
-    request: ^2.88.2
-    unordered-array-remove: ^1.0.2
-    xml2js: ^0.4.23
-  checksum: f5da82e164090145902f4f2b1ce3f3c571a128449d2670daf79fc22df5c54e207eda0f5c5b19fb0abbc1ef2b945133f96c2c44adfc09b61cfed12a8c372baf4f
   languageName: node
   linkType: hard
 
@@ -2405,14 +2391,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai@npm:*":
-  version: 4.2.22
-  resolution: "@types/chai@npm:4.2.22"
-  checksum: dca66a263b25c26112c0a8c6df20316412fa54b557443a108836c07cee961aa56cc5b1763273f69eb450c83ca9f28069ff78b617bffc01806cdd83afc1c20c2a
-  languageName: node
-  linkType: hard
-
-"@types/chai@npm:4.3.0":
+"@types/chai@npm:*, @types/chai@npm:4.3.0":
   version: 4.3.0
   resolution: "@types/chai@npm:4.3.0"
   checksum: 3e393e094263db65df28a0123dc13f342937c1bab6cd173eae913d593c5b9a16b555713a08c34863a1fbf079aa7222b96197c70380a5c130549d6b2f6845a989
@@ -5844,7 +5823,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"debug@npm:4, debug@npm:4.3.2, debug@npm:^4.0.1, debug@npm:^4.1.0, debug@npm:^4.1.1, debug@npm:^4.3.0, debug@npm:^4.3.1, debug@npm:^4.3.2":
+"debug@npm:4, debug@npm:^4.0.1, debug@npm:^4.1.0, debug@npm:^4.1.1, debug@npm:^4.2.0, debug@npm:^4.3.0, debug@npm:^4.3.1, debug@npm:^4.3.2":
+  version: 4.3.3
+  resolution: "debug@npm:4.3.3"
+  dependencies:
+    ms: 2.1.2
+  peerDependenciesMeta:
+    supports-color:
+      optional: true
+  checksum: 14472d56fe4a94dbcfaa6dbed2dd3849f1d72ba78104a1a328047bb564643ca49df0224c3a17fa63533fd11dd3d4c8636cd861191232a2c6735af00cc2d4de16
+  languageName: node
+  linkType: hard
+
+"debug@npm:4.3.2":
   version: 4.3.2
   resolution: "debug@npm:4.3.2"
   dependencies:
@@ -5939,7 +5930,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"default-gateway@npm:^6.0.3":
+"default-gateway@npm:^6.0.2":
   version: 6.0.3
   resolution: "default-gateway@npm:6.0.3"
   dependencies:
@@ -11398,11 +11389,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p@hoprnet/js-libp2p#c30b85b30e50fe822961c25c5f64a150551b4781":
-  version: 0.35.0
-  resolution: "libp2p@https://github.com/hoprnet/js-libp2p.git#commit=c30b85b30e50fe822961c25c5f64a150551b4781"
+"libp2p@npm:0.35.3":
+  version: 0.35.3
+  resolution: "libp2p@npm:0.35.3"
   dependencies:
-    "@motrix/nat-api": ^0.3.1
     "@vascosantos/moving-average": ^1.1.0
     abort-controller: ^3.0.0
     abortable-iterator: ^3.0.0
@@ -11436,6 +11426,7 @@ __metadata:
     multiformats: ^9.0.0
     multistream-select: ^2.0.0
     mutable-proxy: ^1.0.0
+    nat-api: ^0.3.1
     node-forge: ^0.10.0
     p-any: ^3.0.0
     p-fifo: ^1.0.0
@@ -11453,7 +11444,7 @@ __metadata:
     varint: ^6.0.0
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: 3ebac6a425487dbb1f6dd82a703b5e1c1a6581a73782408620a497ccf3a09643add72394d32a3ded860384780c24ae2fbe29948a0cf71d2e736dd52af2377766
+  checksum: 58543be8c167870b048f024baf2078dad835ef625e19d1b603602f56f20ebfff04e84484ab5d1d4341feb6a1f9bdb56c13690cd7dd4cd422dbf0a3864be30a2b
   languageName: node
   linkType: hard
 
@@ -12638,6 +12629,20 @@ __metadata:
   version: 2.0.0
   resolution: "napi-macros@npm:2.0.0"
   checksum: 30384819386977c1f82034757014163fa60ab3c5a538094f778d38788bebb52534966279956f796a92ea771c7f8ae072b975df65de910d051ffbdc927f62320c
+  languageName: node
+  linkType: hard
+
+"nat-api@npm:^0.3.1":
+  version: 0.3.1
+  resolution: "nat-api@npm:0.3.1"
+  dependencies:
+    async: ^3.2.0
+    debug: ^4.2.0
+    default-gateway: ^6.0.2
+    request: ^2.88.2
+    unordered-array-remove: ^1.0.2
+    xml2js: ^0.1.0
+  checksum: ca5e732e89af23519dd11856c0546f0decfb49774b57ff82a47fca8d9700ed33d8d15046f6a4d3ef8153c580b2fa29c10c5e24902e33efcf3ba2faf4eae62a67
   languageName: node
   linkType: hard
 
@@ -15536,7 +15541,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"sax@npm:>=0.6.0, sax@npm:^1.2.4":
+"sax@npm:>=0.1.1, sax@npm:^1.2.4":
   version: 1.2.4
   resolution: "sax@npm:1.2.4"
   checksum: d3df7d32b897a2c2f28e941f732c71ba90e27c24f62ee918bd4d9a8cfb3553f2f81e5493c7f0be94a11c1911b643a9108f231dd6f60df3fa9586b5d2e3e9e1fe
@@ -19031,20 +19036,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"xml2js@npm:^0.4.23":
-  version: 0.4.23
-  resolution: "xml2js@npm:0.4.23"
+"xml2js@npm:^0.1.0":
+  version: 0.1.14
+  resolution: "xml2js@npm:0.1.14"
   dependencies:
-    sax: ">=0.6.0"
-    xmlbuilder: ~11.0.0
-  checksum: ca0cf2dfbf6deeaae878a891c8fbc0db6fd04398087084edf143cdc83d0509ad0fe199b890f62f39c4415cf60268a27a6aed0d343f0658f8779bd7add690fa98
-  languageName: node
-  linkType: hard
-
-"xmlbuilder@npm:~11.0.0":
-  version: 11.0.1
-  resolution: "xmlbuilder@npm:11.0.1"
-  checksum: 7152695e16f1a9976658215abab27e55d08b1b97bca901d58b048d2b6e106b5af31efccbdecf9b07af37c8377d8e7e821b494af10b3a68b0ff4ae60331b415b0
+    sax: ">=0.1.1"
+  checksum: 60ddbf595e4629109f391fd1154b7d37f177940bd41e4ef377e6742c4b41670a23f7fdbf2625f52d8760b881f16c9d4f8d441f9d07927511924d30ca97473c1b
   languageName: node
   linkType: hard
 
