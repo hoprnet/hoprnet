@@ -119,37 +119,10 @@ describe('test dialHelper', function () {
     await peerB.start()
     await peerC.start()
 
-    const waitUntilDiscovered = defer<void>()
-    // waitUntilDiscovered.resolve()
-    // peerA.on('peer:discovery', (peerId: PeerId) => {
-    //   console.log(`here`)
-    //   console.log(peerId.equals(Chris))
-    //   // setImmediate(() => waitUntilDiscovered.resolve())
-    //   if (peerId.equals(Chris)) {
-    //     waitUntilDiscovered.resolve()
-    //   }
-    // })
     await peerA.dial(peerB.peerId)
     await peerC.dial(peerB.peerId)
 
-    // await peerC.dial(peerB.peerId)
-
-    // console.log(`Alice`, Alice.toB58String(), `Bob`, Bob.toB58String(), `Chris`, Chris.toB58String())
-    // await new Promise<void>((resolve) => {
-    //   console.log(`inside promise`)
-    //   peerA.on('peer:discovery', (peerId: PeerId) => {
-    //     console.log(peerId)
-    //     resolve()
-    //     // if (peerId.equals(Chris)) {
-    //     //   resolve()
-    //     // }
-    //   })
-    // })
-    // await new Promise((resolve) => setTimeout(resolve, 200))
-
-    // peerA.on('peer:discovery', console.log)
-
-    await waitUntilDiscovered.promise
+    await new Promise((resolve) => setTimeout(resolve, 200))
 
     let result = await dialHelper(peerA, Chris, TEST_PROTOCOL)
 
