@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.84.0-next.39",
+  "version": "1.85.0-next.21",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -13,8 +13,7 @@
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "coverage": "nyc --reporter=html mocha",
     "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -p",
-    "prepublishOnly": "tsc -p ./tsconfig.npm.json",
+    "build": "yarn clean && tsc -p .",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
   },
@@ -28,15 +27,15 @@
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "bignumber.js": "9.0.1",
+    "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
+    "express": "^4.17.1",
     "peer-id": "0.16.0",
-    "restana": "4.9.2",
     "yargs": "17.2.1"
   },
   "devDependencies": {
-    "@types/blessed": "0.1.19",
-    "@types/chai": "4.2.22",
+    "@types/express": "^4",
+    "@types/mocha": "9.0.0",
     "@types/rimraf": "3.0.2",
     "@types/yargs": "17.0.7",
     "chai": "4.3.4",
@@ -45,7 +44,7 @@
     "rimraf": "3.0.2",
     "typedoc": "0.22.10",
     "typedoc-plugin-markdown": "3.11.7",
-    "typescript": "4.5.2"
+    "typescript": "4.5.3"
   },
   "mocha": {
     "extension": [

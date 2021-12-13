@@ -1,4 +1,4 @@
-export type Network = {
+export type NetworkOptions = {
   id: string
   description: string
   chain_id: number // >= 0
@@ -22,12 +22,12 @@ export type Environment = {
 
 export type ProtocolConfig = {
   environments: Environment[]
-  networks: Network[]
+  networks: NetworkOptions[]
 }
 
 export type ResolvedEnvironment = {
   id: string
-  network: Network
+  network: NetworkOptions
   channel_contract_deploy_block: number
   token_contract_address: string // an Ethereum address
   channels_contract_address: string // an Ethereum address

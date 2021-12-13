@@ -1,15 +1,21 @@
 import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
 import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
-import { randomInteger, limitConcurrency, u8aEquals, Hash, debug } from '@hoprnet/hopr-utils'
-import { HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'
-import { HEARTBEAT_TIMEOUT } from '../constants'
-import { randomBytes } from 'crypto'
+import { randomInteger, limitConcurrency, u8aEquals, debug } from '@hoprnet/hopr-utils'
+import {
+  HEARTBEAT_INTERVAL,
+  HEARTBEAT_TIMEOUT,
+  HEARTBEAT_INTERVAL_VARIANCE,
+  MAX_PARALLEL_CONNECTIONS
+} from '../constants'
+import { createHash, randomBytes } from 'crypto'
 
 import type { Subscribe, SendMessage } from '../index'
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
+
+const PING_HASH_ALGORITHM = 'blake2s256'
 
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
@@ -39,14 +45,14 @@ export default class Heartbeat {
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
     this.networkPeers.register(remotePeer)
     log('beat')
-    return Promise.resolve(Hash.create(msg).serialize())
+    return Promise.resolve(Heartbeat.calculatePingResponse(msg))
   }
 
   public async pingNode(id: PeerId): Promise<boolean> {
     log('ping', id.toB58String())
 
     const challenge = randomBytes(16)
-    const expectedResponse = Hash.create(challenge).serialize()
+    const expectedResponse = Heartbeat.calculatePingResponse(challenge)
 
     try {
       const pingResponse = await this.sendMessage(id, this.protocolHeartbeat, challenge, true, {
@@ -101,6 +107,10 @@ export default class Heartbeat {
   public stop() {
     clearTimeout(this.timeout)
     log(`Heartbeat stopped`)
+  }
+
+  public static calculatePingResponse(challenge: Uint8Array): Uint8Array {
+    return Uint8Array.from(createHash(PING_HASH_ALGORITHM).update(challenge).digest())
   }
 
   public async __forTestOnly_checkNodes() {

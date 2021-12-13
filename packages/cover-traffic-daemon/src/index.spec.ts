@@ -6,7 +6,7 @@ import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
 import { sampleData } from './state.mock'
 import { sampleOptions } from '@hoprnet/hopr-core'
-import { chainMock } from '@hoprnet/hopr-core-ethereum'
+import { connectorMock } from '@hoprnet/hopr-core-ethereum'
 import { libp2pMock } from '@hoprnet/hopr-core'
 
 const namespace = 'hopr:test:cover-traffic'
@@ -27,8 +27,8 @@ describe('cover-traffic daemon', async function () {
     }
     data = sampleData
     stubLibp2p()
-    log('Mocked chain', chainMock)
-    node = new Hopr(mockPeerId, dbMock, chainMock, sampleOptions)
+    log('Mocked chain', connectorMock)
+    node = new Hopr(mockPeerId, dbMock, connectorMock, sampleOptions)
   })
 
   afterEach(function () {
