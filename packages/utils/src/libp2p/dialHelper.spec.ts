@@ -10,7 +10,6 @@ import assert from 'assert'
 import { Multiaddr } from 'multiaddr'
 import pipe from 'it-pipe'
 import { u8aEquals, stringToU8a } from '../u8a'
-import { defer } from '../async'
 
 const TEST_PROTOCOL = '/test'
 const TEST_MESSAGE = new TextEncoder().encode('test msg')
@@ -103,7 +102,7 @@ describe('test dialHelper', function () {
     await peerA.stop()
   })
 
-  it.only('regular dial with DHT', async function () {
+  it('regular dial with DHT', async function () {
     this.timeout(15e3)
     const peerA = await getNode(Alice, true)
     const peerB = await getNode(Bob, true)
