@@ -10,7 +10,7 @@ import assert from 'assert'
 import { Multiaddr } from 'multiaddr'
 import pipe from 'it-pipe'
 import { u8aEquals, stringToU8a } from '../u8a'
-import { defer } from '../async/defer'
+import { defer } from '../async'
 
 const TEST_PROTOCOL = '/test'
 const TEST_MESSAGE = new TextEncoder().encode('test msg')
@@ -22,7 +22,7 @@ const Chris = privKeyToPeerId(stringToU8a('0x1bbb9a915ddd6e19d0f533da6c0fbe88205
 async function getNode(id: PeerId, withDHT = false): Promise<Libp2p> {
   const node = await Libp2p.create({
     addresses: {
-      listen: [new Multiaddr('/ip4/0.0.0.0/tcp/0').toString()]
+      listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toB58String()}`).toString()]
     },
     peerId: id,
     modules: {
@@ -43,6 +43,9 @@ async function getNode(id: PeerId, withDHT = false): Promise<Libp2p> {
       },
       relay: {
         enabled: false
+      },
+      peerDiscovery: {
+        autoDial: false
       }
     }
   })
@@ -100,8 +103,8 @@ describe('test dialHelper', function () {
     await peerA.stop()
   })
 
-  it('regular dial with DHT', async function () {
-    this.timeout(10e3)
+  it.only('regular dial with DHT', async function () {
+    this.timeout(15e3)
     const peerA = await getNode(Alice, true)
     const peerB = await getNode(Bob, true)
     const peerC = await getNode(Chris, true)
@@ -112,25 +115,43 @@ describe('test dialHelper', function () {
     peerB.peerStore.addressBook.add(peerC.peerId, peerC.multiaddrs)
     peerC.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
 
-    // Give DHT time to start
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    await peerA.start()
+    await peerB.start()
+    await peerC.start()
+
+    const waitUntilDiscovered = defer<void>()
+    // waitUntilDiscovered.resolve()
+    // peerA.on('peer:discovery', (peerId: PeerId) => {
+    //   console.log(`here`)
+    //   console.log(peerId.equals(Chris))
+    //   // setImmediate(() => waitUntilDiscovered.resolve())
+    //   if (peerId.equals(Chris)) {
+    //     waitUntilDiscovered.resolve()
+    //   }
+    // })
+    await peerA.dial(peerB.peerId)
+    await peerC.dial(peerB.peerId)
+
+    // await peerC.dial(peerB.peerId)
+
+    // console.log(`Alice`, Alice.toB58String(), `Bob`, Bob.toB58String(), `Chris`, Chris.toB58String())
+    // await new Promise<void>((resolve) => {
+    //   console.log(`inside promise`)
+    //   peerA.on('peer:discovery', (peerId: PeerId) => {
+    //     console.log(peerId)
+    //     resolve()
+    //     // if (peerId.equals(Chris)) {
+    //     //   resolve()
+    //     // }
+    //   })
+    // })
+    // await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // peerA.on('peer:discovery', console.log)
+
+    await waitUntilDiscovered.promise
 
     let result = await dialHelper(peerA, Chris, TEST_PROTOCOL)
-
-    // If DHT failed, wait until Alice has found Chris
-    if (result.status !== DialStatus.SUCCESS) {
-      const waitUntilDiscovered = defer<void>()
-
-      peerA.on('peer:discovery', (peerId: PeerId) => {
-        if (peerId.equals(Chris)) {
-          waitUntilDiscovered.resolve()
-        }
-      })
-
-      await waitUntilDiscovered.promise
-
-      result = await dialHelper(peerA, Chris, TEST_PROTOCOL)
-    }
 
     assert(result.status === DialStatus.SUCCESS, `Dial must be successful`)
 
@@ -175,7 +196,6 @@ describe('test dialHelper', function () {
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)
 
     assert(result.status === DialStatus.DIAL_ERROR)
-    // assert(result.error === 'No new addresses after contacting the DHT')
     assert(result.dhtContacted == true)
   })
 
