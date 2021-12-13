@@ -92,8 +92,8 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
-    this.unsubscribeBlock = this.chain.subscribeBlock((b: number) => {
-      this.onNewBlock(b)
+    this.unsubscribeBlock = this.chain.subscribeBlock((block: number) => {
+      this.onNewBlock(block)
     })
 
     this.unsubscribeErrors = this.chain.subscribeError((error: any) => {
@@ -119,19 +119,19 @@ class Indexer extends EventEmitter {
       }
     })
 
-    this.unsubscribeChannelEvents = this.chain.subscribeChannelEvents((e: TypedEvent<any, any>) => {
-      if (e.event === ANNOUNCEMENT || e.event === 'ChannelUpdated') {
-        this.onNewEvents([e])
+    this.unsubscribeChannelEvents = this.chain.subscribeChannelEvents((channelEvent: TypedEvent<any, any>) => {
+      if (channelEvent.event === ANNOUNCEMENT || channelEvent.event === 'ChannelUpdated') {
+        this.onNewEvents([channelEvent])
       }
     })
-    this.unsubscribeTokenEvents = this.chain.subscribeTokenEvents((e: TypedEvent<any, any>) => {
+    this.unsubscribeTokenEvents = this.chain.subscribeTokenEvents((tokenEvent: TypedEvent<any, any>) => {
       if (
-        e.event === 'Transfer' &&
-        (e.topics[1] === utils.hexZeroPad(this.address.toHex(), 32) ||
-          e.topics[2] === utils.hexZeroPad(this.address.toHex(), 32))
+        tokenEvent.event === 'Transfer' &&
+        (tokenEvent.topics[1] === utils.hexZeroPad(this.address.toHex(), 32) ||
+          tokenEvent.topics[2] === utils.hexZeroPad(this.address.toHex(), 32))
       ) {
         // save transfer events
-        this.onNewEvents([e])
+        this.onNewEvents([tokenEvent])
       }
     })
 
