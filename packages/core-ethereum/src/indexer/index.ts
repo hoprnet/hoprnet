@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { debug, retryWithBackoff } from '@hoprnet/hopr-utils'
+import { debug, DeferType, retryWithBackoff } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -452,26 +452,35 @@ class Indexer extends EventEmitter {
       .then((channels) => channels.filter((channel) => channel.status === ChannelStatus.Open))
   }
 
-  public async resolvePendingTransaction(eventType: IndexerEvents, tx: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const timeoutObj = setTimeout(() => {
+  public resolvePendingTransaction(eventType: IndexerEvents, tx: string): DeferType<string> {
+    const deferred = {} as DeferType<string>
+
+    deferred.promise = new Promise((resolve, reject) => {
+      deferred.reject = () => {
         this.removeListener(eventType, listener)
         log('listener %s on %s timed out and thus removed', eventType, tx)
+      }
+      const timeoutObj = setTimeout(() => {
+        deferred.reject() // remove listener but throw now error
         reject(tx)
       }, INDEXER_TIMEOUT)
 
+      deferred.resolve = () => {
+        clearTimeout(timeoutObj)
+        this.removeListener(eventType, listener)
+        log('listener %s on %s is removed', eventType, tx)
+        resolve(tx)
+      }
+
       const listener = (txHash: string[]) => {
         const indexed = txHash.find((emitted) => emitted === tx)
-        if (indexed) {
-          clearTimeout(timeoutObj)
-          this.removeListener(eventType, listener)
-          log('listener %s on %s is removed', eventType, tx)
-          resolve(tx)
-        }
+        if (indexed) deferred.resolve()
       }
       this.addListener(eventType, listener)
       log('listener %s on %s is added', eventType, tx)
     })
+
+    return deferred;
   }
 }
 
