@@ -27,7 +27,7 @@
   "dependencies": {
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "bignumber.js": "9.0.1",
+    "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
     "express": "^4.17.1",
     "peer-id": "0.16.0",
