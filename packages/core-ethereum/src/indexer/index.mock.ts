@@ -1,6 +1,6 @@
 import EventEmitter from 'events'
 import { providers as Providers, Wallet, BigNumber } from 'ethers'
-import type { HoprChannels, HoprToken } from '@hoprnet/hopr-ethereum'
+import type { HoprChannels, HoprToken, TypedEvent } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   ChannelEntry,
@@ -154,12 +154,29 @@ const createChainMock = (
 ): ChainWrapper => {
   return {
     getLatestBlockNumber: () => provider.getBlockNumber(),
-    subscribeBlock: (cb) => provider.on('block', cb),
-    subscribeError: (cb) => {
+    subscribeBlock: (cb: (blockNumber: number) => void) => {
+      provider.on('block', cb)
+
+      return () => {
+        provider.off('block', cb)
+      }
+    },
+    subscribeError: (cb: (err: any) => void): (() => void) => {
       provider.on('error', cb)
       hoprChannels.on('error', cb)
+
+      return () => {
+        provider.off('error', cb)
+        hoprChannels.off('error', cb)
+      }
     },
-    subscribeChannelEvents: (cb) => hoprChannels.on('*', cb),
+    subscribeChannelEvents: (cb: (event: TypedEvent<any, any>) => void) => {
+      hoprChannels.on('*', cb)
+
+      return () => {
+        hoprChannels.off('*', cb)
+      }
+    },
     start: () => {},
     waitUntilReady: () => {
       chainLogger('Await on chain readyness')
@@ -183,13 +200,15 @@ const createChainMock = (
       on: (event: string) => chainLogger(`Indexer on handler top of chain called with event "${event}"`),
       off: (event: string) => chainLogger(`Indexer off handler top of chain called with event "${event}`)
     },
-    subscribeTokenEvents: (cb) => hoprToken.on('*', cb),
+    subscribeTokenEvents: (cb: (event: TypedEvent<any, any>) => void): (() => void) => {
+      hoprToken.on('*', cb)
+
+      return () => {
+        hoprToken.off('*', cb)
+      }
+    },
     getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => [],
     updateConfirmedTransaction: (_hash: string) => {},
-    unsubscribe: () => {
-      provider.removeAllListeners()
-      hoprChannels.removeAllListeners()
-    },
     getNativeBalance: () => new NativeBalance(SUGGESTED_NATIVE_BALANCE),
     getChannels: () => hoprChannels,
     getWallet: () => account ?? fixtures.ACCOUNT_A,
