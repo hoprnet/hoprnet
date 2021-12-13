@@ -11,7 +11,8 @@ import {
   NativeBalance,
   Hash,
   PublicKey,
-  durations
+  durations,
+  DeferType
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
@@ -24,6 +25,10 @@ const abiCoder = new utils.AbiCoder()
 
 export type Receipt = string
 export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
+export type SendTransactionReturn = {
+  code: 'SUCCESS' | 'DUPLICATE'
+  tx: Partial<ContractTransaction>
+}
 
 export async function createChainWrapper(
   networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
@@ -107,8 +112,9 @@ export async function createChainWrapper(
     checkDuplicate: Boolean,
     contract: T,
     method: keyof T['functions'],
+    handleTxListener: (tx: string) => DeferType<string>,
     ...rest: Parameters<T['functions'][keyof T['functions']]>
-  ): Promise<Partial<ContractTransaction>> {
+  ): Promise<SendTransactionReturn> {
     const gasLimit = 400e3
     const gasPrice = networkInfo.gasPrice ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
@@ -134,6 +140,7 @@ export async function createChainWrapper(
     }
     log('essentialTxPayload %o', essentialTxPayload)
 
+    let deferredListener
     try {
       if (checkDuplicate) {
         const [checkedDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
@@ -144,7 +151,8 @@ export async function createChainWrapper(
 
         if (checkedDuplicate) {
           return {
-            hash
+            code: 'DUPLICATE',
+            tx: { hash }
           }
         }
         // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
@@ -155,7 +163,8 @@ export async function createChainWrapper(
       // compute tx hash and save to initiated tx list in tx manager
       const initiatedHash = utils.keccak256(signedTx)
       transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
-
+      // with let indexer to listen to the tx
+      deferredListener = handleTxListener(initiatedHash)
       // 4. send transaction to our ethereum provider
       transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
@@ -174,49 +183,60 @@ export async function createChainWrapper(
         transactions.moveFromPendingToMined(hash)
       })
     } catch (error) {
+      log(error)
+      // remove listener but not throwing error message
+      deferredListener.reject()
+      // this transaction was not confirmed so we just remove it
+      transactions.remove(transaction.hash)
       const isRevertedErr = [error?.code, String(error)].includes(errors.CALL_EXCEPTION)
       const isAlreadyKnownErr =
         [error?.code, String(error)].includes(errors.NONCE_EXPIRED) ||
         [error?.code, String(error)].includes(errors.REPLACEMENT_UNDERPRICED)
 
       if (isRevertedErr) {
-        log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
-
-        // this transaction failed but was confirmed as reverted
-        transactions.moveFromMinedToConfirmed(transaction.hash)
+        log('Transaction with nonce %d and hash %s reverted due to call exception: %s', nonce, transaction.hash, error)
+      } else if (isAlreadyKnownErr) {
+        log('Transaction with nonce %d and hash %s reverted due to known error: %s', nonce, transaction.hash, error)
       } else {
-        log('Transaction with nonce %d failed to sent: %s', nonce, error)
-
-        // if this hash is already known and we already have it included in
-        // pending we can safely ignore this
-        if (isAlreadyKnownErr && transactions.pending.has(transaction.hash)) return
-
-        // this transaction was not confirmed so we just remove it
-        transactions.remove(transaction.hash)
+        log('Transaction with nonce %d and hash failed to sent: %s', nonce, transaction.hash, error)
       }
 
       throw error
     }
-
-    return transaction
+    try {
+      await deferredListener.promise
+      return {
+        code: 'SUCCESS',
+        tx: { hash: transaction.hash }
+      }
+    } catch (error) {
+      // throw error caught by the listener
+      throw error
+    }
   }
 
-  async function announce(multiaddr: Multiaddr): Promise<string> {
+  async function announce(multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> {
     try {
       const confirmation = await sendTransaction(
         checkDuplicate,
         channels,
         'announce',
+        txHandler,
         publicKey.toUncompressedPubKeyHex(),
         multiaddr.bytes
       )
-      return confirmation.hash
-    } catch {
-      throw new Error('Fatal error, announce transaction failed')
+      return confirmation.tx.hash
+    } catch (error) {
+      throw new Error(`Failed in sending announce transaction ${error}`)
     }
   }
 
-  async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
+  async function withdraw(
+    currency: 'NATIVE' | 'HOPR',
+    recipient: string,
+    amount: string,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<string> {
     if (currency === 'NATIVE') {
       const nonceLock = await nonceTracker.getNonceLock(address)
       try {
@@ -235,8 +255,12 @@ export async function createChainWrapper(
     }
 
     // withdraw HOPR
-    const transaction = await sendTransaction(checkDuplicate, token, 'transfer', recipient, amount)
-    return transaction.hash
+    try {
+      const transaction = await sendTransaction(checkDuplicate, token, 'transfer', txHandler, recipient, amount)
+      return transaction.tx.hash
+    } catch (error) {
+      throw new Error(`Failed in sending withdraw transaction ${error}`)
+    }
   }
 
   async function fundChannel(
@@ -245,21 +269,27 @@ export async function createChainWrapper(
     me: Address,
     counterparty: Address,
     myFund: Balance,
-    counterpartyFund: Balance
+    counterpartyFund: Balance,
+    txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> {
-    const totalFund = myFund.toBN().add(counterpartyFund.toBN())
-    const transaction = await sendTransaction(
-      checkDuplicate,
-      token,
-      'send',
-      channels.address,
-      totalFund.toString(),
-      abiCoder.encode(
-        ['address', 'address', 'uint256', 'uint256'],
-        [me.toHex(), counterparty.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
+    try {
+      const totalFund = myFund.toBN().add(counterpartyFund.toBN())
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        token,
+        'send',
+        txHandler,
+        channels.address,
+        totalFund.toString(),
+        abiCoder.encode(
+          ['address', 'address', 'uint256', 'uint256'],
+          [me.toHex(), counterparty.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
+        )
       )
-    )
-    return transaction.hash
+      return transaction.tx.hash
+    } catch (error) {
+      throw new Error(`Failed in sending fundChannel transaction ${error}`)
+    }
   }
 
   async function openChannel(
@@ -267,31 +297,65 @@ export async function createChainWrapper(
     channels: HoprChannels,
     me: Address,
     counterparty: Address,
-    amount: Balance
+    amount: Balance,
+    txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> {
-    const transaction = await sendTransaction(
-      checkDuplicate,
-      token,
-      'send',
-      channels.address,
-      amount.toBN().toString(),
-      abiCoder.encode(
-        ['address', 'address', 'uint256', 'uint256'],
-        [me.toHex(), counterparty.toHex(), amount.toBN().toString(), '0']
+    try {
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        token,
+        'send',
+        txHandler,
+        channels.address,
+        amount.toBN().toString(),
+        abiCoder.encode(
+          ['address', 'address', 'uint256', 'uint256'],
+          [me.toHex(), counterparty.toHex(), amount.toBN().toString(), '0']
+        )
       )
-    )
-    return transaction.hash
+      return transaction.tx.hash
+    } catch (error) {
+      throw new Error(`Failed in sending openChannel transaction ${error}`)
+    }
   }
 
-  async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const transaction = await sendTransaction(checkDuplicate, channels, 'finalizeChannelClosure', counterparty.toHex())
-    return transaction.hash
+  async function finalizeChannelClosure(
+    channels: HoprChannels,
+    counterparty: Address,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<Receipt> {
+    try {
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        channels,
+        'finalizeChannelClosure',
+        txHandler,
+        counterparty.toHex()
+      )
+      return transaction.tx.hash
+    } catch (error) {
+      throw new Error(`Failed in sending finalizeChannelClosure transaction ${error}`)
+    }
     // TODO: catch race-condition
   }
 
-  async function initiateChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const transaction = await sendTransaction(checkDuplicate, channels, 'initiateChannelClosure', counterparty.toHex())
-    return transaction.hash
+  async function initiateChannelClosure(
+    channels: HoprChannels,
+    counterparty: Address,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<Receipt> {
+    try {
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        channels,
+        'initiateChannelClosure',
+        txHandler,
+        counterparty.toHex()
+      )
+      return transaction.tx.hash
+    } catch (error) {
+      throw new Error(`Failed in sending initiateChannelClosure transaction ${error}`)
+    }
     // TODO: catch race-condition
   }
 
@@ -299,33 +363,49 @@ export async function createChainWrapper(
     channels: HoprChannels,
     counterparty: Address,
     ackTicket: AcknowledgedTicket,
-    ticket: Ticket
+    ticket: Ticket,
+    txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> {
-    const transaction = await sendTransaction(
-      checkDuplicate,
-      channels,
-      'redeemTicket',
-      counterparty.toHex(),
-      ackTicket.preImage.toHex(),
-      ackTicket.ticket.epoch.serialize(),
-      ackTicket.ticket.index.serialize(),
-      ackTicket.response.toHex(),
-      ticket.amount.toBN().toString(),
-      ticket.winProb.toBN().toString(),
-      ticket.signature.serialize()
-    )
-    return transaction.hash
+    try {
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        channels,
+        'redeemTicket',
+        txHandler,
+        counterparty.toHex(),
+        ackTicket.preImage.toHex(),
+        ackTicket.ticket.epoch.serialize(),
+        ackTicket.ticket.index.serialize(),
+        ackTicket.response.toHex(),
+        ticket.amount.toBN().toString(),
+        ticket.winProb.toBN().toString(),
+        ticket.signature.serialize()
+      )
+      return transaction.tx.hash
+    } catch (error) {
+      throw new Error(`Failed in sending redeemticket transaction ${error}`)
+    }
   }
 
-  async function setCommitment(channels: HoprChannels, counterparty: Address, commitment: Hash): Promise<Receipt> {
-    const transaction = await sendTransaction(
-      checkDuplicate,
-      channels,
-      'bumpChannel',
-      counterparty.toHex(),
-      commitment.toHex()
-    )
-    return transaction.hash
+  async function setCommitment(
+    channels: HoprChannels,
+    counterparty: Address,
+    commitment: Hash,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<Receipt> {
+    try {
+      const transaction = await sendTransaction(
+        checkDuplicate,
+        channels,
+        'bumpChannel',
+        txHandler,
+        counterparty.toHex(),
+        commitment.toHex()
+      )
+      return transaction.tx.hash
+    } catch (error) {
+      throw new Error(`Failed in sending setCommitment transaction ${error}`)
+    }
   }
 
   async function getNativeTokenTransactionInBlock(
@@ -347,17 +427,34 @@ export async function createChainWrapper(
     getNativeTokenTransactionInBlock: (blockNumber: number, isOutgoing: boolean = true) =>
       getNativeTokenTransactionInBlock(blockNumber, isOutgoing),
     announce,
-    withdraw: (currency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => withdraw(currency, recipient, amount),
-    fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance) =>
-      fundChannel(token, channels, me, counterparty, myTotal, theirTotal),
-    openChannel: (me: Address, counterparty: Address, amount: Balance) =>
-      openChannel(token, channels, me, counterparty, amount),
-    finalizeChannelClosure: (counterparty: Address) => finalizeChannelClosure(channels, counterparty),
-    initiateChannelClosure: (counterparty: Address) => initiateChannelClosure(channels, counterparty),
-    redeemTicket: (counterparty: Address, ackTicket: AcknowledgedTicket, ticket: Ticket) =>
-      redeemTicket(channels, counterparty, ackTicket, ticket),
+    withdraw: (
+      currency: 'NATIVE' | 'HOPR',
+      recipient: string,
+      amount: string,
+      txHandler: (tx: string) => DeferType<string>
+    ) => withdraw(currency, recipient, amount, txHandler),
+    fundChannel: (
+      me: Address,
+      counterparty: Address,
+      myTotal: Balance,
+      theirTotal: Balance,
+      txHandler: (tx: string) => DeferType<string>
+    ) => fundChannel(token, channels, me, counterparty, myTotal, theirTotal, txHandler),
+    openChannel: (me: Address, counterparty: Address, amount: Balance, txHandler: (tx: string) => DeferType<string>) =>
+      openChannel(token, channels, me, counterparty, amount, txHandler),
+    finalizeChannelClosure: (counterparty: Address, txHandler: (tx: string) => DeferType<string>) =>
+      finalizeChannelClosure(channels, counterparty, txHandler),
+    initiateChannelClosure: (counterparty: Address, txHandler: (tx: string) => DeferType<string>) =>
+      initiateChannelClosure(channels, counterparty, txHandler),
+    redeemTicket: (
+      counterparty: Address,
+      ackTicket: AcknowledgedTicket,
+      ticket: Ticket,
+      txHandler: (tx: string) => DeferType<string>
+    ) => redeemTicket(channels, counterparty, ackTicket, ticket, txHandler),
     getGenesisBlock: () => genesisBlock,
-    setCommitment: (counterparty: Address, comm: Hash) => setCommitment(channels, counterparty, comm),
+    setCommitment: (counterparty: Address, comm: Hash, txHandler: (tx: string) => DeferType<string>) =>
+      setCommitment(channels, counterparty, comm, txHandler),
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber: provider.getBlockNumber.bind(provider), // TODO: use indexer when it's done syncing
