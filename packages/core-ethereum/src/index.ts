@@ -1,6 +1,6 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import type { ChainWrapper } from './ethereum'
+import { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import { debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import {
@@ -22,8 +22,11 @@ import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
-import { chainMock } from './index.mock'
 import { IndexerEvents } from './indexer/types'
+import { connectorMock } from './index.mock'
+import { useFixtures } from './indexer/index.mock'
+import { sampleChainOptions } from './ethereum.mock'
+import ChainWrapperSingleton from './chain'
 
 const log = debug('hopr-core-ethereum')
 
@@ -42,6 +45,15 @@ export type RedeemTicketResponse =
       error: Error | string
     }
 
+export type ChainOptions = {
+  provider: string
+  maxConfirmations?: number
+  chainId: number
+  gasPrice?: number
+  network: string
+  environment: string
+}
+
 export default class HoprEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
@@ -53,22 +65,31 @@ export default class HoprEthereum extends EventEmitter {
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
-    private options?: {
-      provider: string
-      maxConfirmations?: number
-      chainId: number
-      gasPrice?: number
-      network: string
-      environment: string
-    }
+    private options: ChainOptions,
+    protected automaticChainCreation = true
   ) {
     super()
     this.indexer = new Indexer(
       this.publicKey.toAddress(),
       this.db,
-      this.options.maxConfirmations ?? CONFIRMATIONS,
+      this.options?.maxConfirmations ?? CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )
+    // In some cases, we want to make sure the chain within the connector is not triggered
+    // automatically but instead via an event. This is the case for `hoprd`, where we need
+    // to get notified after ther chain was properly created, and we can't get setup the
+    // listeners before the node was actually created.
+    if (automaticChainCreation) {
+      this.createChain()
+    } else {
+      this.once('connector:create', this.createChain)
+    }
+  }
+
+  private async createChain(): Promise<void> {
+    this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
+    // Emit event to make sure connector is aware the chain was created properly.
+    this.emit('connector:created')
   }
 
   async start(): Promise<HoprEthereum> {
@@ -77,7 +98,6 @@ export default class HoprEthereum extends EventEmitter {
     }
 
     const _start = async (): Promise<HoprEthereum> => {
-      this.chain = await createChainWrapper(this.options, this.privateKey)
       await this.chain.waitUntilReady()
       await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
@@ -88,6 +108,10 @@ export default class HoprEthereum extends EventEmitter {
     }
     this.started = _start()
     return this.started
+  }
+
+  public getChain(): ChainWrapper {
+    return this.chain
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -149,7 +173,10 @@ export default class HoprEthereum extends EventEmitter {
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
-  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.publicKey.toAddress())
+  private uncachedGetNativeBalance = () => {
+    log('Chain [inside cached hopr-ethereum]', this.chain)
+    return this.chain.getNativeBalance(this.publicKey.toAddress())
+  }
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
     this.uncachedGetNativeBalance,
     PROVIDER_CACHE_TTL
@@ -346,11 +373,15 @@ export {
   ChannelEntry,
   ChannelCommitmentInfo,
   Indexer,
-  chainMock,
+  ChainWrapperSingleton,
+  ChainWrapper,
+  connectorMock,
   createChainWrapper,
   initializeCommitment,
   findCommitmentPreImage,
   bumpCommitment,
   INDEXER_BLOCK_RANGE,
-  CONFIRMATIONS
+  CONFIRMATIONS,
+  useFixtures,
+  sampleChainOptions
 }

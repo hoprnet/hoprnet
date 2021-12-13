@@ -252,8 +252,11 @@ rm -Rfv \
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat --show-stack-traces > \
+HOPR_ENVIRONMENT_ID="hardhat-localhost" \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat node \
+  --network hardhat \
+  --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
@@ -279,6 +282,23 @@ setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--envi
 setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000
 # }}}
 
+declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
+log "CT node1 address: ${ct_node1_address}"
+
+log "Funding nodes"
+
+#  --- Fund nodes --- {{{
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+  --identity-prefix "${node_prefix}" \
+  --identity-directory "${tmp}" \
+  --use-local-identities \
+  --network hardhat \
+  --address "${ct_node1_address}" \
+  --password "${password}"
+# }}}
+
 log "Waiting for nodes startup"
 
 #  --- Wait until started --- {{{
@@ -290,21 +310,6 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
-declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
-# }}}
-
-log "CT node1 address: ${ct_node1_address}"
-
-log "Funding nodes"
-
-#  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-  --identity-prefix "${node_prefix}" \
-  --identity-directory "${tmp}" \
-  --use-local-identities \
-  --network hardhat \
-  --address "${ct_node1_address}" \
-  --password "${password}"
 # }}}
 
 log "Waiting for port binding"
