@@ -27,7 +27,7 @@ export type Receipt = string
 export type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 export type SendTransactionReturn = {
   code: 'SUCCESS' | 'DUPLICATE'
-  tx: Partial<ContractTransaction> 
+  tx: Partial<ContractTransaction>
 }
 
 export async function createChainWrapper(
@@ -151,7 +151,7 @@ export async function createChainWrapper(
         if (checkedDuplicate) {
           return {
             code: 'DUPLICATE',
-            tx: {hash}
+            tx: { hash }
           }
         }
         // TODO: If the transaction manager is out of sync, check against mempool/mined blocks from provider.
@@ -206,7 +206,7 @@ export async function createChainWrapper(
       await deferredListener.promise
       return {
         code: 'SUCCESS',
-        tx: {hash: transaction.hash}
+        tx: { hash: transaction.hash }
       }
     } catch (error) {
       // throw error caught by the listener

@@ -480,7 +480,7 @@ class Indexer extends EventEmitter {
       log('listener %s on %s is added', eventType, tx)
     })
 
-    return deferred;
+    return deferred
   }
 }
 
