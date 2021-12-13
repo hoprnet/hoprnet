@@ -28,6 +28,7 @@ declare wait_max_wait=1000
 declare cwd=`pwd`
 declare npm_package_version=""
 declare skip_cleanup="false"
+declare api_token="e2e-API-token^^"
 
 while (( "$#" )); do
   case "$1" in
@@ -155,7 +156,7 @@ function setup_node() {
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \
     --announce \
-    --api-token "e2e-API-token^^" \
+    --api-token "${api_token}" \
     --data="${dir}" \
     --host="127.0.0.1:${node_port}" \
     --identity="${id}" \
@@ -326,17 +327,6 @@ setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run 
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2"
 # }}}
 
-#  --- Wait until started --- {{{
-# Wait until node has recovered its private key
-wait_for_regex ${node1_log} "using blockchain address"
-wait_for_regex ${node2_log} "using blockchain address"
-wait_for_regex ${node3_log} "using blockchain address"
-wait_for_regex ${node4_log} "using blockchain address"
-wait_for_regex ${node5_log} "using blockchain address"
-wait_for_regex ${node6_log} "using blockchain address"
-wait_for_regex ${node7_log} "using blockchain address"
-# }}}
-
 #  --- Fund nodes --- {{{
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
@@ -346,6 +336,17 @@ yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --use-local-identities \
   --network hardhat \
   --password "${password}"
+# }}}
+
+#  --- Wait until started --- {{{
+# Wait until node has recovered its private key
+wait_for_regex ${node1_log} "using blockchain address"
+wait_for_regex ${node2_log} "using blockchain address"
+wait_for_regex ${node3_log} "using blockchain address"
+wait_for_regex ${node4_log} "using blockchain address"
+wait_for_regex ${node5_log} "using blockchain address"
+wait_for_regex ${node6_log} "using blockchain address"
+wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
@@ -360,7 +361,7 @@ wait_for_port 19097 "127.0.0.1" "${node7_log}"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 19501 19502
+  127.0.0.1 13301 19501 19502 "${api_token}"
 #}}}
 
 # --- Run test --- {{{

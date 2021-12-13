@@ -12,3 +12,7 @@ lib
 
 # Exclude any built npm packages
 *.tgz
+
+# coverage
+.nyc_output
+coverage

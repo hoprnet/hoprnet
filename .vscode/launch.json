@@ -7,11 +7,24 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Launch Program",
+      "name": "Launch HOPRd (localhost)",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/packages/hoprd/src/index.ts",
-      "args": ["--admin", "--init", "--rest", "--password=''", "--data=/tmp/debug"],
-      "outFiles": ["${workspaceFolder}/**/*.js"]
+      "args": [
+        "--admin",
+        "--init",
+        "--rest",
+        "--password='d3f4uL+%'",
+        "--testNoAuthentication",
+        "--data=/tmp/debug",
+        "--identity=/tmp/debug-identity",
+        "--environment='hardhat-localhost'"
+      ],
+      "env": {
+        "DEBUG": "hopr*"
+      },
+      "console": "integratedTerminal",
+      "outFiles": ["${workspaceFolder}/packages/**/lib/*.js"]
     },
     {
       "type": "node",
@@ -40,7 +53,18 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Test HOPR core Ethereum indexer",
+      "name": "Test HOPR core",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/node_modules/.bin/mocha",
+      "console": "integratedTerminal",
+      "args": ["--reporter=tap", "--full-trace", "--exit"],
+      "cwd": "${workspaceFolder}/packages/core",
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Test HOPR core-ethereum",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/node_modules/.bin/mocha",
       "args": ["--reporter=tap", "--full-trace", "--exit"],

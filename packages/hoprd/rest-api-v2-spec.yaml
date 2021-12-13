@@ -19,6 +19,10 @@ tags:
 # paths are defined at compile-time by the OpenAPI middleware
 paths: {}
 
+security:
+  - keyScheme: ['write']
+  - passwordScheme: ['write']
+
 externalDocs:
   description: Find out more about HOPR and HOPRd
   url: 'http://docs.hoprnet.org'
@@ -49,3 +53,13 @@ components:
         - version
       example:
         version: '1.83.5'
+  securitySchemes:
+    keyScheme:
+      type: apiKey
+      name: x-auth-token
+      in: header
+      description: 'A valid API token which had been configured at node startup.'
+    passwordScheme:
+      type: http
+      scheme: basic
+      description: 'A valid API token is used as the user which had been configured at node startup. No password is required.'
