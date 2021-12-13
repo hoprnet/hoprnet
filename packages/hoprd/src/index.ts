@@ -6,8 +6,9 @@ import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 import setupAPI from './api'
 import setupHealthcheck from './healthcheck'
@@ -16,7 +17,7 @@ import { Commands } from './commands'
 import { LogStream } from './logs'
 import { getIdentity } from './identity'
 
-import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
@@ -58,15 +59,15 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('rest', {
     boolean: true,
-    describe: 'Run a rest interface on localhost:3001, requires --apiToken',
+    describe: 'Expose the Rest API on localhost:3001, requires --apiToken',
     default: false
   })
   .option('restHost', {
-    describe: 'Updates the host for the rest server',
+    describe: 'Set host IP to which the Rest API server will bind',
     default: 'localhost'
   })
   .option('restPort', {
-    describe: 'Updates the port for the rest server',
+    describe: 'Set host port to which the Rest API server will bind',
     default: 3001
   })
   .option('healthCheck', {
@@ -219,8 +220,11 @@ async function main() {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
       let [decoded, time] = decode(msg) as [Buffer, Buffer]
-      logs.log('Message:', decoded.toString())
-      logs.log('Latency:', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+      logs.log(`Message: ${decoded.toString()}`)
+      logs.log(`Latency: ${Date.now() - parseInt(time.toString('hex'), 16)}ms`)
+
+      // also send it tagged as message for apps to use
+      logs.logMessage(decoded.toString())
     } catch (err) {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())
@@ -279,59 +283,70 @@ async function main() {
   // 2. Create node instance
   try {
     logs.log('Creating HOPR Node')
-    node = createHoprNode(peerId, options)
+    node = createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
+    node.on('hopr:connector:created', () => {
+      // 2.b - Connector has been created, and we can now trigger the next set of steps.
+      logs.log('Connector has been loaded properly.')
+      node.emit('hopr:monitoring:start')
+    })
+    node.on('hopr:monitoring:start', async () => {
+      // 3. start all monitoring services, and continue with the rest of the setup.
 
-    // 2.1 start all monitoring services
-
-    if (argv.rest) {
-      setupAPI(node, logs, argv)
-    }
-
-    if (argv.healthCheck) {
-      setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
-    }
-
-    logs.log(`Node address: ${node.getId().toB58String()}`)
-
-    const ethAddr = (await node.getEthereumAddress()).toHex()
-    const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
-
-    logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
-
-    // 2.5 Await funding of wallet.
-    await node.waitForFunds()
-    logs.log('Node has been funded, starting...')
-
-    // 3. Start the node.
-    await node.start()
-    cmds = new Commands(node)
-
-    if (adminServer) {
-      adminServer.registerNode(node, cmds)
-    }
-
-    logs.logStatus('READY')
-    logs.log('Node has started!')
-
-    if (argv.run && argv.run !== '') {
-      // Run a single command and then exit.
-      // We support multiple semicolon separated commands
-      let toRun = argv.run.split(';')
-
-      for (let c of toRun) {
-        console.error('$', c)
-        if (c === 'daemonize') {
-          return
-        }
-        await cmds.execute((msg) => {
-          logs.log(msg)
-        }, c)
+      if (argv.rest) {
+        setupAPI(node, logs, argv)
       }
-      await node.stop()
-      process.exit(0)
-    }
+
+      if (argv.healthCheck) {
+        setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
+      }
+
+      logs.log(`Node address: ${node.getId().toB58String()}`)
+
+      const ethAddr = (await node.getEthereumAddress()).toHex()
+      const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
+
+      logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
+
+      // 2.5 Await funding of wallet.
+      await node.waitForFunds()
+      logs.log('Node has been funded, starting...')
+
+      // 3. Start the node.
+      await node.start()
+      cmds = new Commands(node)
+
+      if (adminServer) {
+        adminServer.registerNode(node, cmds)
+      }
+
+      logs.logStatus('READY')
+      logs.log('Node has started!')
+
+      if (argv.run && argv.run !== '') {
+        // Run a single command and then exit.
+        // We support multiple semicolon separated commands
+        let toRun = argv.run.split(';')
+
+        for (let c of toRun) {
+          console.error('$', c)
+          if (c === 'daemonize') {
+            return
+          }
+          await cmds.execute((msg) => {
+            logs.log(msg)
+          }, c)
+        }
+        await node.stop()
+        process.exit(0)
+      }
+    })
+
+    // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
+    logs.log(`Ready to request on-chain connector to connect to provider.`)
+    node.subscribeOnConnector('connector:created', () => node.emit('hopr:connector:created'))
+    node.emitOnConnector('connector:create')
   } catch (e) {
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)

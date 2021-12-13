@@ -70,19 +70,19 @@ npm install @hoprnet/hoprd@1.73
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-goerli` tag represents the `master` branch, while the `tuttlingen` tag
+The `master-goerli` tag represents the `master` branch, while the `prague` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:tuttlingen
+docker pull gcr.io/hoprassociation/hoprd:prague
 ```
 
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:tuttlingen'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:prague'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -124,11 +124,11 @@ $ hoprd --help
 Options:
   --help                        Show help  [boolean]
   --version                     Show version number  [boolean]
-  --network                     Which network to run the HOPR node on  [choices: "ETHEREUM"] [default: "ETHEREUM"]
+  --environment                 Environment id which the node shall run on  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague"] [default: ""]
   --host                        The network host to run the HOPR node on.  [default: "0.0.0.0:9091"]
   --announce                    Announce public IP to the network  [boolean] [default: false]
   --admin                       Run an admin interface on localhost:3000, requires --apiToken  [boolean] [default: false]
-  --rest                        Run a rest interface on localhost:3001, requires --apiToken  [boolean] [default: false]
+  --rest                        Expose the Rest API on localhost:3001, requires --apiToken  [boolean] [default: false]
   --restHost                    Updates the host for the rest server  [default: "localhost"]
   --restPort                    Updates the port for the rest server  [default: 3001]
   --healthCheck                 Run a health check end point on localhost:8080  [boolean] [default: false]
@@ -137,20 +137,19 @@ Options:
   --forwardLogs                 Forwards all your node logs to a public available sink  [boolean] [default: false]
   --forwardLogsProvider         A provider url for the logging sink node to use  [default: "https://ceramic-clay.3boxlabs.com"]
   --password                    A password to encrypt your keys  [default: ""]
-  --apiToken                    (experimental) A REST API token and admin panel password for user authentication  [string]
-  --identity                    The path to the identity file  [default: "/home/tbr/.hopr-identity"]
+  --apiToken                    A REST API token and admin panel password for user authentication  [string]
+  --privateKey                  A private key to be used for your HOPR node  [string]
+  --identity                    The path to the identity file  [default: "$HOME/.hopr-identity"]
   --run                         Run a single hopr command, same syntax as in hopr-admin  [default: ""]
   --dryRun                      List all the options used to run the HOPR node, but quit instead of starting  [boolean] [default: false]
   --data                        manually specify the database directory to use  [default: ""]
   --init                        initialize a database if it doesn't already exist  [boolean] [default: false]
-  --privateKey                  A private key to be used for your node wallet, to quickly boot your node [string] [default: undefined]
   --adminHost                   Host to listen to for admin console  [default: "localhost"]
   --adminPort                   Port to listen to for admin console  [default: 3000]
-  --environment                 Environment id to run in [string] [default: defined by release]
   --testAnnounceLocalAddresses  For testing local testnets. Announce local addresses.  [boolean] [default: false]
   --testPreferLocalAddresses    For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
   --testUseWeakCrypto           weaker crypto for faster node startup  [boolean] [default: false]
-  --testNoAuthentication        (experimental) disable remote authentication
+  --testNoAuthentication        no remote authentication for easier testing  [boolean] [default: false]
 ```
 
 As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.
@@ -426,7 +425,7 @@ script to the creation script:
 ```sh
 ./scripts/setup-gcloud-cluster.sh \
   my-custom-cluster-without-name \
-  gcr.io/hoprassociation/hoprd:tuttlingen \
+  gcr.io/hoprassociation/hoprd:prague \
   `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
 

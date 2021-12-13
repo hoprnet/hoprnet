@@ -145,7 +145,7 @@ jobs:
         run: ./scripts/configure-git-info.sh
 
       - name: Setup Google Cloud Credentials
-        uses: google-github-actions/setup-gcloud@v0.2.1
+        uses: google-github-actions/setup-gcloud@v0.3.0
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
@@ -181,7 +181,7 @@ jobs:
         run: ./scripts/configure-git-info.sh
 
       - name: Setup Google Cloud Credentials
-        uses: google-github-actions/setup-gcloud@v0.2.1
+        uses: google-github-actions/setup-gcloud@v0.3.0
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
@@ -280,7 +280,7 @@ jobs:
           cache: yarn
 
       - name: Setup Google Cloud Credentials
-        uses: google-github-actions/setup-gcloud@v0.2.1
+        uses: google-github-actions/setup-gcloud@v0.3.0
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
@@ -293,6 +293,8 @@ jobs:
           git pull
           # need to install tools first which may be used during deployment
           yarn
+          # need to build our packages which might by used by the scripts
+          yarn build
           ./scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}

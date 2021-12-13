@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-connect",
-  "version": "1.83.0-next.100",
+  "version": "1.85.0-next.22",
   "description": "A libp2p-complaint transport module that handles NAT traversal by using WebRTC",
   "repository": "https://github.com/hoprnet/hopr-connect.git",
   "homepage": "https://github.com/hoprnet/hopr-connect",
@@ -40,13 +40,13 @@
     "wrtc": "0.4.7"
   },
   "devDependencies": {
-    "@chainsafe/libp2p-noise": "4.1.1",
+    "@chainsafe/libp2p-noise": "5.0.0",
     "@types/bl": "5.0.2",
-    "@types/chai": "4.2.22",
+    "@types/chai": "4.3.0",
     "@types/chai-spies": "1.0.3",
     "@types/debug": "4.1.7",
     "@types/mocha": "9.0.0",
-    "@types/node": "16.11.11",
+    "@types/node": "16.11.12",
     "@types/simple-peer": "9.11.3",
     "@types/yargs": "17.0.7",
     "abortable-iterator": "3.0.0",
@@ -55,14 +55,14 @@
     "it-pair": "1.0.0",
     "it-pipe": "1.1.0",
     "it-pushable": "1.4.2",
-    "libp2p": "robertkiel/js-libp2p#bc60449e4ef1325a6ef094f18359b3ca9a2ec5ad",
+    "libp2p": "0.35.3",
     "libp2p-interfaces": "2.0.0",
-    "libp2p-mplex": "0.10.4",
+    "libp2p-mplex": "0.10.5",
     "mocha": "9.1.3",
-    "prettier": "2.5.0",
+    "prettier": "2.5.1",
     "rimraf": "3.0.2",
     "ts-node": "10.4.0",
-    "typescript": "4.5.2",
+    "typescript": "4.5.3",
     "yargs": "17.2.1"
   },
   "mocha": {

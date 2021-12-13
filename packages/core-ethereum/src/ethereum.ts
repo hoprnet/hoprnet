@@ -19,7 +19,7 @@ import TransactionManager, { TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants'
 
-const log = debug('hopr:core-ethereum:chain-operations')
+const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
 
 export type Receipt = string
@@ -33,6 +33,7 @@ export async function createChainWrapper(
   const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
+  log('Provider obtained from options', provider)
   const wallet = new Wallet(privateKey).connect(provider)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()

@@ -4,7 +4,7 @@ import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
 
-import { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import { createHoprNode, resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
@@ -12,7 +12,7 @@ import { CoverTrafficStrategy } from './strategy'
 import setupHealthcheck from './healthcheck'
 
 import type PeerId from 'peer-id'
-import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import type { HoprOptions } from '@hoprnet/hopr-core'
 import type { PeerData, State } from './state'
 
 const log = debug('hopr:cover-traffic')
@@ -53,13 +53,22 @@ const argv = yargs(process.argv.slice(2))
     string: true,
     default: './ct.json'
   })
+  .option('data', {
+    describe: 'manually specify the database directory to use',
+    default: ''
+  })
+  .option('healthCheck', {
+    boolean: true,
+    describe: 'Run a health check end point on localhost:8080',
+    default: false
+  })
   .option('healthCheckHost', {
     describe: 'Host to listen on for health check',
-    string: true
+    default: 'localhost'
   })
   .option('healthCheckPort', {
     describe: 'Port to listen on for health check',
-    number: true
+    default: 8080
   })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
@@ -71,6 +80,10 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
     environment,
     forceCreateDB: false,
     password: ''
+  }
+
+  if (argv.data && argv.data !== '') {
+    options.dbPath = argv.data
   }
 
   return options
@@ -107,7 +120,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   log('waiting for node to be funded')
   await node.waitForFunds()
 
-  if (argv.healthCheckHost) {
+  if (argv.healthCheck) {
     setupHealthcheck(node, argv.healthCheckHost, argv.healthCheckPort)
   }
 
