@@ -221,7 +221,9 @@ const createChainMock = (
   } as unknown as ChainWrapper
 }
 
-export const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event<ChannelEventNames>[] } = {}) => {
+export const useFixtures = async (
+  ops: { latestBlockNumber?: number; pastEvents?: Event<ChannelEventNames>[] } = {}
+) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const pastEvents = ops.pastEvents ?? []
 
