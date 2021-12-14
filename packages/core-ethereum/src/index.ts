@@ -121,7 +121,7 @@ export default class HoprEthereum extends EventEmitter {
    */
   async stop(): Promise<void> {
     log('Stopping connector...')
-    await this.indexer.stop()
+    this.indexer.stop()
   }
 
   async announce(multiaddr: Multiaddr): Promise<string> {
