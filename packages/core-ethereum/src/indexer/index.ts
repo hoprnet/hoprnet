@@ -237,8 +237,7 @@ class Indexer extends EventEmitter {
       } else {
         await retryWithBackoff(() => this.restart(), backoffOption)
       }
-    }
-    catch (err) {
+    } catch (err) {
       log(`error: exception while processing another provider error ${error}`, err)
     }
   }
@@ -277,12 +276,15 @@ class Indexer extends EventEmitter {
           this.chain.updateConfirmedTransaction(nativeTx)
         })
       }
-    }
-    catch (err) {
-      log(`error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`, err)
+    } catch (err) {
+      log(
+        `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
+        err
+      )
     }
 
-    log('At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
+    log(
+      'At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
       blockNumber,
       this.unconfirmedEvents.length,
       this.unconfirmedEvents.length > 0
@@ -342,17 +344,18 @@ class Indexer extends EventEmitter {
       try {
         lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
         await this.db.updateLatestConfirmedSnapshot(lastSnapshot)
-      }
-      catch (err) {
-        log(`error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`, err)
+      } catch (err) {
+        log(
+          `error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`,
+          err
+        )
       }
     }
 
     try {
       await this.db.updateLatestBlockNumber(new BN(blockNumber))
       this.emit('block-processed', blockNumber)
-    }
-    catch (err) {
+    } catch (err) {
       log(`error: failed to update database with latest block number ${blockNumber}`, err)
     }
   }
