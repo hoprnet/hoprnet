@@ -1,5 +1,4 @@
 import BN from 'bn.js'
-import { debug, DeferType, retryWithBackoff } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -15,7 +14,10 @@ import {
   AccountEntry,
   PublicKey,
   Snapshot,
-  u8aConcat
+  u8aConcat,
+  debug,
+  DeferType,
+  retryWithBackoff
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
@@ -231,9 +233,12 @@ class Indexer extends EventEmitter {
    * This will update {this.latestBlock},
    * and processes events which are within
    * confirmed blocks.
-   * @param block
+   * @param blockNumber
    */
   private async onNewBlock(blockNumber: number): Promise<void> {
+    // NOTE: This function is also used in event handlers
+    // where it cannot be 'awaited', so all exceptions need to be caught.
+
     log('Indexer got new block %d', blockNumber)
     this.emit('block', blockNumber)
 
@@ -242,29 +247,35 @@ class Indexer extends EventEmitter {
       this.latestBlock = blockNumber
     }
 
-    let lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
+    let lastSnapshot;
+    try {
+      lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
-    // This new block markes a previous block
-    // (blockNumber - this.maxConfirmations) is final.
-    // Confirm native token transactions in that previous block.
-    const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
-    // update transaction manager
-    if (nativeTxs.length > 0) {
-      this.indexEvent('withdraw-native', nativeTxs)
-      nativeTxs.forEach((nativeTx) => {
-        this.chain.updateConfirmedTransaction(nativeTx)
-      })
+      // This new block marks a previous block
+      // (blockNumber - this.maxConfirmations) is final.
+      // Confirm native token transactions in that previous block.
+      const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
+      // update transaction manager
+      if (nativeTxs.length > 0) {
+        this.indexEvent('withdraw-native', nativeTxs)
+        nativeTxs.forEach((nativeTx) => {
+          this.chain.updateConfirmedTransaction(nativeTx)
+        })
+      }
+
+      log('At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
+        blockNumber,
+        this.unconfirmedEvents.length,
+        this.unconfirmedEvents.length > 0
+          ? isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
+          : null,
+        this.unconfirmedEvents.length > 0 ? this.unconfirmedEvents.top(1)[0].blockNumber : 0,
+        this.maxConfirmations
+      )
     }
-    log(
-      'At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
-      blockNumber,
-      this.unconfirmedEvents.length,
-      this.unconfirmedEvents.length > 0
-        ? isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
-        : null,
-      this.unconfirmedEvents.length > 0 ? this.unconfirmedEvents.top(1)[0].blockNumber : 0,
-      this.maxConfirmations
-    )
+    catch (err) {
+      log(chalk.red(`Error while retrieving information about block ${blockNumber} with finality ${this.maxConfirmations}: ${err}`))
+    }
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
@@ -295,7 +306,7 @@ class Indexer extends EventEmitter {
       const eventName = event.event as EventNames | TokenEventNames
 
       // update transaction manager
-      this.chain.updateConfirmedTransaction(event.transactionHash as string)
+      this.chain.updateConfirmedTransaction(event.transactionHash)
       log('Event name %s and hash %s', eventName, event.transactionHash)
       try {
         if (eventName === ANNOUNCEMENT) {
@@ -313,12 +324,22 @@ class Indexer extends EventEmitter {
         log('error processing event:', event, err)
       }
 
-      lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
-      await this.db.updateLatestConfirmedSnapshot(lastSnapshot)
+      try {
+        lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
+        await this.db.updateLatestConfirmedSnapshot(lastSnapshot)
+      }
+      catch (err) {
+        log(chalk.red(`error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`))
+      }
     }
 
-    await this.db.updateLatestBlockNumber(new BN(blockNumber))
-    this.emit('block-processed', blockNumber)
+    try {
+      await this.db.updateLatestBlockNumber(new BN(blockNumber))
+      this.emit('block-processed', blockNumber)
+    }
+    catch (err) {
+      log(chalk.red(`error: failed to update database with latest block number ${blockNumber}: ${err}`))
+    }
   }
 
   /**
