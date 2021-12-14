@@ -247,7 +247,7 @@ class Indexer extends EventEmitter {
       this.latestBlock = blockNumber
     }
 
-    let lastSnapshot;
+    let lastSnapshot
     try {
       lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
@@ -263,7 +263,8 @@ class Indexer extends EventEmitter {
         })
       }
 
-      log('At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
+      log(
+        'At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
         blockNumber,
         this.unconfirmedEvents.length,
         this.unconfirmedEvents.length > 0
@@ -272,9 +273,12 @@ class Indexer extends EventEmitter {
         this.unconfirmedEvents.length > 0 ? this.unconfirmedEvents.top(1)[0].blockNumber : 0,
         this.maxConfirmations
       )
-    }
-    catch (err) {
-      log(chalk.red(`Error while retrieving information about block ${blockNumber} with finality ${this.maxConfirmations}: ${err}`))
+    } catch (err) {
+      log(
+        chalk.red(
+          `Error while retrieving information about block ${blockNumber} with finality ${this.maxConfirmations}: ${err}`
+        )
+      )
     }
 
     // check unconfirmed events and process them if found
@@ -327,17 +331,19 @@ class Indexer extends EventEmitter {
       try {
         lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
         await this.db.updateLatestConfirmedSnapshot(lastSnapshot)
-      }
-      catch (err) {
-        log(chalk.red(`error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`))
+      } catch (err) {
+        log(
+          chalk.red(
+            `error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`
+          )
+        )
       }
     }
 
     try {
       await this.db.updateLatestBlockNumber(new BN(blockNumber))
       this.emit('block-processed', blockNumber)
-    }
-    catch (err) {
+    } catch (err) {
       log(chalk.red(`error: failed to update database with latest block number ${blockNumber}: ${err}`))
     }
   }
