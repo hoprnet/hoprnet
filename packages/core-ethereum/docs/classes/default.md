@@ -171,7 +171,7 @@ ___
 | `getChannels` | () => `HoprChannels` |
 | `getGenesisBlock` | () => `number` |
 | `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
-| `getLatestBlockNumber` | () => `Promise`<`number`\> |
+| `getLatestBlockNumber` | `any` |
 | `getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
 | `getPrivateKey` | () => `Uint8Array` |
@@ -181,10 +181,10 @@ ___
 | `openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `subscribeBlock` | (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` |
-| `subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
-| `subscribeError` | (`cb`: `any`) => `void` |
-| `subscribeTokenEvents` | (`cb`: `any`) => `HoprToken` |
+| `subscribeBlock` | (`cb`: (`blockNumber`: `number`) => `void` \| `Promise`<`void`\>) => () => `void` |
+| `subscribeChannelEvents` | (`cb`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` \| `Promise`<`void`\>) => () => `void` |
+| `subscribeError` | (`cb`: (`err`: `any`) => `void` \| `Promise`<`void`\>) => () => `void` |
+| `subscribeTokenEvents` | (`cb`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` \| `Promise`<`void`\>) => () => `void` |
 | `unsubscribe` | () => `void` |
 | `updateConfirmedTransaction` | (`hash`: `string`) => `void` |
 | `waitUntilReady` | () => `Promise`<`Network`\> |
@@ -580,7 +580,7 @@ ___
 | `getChannels` | () => `HoprChannels` |
 | `getGenesisBlock` | () => `number` |
 | `getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` = hoprChannelsDeployment.address; `hoprTokenAddress`: `string` = hoprTokenDeployment.address; `network`: `string` = networkInfo.network } |
-| `getLatestBlockNumber` | () => `Promise`<`number`\> |
+| `getLatestBlockNumber` | `any` |
 | `getNativeBalance` | (`address`: `Address`) => `Promise`<`NativeBalance`\> |
 | `getNativeTokenTransactionInBlock` | (`blockNumber`: `number`, `isOutgoing`: `boolean`) => `Promise`<`string`[]\> |
 | `getPrivateKey` | () => `Uint8Array` |
@@ -590,10 +590,10 @@ ___
 | `openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
 | `setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`, `txHandler`: (`tx`: `string`) => `DeferType`<`string`\>) => `Promise`<`string`\> |
-| `subscribeBlock` | (`cb`: `any`) => `StaticJsonRpcProvider` \| `WebSocketProvider` |
-| `subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
-| `subscribeError` | (`cb`: `any`) => `void` |
-| `subscribeTokenEvents` | (`cb`: `any`) => `HoprToken` |
+| `subscribeBlock` | (`cb`: (`blockNumber`: `number`) => `void` \| `Promise`<`void`\>) => () => `void` |
+| `subscribeChannelEvents` | (`cb`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` \| `Promise`<`void`\>) => () => `void` |
+| `subscribeError` | (`cb`: (`err`: `any`) => `void` \| `Promise`<`void`\>) => () => `void` |
+| `subscribeTokenEvents` | (`cb`: (`event`: `TypedEvent`<`any`, `any`\>) => `void` \| `Promise`<`void`\>) => () => `void` |
 | `unsubscribe` | () => `void` |
 | `updateConfirmedTransaction` | (`hash`: `string`) => `void` |
 | `waitUntilReady` | () => `Promise`<`Network`\> |
