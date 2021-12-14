@@ -58,6 +58,28 @@ async function getNode(id: PeerId, withDHT = false): Promise<Libp2p> {
   return node
 }
 
+function getPeerStore() {
+  const peerStore = new Set<Multiaddr>()
+
+  return {
+    add: peerStore.add.bind(peerStore),
+    get: () => {
+      // Make sure that Typescript does not build unit test if Libp2p API changes.
+      const multiaddrs: Pick<ReturnType<Libp2p['peerStore']['get']>, 'addresses'>['addresses'] = []
+      for (const value of peerStore.values()) {
+        multiaddrs.push({
+          multiaddr: value,
+          isCertified: true
+        })
+      }
+
+      // Libp2p's return value has more properties but
+      // dialHelper only uses the Multiaddresses
+      return { addresses: multiaddrs }
+    }
+  }
+}
+
 describe('test dialHelper', function () {
   it('call non-existing', async function () {
     const peerA = await getNode(Alice)
@@ -138,7 +160,7 @@ describe('test dialHelper', function () {
   })
 
   it('DHT does not find any new addresses', async function () {
-    const peerStore = new Set<Multiaddr>()
+    const peerStore = getPeerStore()
     const peerA = {
       peerRouting: {
         // Array with length > 0
@@ -147,20 +169,7 @@ describe('test dialHelper', function () {
           Promise.resolve({ id: Bob, multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`)] })
       },
       dialProtocol: () => Promise.resolve(undefined),
-      peerStore: {
-        get: () => {
-          const multiaddrs: {
-            multiaddr: Multiaddr
-          }[] = []
-          for (const value of peerStore.values()) {
-            multiaddrs.push({
-              multiaddr: value
-            })
-          }
-
-          return { addresses: multiaddrs } as any
-        }
-      }
+      peerStore
     }
 
     peerStore.add(new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`))
@@ -172,31 +181,17 @@ describe('test dialHelper', function () {
   })
 
   it('DHT throws an error', async function () {
-    const peerStore = new Set<Multiaddr>()
+    const peerStore = getPeerStore()
     const peerA = {
       peerRouting: {
         // Array with length > 0
         _routers: [undefined],
         // Call rejects asynchronously
-        findPeer: () => new Promise<any>((_, reject) => setImmediate(reject))
+        findPeer: () =>
+          new Promise<Awaited<ReturnType<Libp2p['peerRouting']['findPeer']>>>((_, reject) => setImmediate(reject))
       },
       dialProtocol: () => Promise.resolve(undefined),
-      peerStore: {
-        get: () => {
-          const multiaddrs: {
-            multiaddr: Multiaddr
-          }[] = []
-          for (const value of peerStore.values()) {
-            multiaddrs.push({
-              multiaddr: value
-            })
-          }
-
-          // Libp2p's return value has more properties but
-          // dialHelper only uses the Multiaddresses
-          return { addresses: multiaddrs } as any
-        }
-      }
+      peerStore
     }
 
     peerStore.add(new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${Bob.toB58String()}`))
@@ -207,7 +202,7 @@ describe('test dialHelper', function () {
   })
 
   it('DHT does not lead to better addresses', async function () {
-    const peerStore = new Set<Multiaddr>()
+    const peerStore = getPeerStore()
     const peerA = {
       peerRouting: {
         // Array with length > 0
@@ -220,22 +215,7 @@ describe('test dialHelper', function () {
         }
       },
       dialProtocol: () => Promise.resolve(undefined),
-      peerStore: {
-        get: () => {
-          const multiaddrs: {
-            multiaddr: Multiaddr
-          }[] = []
-          for (const value of peerStore.values()) {
-            multiaddrs.push({
-              multiaddr: value
-            })
-          }
-
-          // Libp2p's return value has more properties but
-          // dialHelper only uses the Multiaddresses
-          return { addresses: multiaddrs } as any
-        }
-      }
+      peerStore
     }
 
     const result = await dialHelper(peerA, Bob, TEST_PROTOCOL)

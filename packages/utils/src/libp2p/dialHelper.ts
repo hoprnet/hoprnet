@@ -53,7 +53,9 @@ export type DialResponse =
     }
 
 // Make sure that Typescript fails to build tests if libp2p API changes
-type ReducedPeerStore = { peerStore: Pick<LibP2P['peerStore'], 'get'> }
+type ReducedPeerStore = {
+  peerStore: { get: (peer: PeerId) => Pick<ReturnType<LibP2P['peerStore']['get']>, 'addresses'> }
+}
 type ReducedDHT = { peerRouting: Pick<LibP2P['peerRouting'], '_routers' | 'findPeer'> }
 type ReducedLibp2p = ReducedDHT & ReducedPeerStore & Pick<LibP2P, 'dialProtocol'>
 
@@ -91,7 +93,7 @@ async function attemptDial(
   }
 
   // Libp2p's return types tend to change every now and then
-  if (struct != null && struct != undefined) {
+  if (struct != null) {
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
@@ -127,7 +129,7 @@ async function queryDHT(
   }
 
   // Libp2p's return types tend to change every now and then
-  if (dhtResponse == null || dhtResponse == undefined) {
+  if (dhtResponse == null) {
     return { status: DialStatus.DHT_ERROR, query: destination }
   }
 
@@ -242,7 +244,7 @@ export async function dial(
   opts?: DialOpts
 ): Promise<DialResponse> {
   return abortableTimeout(
-    (opts: Required<TimeoutOpts>) => doDial(libp2p, destination, protocol, opts),
+    (timeoutOpts: Required<TimeoutOpts>) => doDial(libp2p, destination, protocol, timeoutOpts),
     { status: DialStatus.ABORTED },
     { status: DialStatus.TIMEOUT },
     {
