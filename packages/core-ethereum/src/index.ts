@@ -14,7 +14,9 @@ import {
   ChannelStatus,
   generateChannelId,
   Hash,
-  debug, DeferType, privKeyToPeerId
+  debug,
+  DeferType,
+  privKeyToPeerId
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants'
@@ -103,8 +105,7 @@ export default class HoprEthereum extends EventEmitter {
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
         log(chalk.green('Connector started'))
-      }
-      catch (err) {
+      } catch (err) {
         log('error: failed to start the indexer', err)
       }
       return this
