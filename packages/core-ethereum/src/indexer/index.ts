@@ -85,7 +85,7 @@ class Indexer extends EventEmitter {
     )
 
     this.chain.subscribeBlock((b) => {
-      await this.onNewBlock(b)
+      this.onNewBlock(b)
     })
 
     this.chain.subscribeError((error: any) => {
