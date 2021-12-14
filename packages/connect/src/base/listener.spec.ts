@@ -177,34 +177,49 @@ async function stopNode(socket: Socket | Listener) {
 }
 
 describe('check listening to sockets', function () {
-  it('recreate the socket and perform STUN request', async function () {
+  it('recreate the socket and perform STUN requests', async function () {
+    this.timeout(3e3) // 3 seconds should be more than enough
+
     let listener: Listener
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
-    const msgReceived = [defer<void>(), defer<void>()]
+    const AMOUNT = 3
 
-    const stunServers = [
-      await startStunServer(undefined, { msgReceived: msgReceived[0] }),
-      await startStunServer(undefined, { msgReceived: msgReceived[1] })
-    ]
+    const msgReceived = Array.from({ length: AMOUNT }, (_) => defer<void>())
 
-    for (let i = 0; i < 2; i++) {
-      listener = new Listener(
-        undefined,
-        undefined as any,
-        undefined,
-        await Promise.all(stunServers.map((s: Socket) => getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${s.address().port}`))),
-        peerId,
-        undefined,
-        false
+    const stunServers = await Promise.all(
+      Array.from({ length: AMOUNT }, (_, index: number) =>
+        startStunServer(undefined, { msgReceived: msgReceived[index] })
       )
+    )
 
-      await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
+    const peerStoreEntries = await Promise.all(
+      stunServers.map((s: Socket) => getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${s.address().port}`))
+    )
+
+    let port: number | undefined
+
+    for (let i = 0; i < 3; i++) {
+      listener = new Listener(undefined, undefined as any, undefined, [peerStoreEntries[i]], peerId, undefined, false)
+
+      let listeningMultiaddr: Multiaddr
+      if (port != undefined) {
+        listeningMultiaddr = new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`)
+      } else {
+        // Listen to previously used port
+        listeningMultiaddr = new Multiaddr(`/ip4/127.0.0.1/tcp/${port}/p2p/${peerId.toB58String()}`)
+      }
+
+      await waitUntilListening(listener, listeningMultiaddr)
+      if (port == undefined) {
+        // Store the port to which we have listened before
+        port = listener.getPort()
+      }
+      assert(port != undefined)
       await stopNode(listener)
     }
 
     await Promise.all(msgReceived.map((received) => received.promise))
-
     await Promise.all(stunServers.map(stopNode))
   })
 
@@ -348,6 +363,7 @@ describe('check listening to sockets', function () {
     await msgReceived.promise
 
     await stopNode(node.listener)
+    await stopNode(stunServer)
   })
 
   it('get the right addresses', async function () {
@@ -491,6 +507,7 @@ describe('check listening to sockets', function () {
   })
 
   it('overwrite existing relays', async function () {
+    this.timeout(3e3) // 3 seconds should be more than enough
     const stunServer = await startStunServer(undefined)
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
