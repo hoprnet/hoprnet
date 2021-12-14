@@ -458,14 +458,14 @@ export async function createChainWrapper(
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber: provider.getBlockNumber.bind(provider), // TODO: use indexer when it's done syncing
-    subscribeBlock: (cb: (blockNumber: number) => void): (() => void) => {
+    subscribeBlock: (cb: (blockNumber: number) => void | Promise<void>): (() => void) => {
       provider.on('block', cb)
 
       return () => {
         provider.off('block', cb)
       }
     },
-    subscribeError: (cb: (err: any) => void): (() => void) => {
+    subscribeError: (cb: (err: any) => void | Promise<void>): (() => void) => {
       provider.on('error', cb)
       channels.on('error', cb)
       token.on('error', cb)
@@ -476,7 +476,7 @@ export async function createChainWrapper(
         token.off('error', cb)
       }
     },
-    subscribeChannelEvents: (cb: (event: TypedEvent<any, any>) => void): (() => void) => {
+    subscribeChannelEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>): (() => void) => {
       channels.on('*', cb)
 
       return () => {
@@ -484,7 +484,7 @@ export async function createChainWrapper(
       }
     },
     // Cannot directly apply filters here because it does not return a full event object
-    subscribeTokenEvents: (cb: (event: TypedEvent<any, any>) => void): (() => void) => {
+    subscribeTokenEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>): (() => void) => {
       token.on('*', cb)
 
       return () => {

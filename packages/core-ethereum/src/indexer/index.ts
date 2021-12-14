@@ -149,8 +149,11 @@ class Indexer extends EventEmitter {
   /**
    * Stops indexing.
    */
-  public stop(): Promise<void> {
-    if (this.status === 'stopped') return
+  public stop(): void {
+    if (this.status === 'stopped') {
+      return
+    }
+
     log(`Stopping indexer...`)
 
     this.unsubscribeChannelEvents()
@@ -163,8 +166,11 @@ class Indexer extends EventEmitter {
     log(chalk.green('Indexer stopped!'))
   }
 
-  private async restart(): Promise<void> {
-    if (this.status === 'restarting') return
+  protected async restart(): Promise<void> {
+    if (this.status === 'restarting') {
+      return
+    }
+
     log('Indexer restaring')
 
     try {
