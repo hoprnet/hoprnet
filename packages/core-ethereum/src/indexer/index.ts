@@ -262,7 +262,7 @@ class Indexer extends EventEmitter {
       this.latestBlock = blockNumber
     }
 
-    let lastSnapshot;
+    let lastSnapshot
     try {
       lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
