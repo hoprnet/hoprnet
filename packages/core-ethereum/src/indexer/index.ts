@@ -429,7 +429,7 @@ class Indexer extends EventEmitter {
 
     if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
       log('channel was closed')
-      this.onChannelClosed(channel)
+      await this.onChannelClosed(channel)
     }
 
     this.emit('channel-update', channel)
@@ -449,7 +449,7 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelClosed(channel: ChannelEntry) {
-    this.db.deleteAcknowledgedTicketsFromChannel(channel)
+    await this.db.deleteAcknowledgedTicketsFromChannel(channel)
     this.emit('channel-closed', channel)
   }
 
