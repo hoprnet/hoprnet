@@ -60,7 +60,7 @@ class Indexer extends EventEmitter {
     this.genesisBlock = genesisBlock
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
-      await this.db.getLatestBlockNumber(),
+      this.db.getLatestBlockNumber(),
       this.chain.getLatestBlockNumber()
     ])
     this.latestBlock = latestOnChainBlock
@@ -85,14 +85,14 @@ class Indexer extends EventEmitter {
     )
 
     this.chain.subscribeBlock((b) => {
-      this.onNewBlock(b)
+      await this.onNewBlock(b)
     })
 
     this.chain.subscribeError((error: any) => {
       log(chalk.red(`etherjs error: ${error}`))
       // if provider connection issue
       if (
-        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET'].some((err) => [error?.code, String(error)].includes(err))
+        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].some((err) => [error?.code, String(error)].includes(err))
       ) {
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
         if (this.chain.getAllQueuingTransactionRequests().length > 0) {
