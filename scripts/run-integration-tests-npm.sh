@@ -366,7 +366,7 @@ ${mydir}/../test/security-test.sh \
 
 # --- Run test --- {{{
 ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
+  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307" "${api_token}"
 # }}}
 
 # -- Verify node6 has executed the commands {{{
