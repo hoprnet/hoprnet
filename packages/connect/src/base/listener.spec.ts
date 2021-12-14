@@ -2,8 +2,7 @@ import assert from 'assert'
 import { Listener } from './listener'
 import { Multiaddr } from 'multiaddr'
 import type { MultiaddrConnection, Upgrader } from 'libp2p-interfaces/transport'
-import dgram from 'dgram'
-import type { Socket, RemoteInfo } from 'dgram'
+import dgram, { type Socket, type RemoteInfo } from 'dgram'
 import { handleStunRequest } from './stun'
 import PeerId from 'peer-id'
 import { createConnection } from 'net'
@@ -11,10 +10,11 @@ import * as stun from 'webrtc-stun'
 import { once, on, EventEmitter } from 'events'
 
 import { networkInterfaces } from 'os'
-import { u8aEquals, defer } from '@hoprnet/hopr-utils'
-import type { DeferType } from '@hoprnet/hopr-utils'
+import { u8aEquals, defer, type DeferType } from '@hoprnet/hopr-utils'
 
 import type { PublicNodesEmitter, PeerStoreType } from '../types'
+
+import { waitUntilListening, stopNode } from './utils.spec'
 
 /**
  * Decorated Listener class that emits events after
@@ -91,14 +91,6 @@ async function startStunServer(port: number | undefined, state?: { msgReceived?:
   return socket
 }
 
-async function waitUntilListening(socket: Listener, ma: Multiaddr) {
-  const promise = once(socket, 'listening')
-
-  await socket.listen(ma)
-
-  return promise
-}
-
 /**
  * Creates a node and attaches message listener to it.
  * @param publicNodes emitter that emit an event on new public nodes
@@ -166,14 +158,6 @@ async function startNode(
     listener,
     publicNodesEmitter
   }
-}
-
-async function stopNode(socket: Socket | Listener) {
-  const closePromise = once(socket, 'close')
-
-  socket.close()
-
-  return closePromise
 }
 
 describe('check listening to sockets', function () {

@@ -1,5 +1,4 @@
-import { createServer } from 'net'
-import type { Socket, Server, AddressInfo } from 'net'
+import { createServer, type Socket, type AddressInfo } from 'net'
 
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'
 import { once } from 'events'
@@ -9,21 +8,7 @@ import PeerId from 'peer-id'
 import assert from 'assert'
 import type { EventEmitter } from 'events'
 
-async function waitUntilListening(socket: Server, port: number | undefined) {
-  const promise = once(socket, 'listening')
-
-  socket.listen(port)
-
-  return promise
-}
-
-async function stopNode(socket: Server) {
-  const closePromise = once(socket, 'close')
-
-  socket.close()
-
-  return closePromise
-}
+import { waitUntilListening, stopNode } from './utils.spec'
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {
@@ -43,7 +28,7 @@ describe('test TCP connection', function () {
       })
     })
 
-    await waitUntilListening(server, undefined)
+    await waitUntilListening<undefined | number>(server, undefined)
 
     const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
