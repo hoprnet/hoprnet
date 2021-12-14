@@ -263,11 +263,11 @@ ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: `Awaited`<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  }
+Ƭ **DialResponse**: { `resp`: `Awaited`<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `query`: `PeerId` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  }
 
 #### Defined in
 
-[libp2p/dialHelper.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L34)
+[libp2p/dialHelper.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L35)
 
 ___
 
@@ -920,7 +920,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `fn` | (`opts`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Result`\> |
+| `fn` | (`opts`: `Required`<[`TimeoutOpts`](modules.md#timeoutopts)\>) => `Promise`<`Result`\> |
 | `abortMsg` | `AbortMsg` |
 | `timeoutMsg` | `TimeoutMsg` |
 | `opts` | [`TimeoutOpts`](modules.md#timeoutopts) |
@@ -1290,7 +1290,7 @@ ___
 
 ▸ **dial**(`libp2p`, `destination`, `protocol`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
 
-Combines libp2p methods such as dialProtocol and peerRouting.findPeer
+Performs a dial strategy using libp2p.dialProtocol and libp2p.findPeer
 to establish a connection.
 Contains a baseline protection against dialing same addresses twice.
 
@@ -1298,7 +1298,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `libp2p` | `Libp2p` | a libp2p instance |
+| `libp2p` | `ReducedLibp2p` | a libp2p instance |
 | `destination` | `PeerId` | PeerId of the destination |
 | `protocol` | `string` | - |
 | `opts?` | `DialOpts` |  |
@@ -1309,7 +1309,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L169)
+[libp2p/dialHelper.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L240)
 
 ___
 
