@@ -691,7 +691,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     const usableInterfaces = osInterfaces[this._interface]?.filter(
-      (iface: NetworkInterfaceInfo) => iface.family.toLowerCase() == family && !iface.internal
+      (iface: NetworkInterfaceInfo) => iface.family == family && !iface.internal
     )
 
     if (usableInterfaces == undefined || usableInterfaces.length == 0) {
