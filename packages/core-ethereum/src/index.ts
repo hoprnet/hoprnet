@@ -2,7 +2,7 @@ import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import { debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
+import { debug, DeferType, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import {
   AcknowledgedTicket,
   PublicKey,
@@ -135,7 +135,7 @@ export default class HoprEthereum extends EventEmitter {
     )
   }
 
-  public setTxHandler(evt: IndexerEvents, tx: string): Promise<string> {
+  public setTxHandler(evt: IndexerEvents, tx: string): DeferType<string> {
     return this.indexer.resolvePendingTransaction(evt, tx)
   }
 

@@ -117,7 +117,12 @@ export class CoverTrafficStrategy extends SaneDefaults {
           log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toB58String())
           toClose.push(openChannel.destination)
         } else {
-          log('Unknown error in sending traffic')
+          log(
+            `Unknown error in sending traffic. Channel is ${channel.status}; openChannel is ${JSON.stringify({
+              ...openChannel,
+              destination: openChannel.destination.toB58String()
+            })}`
+          )
         }
       }
     } else {
