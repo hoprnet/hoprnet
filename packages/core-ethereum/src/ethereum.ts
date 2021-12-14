@@ -198,7 +198,7 @@ export async function createChainWrapper(
       } else if (isAlreadyKnownErr) {
         log('Transaction with nonce %d and hash %s reverted due to known error: %s', nonce, transaction.hash, error)
       } else {
-        log('Transaction with nonce %d and hash failed to sent: %s', nonce, transaction.hash, error)
+        log('Transaction with nonce %d and hash failed to send: %s', nonce, transaction.hash, error)
       }
 
       throw error
@@ -210,7 +210,7 @@ export async function createChainWrapper(
         tx: { hash: transaction.hash }
       }
     } catch (error) {
-      // throw error caught by the listener
+      log('error: transaction with nonce %d and hash failed to send: %s', nonce, transaction.hash, error)
       throw error
     }
   }
