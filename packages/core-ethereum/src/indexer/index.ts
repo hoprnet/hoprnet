@@ -86,33 +86,12 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
-    this.chain.subscribeBlock((b) => {
-      this.onNewBlock(b)
+    this.chain.subscribeBlock(async (b) => {
+      await this.onNewBlock(b) // exceptions are handled
     })
 
-    this.chain.subscribeError((error: any) => {
-      log(chalk.red(`etherjs error: ${error}`))
-      // if provider connection issue
-      if (
-        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].some((err) =>
-          [error?.code, String(error)].includes(err)
-        )
-      ) {
-        log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
-        if (this.chain.getAllQueuingTransactionRequests().length > 0) {
-          const wallet = this.chain.getWallet()
-          retryWithBackoff(
-            () =>
-              Promise.allSettled([
-                ...this.chain.getAllQueuingTransactionRequests().map((request) => wallet.sendTransaction(request)),
-                this.restart()
-              ]),
-            backoffOption
-          )
-        }
-      } else {
-        retryWithBackoff(() => this.restart(), backoffOption)
-      }
+    this.chain.subscribeError(async (error: any) => {
+      await this.onProviderError(error) // exceptions are handled
     })
 
     this.chain.subscribeChannelEvents((e) => {
@@ -132,8 +111,7 @@ class Indexer extends EventEmitter {
     })
 
     // get past events
-    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
-    fromBlock = lastBlock
+    fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
 
     log('Subscribing to events from block %d', fromBlock)
 
@@ -178,8 +156,8 @@ class Indexer extends EventEmitter {
    * If we exceed response pull limit, we switch into quering smaller chunks.
    * TODO: optimize DB and fetch requests
    * @param fromBlock
-   * @param toBlock
-   * @param blockRange
+   * @param maxToBlock
+   * @param maxBlockRange
    * @return past events and last queried block
    */
   private async processPastEvents(fromBlock: number, maxToBlock: number, maxBlockRange: number): Promise<number> {
@@ -229,6 +207,43 @@ class Indexer extends EventEmitter {
   }
 
   /**
+   * Called whenever there was a provider error.
+   * Will restart the indexer if needed.
+   * @param error
+   * @private
+   */
+  private async onProviderError(error: any): Promise<void> {
+    log(chalk.red(`etherjs error: ${error}`))
+
+    try {
+      // if provider connection issue
+      if (
+        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].some((err) =>
+          [error?.code, String(error)].includes(err)
+        )
+      ) {
+        log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
+        if (this.chain.getAllQueuingTransactionRequests().length > 0) {
+          const wallet = this.chain.getWallet()
+          await retryWithBackoff(
+            () =>
+              Promise.allSettled([
+                ...this.chain.getAllQueuingTransactionRequests().map((request) => wallet.sendTransaction(request)),
+                this.restart()
+              ]),
+            backoffOption
+          )
+        }
+      } else {
+        await retryWithBackoff(() => this.restart(), backoffOption)
+      }
+    }
+    catch (err) {
+      log(`error: exception while processing another provider error ${error}`, err)
+    }
+  }
+
+  /**
    * Called whenever a new block found.
    * This will update {this.latestBlock},
    * and processes events which are within
@@ -262,20 +277,20 @@ class Indexer extends EventEmitter {
           this.chain.updateConfirmedTransaction(nativeTx)
         })
       }
-
-      log('At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
-        blockNumber,
-        this.unconfirmedEvents.length,
-        this.unconfirmedEvents.length > 0
-          ? isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
-          : null,
-        this.unconfirmedEvents.length > 0 ? this.unconfirmedEvents.top(1)[0].blockNumber : 0,
-        this.maxConfirmations
-      )
     }
     catch (err) {
-      log(chalk.red(`Error while retrieving information about block ${blockNumber} with finality ${this.maxConfirmations}: ${err}`))
+      log(`error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`, err)
     }
+
+    log('At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
+      blockNumber,
+      this.unconfirmedEvents.length,
+      this.unconfirmedEvents.length > 0
+        ? isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
+        : null,
+      this.unconfirmedEvents.length > 0 ? this.unconfirmedEvents.top(1)[0].blockNumber : 0,
+      this.maxConfirmations
+    )
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
@@ -329,7 +344,7 @@ class Indexer extends EventEmitter {
         await this.db.updateLatestConfirmedSnapshot(lastSnapshot)
       }
       catch (err) {
-        log(chalk.red(`error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`))
+        log(`error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`, err)
       }
     }
 
@@ -338,7 +353,7 @@ class Indexer extends EventEmitter {
       this.emit('block-processed', blockNumber)
     }
     catch (err) {
-      log(chalk.red(`error: failed to update database with latest block number ${blockNumber}: ${err}`))
+      log(`error: failed to update database with latest block number ${blockNumber}`, err)
     }
   }
 
