@@ -1150,7 +1150,7 @@ __metadata:
     "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
     "@types/mocha": 9.0.0
-    "@types/node": 16.11.12
+    "@types/node": 16.11.13
     "@types/simple-peer": 9.11.3
     "@types/yargs": 17.0.7
     abortable-iterator: 3.0.0
@@ -2578,10 +2578,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:16.11.12, @types/node@npm:>=13.7.0":
+"@types/node@npm:*, @types/node@npm:>=13.7.0":
   version: 16.11.12
   resolution: "@types/node@npm:16.11.12"
   checksum: a3feb346d61a56f5a137c29bb8c63cfa3cc02e184b9dffdc18ef1528dcce55596e570575215a2e39e6ce69343eeb2a5ba71c271938f1dc8db4cc393902855412
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:16.11.13":
+  version: 16.11.13
+  resolution: "@types/node@npm:16.11.13"
+  checksum: 7c9d62c024537d7c9f2229097b9e7a93a60bc60efbc9171977f172819e229b01d0b6ed276d335996d39b0096aed2cefa58c4a34b264d712ae3595449e8d96ab7
   languageName: node
   linkType: hard
 
