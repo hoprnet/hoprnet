@@ -1,7 +1,7 @@
 import type { ContractTransaction, BaseContract } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import { providers, utils, errors, Wallet, BigNumber, ethers } from 'ethers'
-import type { HoprToken, HoprChannels } from '@hoprnet/hopr-ethereum'
+import type { HoprToken, HoprChannels, TypedEvent } from '@hoprnet/hopr-ethereum'
 import { getContractData } from '@hoprnet/hopr-ethereum'
 import {
   Address,
@@ -66,7 +66,7 @@ export async function createChainWrapper(
   const transactions = new TransactionManager()
   const nonceTracker = new NonceTracker(
     {
-      getLatestBlockNumber: async () => provider.getBlockNumber(),
+      getLatestBlockNumber: provider.getBlockNumber.bind(provider),
       getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
       getPendingTransactions: (_addr) => transactions.getAllUnconfirmedTxs(),
       getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values())
@@ -457,16 +457,40 @@ export async function createChainWrapper(
       setCommitment(channels, counterparty, comm, txHandler),
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
-    getLatestBlockNumber: async () => provider.getBlockNumber(), // TODO: use indexer when it's done syncing
-    subscribeBlock: (cb) => provider.on('block', cb),
-    subscribeError: (cb) => {
+    getLatestBlockNumber: provider.getBlockNumber.bind(provider), // TODO: use indexer when it's done syncing
+    subscribeBlock: (cb: (blockNumber: number) => void | Promise<void>): (() => void) => {
+      provider.on('block', cb)
+
+      return () => {
+        provider.off('block', cb)
+      }
+    },
+    subscribeError: (cb: (err: any) => void | Promise<void>): (() => void) => {
       provider.on('error', cb)
       channels.on('error', cb)
       token.on('error', cb)
+
+      return () => {
+        provider.off('error', cb)
+        channels.off('error', cb)
+        token.off('error', cb)
+      }
     },
-    subscribeChannelEvents: (cb) => channels.on('*', cb),
+    subscribeChannelEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>): (() => void) => {
+      channels.on('*', cb)
+
+      return () => {
+        channels.off('*', cb)
+      }
+    },
     // Cannot directly apply filters here because it does not return a full event object
-    subscribeTokenEvents: (cb) => token.on('*', cb), // subscribe all the Transfer events from current nodes in HoprToken.
+    subscribeTokenEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>): (() => void) => {
+      token.on('*', cb)
+
+      return () => {
+        token.off('*', cb)
+      }
+    }, // subscribe all the Transfer events from current nodes in HoprToken.
     unsubscribe: () => {
       provider.removeAllListeners()
       channels.removeAllListeners()

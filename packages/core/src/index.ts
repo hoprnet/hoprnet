@@ -468,7 +468,7 @@ class Hopr extends EventEmitter {
     clearTimeout(this.checkTimeout)
     verbose('Stopping heartbeat & indexer')
     await Promise.all([this.heartbeat.stop(), this.connector.stop()])
-    verbose('Stoping database & libp2p', this.db)
+    verbose('Stopping database & libp2p', this.db)
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
     // Give the operating system some extra time to close the sockets

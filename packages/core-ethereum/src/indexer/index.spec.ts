@@ -17,11 +17,49 @@ describe('test indexer', function () {
   })
 
   it('should stop indexer', async function () {
-    const { indexer, chain } = await useFixtures()
+    const { indexer, chain, hoprChannels, hoprToken, provider } = await useFixtures()
 
     await indexer.start(chain, 0)
-    await indexer.stop()
+
+    // Make sure that it assigns event listeners
+    assert(hoprChannels.listeners('*').length > 0)
+    assert(hoprToken.listeners('*').length > 0)
+    assert(hoprChannels.listeners('error').length > 0)
+    assert(hoprToken.listeners('error').length > 0)
+    assert(provider.listeners('error').length > 0)
+    assert(provider.listeners('block').length > 0)
+
+    indexer.stop()
+
+    // Make sure that it does the cleanup properly
+    assert(hoprChannels.listeners('*').length == 0)
+    assert(hoprToken.listeners('*').length == 0)
+    assert(hoprChannels.listeners('error').length == 0)
+    assert(hoprToken.listeners('error').length == 0)
+    assert(provider.listeners('error').length == 0)
+    assert(provider.listeners('block').length == 0)
+
     assert.strictEqual(indexer.status, 'stopped')
+  })
+
+  it('should restart the indexer', async function () {
+    const { indexer, chain, hoprChannels, hoprToken, provider } = await useFixtures()
+
+    await indexer.start(chain, 0)
+
+    for (let i = 0; i < 5; i++) {
+      await indexer.restart()
+    }
+
+    indexer.stop()
+
+    // Make sure that it does the cleanup properly
+    assert(hoprChannels.listeners('*').length == 0)
+    assert(hoprToken.listeners('*').length == 0)
+    assert(hoprChannels.listeners('error').length == 0)
+    assert(hoprToken.listeners('error').length == 0)
+    assert(provider.listeners('error').length == 0)
+    assert(provider.listeners('block').length == 0)
   })
 
   it('should process 1 past event', async function () {

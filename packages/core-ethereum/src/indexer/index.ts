@@ -23,6 +23,7 @@ import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } fr
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import { errors, utils } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
+import { TypedEvent } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
@@ -41,6 +42,11 @@ class Indexer extends EventEmitter {
   private chain: ChainWrapper
   private genesisBlock: number
 
+  private unsubscribeErrors: () => void
+  private unsubscribeTokenEvents: () => void
+  private unsubscribeChannelEvents: () => void
+  private unsubscribeBlock: () => void
+
   constructor(
     private address: Address,
     private db: HoprDB,
@@ -54,13 +60,15 @@ class Indexer extends EventEmitter {
    * Starts indexing.
    */
   public async start(chain: ChainWrapper, genesisBlock: number): Promise<void> {
-    if (this.status === 'started') return
+    if (this.status === 'started') {
+      return
+    }
     log(`Starting indexer...`)
     this.chain = chain
     this.genesisBlock = genesisBlock
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
-      await this.db.getLatestBlockNumber(),
+      this.db.getLatestBlockNumber(),
       this.chain.getLatestBlockNumber()
     ])
     this.latestBlock = latestOnChainBlock
@@ -84,11 +92,11 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
-    this.chain.subscribeBlock((b) => {
-      this.onNewBlock(b)
+    this.unsubscribeBlock = this.chain.subscribeBlock((block: number) => {
+      this.onNewBlock(block)
     })
 
-    this.chain.subscribeError((error: any) => {
+    this.unsubscribeErrors = this.chain.subscribeError((error: any) => {
       log(chalk.red(`etherjs error: ${error}`))
       // if provider connection issue
       if (
@@ -111,19 +119,19 @@ class Indexer extends EventEmitter {
       }
     })
 
-    this.chain.subscribeChannelEvents((e) => {
-      if (e.event === ANNOUNCEMENT || e.event === 'ChannelUpdated') {
-        this.onNewEvents([e])
+    this.unsubscribeChannelEvents = this.chain.subscribeChannelEvents((channelEvent: TypedEvent<any, any>) => {
+      if (channelEvent.event === ANNOUNCEMENT || channelEvent.event === 'ChannelUpdated') {
+        this.onNewEvents([channelEvent])
       }
     })
-    this.chain.subscribeTokenEvents((e) => {
+    this.unsubscribeTokenEvents = this.chain.subscribeTokenEvents((tokenEvent: TypedEvent<any, any>) => {
       if (
-        e.event === 'Transfer' &&
-        (e.topics[1] === utils.hexZeroPad(this.address.toHex(), 32) ||
-          e.topics[2] === utils.hexZeroPad(this.address.toHex(), 32))
+        tokenEvent.event === 'Transfer' &&
+        (tokenEvent.topics[1] === utils.hexZeroPad(this.address.toHex(), 32) ||
+          tokenEvent.topics[2] === utils.hexZeroPad(this.address.toHex(), 32))
       ) {
         // save transfer events
-        this.onNewEvents([e])
+        this.onNewEvents([tokenEvent])
       }
     })
 
@@ -141,25 +149,34 @@ class Indexer extends EventEmitter {
   /**
    * Stops indexing.
    */
-  public async stop(): Promise<void> {
-    if (this.status === 'stopped') return
+  public stop(): void {
+    if (this.status === 'stopped') {
+      return
+    }
+
     log(`Stopping indexer...`)
 
-    this.chain.unsubscribe()
+    this.unsubscribeChannelEvents()
+    this.unsubscribeTokenEvents()
+    this.unsubscribeBlock()
+    this.unsubscribeErrors()
 
     this.status = 'stopped'
     this.emit('status', 'stopped')
     log(chalk.green('Indexer stopped!'))
   }
 
-  private async restart(): Promise<void> {
-    if (this.status === 'restarting') return
+  protected async restart(): Promise<void> {
+    if (this.status === 'restarting') {
+      return
+    }
+
     log('Indexer restaring')
 
     try {
       this.status = 'restarting'
 
-      await this.stop()
+      this.stop()
       await this.start(this.chain, this.genesisBlock)
     } catch (err) {
       this.status = 'stopped'
