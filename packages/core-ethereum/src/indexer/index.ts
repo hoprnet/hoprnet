@@ -92,7 +92,9 @@ class Indexer extends EventEmitter {
       log(chalk.red(`etherjs error: ${error}`))
       // if provider connection issue
       if (
-        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].some((err) => [error?.code, String(error)].includes(err))
+        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].some((err) =>
+          [error?.code, String(error)].includes(err)
+        )
       ) {
         log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
         if (this.chain.getAllQueuingTransactionRequests().length > 0) {
