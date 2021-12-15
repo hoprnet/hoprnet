@@ -2,7 +2,19 @@ import type { Event } from './types'
 import BN from 'bn.js'
 import assert from 'assert'
 import { BigNumber } from 'ethers'
-import { Hash, AccountEntry, ChannelEntry, u8aToHex, Ticket, Challenge, stringToU8a, UINT256, Balance, Signature, SIGNATURE_LENGTH } from '@hoprnet/hopr-utils'
+import {
+  Hash,
+  AccountEntry,
+  ChannelEntry,
+  u8aToHex,
+  Ticket,
+  Challenge,
+  stringToU8a,
+  UINT256,
+  Balance,
+  Signature,
+  SIGNATURE_LENGTH
+} from '@hoprnet/hopr-utils'
 import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtures'
 
 export * from '../fixtures'
@@ -148,7 +160,7 @@ export const oneLargeTicket = new Ticket(
   new Balance(new BN('2')),
   UINT256.fromInverseProbability(new BN(1)),
   UINT256.fromString('0'),
-   new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
+  new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 )
 export const oneSmallTicket = new Ticket(
   PARTY_B.toAddress(),
@@ -160,5 +172,5 @@ export const oneSmallTicket = new Ticket(
   new Balance(new BN('1')),
   UINT256.fromInverseProbability(new BN(1)),
   UINT256.fromString('0'),
-   new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
+  new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 )

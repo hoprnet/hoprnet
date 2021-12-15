@@ -105,7 +105,11 @@ class Indexer extends EventEmitter {
     })
 
     this.unsubscribeChannelEvents = this.chain.subscribeChannelEvents((channelEvent: TypedEvent<any, any>) => {
-      if (channelEvent.event === ANNOUNCEMENT || channelEvent.event === 'ChannelUpdated' || channelEvent.event === 'TicketRedeemed') {
+      if (
+        channelEvent.event === ANNOUNCEMENT ||
+        channelEvent.event === 'ChannelUpdated' ||
+        channelEvent.event === 'TicketRedeemed'
+      ) {
         this.onNewEvents([channelEvent])
       }
     })
@@ -351,17 +355,17 @@ class Indexer extends EventEmitter {
             this.indexEvent('announce', [event.transactionHash])
             await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
             break
-          case "ChannelUpdated":
-          case "ChannelUpdated(address,address,tuple)":
+          case 'ChannelUpdated':
+          case 'ChannelUpdated(address,address,tuple)':
             await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
             break
-          case "Transfer":
-          case "Transfer(address,address,uint256)":
+          case 'Transfer':
+          case 'Transfer(address,address,uint256)':
             // handle HOPR token transfer
             this.indexEvent('withdraw-hopr', [event.transactionHash])
             break
-          case "TicketRedeemed":
-          case "TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)":
+          case 'TicketRedeemed':
+          case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
             // if unlock `outstandingTicketBalance`, if applicable
             await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
             break

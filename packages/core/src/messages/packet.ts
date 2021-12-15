@@ -76,7 +76,9 @@ export async function createTicket(
    */
   const outstandingTicketBalance = await db.getPendingBalanceTo(dest.toAddress())
   const balance = channel.balance.toBN().sub(outstandingTicketBalance.toBN())
-  log(`balances ${channel.balance.toString()} - ${outstandingTicketBalance.toString()} = ${balance.toString()} should >= ${amount.toString()}`)
+  log(
+    `balances ${channel.balance.toString()} - ${outstandingTicketBalance.toString()} = ${balance.toString()} should >= ${amount.toString()}`
+  )
   if (balance.lt(amount.toBN())) {
     throw Error(
       `We don't have enough funds in channel ${channel

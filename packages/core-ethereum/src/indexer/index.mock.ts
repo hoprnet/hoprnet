@@ -238,7 +238,9 @@ class TestingIndexer extends Indexer {
   }
 }
 
-export const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[]; id?: PublicKey } = {}) => {
+export const useFixtures = async (
+  ops: { latestBlockNumber?: number; pastEvents?: Event<any>[]; id?: PublicKey } = {}
+) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const pastEvents = ops.pastEvents ?? []
 

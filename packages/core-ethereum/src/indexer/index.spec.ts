@@ -347,7 +347,12 @@ describe('test indexer', function () {
   it('should process TicketRedeemed event and reduce outstanding balance for sender', async function () {
     const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT],
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ],
       id: fixtures.PARTY_A
     })
     // sender node has pending ticket...
@@ -375,7 +380,12 @@ describe('test indexer', function () {
   it('should process TicketRedeemed event and not reduce outstanding balance for sender when db has no outstanding balance', async function () {
     const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT],
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ],
       id: fixtures.PARTY_A
     })
     // sender node has pending ticket...
@@ -402,7 +412,12 @@ describe('test indexer', function () {
   it('should process TicketRedeemed event and not reduce outstanding balance for recipient', async function () {
     const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT],
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ],
       id: fixtures.PARTY_B
     })
     // recipient node has no ticket...
@@ -430,7 +445,12 @@ describe('test indexer', function () {
   it('should process TicketRedeemed event and not reduce outstanding balance for a third node', async function () {
     const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT]
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ]
     })
     // recipient node has no ticket...
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
@@ -457,7 +477,12 @@ describe('test indexer', function () {
   it('should process TicketRedeemed event and reduce outstanding balance to zero for sender when some history is missing', async function () {
     const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT],
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ],
       id: fixtures.PARTY_A
     })
     // sender node has some pending tickets, but not the entire history...
