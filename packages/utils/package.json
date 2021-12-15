@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.85.0-next.26",
+  "version": "1.85.0-next.30",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -50,7 +50,7 @@
     "@types/pino": "7.0.4",
     "bl": "5.0.0",
     "chai": "4.3.4",
-    "libp2p": "0.35.3",
+    "libp2p": "0.35.5",
     "libp2p-kad-dht": "0.27.3",
     "libp2p-mplex": "0.10.5",
     "libp2p-tcp": "0.17.2",

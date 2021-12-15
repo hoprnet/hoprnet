@@ -1,8 +1,7 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import { ChainWrapper } from './ethereum'
+import { ChainWrapper, createChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import { debug, DeferType, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import {
   AcknowledgedTicket,
   PublicKey,
@@ -14,12 +13,13 @@ import {
   ChannelEntry,
   ChannelStatus,
   generateChannelId,
-  Hash
+  Hash,
+  debug,
+  DeferType,
+  privKeyToPeerId
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
-import { CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
-import { createChainWrapper } from './ethereum'
-import { PROVIDER_CACHE_TTL } from './constants'
+import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
 import { IndexerEvents } from './indexer/types'
@@ -98,12 +98,16 @@ export default class HoprEthereum extends EventEmitter {
     }
 
     const _start = async (): Promise<HoprEthereum> => {
-      await this.chain.waitUntilReady()
-      await this.indexer.start(this.chain, this.chain.getGenesisBlock())
+      try {
+        await this.chain.waitUntilReady()
+        await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
-      // Debug log used in e2e integration tests, please don't change
-      log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
-      log(chalk.green('Connector started'))
+        // Debug log used in e2e integration tests, please don't change
+        log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
+        log(chalk.green('Connector started'))
+      } catch (err) {
+        log('error: failed to start the indexer', err)
+      }
       return this
     }
     this.started = _start()

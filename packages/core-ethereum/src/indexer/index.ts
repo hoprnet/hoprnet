@@ -1,5 +1,4 @@
 import BN from 'bn.js'
-import { debug, DeferType, retryWithBackoff } from '@hoprnet/hopr-utils'
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -15,7 +14,10 @@ import {
   AccountEntry,
   PublicKey,
   Snapshot,
-  u8aConcat
+  u8aConcat,
+  debug,
+  DeferType,
+  retryWithBackoff
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
@@ -92,31 +94,12 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
-    this.unsubscribeBlock = this.chain.subscribeBlock((block: number) => {
-      this.onNewBlock(block)
+    this.unsubscribeBlock = this.chain.subscribeBlock(async (block: number) => {
+      await this.onNewBlock(block) // exceptions are handled
     })
 
-    this.unsubscribeErrors = this.chain.subscribeError((error: any) => {
-      log(chalk.red(`etherjs error: ${error}`))
-      // if provider connection issue
-      if (
-        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET'].some((err) => [error?.code, String(error)].includes(err))
-      ) {
-        log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
-        if (this.chain.getAllQueuingTransactionRequests().length > 0) {
-          const wallet = this.chain.getWallet()
-          retryWithBackoff(
-            () =>
-              Promise.allSettled([
-                ...this.chain.getAllQueuingTransactionRequests().map((request) => wallet.sendTransaction(request)),
-                this.restart()
-              ]),
-            backoffOption
-          )
-        }
-      } else {
-        retryWithBackoff(() => this.restart(), backoffOption)
-      }
+    this.unsubscribeErrors = this.chain.subscribeError(async (error: any) => {
+      await this.onProviderError(error) // exceptions are handled
     })
 
     this.unsubscribeChannelEvents = this.chain.subscribeChannelEvents((channelEvent: TypedEvent<any, any>) => {
@@ -136,8 +119,7 @@ class Indexer extends EventEmitter {
     })
 
     // get past events
-    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
-    fromBlock = lastBlock
+    fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
 
     log('Subscribing to events from block %d', fromBlock)
 
@@ -191,8 +173,8 @@ class Indexer extends EventEmitter {
    * If we exceed response pull limit, we switch into quering smaller chunks.
    * TODO: optimize DB and fetch requests
    * @param fromBlock
-   * @param toBlock
-   * @param blockRange
+   * @param maxToBlock
+   * @param maxBlockRange
    * @return past events and last queried block
    */
   private async processPastEvents(fromBlock: number, maxToBlock: number, maxBlockRange: number): Promise<number> {
@@ -242,13 +224,52 @@ class Indexer extends EventEmitter {
   }
 
   /**
+   * Called whenever there was a provider error.
+   * Will restart the indexer if needed.
+   * @param error
+   * @private
+   */
+  private async onProviderError(error: any): Promise<void> {
+    log(chalk.red(`etherjs error: ${error}`))
+
+    try {
+      // if provider connection issue
+      if (
+        [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].some((err) =>
+          [error?.code, String(error)].includes(err)
+        )
+      ) {
+        log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
+        if (this.chain.getAllQueuingTransactionRequests().length > 0) {
+          const wallet = this.chain.getWallet()
+          await retryWithBackoff(
+            () =>
+              Promise.allSettled([
+                ...this.chain.getAllQueuingTransactionRequests().map((request) => wallet.sendTransaction(request)),
+                this.restart()
+              ]),
+            backoffOption
+          )
+        }
+      } else {
+        await retryWithBackoff(() => this.restart(), backoffOption)
+      }
+    } catch (err) {
+      log(`error: exception while processing another provider error ${error}`, err)
+    }
+  }
+
+  /**
    * Called whenever a new block found.
    * This will update {this.latestBlock},
    * and processes events which are within
    * confirmed blocks.
-   * @param block
+   * @param blockNumber
    */
   private async onNewBlock(blockNumber: number): Promise<void> {
+    // NOTE: This function is also used in event handlers
+    // where it cannot be 'awaited', so all exceptions need to be caught.
+
     log('Indexer got new block %d', blockNumber)
     this.emit('block', blockNumber)
 
@@ -257,19 +278,28 @@ class Indexer extends EventEmitter {
       this.latestBlock = blockNumber
     }
 
-    let lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
+    let lastSnapshot
+    try {
+      lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
-    // This new block markes a previous block
-    // (blockNumber - this.maxConfirmations) is final.
-    // Confirm native token transactions in that previous block.
-    const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
-    // update transaction manager
-    if (nativeTxs.length > 0) {
-      this.indexEvent('withdraw-native', nativeTxs)
-      nativeTxs.forEach((nativeTx) => {
-        this.chain.updateConfirmedTransaction(nativeTx)
-      })
+      // This new block marks a previous block
+      // (blockNumber - this.maxConfirmations) is final.
+      // Confirm native token transactions in that previous block.
+      const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
+      // update transaction manager
+      if (nativeTxs.length > 0) {
+        this.indexEvent('withdraw-native', nativeTxs)
+        nativeTxs.forEach((nativeTx) => {
+          this.chain.updateConfirmedTransaction(nativeTx)
+        })
+      }
+    } catch (err) {
+      log(
+        `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
+        err
+      )
     }
+
     log(
       'At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
       blockNumber,
@@ -310,7 +340,7 @@ class Indexer extends EventEmitter {
       const eventName = event.event as EventNames | TokenEventNames
 
       // update transaction manager
-      this.chain.updateConfirmedTransaction(event.transactionHash as string)
+      this.chain.updateConfirmedTransaction(event.transactionHash)
       log('Event name %s and hash %s', eventName, event.transactionHash)
       try {
         if (eventName === ANNOUNCEMENT) {
@@ -328,12 +358,23 @@ class Indexer extends EventEmitter {
         log('error processing event:', event, err)
       }
 
-      lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
-      await this.db.updateLatestConfirmedSnapshot(lastSnapshot)
+      try {
+        lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
+        await this.db.updateLatestConfirmedSnapshot(lastSnapshot)
+      } catch (err) {
+        log(
+          `error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`,
+          err
+        )
+      }
     }
 
-    await this.db.updateLatestBlockNumber(new BN(blockNumber))
-    this.emit('block-processed', blockNumber)
+    try {
+      await this.db.updateLatestBlockNumber(new BN(blockNumber))
+      this.emit('block-processed', blockNumber)
+    } catch (err) {
+      log(`error: failed to update database with latest block number ${blockNumber}`, err)
+    }
   }
 
   /**
@@ -388,7 +429,7 @@ class Indexer extends EventEmitter {
 
     if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
       log('channel was closed')
-      this.onChannelClosed(channel)
+      await this.onChannelClosed(channel)
     }
 
     this.emit('channel-update', channel)
@@ -408,7 +449,7 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelClosed(channel: ChannelEntry) {
-    this.db.deleteAcknowledgedTicketsFromChannel(channel)
+    await this.db.deleteAcknowledgedTicketsFromChannel(channel)
     this.emit('channel-closed', channel)
   }
 
