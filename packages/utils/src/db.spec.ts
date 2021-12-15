@@ -146,4 +146,11 @@ describe(`database tests`, function () {
     await db.setEnvironmentId('test-env')
     assert.equal(await db.getEnvironmentId(), 'test-env')
   })
+
+  it('should verify environment', async function () {
+    await db.setEnvironmentId('test-env')
+    assert.rejects(async () => db.verifyEnvironmentId('wrong-id'))
+    assert.doesNotReject(async () => db.verifyEnvironmentId.bind('test-env'))
+  })
+
 })

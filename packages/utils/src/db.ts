@@ -536,4 +536,11 @@ export class HoprDB {
   public async getEnvironmentId(): Promise<string> {
     return decoder.decode(await this.get(encoder.encode('environment_id')))
   }
+
+  public async verifyEnvironmentId(expectedId: string): Promise<void> {
+    const storedId = await this.getEnvironmentId()
+    if (storedId !== expectedId) {
+      throw new Error(`invalid db environment id: ${storedId} (expected: ${expectedId})`)
+    }
+  }
 }
