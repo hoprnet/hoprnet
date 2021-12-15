@@ -23,6 +23,7 @@ import { u8aEquals, u8aToNumber } from './u8a'
 
 const log = debug(`hopr-core:db`)
 const encoder = new TextEncoder()
+const decoder = new TextDecoder()
 
 const TICKET_PREFIX = encoder.encode('tickets-')
 const SEPARATOR = encoder.encode(':')
@@ -526,5 +527,13 @@ export class HoprDB {
     return this.getChannels((channel) => {
       return address.eq(channel.destination.toAddress())
     })
+  }
+
+  public async setEnvironmentId(environment_id: string): Promise<void> {
+    await this.put(Buffer.from('environment_id'), Buffer.from(environment_id))
+  }
+
+  public async getEnvironmentId(): Promise<string> {
+    return decoder.decode(await this.get(encoder.encode('environment_id')))
   }
 }
