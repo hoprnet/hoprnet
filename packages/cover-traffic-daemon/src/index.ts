@@ -109,7 +109,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   log('creating a node')
-  const node = createHoprNode(peerId, options)
+  const node = await createHoprNode(peerId, options)
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
@@ -155,8 +155,8 @@ if (require.main === module) {
   main((state: State) => {
     console.log(
       `CT: State update:` +
-        `${Object.keys(state.nodes).length} nodes, ` +
-        `${Object.keys(state.channels).length} channels`
+      `${Object.keys(state.nodes).length} nodes, ` +
+      `${Object.keys(state.channels).length} channels`
     )
   })
 }

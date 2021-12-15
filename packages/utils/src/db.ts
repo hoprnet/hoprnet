@@ -73,29 +73,42 @@ export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
 export class HoprDB {
   private db: LevelUp
 
-  constructor(private id: PublicKey, initialize: boolean, version: string, dbPath?: string, forceCreate?: boolean) {
+  constructor(private id: PublicKey) { }
+
+  async init(initialize: boolean, version: string, dbPath?: string, forceCreate?: boolean, environmentId?: string) {
     if (!dbPath) {
       dbPath = path.join(process.cwd(), 'db', version)
     }
 
     dbPath = path.resolve(dbPath)
 
+    let setEnvironment = false
+
     log('using db at ', dbPath)
     if (forceCreate) {
       log('force create - wipe old database and create a new')
       rmSync(dbPath, { recursive: true, force: true })
       mkdirSync(dbPath, { recursive: true })
+      setEnvironment = true
     }
     if (!existsSync(dbPath)) {
       log('db does not exist, creating?:', initialize)
       if (initialize) {
         mkdirSync(dbPath, { recursive: true })
+        setEnvironment = true
       } else {
         throw new Error('Database does not exist: ' + dbPath)
       }
     }
     this.db = levelup(leveldown(dbPath))
-    log('namespacing db by pubkey: ', id.toAddress().toHex())
+    log('namespacing db by pubkey: ', this.id.toAddress().toHex())
+    if (setEnvironment) {
+      if (!environmentId) {
+        throw new Error(`must provide environment id when creating db`)
+      }
+      log(`setting environment id ${environmentId} to db`)
+      await this.setEnvironmentId(environmentId)
+    }
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
