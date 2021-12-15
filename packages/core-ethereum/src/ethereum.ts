@@ -74,10 +74,8 @@ export async function createChainWrapper(
     durations.minutes(15)
   )
 
-  // naive implementation, assumes transaction is not replaced
-  // temporary used until https://github.com/ethers-io/ethers.js/issues/1479
-  // is fixed
-  async function waitForConfirmations(
+  // waits until tx is mined
+  async function waitForMined(
     transactionHash: string,
     timeout: number,
     onMined: (nonce: number, hash: string) => void
@@ -143,13 +141,13 @@ export async function createChainWrapper(
     let deferredListener
     try {
       if (checkDuplicate) {
-        const [checkedDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
+        const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
         // check duplicated pending/mined transaction against transaction manager
         // if transaction manager has a transaction with the same payload that is mined or is pending but with
         // a higher or equal nonce, halt.
-        log('checkDuplicate %s %s with hash %s', checkDuplicate, checkedDuplicate, hash)
+        log('checkDuplicate checkDuplicate=%s isDuplicate=%s with hash %s', checkDuplicate, isDuplicate, hash)
 
-        if (checkedDuplicate) {
+        if (isDuplicate) {
           return {
             code: 'DUPLICATE',
             tx: { hash }
@@ -178,10 +176,18 @@ export async function createChainWrapper(
     nonceLock.releaseLock()
 
     try {
-      await waitForConfirmations(transaction.hash, 30e3, (nonce: number, hash: string) => {
+      // wait for the tx to be mined
+      await waitForMined(transaction.hash, 30e3, (nonce: number, hash: string) => {
         log('Transaction with nonce %d and hash %s mined', nonce, hash)
         transactions.moveFromPendingToMined(hash)
       })
+
+      // lookup tx receipt if the tx reverted (tx was mined successfully but reverted)
+      const receipt = await provider.getTransactionReceipt(transaction.hash)
+      // status = 0 means reverted
+      if (receipt.status === 0) {
+        throw Error(errors.CALL_EXCEPTION)
+      }
     } catch (error) {
       log(error)
       // remove listener but not throwing error message

@@ -88,11 +88,12 @@ class TranscationManager {
    * If a transaction payload exists in mined or pending with a higher/equal gas price
    * @param payload object
    * @param gasPrice gas price associated with the payload
+   * @returns [true if it exists, transaction hash]
    */
   public existInMinedOrPendingWithHigherFee(
     payload: TransactionPayload,
     gasPrice: number | BigNumber
-  ): [Boolean, string] {
+  ): [boolean, string] {
     // Using isDeepStrictEqual to compare TransactionPayload objects, see
     // https://nodejs.org/api/util.html#util_util_isdeepstrictequal_val1_val2
     const index = Array.from(this.payloads.values()).findIndex((pl) => isDeepStrictEqual(pl, payload))
