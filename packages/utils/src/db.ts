@@ -75,9 +75,12 @@ export class HoprDB {
 
   constructor(private id: PublicKey) { }
 
-  async init(initialize: boolean, version: string, dbPath?: string, forceCreate?: boolean, environmentId?: string) {
+  async init(initialize: boolean, version: string, dbPath: string, forceCreate?: boolean, environmentId?: string) {
     if (!dbPath) {
-      dbPath = path.join(process.cwd(), 'db', version)
+      if (!environmentId) {
+        throw new Error(`must provide environmentId if no dbPath is given`)
+      }
+      dbPath = path.join(process.cwd(), 'db', environmentId, version)
     }
 
     dbPath = path.resolve(dbPath)
