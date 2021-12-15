@@ -276,7 +276,7 @@ describe('test STUN helper functions', function () {
   })
 })
 
-describe.only('test getExternalIp', function () {
+describe('test getExternalIp', function () {
   it('return an address in local-mode if no STUN servers are given', async function () {
     const socket = await bindToUdpSocket()
 
