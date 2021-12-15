@@ -210,7 +210,8 @@ describe('test indexer', function () {
     this.timeout(5000)
     const { indexer, newEvent, newBlock, chain } = await useFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT],
+      id: fixtures.PARTY_A
     })
 
     const opened = defer<void>()
@@ -341,5 +342,143 @@ describe('test indexer', function () {
 
     const channel = await db.getChannel(COMMITTED_CHANNEL.getId())
     expectChannelsToBeEqual(channel, COMMITTED_CHANNEL)
+  })
+
+  it('should process TicketRedeemed event and reduce outstanding balance for sender', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT],
+      id: fixtures.PARTY_A
+    })
+    // sender node has pending ticket...
+    await db.markPending(fixtures.oneLargeTicket)
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '2')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+  })
+
+  it('should process TicketRedeemed event and not reduce outstanding balance for sender when db has no outstanding balance', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT],
+      id: fixtures.PARTY_A
+    })
+    // sender node has pending ticket...
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+  })
+
+  it('should process TicketRedeemed event and not reduce outstanding balance for recipient', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT],
+      id: fixtures.PARTY_B
+    })
+    // recipient node has no ticket...
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+  })
+
+  it('should process TicketRedeemed event and not reduce outstanding balance for a third node', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT]
+    })
+    // recipient node has no ticket...
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+  })
+
+  it('should process TicketRedeemed event and reduce outstanding balance to zero for sender when some history is missing', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT, fixtures.COMMITTED_EVENT],
+      id: fixtures.PARTY_A
+    })
+    // sender node has some pending tickets, but not the entire history...
+    await db.markPending(fixtures.oneSmallTicket)
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '1')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
   })
 })

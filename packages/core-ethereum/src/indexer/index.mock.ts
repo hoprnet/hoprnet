@@ -10,7 +10,8 @@ import {
   NativeBalance,
   SUGGESTED_NATIVE_BALANCE,
   debug,
-  AccountEntry
+  AccountEntry,
+  PublicKey
 } from '@hoprnet/hopr-utils'
 
 import Indexer from '.'
@@ -237,11 +238,11 @@ class TestingIndexer extends Indexer {
   }
 }
 
-export const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
+export const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[]; id?: PublicKey } = {}) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const pastEvents = ops.pastEvents ?? []
 
-  const db = HoprDB.createMock()
+  const db = HoprDB.createMock(ops.id)
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
   const { hoprToken } = createHoprTokenMock()
@@ -253,7 +254,7 @@ export const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?
     hoprChannels,
     hoprToken,
     newEvent,
-    indexer: new TestingIndexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5),
+    indexer: new TestingIndexer(!ops.id ? PublicKey.createMock().toAddress() : ops.id.toAddress(), db, 1, 5),
     chain,
     OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
       Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)

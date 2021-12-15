@@ -17,7 +17,9 @@ import {
   u8aConcat,
   debug,
   DeferType,
-  retryWithBackoff
+  retryWithBackoff,
+  Ticket,
+  Balance
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
@@ -103,7 +105,7 @@ class Indexer extends EventEmitter {
     })
 
     this.unsubscribeChannelEvents = this.chain.subscribeChannelEvents((channelEvent: TypedEvent<any, any>) => {
-      if (channelEvent.event === ANNOUNCEMENT || channelEvent.event === 'ChannelUpdated') {
+      if (channelEvent.event === ANNOUNCEMENT || channelEvent.event === 'ChannelUpdated' || channelEvent.event === 'TicketRedeemed') {
         this.onNewEvents([channelEvent])
       }
     })
@@ -343,16 +345,28 @@ class Indexer extends EventEmitter {
       this.chain.updateConfirmedTransaction(event.transactionHash)
       log('Event name %s and hash %s', eventName, event.transactionHash)
       try {
-        if (eventName === ANNOUNCEMENT) {
-          this.indexEvent('announce', [event.transactionHash])
-          await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
-        } else if (eventName === 'ChannelUpdated') {
-          await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
-        } else if (eventName === 'Transfer') {
-          // handle HOPR token transfer
-          this.indexEvent('withdraw-hopr', [event.transactionHash])
-        } else {
-          log(`ignoring event '${String(eventName)}'`)
+        switch (eventName) {
+          case 'Announcement':
+          case 'Announcement(address,bytes,bytes)':
+            this.indexEvent('announce', [event.transactionHash])
+            await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
+            break
+          case "ChannelUpdated":
+          case "ChannelUpdated(address,address,tuple)":
+            await this.onChannelUpdated(event as Event<'ChannelUpdated'>)
+            break
+          case "Transfer":
+          case "Transfer(address,address,uint256)":
+            // handle HOPR token transfer
+            this.indexEvent('withdraw-hopr', [event.transactionHash])
+            break
+          case "TicketRedeemed":
+          case "TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)":
+            // if unlock `outstandingTicketBalance`, if applicable
+            await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
+            break
+          default:
+            log(`ignoring event '${String(eventName)}'`)
         }
       } catch (err) {
         log('error processing event:', event, err)
@@ -444,6 +458,35 @@ class Indexer extends EventEmitter {
           log('channel to us waiting for commitment', channel)
           this.emit('channel-waiting-for-commitment', channel)
         }
+      }
+    }
+  }
+
+  private async onTicketRedeemed(event: Event<'TicketRedeemed'>) {
+    if (Address.fromString(event.args.source).eq(this.address)) {
+      // the node used to lock outstandingTicketBalance
+      // rebuild part of the Ticket
+      const partialTicket: Partial<Ticket> = {
+        counterparty: Address.fromString(event.args.destination),
+        amount: new Balance(new BN(event.args.amount.toString()))
+      }
+      const outstandingBalance = await this.db.getPendingBalanceTo(partialTicket.counterparty)
+
+      try {
+        if (!outstandingBalance.toBN().gte(new BN('0'))) {
+          await this.db.resolvePending(partialTicket)
+        } else {
+          await this.db.resolvePending({
+            ...partialTicket,
+            amount: outstandingBalance
+          })
+          // It falls into this case when db of sender gets erased while having tickets pending.
+          // TODO: handle this may allow sender to send arbitrary amount of tickets through open
+          // channels with positive balance, before the counterparty initiates closure.
+        }
+      } catch (error) {
+        log(`error in onTicketRedeemed ${error}`)
+        throw new Error(`error in onTicketRedeemed ${error}`)
       }
     }
   }
