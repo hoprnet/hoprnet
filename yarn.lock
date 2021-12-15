@@ -1163,7 +1163,7 @@ __metadata:
     it-pair: 1.0.0
     it-pipe: 1.1.0
     it-pushable: 1.4.2
-    libp2p: 0.35.3
+    libp2p: 0.35.5
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.5
     mocha: 9.1.3
@@ -1233,7 +1233,7 @@ __metadata:
     heap-js: ^2.1.6
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.35.3
+    libp2p: 0.35.5
     libp2p-kad-dht: 0.27.3
     libp2p-mplex: 0.10.5
     libp2p-tcp: 0.17.2
@@ -1335,7 +1335,7 @@ __metadata:
     jsonschema: ^1.4.0
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.35.3
+    libp2p: 0.35.5
     libp2p-crypto: 0.21.0
     libp2p-kad-dht: 0.27.3
     libp2p-mplex: 0.10.5
@@ -11405,9 +11405,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.35.3":
-  version: 0.35.3
-  resolution: "libp2p@npm:0.35.3"
+"libp2p@npm:0.35.5":
+  version: 0.35.5
+  resolution: "libp2p@npm:0.35.5"
   dependencies:
     "@vascosantos/moving-average": ^1.1.0
     abort-controller: ^3.0.0
@@ -11460,7 +11460,7 @@ __metadata:
     varint: ^6.0.0
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: 58543be8c167870b048f024baf2078dad835ef625e19d1b603602f56f20ebfff04e84484ab5d1d4341feb6a1f9bdb56c13690cd7dd4cd422dbf0a3864be30a2b
+  checksum: 2a0d4c8af0431187e1b741a41e3803f3eb51b2cbc8ced60396cc5fd62a1002736ef3b2968231a403bd66bae4efd7521b984e9b885beea190577ef4085c3a9827
   languageName: node
   linkType: hard
 
