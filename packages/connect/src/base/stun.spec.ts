@@ -78,7 +78,6 @@ describe('test STUN helper functions', function () {
 
     await Promise.all(states.map((state: StateType) => state.msgReceived.promise))
 
-    console.log(responses)
     assert(
       responses != undefined && responses.length == 1,
       `Must contain only one response because the other STUN servers were not responding`
@@ -345,6 +344,7 @@ describe('test getExternalIp', function () {
   })
 
   it(`get the external IP`, async function () {
+    this.timeout((DEFAULT_PARALLEL_STUN_CALLS / DEFAULT_PARALLEL_STUN_CALLS) * STUN_TIMEOUT + 2e3)
     const socket = await bindToUdpSocket()
 
     const results = await iterateThroughStunServers(PUBLIC_STUN_SERVERS, socket)
