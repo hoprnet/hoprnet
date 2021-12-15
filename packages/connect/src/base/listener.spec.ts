@@ -2,8 +2,7 @@ import assert from 'assert'
 import { Listener } from './listener'
 import { Multiaddr } from 'multiaddr'
 import type { MultiaddrConnection, Upgrader } from 'libp2p-interfaces/transport'
-import dgram, { type Socket, type RemoteInfo } from 'dgram'
-import { handleStunRequest } from './stun'
+import dgram, { type Socket } from 'dgram'
 import PeerId from 'peer-id'
 import { createConnection } from 'net'
 import * as stun from 'webrtc-stun'
@@ -14,7 +13,7 @@ import { u8aEquals, defer, type DeferType, toNetworkPrefix, u8aAddrToString } fr
 
 import type { PublicNodesEmitter, PeerStoreType } from '../types'
 
-import { waitUntilListening, stopNode } from './utils.spec'
+import { waitUntilListening, stopNode, startStunServer } from './utils.spec'
 
 /**
  * Decorated Listener class that emits events after
@@ -46,49 +45,6 @@ async function getPeerStoreEntry(addr: string): Promise<PeerStoreType> {
     id: await PeerId.create({ keyType: 'secp256k1' }),
     multiaddrs: [new Multiaddr(addr)]
   }
-}
-
-/**
- * Creates a UDP socket and binds it to the given port.
- * @param port port to which the socket should be bound
- * @returns a bound socket
- */
-function bindToUdpSocket(port?: number): Promise<Socket> {
-  const socket = dgram.createSocket('udp4')
-
-  return new Promise<Socket>((resolve, reject) => {
-    socket.once('error', (err: any) => {
-      socket.removeListener('listening', resolve)
-      reject(err)
-    })
-    socket.once('listening', () => {
-      socket.removeListener('error', reject)
-      resolve(socket)
-    })
-
-    try {
-      socket.bind(port)
-    } catch (err) {
-      reject(err)
-    }
-  })
-}
-
-/**
- * Encapsulates the logic that is necessary to lauch a test
- * STUN server instance and track whether it receives requests
- * @param port port to listen to
- * @param state used to track incoming messages
- */
-async function startStunServer(port: number | undefined, state?: { msgReceived?: DeferType<void> }): Promise<Socket> {
-  const socket = await bindToUdpSocket(port)
-
-  socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
-    state?.msgReceived?.resolve()
-    handleStunRequest(socket, msg, rinfo)
-  })
-
-  return socket
 }
 
 /**
