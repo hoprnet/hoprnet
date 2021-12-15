@@ -148,20 +148,22 @@ particular branch to deploy on every change.
 1. (on `master`) As a preparation for a release there should be a respective entry in `packages/hoprs/releases.json` and if needed in `packages/core/protocol-config.json`. If the entries are missing, create and merge them before starting the actual release process. This step can be done way in advance to plan environments and releases, too.
 1. (on `master`) Now create the release branch locally. E.g. doing `git checkout -b release/${RELEASE_NAME}`.
 1. (on `release/${RELEASE_NAME}`) Before pushing the branch to Github, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
-    1. Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
-    1. Change use of `master-goerli` in `packages/avado/Dockerfile` to the new release name. Changes should be committed locally.
-    1. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
-    1. Copy contract deployment files from the old release. This can be done doing
 
-    ```
-    mkdir -p packages/ethereum/deployments/${RELEASE_NAME}/xdai
-    cp packages/ethereum/deployments/${OLD_RELEASE_NAME}/xdai/* packages/ethereum/deployments/${RELEASE_NAME}/xdai/
-    rm packages/ethereum/deployments/${RELEASE_NAME}/xdai/HoprChannels.json
-    ```
-  
-    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
+   1. Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
+   1. Change use of `master-goerli` in `packages/avado/Dockerfile` to the new release name. Changes should be committed locally.
+   1. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
+   1. Copy contract deployment files from the old release. This can be done doing
 
-    Changes should be committed locally.
+   ```
+   mkdir -p packages/ethereum/deployments/${RELEASE_NAME}/xdai
+   cp packages/ethereum/deployments/${OLD_RELEASE_NAME}/xdai/* packages/ethereum/deployments/${RELEASE_NAME}/xdai/
+   rm packages/ethereum/deployments/${RELEASE_NAME}/xdai/HoprChannels.json
+   ```
+
+   NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
+
+   Changes should be committed locally.
+
 1. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
 1. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
 1. (on `release/${RELEASE_NAME}`) Start a topology cluster using the script mentioned at the end of this document.
@@ -182,9 +184,9 @@ Once the release testing has concluded, or if any signifant amount of patches we
 1. (on `merge-back-release-${RELEASE_NAME}`) Merge `master` into the branch: `git merge master`.
    For an example of a merge-back, take a look at older releases: https://github.com/hoprnet/hoprnet/pull/2956
    In case of conflicts (which is expected) changes from `master` have preference in the following cases:
-    1. Revert changes in `packages/avado/docker-compose.yml`
-    1. Revert any chain specific changes.
-    1. Revert changes made to Avado configuration files as part of the initial release creation.
+   1. Revert changes in `packages/avado/docker-compose.yml`
+   1. Revert any chain specific changes.
+   1. Revert changes made to Avado configuration files as part of the initial release creation.
 
 ### Actions
 
@@ -222,8 +224,8 @@ The following are a series of manual tasks that are needed to be executed for th
 
 - [ ] Create a DNS alias for each node (cloud, cover-traffic, topology), to be accessed via our `hoprnet.link` domain (e.g. ct-1-$release.hoprnet.link)
 - [ ] Tag a distribution manually $release on npm and on Docker Hub.
-    - `npm login`, `npm dist-tag add @hoprnet/hoprd@$version $mountain/$city`
-    - `docker login`, `docker tag gcr.io/hoprassociation/hoprd:latest hopr/hoprd:$city/$mountain`
+  - `npm login`, `npm dist-tag add @hoprnet/hoprd@$version $mountain/$city`
+  - `docker login`, `docker tag gcr.io/hoprassociation/hoprd:latest hopr/hoprd:$city/$mountain`
 
 #### Per $chain
 
