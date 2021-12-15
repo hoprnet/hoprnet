@@ -1,4 +1,4 @@
-import LibP2P from 'libp2p'
+import type LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
 import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
