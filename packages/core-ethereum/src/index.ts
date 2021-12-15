@@ -54,10 +54,10 @@ export type ChainOptions = {
   environment: string
 }
 
-export default class HoprEthereum extends EventEmitter {
+export default class HoprCoreEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
-  private started: Promise<HoprEthereum> | undefined
+  private started: Promise<HoprCoreEthereum> | undefined
   private redeemingAll: Promise<void> | undefined = undefined
 
   constructor(
@@ -92,12 +92,12 @@ export default class HoprEthereum extends EventEmitter {
     this.emit('connector:created')
   }
 
-  async start(): Promise<HoprEthereum> {
+  async start(): Promise<HoprCoreEthereum> {
     if (this.started) {
       return this.started
     }
 
-    const _start = async (): Promise<HoprEthereum> => {
+    const _start = async (): Promise<HoprCoreEthereum> => {
       try {
         await this.chain.waitUntilReady()
         await this.indexer.start(this.chain, this.chain.getGenesisBlock())
