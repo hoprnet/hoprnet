@@ -102,7 +102,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.mock.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.mock.ts#L13)
+[packages/core-ethereum/src/index.mock.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.mock.ts#L12)
 
 ___
 
