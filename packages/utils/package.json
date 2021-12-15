@@ -51,7 +51,7 @@
     "bl": "5.0.0",
     "chai": "4.3.4",
     "libp2p": "0.35.5",
-    "libp2p-kad-dht": "0.27.3",
+    "libp2p-kad-dht": "0.27.4",
     "libp2p-mplex": "0.10.5",
     "libp2p-tcp": "0.17.2",
     "mocha": "9.1.3",
