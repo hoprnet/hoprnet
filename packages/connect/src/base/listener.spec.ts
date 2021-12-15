@@ -2,19 +2,18 @@ import assert from 'assert'
 import { Listener } from './listener'
 import { Multiaddr } from 'multiaddr'
 import type { MultiaddrConnection, Upgrader } from 'libp2p-interfaces/transport'
-import dgram from 'dgram'
-import type { Socket, RemoteInfo } from 'dgram'
-import { handleStunRequest } from './stun'
+import dgram, { type Socket } from 'dgram'
 import PeerId from 'peer-id'
 import { createConnection } from 'net'
 import * as stun from 'webrtc-stun'
 import { once, on, EventEmitter } from 'events'
 
-import { networkInterfaces } from 'os'
-import { u8aEquals, defer } from '@hoprnet/hopr-utils'
-import type { DeferType } from '@hoprnet/hopr-utils'
+import { type NetworkInterfaceInfo, networkInterfaces } from 'os'
+import { u8aEquals, defer, type DeferType, toNetworkPrefix, u8aAddrToString } from '@hoprnet/hopr-utils'
 
 import type { PublicNodesEmitter, PeerStoreType } from '../types'
+
+import { waitUntilListening, stopNode, startStunServer } from './utils.spec'
 
 /**
  * Decorated Listener class that emits events after
@@ -46,57 +45,6 @@ async function getPeerStoreEntry(addr: string): Promise<PeerStoreType> {
     id: await PeerId.create({ keyType: 'secp256k1' }),
     multiaddrs: [new Multiaddr(addr)]
   }
-}
-
-/**
- * Creates a UDP socket and binds it to the given port.
- * @param port port to which the socket should be bound
- * @returns a bound socket
- */
-function bindToUdpSocket(port?: number): Promise<Socket> {
-  const socket = dgram.createSocket('udp4')
-
-  return new Promise<Socket>((resolve, reject) => {
-    socket.once('error', (err: any) => {
-      socket.removeListener('listening', resolve)
-      reject(err)
-    })
-    socket.once('listening', () => {
-      socket.removeListener('error', reject)
-      resolve(socket)
-    })
-
-    try {
-      socket.bind(port)
-    } catch (err) {
-      reject(err)
-    }
-  })
-}
-
-/**
- * Encapsulates the logic that is necessary to lauch a test
- * STUN server instance and track whether it receives requests
- * @param port port to listen to
- * @param state used to track incoming messages
- */
-async function startStunServer(port: number | undefined, state?: { msgReceived?: DeferType<void> }): Promise<Socket> {
-  const socket = await bindToUdpSocket(port)
-
-  socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
-    state?.msgReceived?.resolve()
-    handleStunRequest(socket, msg, rinfo)
-  })
-
-  return socket
-}
-
-async function waitUntilListening(socket: Listener, ma: Multiaddr) {
-  const promise = once(socket, 'listening')
-
-  await socket.listen(ma)
-
-  return promise
 }
 
 /**
@@ -168,43 +116,50 @@ async function startNode(
   }
 }
 
-async function stopNode(socket: Socket | Listener) {
-  const closePromise = once(socket, 'close')
-
-  socket.close()
-
-  return closePromise
-}
-
 describe('check listening to sockets', function () {
-  it('recreate the socket and perform STUN request', async function () {
+  it('recreate the socket and perform STUN requests', async function () {
+    this.timeout(10e3) // 3 seconds should be more than enough
+
     let listener: Listener
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
-    const msgReceived = [defer<void>(), defer<void>()]
+    const AMOUNT = 3
 
-    const stunServers = [
-      await startStunServer(undefined, { msgReceived: msgReceived[0] }),
-      await startStunServer(undefined, { msgReceived: msgReceived[1] })
-    ]
+    const msgReceived = Array.from({ length: AMOUNT }, (_) => defer<void>())
 
-    for (let i = 0; i < 2; i++) {
-      listener = new Listener(
-        undefined,
-        undefined as any,
-        undefined,
-        await Promise.all(stunServers.map((s: Socket) => getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${s.address().port}`))),
-        peerId,
-        undefined,
-        false
+    const stunServers = await Promise.all(
+      Array.from({ length: AMOUNT }, (_, index: number) =>
+        startStunServer(undefined, { msgReceived: msgReceived[index] })
       )
+    )
 
-      await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
+    const peerStoreEntries = await Promise.all(
+      stunServers.map((s: Socket) => getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${s.address().port}`))
+    )
+
+    let port: number | undefined
+
+    for (let i = 0; i < 3; i++) {
+      listener = new Listener(undefined, undefined as any, undefined, [peerStoreEntries[i]], peerId, undefined, false)
+
+      let listeningMultiaddr: Multiaddr
+      if (port != undefined) {
+        listeningMultiaddr = new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`)
+      } else {
+        // Listen to previously used port
+        listeningMultiaddr = new Multiaddr(`/ip4/127.0.0.1/tcp/${port}/p2p/${peerId.toB58String()}`)
+      }
+
+      await waitUntilListening(listener, listeningMultiaddr)
+      if (port == undefined) {
+        // Store the port to which we have listened before
+        port = listener.getPort()
+      }
+      assert(port != undefined)
       await stopNode(listener)
     }
 
     await Promise.all(msgReceived.map((received) => received.promise))
-
     await Promise.all(stunServers.map(stopNode))
   })
 
@@ -277,14 +232,41 @@ describe('check listening to sockets', function () {
   })
 
   it('should bind to specific interfaces', async function () {
-    const validInterfaces = Object.keys(networkInterfaces()).filter((iface) =>
-      networkInterfaces()[iface]?.some((x) => !x.internal)
-    )
+    // Test does do not do anything if there are only IPv6 addresses
+    const usableInterfaces = networkInterfaces()
 
-    if (validInterfaces.length == 0) {
+    for (const iface of Object.keys(usableInterfaces)) {
+      const osIface = usableInterfaces[iface]
+
+      if (osIface == undefined || osIface.some((x) => x.internal) || !osIface.some((x) => x.family == 'IPv4')) {
+        delete usableInterfaces[iface]
+      }
+    }
+
+    if (Object.keys(usableInterfaces).length == 0) {
       // Cannot test without any available interfaces
       return
     }
+
+    const firstUsableInterfaceName = Object.keys(usableInterfaces)[0]
+
+    const address = (usableInterfaces[firstUsableInterfaceName] as NetworkInterfaceInfo[]).filter((addr) => {
+      if (addr.internal) {
+        return false
+      }
+
+      if (addr.family == 'IPv6') {
+        return false
+      }
+
+      return true
+    })[0]
+
+    const network = toNetworkPrefix(address)
+
+    const notUsableAddress = network.networkPrefix.slice()
+    // flip first bit of the address
+    notUsableAddress[0] ^= 128
 
     const stunServer = await startStunServer(undefined)
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
@@ -297,13 +279,22 @@ describe('check listening to sockets', function () {
       undefined,
       [await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
       peerId,
-      validInterfaces[0],
+      firstUsableInterfaceName,
       false
     )
 
-    await assert.rejects(async () => {
-      await waitUntilListening(listener, new Multiaddr(`/ip4/0.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
-    })
+    await assert.rejects(
+      () =>
+        listener.listen(
+          new Multiaddr(`/ip4/${u8aAddrToString(notUsableAddress, address.family)}/tcp/0/p2p/${peerId.toB58String()}`)
+        ),
+      `Must throw if we can't bind to an unusable address`
+    )
+
+    await assert.doesNotReject(
+      async () => await listener.listen(new Multiaddr(`/ip4/${address.address}/tcp/0/p2p/${peerId.toB58String()}`)),
+      `Must be able to bind to correct address`
+    )
 
     await Promise.all([stopNode(listener), stopNode(stunServer)])
   })
@@ -348,6 +339,7 @@ describe('check listening to sockets', function () {
     await msgReceived.promise
 
     await stopNode(node.listener)
+    await stopNode(stunServer)
   })
 
   it('get the right addresses', async function () {
@@ -491,6 +483,7 @@ describe('check listening to sockets', function () {
   })
 
   it('overwrite existing relays', async function () {
+    this.timeout(3e3) // 3 seconds should be more than enough
     const stunServer = await startStunServer(undefined)
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
