@@ -290,4 +290,6 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
   }
 }
 
+export type { PublicNodesEmitter }
+
 export default HoprConnect

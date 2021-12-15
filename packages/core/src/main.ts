@@ -4,13 +4,12 @@ import HoprEthereum from '@hoprnet/hopr-core-ethereum'
 import MPLEX from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 import { debug } from '@hoprnet/hopr-utils'
 import Hopr, { HoprOptions, VERSION } from '.'
 import { getAddrs } from './identity'
-import HoprConnect, { HoprConnectOptions } from '@hoprnet/hopr-connect'
-import { Multiaddr } from 'multiaddr'
-import { PublicNodesEmitter } from '@hoprnet/hopr-connect/lib/types'
+import HoprConnect, { type HoprConnectOptions, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import type { Multiaddr } from 'multiaddr'
 
 const log = debug(`hopr-core:create-hopr`)
 
