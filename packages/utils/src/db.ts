@@ -73,7 +73,7 @@ export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
 export class HoprDB {
   private db: LevelUp
 
-  constructor(private id: PublicKey) { }
+  constructor(private id: PublicKey) {}
 
   async init(initialize: boolean, version: string, dbPath: string, forceCreate?: boolean, environmentId?: string) {
     if (!dbPath) {

@@ -152,5 +152,4 @@ describe(`database tests`, function () {
     assert.rejects(async () => db.verifyEnvironmentId('wrong-id'))
     assert.doesNotReject(async () => db.verifyEnvironmentId.bind('test-env'))
   })
-
 })

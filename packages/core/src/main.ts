@@ -89,10 +89,12 @@ export async function createLibp2pInstance(
  * @param options:HoprOptions - Required options to create node
  * @returns {Hopr} - HOPR node
  */
-export async function createHoprNode(peerId: PeerId, options: HoprOptions, automaticChainCreation = true): Promise<Hopr> {
-  const db = new HoprDB(
-    PublicKey.fromPrivKey(peerId.privKey.marshal())
-  )
+export async function createHoprNode(
+  peerId: PeerId,
+  options: HoprOptions,
+  automaticChainCreation = true
+): Promise<Hopr> {
+  const db = new HoprDB(PublicKey.fromPrivKey(peerId.privKey.marshal()))
 
   try {
     await db.init(options.createDbIfNotExist,
