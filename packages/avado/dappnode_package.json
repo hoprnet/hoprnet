@@ -27,6 +27,6 @@
   "license": "(C)",
   "dependencies": {},
   "links": {
-    "OnboardingWizard": "http://my.hopr.avado.dnp.dappnode.eth:3000"
+    "OnboardingWizard": "http://hopr.my.ava.do:3000"
   }
 }
