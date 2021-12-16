@@ -168,7 +168,7 @@ particular branch to deploy on every change.
 
 5. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
 6. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
-7. (on `release/${RELEASE_NAME}`) Start a topology cluster using the script mentioned at the end of this document.
+7. (on `release/${RELEASE_NAME}`) Start a topology cluster using the [script](./releases.md#topology-deployment-script) mentioned at the end of this document.
 8. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.
 9. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
