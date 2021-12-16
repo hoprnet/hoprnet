@@ -53,6 +53,7 @@ const PENDING_TICKETS_VALUE = (address: Address) =>
 const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
+const ENVIRONMENT_KEY = encoder.encode('environment_id')
 
 enum PendingAcknowledgementPrefix {
   Relayer = 0,
@@ -550,11 +551,11 @@ export class HoprDB {
   }
 
   public async setEnvironmentId(environment_id: string): Promise<void> {
-    await this.put(Buffer.from('environment_id'), Buffer.from(environment_id))
+    await this.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
   }
 
   public async getEnvironmentId(): Promise<string> {
-    return decoder.decode(await this.get(encoder.encode('environment_id')))
+    return decoder.decode(await this.get(ENVIRONMENT_KEY))
   }
 
   public async verifyEnvironmentId(expectedId: string): Promise<void> {
