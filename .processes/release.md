@@ -165,7 +165,7 @@ particular branch to deploy on every change.
    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
 
    Changes should be committed locally.
-
+1. Delete all VM instances of ${OLD_OLD_RELEASE} at [Google Cloud](https://console.cloud.google.com/compute/instances)
 5. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
 6. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
 7. (on `release/${RELEASE_NAME}`) Start a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
