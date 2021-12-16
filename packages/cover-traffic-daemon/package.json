@@ -29,12 +29,12 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
-    "express": "^4.17.1",
+    "express": "4.17.1",
     "peer-id": "0.16.0",
     "yargs": "17.2.1"
   },
   "devDependencies": {
-    "@types/express": "^4",
+    "@types/express": "4",
     "@types/mocha": "9.0.0",
     "@types/rimraf": "3.0.2",
     "@types/yargs": "17.0.7",
