@@ -218,6 +218,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `ops` | `Object` |
+| `ops.id?` | `PublicKey` |
 | `ops.latestBlockNumber?` | `number` |
 | `ops.pastEvents?` | `TypedEvent`<`any`, `any`\>[] |
 
@@ -227,4 +228,4 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.mock.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.mock.ts#L240)
+[packages/core-ethereum/src/indexer/index.mock.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.mock.ts#L241)
