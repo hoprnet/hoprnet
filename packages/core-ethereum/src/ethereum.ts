@@ -18,7 +18,6 @@ import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager, { TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
-import { TX_CONFIRMATION_WAIT } from './constants'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -73,47 +72,6 @@ export async function createChainWrapper(
     },
     durations.minutes(15)
   )
-
-  // waits until tx is mined
-  async function waitForMined(
-    transactionHash: string,
-    timeout: number,
-    onMined: (nonce: number, hash: string) => void
-  ): Promise<providers.TransactionResponse> {
-    let started = 0
-    let response: providers.TransactionResponse
-
-    while (started < timeout) {
-      response = await provider.getTransaction(transactionHash)
-      if (response && response.confirmations >= 0) {
-        onMined(response.nonce, response.hash)
-        break
-      }
-      // wait 1 sec
-      await new Promise((resolve) => setTimeout(resolve, TX_CONFIRMATION_WAIT))
-      started += TX_CONFIRMATION_WAIT
-    }
-
-    if (!response) throw Error(errors.TIMEOUT)
-    return response
-  }
-
-  // waits for receipt
-  async function waitForReceipt(transactionHash: string, timeout: number): Promise<providers.TransactionReceipt> {
-    let started = 0
-    let receipt: providers.TransactionReceipt
-
-    while (started < timeout) {
-      receipt = await provider.getTransactionReceipt(transactionHash)
-      if (receipt && receipt.confirmations >= 0) break
-      // wait 1 sec
-      await new Promise((resolve) => setTimeout(resolve, TX_CONFIRMATION_WAIT))
-      started += TX_CONFIRMATION_WAIT
-    }
-
-    if (!receipt) throw Error(errors.TIMEOUT)
-    return receipt
-  }
 
   /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
@@ -184,10 +142,12 @@ export async function createChainWrapper(
       transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
+      // remove listener but not throwing error message
       deferredListener.reject()
+      // this transaction was not broadcasted so we just remove it
       transactions.remove(transaction.hash)
       nonceLock.releaseLock()
-      throw error
+      throw new Error(`Failed in sending transaction. ${error}`)
     }
 
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
@@ -196,17 +156,7 @@ export async function createChainWrapper(
 
     try {
       // wait for the tx to be mined
-      await waitForMined(transaction.hash, 30e3, (nonce: number, hash: string) => {
-        log('Transaction with nonce %d and hash %s mined', nonce, hash)
-        transactions.moveFromPendingToMined(hash)
-      })
-
-      // lookup tx receipt if the tx reverted (tx was mined successfully but reverted)
-      const receipt = await waitForReceipt(transaction.hash, 30e3)
-      // status = 0 means reverted
-      if (receipt.status === 0) {
-        throw Error(errors.CALL_EXCEPTION)
-      }
+      await transaction.wait()
     } catch (error) {
       log(error)
       // remove listener but not throwing error message
@@ -225,9 +175,9 @@ export async function createChainWrapper(
       } else {
         log('Transaction with nonce %d and hash failed to send: %s', nonce, transaction.hash, error)
       }
-
-      throw error
+      throw new Error(`Failed in mining transaction. ${error}`)
     }
+
     try {
       await deferredListener.promise
       return {
@@ -235,8 +185,8 @@ export async function createChainWrapper(
         tx: { hash: transaction.hash }
       }
     } catch (error) {
-      log('error: transaction with nonce %d and hash failed to send: %s', nonce, transaction.hash, error)
-      throw error
+      log('error: transaction with nonce %d and hash %s failed to send: %s', nonce, transaction.hash, error)
+      throw new Error(`Failed in mining transaction in time. ${error}`)
     }
   }
 
