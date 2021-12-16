@@ -289,7 +289,7 @@ gcloud_create_or_update_managed_instance_group() {
 
   log "waiting for managed instance group ${name}"
   gcloud compute instance-groups managed wait-until "${name}" \
-    --stable \
+    --version-target-reached \
     ${gcloud_region}
 }
 
@@ -306,10 +306,23 @@ gcloud_delete_managed_instance_group() {
 # $1=group name
 gcloud_get_managed_instance_group_instances_ips() {
   local name="${1}"
+  local nproc_cmd
+  declare kernel 
+
+  kernel=$(uname -s)
+  
+  if [ "${kernel}" = "Linux" ]; then
+    nproc_cmd="nproc"
+  elif [ "${kernel}" = "Darwin" ]; then
+    nproc_cmd="sysctl -n hw.logicalcpu"
+  else
+    log "⛔️ don't know how to get virtual cores count for kernel ${kernel}"
+    exit 1
+  fi
 
   gcloud compute instance-groups list-instances "${name}" \
     ${gcloud_region} --uri | \
-    xargs -P `nproc` -I '{}' gcloud compute instances describe '{}' \
+    xargs -P `${nproc_cmd}` -I '{}' gcloud compute instances describe '{}' \
       --flatten 'networkInterfaces[].accessConfigs[]' \
       --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
 }
