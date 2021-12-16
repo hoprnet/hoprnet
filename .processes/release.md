@@ -166,7 +166,7 @@ particular branch to deploy on every change.
 
    Changes should be committed locally.
 
-5. Delete all VM instances of ${OLD_OLD_RELEASE}. Check `gcloud compute instance-groups managed list` to view instance groups of ${OLD_OLD_RELEASE} and delete them using 
+5. Delete all VM instances of ${OLD_OLD_RELEASE}. Check `gcloud compute instance-groups managed list` to view instance groups of ${OLD_OLD_RELEASE} and delete them using
    ```sh
    gcloud compute instance-groups managed delete ${OLD_OLD_RELEASE} --region=$REGION`
    ```
