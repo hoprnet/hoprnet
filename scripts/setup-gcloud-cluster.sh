@@ -57,7 +57,7 @@ declare init_script=${2:-}
 declare cluster_id="${3:-${environment}-topology-${RANDOM}-${RANDOM}}"
 declare docker_image=${4:-gcr.io/hoprassociation/hoprd:${environment}}
 
-declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}%${RANDOM}%${RANDOM}Token}"
+declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
