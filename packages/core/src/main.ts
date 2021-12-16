@@ -1,16 +1,15 @@
 import LibP2P from 'libp2p'
 import { AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
-import HoprEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import MPLEX from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 import { debug } from '@hoprnet/hopr-utils'
 import Hopr, { HoprOptions, VERSION } from '.'
 import { getAddrs } from './identity'
-import HoprConnect, { HoprConnectOptions } from '@hoprnet/hopr-connect'
-import { Multiaddr } from 'multiaddr'
-import { PublicNodesEmitter } from '@hoprnet/hopr-connect/lib/types'
+import HoprConnect, { type HoprConnectOptions, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import type { Multiaddr } from 'multiaddr'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -99,7 +98,7 @@ export function createHoprNode(peerId: PeerId, options: HoprOptions, automaticCh
   )
   const provider = expandVars(options.environment.network.default_provider, process.env)
   log(`using provider URL: ${provider}`)
-  const chain = new HoprEthereum(
+  const chain = new HoprCoreEthereum(
     db,
     PublicKey.fromPeerId(peerId),
     peerId.privKey.marshal(),

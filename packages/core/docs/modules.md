@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L99)
+[packages/core/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L97)
 
 ___
 
@@ -108,7 +108,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L114)
+[packages/core/src/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L112)
 
 ___
 
@@ -118,7 +118,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L101)
+[packages/core/src/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L99)
 
 ## Variables
 
@@ -298,7 +298,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/libp2p.mock.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L46)
+[packages/core/src/libp2p.mock.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L45)
 
 ___
 
@@ -330,7 +330,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L92)
+[packages/core/src/main.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L91)
 
 ___
 

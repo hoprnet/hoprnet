@@ -1,6 +1,4 @@
-// Currently using a fork of libp2p,
-// see https://github.com/libp2p/js-libp2p/pull/1044
-import LibP2P from 'libp2p'
+import type LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
 import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
