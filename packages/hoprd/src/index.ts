@@ -271,17 +271,18 @@ async function main() {
     process.exit(0)
   }
 
-  // 1. Find or create an identity
-  const peerId = await getIdentity({
-    initialize: argv.init,
-    idPath: argv.identity,
-    password: argv.password,
-    useWeakCrypto: argv.testUseWeakCrypto,
-    privateKey: argv.privateKey
-  })
-
-  // 2. Create node instance
   try {
+    // 1. Find or create an identity
+    const peerId = await getIdentity({
+      initialize: argv.init,
+      idPath: argv.identity,
+      password: argv.password,
+      useWeakCrypto: argv.testUseWeakCrypto,
+      privateKey: argv.privateKey
+    })
+
+    // 2. Create node instance
+
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
