@@ -470,6 +470,10 @@ export class HoprDB {
     await this.addBalance(PENDING_TICKETS_VALUE(ticket.counterparty), ticket.amount)
   }
 
+  public async resolvePending(ticket: Partial<Ticket>) {
+    await this.subBalance(PENDING_TICKETS_VALUE(ticket.counterparty), ticket.amount)
+  }
+
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
     await this.increment(REDEEMED_TICKETS_COUNT)
     await this.delAcknowledgedTicket(a)
