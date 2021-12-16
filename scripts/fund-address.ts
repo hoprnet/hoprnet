@@ -53,7 +53,7 @@ async function fundERC20(chain, sender: string, receiver: string, targetBalanceS
   console.log(
     `transfer ${diff.toFormattedString()} from ${sender} to ${receiver} to top up ${balance.toFormattedString()}`
   )
-  await chain.withdraw('HOPR', receiver, diff.toString())
+  await chain.withdraw('HOPR', receiver, diff.toString(), (tx: string) => this.setTxHandler('withdraw-hopr', tx))
 }
 
 async function fundNative(chain, sender: string, receiver: string, targetBalanceStr: string) {
@@ -83,7 +83,7 @@ async function fundNative(chain, sender: string, receiver: string, targetBalance
   console.log(
     `transfer ${diff.toFormattedString()} from ${sender} to ${receiver} to top up ${balance.toFormattedString()}`
   )
-  await chain.withdraw('NATIVE', receiver, diff.toString())
+  await chain.withdraw('NATIVE', receiver, diff.toString(), (tx: string) => this.setTxHandler('withdraw-native', tx))
 }
 
 async function main() {
