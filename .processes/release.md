@@ -167,9 +167,13 @@ particular branch to deploy on every change.
    Changes should be committed locally.
 
 5. Delete all topology VM instances of ${OLD_OLD_RELEASE} and ${OLD_RELEASE} and all instances of ${OLD_OLD_RELEASE}, e.g. `prague-1.84`. Check `gcloud compute instance-groups managed list` for a list and delete the instance groups using
+
    ```sh
    gcloud compute instance-groups managed delete ${INSTANCE_GROUP_NAME} --region=$REGION`
    ```
+
+   ```
+
 6. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
 7. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
 8. (on `release/${RELEASE_NAME}`) Start a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
