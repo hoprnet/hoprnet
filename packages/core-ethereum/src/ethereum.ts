@@ -175,7 +175,7 @@ export async function createChainWrapper(
         log('Transaction with nonce %d and hash failed to send: %s', nonce, transaction.hash, error)
       }
 
-      throw error
+      throw new Error(`Failed in mining transaction. ${error}`)
     }
     try {
       await deferredListener.promise
