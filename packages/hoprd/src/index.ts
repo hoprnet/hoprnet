@@ -48,7 +48,6 @@ function addUnhandledPromiseRejectionHandler() {
 }
 
 export async function main() {
-
   const argv = yargs(process.argv.slice(2))
     .option('environment', {
       string: true,
@@ -353,7 +352,7 @@ export async function main() {
     logs.log(`Ready to request on-chain connector to connect to provider.`)
     node.subscribeOnConnector('connector:created', () => node.emit('hopr:connector:created'))
     node.emitOnConnector('connector:create')
-    return node;
+    return node
   } catch (e) {
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)

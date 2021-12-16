@@ -20,8 +20,15 @@ describe('HOPRd', () => {
     // })
     // log('Hardhat has been started, we can now start alice.')
     log('Starting alice')
-    process.argv.push('--password="hi"', `--data="/tmp/${Date.now()}-db"`, '--testUseWeakCrypto', '--init', `--identity="/tmp/${Date.now()}-identity"`, '--environment hardhat-localhost')
-    const alice = await main();
+    process.argv.push(
+      '--password="hi"',
+      `--data="/tmp/${Date.now()}-db"`,
+      '--testUseWeakCrypto',
+      '--init',
+      `--identity="/tmp/${Date.now()}-identity"`,
+      '--environment hardhat-localhost'
+    )
+    const alice = await main()
     alice.on('hopr:monitoring:start', () => {
       log('Alice has managed to start its chain provider successfully.')
     })
