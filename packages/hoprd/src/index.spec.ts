@@ -7,6 +7,7 @@ const log = debug(namespace)
 //const hardhatLog = debug(`${namespace}:hardhat`)
 
 describe('HOPRd', () => {
+<<<<<<< HEAD
   it('should close channels properly between alice and bob', async function () {
     this.timeout(0)
     // @TODO Replace calling hardhat outside of this test for doing it inside to have better control. For now, the complexities around
@@ -23,6 +24,12 @@ describe('HOPRd', () => {
     process.argv.push('--password="hi"', `--data="/tmp/${Date.now()}-db"`, '--testUseWeakCrypto', '--init', `--identity="/tmp/${Date.now()}-identity"`, '--environment hardhat-localhost')
     await main(); // alice
     await wait(10000) // holding on 10secs to let multiple un-awaitable operations complete.
+=======
+  it('should close channels properly between alice and bob', async () => {
+    console.log('This should be logged.')
+    log('starting alice')
+    await main()
+>>>>>>> 98609205787be00fa3b788935550ae2757b6f8fb
     log('alice has been completed')
   })
 })
