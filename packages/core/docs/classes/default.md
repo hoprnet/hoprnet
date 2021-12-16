@@ -134,7 +134,7 @@ ___
 
 ### environment
 
-• `Private` **environment**: [`ResolvedEnvironment`](../modules.md#resolvedenvironment)
+• **environment**: [`ResolvedEnvironment`](../modules.md#resolvedenvironment)
 
 #### Defined in
 

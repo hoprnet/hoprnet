@@ -314,7 +314,7 @@ ___
 
 ### createHoprNode
 
-▸ **createHoprNode**(`peerId`, `options`, `automaticChainCreation?`): [`default`](classes/default.md)
+▸ **createHoprNode**(`peerId`, `options`, `automaticChainCreation?`): `Promise`<[`default`](classes/default.md)\>
 
 #### Parameters
 
@@ -326,7 +326,7 @@ ___
 
 #### Returns
 
-[`default`](classes/default.md)
+`Promise`<[`default`](classes/default.md)\>
 
 #### Defined in
 
