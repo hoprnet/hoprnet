@@ -1,6 +1,6 @@
 import EventEmitter from 'events'
 import { providers as Providers, Wallet, BigNumber } from 'ethers'
-import type { HoprChannels, HoprToken } from '@hoprnet/hopr-ethereum'
+import type { HoprChannels, HoprToken, TypedEvent } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   ChannelEntry,
@@ -10,7 +10,8 @@ import {
   NativeBalance,
   SUGGESTED_NATIVE_BALANCE,
   debug,
-  AccountEntry
+  AccountEntry,
+  PublicKey
 } from '@hoprnet/hopr-utils'
 
 import Indexer from '.'
@@ -154,12 +155,31 @@ const createChainMock = (
 ): ChainWrapper => {
   return {
     getLatestBlockNumber: () => provider.getBlockNumber(),
-    subscribeBlock: (cb) => provider.on('block', cb),
-    subscribeError: (cb) => {
+    subscribeBlock: (cb: (blockNumber: number) => void | Promise<void>) => {
+      provider.on('block', cb)
+
+      return () => {
+        provider.off('block', cb)
+      }
+    },
+    subscribeError: (cb: (err: any) => void | Promise<void>): (() => void) => {
       provider.on('error', cb)
       hoprChannels.on('error', cb)
+      hoprToken.on('error', cb)
+
+      return () => {
+        provider.off('error', cb)
+        hoprChannels.off('error', cb)
+        hoprToken.off('error', cb)
+      }
     },
-    subscribeChannelEvents: (cb) => hoprChannels.on('*', cb),
+    subscribeChannelEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>) => {
+      hoprChannels.on('*', cb)
+
+      return () => {
+        hoprChannels.off('*', cb)
+      }
+    },
     start: () => {},
     waitUntilReady: () => {
       chainLogger('Await on chain readyness')
@@ -183,13 +203,15 @@ const createChainMock = (
       on: (event: string) => chainLogger(`Indexer on handler top of chain called with event "${event}"`),
       off: (event: string) => chainLogger(`Indexer off handler top of chain called with event "${event}`)
     },
-    subscribeTokenEvents: (cb) => hoprToken.on('*', cb),
+    subscribeTokenEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>): (() => void) => {
+      hoprToken.on('*', cb)
+
+      return () => {
+        hoprToken.off('*', cb)
+      }
+    },
     getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => [],
     updateConfirmedTransaction: (_hash: string) => {},
-    unsubscribe: () => {
-      provider.removeAllListeners()
-      hoprChannels.removeAllListeners()
-    },
     getNativeBalance: () => new NativeBalance(SUGGESTED_NATIVE_BALANCE),
     getChannels: () => hoprChannels,
     getWallet: () => account ?? fixtures.ACCOUNT_A,
@@ -210,11 +232,19 @@ const createChainMock = (
   } as unknown as ChainWrapper
 }
 
-export const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
+class TestingIndexer extends Indexer {
+  public restart(): Promise<void> {
+    return super.restart()
+  }
+}
+
+export const useFixtures = async (
+  ops: { latestBlockNumber?: number; pastEvents?: Event<any>[]; id?: PublicKey } = {}
+) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const pastEvents = ops.pastEvents ?? []
 
-  const db = HoprDB.createMock()
+  const db = HoprDB.createMock(ops.id)
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
   const { hoprToken } = createHoprTokenMock()
@@ -224,8 +254,9 @@ export const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?
     provider,
     newBlock,
     hoprChannels,
+    hoprToken,
     newEvent,
-    indexer: new Indexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5),
+    indexer: new TestingIndexer(!ops.id ? PublicKey.createMock().toAddress() : ops.id.toAddress(), db, 1, 5),
     chain,
     OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
       Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)

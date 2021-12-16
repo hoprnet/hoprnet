@@ -1,6 +1,4 @@
-// Currently using a fork of libp2p,
-// see https://github.com/libp2p/js-libp2p/pull/1044
-import LibP2P from 'libp2p'
+import type LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
 import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
@@ -129,7 +127,7 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private environment: ResolvedEnvironment
+  public environment: ResolvedEnvironment
 
   public indexer: Indexer
 
@@ -468,7 +466,7 @@ class Hopr extends EventEmitter {
     clearTimeout(this.checkTimeout)
     verbose('Stopping heartbeat & indexer')
     await Promise.all([this.heartbeat.stop(), this.connector.stop()])
-    verbose('Stoping database & libp2p', this.db)
+    verbose('Stopping database & libp2p', this.db)
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
     // Give the operating system some extra time to close the sockets

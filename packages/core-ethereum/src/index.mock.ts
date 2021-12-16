@@ -1,9 +1,8 @@
 import { AccountEntry, Address, debug, NativeBalance } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum from '.'
+import type HoprCoreEthereum from '.'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
-import HoprEthereum from '.'
 
 export const sampleAddress = Address.fromString('0x55CfF15a5159239002D57C591eF4ACA7f2ACAfE6')
 export const samplePeerId = PeerId.createFromB58String('16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7')
@@ -13,7 +12,7 @@ const connectorLogger = debug(`hopr:mocks:connector`)
 const connectorMock = {
   start: () => {
     connectorLogger('starting connector called.')
-    return {} as unknown as HoprEthereum
+    return {} as unknown as HoprCoreEthereum
   },
   stop: () => {
     connectorLogger('stopping connector called.')

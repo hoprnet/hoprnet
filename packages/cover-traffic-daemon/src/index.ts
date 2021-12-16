@@ -109,7 +109,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   log('creating a node')
-  const node = createHoprNode(peerId, options)
+  const node = await createHoprNode(peerId, options)
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
@@ -129,7 +129,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   log('node is running')
 
   log(node.getVersion())
-  log(node.smartContractInfo())
+  log(await node.smartContractInfo())
 
   const channels = await node.getChannelsFrom(selfAddr)
   data.setCTChannels(channels.map((c) => ({ destination: c.destination, latestQualityOf: 0, openFrom: Date.now() })))

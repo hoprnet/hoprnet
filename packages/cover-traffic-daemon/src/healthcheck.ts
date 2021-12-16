@@ -11,6 +11,7 @@ export default function setupHealthcheck(node: Hopr, host: string, port: number)
   const service = express()
 
   service.get('/healthcheck/v1/version', (_, res) => res.send(`CT node: ${node.getVersion()}`))
+  service.get('/healthcheck/v1/environment', (_, res) => res.send(node.environment.id))
 
   http
     .createServer(service)

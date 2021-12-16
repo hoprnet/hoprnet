@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-cover-traffic-daemon",
   "description": "Generate chaffing traffic",
-  "version": "1.85.0-next.22",
+  "version": "1.85.0-next.37",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -9,7 +9,7 @@
   "main": "lib/index.js",
   "bin": "lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./db ./ct.json ./tsconfig.spec.tsbuildinfo",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "coverage": "nyc --reporter=html mocha",
     "dev": "yarn clean && tsc -w",
@@ -44,7 +44,7 @@
     "rimraf": "3.0.2",
     "typedoc": "0.22.10",
     "typedoc-plugin-markdown": "3.11.7",
-    "typescript": "4.5.3"
+    "typescript": "4.5.4"
   },
   "mocha": {
     "extension": [

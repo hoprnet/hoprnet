@@ -1,7 +1,5 @@
-import { createServer } from 'net'
-import { Socket } from 'net'
+import { createServer, type Socket, type AddressInfo } from 'net'
 
-import type { AddressInfo } from 'net'
 import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'
 import { once } from 'events'
 import { Multiaddr } from 'multiaddr'
@@ -9,6 +7,8 @@ import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import assert from 'assert'
 import type { EventEmitter } from 'events'
+
+import { waitUntilListening, stopNode } from './utils.spec'
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {
@@ -28,10 +28,7 @@ describe('test TCP connection', function () {
       })
     })
 
-    const boundPromise = once(server, 'listening')
-    server.listen()
-
-    await boundPromise
+    await waitUntilListening<undefined | number>(server, undefined)
 
     const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
@@ -63,10 +60,7 @@ describe('test TCP connection', function () {
       `TCPConnection must populate timeline object`
     )
 
-    const serverClosePromise = once(server, 'close')
-    server.close()
-
-    await serverClosePromise
+    await stopNode(server)
   })
 
   it('trigger a socket close timeout', async function () {
@@ -76,10 +70,12 @@ describe('test TCP connection', function () {
 
     const server = createServer()
 
-    const boundPromise = once(server, 'listening')
-    server.listen()
+    server.on('close', console.log)
+    server.on('error', console.log)
+    const sockets: Socket[] = []
+    server.on('connection', sockets.push.bind(sockets))
 
-    await boundPromise
+    await waitUntilListening(server, undefined)
 
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
     const conn = await TCPConnection.create(
@@ -95,9 +91,17 @@ describe('test TCP connection', function () {
 
     const start = Date.now()
     const closePromise = once(conn.conn, 'close')
+    // @dev produces a half-open socket on the other side
     conn.close()
 
     await closePromise
+
+    // Destroy half-open sockets.
+    for (const socket of sockets) {
+      socket.destroy()
+    }
+
+    await stopNode(server)
 
     assert(Date.now() - start >= SOCKET_CLOSE_TIMEOUT)
 

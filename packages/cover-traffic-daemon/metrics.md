@@ -53,6 +53,14 @@ Other metrics can be deduced from logs. Note that logs start with `hopr:cover-tr
      ```
      hopr:cover-traffic channel is stalled in WAITING_FOR_COMMITMENT, closing 16Uiu2HAmBCcc822eURPRu6YXuSNmPZn2tJ1nEePNPUsz8xRNZRV7
      ```
+   - for other (unknown) errors:
+     ```js
+     Unknown error in sending traffic. Channel is ${channel.status}; openChannel is ${JSON.stringify(openChannel)}
+     ```
+     E.g.
+     ```
+     hopr:cover-traffic Unknown error in sending traffic. Channel is PENDING_TO_CLOSE; openChannel is {"destination":"16Uiu2HAmBCcc822eURPRu6YXuSNmPZn2tJ1nEePNPUsz8xRNZRV7","lastestQualityOf":0.5,"openFrom":1639400526749}
+     ```
 4. Opening channel
    ```js
    opening ${c.toB58String()}

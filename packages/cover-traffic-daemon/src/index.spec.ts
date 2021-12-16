@@ -5,9 +5,8 @@ import sinon from 'sinon'
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
 import { sampleData } from './state.mock'
-import { sampleOptions } from '@hoprnet/hopr-core'
+import { sampleOptions, libp2pMock } from '@hoprnet/hopr-core'
 import { connectorMock } from '@hoprnet/hopr-core-ethereum'
-import { libp2pMock } from '@hoprnet/hopr-core'
 
 const namespace = 'hopr:test:cover-traffic'
 const log = debug(namespace)

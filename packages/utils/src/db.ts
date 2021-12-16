@@ -23,6 +23,7 @@ import { u8aEquals, u8aToNumber } from './u8a'
 
 const log = debug(`hopr-core:db`)
 const encoder = new TextEncoder()
+const decoder = new TextDecoder()
 
 const TICKET_PREFIX = encoder.encode('tickets-')
 const SEPARATOR = encoder.encode(':')
@@ -52,6 +53,7 @@ const PENDING_TICKETS_VALUE = (address: Address) =>
 const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
+const ENVIRONMENT_KEY = encoder.encode('environment_id')
 
 enum PendingAcknowledgementPrefix {
   Relayer = 0,
@@ -72,29 +74,45 @@ export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
 export class HoprDB {
   private db: LevelUp
 
-  constructor(private id: PublicKey, initialize: boolean, version: string, dbPath?: string, forceCreate?: boolean) {
+  constructor(private id: PublicKey) {}
+
+  async init(initialize: boolean, version: string, dbPath: string, forceCreate?: boolean, environmentId?: string) {
     if (!dbPath) {
-      dbPath = path.join(process.cwd(), 'db', version)
+      if (!environmentId) {
+        throw new Error(`must provide environmentId if no dbPath is given`)
+      }
+      dbPath = path.join(process.cwd(), 'db', environmentId, version)
     }
 
     dbPath = path.resolve(dbPath)
+
+    let setEnvironment = false
 
     log('using db at ', dbPath)
     if (forceCreate) {
       log('force create - wipe old database and create a new')
       rmSync(dbPath, { recursive: true, force: true })
       mkdirSync(dbPath, { recursive: true })
+      setEnvironment = true
     }
     if (!existsSync(dbPath)) {
       log('db does not exist, creating?:', initialize)
       if (initialize) {
         mkdirSync(dbPath, { recursive: true })
+        setEnvironment = true
       } else {
         throw new Error('Database does not exist: ' + dbPath)
       }
     }
     this.db = levelup(leveldown(dbPath))
-    log('namespacing db by pubkey: ', id.toAddress().toHex())
+    log('namespacing db by pubkey: ', this.id.toAddress().toHex())
+    if (setEnvironment) {
+      if (!environmentId) {
+        throw new Error(`must provide environment id when creating db`)
+      }
+      log(`setting environment id ${environmentId} to db`)
+      await this.setEnvironmentId(environmentId)
+    }
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
@@ -470,6 +488,10 @@ export class HoprDB {
     await this.addBalance(PENDING_TICKETS_VALUE(ticket.counterparty), ticket.amount)
   }
 
+  public async resolvePending(ticket: Partial<Ticket>) {
+    await this.subBalance(PENDING_TICKETS_VALUE(ticket.counterparty), ticket.amount)
+  }
+
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
     await this.increment(REDEEMED_TICKETS_COUNT)
     await this.delAcknowledgedTicket(a)
@@ -526,5 +548,20 @@ export class HoprDB {
     return this.getChannels((channel) => {
       return address.eq(channel.destination.toAddress())
     })
+  }
+
+  public async setEnvironmentId(environment_id: string): Promise<void> {
+    await this.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
+  }
+
+  public async getEnvironmentId(): Promise<string> {
+    return decoder.decode(await this.get(ENVIRONMENT_KEY))
+  }
+
+  public async verifyEnvironmentId(expectedId: string): Promise<void> {
+    const storedId = await this.getEnvironmentId()
+    if (storedId !== expectedId) {
+      throw new Error(`invalid db environment id: ${storedId} (expected: ${expectedId})`)
+    }
   }
 }
