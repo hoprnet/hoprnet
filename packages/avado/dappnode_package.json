@@ -19,14 +19,14 @@
       "9091:9091/tcp"
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
-    "hash": "/ipfs/QmQzQu2zWvpBx6wokKbzHFLNQsxDYNcZ7hvBXLnXG8iHVp",
-    "size": 84105304,
+    "hash": "/ipfs/QmRyGG3JGHBSCDqhsgirr4u8AogWrkJpuLhqLa5XKqydXX",
+    "size": 78043764,
     "restart": "always"
   },
   "author": "HOPR",
   "license": "(C)",
   "dependencies": {},
   "links": {
-    "OnboardingWizard": "http://my.hopr.avado.dnp.dappnode.eth:3000"
+    "OnboardingWizard": "http://hopr.my.ava.do:3000"
   }
 }

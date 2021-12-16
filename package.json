@@ -29,7 +29,7 @@
     "test:utils": "yarn workspace @hoprnet/hopr-utils run test",
     "test:contracts": "yarn workspace @hoprnet/hopr-ethereum run test",
     "run:network": "yarn workspace @hoprnet/hopr-ethereum run network",
-    "run:hoprd": "yarn workspace @hoprnet/hoprd run start --password='d3f4uL+!' --data=/tmp/default --identity=/tmp/default-identity --testNoAuthentication",
+    "run:hoprd": "yarn workspace @hoprnet/hoprd run start --password='d3f4uL+!' --identity=/tmp/default-identity --testNoAuthentication",
     "run:hoprd:xdai": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --adminPort=2990 --restPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --testNoAuthentication",
     "run:hoprd:xdai:protected": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --adminPort=2990 --restPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --apiToken=xD4!-N3+w0rK",
     "run:hoprd:goerli": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9060 --adminPort=2970 --restPort=2971 --provider=https://goerli.infura.io/v3/${HOPRD_INFURA_KEY} --password='goerli' --announce --data=/tmp/goerli --identity=/tmp/goerli-identity --testNoAuthentication",
@@ -47,7 +47,7 @@
     "prettier": "2.5.1",
     "rimraf": "3.0.2",
     "ts-node": "10.4.0",
-    "typescript": "4.5.2",
+    "typescript": "4.5.4",
     "yargs": "17.2.1"
   },
   "prettier": {

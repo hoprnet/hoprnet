@@ -16,9 +16,7 @@
 
 - [ChannelsToClose](modules.md#channelstoclose)
 - [ChannelsToOpen](modules.md#channelstoopen)
-- [Network](modules.md#network)
 - [NodeStatus](modules.md#nodestatus)
-- [ProtocolConfig](modules.md#protocolconfig)
 - [ResolvedEnvironment](modules.md#resolvedenvironment)
 - [SendMessage](modules.md#sendmessage)
 - [Subscribe](modules.md#subscribe)
@@ -74,56 +72,13 @@ ___
 
 ___
 
-### Network
-
-Ƭ **Network**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `chain_id` | `number` |
-| `default_provider` | `string` |
-| `description` | `string` |
-| `gas?` | `string` |
-| `gasPrice?` | `number` |
-| `gas_multiplier` | `number` |
-| `hopr_token_name` | `string` |
-| `id` | `string` |
-| `live` | `boolean` |
-| `native_token_name` | `string` |
-| `tags` | `string`[] |
-
-#### Defined in
-
-[packages/core/src/environment.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L1)
-
-___
-
 ### NodeStatus
 
 Ƭ **NodeStatus**: ``"UNINITIALIZED"`` \| ``"INITIALIZING"`` \| ``"RUNNING"`` \| ``"DESTROYED"``
 
 #### Defined in
 
-[packages/core/src/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L99)
-
-___
-
-### ProtocolConfig
-
-Ƭ **ProtocolConfig**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `environments` | `Environment`[] |
-| `networks` | [`Network`](modules.md#network)[] |
-
-#### Defined in
-
-[packages/core/src/environment.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L23)
+[packages/core/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L97)
 
 ___
 
@@ -138,7 +93,7 @@ ___
 | `channel_contract_deploy_block` | `number` |
 | `channels_contract_address` | `string` |
 | `id` | `string` |
-| `network` | [`Network`](modules.md#network) |
+| `network` | `NetworkOptions` |
 | `token_contract_address` | `string` |
 
 #### Defined in
@@ -153,7 +108,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L114)
+[packages/core/src/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L112)
 
 ___
 
@@ -163,7 +118,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L101)
+[packages/core/src/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L99)
 
 ## Variables
 
@@ -343,7 +298,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/libp2p.mock.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L46)
+[packages/core/src/libp2p.mock.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/libp2p.mock.ts#L45)
 
 ___
 
@@ -359,22 +314,23 @@ ___
 
 ### createHoprNode
 
-▸ **createHoprNode**(`peerId`, `options`): [`default`](classes/default.md)
+▸ **createHoprNode**(`peerId`, `options`, `automaticChainCreation?`): `Promise`<[`default`](classes/default.md)\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `peerId` | `PeerId` |
-| `options` | [`HoprOptions`](classes/HoprOptions.md) |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `peerId` | `PeerId` | `undefined` |
+| `options` | [`HoprOptions`](classes/HoprOptions.md) | `undefined` |
+| `automaticChainCreation` | `boolean` | `true` |
 
 #### Returns
 
-[`default`](classes/default.md)
+`Promise`<[`default`](classes/default.md)\>
 
 #### Defined in
 
-[packages/core/src/main.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L92)
+[packages/core/src/main.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L91)
 
 ___
 

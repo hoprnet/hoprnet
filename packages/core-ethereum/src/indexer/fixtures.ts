@@ -2,7 +2,19 @@ import type { Event } from './types'
 import BN from 'bn.js'
 import assert from 'assert'
 import { BigNumber } from 'ethers'
-import { Hash, AccountEntry, ChannelEntry, u8aToHex } from '@hoprnet/hopr-utils'
+import {
+  Hash,
+  AccountEntry,
+  ChannelEntry,
+  u8aToHex,
+  Ticket,
+  Challenge,
+  stringToU8a,
+  UINT256,
+  Balance,
+  Signature,
+  SIGNATURE_LENGTH
+} from '@hoprnet/hopr-utils'
 import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtures'
 
 export * from '../fixtures'
@@ -97,3 +109,68 @@ export const COMMITTED_EVENT = {
     }
   } as any
 } as Event<'ChannelUpdated'>
+
+export const UPDATED_WHEN_REDEEMED_EVENT = {
+  event: 'ChannelUpdated',
+  transactionHash: '',
+  blockNumber: 5,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    source: PARTY_A.toAddress().toHex(),
+    destination: PARTY_B.toAddress().toHex(),
+    newState: {
+      balance: BigNumber.from('1'),
+      commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      ticketEpoch: BigNumber.from('0'),
+      ticketIndex: BigNumber.from('1'),
+      status: 2,
+      channelEpoch: BigNumber.from('0'),
+      closureTime: BigNumber.from('0')
+    }
+  } as any
+} as Event<'ChannelUpdated'>
+
+export const TICKET_REDEEMED_EVENT = {
+  event: 'TicketRedeemed',
+  transactionHash: '',
+  blockNumber: 5,
+  transactionIndex: 1,
+  logIndex: 0,
+  args: {
+    source: PARTY_A.toAddress().toHex(),
+    destination: PARTY_B.toAddress().toHex(),
+    nextCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+    ticketEpoch: BigNumber.from('0'),
+    ticketIndex: BigNumber.from('1'),
+    proofOfRelaySecret: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+    amount: BigNumber.from('2'),
+    winProb: BigNumber.from('1'),
+    signature: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex()
+  } as any
+} as Event<'TicketRedeemed'>
+
+export const oneLargeTicket = new Ticket(
+  PARTY_B.toAddress(),
+  new Challenge(
+    stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')
+  ).toEthereumChallenge(),
+  UINT256.fromString('0'),
+  UINT256.fromString('0'),
+  new Balance(new BN('2')),
+  UINT256.fromInverseProbability(new BN(1)),
+  UINT256.fromString('0'),
+  new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
+)
+export const oneSmallTicket = new Ticket(
+  PARTY_B.toAddress(),
+  new Challenge(
+    stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')
+  ).toEthereumChallenge(),
+  UINT256.fromString('0'),
+  UINT256.fromString('0'),
+  new Balance(new BN('1')),
+  UINT256.fromInverseProbability(new BN(1)),
+  UINT256.fromString('0'),
+  new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
+)

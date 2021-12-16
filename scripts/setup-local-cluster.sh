@@ -10,22 +10,22 @@ set -Eeuo pipefail
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-declare HOPR_LOG_ID="e2e-source-test"
+declare HOPR_LOG_ID="setup-local-cluster"
 source "${mydir}/utils.sh"
+
+# verify and set parameters
+declare api_token="^^LOCAL-testing-123^^"
+declare myne_chat_url="http://app.myne.chat"
+declare init_script=""
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-s|--skip-cleanup]"
+  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>]"
   msg
-  msg "The cleanup process can be skipped by using '--skip-cleanup'."
-  msg
+  msg "<api_token> is set to '${api_token}' by default"
+  msg "<myne_chat_url> is set to '${myne_chat_url}' by default"
+  msg "<init_script> is empty by default, expected to be path to a script which is called with all node API endpoints as parameters"
 }
-
-# verify and set parameters
-declare wait_delay=2
-declare wait_max_wait=1000
-declare skip_cleanup="false"
-declare api_token="e2e-API-token^^"
 
 while (( "$#" )); do
   case "$1" in
@@ -34,8 +34,19 @@ while (( "$#" )); do
       usage
       exit 0
       ;;
-    -s|--skip-cleanup)
-      skip_cleanup="true"
+    -t|--api-token)
+      api_token="${2}"
+      shift
+      shift
+      ;;
+    -m|--myne-chat-url)
+      myne_chat_url="${2}"
+      shift
+      shift
+      ;;
+    -i|--init-script)
+      init_script="${2}"
+      shift
       shift
       ;;
     -*|--*=)
@@ -48,49 +59,32 @@ while (( "$#" )); do
   esac
 done
 
-if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
-  wait_delay=10
-  wait_max_wait=10
-fi
-
 # find usable tmp dir
 declare tmp="$(find_tmp_dir)"
 
-declare node_prefix="hopr-source-node"
+declare node_prefix="hopr-local-node"
 
 declare node1_dir="${tmp}/${node_prefix}-1"
 declare node2_dir="${tmp}/${node_prefix}-2"
 declare node3_dir="${tmp}/${node_prefix}-3"
 declare node4_dir="${tmp}/${node_prefix}-4"
 declare node5_dir="${tmp}/${node_prefix}-5"
-declare node6_dir="${tmp}/${node_prefix}-6"
-declare node7_dir="${tmp}/${node_prefix}-7"
-
-declare ct_node1_dir="${tmp}/${node_prefix}-ct1"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
 declare node3_log="${node3_dir}.log"
 declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
-declare node6_log="${node6_dir}.log"
-declare node7_log="${node7_dir}.log"
-
-declare ct_node1_log="${ct_node1_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
 declare node3_id="${node3_dir}.id"
 declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
-declare node6_id="${node6_dir}.id"
-declare node7_id="${node7_dir}.id"
 
-declare password="e2e-test"
+declare password="local-testing-mode"
 
-declare ct_db_file="${tmp}/hopr-ct-db.json"
-
-declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
+declare hardhat_rpc_log="${tmp}/hopr-local-hardhat-rpc.log"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -101,19 +95,17 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${ct_node1_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node7_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
+  for port in 8545 13301 13302 13303 13304 13305 19091 19092 19093 19094 19095; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
   exit $EXIT_CODE
 }
 
-if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
-  trap cleanup SIGINT SIGTERM ERR EXIT
-fi
+trap cleanup SIGINT SIGTERM ERR EXIT
 
 # $1 = rest port
 # $2 = node port
@@ -162,37 +154,8 @@ function setup_node() {
     > "${log}" 2>&1 &
 }
 
-# $1 = node log file
-# $2 = private key, must be hex string of length 66
-# $3 = health check port
-# $4 = data directory
-# $5 = OPTIONAL: additional args to ct daemon
-function setup_ct_node() {
-  local log=${1}
-  local private_key=${2}
-  local health_check_port=${3}
-  local dir=${4}
-  local additional_args=${5:-""}
-
-  log "Run CT node -> ${log}"
-
-  if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
-  fi
-  log "Additional args: \"${additional_args}\""
-
-  DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
-    --privateKey "${private_key}" \
-    --dbFile "${ct_db_file}" \
-    --data="${dir}" \
-    --healthCheck \
-    --healthCheckPort "${health_check_port}" \
-    ${additional_args} \
-     > "${log}" 2>&1 &
-}
-
-# --- Log test info {{{
-log "Test files and directories"
+# --- Log setup info {{{
+log "Node files and directories"
 log "\thardhat"
 log "\t\tlog: ${hardhat_rpc_log}"
 log "\tnode1"
@@ -215,17 +178,6 @@ log "\tnode5"
 log "\t\tdata dir: ${node5_dir} (will be removed)"
 log "\t\tlog: ${node5_log}"
 log "\t\tid: ${node5_id}"
-log "\tnode6"
-log "\t\tdata dir: ${node6_dir} (will be removed)"
-log "\t\tlog: ${node6_log}"
-log "\t\tid: ${node6_id}"
-log "\tnode7"
-log "\t\tdata dir: ${node7_dir} (will be removed)"
-log "\t\tlog: ${node7_log}"
-log "\t\tid: ${node7_id}"
-log "\tct_node1"
-log "\t\tdata dir: ${ct_node1_dir} (will be removed)"
-log "\t\tlog: ${ct_node1_log}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -235,16 +187,11 @@ ensure_port_is_free 13302
 ensure_port_is_free 13303
 ensure_port_is_free 13304
 ensure_port_is_free 13305
-ensure_port_is_free 13306
-ensure_port_is_free 13307
 ensure_port_is_free 19091
 ensure_port_is_free 19092
 ensure_port_is_free 19093
 ensure_port_is_free 19094
 ensure_port_is_free 19095
-ensure_port_is_free 19096
-ensure_port_is_free 19097
-ensure_port_is_free 20000
 # }}}
 
 # --- Cleanup old contract deployments {{{
@@ -256,11 +203,8 @@ rm -Rfv \
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat \
-  --show-stack-traces > \
+HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
+  --network hardhat --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
@@ -277,30 +221,10 @@ cp -R \
 
 #  --- Run nodes --- {{{
 setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
+setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}"
 setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
 setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
-setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
-# }}}
-
-declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
-log "CT node1 address: ${ct_node1_address}"
-
-log "Funding nodes"
-
-#  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-  --identity-prefix "${node_prefix}" \
-  --identity-directory "${tmp}" \
-  --use-local-identities \
-  --network hardhat \
-  --address "${ct_node1_address}" \
-  --password "${password}"
 # }}}
 
 log "Waiting for nodes startup"
@@ -312,8 +236,17 @@ wait_for_regex ${node2_log} "using blockchain address"
 wait_for_regex ${node3_log} "using blockchain address"
 wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
-wait_for_regex ${node6_log} "using blockchain address"
-wait_for_regex ${node7_log} "using blockchain address"
+# }}}
+
+log "Funding nodes"
+
+#  --- Fund nodes --- {{{
+HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+  --identity-prefix "${node_prefix}" \
+  --identity-directory "${tmp}" \
+  --use-local-identities \
+  --network hardhat \
+  --password "${password}"
 # }}}
 
 log "Waiting for port binding"
@@ -324,30 +257,54 @@ wait_for_regex ${node2_log} "STARTED NODE"
 wait_for_regex ${node3_log} "STARTED NODE"
 wait_for_regex ${node4_log} "STARTED NODE"
 wait_for_regex ${node5_log} "STARTED NODE"
-# no need to wait for node 6 since that will stop right away
-wait_for_port 19097 "127.0.0.1" "${node7_log}"
 # }}}
 
 log "All nodes came up online"
 
-# --- Run security tests --- {{{
-${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 19501 19502 "${api_token}"
+declare endpoints="localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305"
+
+# --- Call init script--- {{{
+if [ -n "${init_script}" ] && [ -x "${init_script}" ]; then
+  log "Calling init script ${init_script}"
+  HOPRD_API_TOKEN="${api_token}" \
+    "${init_script}" ${endpoints}
+fi
 # }}}
 
-# --- Run protocol test --- {{{
-HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
+# --- Get peer ids for reporting --- {{{
+declare -a peers
+for endpoint in ${endpoints}; do
+  declare peer="$(get_hopr_address "${api_token}@${endpoint}")"
+  peers+=(${peer})
+done
 # }}}
 
-# -- Verify node6 has executed the commands {{{
-log "Verifying node6 log output"
-grep -E "HOPR Balance: +10 txHOPR" "${node6_log}"
-grep -E "ETH Balance: +1 xDAI" "${node6_log}"
-grep -E "Running on: hardhat" "${node6_log}"
-# }}}
+log "Node port info"
+log "\tnode1"
+log "\t\tPeer Id:\t${peers[0]}"
+log "\t\tRest API:\thttp://localhost:13301/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19501/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13301&wsEndpoint=ws://localhost:19501&securityToken=${api_token}"
+log "\tnode2"
+log "\t\tPeer Id:\t${peers[1]}"
+log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19502/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13302&wsEndpoint=ws://localhost:19502&securityToken=${api_token}"
+log "\tnode3"
+log "\t\tPeer Id:\t${peers[2]}"
+log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19504/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13303&wsEndpoint=ws://localhost:19503&securityToken=${api_token}"
+log "\tnode4"
+log "\t\tPeer Id:\t${peers[3]}"
+log "\t\tRest API:\thttp://localhost:13304/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19504/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13304&wsEndpoint=ws://localhost:19504&securityToken=${api_token}"
+log "\tnode5"
+log "\t\tPeer Id:\t${peers[4]}"
+log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
+log "\t\tAdmin UI:\thttp://localhost:19505/"
+log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
 
-# -- CT test {{{
-${mydir}/../test/ct-test.sh \
-  "${ct_node1_log}" "127.0.0.1" 20000
-# }}}
+log "Terminating this script will clean up the running local cluster"
+wait

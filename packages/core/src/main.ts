@@ -1,16 +1,15 @@
 import LibP2P from 'libp2p'
 import { AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
-import HoprEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import MPLEX from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 import { debug } from '@hoprnet/hopr-utils'
 import Hopr, { HoprOptions, VERSION } from '.'
 import { getAddrs } from './identity'
-import HoprConnect, { HoprConnectOptions } from '@hoprnet/hopr-connect'
-import { Multiaddr } from 'multiaddr'
-import { PublicNodesEmitter } from '@hoprnet/hopr-connect/lib/types'
+import HoprConnect, { type HoprConnectOptions, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import type { Multiaddr } from 'multiaddr'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -89,17 +88,30 @@ export async function createLibp2pInstance(
  * @param options:HoprOptions - Required options to create node
  * @returns {Hopr} - HOPR node
  */
-export function createHoprNode(peerId: PeerId, options: HoprOptions, automaticChainCreation = true): Hopr {
-  const db = new HoprDB(
-    PublicKey.fromPrivKey(peerId.privKey.marshal()),
-    options.createDbIfNotExist,
-    VERSION,
-    options.dbPath,
-    options.forceCreateDB
-  )
+export async function createHoprNode(
+  peerId: PeerId,
+  options: HoprOptions,
+  automaticChainCreation = true
+): Promise<Hopr> {
+  const db = new HoprDB(PublicKey.fromPrivKey(peerId.privKey.marshal()))
+
+  try {
+    await db.init(options.createDbIfNotExist, VERSION, options.dbPath, options.forceCreateDB, options.environment.id)
+  } catch (err) {
+    log(`failed init db: ${err.toString()}`)
+    throw err
+  }
+
+  try {
+    await db.verifyEnvironmentId(options.environment.id)
+  } catch (err) {
+    log(`failed to verify db: ${err.toString()}`)
+    throw err
+  }
+
   const provider = expandVars(options.environment.network.default_provider, process.env)
   log(`using provider URL: ${provider}`)
-  const chain = new HoprEthereum(
+  const chain = new HoprCoreEthereum(
     db,
     PublicKey.fromPeerId(peerId),
     peerId.privKey.marshal(),
