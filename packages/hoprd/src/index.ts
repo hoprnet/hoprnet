@@ -39,166 +39,6 @@ function defaultEnvironment(): string {
   }
 }
 
-const argv = yargs(process.argv.slice(2))
-  .option('environment', {
-    string: true,
-    describe: 'Environment id which the node shall run on',
-    choices: supportedEnvironments().map((env) => env.id),
-    default: defaultEnvironment() || 'hardhat-localhost'
-  })
-  .option('host', {
-    describe: 'The network host to run the HOPR node on.',
-    default: '0.0.0.0:9091'
-  })
-  .option('announce', {
-    boolean: true,
-    describe: 'Announce public IP to the network',
-    default: false
-  })
-  .option('admin', {
-    boolean: true,
-    describe: 'Run an admin interface on localhost:3000, requires --apiToken',
-    default: false
-  })
-  .option('rest', {
-    boolean: true,
-    describe: 'Expose the Rest API on localhost:3001, requires --apiToken',
-    default: false
-  })
-  .option('restHost', {
-    describe: 'Set host IP to which the Rest API server will bind',
-    default: 'localhost'
-  })
-  .option('restPort', {
-    describe: 'Set host port to which the Rest API server will bind',
-    default: 3001
-  })
-  .option('healthCheck', {
-    boolean: true,
-    describe: 'Run a health check end point on localhost:8080',
-    default: false
-  })
-  .option('healthCheckHost', {
-    describe: 'Updates the host for the healthcheck server',
-    default: 'localhost'
-  })
-  .option('healthCheckPort', {
-    describe: 'Updates the port for the healthcheck server',
-    default: 8080
-  })
-  .option('forwardLogs', {
-    boolean: true,
-    describe: 'Forwards all your node logs to a public available sink',
-    default: false
-  })
-  .option('forwardLogsProvider', {
-    describe: 'A provider url for the logging sink node to use',
-    default: 'https://ceramic-clay.3boxlabs.com'
-  })
-  .option('password', {
-    describe: 'A password to encrypt your keys',
-    default: ''
-  })
-  .option('apiToken', {
-    describe: 'A REST API token and admin panel password for user authentication',
-    string: true,
-    default: undefined
-  })
-  .option('privateKey', {
-    describe: 'A private key to be used for your HOPR node',
-    string: true,
-    default: undefined
-  })
-  .option('identity', {
-    describe: 'The path to the identity file',
-    default: DEFAULT_ID_PATH
-  })
-  .option('run', {
-    describe: 'Run a single hopr command, same syntax as in hopr-admin',
-    default: ''
-  })
-  .option('dryRun', {
-    boolean: true,
-    describe: 'List all the options used to run the HOPR node, but quit instead of starting',
-    default: false
-  })
-  .option('data', {
-    describe: 'manually specify the database directory to use',
-    default: ''
-  })
-  .option('init', {
-    boolean: true,
-    describe: "initialize a database if it doesn't already exist",
-    default: false
-  })
-  .option('adminHost', {
-    describe: 'Host to listen to for admin console',
-    default: 'localhost'
-  })
-  .option('adminPort', {
-    describe: 'Port to listen to for admin console',
-    default: 3000
-  })
-  .option('testAnnounceLocalAddresses', {
-    boolean: true,
-    describe: 'For testing local testnets. Announce local addresses.',
-    default: false
-  })
-  .option('testPreferLocalAddresses', {
-    boolean: true,
-    describe: 'For testing local testnets. Prefer local peers to remote.',
-    default: false
-  })
-  .option('testUseWeakCrypto', {
-    boolean: true,
-    describe: 'weaker crypto for faster node startup',
-    default: false
-  })
-  .option('testNoAuthentication', {
-    boolean: true,
-    describe: 'no remote authentication for easier testing',
-    default: false
-  })
-  .wrap(Math.min(120, terminalWidth()))
-  .parseSync()
-
-function parseHosts(): HoprOptions['hosts'] {
-  const hosts: HoprOptions['hosts'] = {}
-  if (argv.host !== undefined) {
-    const str = argv.host.replace(/\/\/.+/, '').trim()
-    const params = str.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,6})/)
-    if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv4 host. Got ${str}`)
-    }
-
-    hosts.ip4 = {
-      ip: params[1],
-      port: parseInt(params[2])
-    }
-  }
-  return hosts
-}
-
-async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
-  let options: HoprOptions = {
-    createDbIfNotExist: argv.init,
-    announce: argv.announce,
-    hosts: parseHosts(),
-    announceLocalAddresses: argv.testAnnounceLocalAddresses,
-    preferLocalAddresses: argv.testPreferLocalAddresses,
-    environment
-  }
-
-  if (argv.password !== undefined) {
-    options.password = argv.password as string
-  }
-
-  if (argv.data && argv.data !== '') {
-    options.dbPath = argv.data
-  }
-  return options
-}
-
 function addUnhandledPromiseRejectionHandler() {
   require('trace-unhandled/register')
   setLogger((msg) => {
@@ -208,6 +48,167 @@ function addUnhandledPromiseRejectionHandler() {
 }
 
 export async function main() {
+
+  const argv = yargs(process.argv.slice(2))
+    .option('environment', {
+      string: true,
+      describe: 'Environment id which the node shall run on',
+      choices: supportedEnvironments().map((env) => env.id),
+      default: defaultEnvironment() || 'hardhat-localhost'
+    })
+    .option('host', {
+      describe: 'The network host to run the HOPR node on.',
+      default: '0.0.0.0:9091'
+    })
+    .option('announce', {
+      boolean: true,
+      describe: 'Announce public IP to the network',
+      default: false
+    })
+    .option('admin', {
+      boolean: true,
+      describe: 'Run an admin interface on localhost:3000, requires --apiToken',
+      default: false
+    })
+    .option('rest', {
+      boolean: true,
+      describe: 'Expose the Rest API on localhost:3001, requires --apiToken',
+      default: false
+    })
+    .option('restHost', {
+      describe: 'Set host IP to which the Rest API server will bind',
+      default: 'localhost'
+    })
+    .option('restPort', {
+      describe: 'Set host port to which the Rest API server will bind',
+      default: 3001
+    })
+    .option('healthCheck', {
+      boolean: true,
+      describe: 'Run a health check end point on localhost:8080',
+      default: false
+    })
+    .option('healthCheckHost', {
+      describe: 'Updates the host for the healthcheck server',
+      default: 'localhost'
+    })
+    .option('healthCheckPort', {
+      describe: 'Updates the port for the healthcheck server',
+      default: 8080
+    })
+    .option('forwardLogs', {
+      boolean: true,
+      describe: 'Forwards all your node logs to a public available sink',
+      default: false
+    })
+    .option('forwardLogsProvider', {
+      describe: 'A provider url for the logging sink node to use',
+      default: 'https://ceramic-clay.3boxlabs.com'
+    })
+    .option('password', {
+      describe: 'A password to encrypt your keys',
+      default: ''
+    })
+    .option('apiToken', {
+      describe: 'A REST API token and admin panel password for user authentication',
+      string: true,
+      default: undefined
+    })
+    .option('privateKey', {
+      describe: 'A private key to be used for your HOPR node',
+      string: true,
+      default: undefined
+    })
+    .option('identity', {
+      describe: 'The path to the identity file',
+      default: DEFAULT_ID_PATH
+    })
+    .option('run', {
+      describe: 'Run a single hopr command, same syntax as in hopr-admin',
+      default: ''
+    })
+    .option('dryRun', {
+      boolean: true,
+      describe: 'List all the options used to run the HOPR node, but quit instead of starting',
+      default: false
+    })
+    .option('data', {
+      describe: 'manually specify the database directory to use',
+      default: ''
+    })
+    .option('init', {
+      boolean: true,
+      describe: "initialize a database if it doesn't already exist",
+      default: false
+    })
+    .option('adminHost', {
+      describe: 'Host to listen to for admin console',
+      default: 'localhost'
+    })
+    .option('adminPort', {
+      describe: 'Port to listen to for admin console',
+      default: 3000
+    })
+    .option('testAnnounceLocalAddresses', {
+      boolean: true,
+      describe: 'For testing local testnets. Announce local addresses.',
+      default: false
+    })
+    .option('testPreferLocalAddresses', {
+      boolean: true,
+      describe: 'For testing local testnets. Prefer local peers to remote.',
+      default: false
+    })
+    .option('testUseWeakCrypto', {
+      boolean: true,
+      describe: 'weaker crypto for faster node startup',
+      default: false
+    })
+    .option('testNoAuthentication', {
+      boolean: true,
+      describe: 'no remote authentication for easier testing',
+      default: false
+    })
+    .wrap(Math.min(120, terminalWidth()))
+    .parseSync()
+
+  function parseHosts(): HoprOptions['hosts'] {
+    const hosts: HoprOptions['hosts'] = {}
+    if (argv.host !== undefined) {
+      const str = argv.host.replace(/\/\/.+/, '').trim()
+      const params = str.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,6})/)
+      if (params == null || params.length != 3) {
+        throw Error(`Invalid IPv4 host. Got ${str}`)
+      }
+
+      hosts.ip4 = {
+        ip: params[1],
+        port: parseInt(params[2])
+      }
+    }
+    return hosts
+  }
+
+  async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
+    let options: HoprOptions = {
+      createDbIfNotExist: argv.init,
+      announce: argv.announce,
+      hosts: parseHosts(),
+      announceLocalAddresses: argv.testAnnounceLocalAddresses,
+      preferLocalAddresses: argv.testPreferLocalAddresses,
+      environment
+    }
+
+    if (argv.password !== undefined) {
+      options.password = argv.password as string
+    }
+
+    if (argv.data && argv.data !== '') {
+      options.dbPath = argv.data
+    }
+    return options
+  }
+
   // Starting with Node.js 15, undhandled promise rejections terminate the
   // process with a non-zero exit code, which makes debugging quite difficult.
   // Therefore adding a promise rejection handler to make sure that the origin of
@@ -352,6 +353,7 @@ export async function main() {
     logs.log(`Ready to request on-chain connector to connect to provider.`)
     node.subscribeOnConnector('connector:created', () => node.emit('hopr:connector:created'))
     node.emitOnConnector('connector:create')
+    return node;
   } catch (e) {
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)

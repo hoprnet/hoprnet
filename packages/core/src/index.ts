@@ -91,7 +91,7 @@ export class HoprOptions {
     // when true, addresses will be sorted local first
     // when false, addresses will be sorted public first
     public preferLocalAddresses?: boolean
-  ) {}
+  ) { }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -264,7 +264,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => {},
+      () => { },
       protocolAck
     )
 
@@ -972,7 +972,7 @@ class Hopr extends EventEmitter {
                 resolve()
               } else {
                 log('still unfunded, trying again soon')
-                reject()
+                reject(`Native balance: ${nativeBalance.toString()}, Minimum: ${MIN_NATIVE_BALANCE}`)
               }
             } catch (e) {
               log('error with native balance call, trying again soon')
