@@ -88,14 +88,27 @@ export async function createLibp2pInstance(
  * @param options:HoprOptions - Required options to create node
  * @returns {Hopr} - HOPR node
  */
-export function createHoprNode(peerId: PeerId, options: HoprOptions, automaticChainCreation = true): Hopr {
-  const db = new HoprDB(
-    PublicKey.fromPrivKey(peerId.privKey.marshal()),
-    options.createDbIfNotExist,
-    VERSION,
-    options.dbPath,
-    options.forceCreateDB
-  )
+export async function createHoprNode(
+  peerId: PeerId,
+  options: HoprOptions,
+  automaticChainCreation = true
+): Promise<Hopr> {
+  const db = new HoprDB(PublicKey.fromPrivKey(peerId.privKey.marshal()))
+
+  try {
+    await db.init(options.createDbIfNotExist, VERSION, options.dbPath, options.forceCreateDB, options.environment.id)
+  } catch (err) {
+    log(`failed init db: ${err.toString()}`)
+    throw err
+  }
+
+  try {
+    await db.verifyEnvironmentId(options.environment.id)
+  } catch (err) {
+    log(`failed to verify db: ${err.toString()}`)
+    throw err
+  }
+
   const provider = expandVars(options.environment.network.default_provider, process.env)
   log(`using provider URL: ${provider}`)
   const chain = new HoprCoreEthereum(

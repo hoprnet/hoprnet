@@ -127,7 +127,7 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private environment: ResolvedEnvironment
+  public environment: ResolvedEnvironment
 
   public indexer: Indexer
 

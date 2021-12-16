@@ -283,7 +283,7 @@ async function main() {
   // 2. Create node instance
   try {
     logs.log('Creating HOPR Node')
-    node = createHoprNode(peerId, options, false)
+    node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
     node.on('hopr:connector:created', () => {

@@ -109,7 +109,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   }
 
   log('creating a node')
-  const node = createHoprNode(peerId, options)
+  const node = await createHoprNode(peerId, options)
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
