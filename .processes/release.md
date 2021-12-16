@@ -159,7 +159,7 @@ particular branch to deploy on every change.
    cp packages/ethereum/deployments/${OLD_RELEASE_NAME}/xdai/* packages/ethereum/deployments/${RELEASE_NAME}/xdai/
    cp packages/ethereum/deployments/${OLD_RELEASE_NAME}/xdai/.chainId packages/ethereum/deployments/${RELEASE_NAME}/xdai/
    rm packages/ethereum/deployments/${RELEASE_NAME}/xdai/HoprChannels.json
-   
+
    ```
 
    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
