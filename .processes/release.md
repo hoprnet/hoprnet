@@ -231,7 +231,7 @@ The following are a series of manual tasks that are needed to be executed for th
 
 ```
 CT_PRIV_KEY=14e6...a6a5 \
-  ./scripts/setup-ct-gcloud-cluster.sh prague
+  ./scripts/setup-ct-gcloud-cluster.sh budapest
 ```
 
 #### `topology` deployment script
@@ -240,5 +240,5 @@ CT_PRIV_KEY=14e6...a6a5 \
 HOPRD_PERFORM_CLEANUP=false \
 FUNDING_PRIV_KEY=0xa77a...21b8 \
 HOPRD_SHOW_PRESTART_INFO=true \
-  ./scripts/setup-gcloud-cluster.sh prague `pwd`/scripts/topologies/full_interconnected_cluster.sh
+  ./scripts/setup-gcloud-cluster.sh budapest `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
