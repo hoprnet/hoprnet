@@ -1,4 +1,4 @@
-import * as stun from 'webrtc-stun'
+import { createBlank, createBindingRequest, generateTransactionId } from 'webrtc-stun'
 
 import type { Socket, RemoteInfo } from 'dgram'
 import { Multiaddr } from 'multiaddr'
@@ -16,9 +16,16 @@ export type Interface = {
   address: string
 }
 
-type ConnectionInfo = {
-  port: number
-  address: string
+function isInterface(obj: any): obj is Interface {
+  if (obj.family == undefined || obj.port == undefined || obj.address == undefined) {
+    return false
+  }
+
+  if (!['IPv4', 'IPv6'].includes(obj.family)) {
+    return false
+  }
+
+  return true
 }
 
 export const STUN_TIMEOUT = 1000
@@ -37,14 +44,14 @@ export const PUBLIC_STUN_SERVERS = [
 export const DEFAULT_PARALLEL_STUN_CALLS = 4
 
 /**
- * Handle STUN requests
+ * Handles STUN requests
  * @param socket Node.JS socket to use
  * @param data received packet
  * @param rinfo Addr+Port of the incoming connection
  * @param __fakeRInfo [testing] overwrite incoming information to intentionally send misleading STUN response
  */
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo, __fakeRInfo?: RemoteInfo): void {
-  const req = stun.createBlank()
+  const req = createBlank()
 
   // Overwrite console.log because 'webrtc-stun' package
   // pollutes console output
@@ -76,16 +83,10 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
   }
 }
 
-type Address = {
-  address: string
-  family: string
-  port: number
-}
-
 export type Request = {
   multiaddr: Multiaddr
   tId: string
-  response?: Address
+  response?: Interface
 }
 
 type RequestWithResponse = Required<Request>
@@ -152,7 +153,6 @@ export async function iterateThroughStunServers(
 
   return responses
 }
-
 /**
  * Performs STUN requests and returns their responses, if any
  * @param multiAddrs STUN servers to contact
@@ -167,8 +167,16 @@ export async function performSTUNRequests(
   timeout = STUN_TIMEOUT,
   runningLocally = false
 ): Promise<RequestWithResponse[]> {
-  const requests = generateRequests(multiAddrs)
+  const requests: Request[] = []
+  for (const multiaddr of multiAddrs) {
+    requests.push({
+      multiaddr,
+      tId: generateTransactionId()
+    })
+  }
+  // Assign the event handler before sending the requests
   const results = decodeIncomingSTUNResponses(requests, socket, timeout)
+  // Everything is set up, so we can dispatch the requests
   sendStunRequests(requests, socket)
 
   const responses = await results
@@ -198,31 +206,26 @@ function sendStunRequests(addrs: Request[], socket: Socket): void {
       continue
     }
 
-    const res = stun.createBindingRequest(addr.tId).setFingerprintAttribute()
+    const res = createBindingRequest(addr.tId).setFingerprintAttribute()
 
-    verbose(`STUN request sent to ${nodeAddress.address}:${nodeAddress.port}`)
-    socket.send(res.toBuffer(), nodeAddress.port, nodeAddress.address, (err: any) => err && error(err.message))
+    socket.send(res.toBuffer(), nodeAddress.port, nodeAddress.address, (err?: any) => {
+      if (err) {
+        error(err.message)
+      } else {
+        verbose(`STUN request successfully sent to ${nodeAddress.address}:${nodeAddress.port}`)
+      }
+    })
   }
 }
 
-function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: number = STUN_TIMEOUT) {
+function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: number = STUN_TIMEOUT): Promise<Request[]> {
   return new Promise<Request[]>((resolve) => {
     let responsesReceived = 0
 
-    let done: () => void
     let listener: (msg: Buffer) => void
     let finished = false
 
-    const timeout = setTimeout(() => {
-      log(
-        `STUN timeout. ${addrs.filter((addr) => addr.response).length} of ${
-          addrs.length
-        } selected STUN servers replied.`
-      )
-      done()
-    }, ms)
-
-    done = () => {
+    let done = () => {
       if (finished) {
         return
       }
@@ -235,8 +238,18 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
       resolve(addrs)
     }
 
+    const timeout = setTimeout(() => {
+      log(
+        `STUN timeout. ${addrs.filter((addr) => addr.response).length} of ${
+          addrs.length
+        } selected STUN servers replied.`
+      )
+      done()
+    }, ms)
+
+    // Receiving a Buffer, not a Uint8Array
     listener = (msg: Buffer) => {
-      const res = stun.createBlank()
+      const res = createBlank()
 
       // Overwrite console.log because 'webrtc-stun' package
       // pollutes console output
@@ -261,6 +274,11 @@ function decodeIncomingSTUNResponses(addrs: Request[], socket: Socket, ms: numbe
         }
 
         const attr = res.getXorMappedAddressAttribute() ?? res.getMappedAddressAttribute()
+
+        if (!isInterface(attr)) {
+          error(`Invalid STUN response. Got ${attr}`)
+          return
+        }
 
         console.log = consoleBackup
 
@@ -307,7 +325,7 @@ export function getUsableResults(responses: Request[], runningLocally = false): 
       continue
     }
 
-    switch (result.response.family as 'IPv6' | 'IPv4') {
+    switch (result.response.family) {
       case 'IPv6':
         // STUN over IPv6 is not yet supported
         break
@@ -336,6 +354,7 @@ export function getUsableResults(responses: Request[], runningLocally = false): 
  * Check if the results are ambiguous and return single response
  * if not ambiguous.
  * @param results results to check for ambiguity
+ * @returns a public address if, and only if, the results are not ambiguous
  */
 export function intepreteResults(results: RequestWithResponse[]):
   | {
@@ -343,7 +362,7 @@ export function intepreteResults(results: RequestWithResponse[]):
     }
   | {
       ambiguous: false
-      publicAddress: Address
+      publicAddress: Interface
     } {
   if (results.length == 0 || results[0].response == undefined) {
     return { ambiguous: true }
@@ -365,13 +384,6 @@ export function intepreteResults(results: RequestWithResponse[]):
   }
 }
 
-function generateRequests(multiAddrs: Multiaddr[]): Request[] {
-  return multiAddrs.map<Request>((multiaddr: Multiaddr) => ({
-    multiaddr,
-    tId: stun.generateTransactionId()
-  }))
-}
-
 /**
  * Tries to determine the external IPv4 address
  * @returns Addr+Port or undefined if the STUN response are ambiguous (e.g. bidirectional NAT)
@@ -384,17 +396,24 @@ export async function getExternalIp(
   multiAddrs: Multiaddr[] | undefined,
   socket: Socket,
   runningLocally = false
-): Promise<ConnectionInfo | undefined> {
+): Promise<Interface | undefined> {
   let responses: RequestWithResponse[] = []
   if (runningLocally) {
     if (multiAddrs == undefined || multiAddrs.length == 0) {
-      const socketAddress = socket.address()
+      const socketAddress = socket.address() as Interface | null
+      if (socketAddress == null) {
+        throw Error(`Socket is not listening`)
+      }
+      if (socketAddress.family === 'IPv6') {
+        throw Error(`IPv6 is not supported`)
+      }
       log(
         `Running in local-mode without any given STUN server, assuming that socket address 127.0.0.1:${socketAddress.port} is public address`
       )
       return {
         ...socketAddress,
-        address: '127.0.0.1'
+        address: '127.0.0.1',
+        family: 'IPv4'
       }
     }
 
