@@ -74,32 +74,6 @@ export async function createChainWrapper(
     durations.minutes(15)
   )
 
-  // naive implementation, assumes transaction is not replaced
-  // temporary used until https://github.com/ethers-io/ethers.js/issues/1479
-  // is fixed
-  async function waitForConfirmations(
-    transactionHash: string,
-    timeout: number,
-    onMined: (nonce: number, hash: string) => void
-  ): Promise<providers.TransactionResponse> {
-    let started = 0
-    let response: providers.TransactionResponse
-
-    while (started < timeout) {
-      response = await provider.getTransaction(transactionHash)
-      if (response && response.confirmations >= 0) {
-        onMined(response.nonce, response.hash)
-        break
-      }
-      // wait 1 sec
-      await new Promise((resolve) => setTimeout(resolve, TX_CONFIRMATION_WAIT))
-      started += TX_CONFIRMATION_WAIT
-    }
-
-    if (!response) throw Error(errors.TIMEOUT)
-    return response
-  }
-
   /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
    * to the response until reaching block confirmation.
@@ -143,13 +117,13 @@ export async function createChainWrapper(
     let deferredListener
     try {
       if (checkDuplicate) {
-        const [checkedDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
+        const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
         // check duplicated pending/mined transaction against transaction manager
         // if transaction manager has a transaction with the same payload that is mined or is pending but with
         // a higher or equal nonce, halt.
-        log('checkDuplicate %s %s with hash %s', checkDuplicate, checkedDuplicate, hash)
+        log('checkDuplicate checkDuplicate=%s isDuplicate=%s with hash %s', checkDuplicate, isDuplicate, hash)
 
-        if (checkedDuplicate) {
+        if (isDuplicate) {
           return {
             code: 'DUPLICATE',
             tx: { hash }
@@ -169,6 +143,8 @@ export async function createChainWrapper(
       transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
+      deferredListener.reject()
+      transactions.remove(transaction.hash)
       nonceLock.releaseLock()
       throw error
     }
@@ -178,10 +154,8 @@ export async function createChainWrapper(
     nonceLock.releaseLock()
 
     try {
-      await waitForConfirmations(transaction.hash, 30e3, (nonce: number, hash: string) => {
-        log('Transaction with nonce %d and hash %s mined', nonce, hash)
-        transactions.moveFromPendingToMined(hash)
-      })
+      // wait for the tx to be mined
+      await provider.waitForTransaction(transaction.hash, 1, TX_CONFIRMATION_WAIT)
     } catch (error) {
       log(error)
       // remove listener but not throwing error message
@@ -201,7 +175,7 @@ export async function createChainWrapper(
         log('Transaction with nonce %d and hash failed to send: %s', nonce, transaction.hash, error)
       }
 
-      throw error
+      throw new Error(`Failed in mining transaction. ${error}`)
     }
     try {
       await deferredListener.promise
