@@ -166,11 +166,12 @@ particular branch to deploy on every change.
 
    Changes should be committed locally.
 
-5. Delete all VM instances of ${OLD_OLD_RELEASE} at [Google Cloud](https://console.cloud.google.com/compute/instances)
-6. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
-7. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
-8. (on `release/${RELEASE_NAME}`) Start a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
-9. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
+5. Delete all VM instances of ${OLD_OLD_RELEASE}. Check `gcloud compute instance-groups managed list` to view instance groups of ${OLD_OLD_RELEASE} and delete them using `gcloud compute instance-groups managed delete ${OLD_OLD_RELEASE} --region=$REGION`
+   ```
+7. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
+8. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
+9. (on `release/${RELEASE_NAME}`) Start a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
+10. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.
 10. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
     On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
