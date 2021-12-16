@@ -157,6 +157,7 @@ particular branch to deploy on every change.
    ```
    mkdir -p packages/ethereum/deployments/${RELEASE_NAME}/xdai
    cp packages/ethereum/deployments/${OLD_RELEASE_NAME}/xdai/* packages/ethereum/deployments/${RELEASE_NAME}/xdai/
+   cp packages/ethereum/deployments/${OLD_RELEASE_NAME}/xdai/.chainId packages/ethereum/deployments/${RELEASE_NAME}/xdai/
    rm packages/ethereum/deployments/${RELEASE_NAME}/xdai/HoprChannels.json
    ```
 
@@ -164,17 +165,21 @@ particular branch to deploy on every change.
 
    Changes should be committed locally.
 
-5. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
-6. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
-7. (on `release/${RELEASE_NAME}`) Start a topology cluster using the script mentioned at the end of this document.
-8. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
+5. Delete all topology VM instances of ${OLD_OLD_RELEASE} and ${OLD_RELEASE} and all instances of ${OLD_OLD_RELEASE}, e.g. `prague-1.84`. Check `gcloud compute instance-groups managed list` for a list and delete the instance groups using
+   ```sh
+   gcloud compute instance-groups managed delete ${INSTANCE_GROUP_NAME} --region=$REGION
+   ```
+6. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
+7. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
+8. (on `release/${RELEASE_NAME}`) Start a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
+9. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.
-9. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
-   On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
-10. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
+10. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
+    On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
+11. Patches to the release are created via `hotfix/RELEASE_NAME/**` branches.
     Each of these merges will trigger a new release version, and re-build our infrastructure
     for that version. Upon successfullly testing a release
-11. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See the next section for details.
+12. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See the next section for details.
 
 Once the release testing has concluded, or if any signifant amount of patches were applied to the release branch, the release branch should be merged back into `master` again.
 
