@@ -87,9 +87,14 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   private async createChain(): Promise<void> {
-    this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
-    // Emit event to make sure connector is aware the chain was created properly.
-    this.emit('connector:created')
+    try {
+      this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
+      // Emit event to make sure connector is aware the chain was created properly.
+      this.emit('connector:created')
+    }
+    catch (err) {
+      log('error: failed to create provider chain wrapper', err)
+    }
   }
 
   async start(): Promise<HoprCoreEthereum> {
