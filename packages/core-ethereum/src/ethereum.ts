@@ -98,6 +98,23 @@ export async function createChainWrapper(
     return response
   }
 
+  // waits for receipt
+  async function waitForReceipt(transactionHash: string, timeout: number): Promise<providers.TransactionReceipt> {
+    let started = 0
+    let receipt: providers.TransactionReceipt
+
+    while (started < timeout) {
+      receipt = await provider.getTransactionReceipt(transactionHash)
+      if (receipt && receipt.confirmations >= 0) break
+      // wait 1 sec
+      await new Promise((resolve) => setTimeout(resolve, TX_CONFIRMATION_WAIT))
+      started += TX_CONFIRMATION_WAIT
+    }
+
+    if (!receipt) throw Error(errors.TIMEOUT)
+    return receipt
+  }
+
   /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
    * to the response until reaching block confirmation.
@@ -183,7 +200,7 @@ export async function createChainWrapper(
       })
 
       // lookup tx receipt if the tx reverted (tx was mined successfully but reverted)
-      const receipt = await provider.getTransactionReceipt(transaction.hash)
+      const receipt = await waitForReceipt(transaction.hash, 30e3)
       // status = 0 means reverted
       if (receipt.status === 0) {
         throw Error(errors.CALL_EXCEPTION)
