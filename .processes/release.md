@@ -170,8 +170,6 @@ particular branch to deploy on every change.
    ```sh
    gcloud compute instance-groups managed delete ${OLD_OLD_RELEASE} --region=$REGION`
    ```
-
-   ```
 6. (on `release/${RELEASE_NAME}`) Now everything is ready and can be pushed to Github: `git push origin`. Wait until the deployment of the basic cluster has completed by the CD.
 7. Create a release tracking PR which can be used to follow CD builds. However, the PR should never be merged! As a reference take a look at https://github.com/hoprnet/hoprnet/pull/3048
 8. (on `release/${RELEASE_NAME}`) Start a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
