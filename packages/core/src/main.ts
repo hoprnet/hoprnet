@@ -97,12 +97,7 @@ export async function createHoprNode(
   const db = new HoprDB(PublicKey.fromPrivKey(peerId.privKey.marshal()))
 
   try {
-    await db.init(options.createDbIfNotExist,
-      VERSION,
-      options.dbPath,
-      options.forceCreateDB,
-      options.environment.id,
-    )
+    await db.init(options.createDbIfNotExist, VERSION, options.dbPath, options.forceCreateDB, options.environment.id)
   } catch (err) {
     log(`failed init db: ${err.toString()}`)
     throw err
