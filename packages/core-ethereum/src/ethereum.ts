@@ -155,7 +155,7 @@ export async function createChainWrapper(
 
     try {
       // wait for the tx to be mined
-      await provider.waitForTransaction(transaction.hash, 1, 30e3)
+      await provider.waitForTransaction(transaction.hash, 1, TX_CONFIRMATION_WAIT)
     } catch (error) {
       log(error)
       // remove listener but not throwing error message
