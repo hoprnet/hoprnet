@@ -74,47 +74,6 @@ export async function createChainWrapper(
     durations.minutes(15)
   )
 
-  // waits until tx is mined
-  async function waitForMined(
-    transactionHash: string,
-    timeout: number,
-    onMined: (nonce: number, hash: string) => void
-  ): Promise<providers.TransactionResponse> {
-    let started = 0
-    let response: providers.TransactionResponse
-
-    while (started < timeout) {
-      response = await provider.getTransaction(transactionHash)
-      if (response && response.confirmations >= 0) {
-        onMined(response.nonce, response.hash)
-        break
-      }
-      // wait 1 sec
-      await new Promise((resolve) => setTimeout(resolve, TX_CONFIRMATION_WAIT))
-      started += TX_CONFIRMATION_WAIT
-    }
-
-    if (!response) throw Error(errors.TIMEOUT)
-    return response
-  }
-
-  // waits for receipt
-  async function waitForReceipt(transactionHash: string, timeout: number): Promise<providers.TransactionReceipt> {
-    let started = 0
-    let receipt: providers.TransactionReceipt
-
-    while (started < timeout) {
-      receipt = await provider.getTransactionReceipt(transactionHash)
-      if (receipt && receipt.confirmations >= 0) break
-      // wait 1 sec
-      await new Promise((resolve) => setTimeout(resolve, TX_CONFIRMATION_WAIT))
-      started += TX_CONFIRMATION_WAIT
-    }
-
-    if (!receipt) throw Error(errors.TIMEOUT)
-    return receipt
-  }
-
   /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
    * to the response until reaching block confirmation.
@@ -196,17 +155,7 @@ export async function createChainWrapper(
 
     try {
       // wait for the tx to be mined
-      await waitForMined(transaction.hash, 30e3, (nonce: number, hash: string) => {
-        log('Transaction with nonce %d and hash %s mined', nonce, hash)
-        transactions.moveFromPendingToMined(hash)
-      })
-
-      // lookup tx receipt if the tx reverted (tx was mined successfully but reverted)
-      const receipt = await waitForReceipt(transaction.hash, 30e3)
-      // status = 0 means reverted
-      if (receipt.status === 0) {
-        throw Error(errors.CALL_EXCEPTION)
-      }
+      await provider.waitForTransaction(transaction.hash, 1, 30e3)
     } catch (error) {
       log(error)
       // remove listener but not throwing error message
