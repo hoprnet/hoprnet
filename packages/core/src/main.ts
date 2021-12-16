@@ -94,12 +94,17 @@ export async function createHoprNode(peerId: PeerId, options: HoprOptions, autom
     PublicKey.fromPrivKey(peerId.privKey.marshal())
   )
 
-  await db.init(options.createDbIfNotExist,
-    VERSION,
-    options.dbPath,
-    options.forceCreateDB,
-    options.environment.id,
-  )
+  try {
+    await db.init(options.createDbIfNotExist,
+      VERSION,
+      options.dbPath,
+      options.forceCreateDB,
+      options.environment.id,
+    )
+  } catch (err) {
+    log(`failed init db: ${err.toString()}`)
+    throw err
+  }
 
   try {
     await db.verifyEnvironmentId(options.environment.id)
