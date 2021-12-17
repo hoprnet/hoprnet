@@ -54,13 +54,10 @@ fund_if_empty() {
   # start funding in parallel
   # we need to use yarn explicitely to ensure packages can be resolved properly
   PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
-	  --environment ${environment} --address ${address} --target ${min_funds} &
+	  --environment ${environment} --address ${address} --target ${min_funds} &&
 
   PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
-	  --environment ${environment} --address ${address} --target ${min_funds_hopr} --erc20 &
-
-  # wait until both funding procedures have completed
-  wait
+	  --environment ${environment} --address ${address} --target ${min_funds_hopr} --erc20
 }
 
 # $1=IP
