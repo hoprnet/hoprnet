@@ -19,14 +19,18 @@
       "9091:9091/tcp",
       "9091:9091/udp"
     ],
-    "restart": "always"
+    "restart": "always",
+    "path": "hopr.avado.dnp.dappnode.eth_0.0.0.tar.xz",
+    "hash": "/ipfs/QmYgvxAk9PGXa7nrVnh8fEHpXUymcgBUxeDm8J1YpDLp3A",
+    "size": 78133948
   },
   "author": "HOPR",
   "license": "GPL-3.0",
   "dependencies": {},
   "links": {
     "homepage": "https://hoprnet.org",
-    "OnboardingWizard": "http://hopr.my.ava.do:3000"
+    "Admin interface": "http://hopr.my.ava.do:3000",
+    "Rest API V2": "http://hopr.my.ava.do:3001/api/v2/_swagger/"
   },
-  "builddate": "2021-12-16T23:43:29.678Z"
+  "builddate": "2021-12-17T12:48:02.608Z"
 }
