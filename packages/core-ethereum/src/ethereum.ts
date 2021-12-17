@@ -114,6 +114,7 @@ export async function createChainWrapper(
     }
     log('essentialTxPayload %o', essentialTxPayload)
 
+    let initiatedHash: string
     let deferredListener
     try {
       if (checkDuplicate) {
@@ -135,7 +136,7 @@ export async function createChainWrapper(
       // 3. sign transaction
       const signedTx = await wallet.signTransaction(populatedTx)
       // compute tx hash and save to initiated tx list in tx manager
-      const initiatedHash = utils.keccak256(signedTx)
+      initiatedHash = utils.keccak256(signedTx)
       transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
       // with let indexer to listen to the tx
       deferredListener = handleTxListener(initiatedHash)
@@ -144,7 +145,7 @@ export async function createChainWrapper(
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
       if (deferredListener) deferredListener.reject()
-      transactions.remove(transaction.hash)
+      transactions.remove(initiatedHash)
       nonceLock.releaseLock()
       throw error
     }
