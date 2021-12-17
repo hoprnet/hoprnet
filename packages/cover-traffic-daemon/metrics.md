@@ -27,7 +27,7 @@ Other metrics can be deduced from logs. Note that logs start with `hopr:cover-tr
      ```
      E.g.
      ```
-     closing channel 16Uiu2HAmBCcc822eURPRu6YXuSNmPZn2tJ1nEePNPUsz8xRNZRV7 with quality < 0.15
+     hopr:cover-traffic closing channel 16Uiu2HAmBCcc822eURPRu6YXuSNmPZn2tJ1nEePNPUsz8xRNZRV7 with quality < 0.15
      ```
    - it does not have enough stake.
      ```js
@@ -71,21 +71,30 @@ Other metrics can be deduced from logs. Note that logs start with `hopr:cover-tr
    ```
 5. Sending traffic:
    - Failure in sending traffic:
-     ```sh
+     ```
      aborting send messages - less channels in network than hops required
      ```
      more specifically CT channels that fails to send traffic:
      ```typescript
      failed to send to ${openChannel.destination.toB58String()} fails: ${this.data.messageFails  (openChannel.destination)}
      ```
+     e.g.
      ```
      hopr:cover-traffic failed to send to 16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1 fails: 3
      ```
    - Success in sending traffic:
      ```
-     message send phase complete
+     hopr:cover-traffic message send phase complete
      ```
 6. As CT node is also a HOPR node, it can relay packets and accumulate tickets. However, it does not react upon a winning ticket and simply logs
+   ```typescript
+   Received message ${msg.toString()}
    ```
-   cover traffic ignores winning ticket.
+   e.g.
+   ```
+   hopr:cover-traffic Received message 1
+   ```
+7. As CT node is also a HOPR node, it can relay packets and accumulate tickets. However, it does not react upon a winning ticket and simply logs
+   ```
+   hopr:cover-traffic cover traffic ignores winning ticket.
    ```
