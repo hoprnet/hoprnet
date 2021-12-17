@@ -137,11 +137,13 @@ export async function createChainWrapper(
       const signedTx = await wallet.signTransaction(populatedTx)
       // compute tx hash and save to initiated tx list in tx manager
       initiatedHash = utils.keccak256(signedTx)
+      log(`Wallet signed a tx and returns an initiatedHash ${initiatedHash}`)
       transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
       // with let indexer to listen to the tx
       deferredListener = handleTxListener(initiatedHash)
       // 4. send transaction to our ethereum provider
       transaction = await provider.sendTransaction(signedTx)
+      log(`Wallet broadcasted a tx and returns ransaction.hash ${transaction.hash}`)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
       if (deferredListener) deferredListener.reject()
@@ -157,6 +159,7 @@ export async function createChainWrapper(
     try {
       // wait for the tx to be mined
       await provider.waitForTransaction(transaction.hash, 1, TX_CONFIRMATION_WAIT)
+      log(`Transaction with hash %s is mined with 1 block confirmation`, transaction.hash)
     } catch (error) {
       log(error)
       // remove listener but not throwing error message
@@ -225,7 +228,7 @@ export async function createChainWrapper(
         return transaction.hash
       } catch (err) {
         nonceLock.releaseLock()
-        throw err
+        throw new Error(`Failed in sending withdraw native token transaction ${err}`)
       }
     }
 
@@ -234,7 +237,7 @@ export async function createChainWrapper(
       const transaction = await sendTransaction(checkDuplicate, token, 'transfer', txHandler, recipient, amount)
       return transaction.tx.hash
     } catch (error) {
-      throw new Error(`Failed in sending withdraw transaction ${error}`)
+      throw new Error(`Failed in sending withdraw HOPR transaction ${error}`)
     }
   }
 
