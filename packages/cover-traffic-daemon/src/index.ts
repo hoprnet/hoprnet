@@ -3,7 +3,7 @@
 import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
-
+import { decode } from 'rlp'
 import { createHoprNode, resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
@@ -104,12 +104,19 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     data.setChannel(newChannel)
   }
 
+  function logMessageToNode(msg: Uint8Array) {
+    log(`Received message ${msg.toString()}`)
+  }
+
   const peerUpdate = (peer: PeerData) => {
     data.setNode(peer)
   }
 
   log('creating a node')
   const node = await createHoprNode(peerId, options)
+
+  node.on('hopr:message', logMessageToNode)
+
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
