@@ -2,7 +2,7 @@ version: '3.4'
 services:
   hopr.avado.dnp.dappnode.eth:
     build: ./build
-    image: 'hopr.avado.dnp.dappnode.eth:1.2.3'
+    image: 'hopr.avado.dnp.dappnode.eth:0.0.0'
     environment:
       DEBUG: hopr*
     restart: always

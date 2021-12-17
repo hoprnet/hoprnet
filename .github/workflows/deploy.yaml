@@ -230,9 +230,7 @@ jobs:
           HOPR_PACKAGE: hoprd
 
       - name: Build Avado
-        working-directory: packages/avado
         env:
-          HOPR_GIT_MSG: "placeholder"
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
         run: |
