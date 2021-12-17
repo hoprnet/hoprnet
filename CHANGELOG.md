@@ -6,6 +6,7 @@
 
 ### Changes
 
+- Rest API v2 ([#3093](https://github.com/hoprnet/hoprnet/pull/3093)), see [API specification](./packages/hoprd/rest-api-v2-spec.yaml)
 - Update ping to use Blake2s instead of SHA256 for response computation (([#3080](https://github.com/hoprnet/hoprnet/pull/3080)))
 
 ### Bugfixes
