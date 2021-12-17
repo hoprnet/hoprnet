@@ -51,13 +51,17 @@ fund_if_empty() {
   local address="${1}"
   local environment="${2}"
 
-  # start funding in parallel
+  # start funding in sequence (nonce-tracker will not be able to keep track of nonce in two processes)
   # we need to use yarn explicitely to ensure packages can be resolved properly
   PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
-	  --environment ${environment} --address ${address} --target ${min_funds} &&
+	  --environment ${environment} --address ${address} --target ${min_funds}
+
+  sleep 10
 
   PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
 	  --environment ${environment} --address ${address} --target ${min_funds_hopr} --erc20
+
+  sleep 10
 }
 
 # $1=IP
