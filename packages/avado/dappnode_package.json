@@ -21,9 +21,10 @@
     "restart": "always"
   },
   "author": "HOPR",
-  "license": "GPL-3.0-only",
+  "license": "GPL-3.0",
   "dependencies": {},
   "links": {
+    "homepage": "https://hoprnet.org",
     "OnboardingWizard": "http://hopr.my.ava.do:3000"
   },
   "builddate": "2021-12-16T23:43:29.678Z"
