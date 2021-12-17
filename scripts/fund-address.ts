@@ -24,7 +24,7 @@ function createTxHandler(tx: string): DeferType<string> {
   const deferred = {} as DeferType<string>
   deferred.promise = new Promise((resolve, reject) => {
     deferred.reject = () => {
-      console.log(`tx ${tx} is rejected`);
+      console.log(`tx ${tx} is rejected`)
       reject(tx)
     }
     setTimeout(() => {
@@ -32,7 +32,7 @@ function createTxHandler(tx: string): DeferType<string> {
     }, TX_CONFIRMATION_WAIT)
 
     deferred.resolve = () => {
-      console.log(`tx ${tx} is resolved`);
+      console.log(`tx ${tx} is resolved`)
       resolve(tx)
     }
   })
