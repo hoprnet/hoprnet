@@ -21,7 +21,7 @@
     "restart": "always"
   },
   "author": "HOPR",
-  "license": "(C)",
+  "license": "GPL-3.0-only",
   "dependencies": {},
   "links": {
     "OnboardingWizard": "http://hopr.my.ava.do:3000"
