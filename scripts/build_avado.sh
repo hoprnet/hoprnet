@@ -35,18 +35,19 @@ fi
 
 declare AVADO_VERSION="${1}"
 
-if ! [[ $AVADO_VERSION =~ [0-9]{1,}[.]{1}[0-9]{1,}[.]{1}[0-9]{1,}$ ]]; then
+if ! [[ $AVADO_VERSION =~ [0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}$ ]]; then
   # AVADO build tool requires proper semver versions
   msg "Version '${AVADO_VERSION}' is not semver"
+  exit 1
 fi
 
 cd "${mydir}/../packages/avado"
 
 # Write AVADO docker build version
-sed -i "s/image:[ ]'hopr.avado.dnp.dappnode.eth:[0-9]*\.[0-9]*\.[0-9]*/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/"  ./docker-compose.yml
+sed -i "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/" ./docker-compose.yml
 
 # Write dappnode version
-sed -i "s/\"version\":[ ]\"[0-9]*\.[0-9]*\.[0-9]*\"/\"version\": \"${AVADO_VERSION}\"/"  ./dappnode_package.json
+sed -i "s/\"version\":[ ]\"[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"/\"version\": \"${AVADO_VERSION}\"/" ./dappnode_package.json
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
 declare AVADO_SDK_COMMIT="de9f16d"
