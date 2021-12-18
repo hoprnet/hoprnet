@@ -9,7 +9,7 @@
   "main": "lib/index.js",
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
-    "test": "mocha --parallel",
+    "test": "mocha",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
     "docs:generate": "typedoc",
@@ -67,7 +67,7 @@
     "extension": [
       "ts"
     ],
-    "spec": "src/**/*.spec.ts",
+    "spec": "src/libp2p/dialHelper.spec.ts",
     "require": "ts-node/register"
   },
   "stableVersion": "1.76.0-next.30"

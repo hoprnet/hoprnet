@@ -42,9 +42,6 @@ async function getNode(id: PeerId, withDHT = false): Promise<Libp2p> {
       },
       relay: {
         enabled: false
-      },
-      peerDiscovery: {
-        autoDial: false
       }
     }
   })
@@ -80,7 +77,7 @@ function getPeerStore() {
   }
 }
 
-describe('test dialHelper', function () {
+describe.only('test dialHelper', function () {
   it('call non-existing', async function () {
     const peerA = await getNode(Alice)
 
@@ -124,7 +121,7 @@ describe('test dialHelper', function () {
     await peerA.stop()
   })
 
-  it('regular dial with DHT', async function () {
+  it.only('regular dial with DHT', async function () {
     this.timeout(15e3)
     const peerA = await getNode(Alice, true)
     const peerB = await getNode(Bob, true)
@@ -140,9 +137,11 @@ describe('test dialHelper', function () {
     await peerB.start()
     await peerC.start()
 
-    await peerA.dial(peerB.peerId)
-    await peerC.dial(peerB.peerId)
+    // Uncomment to experiment with dials
+    // await peerA.dial(peerB.peerId)
+    // await peerC.dial(peerB.peerId)
 
+    // Comment to add artificial timeout
     await new Promise((resolve) => setTimeout(resolve, 200))
 
     let result = await dialHelper(peerA, Chris, TEST_PROTOCOL)

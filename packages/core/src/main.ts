@@ -68,10 +68,11 @@ export async function createLibp2pInstance(
       },
       relay: {
         enabled: false
-      },
-      peerDiscovery: {
-        autoDial: false
       }
+      // Uncomment/comment to check autoDial functionality
+      // peerDiscovery: {
+      //   autoDial: false
+      // }
     },
     dialer: {
       addressSorter,
