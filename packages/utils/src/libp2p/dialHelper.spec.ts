@@ -18,7 +18,7 @@ const Alice = privKeyToPeerId(stringToU8a('0xcf0b158c5f9d83dabf81a43391cce6cced6
 const Bob = privKeyToPeerId(stringToU8a('0x801f499e287fa0e5ac546a86d7f1e3ca766249f62759e6a1f2c90de6090cc4c0'))
 const Chris = privKeyToPeerId(stringToU8a('0x1bbb9a915ddd6e19d0f533da6c0fbe8820541a370110728f647829cd2c91bc79'))
 
-async function getNode(id: PeerId, withDHT = false): Promise<Libp2p> {
+async function getNode(id: PeerId, withDHT = false, bootstrapPeers: PeerId[] = []): Promise<Libp2p> {
   const node = await Libp2p.create({
     addresses: {
       listen: [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${id.toB58String()}`).toString()]
@@ -35,7 +35,12 @@ async function getNode(id: PeerId, withDHT = false): Promise<Libp2p> {
     },
     config: {
       dht: {
-        enabled: withDHT
+        enabled: withDHT,
+        // Total hack. Populate DHT routingTable with initial peers
+        // @ts-ignore
+        bootstrapPeers: bootstrapPeers.map((peer: PeerId) => ({
+          id: peer
+        }))
       },
       nat: {
         enabled: false
@@ -122,10 +127,11 @@ describe.only('test dialHelper', function () {
   })
 
   it.only('regular dial with DHT', async function () {
-    this.timeout(15e3)
-    const peerA = await getNode(Alice, true)
-    const peerB = await getNode(Bob, true)
-    const peerC = await getNode(Chris, true)
+    this.timeout(5e3)
+    const bootstrapPeers = [Alice, Bob, Chris]
+    const peerA = await getNode(Alice, true, bootstrapPeers)
+    const peerB = await getNode(Bob, true, bootstrapPeers)
+    const peerC = await getNode(Chris, true, bootstrapPeers)
 
     peerB.peerStore.addressBook.add(peerA.peerId, peerA.multiaddrs)
     peerA.peerStore.addressBook.add(peerB.peerId, peerB.multiaddrs)
@@ -137,12 +143,18 @@ describe.only('test dialHelper', function () {
     await peerB.start()
     await peerC.start()
 
-    // Uncomment to experiment with dials
-    // await peerA.dial(peerB.peerId)
-    // await peerC.dial(peerB.peerId)
+    // TODO: remove this after debugging
+    // for (const peer of [peerA, peerB, peerC]) {
+    //   for (const bootstrapPeer of [Alice, Bob, Chris]) {
+    //     await peer._dht._wan._routingTable.add(bootstrapPeer)
+    //     await peer._dht._lan._routingTable.add(bootstrapPeer)
+    //   }
+    //   await peer._dht._wan._routingTableRefresh.start()
+    //   await peer._dht._lan._routingTableRefresh.start()
 
-    // Comment to add artificial timeout
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    //   await peer._dht._wan.refreshRoutingTable()
+    //   await peer._dht._lan.refreshRoutingTable()
+    // }
 
     let result = await dialHelper(peerA, Chris, TEST_PROTOCOL)
 
