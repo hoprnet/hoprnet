@@ -19,7 +19,8 @@ source "${mydir}/dns.sh"
 declare min_funds=0.1
 
 # HOPR tokens
-declare min_funds_hopr=0.5
+# a topology node uses 0.5 HOPR to open channels, the rest are left in reserve
+declare min_funds_hopr=1
 
 # $1=role (ie. node-4)
 # $2=network name
