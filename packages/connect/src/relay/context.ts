@@ -80,6 +80,8 @@ class RelayContext extends EventEmitter {
           } catch (err) {
             // Close stream
             this.queueStatusMessage(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
+            console.trace()
+            console.log(err)
             deferred.reject(err)
           }
         }.call(this)

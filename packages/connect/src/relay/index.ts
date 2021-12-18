@@ -260,7 +260,13 @@ class Relay {
    */
   private async contactCounterparty(counterparty: PeerId): Promise<Stream | undefined> {
     // @TODO this produces struct with unset connection property
-    let newConn = await dialHelper(this.libp2p, counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
+    let newConn
+    try {
+      newConn = await dialHelper(this.libp2p, counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
+    } catch (err) {
+      log(`Forbidden error: must not happen`, err)
+      return undefined
+    }
 
     if (newConn.status === 'SUCCESS') {
       return newConn.resp.stream as any
