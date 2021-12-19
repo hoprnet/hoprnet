@@ -343,6 +343,7 @@ describe('check listening to sockets', function () {
   })
 
   it('get the right addresses', async function () {
+    this.timeout(4e3) // for CI
     const stunServer = await startStunServer(undefined)
 
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
@@ -483,7 +484,7 @@ describe('check listening to sockets', function () {
   })
 
   it('overwrite existing relays', async function () {
-    this.timeout(3e3) // 3 seconds should be more than enough
+    this.timeout(4e3) // for CI
     const stunServer = await startStunServer(undefined)
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
@@ -534,6 +535,7 @@ describe('check listening to sockets', function () {
   })
 
   it('remove offline relay nodes', async function () {
+    this.timeout(4e3) // for CI
     const stunServer = await startStunServer(undefined)
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
@@ -572,6 +574,7 @@ describe('check listening to sockets', function () {
   })
 
   it('remove offline relay nodes - edge cases', async function () {
+    this.timeout(4e3) // for CI
     const stunServer = await startStunServer(undefined)
     const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
 
