@@ -1,5 +1,6 @@
 import type { Stream, StreamType } from '../types'
-import handshake, { Handshake } from 'it-handshake'
+import handshake from 'it-handshake'
+import type { Handshake } from 'it-handshake'
 import type PeerId from 'peer-id'
 
 import { green, yellow } from 'chalk'
@@ -269,7 +270,15 @@ class RelayHandshake {
         this.shaker.rest()
         destinationShaker.rest()
 
-        createNew(source, destination, this.shaker.stream, destinationShaker.stream, __relayFreeTimeout)
+        try {
+          await createNew(source, destination, this.shaker.stream, destinationShaker.stream, __relayFreeTimeout)
+        } catch (err) {
+          error(
+            `Cannot established relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,
+            err
+          )
+          // @TODO find a way how to forward the error to source and destination
+        }
         break
       default:
         this.shaker.write(Uint8Array.of(RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY))
