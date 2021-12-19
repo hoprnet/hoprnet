@@ -278,6 +278,7 @@ class RelayHandshake {
             err
           )
           // @TODO find a way how to forward the error to source and destination
+          return
         }
         break
       default:
