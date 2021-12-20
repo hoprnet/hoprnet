@@ -68,9 +68,6 @@ export async function createLibp2pInstance(
       },
       relay: {
         enabled: false
-      },
-      peerDiscovery: {
-        autoDial: false
       }
     },
     dialer: {
