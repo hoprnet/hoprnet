@@ -131,9 +131,10 @@ export class CoverTrafficStrategy extends SaneDefaults {
     log('message send phase complete')
 
     let attempts = 0
+    let currentChannelNum = currentChannels.length
     // When there is no enough cover traffic channels, providing node exists and adequete past attempts, the node will open some channels.
     while (
-      currentChannels.length < CHANNELS_PER_COVER_TRAFFIC_NODE &&
+      currentChannelNum < CHANNELS_PER_COVER_TRAFFIC_NODE &&
       Object.keys(state.nodes).length > 0 &&
       attempts < 100
     ) {
@@ -157,6 +158,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       }
 
       log(`opening ${c.toB58String()}`)
+      currentChannelNum ++
       toOpen.push([c, CHANNEL_STAKE])
     }
 
