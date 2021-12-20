@@ -55,7 +55,7 @@ describe('test relay handshake', function () {
       () => false,
       async () => true,
       () => {},
-      () => {}
+      async () => {}
     )
 
     await initiatorReceived.promise
@@ -96,7 +96,7 @@ describe('test relay handshake', function () {
       () => false,
       async () => true,
       () => {},
-      () => {}
+      async () => {}
     )
 
     await Promise.all([handshakePromise, destinationHandshake])
@@ -137,7 +137,7 @@ describe('test relay handshake', function () {
       () => false,
       async () => true,
       () => {},
-      (_source, _destination, toSource: Stream, toDestination: Stream) => {
+      async (_source, _destination, toSource: Stream, toDestination: Stream) => {
         toSource.sink(toDestination.source)
         toDestination.sink(toSource.source)
       }

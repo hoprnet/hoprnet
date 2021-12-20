@@ -365,6 +365,10 @@ class Hopr extends EventEmitter {
       return
     }
 
+    // Total hack
+    // function cannot throw because it has a catch all
+    this.addPeerToDHT(peer.id)
+
     const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
       const tuples = ma.tuples()
       return tuples.length > 1 && tuples[0][0] != protocols.names['p2p'].code
@@ -377,6 +381,28 @@ class Hopr extends EventEmitter {
       this.publicNodesEmitter.emit('addPublicNode', { id: peer.id, multiaddrs: dialables })
 
       this.libp2p.peerStore.addressBook.add(peer.id, dialables)
+    }
+  }
+
+  /**
+   * Total hack.
+   * Libp2p seems to miss a channel that passes discovered peers
+   * to the DHT routing table.
+   * @param peer peer to add to DHT routing table
+   */
+  private async addPeerToDHT(peer: PeerId): Promise<void> {
+    try {
+      await this.libp2p._dht._wan._routingTable.add(peer)
+      await this.libp2p._dht._lan._routingTable.add(peer)
+
+      await this.libp2p._dht._wan._routingTableRefresh.start()
+      await this.libp2p._dht._lan._routingTableRefresh.start()
+
+      await this.libp2p._dht._wan.refreshRoutingTable()
+      await this.libp2p._dht._lan.refreshRoutingTable()
+    } catch (err) {
+      // Catch and log all DHT errors, entirely unclear how to handle them
+      log(`Failed while populating the DHT routing table`, err)
     }
   }
 
