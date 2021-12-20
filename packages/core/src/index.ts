@@ -23,7 +23,7 @@ import {
   ChannelStatus,
   MIN_NATIVE_BALANCE,
   u8aConcat,
-  isMultiaddrLocal
+  isMultiaddrLocal, getIpv4LocalAddressClass
 } from '@hoprnet/hopr-utils'
 import type {
   LibP2PHandlerFunction,
@@ -681,9 +681,11 @@ class Hopr extends EventEmitter {
     }, this.strategy.tickInterval)
   }
 
+
+
   /**
    * Announces address of node on-chain to be reachable by other nodes.
-   * @dev Promise resolves before own announcment appears in the indexer
+   * @dev Promise resolves before own announcement appears in the indexer
    * @param includeRouting publish routable address if true
    * @returns Promise that resolves once announce transaction has been published
    */
@@ -692,10 +694,31 @@ class Hopr extends EventEmitter {
     let addrToAnnounce: Multiaddr
 
     if (includeRouting) {
-      const multiaddrs = await this.getAnnouncedAddresses()
+      let multiaddrs = await this.getAnnouncedAddresses();
+      multiaddrs.sort((a,b) =>
+      {
+            if (isMultiaddrLocal(a) && !isMultiaddrLocal(b))
+              return this.options.preferLocalAddresses ? -1 : 1
+            else if (!isMultiaddrLocal(a) && isMultiaddrLocal(b))
+              return this.options.preferLocalAddresses ? 1 : -1
+            else if (isMultiaddrLocal(a) && isMultiaddrLocal(b)) {
+              const clsA = getIpv4LocalAddressClass(a)
+              const clsB = getIpv4LocalAddressClass(b)
+              if (clsA == undefined)
+                return 1
+              if (clsB == undefined)
+                return -1
+              return clsA.localeCompare(clsB)
+            }
+            else return 0
+      })
 
-      const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
-      const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
+      log(`available multiaddresses ${multiaddrs}`)
+
+      const ip4 = multiaddrs
+                    .find((s) => s.toString().startsWith('/ip4/'))
+      const ip6 = multiaddrs
+                    .find((s) => s.toString().startsWith('/ip6/'))
 
       // Prefer IPv4 addresses over IPv6 addresses, if any
       addrToAnnounce = ip4 ?? ip6
@@ -724,6 +747,7 @@ class Hopr extends EventEmitter {
       log(`announcing ${includeRouting && isRoutableAddress ? 'with' : 'without'} routing`)
 
       await this.connector.announce(addrToAnnounce)
+      log(`announced address ${addrToAnnounce}`)
     } catch (err) {
       log('announce failed')
       await this.isOutOfFunds(err)

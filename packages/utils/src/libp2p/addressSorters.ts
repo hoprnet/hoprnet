@@ -31,6 +31,25 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
   }
 }
 
+export function getIpv4LocalAddressClass(address: Multiaddr): 'A' | 'B' | 'C' | 'D' | undefined {
+
+  if (isMultiaddrLocal(address)) {
+    if (address.toString().startsWith("/ip4/10."))
+      return 'A'
+
+    if (address.toString().startsWith("/ip4/172.16"))
+      return 'B'
+
+    if (address.toString().startsWith("/ip4/192.168."))
+      return 'C'
+
+    if (address.toString().startsWith("/ip4/127.0.0.1"))
+      return 'D'
+  }
+
+  return undefined
+}
+
 function addressesLocalFirstCompareFunction(a: Address, b: Address) {
   const isAPrivate = isMultiaddrLocal(a.multiaddr)
   const isBPrivate = isMultiaddrLocal(b.multiaddr)
