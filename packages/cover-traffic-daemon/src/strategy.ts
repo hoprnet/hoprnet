@@ -67,7 +67,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
         toClose.push(c.destination)
       }
       // If the HOPR token balance of the current CT node is no larger than the `MINIMUM_STAKE_BEFORE_CLOSURE`, close all the non-closed channels.
-      if (c.balance.toBN().lte(MINIMUM_STAKE_BEFORE_CLOSURE)) {
+      if (c.balance.toBN().lt(MINIMUM_STAKE_BEFORE_CLOSURE)) {
         log(`closing channel with balance too low ${c.destination.toB58String()}`)
         toClose.push(c.destination)
       }
