@@ -158,7 +158,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       }
 
       log(`opening ${c.toB58String()}`)
-      currentChannelNum ++
+      currentChannelNum++
       toOpen.push([c, CHANNEL_STAKE])
     }
 
