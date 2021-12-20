@@ -1,5 +1,4 @@
 import { PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
 
 export const CHANNELS_PER_COVER_TRAFFIC_NODE = 10
 export const CT_INTERMEDIATE_HOPS = 2 // 3  // NB. min is 2
