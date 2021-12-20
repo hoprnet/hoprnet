@@ -64,7 +64,9 @@ export async function createLibp2pInstance(
         } as HoprConnectOptions
       },
       dht: {
-        enabled: true
+        enabled: true,
+        // @ts-ignore
+        bootstrapPeers: initialNodes
       },
       relay: {
         enabled: false
