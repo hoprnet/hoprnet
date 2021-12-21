@@ -1,7 +1,5 @@
-import { createServer } from 'net'
-import type { AddressInfo, Socket as TCPSocket, Server as TCPServer } from 'net'
-import { createSocket } from 'dgram'
-import type { RemoteInfo, Socket as UDPSocket } from 'dgram'
+import { createServer, type AddressInfo, type Socket as TCPSocket, type Server as TCPServer } from 'net'
+import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 
 import { once, EventEmitter } from 'events'
 import type { PeerStoreType, PublicNodesEmitter } from '../types'
@@ -27,7 +25,7 @@ const error = Debug('hopr-connect:listener:error')
 const verbose = Debug('hopr-connect:verbose:listener')
 
 // @TODO to be adjusted
-const MAX_RELAYS_PER_NODE = 7
+export const MAX_RELAYS_PER_NODE = 5
 const SOCKET_CLOSE_TIMEOUT = 500
 
 /**
@@ -72,17 +70,17 @@ type Address = { port: number; address: string }
 
 class Listener extends EventEmitter implements InterfaceListener {
   private __connections: MultiaddrConnection[]
-  private tcpSocket: TCPServer
+  protected tcpSocket: TCPServer
   private udpSocket: UDPSocket
 
   private state: State
 
   private listeningAddr?: Multiaddr
 
-  private publicNodes: NodeEntry[]
-  private uncheckedNodes: PeerStoreType[]
+  protected publicNodes: NodeEntry[]
+  protected uncheckedNodes: PeerStoreType[]
 
-  private addrs: {
+  protected addrs: {
     interface: Multiaddr[]
     external: Multiaddr[]
     relays: Multiaddr[]
@@ -167,9 +165,22 @@ class Listener extends EventEmitter implements InterfaceListener {
    * Called once there is a new relay opportunity known
    * @param ma Multiaddr of node that is added as a relay opportunity
    */
-  private onNewRelay(peer: PeerStoreType) {
+  protected onNewRelay(peer: PeerStoreType) {
     if (peer.id.equals(this.peerId)) {
       return
+    }
+
+    if (peer.multiaddrs == undefined || peer.multiaddrs.length == 0) {
+      log(`Received entry node ${peer.id.toB58String()} without any multiaddr`)
+      return
+    }
+
+    for (const uncheckedNode of this.uncheckedNodes) {
+      if (uncheckedNode.id.equals(peer.id)) {
+        log(`Received duplicate entry node ${peer.id.toB58String()}`)
+        // TODO add difference to previous multiaddrs
+        return
+      }
     }
 
     this.uncheckedNodes.push({
@@ -370,15 +381,6 @@ class Listener extends EventEmitter implements InterfaceListener {
         // Filter empty entries
         .filter((addr) => addr)
     )
-  }
-
-  /**
-   * Get listening port
-   * @dev used for testing
-   * @returns if listening, return port number, otherwise -1
-   */
-  getPort(): number {
-    return (this.tcpSocket.address() as AddressInfo)?.port ?? -1
   }
 
   /**
