@@ -258,7 +258,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       )
     )
       .filter<PromiseFulfilledResult<NodeEntry>>(
-        (entry): entry is PromiseFulfilledResult<NodeEntry> => entry.status === 'fulfilled'
+        (entry): entry is PromiseFulfilledResult<NodeEntry> => entry.status === 'fulfilled' && entry.value.latency >= 0
       )
       .map<NodeEntry>((entry) => entry.value)
 
