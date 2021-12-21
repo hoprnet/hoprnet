@@ -94,9 +94,9 @@ _Where:_ Google meet
 
 ### End of working day
 
-At the end of every working day, members may write an update on what they have accomplished during the day.
+At the end of every working day, members write an update on what they have accomplished during the day.
 
-_Required:_ `False`
+_Required:_ `True`
 
 _When:_ Every day, at end of work
 
