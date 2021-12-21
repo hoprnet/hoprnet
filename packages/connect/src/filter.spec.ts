@@ -27,7 +27,7 @@ describe('test addr filtering', function () {
     filter = new TestFilter(firstPeer)
   })
 
-  it.only('should accept valid circuit addresses', function () {
+  it('should accept valid circuit addresses', function () {
     assert(
       filter.filter(new Multiaddr(`/p2p/${firstPeer.toB58String()}`)) == false,
       'Should not accept relay addrs without recipient'
