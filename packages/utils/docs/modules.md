@@ -1309,7 +1309,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L240)
+[libp2p/dialHelper.ts:245](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L245)
 
 ___
 
