@@ -501,7 +501,7 @@ describe('entry node functionality', function () {
   it('update nodes once node became offline', async function () {
     const node = await startNode()
 
-    const newNode = getPeerStoreEntry(`/ip4/127.0.0.1`)
+    const newNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/12345`)
 
     const relayContacted = defer<void>()
 
@@ -528,6 +528,33 @@ describe('entry node functionality', function () {
     // Add some propagtion delay
     await new Promise((resolve) => setTimeout(resolve, 50))
     assert(node.listener.publicNodes.length == 1)
+
+    await Promise.all([stopNode(node.listener), stopNode(relay.listener)])
+  })
+
+  it('take those nodes that are online', async function () {
+    const node = await startNode()
+
+    const relayContacted = defer<void>()
+
+    const relay = await startNode(undefined, {
+      msgReceived: relayContacted
+    })
+
+    const fakeNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/12345`)
+
+    node.listener.uncheckedNodes.push(getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}`, relay.peerId))
+    node.listener.uncheckedNodes.push(fakeNode)
+
+    node.listener.updatePublicNodes()
+
+    await relayContacted.promise
+
+    // Add some propagtion delay
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    assert(node.listener.publicNodes.length == 1)
+    assert(node.listener.publicNodes[0].id.equals(relay.peerId))
 
     await Promise.all([stopNode(node.listener), stopNode(relay.listener)])
   })
