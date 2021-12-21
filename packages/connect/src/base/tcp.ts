@@ -126,7 +126,11 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
    * @param options.signal Used to abort dial requests
    * @returns Resolves a TCP Socket
    */
-  public static create(ma: Multiaddr, self: PeerId, options?: DialOptions): Promise<TCPConnection> {
+  public static create(
+    ma: Multiaddr,
+    self: PeerId,
+    options?: DialOptions & { timeout?: number }
+  ): Promise<TCPConnection> {
     if (options?.signal?.aborted) {
       throw new AbortError()
     }
@@ -183,6 +187,10 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
         .on('error', onError)
         .on('timeout', onTimeout)
         .on('connect', onConnect)
+
+      if (options?.timeout) {
+        rawSocket.setTimeout(options.timeout)
+      }
 
       options?.signal?.addEventListener('abort', onAbort)
     })
