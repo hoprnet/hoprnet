@@ -15,6 +15,7 @@ import type { HoprOptions } from '@hoprnet/hopr-core'
 import type { PeerData, State } from './state'
 
 const log = debug('hopr:cover-traffic')
+const verbose = debug('hopr:cover-traffic:verbose')
 
 function stopGracefully(signal: number) {
   console.log(`Process exiting with signal ${signal}`)
@@ -143,8 +144,8 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
 
   setInterval(async () => {
     // CT stats
-    console.log('-- CT Stats --')
-    console.log(await node.connectionReport())
+    verbose('-- CT Stats --')
+    verbose(await node.connectionReport())
   }, 5000)
 }
 
@@ -159,10 +160,8 @@ if (require.main === module) {
   })
 
   main((state: State) => {
-    console.log(
-      `CT: State update:` +
-        `${Object.keys(state.nodes).length} nodes, ` +
-        `${Object.keys(state.channels).length} channels`
+    log(
+      `State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`
     )
   })
 }
