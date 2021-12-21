@@ -59,8 +59,13 @@ type ReducedPeerStore = {
 type ReducedDHT = { peerRouting: Pick<LibP2P['peerRouting'], '_routers' | 'findPeer'> }
 type ReducedLibp2p = ReducedDHT & ReducedPeerStore & Pick<LibP2P, 'dialProtocol'>
 
-function printPeerStoreAddresses(msg: string, addresses: Address[], delimiter: string = '\n  '): string {
-  return msg.concat(addresses.map((addr: Address) => addr.multiaddr.toString()).join(delimiter))
+function printPeerStoreAddresses(msg: string, addresses: Address[]): void {
+  logError(msg)
+  logError(`Known addresses:`)
+
+  for (const address of addresses) {
+    logError(address.multiaddr.toString())
+  }
 }
 
 /**
