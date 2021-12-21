@@ -57,7 +57,7 @@ _Current:_
 
 #### Electing a new representantive
 
-- every election should begin 5 days prior to the representantive's replacement
+- every election should begin 5 working days prior to the representantive's replacement
 - voting is done via google form similar to [this](https://docs.google.com/forms/d/1CA_C_NgI9M_drHFqOOVlBVdfuiWsg64xE_wE1V1pgyw)
 - email login is required but emails should not be collected
 - only tech _members_ may vote
