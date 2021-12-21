@@ -6,6 +6,7 @@ FROM node:16-buster-slim@sha256:269885d847d382df99cc93ab5c37d3aea9f81fd8add895a9
 # python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update && \
     apt-get install -y \
+    git \
     python3 \
     build-essential
 
