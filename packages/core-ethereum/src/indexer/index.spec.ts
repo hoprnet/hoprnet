@@ -506,4 +506,37 @@ describe('test indexer', function () {
     assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
     assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
   })
+
+  it('should process Transfer events and reduce balance', async function () {
+    const { indexer, chain, newBlock, newTokenEvent, db } = await useFixtures({
+      latestBlockNumber: 0,
+      pastEvents: [],
+      id: fixtures.PARTY_A
+    })
+
+    const secondBlockMined = defer<void>()
+    const thirdBlockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 2) secondBlockMined.resolve()
+      else if (blockNumber === 3) thirdBlockMined.resolve()
+    })
+
+    await indexer.start(chain, 0)
+
+    assert.equal((await db.getHoprBalance()).toString(), '0')
+
+    newTokenEvent(fixtures.PARTY_A_TRANSFER_INCOMING) // +3
+    newBlock()
+    newBlock()
+
+    await secondBlockMined.promise
+
+    newTokenEvent(fixtures.PARTY_A_TRANSFER_OUTGOING) // -1
+    newBlock()
+    newBlock()
+
+    await thirdBlockMined.promise
+
+    assert.equal((await db.getHoprBalance()).toString(), '2')
+  })
 })

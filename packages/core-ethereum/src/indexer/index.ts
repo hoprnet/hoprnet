@@ -323,7 +323,7 @@ class Indexer extends EventEmitter {
       isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
-      log('Processing event %s %s %s', event.event, blockNumber, this.maxConfirmations)
+      log('Processing event %s blockNumber=%s maxConfirmations=%s', event.event, blockNumber, this.maxConfirmations)
 
       // if we find a previous snapshot, compare event's snapshot with last processed
       if (lastSnapshot) {
@@ -362,7 +362,9 @@ class Indexer extends EventEmitter {
           case 'Transfer(address,address,uint256)':
             // handle HOPR token transfer
             this.indexEvent('withdraw-hopr', [event.transactionHash])
+            console.log('ON TRANSFER START')
             await this.onTransfer(event as TokenEvent<'Transfer'>)
+            console.log('ON TRANSFER END')
             break
           case 'TicketRedeemed':
           case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
@@ -502,6 +504,7 @@ class Indexer extends EventEmitter {
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>) {
+    console.log('onTransfer start', event.args.value.toString())
     const isIncoming = Address.fromString(event.args.to).eq(this.address)
     const amount = new Balance(new BN(event.args.value.toString()))
 
@@ -510,6 +513,8 @@ class Indexer extends EventEmitter {
     } else {
       await this.db.subHoprBalance(amount)
     }
+
+    console.log('onTransfer end', event.args.value.toString())
   }
 
   private indexEvent(indexerEvent: IndexerEvents, txHash: string[]) {
