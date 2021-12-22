@@ -1,153 +1,162 @@
-// import type { Stream, StreamType } from '../types'
-// import type { HandlerProps } from 'libp2p'
-// import { Relay } from './index'
-// import PeerId from 'peer-id'
-// import EventEmitter from 'events'
-// import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
-// import handshake from 'it-handshake'
-// import { RelayConnection } from './connection'
-// import assert from 'assert'
-// import Pair from 'it-pair'
-// import { Multiaddr } from 'multiaddr'
+import type { StreamType } from '../types'
+import type { HandlerProps } from 'libp2p'
+import type { Connection } from 'libp2p-interfaces/connection'
 
-// const initiator = privKeyToPeerId(stringToU8a('0xa889bad3e2a31cceff4faccdd374af67db485ac0e05e7e654530aff0da5199f7'))
-// const relay = privKeyToPeerId(stringToU8a('0xcd1fb76053833d9bb5b3ff243b2d17b96dc5ad7cc09b33c4cf77ba83c297443f'))
-// const counterparty = privKeyToPeerId(stringToU8a('0x4090ca3740b1fe0f6da22befc4f7cba26389c51808d245dd29a2076fc66103aa'))
+import { Relay } from './index'
+import PeerId from 'peer-id'
+import EventEmitter from 'events'
+import { privKeyToPeerId, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import handshake from 'it-handshake'
+import { RelayConnection } from './connection'
+import assert from 'assert'
+import Pair from 'it-pair'
+import { Multiaddr } from 'multiaddr'
 
-// function msgToEchoedMessage(message: string) {
-//   return new TextEncoder().encode(`Echo: <${message}>`)
-// }
+const initiator = privKeyToPeerId(stringToU8a('0xa889bad3e2a31cceff4faccdd374af67db485ac0e05e7e654530aff0da5199f7'))
+const relay = privKeyToPeerId(stringToU8a('0xcd1fb76053833d9bb5b3ff243b2d17b96dc5ad7cc09b33c4cf77ba83c297443f'))
+const counterparty = privKeyToPeerId(stringToU8a('0x4090ca3740b1fe0f6da22befc4f7cba26389c51808d245dd29a2076fc66103aa'))
 
-// describe('test relay', function () {
-//   const connEvents = new EventEmitter()
+function msgToEchoedMessage(message: string): Uint8Array {
+  return new TextEncoder().encode(`Echo: <${message}>`)
+}
 
-//   function handle(peer: PeerId, protocol: string, handler: (conn: HandlerProps) => void) {
-//     connEvents.on(`${peer.toB58String()}${protocol}`, handler)
-//   }
+function getPeerProtocol(peer: PeerId, protocol: string) {
+  return `${peer.toB58String()}${protocol}`
+}
 
-//   function createPeer(source: PeerId) {
-//     return new Relay(
-//       {
-//         peerId: source,
-//         handle: (protocol: string, handler: (handler: HandlerProps) => void) => handle(source, protocol, handler),
-//         upgrader: {
-//           upgradeInbound: (async (conn: RelayConnection) => {
-//             const shaker = handshake(conn)
+function getPeer(peerId: PeerId, network: EventEmitter) {
+  function handle(protocol: string, handler: (conn: HandlerProps) => void) {
+    console.log(`listening on ${getPeerProtocol(peerId, protocol)}`)
+    network.on(getPeerProtocol(peerId, protocol), handler)
+  }
 
-//             const message = new TextDecoder().decode((await shaker.read()).slice())
+  async function dialDirectly(ma: Multiaddr): Promise<Connection> {
+    const peerId = PeerId.createFromB58String(ma.getPeerId() as string)
 
-//             shaker.write(msgToEchoedMessage(message))
+    return {
+      remotePeer: peerId,
+      newStream: async (protocol: string) => {
+        const AtoB = Pair<StreamType>()
+        const BtoA = Pair<StreamType>()
 
-//             shaker.rest()
-//           }) as any,
-//           upgradeOutbound: (conn: any) => conn
-//         },
-//         peerStore: {
-//           get: (peer: PeerId) => {
-//             return {
-//               addresses: [
-//                 {
-//                   multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/${peer.toB58String()}`),
-//                   isCertified: true
-//                 }
-//               ]
-//             }
-//           }
-//         },
-//         peerRouting: {} as any,
-//         dialer: {} as any,
-//         connectionManager: {} as any,
-//         dialProtocol: async (peer: PeerId, protocol: string) => {
-//           let sourceToPeer: Stream
-//           let peerToSource: Stream
+        console.log(`emitting ${getPeerProtocol(peerId, protocol)}`)
+        network.emit(getPeerProtocol(peerId, protocol), {
+          stream: {
+            sink: AtoB.sink,
+            source: BtoA.source
+          },
+          connection: {
+            remotePeer: peerId
+          }
+        })
 
-//           const [connA, connB] = [Pair<StreamType>(), Pair<StreamType>()]
-//           sourceToPeer = {
-//             source: connB.source,
-//             sink: connA.sink
-//           }
+        return {
+          sink: BtoA.sink,
+          source: AtoB.source
+        }
+      }
+    } as any
+  }
 
-//           peerToSource = {
-//             source: connA.source,
-//             sink: connB.sink
-//           }
+  return new Relay(
+    {
+      peerId,
+      handle,
+      upgrader: {
+        upgradeInbound: (async (conn: RelayConnection) => {
+          const shaker = handshake(conn)
 
-//           connEvents.emit(`${peer.toB58String()}${protocol}`, {
-//             stream: peerToSource,
-//             connection: {
-//               remotePeer: source
-//             }
-//           } as any)
+          const message = new TextDecoder().decode((await shaker.read()).slice())
 
-//           return {
-//             connection: {
-//               remotePeer: relay
-//             },
-//             protocol,
-//             // Libp2p stream type is slightly different
-//             stream: sourceToPeer as any
-//           }
-//         }
-//       },
-//       undefined,
-//       undefined,
-//       undefined
-//     )
-//   }
+          shaker.write(msgToEchoedMessage(message))
 
-//   afterEach(function () {
-//     connEvents.removeAllListeners()
-//   })
+          shaker.rest()
+        }) as any,
+        upgradeOutbound: (conn: any) => conn
+      },
+      peerStore: {
+        get: (peer: PeerId) => {
+          return {
+            addresses: [
+              {
+                multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peer.toB58String()}`),
+                isCertified: true
+              }
+            ]
+          }
+        }
+      },
+      dialer: {} as any,
+      connectionManager: {
+        get: () => null
+      } as any
+    },
+    dialDirectly,
+    (multiaddrs: Multiaddr[]) => multiaddrs,
+    () => {}
+  )
+}
 
-//   it('connect to a relay, close the connection and reconnect', async function () {
-//     const Alice = createPeer(initiator)
+describe('test relay', function () {
+  it('connect to a relay, close the connection and reconnect', async function () {
+    const network = new EventEmitter()
 
-//     const Bob = createPeer(relay)
+    const Alice = getPeer(initiator, network)
+    const Bob = getPeer(relay, network)
+    const Charly = getPeer(counterparty, network)
 
-//     const Charly = createPeer(counterparty)
+    Alice.start()
+    Bob.start()
+    Charly.start()
 
-//     for (let i = 0; i < 5; i++) {
-//       const conn = await Alice.connect(Bob.libp2p.peerId, Charly.libp2p.peerId)
+    for (let i = 0; i < 5; i++) {
+      const conn = await Alice.connect(Bob.libp2p.peerId, Charly.libp2p.peerId)
 
-//       assert(conn != undefined, `Should be able to connect`)
-//       const shaker = handshake(conn)
+      assert(conn != undefined, `Should be able to connect`)
+      const shaker = handshake<StreamType>(conn as any)
 
-//       const msg = '<Hello>, that should be sent and echoed through relayed connection'
-//       shaker.write(new TextEncoder().encode(msg))
+      const msg = '<Hello>, that should be sent and echoed through relayed connection'
+      shaker.write(new TextEncoder().encode(msg))
 
-//       assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
+      assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
 
-//       shaker.rest()
+      shaker.rest()
 
-//       await conn.close()
+      await conn.close()
 
-//       // Let I/O happen
-//       await new Promise((resolve) => setTimeout(resolve))
-//     }
-//   })
+      // Let I/O happen
+      await new Promise((resolve) => setTimeout(resolve))
+    }
 
-//   it('connect to a relay and reconnect', async function () {
-//     const Alice = createPeer(initiator)
+    network.removeAllListeners()
+  })
 
-//     const Bob = createPeer(relay)
+  it('connect to a relay and reconnect', async function () {
+    const network = new EventEmitter()
 
-//     const Charly = createPeer(counterparty)
+    const Alice = getPeer(initiator, network)
+    const Bob = getPeer(relay, network)
+    const Charly = getPeer(counterparty, network)
 
-//     for (let i = 0; i < 3; i++) {
-//       const conn = await Alice.connect(Bob.libp2p.peerId, Charly.libp2p.peerId)
+    Alice.start()
+    Bob.start()
+    Charly.start()
 
-//       assert(conn != undefined, `Should be able to connect`)
-//       const shaker = handshake(conn)
+    for (let i = 0; i < 3; i++) {
+      const conn = await Alice.connect(Bob.libp2p.peerId, Charly.libp2p.peerId)
 
-//       const msg = '<Hello>, that should be sent and echoed through relayed connection'
-//       shaker.write(new TextEncoder().encode(msg))
+      assert(conn != undefined, `Should be able to connect`)
+      const shaker = handshake<StreamType>(conn as any)
 
-//       assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
+      const msg = '<Hello>, that should be sent and echoed through relayed connection'
+      shaker.write(new TextEncoder().encode(msg))
 
-//       shaker.rest()
+      assert(u8aEquals((await shaker.read()).slice(), msgToEchoedMessage(msg)))
 
-//       // Let I/O happen
-//       await new Promise((resolve) => setTimeout(resolve))
-//     }
-//   })
-// })
+      shaker.rest()
+
+      // Let I/O happen
+      await new Promise((resolve) => setTimeout(resolve))
+    }
+  })
+})
