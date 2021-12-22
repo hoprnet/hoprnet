@@ -1,21 +1,23 @@
 import type { HandlerProps } from 'libp2p'
 import type { Connection } from 'libp2p-interfaces/connection'
 import type { ConnectionHandler } from 'libp2p-interfaces/transport'
-import type { Stream, DialOptions } from '../types'
+import type { Stream, HoprConnectDialOptions } from '../types'
 import type Libp2p from 'libp2p'
 import type PeerId from 'peer-id'
 import { AbortError } from 'abortable-iterator'
 
-import { dial as dialHelper } from '@hoprnet/hopr-utils'
-
 import debug from 'debug'
 
 import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
-import { green } from 'chalk'
+import chalk from 'chalk'
 import { RELAY_CIRCUIT_TIMEOUT, RELAY, DELIVERY } from '../constants'
 import { RelayConnection } from './connection'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
+
+import type HoprConnect from '..'
+
+import { Multiaddr } from 'multiaddr'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -53,6 +55,8 @@ class Relay {
 
   constructor(
     public libp2p: ReducedLibp2p,
+    private dialDirectly: HoprConnect['dialDirectly'],
+    private filter: HoprConnect['filter'],
     private connHandler: ConnectionHandler | undefined,
     private webRTCUpgrader?: WebRTCUpgrader,
     private __noWebRTCUpgrade?: boolean,
@@ -60,7 +64,14 @@ class Relay {
     private __relayFreeTimeout?: number
   ) {
     this.relayState = new RelayState()
+  }
 
+  /**
+   * Assigns the event listener to the constructed object.
+   * @dev Must not happen in the constructor because `this` is not ready
+   *      at that point in time
+   */
+  start(): void {
     this.libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
 
     this.libp2p.handle(RELAY, ({ stream, connection }) => {
@@ -80,7 +91,7 @@ class Relay {
       } else {
         shaker.negotiate(
           connection.remotePeer,
-          (counterparty: PeerId) => this.contactCounterparty(counterparty),
+          this.dialNodeDirectly.bind(this),
           this.relayState.exists.bind(this.relayState),
           this.relayState.isActive.bind(this.relayState),
           this.relayState.updateExisting.bind(this.relayState),
@@ -101,25 +112,23 @@ class Relay {
   public async connect(
     relay: PeerId,
     destination: PeerId,
-    options?: DialOptions
+    options?: HoprConnectDialOptions
   ): Promise<RelayConnection | WebRTCConnection | undefined> {
-    options?.signal
-    const baseConnection = await dialHelper(this.libp2p, relay, RELAY, {
+    const baseConnection = await this.dialNodeDirectly(relay, RELAY, {
       timeout: RELAY_CIRCUIT_TIMEOUT,
       signal: options?.signal
     })
 
-    if (baseConnection.status !== 'SUCCESS') {
+    if (baseConnection == undefined) {
       error(
-        `Could not establish relayed conntection over ${green(relay.toB58String())} to ${green(
-          destination.toB58String()
-        )}`,
-        baseConnection.status
+        `Cannot establish a connection to ${chalk.green(destination.toB58String())} because relay ${chalk.green(
+          relay.toB58String()
+        )} is not reachable`
       )
       return
     }
 
-    const handshakeResult = await new RelayHandshake(baseConnection.resp.stream as any).initiate(relay, destination)
+    const handshakeResult = await new RelayHandshake(baseConnection).initiate(relay, destination)
 
     if (!handshakeResult.success) {
       error(`Handshake led to empty stream. Giving up.`)
@@ -130,12 +139,16 @@ class Relay {
       throw new AbortError()
     }
 
+    return this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
+  }
+
+  private upgradeOutbound(relay: PeerId, destination: PeerId, stream: Stream, opts?: HoprConnectDialOptions) {
     // Attempt to upgrade to WebRTC if available
     if (this.webRTCUpgrader != undefined) {
       let channel = this.webRTCUpgrader.upgradeOutbound()
 
       let newConn = new RelayConnection({
-        stream: handshakeResult.stream,
+        stream,
         self: this.libp2p.peerId,
         relay,
         counterparty: destination,
@@ -148,11 +161,11 @@ class Relay {
 
       return new WebRTCConnection(destination, this.libp2p.connectionManager, newConn, channel, {
         __noWebRTCUpgrade: this.__noWebRTCUpgrade,
-        ...options
+        ...opts
       } as any)
     } else {
       return new RelayConnection({
-        stream: handshakeResult.stream,
+        stream,
         self: this.libp2p.peerId,
         relay,
         counterparty: destination,
@@ -184,16 +197,18 @@ class Relay {
 
     log(`incoming connection from ${handShakeResult.counterparty.toB58String()}`)
 
-    log(`counterparty relayed connection established`)
+    return this.upgradeInbound(handShakeResult.counterparty, conn.connection.remotePeer, handShakeResult.stream)
+  }
 
+  private upgradeInbound(initiator: PeerId, relay: PeerId, stream: Stream) {
     if (this.webRTCUpgrader != undefined) {
       let channel = this.webRTCUpgrader.upgradeInbound()
 
       let newConn = new RelayConnection({
-        stream: handShakeResult.stream,
+        stream,
         self: this.libp2p.peerId,
-        relay: conn.connection.remotePeer,
-        counterparty: handShakeResult.counterparty,
+        relay,
+        counterparty: initiator,
         onReconnect: this.onReconnect.bind(this),
         webRTC: {
           channel,
@@ -201,15 +216,15 @@ class Relay {
         }
       })
 
-      return new WebRTCConnection(handShakeResult.counterparty, this.libp2p.connectionManager, newConn, channel, {
+      return new WebRTCConnection(initiator, this.libp2p.connectionManager, newConn, channel, {
         __noWebRTCUpgrade: this.__noWebRTCUpgrade
       } as any)
     } else {
       return new RelayConnection({
-        stream: handShakeResult.stream,
+        stream,
         self: this.libp2p.peerId,
-        relay: conn.connection.remotePeer,
-        counterparty: handShakeResult.counterparty,
+        relay,
+        counterparty: initiator,
         onReconnect: this.onReconnect.bind(this)
       })
     }
@@ -279,25 +294,71 @@ class Relay {
    * @param counterparty peerId of counterparty
    * @returns a duplex stream to counterparty, if connection is possible
    */
-  private async contactCounterparty(counterparty: PeerId): Promise<Stream | undefined> {
-    // @TODO this produces struct with unset connection property
-    const existingConnection = this.libp2p.connectionManager.get(counterparty)
-    if (existingConnection == null) {
-      log(`We don't have any connection to ${counterparty.toB58String()}`)
+  private async dialNodeDirectly(
+    counterparty: PeerId,
+    protocol: string,
+    opts?: HoprConnectDialOptions
+  ): Promise<Stream | undefined> {
+    let stream = await this.tryExistingConnection(counterparty, protocol)
+
+    if (stream == undefined) {
+      stream = await this.establishDirectConnection(counterparty, protocol, opts)
+    }
+
+    return stream
+  }
+
+  private async establishDirectConnection(
+    peer: PeerId,
+    protocol: string,
+    opts?: HoprConnectDialOptions
+  ): Promise<Stream | undefined> {
+    const usableAddresses: Multiaddr[] = []
+
+    for (const knownAddress of this.libp2p.peerStore.get(peer)?.addresses ?? []) {
+      if (this.filter([knownAddress.multiaddr])) {
+        usableAddresses.push(knownAddress.multiaddr)
+      }
+    }
+
+    if (usableAddresses.length == 0) {
       return
     }
 
-    // TODO: add direct dialing
+    let stream: Stream | undefined
+    for (const usable of usableAddresses) {
+      let conn: Connection
+      try {
+        conn = await this.dialDirectly(usable, opts)
+      } catch (err) {
+        continue
+      }
+
+      if (conn != undefined) {
+        try {
+          stream = (await conn.newStream([protocol])) as any
+        } catch (err) {
+          console.log(`stream failed`, usable.toString(), err)
+
+          continue
+        }
+      }
+    }
+    console.log(`stream successful`)
+
+    return stream
+  }
+
+  private async tryExistingConnection(peer: PeerId, protocol: string): Promise<Stream | undefined> {
+    const existingConnection = this.libp2p.connectionManager.get(peer)
+    if (existingConnection == null) {
+      return
+    }
 
     let stream: Stream
     try {
-      stream = (await existingConnection.newStream(DELIVERY)).stream as any
+      stream = (await existingConnection.newStream(protocol)).stream as any
     } catch (err) {
-      log(`Could not create a stream to ${counterparty.toB58String()}`)
-      return
-    }
-
-    if (stream == undefined) {
       return
     }
 

@@ -7,8 +7,10 @@ import { green, yellow } from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
 import { RelayState } from './state'
+import type { Relay } from '.'
 
 import debug from 'debug'
+import { DELIVERY } from '../constants'
 
 export enum RelayHandshakeMessage {
   OK,
@@ -163,7 +165,7 @@ class RelayHandshake {
    */
   async negotiate(
     source: PeerId,
-    getStreamToCounterparty: (peerId: PeerId) => Promise<Stream | undefined>,
+    getStreamToCounterparty: InstanceType<typeof Relay>['dialNodeDirectly'],
     exists: InstanceType<typeof RelayState>['exists'],
     isActive: InstanceType<typeof RelayState>['isActive'],
     updateExisting: InstanceType<typeof RelayState>['updateExisting'],
@@ -229,7 +231,7 @@ class RelayHandshake {
 
     let toDestination: Stream | undefined
     try {
-      toDestination = await getStreamToCounterparty(destination)
+      toDestination = await getStreamToCounterparty(destination, DELIVERY)
     } catch (err) {
       error(err)
     }
