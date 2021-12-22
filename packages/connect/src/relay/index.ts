@@ -183,7 +183,6 @@ class Relay {
   }
 
   private onRelay(conn: HandlerProps) {
-    console.log(conn)
     if (conn.connection == undefined || conn.connection.remotePeer == undefined) {
       verbose(`Received incomplete connection object`)
       return

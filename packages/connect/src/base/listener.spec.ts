@@ -441,9 +441,8 @@ describe('entry node functionality', function () {
     assert(node.listener.addrs.relays != undefined, `must expose relay addrs`)
     assert(node.listener.addrs.relays.length == 1, `must expose exactly one relay addrs`)
     assert(
-      node.listener.addrs.relays[0].equals(
-        new Multiaddr(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
-      ),
+      node.listener.addrs.relays[0].toString() ===
+        `/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`,
       `must expose the right relay address`
     )
 

@@ -26,7 +26,6 @@ function getPeerProtocol(peer: PeerId, protocol: string) {
 
 function getPeer(peerId: PeerId, network: EventEmitter) {
   function handle(protocol: string, handler: (conn: HandlerProps) => void) {
-    console.log(`listening on ${getPeerProtocol(peerId, protocol)}`)
     network.on(getPeerProtocol(peerId, protocol), handler)
   }
 
@@ -39,7 +38,6 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
         const AtoB = Pair<StreamType>()
         const BtoA = Pair<StreamType>()
 
-        console.log(`emitting ${getPeerProtocol(peerId, protocol)}`)
         network.emit(getPeerProtocol(peerId, protocol), {
           stream: {
             sink: AtoB.sink,

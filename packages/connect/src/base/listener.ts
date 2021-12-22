@@ -68,8 +68,6 @@ enum State {
 
 type Address = { port: number; address: string }
 
-type ReducedUpgrader = Pick<Upgrader, 'upgradeInbound' | 'upgradeOutbound'>
-
 class Listener extends EventEmitter implements InterfaceListener {
   private __connections: MultiaddrConnection[]
   protected tcpSocket: TCPServer
@@ -99,7 +97,7 @@ class Listener extends EventEmitter implements InterfaceListener {
    */
   constructor(
     private handler: ((conn: Connection) => void) | undefined,
-    private upgrader: ReducedUpgrader,
+    private upgrader: Pick<Upgrader, 'upgradeInbound' | 'upgradeOutbound'>,
     publicNodes: PublicNodesEmitter | undefined,
     private initialNodes: PeerStoreType[] = [],
     private peerId: PeerId,
@@ -221,6 +219,10 @@ class Listener extends EventEmitter implements InterfaceListener {
     setImmediate(this.updatePublicNodes.bind(this))
   }
 
+  /**
+   * Updates the list of exposed entry nodes.
+   * Called at startup and once an entry node is considered offline.
+   */
   protected async updatePublicNodes(): Promise<void> {
     const nodesToCheck: PeerStoreType[] = []
 
@@ -270,7 +272,9 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.uncheckedNodes = []
 
-    this.addrs.relays = this.publicNodes.map(this.publicNodesToRelayMultiaddr.bind(this))
+    this.addrs.relays = this.publicNodes.map(
+      (entry: NodeEntry) => new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
+    )
 
     log(`Current relay addresses:`)
     for (const ma of this.addrs.relays) {
@@ -282,10 +286,6 @@ class Listener extends EventEmitter implements InterfaceListener {
       // the updated peer record to all connected peers
       this.emit('listening')
     }
-  }
-
-  private publicNodesToRelayMultiaddr(entry: NodeEntry) {
-    return new Multiaddr(`/p2p/${entry.id}/p2p-circuit/p2p/${this.peerId}`)
   }
 
   /**
