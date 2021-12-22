@@ -104,7 +104,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
         const hoprBalance = await this.chain.getBalance(this.publicKey.toAddress())
         await this.db.setHoprBalance(hoprBalance)
-        log(`settings HOPR balance to ${hoprBalance.toFormattedString()}`)
+        log(`set HOPR balance to ${hoprBalance.toFormattedString()}`)
 
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
