@@ -145,12 +145,17 @@ export const findCtChannelOpenTime = (dest: PublicKey, state: State): number => 
 export const sendCTMessage = async (
   startNode: PublicKey,
   selfPub: PublicKey,
-  sendMessage: (path: PublicKey[]) => Promise<void>,
+  sendMessage: (message: Uint8Array, path: PublicKey[]) => Promise<void>,
   data: PersistedState
 ): Promise<boolean> => {
   // get the randomized weighted importance score of the destination of a given channel.
   const weight = async (edge: ChannelEntry): Promise<BN> => randomWeightedImportance(edge.destination, data.get())
   let path: PublicKey[]
+
+  // build CT message, 
+  const counter = data.messageTotalSuccess()
+  const message = new TextEncoder().encode(`CT_${counter.toString}`)
+
   try {
     path = await findPath(
       startNode,
@@ -161,16 +166,20 @@ export const sendCTMessage = async (
       weight
     )
 
+    // update counters in the state
+    path.forEach((p) => data.incrementForwards(p)) // increase counter for non-1st hop nodes
+    data.incrementSent(startNode) // increase counter for 1st hop node
+
+    // build the complete path
     path.unshift(startNode) // Path doesn't normally include this
-    path.forEach((p) => data.incrementForwards(p))
-    log('SEND ' + path.map((pub) => pub.toB58String()).join(','))
+
+    log(`SEND ${path.map((pub) => pub.toB58String()).join(',')}`)
   } catch (e) {
     return false
   }
   try {
-    data.incrementSent(startNode)
-    await sendMessage(path)
-    log(`success sending ${path.map((x) => x.toB58String()).toString()}`)
+    await sendMessage(message, path)
+    log(`success sending ${path.map((pub) => pub.toB58String()).join(',')} message ${message}`)
     return true
   } catch (e) {
     log(`error ${e} sending to ${startNode.toB58String()}`)

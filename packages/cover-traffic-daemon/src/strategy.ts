@@ -94,8 +94,8 @@ export class CoverTrafficStrategy extends SaneDefaults {
           sendCTMessage(
             openChannel.destination,
             this.selfPub,
-            async (path: PublicKey[]) => {
-              await this.node.sendMessage(new Uint8Array(1), this.selfPub.toPeerId(), path)
+            async (message: Uint8Array, path: PublicKey[]) => {
+              await this.node.sendMessage(message, this.selfPub.toPeerId(), path)
             },
             this.data
           ).then((success) => {
@@ -106,6 +106,8 @@ export class CoverTrafficStrategy extends SaneDefaults {
                 )}`
               )
               this.data.incrementMessageFails(openChannel.destination)
+            } else {
+              this.data.incrementMessageTotalSuccess()
             }
           })
         } else if (
@@ -131,7 +133,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
     } else {
       log('aborting send messages - less channels in network than hops required')
     }
-    log('message send phase complete')
+    log(`message send phase complete for ${state.ctChannels,length} ctChannels`)
 
     let attempts = 0
     let currentChannelNum = currentChannels.length
