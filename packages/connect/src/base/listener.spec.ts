@@ -94,22 +94,21 @@ async function startNode(
 
   const listener = new TestingListener(
     handler,
-    upgrader ??
-      ({
-        upgradeInbound: async (conn: MultiaddrConnection) => {
-          if (expectedMessage != undefined) {
-            for await (const msg of conn.source) {
-              if (u8aEquals(msg.slice(), expectedMessage)) {
-                state?.expectedMessageReceived?.resolve()
-              }
+    upgrader ?? {
+      upgradeInbound: async (conn: MultiaddrConnection) => {
+        if (expectedMessage != undefined) {
+          for await (const msg of conn.source) {
+            if (u8aEquals(msg.slice(), expectedMessage)) {
+              state?.expectedMessageReceived?.resolve()
             }
           }
+        }
 
-          state?.msgReceived?.resolve()
-          return conn
-        },
-        upgradeOutbound: async (conn: MultiaddrConnection) => conn
-      } as any),
+        state?.msgReceived?.resolve()
+        return conn as any
+      },
+      upgradeOutbound: async (conn: MultiaddrConnection) => conn as any
+    },
     publicNodesEmitter,
     initialNodes,
     peerId,

@@ -1,7 +1,5 @@
 import type { Stream, StreamType } from '../types'
 import type { HandlerProps } from 'libp2p'
-import type Libp2p from 'libp2p'
-
 import { Relay } from './index'
 import PeerId from 'peer-id'
 import EventEmitter from 'events'
@@ -33,7 +31,7 @@ describe('test relay', function () {
         peerId: source,
         handle: (protocol: string, handler: (handler: HandlerProps) => void) => handle(source, protocol, handler),
         upgrader: {
-          upgradeInbound: async (conn: RelayConnection) => {
+          upgradeInbound: (async (conn: RelayConnection) => {
             const shaker = handshake(conn)
 
             const message = new TextDecoder().decode((await shaker.read()).slice())
@@ -41,21 +39,23 @@ describe('test relay', function () {
             shaker.write(msgToEchoedMessage(message))
 
             shaker.rest()
-          },
+          }) as any,
           upgradeOutbound: (conn: any) => conn
-        } as any,
+        },
         peerStore: {
           get: (peer: PeerId) => {
             return {
               addresses: [
                 {
-                  multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/${peer.toB58String()}`)
+                  multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/${peer.toB58String()}`),
+                  isCertified: true
                 }
               ]
             }
           }
         },
-        dialer: {},
+        peerRouting: {} as any,
+        dialer: {} as any,
         connectionManager: {} as any,
         dialProtocol: async (peer: PeerId, protocol: string) => {
           let sourceToPeer: Stream
@@ -84,11 +84,11 @@ describe('test relay', function () {
               remotePeer: relay
             },
             protocol,
-            stream: sourceToPeer
-          } as any
+            // Libp2p stream type is slightly different
+            stream: sourceToPeer as any
+          }
         }
-      } as Libp2p,
-      // (peer: PeerId, protocol: string, opts: any) => dialHelper(source, peer, protocol, opts) as any,
+      },
       undefined,
       undefined,
       undefined

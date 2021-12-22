@@ -68,6 +68,8 @@ enum State {
 
 type Address = { port: number; address: string }
 
+type ReducedUpgrader = Pick<Upgrader, 'upgradeInbound' | 'upgradeOutbound'>
+
 class Listener extends EventEmitter implements InterfaceListener {
   private __connections: MultiaddrConnection[]
   protected tcpSocket: TCPServer
@@ -97,7 +99,7 @@ class Listener extends EventEmitter implements InterfaceListener {
    */
   constructor(
     private handler: ((conn: Connection) => void) | undefined,
-    private upgrader: Upgrader,
+    private upgrader: ReducedUpgrader,
     publicNodes: PublicNodesEmitter | undefined,
     private initialNodes: PeerStoreType[] = [],
     private peerId: PeerId,
@@ -257,10 +259,10 @@ class Listener extends EventEmitter implements InterfaceListener {
         })
       )
     )
-      .filter<PromiseFulfilledResult<NodeEntry>>(
+      .filter(
         (entry): entry is PromiseFulfilledResult<NodeEntry> => entry.status === 'fulfilled' && entry.value.latency >= 0
       )
-      .map<NodeEntry>((entry) => entry.value)
+      .map((entry) => entry.value)
 
     const sorted = results.concat(this.publicNodes).sort(latencyCompare)
 
@@ -273,6 +275,12 @@ class Listener extends EventEmitter implements InterfaceListener {
     log(`Current relay addresses:`)
     for (const ma of this.addrs.relays) {
       log(`\t${ma.toString()}`)
+    }
+
+    if (this.state == State.LISTENING) {
+      // updates libp2p's peer record and lets libp2p push
+      // the updated peer record to all connected peers
+      this.emit('listening')
     }
   }
 

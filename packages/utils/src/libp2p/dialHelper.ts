@@ -54,7 +54,9 @@ export type DialResponse =
 
 // Make sure that Typescript fails to build tests if libp2p API changes
 type ReducedPeerStore = {
-  peerStore: { get: (peer: PeerId) => Pick<ReturnType<LibP2P['peerStore']['get']>, 'addresses'> | undefined }
+  peerStore: {
+    get: (peer: PeerId) => Pick<NonNullable<ReturnType<LibP2P['peerStore']['get']>>, 'addresses'> | undefined
+  }
 }
 type ReducedDHT = { peerRouting: Pick<LibP2P['peerRouting'], '_routers' | 'findPeer'> }
 type ReducedLibp2p = ReducedDHT & ReducedPeerStore & Pick<LibP2P, 'dialProtocol'>

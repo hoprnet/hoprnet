@@ -24,6 +24,27 @@ const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(':error'))
 const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 
+// Specify which libp2p methods this class uses
+// such that Typescript fails to build if anything changes
+type ReducedPeerStore = {
+  peerStore: {
+    get: (peer: PeerId) => Pick<NonNullable<ReturnType<Libp2p['peerStore']['get']>>, 'addresses'> | undefined
+  }
+}
+type ReducedDialer = { dialer: Pick<Libp2p['dialer'], '_pendingDials'> }
+type ReducedUpgrader = { upgrader: Pick<Libp2p['upgrader'], 'upgradeInbound' | 'upgradeOutbound'> }
+type ReducedConnectionManager = { connectionManager: Pick<Libp2p['connectionManager'], 'connections' | 'get'> }
+type ReducedDHT = { peerRouting: Pick<Libp2p['peerRouting'], '_routers' | 'findPeer'> }
+type ReducedLibp2p = ReducedPeerStore &
+  ReducedDialer &
+  ReducedDHT &
+  ReducedConnectionManager &
+  ReducedUpgrader & {
+    peerId: PeerId
+    handle: Libp2p['handle']
+    dialProtocol: Libp2p['dialProtocol']
+  }
+
 /**
  * API interface for relayed connections
  */
@@ -31,7 +52,7 @@ class Relay {
   private relayState: RelayState
 
   constructor(
-    public libp2p: Libp2p,
+    public libp2p: ReducedLibp2p,
     private connHandler: ConnectionHandler | undefined,
     private webRTCUpgrader?: WebRTCUpgrader,
     private __noWebRTCUpgrade?: boolean,
@@ -260,13 +281,27 @@ class Relay {
    */
   private async contactCounterparty(counterparty: PeerId): Promise<Stream | undefined> {
     // @TODO this produces struct with unset connection property
-    let newConn = await dialHelper(this.libp2p, counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
-
-    if (newConn.status === 'SUCCESS') {
-      return newConn.resp.stream as any
+    const existingConnection = this.libp2p.connectionManager.get(counterparty)
+    if (existingConnection == null) {
+      log(`We don't have any connection to ${counterparty.toB58String()}`)
+      return
     }
 
-    return undefined
+    // TODO: add direct dialing
+
+    let stream: Stream
+    try {
+      stream = (await existingConnection.newStream(DELIVERY)).stream as any
+    } catch (err) {
+      log(`Could not create a stream to ${counterparty.toB58String()}`)
+      return
+    }
+
+    if (stream == undefined) {
+      return
+    }
+
+    return stream
   }
 }
 

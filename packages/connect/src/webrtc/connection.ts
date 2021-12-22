@@ -1,6 +1,4 @@
 import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
-import type ConnectionManager from 'libp2p/src/connection-manager'
-
 import type { Instance as SimplePeer } from 'simple-peer'
 import type PeerId from 'peer-id'
 import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
@@ -8,6 +6,7 @@ import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import type { RelayConnection } from '../relay/connection'
+import type Libp2p from 'libp2p'
 import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils'
 import abortable from 'abortable-iterator'
@@ -35,6 +34,10 @@ function getAbortableSource(source: Stream['source'], signal?: AbortSignal) {
 
   return source
 }
+
+// Specify which libp2p methods this class uses
+// such that Typescript fails to build if anything changes
+type ReducedConnectionManager = Pick<Libp2p['connectionManager'], 'connections'>
 
 /**
  * Encapsulate state management and upgrade from relayed connection to
@@ -68,7 +71,7 @@ class WebRTCConnection implements MultiaddrConnection<StreamType> {
 
   constructor(
     private counterparty: PeerId,
-    private connectionManager: ConnectionManager,
+    private connectionManager: ReducedConnectionManager,
     private relayConn: RelayConnection,
     private channel: SimplePeer,
     private options?: DialOptions & { __noWebRTCUpgrade?: boolean }

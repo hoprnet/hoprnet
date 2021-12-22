@@ -34,7 +34,7 @@ type ListeningOptions = undefined
 /**
  * @class HoprConnect
  */
-class HoprConnect implements Transport<DialOptions, ListeningOptions> {
+class HoprConnect implements Transport<DialOptions & { timeout: number }, ListeningOptions> {
   get [Symbol.toStringTag]() {
     return 'HoprConnect'
   }
@@ -49,7 +49,8 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
   private __noDirectConnections: boolean
   private __noWebRTCUpgrade: boolean
   private __useLocalAddress: boolean
-  private _upgrader: Upgrader
+  private _upgradeOutbound: Upgrader['upgradeOutbound']
+  private _upgradeInbound: Upgrader['upgradeInbound']
   private _peerId: PeerId
   private relay: Relay
   private _webRTCUpgrader?: WebRTCUpgrader
@@ -83,7 +84,6 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
 
     this._addressFilter = new Filter(this._peerId)
 
-    this._upgrader = opts.upgrader
     this._interface = opts.interface
 
     if (USE_WEBRTC) {
@@ -91,6 +91,9 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
     }
 
     this.discovery = new Discovery()
+
+    this._upgradeOutbound = opts.upgrader.upgradeOutbound.bind(opts.upgrader)
+    this._upgradeInbound = opts.upgrader.upgradeInbound.bind(opts.upgrader)
 
     this.relay = new Relay(
       this._libp2p,
@@ -201,7 +204,10 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
 
     return new Listener(
       this.connHandler,
-      this._upgrader,
+      {
+        upgradeInbound: this._upgradeInbound,
+        upgradeOutbound: this._upgradeOutbound
+      },
       this.publicNodes,
       this.initialNodes,
       this._peerId,
@@ -245,7 +251,7 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
       throw Error(`Could not establish relayed connection.`)
     }
 
-    return await this._upgrader.upgradeOutbound(conn as any)
+    return await this._upgradeOutbound(conn as any)
   }
 
   /**
@@ -259,7 +265,7 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
-    return await this._upgrader.upgradeOutbound(maConn as any)
+    return await this._upgradeOutbound(maConn as any)
   }
 
   /**
