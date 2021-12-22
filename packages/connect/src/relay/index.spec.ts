@@ -156,5 +156,7 @@ describe('test relay', function () {
       // Let I/O happen
       await new Promise((resolve) => setTimeout(resolve))
     }
+
+    network.removeAllListeners()
   })
 })
