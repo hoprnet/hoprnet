@@ -54,7 +54,7 @@ const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
 const ENVIRONMENT_KEY = encoder.encode('environment_id')
-const HOPR_BALANCE_KEY = u8aConcat(ACCOUNT_PREFIX, encoder.encode('hopr-balance'))
+const HOPR_BALANCE_KEY = encoder.encode('hopr-balance')
 
 enum PendingAcknowledgementPrefix {
   Relayer = 0,
