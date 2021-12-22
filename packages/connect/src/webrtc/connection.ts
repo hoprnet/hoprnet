@@ -35,10 +35,6 @@ function getAbortableSource(source: Stream['source'], signal?: AbortSignal) {
   return source
 }
 
-// Specify which libp2p methods this class uses
-// such that Typescript fails to build if anything changes
-type ReducedConnectionManager = Pick<Libp2p['connectionManager'], 'connections'>
-
 /**
  * Encapsulate state management and upgrade from relayed connection to
  * WebRTC connection
@@ -70,7 +66,7 @@ class WebRTCConnection implements MultiaddrConnection<StreamType> {
 
   constructor(
     private counterparty: PeerId,
-    private connectionManager: ReducedConnectionManager,
+    private connectionManager: Pick<Libp2p['connectionManager'], 'connections'>,
     private relayConn: RelayConnection,
     private channel: SimplePeer,
     private options?: HoprConnectDialOptions & { __noWebRTCUpgrade?: boolean }
