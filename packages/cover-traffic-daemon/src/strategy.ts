@@ -110,15 +110,18 @@ export class CoverTrafficStrategy extends SaneDefaults {
           })
         } else if (
           channel &&
-          channel.status == ChannelStatus.WaitingForCommitment &&
-          Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT
+          channel.status == ChannelStatus.WaitingForCommitment
         ) {
-          // handle waiting for commitment stalls
-          log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toB58String())
-          toClose.push(openChannel.destination)
+          if (Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT) {
+            // handle waiting for commitment stalls
+            log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toB58String())
+            toClose.push(openChannel.destination)
+          } else {
+            log('channel is WAITING_FOR_COMMITMENT, waiting', openChannel.destination.toB58String())
+          }
         } else {
           log(
-            `Unknown error in sending traffic. Channel is ${channel.status}; openChannel is ${JSON.stringify({
+            `Unknown error with open CT channels. Channel is ${channel.status}; openChannel is ${JSON.stringify({
               ...openChannel,
               destination: openChannel.destination.toB58String()
             })}`
