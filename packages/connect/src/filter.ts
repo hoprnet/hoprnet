@@ -77,7 +77,7 @@ export class Filter {
     }
   }
 
-  public filter(ma: Multiaddr) {
+  public filter(ma: Multiaddr): boolean {
     if (this.addrsSet) {
       return this.filterDial(ma)
     } else {
@@ -90,7 +90,7 @@ export class Filter {
    * @param ma Multiaddr to check
    * @returns true if address is usable
    */
-  public filterListening(ma: Multiaddr): boolean {
+  private filterListening(ma: Multiaddr): boolean {
     const parsed = parseAddress(ma)
 
     if (!parsed.valid || !['IPv4', 'IPv6'].includes(parsed.address.type)) {
@@ -111,7 +111,7 @@ export class Filter {
    * @param ma Multiaddress to check
    * @returns true if considered dialable
    */
-  public filterDial(ma: Multiaddr): boolean {
+  private filterDial(ma: Multiaddr): boolean {
     const parsed = parseAddress(ma)
 
     if (!parsed.valid) {

@@ -97,7 +97,7 @@ class Listener extends EventEmitter implements InterfaceListener {
    */
   constructor(
     private handler: ((conn: Connection) => void) | undefined,
-    private upgrader: Upgrader,
+    private upgrader: Pick<Upgrader, 'upgradeInbound' | 'upgradeOutbound'>,
     publicNodes: PublicNodesEmitter | undefined,
     private initialNodes: PeerStoreType[] = [],
     private peerId: PeerId,
@@ -219,6 +219,10 @@ class Listener extends EventEmitter implements InterfaceListener {
     setImmediate(this.updatePublicNodes.bind(this))
   }
 
+  /**
+   * Updates the list of exposed entry nodes.
+   * Called at startup and once an entry node is considered offline.
+   */
   protected async updatePublicNodes(): Promise<void> {
     const nodesToCheck: PeerStoreType[] = []
 
@@ -257,10 +261,10 @@ class Listener extends EventEmitter implements InterfaceListener {
         })
       )
     )
-      .filter<PromiseFulfilledResult<NodeEntry>>(
+      .filter(
         (entry): entry is PromiseFulfilledResult<NodeEntry> => entry.status === 'fulfilled' && entry.value.latency >= 0
       )
-      .map<NodeEntry>((entry) => entry.value)
+      .map((entry) => entry.value)
 
     const sorted = results.concat(this.publicNodes).sort(latencyCompare)
 
@@ -268,16 +272,20 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.uncheckedNodes = []
 
-    this.addrs.relays = this.publicNodes.map(this.publicNodesToRelayMultiaddr.bind(this))
+    this.addrs.relays = this.publicNodes.map(
+      (entry: NodeEntry) => new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
+    )
 
     log(`Current relay addresses:`)
     for (const ma of this.addrs.relays) {
       log(`\t${ma.toString()}`)
     }
-  }
 
-  private publicNodesToRelayMultiaddr(entry: NodeEntry) {
-    return new Multiaddr(`/p2p/${entry.id}/p2p-circuit/p2p/${this.peerId}`)
+    if (this.state == State.LISTENING) {
+      // updates libp2p's peer record and lets libp2p push
+      // the updated peer record to all connected peers
+      this.emit('listening')
+    }
   }
 
   /**

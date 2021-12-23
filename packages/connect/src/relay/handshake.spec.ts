@@ -1,19 +1,29 @@
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
-import { u8aEquals, defer } from '@hoprnet/hopr-utils'
+import { u8aEquals, defer, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
 import PeerId from 'peer-id'
 import assert from 'assert'
 import type { Stream, StreamType } from '../types'
 
+const initiator = privKeyToPeerId('0x695a1ad048d12a1a82f827a38815ab33aa4464194fa0bdb99f78d9c66ec21505')
+const relay = privKeyToPeerId('0xf0b8e814c3594d0c552d72fb3dfda7f0d9063458a7792369e7c044eda10f3b52')
+const destination = privKeyToPeerId('0xf2462c7eec43cde144e025c8feeac547d8f87fb9ad87e625c833391085e94d5d')
+
+function getRelayState(existing: boolean = false): Parameters<RelayHandshake['negotiate']>[2] {
+  return {
+    exists: () => existing,
+    isActive: async () => false,
+    updateExisting: () => false,
+    createNew: async (_source: PeerId, _destination: PeerId, toSource: Stream, toDestination: Stream) => {
+      if (existing) {
+        toSource.sink(toDestination.source)
+        toDestination.sink(toSource.source)
+      }
+    }
+  }
+}
+
 describe('test relay handshake', function () {
-  let initiator: PeerId, relay: PeerId, destination: PeerId
-
-  before(async function () {
-    ;[initiator, relay, destination] = await Promise.all(
-      Array.from({ length: 3 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
-    )
-  })
-
   it('check initiating sequence', async function () {
     const initiatorToRelay = Pair<StreamType>()
     const relayToInitiator = Pair<StreamType>()
@@ -52,10 +62,7 @@ describe('test relay handshake', function () {
           }
         }
       },
-      () => false,
-      async () => true,
-      () => {},
-      async () => {}
+      getRelayState()
     )
 
     await initiatorReceived.promise
@@ -93,10 +100,7 @@ describe('test relay handshake', function () {
           sink: relayToDestination.sink
         }
       },
-      () => false,
-      async () => true,
-      () => {},
-      async () => {}
+      getRelayState()
     )
 
     await Promise.all([handshakePromise, destinationHandshake])
@@ -134,13 +138,7 @@ describe('test relay handshake', function () {
           sink: relayToDestination.sink
         }
       },
-      () => false,
-      async () => true,
-      () => {},
-      async (_source, _destination, toSource: Stream, toDestination: Stream) => {
-        toSource.sink(toDestination.source)
-        toDestination.sink(toSource.source)
-      }
+      getRelayState(true)
     )
 
     const [initiatorResult, destinationResult] = await Promise.all([

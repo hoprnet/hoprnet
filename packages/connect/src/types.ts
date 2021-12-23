@@ -57,4 +57,20 @@ export type Stream<T = StreamType> = {
 
 export type StreamResult = IteratorResult<StreamType>
 
-export type DialOptions = { signal?: AbortSignal }
+export type HoprConnectOptions = {
+  publicNodes?: PublicNodesEmitter
+  initialNodes?: PeerStoreType[]
+  interface?: string
+  __noDirectConnections?: boolean
+  __noWebRTCUpgrade?: boolean
+  maxRelayedConnections?: number
+  __relayFreeTimeout?: number
+  __useLocalAddresses?: boolean
+}
+
+export type HoprConnectListeningOptions = undefined
+
+export type HoprConnectDialOptions = {
+  signal?: AbortSignal
+  timeout?: number
+}

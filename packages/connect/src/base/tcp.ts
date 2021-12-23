@@ -17,7 +17,7 @@ import { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
 import { toU8aStream } from '../utils'
 import type PeerId from 'peer-id'
-import type { Stream, StreamType, DialOptions } from '../types'
+import type { Stream, StreamType, HoprConnectDialOptions } from '../types'
 
 /**
  * Class to encapsulate TCP sockets
@@ -36,7 +36,7 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
     close?: number
   }
 
-  constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: DialOptions) {
+  constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: HoprConnectDialOptions) {
     this.localAddr = Multiaddr.fromNodeAddress(nodeToMultiaddr(this.conn.address() as AddressInfo), 'tcp').encapsulate(
       `/p2p/${self.toB58String()}`
     )
@@ -126,11 +126,7 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
    * @param options.signal Used to abort dial requests
    * @returns Resolves a TCP Socket
    */
-  public static create(
-    ma: Multiaddr,
-    self: PeerId,
-    options?: DialOptions & { timeout?: number }
-  ): Promise<TCPConnection> {
+  public static create(ma: Multiaddr, self: PeerId, options?: HoprConnectDialOptions): Promise<TCPConnection> {
     if (options?.signal?.aborted) {
       throw new AbortError()
     }

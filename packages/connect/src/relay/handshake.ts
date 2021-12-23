@@ -7,8 +7,10 @@ import { green, yellow } from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
 import { RelayState } from './state'
+import type { Relay } from '.'
 
 import debug from 'debug'
+import { DELIVERY } from '../constants'
 
 export enum RelayHandshakeMessage {
   OK,
@@ -163,11 +165,8 @@ class RelayHandshake {
    */
   async negotiate(
     source: PeerId,
-    getStreamToCounterparty: (peerId: PeerId) => Promise<Stream | undefined>,
-    exists: InstanceType<typeof RelayState>['exists'],
-    isActive: InstanceType<typeof RelayState>['isActive'],
-    updateExisting: InstanceType<typeof RelayState>['updateExisting'],
-    createNew: InstanceType<typeof RelayState>['createNew'],
+    getStreamToCounterparty: InstanceType<typeof Relay>['dialNodeDirectly'],
+    state: Pick<RelayState, 'exists' | 'isActive' | 'updateExisting' | 'createNew'>,
     __relayFreeTimeout?: number
   ): Promise<void> {
     log(`handling relay request`)
@@ -211,17 +210,17 @@ class RelayHandshake {
       return
     }
 
-    const relayedConnectionExists = exists(source, destination)
+    const relayedConnectionExists = state.exists(source, destination)
 
     if (relayedConnectionExists) {
       // Relay could exist but connection is dead
-      const connectionIsActive = await isActive(source, destination)
+      const connectionIsActive = await state.isActive(source, destination)
 
       if (connectionIsActive) {
         this.shaker.write(Uint8Array.of(RelayHandshakeMessage.OK))
         this.shaker.rest()
 
-        updateExisting(source, destination, this.shaker.stream)
+        state.updateExisting(source, destination, this.shaker.stream)
 
         return
       }
@@ -229,7 +228,7 @@ class RelayHandshake {
 
     let toDestination: Stream | undefined
     try {
-      toDestination = await getStreamToCounterparty(destination)
+      toDestination = await getStreamToCounterparty(destination, DELIVERY)
     } catch (err) {
       error(err)
     }
@@ -271,7 +270,7 @@ class RelayHandshake {
         destinationShaker.rest()
 
         try {
-          await createNew(source, destination, this.shaker.stream, destinationShaker.stream, __relayFreeTimeout)
+          await state.createNew(source, destination, this.shaker.stream, destinationShaker.stream, __relayFreeTimeout)
         } catch (err) {
           error(
             `Cannot established relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,

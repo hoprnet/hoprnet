@@ -94,22 +94,21 @@ async function startNode(
 
   const listener = new TestingListener(
     handler,
-    upgrader ??
-      ({
-        upgradeInbound: async (conn: MultiaddrConnection) => {
-          if (expectedMessage != undefined) {
-            for await (const msg of conn.source) {
-              if (u8aEquals(msg.slice(), expectedMessage)) {
-                state?.expectedMessageReceived?.resolve()
-              }
+    upgrader ?? {
+      upgradeInbound: async (conn: MultiaddrConnection) => {
+        if (expectedMessage != undefined) {
+          for await (const msg of conn.source) {
+            if (u8aEquals(msg.slice(), expectedMessage)) {
+              state?.expectedMessageReceived?.resolve()
             }
           }
+        }
 
-          state?.msgReceived?.resolve()
-          return conn
-        },
-        upgradeOutbound: async (conn: MultiaddrConnection) => conn
-      } as any),
+        state?.msgReceived?.resolve()
+        return conn as any
+      },
+      upgradeOutbound: async (conn: MultiaddrConnection) => conn as any
+    },
     publicNodesEmitter,
     initialNodes,
     peerId,
@@ -442,9 +441,8 @@ describe('entry node functionality', function () {
     assert(node.listener.addrs.relays != undefined, `must expose relay addrs`)
     assert(node.listener.addrs.relays.length == 1, `must expose exactly one relay addrs`)
     assert(
-      node.listener.addrs.relays[0].equals(
-        new Multiaddr(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
-      ),
+      node.listener.addrs.relays[0].toString() ===
+        `/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`,
       `must expose the right relay address`
     )
 
