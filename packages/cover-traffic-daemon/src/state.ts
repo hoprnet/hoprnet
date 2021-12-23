@@ -6,9 +6,9 @@ import fs from 'fs'
 
 export type ChannelData = {
   channel: ChannelEntry
-  // number of attempts of a node to receive and send CT packets as the 1st hop (aka the recipient of CT channel)
+  // number of attempts of a channel to receive and send CT packets as the 1st hop (aka the recipient of CT channel)
   sendAttempts: number
-  // number of attempts of a node to forward packets (aka as intermediate hops other than the 1st hop).
+  // number of attempts of a channel to forward packets (aka as intermediate hops other than the 1st hop).
   forwardAttempts: number
 }
 
@@ -34,7 +34,7 @@ export type State = {
 export type PeerData = {
   id: any //PeerId type, as implemented in IPFS
   pub: PublicKey
-  multiaddrs: any // Multiaddress type
+  multiaddrs: any[] // Multiaddress type
 }
 
 export class PersistedState {
@@ -265,25 +265,35 @@ export class PersistedState {
   }
 
   /**
-   * Increase the number of attempts for a node to send out packets (as the 1st hop, aka the destination of CT channel) by 1
-   * @param p Public key of the message sender.
+   * Increase the number of attempts for a channel to send out packets (as the 1st hop, aka the destination of CT channel) by 1
+   * @param source Public key of the message sender.
+   * @param destination Public key of the message sender.
    */
-  async incrementSent(p: PublicKey) {
+  async incrementSent(source: PublicKey, destination: PublicKey) {
     const s = this.get()
-    const prev = s.channels[p.toB58String()].sendAttempts || 0
-    s.channels[p.toB58String()].sendAttempts = prev + 1
-    this.set(s)
+    const channel = findChannel(source, destination, s)
+    if (channel) {
+      const channelId = channel.getId().toHex();
+      const prev = s.channels[channelId].sendAttempts || 0
+      s.channels[channelId].sendAttempts = prev + 1
+      this.set(s)
+    }
   }
 
   /**
-   * Increase the number of attempts for a node to forward packets by 1
-   * @param p Public key of the message forwarder.
+   * Increase the number of attempts for a channel to forward packets by 1
+  * @param source Public key of the message sender.
+   * @param destination Public key of the message sender.
    */
-  async incrementForwards(p: PublicKey) {
+  async incrementForwards(source: PublicKey, destination: PublicKey) {
     const s = this.get()
-    const prev = s.channels[p.toB58String()].forwardAttempts || 0
-    s.channels[p.toB58String()].forwardAttempts = prev + 1
-    this.set(s)
+    const channel = findChannel(source, destination, s)
+    if (channel) {
+      const channelId = channel.getId().toHex();
+      const prev = s.channels[channelId].forwardAttempts || 0
+      s.channels[channelId].forwardAttempts = prev + 1
+      this.set(s)
+    }
   }
 
   /**

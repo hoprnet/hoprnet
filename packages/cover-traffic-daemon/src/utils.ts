@@ -167,8 +167,15 @@ export const sendCTMessage = async (
     )
 
     // update counters in the state
-    path.forEach((p) => data.incrementForwards(p)) // increase counter for non-1st hop nodes
-    data.incrementSent(startNode) // increase counter for 1st hop node
+    path.forEach((p, i, a) => { 
+      // increase counter for non-1st hop nodes
+      if (i < CT_INTERMEDIATE_HOPS - 2) {
+        data.incrementForwards(p, a[i+1])
+      } else {
+        data.incrementForwards(p, selfPub)
+      }
+    }) 
+    data.incrementSent(startNode, path[0]) // increase counter for 1st hop node
 
     // build the complete path
     path.unshift(startNode) // Path doesn't normally include this
