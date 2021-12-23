@@ -24,7 +24,7 @@ EOF
 }
 
 
-while getopts ":r:th" optKey; do
+while getopts "r:t:h" optKey; do
   case "$optKey" in
     r)
       RELEASE=$OPTARG
