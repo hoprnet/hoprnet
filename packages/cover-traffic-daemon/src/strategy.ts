@@ -120,7 +120,11 @@ export class CoverTrafficStrategy extends SaneDefaults {
           }
         } else {
           log(
-            `Unknown error with open CT channels. Channel is ${channel.status}; openChannel is to ${openChannel.destination.toB58String()} since ${openChannel.openFrom} with quality ${openChannel.latestQualityOf}`
+            `Unknown error with open CT channels. Channel is ${
+              channel.status
+            }; openChannel is to ${openChannel.destination.toB58String()} since ${openChannel.openFrom} with quality ${
+              openChannel.latestQualityOf
+            }`
           )
         }
       }
