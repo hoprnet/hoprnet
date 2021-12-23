@@ -265,8 +265,6 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     const TIMEOUT = 3e3
 
-    const start = Date.now()
-
     const results = await Promise.allSettled(
       nodesToCheck.concat(this.publicNodes).map(async (entry: PeerStoreType): Promise<NodeEntry> => {
         let latency = await this.connectToRelay(entry.multiaddrs[0], TIMEOUT)
@@ -284,9 +282,6 @@ class Listener extends EventEmitter implements InterfaceListener {
         values.push(result.value)
       }
     }
-
-    console.log(`time: ${Date.now() - start}`)
-    console.log(`entry nodes`, values)
 
     // Take all entry nodes that appeared to be online
     this.publicNodes = values.sort(latencyCompare)
