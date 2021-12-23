@@ -4,7 +4,6 @@ import { log, mockChannelEntry } from './state.mock'
 import proxyquire from 'proxyquire'
 import fs from 'fs'
 import { expect } from 'chai'
-import BN from 'bn.js'
 import Hopr from '@hoprnet/hopr-core'
 import { CoverTrafficStrategy } from './strategy'
 
