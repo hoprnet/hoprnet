@@ -512,6 +512,11 @@ describe('entry node functionality', function () {
       latency: 23
     })
 
+    node.listener.addrs.relays.push(
+      new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
+    )
+
+    assert(node.listener.addrs.relays.length == 1)
     assert(node.listener.publicNodes.length == 1)
 
     node.listener.uncheckedNodes.push(getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}`, relay.peerId))

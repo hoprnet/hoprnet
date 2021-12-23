@@ -201,11 +201,14 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
     }
 
+    let inUse = false
     const peerB58String = peer.toB58String()
     for (const [index, relayAddr] of this.addrs.relays.entries()) {
-      if (relayAddr.getPeerId() === peerB58String) {
+      // remove second part of relay address to get relay peerId
+      if (relayAddr.decapsulateCode(CODE_P2P).getPeerId() === peerB58String) {
         // Remove node without changing order
         this.addrs.relays.splice(index, 1)
+        inUse = true
       }
     }
 
@@ -215,8 +218,12 @@ class Listener extends EventEmitter implements InterfaceListener {
         .join(`\n\t`)}`
     )
 
-    // Rebuild later
-    setImmediate(this.updatePublicNodes.bind(this))
+    // Only rebuild list of relay nodes if we were using the
+    // offline node
+    if (inUse) {
+      // Rebuild later
+      setImmediate(this.updatePublicNodes.bind(this))
+    }
   }
 
   /**
@@ -224,21 +231,30 @@ class Listener extends EventEmitter implements InterfaceListener {
    * Called at startup and once an entry node is considered offline.
    */
   protected async updatePublicNodes(): Promise<void> {
+    const knownNodes = new Set<string>(this.publicNodes.map((entry: NodeEntry) => entry.id.toB58String()))
     const nodesToCheck: PeerStoreType[] = []
 
     for (const uncheckedNode of this.uncheckedNodes) {
       if (uncheckedNode.id.equals(this.peerId)) {
-        return
-      }
-
-      for (const publicNode of this.publicNodes) {
-        if (publicNode.id.equals(uncheckedNode.id)) {
-          // Peer is already a public node, so nothing to do
-          return
-        }
+        continue
       }
 
       const usableAddresses: Multiaddr[] = uncheckedNode.multiaddrs.filter(isUsableRelay)
+
+      if (knownNodes.has(uncheckedNode.id.toB58String())) {
+        const index = this.publicNodes.findIndex((entry) => entry.id.equals(uncheckedNode.id))
+
+        if (index < 0) {
+          continue
+        }
+
+        // Overwrite previous addresses. E.g. a node was restarted
+        // and now announces with a different address
+        this.publicNodes[index].multiaddrs = usableAddresses
+
+        // Nothing to do. Public nodes are added later
+        continue
+      }
 
       // Ignore if entry nodes have more than one address
       nodesToCheck.push({
@@ -247,34 +263,44 @@ class Listener extends EventEmitter implements InterfaceListener {
       })
     }
 
-    const TIMEOUT = 5e3
+    const TIMEOUT = 3e3
 
-    const results = (
-      await Promise.allSettled(
-        nodesToCheck.map(async (entry: PeerStoreType): Promise<NodeEntry> => {
-          let latency = await this.connectToRelay(entry.multiaddrs[0], TIMEOUT)
+    const start = Date.now()
 
-          return {
-            ...entry,
-            latency
-          }
-        })
-      )
+    const results = await Promise.allSettled(
+      nodesToCheck.concat(this.publicNodes).map(async (entry: PeerStoreType): Promise<NodeEntry> => {
+        let latency = await this.connectToRelay(entry.multiaddrs[0], TIMEOUT)
+
+        return {
+          ...entry,
+          latency
+        }
+      })
     )
-      .filter(
-        (entry): entry is PromiseFulfilledResult<NodeEntry> => entry.status === 'fulfilled' && entry.value.latency >= 0
-      )
-      .map((entry) => entry.value)
 
-    const sorted = results.concat(this.publicNodes).sort(latencyCompare)
+    let values: NodeEntry[] = []
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value.latency >= 0) {
+        values.push(result.value)
+      }
+    }
 
-    this.publicNodes = sorted.slice(0, MAX_RELAYS_PER_NODE)
+    console.log(`time: ${Date.now() - start}`)
+    console.log(`entry nodes`, values)
 
+    // Take all entry nodes that appeared to be online
+    this.publicNodes = values.sort(latencyCompare)
+
+    // Reset list of unchecked nodes
     this.uncheckedNodes = []
 
-    this.addrs.relays = this.publicNodes.map(
-      (entry: NodeEntry) => new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
-    )
+    this.addrs.relays = this.publicNodes
+      // select only those entry nodes with smallest latencies
+      .slice(0, MAX_RELAYS_PER_NODE)
+      .map(
+        (entry: NodeEntry) =>
+          new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
+      )
 
     log(`Current relay addresses:`)
     for (const ma of this.addrs.relays) {
