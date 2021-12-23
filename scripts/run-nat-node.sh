@@ -1,5 +1,7 @@
 #!/bin/bash
 
+function echoerr() { echo "$@" 1>&2; }
+
 if [ $(id -u) -ne 0 ]; then 
   echoerr "ERR: Please run as root!"
   exit 1 
@@ -8,8 +10,6 @@ fi
 
 declare rundir="/var/hoprd"
 unset RELEASE API_TOKEN
-
-function echoerr() { echo "$@" 1>&2; }
 
 function usage {
   cat <<EOF
