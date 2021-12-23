@@ -409,15 +409,14 @@ class Hopr extends EventEmitter {
   private async tickChannelStrategy() {
     verbose('strategy tick', this.status, this.strategy.name)
     if (this.status != 'RUNNING') {
-      return
+      throw new Error('node is not RUNNING')
     }
 
     const currentChannels: ChannelEntry[] | undefined = await this.getAllChannels()
     verbose('Channels obtained', currentChannels)
 
     if (currentChannels === undefined) {
-      log('invalid channels retrieved from database')
-      return
+      throw new Error('invalid channels retrieved from database')
     }
 
     for (const channel of currentChannels) {
@@ -428,8 +427,7 @@ class Hopr extends EventEmitter {
     try {
       balance = await this.getBalance()
     } catch (e) {
-      log('failed to getBalance, aborting tick')
-      return
+      throw new Error('failed to getBalance, aborting tick')
     }
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance.toBN(),
