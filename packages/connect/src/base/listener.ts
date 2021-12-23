@@ -294,6 +294,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     // Reset list of unchecked nodes
     this.uncheckedNodes = []
 
+    const previous = new Set(this.addrs.relays.map((ma) => ma.toString()))
+
     this.addrs.relays = this.publicNodes
       // select only those entry nodes with smallest latencies
       .slice(0, MAX_RELAYS_PER_NODE)
@@ -302,15 +304,26 @@ class Listener extends EventEmitter implements InterfaceListener {
           new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
       )
 
-    log(`Current relay addresses:`)
-    for (const ma of this.addrs.relays) {
-      log(`\t${ma.toString()}`)
+    let isDifferent = false
+    for (const current of this.addrs.relays) {
+      if (!previous.has(current.toString())) {
+        isDifferent = true
+        break
+      }
     }
 
-    if (this.state == State.LISTENING) {
-      // updates libp2p's peer record and lets libp2p push
-      // the updated peer record to all connected peers
-      this.emit('listening')
+    if (isDifferent) {
+      log(`Current relay addresses:`)
+      for (const ma of this.addrs.relays) {
+        log(`\t${ma.toString()}`)
+      }
+
+      // TODO only do this if things changed
+      if (this.state == State.LISTENING) {
+        // updates libp2p's peer record and lets libp2p push
+        // the updated peer record to all connected peers
+        this.emit('listening')
+      }
     }
   }
 
