@@ -1,22 +1,47 @@
 #!/bin/bash
 
-echoerr() { echo "$@" 1>&2; }
-
 if [ $(id -u) -ne 0 ]; then 
-	echoerr "ERR: Please run as root!"
-	exit 1 
+  echoerr "ERR: Please run as root!"
+  exit 1 
 fi
 
 
-if [ $# -le 0 ]; then
-	echoerr "ERR: Missing API token argument!"
-	exit 1
-fi
-
-
-declare release="budapest"
 declare rundir="/var/hoprd"
-declare api_token="$1"
+unset RELEASE API_TOKEN
+
+function echoerr() { echo "$@" 1>&2; }
+
+function usage {
+  cat <<EOF
+Usage: $(basename "$0") [OPTION]
+
+  -r VALUE    relase name, e.g. prague
+  -t VALUE    API token
+  -h          display help
+EOF
+
+  exit 2
+}
+
+
+while getopts ":r:th" optKey; do
+  case "$optKey" in
+    r)
+      RELEASE=$OPTARG
+      ;;
+    t)
+      API_TOKEN=$OPTARG
+      ;;
+    h|*)
+      usage
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+[ -z "$RELEASE" ] && usage
+[ -z "$API_TOKEN" ] && usage
 
 
 cat <<EOF >docker-compose.yaml
@@ -31,7 +56,7 @@ networks:
 services:
   hoprd-natted:
     
-    image: gcr.io/hoprassociation/hoprd:$release
+    image: gcr.io/hoprassociation/hoprd:$RELEASE
 
     command: 
       - "--admin"
@@ -48,9 +73,9 @@ services:
       - "--restHost"
       - "0.0.0.0"
       - "--environment"
-      - "$release"
+      - "$RELEASE"
       - "--apiToken"
-      - "$api_token"
+      - "$API_TOKEN"
       - "--password"
       - "pw14775124087585pw"
    
