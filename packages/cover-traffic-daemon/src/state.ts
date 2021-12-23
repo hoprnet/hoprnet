@@ -27,7 +27,7 @@ export type State = {
   block: BN
   // number of failed messages indexed by the base58-encoded string of node id.
   messageFails: Record<string, number>
-  // number of messages being successfully sent out by the CT node 
+  // number of messages being successfully sent out by the CT node
   messageTotalSuccess: number
 }
 
@@ -273,7 +273,7 @@ export class PersistedState {
     const s = this.get()
     const channel = findChannel(source, destination, s)
     if (channel) {
-      const channelId = channel.getId().toHex();
+      const channelId = channel.getId().toHex()
       const prev = s.channels[channelId].sendAttempts || 0
       s.channels[channelId].sendAttempts = prev + 1
       this.set(s)
@@ -282,14 +282,14 @@ export class PersistedState {
 
   /**
    * Increase the number of attempts for a channel to forward packets by 1
-  * @param source Public key of the message sender.
+   * @param source Public key of the message sender.
    * @param destination Public key of the message sender.
    */
   async incrementForwards(source: PublicKey, destination: PublicKey) {
     const s = this.get()
     const channel = findChannel(source, destination, s)
     if (channel) {
-      const channelId = channel.getId().toHex();
+      const channelId = channel.getId().toHex()
       const prev = s.channels[channelId].forwardAttempts || 0
       s.channels[channelId].forwardAttempts = prev + 1
       this.set(s)
@@ -309,7 +309,7 @@ export class PersistedState {
    * Get the number of total messages that are sent out from the current CT node
    * @returns number of total messages. If none, returns zero.
    */
-   messageTotalSuccess(): number {
+  messageTotalSuccess(): number {
     return this.get().messageTotalSuccess || 0
   }
 

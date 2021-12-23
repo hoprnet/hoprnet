@@ -152,7 +152,7 @@ export const sendCTMessage = async (
   const weight = async (edge: ChannelEntry): Promise<BN> => randomWeightedImportance(edge.destination, data.get())
   let path: PublicKey[]
 
-  // build CT message, 
+  // build CT message,
   const counter = data.messageTotalSuccess()
   const message = new TextEncoder().encode(`CT_${counter.toString}`)
 
@@ -167,14 +167,14 @@ export const sendCTMessage = async (
     )
 
     // update counters in the state
-    path.forEach((p, i, a) => { 
+    path.forEach((p, i, a) => {
       // increase counter for non-1st hop nodes
       if (i < CT_INTERMEDIATE_HOPS - 2) {
-        data.incrementForwards(p, a[i+1])
+        data.incrementForwards(p, a[i + 1])
       } else {
         data.incrementForwards(p, selfPub)
       }
-    }) 
+    })
     data.incrementSent(startNode, path[0]) // increase counter for 1st hop node
 
     // build the complete path

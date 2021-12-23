@@ -110,10 +110,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
               this.data.incrementMessageTotalSuccess()
             }
           })
-        } else if (
-          channel &&
-          channel.status == ChannelStatus.WaitingForCommitment
-        ) {
+        } else if (channel && channel.status == ChannelStatus.WaitingForCommitment) {
           if (Date.now() - openChannel.openFrom >= CT_CHANNEL_STALL_TIMEOUT) {
             // handle waiting for commitment stalls
             log('channel is stalled in WAITING_FOR_COMMITMENT, closing', openChannel.destination.toB58String())
@@ -133,7 +130,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
     } else {
       log('aborting send messages - less channels in network than hops required')
     }
-    log(`message send phase complete for ${state.ctChannels,length} ctChannels`)
+    log(`message send phase complete for ${(state.ctChannels, length)} ctChannels`)
 
     let attempts = 0
     let currentChannelNum = currentChannels.length

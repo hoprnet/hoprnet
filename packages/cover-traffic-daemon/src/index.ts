@@ -160,8 +160,6 @@ if (require.main === module) {
   })
 
   main((state: State) => {
-    log(
-      `State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`
-    )
+    log(`State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`)
   })
 }

@@ -9,18 +9,16 @@ export const log = debug('hopr:cover-traffic:mock')
 export const sampleData = {} as unknown as PersistedState
 
 export const mockPersistedState: PersistedState = new PersistedState((state: State) => {
-    log(
-      `State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`
-    )
-  }, "./test/db.json")
+  log(`State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`)
+}, './test/db.json')
 
 export const mockState: State = {
-    nodes: {},
-    channels: {},
-    ctChannels: [],
-    block: new BN('123456'),
-    messageFails: {},
-    messageTotalSuccess: 0
+  nodes: {},
+  channels: {},
+  ctChannels: [],
+  block: new BN('123456'),
+  messageFails: {},
+  messageTotalSuccess: 0
 }
 
 export const PARTY_A = PublicKey.fromPrivKey(
@@ -43,17 +41,17 @@ export const mockChannelEntry = new ChannelEntry(
   new UINT256(new BN('0'))
 )
 
-const mockPeerId = PeerId.createFromB58String("16Uiu2HAm6fJyjpFFbFtNx2aqRakVCjodRUoagu6Pu4w1LAKL9uLy")
+const mockPeerId = PeerId.createFromB58String('16Uiu2HAm6fJyjpFFbFtNx2aqRakVCjodRUoagu6Pu4w1LAKL9uLy')
 export const mockPublicKey = PublicKey.fromPeerId(mockPeerId)
 
 export const mockPeerData: PeerData = {
   id: mockPeerId,
   pub: mockPublicKey,
-  multiaddrs: [new Multiaddr("/ip4/127.0.0.1/udp/1234")]
+  multiaddrs: [new Multiaddr('/ip4/127.0.0.1/udp/1234')]
 }
 
 export const mockOpenChannel: OpenChannels = {
   destination: PARTY_B,
   latestQualityOf: 1,
-  openFrom: 0,
+  openFrom: 0
 }
