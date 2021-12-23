@@ -25,7 +25,7 @@ import {
 import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } from './types'
 import { isConfirmedBlock, snapshotComparator } from './utils'
-import { errors, utils } from 'ethers'
+import { errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 import { TypedEvent } from '@hoprnet/hopr-ethereum'
 
@@ -114,11 +114,10 @@ class Indexer extends EventEmitter {
       }
     })
     this.unsubscribeTokenEvents = this.chain.subscribeTokenEvents((tokenEvent: TypedEvent<any, any>) => {
-      if (
-        tokenEvent.event === 'Transfer' &&
-        (tokenEvent.topics[1] === utils.hexZeroPad(this.address.toHex(), 32) ||
-          tokenEvent.topics[2] === utils.hexZeroPad(this.address.toHex(), 32))
-      ) {
+      if (tokenEvent.event !== 'Transfer') return
+
+      const event = tokenEvent as TokenEvent<'Transfer'>
+      if (Address.fromString(event.args.from).eq(this.address) || Address.fromString(event.args.to).eq(this.address)) {
         // save transfer events
         this.onNewEvents([tokenEvent])
       }
@@ -324,7 +323,7 @@ class Indexer extends EventEmitter {
       isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
-      log('Processing event %s %s %s', event.event, blockNumber, this.maxConfirmations)
+      log('Processing event %s blockNumber=%s maxConfirmations=%s', event.event, blockNumber, this.maxConfirmations)
 
       // if we find a previous snapshot, compare event's snapshot with last processed
       if (lastSnapshot) {
@@ -363,6 +362,9 @@ class Indexer extends EventEmitter {
           case 'Transfer(address,address,uint256)':
             // handle HOPR token transfer
             this.indexEvent('withdraw-hopr', [event.transactionHash])
+            console.log('ON TRANSFER START')
+            await this.onTransfer(event as TokenEvent<'Transfer'>)
+            console.log('ON TRANSFER END')
             break
           case 'TicketRedeemed':
           case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
@@ -499,6 +501,20 @@ class Indexer extends EventEmitter {
   private async onChannelClosed(channel: ChannelEntry) {
     await this.db.deleteAcknowledgedTicketsFromChannel(channel)
     this.emit('channel-closed', channel)
+  }
+
+  private async onTransfer(event: TokenEvent<'Transfer'>) {
+    console.log('onTransfer start', event.args.value.toString())
+    const isIncoming = Address.fromString(event.args.to).eq(this.address)
+    const amount = new Balance(new BN(event.args.value.toString()))
+
+    if (isIncoming) {
+      await this.db.addHoprBalance(amount)
+    } else {
+      await this.db.subHoprBalance(amount)
+    }
+
+    console.log('onTransfer end', event.args.value.toString())
   }
 
   private indexEvent(indexerEvent: IndexerEvents, txHash: string[]) {
