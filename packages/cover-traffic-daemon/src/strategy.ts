@@ -131,7 +131,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
     } else {
       log('aborting send messages - less channels in network than hops required')
     }
-    log(`message send phase complete for ${(state.ctChannels, length)} ctChannels`)
+    log(`message send phase complete for ${(state.ctChannels.length)} ctChannels`)
 
     let attempts = 0
     let currentChannelNum = currentChannels.length
@@ -141,6 +141,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       Object.keys(state.nodes).length > 0 &&
       attempts < 100
     ) {
+      log(`[DEBUG] while loop ${attempts} currentChannelNum ${currentChannelNum}`)
       attempts++
       const c = this.data.weightedRandomChoice()
       const q = await peers.qualityOf(c)
