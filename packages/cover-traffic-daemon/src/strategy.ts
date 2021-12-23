@@ -141,7 +141,6 @@ export class CoverTrafficStrategy extends SaneDefaults {
       Object.keys(state.nodes).length > 0 &&
       attempts < 100
     ) {
-      log(`[DEBUG] while loop ${attempts} currentChannelNum ${currentChannelNum}`)
       attempts++
       const c = this.data.weightedRandomChoice()
       const q = await peers.qualityOf(c)
