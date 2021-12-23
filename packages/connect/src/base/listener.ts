@@ -318,7 +318,6 @@ class Listener extends EventEmitter implements InterfaceListener {
         log(`\t${ma.toString()}`)
       }
 
-      // TODO only do this if things changed
       if (this.state == State.LISTENING) {
         // updates libp2p's peer record and lets libp2p push
         // the updated peer record to all connected peers

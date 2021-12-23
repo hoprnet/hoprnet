@@ -561,7 +561,7 @@ describe('entry node functionality', function () {
     await Promise.all([stopNode(node.listener), stopNode(relay.listener)])
   })
 
-  it.only('do not emit listening event if nothing has changed', async function () {
+  it('do not emit listening event if nothing has changed', async function () {
     const node = await startNode()
 
     const relay = await startNode()
