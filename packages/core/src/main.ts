@@ -101,13 +101,6 @@ export async function createHoprNode(
     throw err
   }
 
-  try {
-    await db.verifyEnvironmentId(options.environment.id)
-  } catch (err) {
-    log(`failed to verify db: ${err.toString()}`)
-    throw err
-  }
-
   const provider = expandVars(options.environment.network.default_provider, process.env)
   log(`using provider URL: ${provider}`)
   const chain = new HoprCoreEthereum(

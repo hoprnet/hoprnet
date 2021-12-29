@@ -105,6 +105,10 @@ export class HoprDB {
       }
     }
     this.db = levelup(leveldown(dbPath))
+
+    // Fully initialize database
+    await this.db.open()
+
     log('namespacing db by pubkey: ', this.id.toAddress().toHex())
     if (setEnvironment) {
       if (!environmentId) {
@@ -112,6 +116,14 @@ export class HoprDB {
       }
       log(`setting environment id ${environmentId} to db`)
       await this.setEnvironmentId(environmentId)
+    } else {
+      const hasEnvironmentKey = await this.verifyEnvironmentId(environmentId)
+
+      if (!hasEnvironmentKey) {
+        const storedId = await this.getEnvironmentId()
+
+        throw new Error(`invalid db environment id: ${storedId} (expected: ${environmentId})`)
+      }
     }
   }
 
@@ -555,13 +567,16 @@ export class HoprDB {
   }
 
   public async getEnvironmentId(): Promise<string> {
-    return decoder.decode(await this.get(ENVIRONMENT_KEY))
+    return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
   }
 
-  public async verifyEnvironmentId(expectedId: string): Promise<void> {
+  public async verifyEnvironmentId(expectedId: string): Promise<boolean> {
     const storedId = await this.getEnvironmentId()
-    if (storedId !== expectedId) {
-      throw new Error(`invalid db environment id: ${storedId} (expected: ${expectedId})`)
+
+    if (storedId == undefined) {
+      return false
     }
+
+    return storedId !== expectedId
   }
 }
