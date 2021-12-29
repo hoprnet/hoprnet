@@ -17,7 +17,7 @@ export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
   const abort = new AbortController()
 
   // forward abort request
-  const onOuterAbort = () => abort.abort()
+  const onOuterAbort = abort.abort.bind(abort)
   opts.signal?.addEventListener('abort', () => {
     onOuterAbort()
     opts.signal?.removeEventListener('abort', onOuterAbort)
@@ -51,13 +51,12 @@ export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
   abort.signal.addEventListener('abort', onAbort)
 
   const resultFunction = async (): Promise<Result> => {
+    let result: Result
     try {
-      const result = await fn({
+      result = await fn({
         timeout: opts.timeout,
         signal: abort.signal
       })
-      cleanUp()
-      return result
     } catch (err) {
       if (!done) {
         throw err
@@ -70,10 +69,12 @@ export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
         // to prevent from uncaught promise rejection, the error
         // are logged.
         logError(`Function has thrown an error after the timeout happend or the function got aborted`, err)
+        return
       }
     }
 
-    return
+    cleanUp()
+    return result
   }
 
   return Promise.race([abortableTimeout.promise, resultFunction()])
