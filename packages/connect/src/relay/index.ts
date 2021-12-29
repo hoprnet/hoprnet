@@ -1,6 +1,5 @@
 import type { HandlerProps } from 'libp2p'
 import type { Connection } from 'libp2p-interfaces/connection'
-import type { ConnectionHandler } from 'libp2p-interfaces/transport'
 import type { Stream, HoprConnectDialOptions } from '../types'
 import type Libp2p from 'libp2p'
 import type PeerId from 'peer-id'
@@ -55,7 +54,6 @@ class Relay {
     public libp2p: ReducedLibp2p,
     private dialDirectly: HoprConnect['dialDirectly'],
     private filter: HoprConnect['filter'],
-    private connHandler: ConnectionHandler | undefined,
     private webRTCUpgrader?: WebRTCUpgrader,
     private __noWebRTCUpgrade?: boolean,
     private maxRelayedConnections: number = DEFAULT_MAX_RELAYED_CONNECTIONS,
@@ -234,9 +232,8 @@ class Relay {
       handShakeResult.stream
     ) as any
 
-    let upgraded: Connection
     try {
-      upgraded = (await this.libp2p.upgrader.upgradeInbound(newConn)) as any
+      await this.libp2p.upgrader.upgradeInbound(newConn)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -244,8 +241,6 @@ class Relay {
 
     // @TODO
     // this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])
-
-    this.connHandler?.(upgraded)
   }
 
   /**
@@ -276,8 +271,6 @@ class Relay {
     // @TODO remove this
     this.libp2p.dialer._pendingDials?.get(counterparty.toB58String())?.destroy()
     this.libp2p.connectionManager.connections?.set(counterparty.toB58String(), [newConn as any])
-
-    this.connHandler?.(newConn)
   }
 
   /**

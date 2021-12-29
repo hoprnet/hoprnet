@@ -63,5 +63,7 @@ export function isValidPrefix(prefix: RelayPrefix): boolean {
   }
 }
 
+export const MAX_RELAYS_PER_NODE = 5
+
 export const RELAY = `/${NAME}/relay/${version}`
 export const DELIVERY = `/${NAME}/delivery/${version}`

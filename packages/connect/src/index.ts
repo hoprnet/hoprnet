@@ -42,16 +42,17 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
   private __noDirectConnections: boolean
   private __noWebRTCUpgrade: boolean
   private __useLocalAddress: boolean
+
+  private _dialDirectly: HoprConnect['dialDirectly']
   private _upgradeOutbound: Upgrader['upgradeOutbound']
   private _upgradeInbound: Upgrader['upgradeInbound']
+
   private _peerId: PeerId
   private relay: Relay
   private _webRTCUpgrader?: WebRTCUpgrader
   private _interface?: string
   private _addressFilter: Filter
   private _libp2p: libp2p
-
-  private connHandler: ConnectionHandler | undefined
 
   constructor(
     opts: {
@@ -88,11 +89,12 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     this._upgradeOutbound = opts.upgrader.upgradeOutbound.bind(opts.upgrader)
     this._upgradeInbound = opts.upgrader.upgradeInbound.bind(opts.upgrader)
 
+    this._dialDirectly = this.dialDirectly.bind(this)
+
     this.relay = new Relay(
       this._libp2p,
-      this.dialDirectly.bind(this),
+      this._dialDirectly,
       this.filter.bind(this),
-      this.connHandler,
       this._webRTCUpgrader,
       opts.__noWebRTCUpgrade,
       opts.maxRelayedConnections,
@@ -191,19 +193,10 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @param handler
    * @returns A TCP listener
    */
-  createListener(options: HoprConnectListeningOptions, handler?: ConnectionHandler): Listener {
-    if (arguments.length == 1 && typeof options === 'function') {
-      this.connHandler = options
-    } else {
-      this.connHandler = handler
-    }
-
+  createListener(_options: HoprConnectListeningOptions, _handler?: ConnectionHandler): Listener {
     return new Listener(
-      this.connHandler,
-      {
-        upgradeInbound: this._upgradeInbound,
-        upgradeOutbound: this._upgradeOutbound
-      },
+      this._dialDirectly,
+      this._upgradeInbound,
       this.publicNodes,
       this.initialNodes,
       this._peerId,

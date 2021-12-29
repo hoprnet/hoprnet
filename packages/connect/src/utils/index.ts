@@ -1,6 +1,9 @@
 import type { Stream, StreamType } from '../types'
 import type { Multiaddr } from 'multiaddr'
-import type { AddressInfo } from 'net'
+import type { AddressInfo, Server as TCPServer } from 'net'
+import type { Socket as UDPSocket } from 'dgram'
+import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
+import type { Connection } from 'libp2p-interfaces/connection'
 
 export { parseAddress } from './addrs'
 export type { ValidAddress } from './addrs'
@@ -96,6 +99,12 @@ export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): Asyn
   }
 }
 
+/**
+ * Converts a Node.js address instance to format that is
+ * understood by Multiaddr
+ * @param addr a Node.js address instance
+ * @returns
+ */
 export function nodeToMultiaddr(addr: AddressInfo): Parameters<typeof Multiaddr.fromNodeAddress>[0] {
   let family: 4 | 6
   switch (addr.family) {
@@ -113,5 +122,93 @@ export function nodeToMultiaddr(addr: AddressInfo): Parameters<typeof Multiaddr.
     family,
     address: addr.address,
     port: addr.port
+  }
+}
+
+/**
+ * Binds a UDP or TCP socket to a port and a host
+ * @param protocol type of the socket, either 'TCP' or 'UDP'
+ * @param socket TCP Socket or UDP socket
+ * @param logError forward error report, if any
+ * @param opts host and port to bind to
+ * @returns a Promise that resolves once the socket is bound
+ */
+export type bindToPort = ((
+  protocol: 'TCP',
+  socket: TCPServer,
+  logError: (...args: any[]) => void,
+  opts?: { host?: string; port: number }
+) => Promise<void>) &
+  ((
+    protocol: 'UDP',
+    socket: UDPSocket,
+    logError: (...args: any[]) => void,
+    opts?: { host?: string; port: number }
+  ) => Promise<void>)
+export function bindToPort(
+  protocol: 'UDP' | 'TCP',
+  socket: TCPServer | UDPSocket,
+  logError: (...args: any[]) => void,
+  opts?: { host?: string; port: number }
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let done = false
+
+    const errListener = (err: any) => {
+      socket.removeListener('listening', successListener)
+      if (!done) {
+        done = true
+        reject(err)
+      }
+    }
+
+    const successListener = () => {
+      socket.removeListener('error', errListener)
+      if (!done) {
+        done = true
+        resolve()
+      }
+    }
+
+    socket.once('error', errListener)
+    socket.once('listening', successListener)
+
+    try {
+      switch (protocol) {
+        case 'TCP':
+          ;(socket as TCPServer).listen(opts)
+          break
+        case 'UDP':
+          ;(socket as UDPSocket).bind(opts?.port)
+          break
+      }
+    } catch (err: any) {
+      socket.removeListener('error', errListener)
+      socket.removeListener('listening', successListener)
+
+      logError(`Could not bind to ${protocol} socket.`, err)
+
+      if (!done) {
+        done = true
+        reject(err)
+      }
+    }
+  })
+}
+
+/**
+ * Attempts to close the given maConn. If a failure occurs, it will be logged.
+ * @private
+ * @param maConn
+ */
+export async function attemptClose(maConn: MultiaddrConnection | Connection, logError: (...args: any[]) => void) {
+  if (maConn == null) {
+    return
+  }
+
+  try {
+    await maConn.close()
+  } catch (err) {
+    logError?.('an error occurred while closing the connection', err)
   }
 }
