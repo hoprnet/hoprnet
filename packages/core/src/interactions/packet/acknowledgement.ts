@@ -22,7 +22,7 @@ async function handleAcknowledgement(
   onAcknowledgement: OnAcknowledgement,
   onWinningTicket: OnWinningTicket,
   onOutOfCommitments: OnOutOfCommitments
-) {
+): Promise<void> {
   const acknowledgement = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
   // There are three cases:
@@ -112,10 +112,10 @@ export function subscribeToAcknowledgements(
   onOutOfCommitments: OnOutOfCommitments,
   protocolAck: string
 ) {
-  const limitConcurrency = oneAtATime()
+  const limitConcurrency = oneAtATime<void>()
   subscribe(
     protocolAck,
-    (msg: Uint8Array, remotePeer: PeerId) =>
+    async (msg: Uint8Array, remotePeer: PeerId) =>
       limitConcurrency(() =>
         handleAcknowledgement(msg, remotePeer, pubKey, db, onAcknowledgement, onWinningTicket, onOutOfCommitments)
       ),
