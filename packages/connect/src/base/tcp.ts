@@ -1,6 +1,5 @@
-import net from 'net'
+import net, { type Socket, type AddressInfo } from 'net'
 import abortable, { AbortError } from 'abortable-iterator'
-import type { Socket, AddressInfo } from 'net'
 import Debug from 'debug'
 import { nodeToMultiaddr } from '../utils'
 import { once } from 'events'
@@ -178,15 +177,12 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
       rawSocket = net
         .createConnection({
           host: cOpts.host,
-          port: cOpts.port
+          port: cOpts.port,
+          timeout: options?.timeout
         })
         .on('error', onError)
         .on('timeout', onTimeout)
         .on('connect', onConnect)
-
-      if (options?.timeout) {
-        rawSocket.setTimeout(options.timeout)
-      }
 
       options?.signal?.addEventListener('abort', onAbort)
     })
