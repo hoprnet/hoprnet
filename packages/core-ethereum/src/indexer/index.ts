@@ -504,7 +504,6 @@ class Indexer extends EventEmitter {
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>) {
-    console.log('onTransfer start', event.args.value.toString())
     const isIncoming = Address.fromString(event.args.to).eq(this.address)
     const amount = new Balance(new BN(event.args.value.toString()))
 
@@ -513,8 +512,6 @@ class Indexer extends EventEmitter {
     } else {
       await this.db.subHoprBalance(amount)
     }
-
-    console.log('onTransfer end', event.args.value.toString())
   }
 
   private indexEvent(indexerEvent: IndexerEvents, txHash: string[]) {
