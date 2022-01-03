@@ -1155,7 +1155,7 @@ __metadata:
     "@types/node": 16.11.18
     "@types/simple-peer": 9.11.3
     "@types/yargs": 17.0.7
-    abortable-iterator: 3.0.0
+    abortable-iterator: 3.0.1
     bl: 5.0.0
     chai: 4.3.4
     chai-spies: 1.0.0
@@ -2830,7 +2830,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"abortable-iterator@npm:3.0.0, abortable-iterator@npm:^3.0.0":
+"abortable-iterator@npm:3.0.1":
+  version: 3.0.1
+  resolution: "abortable-iterator@npm:3.0.1"
+  dependencies:
+    get-iterator: ^1.0.2
+  checksum: 1c4e0379f0c0aaab15c975bf7ef175bc5900bcd85955d60f9c68a526c6f150b7ec2a87f642b6022ebe7dd2dbf630a690a2c0cc8211cd800ba16a4d3380f19b2e
+  languageName: node
+  linkType: hard
+
+"abortable-iterator@npm:^3.0.0":
   version: 3.0.0
   resolution: "abortable-iterator@npm:3.0.0"
   dependencies:
