@@ -579,11 +579,15 @@ class Indexer extends EventEmitter {
 
     deferred.promise = new Promise((resolve, reject) => {
       deferred.reject = () => {
+        clearTimeout(timeoutObj)
         this.removeListener(eventType, listener)
-        log('listener %s on %s timed out and thus removed', eventType, tx)
+        log('listener %s on %s is removed due to error', eventType, tx)
+        resolve(tx)
       }
       const timeoutObj = setTimeout(() => {
-        deferred.reject() // remove listener but throw now error
+        // remove listener but throw now error
+        this.removeListener(eventType, listener)
+        log('listener %s on %s timed out and thus removed', eventType, tx)
         reject(tx)
       }, INDEXER_TIMEOUT)
 
