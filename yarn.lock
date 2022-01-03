@@ -1345,7 +1345,7 @@ __metadata:
     memdown: 6.1.1
     mocha: 9.1.3
     multiaddr: 10.0.1
-    multihashes: 4.0.1
+    multihashes: 4.0.3
     peer-id: 0.16.0
     pino: 7.6.2
     pino-logflare: 0.3.12
@@ -12519,17 +12519,6 @@ __metadata:
   version: 9.4.10
   resolution: "multiformats@npm:9.4.10"
   checksum: 57093ef493696122d3f843bc683167f535687d327a07a2488ac9b23ca555ca049db99c4f8344aac09646b515c8e48edac92ab5dccd6622b0437760f0b8effe27
-  languageName: node
-  linkType: hard
-
-"multihashes@npm:4.0.1":
-  version: 4.0.1
-  resolution: "multihashes@npm:4.0.1"
-  dependencies:
-    multibase: ^4.0.1
-    uint8arrays: ^2.1.3
-    varint: ^5.0.2
-  checksum: bdc64208de5bc200326380584322cd39e9d605e3244b48faaa8f12839fa5dafefdeabf36f84f118c13d87937d34d3d04b1f8ddcf714c46c7563e4e815e613db5
   languageName: node
   linkType: hard
 
