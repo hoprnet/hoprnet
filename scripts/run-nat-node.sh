@@ -13,14 +13,18 @@ fi
 
 unset RELEASE API_TOKEN DBG_STRING HOPR_VOLUME
 GENERATE_ONLY=false
+RELEASE=""
+API_TOKEN=""
+DBG_STRING=""
+HOPR_VOLUME="/var/hoprd"
 
 function usage {
   cat <<EOF
-Usage: $(basename "$0") [OPTION]
+Usage: $(basename "$0") [OPTIONS]
 
-  -r VALUE    relase name, e.g. prague
-  -t VALUE    API token
-  -d VALUE    debug environment variable (DEBUG=VALUE, optional)
+  -r VALUE    relase name, e.g. prague (required)
+  -t VALUE    API token (required)
+  -d VALUE    debug environment variable (DEBUG=VALUE, default: none)
   -v VALUE    hoprd database directory mount (default: /var/hoprd)
   -g          only generate docker-compose.yaml, do not start docker compose
   -h          display help
@@ -114,13 +118,13 @@ if [ ! -z "$DBG_STRING" ]; then
 
 cat <<EOF >>docker-compose.yaml
     environment:
-      - "DEBUG=$DGB_STRING"
+      - "DEBUG=$DBG_STRING"
 EOF
 
 fi
 
 
 # Start Docker compose
-[ "$GENERATE_ONLY" = false ] && docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w="$PWD" docker/compose:1.29.2 up -d --force-recreate
+[ "$GENERATE_ONLY" = false ] && docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w="$PWD" docker/compose:1.29.2 up -d --force-recreate --remove-orphans
 
 
