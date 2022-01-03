@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -e
+set -u
+set -o pipefail
 
 function echoerr() { echo "$@" 1>&2; }
 
@@ -7,9 +11,8 @@ if [ $(id -u) -ne 0 ]; then
   exit 1 
 fi
 
-
-declare rundir="/var/hoprd"
-unset RELEASE API_TOKEN
+unset RELEASE API_TOKEN DBG_STRING HOPR_VOLUME
+GENERATE_ONLY=false
 
 function usage {
   cat <<EOF
@@ -17,6 +20,9 @@ Usage: $(basename "$0") [OPTION]
 
   -r VALUE    relase name, e.g. prague
   -t VALUE    API token
+  -d VALUE    debug environment variable (DEBUG=VALUE, optional)
+  -v VALUE    hoprd database directory mount (default: /var/hoprd)
+  -g          only generate docker-compose.yaml, do not start docker compose
   -h          display help
 EOF
 
@@ -24,13 +30,22 @@ EOF
 }
 
 
-while getopts "r:t:h" optKey; do
+while getopts "r:t:d:v:gh" optKey; do
   case "$optKey" in
     r)
       RELEASE=$OPTARG
       ;;
     t)
       API_TOKEN=$OPTARG
+      ;;
+    d)
+      DBG_STRING=$OPTARG
+      ;;
+    v)
+      HOPR_VOLUME=$OPTARG
+      ;;
+    g)
+      GENERATE_ONLY=true
       ;;
     h|*)
       usage
@@ -40,8 +55,12 @@ done
 
 shift $((OPTIND - 1))
 
+# Required parameters
 [ -z "$RELEASE" ] && usage
 [ -z "$API_TOKEN" ] && usage
+
+# Optional parameters
+[ -z "$HOPR_VOLUME" ] && HOPR_VOLUME="/var/hoprd"
 
 
 cat <<EOF >docker-compose.yaml
@@ -49,12 +68,12 @@ version: "3.9"
 
 # Start an internal-only bridge network to simulate NAT (NATwork)
 networks:
-  natwork:
+  hopr-local-network:
     driver: bridge
 
 # Starts HOPRD behind NAT
 services:
-  hoprd-natted:
+  hoprd-nat:
     
     image: gcr.io/hoprassociation/hoprd:$RELEASE
 
@@ -62,7 +81,6 @@ services:
       - "--admin"
       - "--adminHost"
       - "0.0.0.0"
-      - "--announce"
       - "--healthCheck"
       - "--healthCheckHost"
       - "0.0.0.0"
@@ -80,26 +98,29 @@ services:
       - "pw14775124087585pw"
    
     volumes:
-      - "$rundir:/app/db"
-
-    environment:
-      - "DEBUG=hopr*"
+      - "$HOPR_VOLUME:/app/db"
 
     networks:
-      - "natwork"
+      - "hopr-local-network"
 
     ports:
-      - "3000:3000"
-      - "3001:3001"
+      - "3000:3010"
+      - "3001:3011"
 EOF
 
 
+# Add environment variables for debugging
+if [ ! -z "$DBG_STRING" ]; then
+
+cat <<EOF >>docker-compose.yaml
+    environment:
+      - "DEBUG=$DGB_STRING"
+EOF
+
+fi
+
+
 # Start Docker compose
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w="$PWD" docker/compose:1.29.2 up --force-recreate --abort-on-container-exit --exit-code-from hoprd-natted
-ec=$?
+[ "$GENERATE_ONLY" = false ] && docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w="$PWD" docker/compose:1.29.2 up -d --force-recreate
 
-echo "Node exitted with code $ec"
-rm docker-compose.yaml
-
-exit $ec
 
