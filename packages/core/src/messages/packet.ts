@@ -65,7 +65,6 @@ export async function createTicket(
   privKey: PeerId
 ): Promise<Ticket> {
   const channel = await db.getChannelTo(dest)
-  const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
   const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
   const winProb = new BN(INVERSE_TICKET_WIN_PROB)
 
@@ -88,6 +87,8 @@ export async function createTicket(
         .toHex()} with counterparty ${dest.toB58String()} to create ticket`
     )
   }
+
+  const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
 
   const ticket = Ticket.create(
     dest.toAddress(),
