@@ -354,17 +354,16 @@ custom a isolated network which forces NAT to take place whenever the node attem
 ```
 
 The above example command specifies release `prague` Docker image to be used for the hoprd container with
-the API token `MyT0ken123^` and standard debugging log filter (an optional argument). 
-The container running behind NAT does not have standard publicly accessible HOPR port at `9000`, but the 
+the API token `MyT0ken123^` and standard debugging log filter (an optional argument).
+The container running behind NAT does not have standard publicly accessible HOPR port at `9000`, but the
 Admin and API ports are accessible through `3010` and `3011` respectively.
 
-If you wish just to generate the `docker-compose.yaml` and not start the docker-compose, you can supply 
+If you wish just to generate the `docker-compose.yaml` and not start the docker-compose, you can supply
 an optional `-g` parameter which just generates the YAML file with configuration without starting anything.
 
 ```sh
 ./scripts/run-nat-node.sh -r prague -t MyT0ken123^ -d "hopr*" -g
 ```
-
 
 #### Running Tests on Google Cloud Platform
 
