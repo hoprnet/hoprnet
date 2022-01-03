@@ -57,7 +57,7 @@
     "rlp": "2.2.7",
     "run-queue": "2.0.1",
     "strip-ansi": "6.0.1",
-    "swagger-ui-express": "4.2.0",
+    "swagger-ui-express": "4.3.0",
     "tiny-hashes": "1.0.1",
     "trace-unhandled": "2.0.1",
     "ws": "8.3.0",
