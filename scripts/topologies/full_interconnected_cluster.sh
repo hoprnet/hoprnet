@@ -136,9 +136,10 @@ done
 
 log "Opening channels in background to parallelize operations"
 
-for (( i = 0; i < ${#endpoints[*]}; ++ i )); do
-  endpoint=${files[$i]}
-  other_endpoint=${files[$i+1]}
+# use for loop to read all values and indexes
+for (( i=0; i<${#endpoints_arr[@]}; i++ )); do
+  endpoint=${endpoints_arr[$i]}
+  other_endpoint=${endpoints_arr[$i+1]:-""}
 
   if [ -n "${other_endpoint}" ]; then
     log "${endpoint} opening channel to other node at ${other_endpoint}"
