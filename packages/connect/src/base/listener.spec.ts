@@ -512,19 +512,24 @@ describe('entry node functionality', function () {
       latency: 23
     })
 
+    node.listener.addrs.relays.push(
+      new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
+    )
+
+    assert(node.listener.addrs.relays.length == 1)
     assert(node.listener.publicNodes.length == 1)
 
     node.listener.uncheckedNodes.push(getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}`, relay.peerId))
 
+    const listeningEventPromise = once(node.listener, 'listening')
     node.listener.onRemoveRelay(newNode.id)
 
     // @ts-ignore
     assert(node.listener.publicNodes.length == 0)
 
     await relayContacted.promise
+    await listeningEventPromise
 
-    // Add some propagtion delay
-    await new Promise((resolve) => setTimeout(resolve, 50))
     assert(node.listener.publicNodes.length == 1)
 
     await Promise.all([stopNode(node.listener), stopNode(relay.listener)])
@@ -544,15 +549,42 @@ describe('entry node functionality', function () {
     node.listener.uncheckedNodes.push(getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}`, relay.peerId))
     node.listener.uncheckedNodes.push(fakeNode)
 
+    const listeningEventPromise = once(node.listener, 'listening')
     node.listener.updatePublicNodes()
 
     await relayContacted.promise
-
-    // Add some propagtion delay
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await listeningEventPromise
 
     assert(node.listener.publicNodes.length == 1)
     assert(node.listener.publicNodes[0].id.equals(relay.peerId))
+
+    await Promise.all([stopNode(node.listener), stopNode(relay.listener)])
+  })
+
+  it('do not emit listening event if nothing has changed', async function () {
+    const node = await startNode()
+
+    const relay = await startNode()
+
+    node.listener.publicNodes.push({
+      id: relay.peerId,
+      multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)],
+      latency: 23
+    })
+    node.listener.addrs.relays.push(
+      new Multiaddr(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`)
+    )
+
+    node.listener.once('listening', () =>
+      assert.fail(`must not throw listening event if list of entry nodes has not changed`)
+    )
+
+    await node.listener.updatePublicNodes()
+
+    assert(node.listener.publicNodes.length == 1)
+    assert(node.listener.publicNodes[0].id.equals(relay.peerId))
+
+    assert(node.listener.addrs)
 
     await Promise.all([stopNode(node.listener), stopNode(relay.listener)])
   })
