@@ -47,7 +47,7 @@
     "@types/debug": "4.1.7",
     "@types/mocha": "9.0.0",
     "@types/node": "16.11.18",
-    "@types/simple-peer": "9.11.3",
+    "@types/simple-peer": "9.11.4",
     "@types/yargs": "17.0.7",
     "abortable-iterator": "3.0.1",
     "chai": "4.3.4",
