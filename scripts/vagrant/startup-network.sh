@@ -5,7 +5,8 @@ cd /opt/hopr/ || exit 1
 yarn && yarn build
 
 # Start the HardHat network on localhost
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network &
+echo "Starting HardHat network..."
+HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network > /dev/null 2>&1 &
 
 while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ]]; do
 	echo "Waiting for hardhat network to come up..."
