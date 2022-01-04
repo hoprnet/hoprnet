@@ -7,8 +7,6 @@ db
 *.swp
 .vercel
 
-.DS_Store
-
 test/local-fixtures
 
 # logs
@@ -41,3 +39,4 @@ packages/cover-traffic-daemon/default-environment.json
 
 # CT database
 **/ct.json
+/scripts/vagrant/.vagrant/
