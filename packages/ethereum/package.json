@@ -7,7 +7,7 @@
   "homepage": "https://hoprnet.org",
   "main": "./lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./hardhat ./deployments/default/localhost",
+    "clean": "rimraf ./lib ./src/types ./tsconfig.tsbuildinfo ./tsconfig.hardhat.tsbuildinfo ./tsconfig.spec.tsbuildinfo ./hardhat ./deployments/default/localhost",
     "build": "yarn clean && yarn build:sol:types && yarn build:tsc",
     "build:tsc": "tsc -p .",
     "build:sol": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat compile",

@@ -8,7 +8,7 @@
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "dev": "yarn clean && tsc -w",
