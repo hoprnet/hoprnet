@@ -1,0 +1,3 @@
+./scripts/setup-local-cluster.sh -m "https://int-dev-app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
+
+DEBUG="hopr*,-hopr-connect*,-*heartbeat,-*libp2p*" yarn hopr-cover-traffic-daemon --environment hardhat-localhost --privateKey 0x0d0542397da28e7c5cc0a7e169cc11351554e7e3ec8b0f61ffc23aeff2e089e9 2>&1 | tee ./ct.log

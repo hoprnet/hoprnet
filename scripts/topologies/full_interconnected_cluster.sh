@@ -136,14 +136,14 @@ done
 
 log "Opening channels in background to parallelize operations"
 
-for endpoint in ${endpoints}; do
-  for other_endpoint in ${endpoints}; do
-    # only perform operation if endpoints differ
-    if [ "${endpoint}" != "${other_endpoint}" ]; then
-      log "${endpoint} opening channel to other node at ${other_endpoint}"
-      run_command ${endpoint} "open ${peers["${other_endpoint}"]} 0.1" "Successfully opened channel" 600 &
-    fi
-  done
+for (( i = 0; i < ${#endpoints[*]}; ++ i )); do
+  endpoint=${files[$i]}
+  other_endpoint=${files[$i+1]}
+
+  if [ -n "${other_endpoint}" ]; then
+    log "${endpoint} opening channel to other node at ${other_endpoint}"
+    run_command ${endpoint} "open ${peers["${other_endpoint}"]} 0.1" "Successfully opened channel" 600 &
+  fi
 done
 
 

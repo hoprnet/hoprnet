@@ -293,7 +293,7 @@ log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13302&wsEnd
 log "\tnode3"
 log "\t\tPeer Id:\t${peers[2]}"
 log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19504/"
+log "\t\tAdmin UI:\thttp://localhost:19503/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13303&wsEndpoint=ws://localhost:19503&securityToken=${api_token}"
 log "\tnode4"
 log "\t\tPeer Id:\t${peers[3]}"
