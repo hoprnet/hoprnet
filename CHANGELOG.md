@@ -5,7 +5,7 @@
 ### Changes
 
 - Update ping to use Blake2s instead of SHA256 for response computation ([#3080](https://github.com/hoprnet/hoprnet/pull/3080))
-- Fixed behavior when no network was found or invalid password is entered ([#3080](https://github.com/hoprnet/hoprnet/pull/3147))
+- Fixed behavior when no network was found or invalid password is entered ([#3147](https://github.com/hoprnet/hoprnet/pull/3147))
 
 ---
 
