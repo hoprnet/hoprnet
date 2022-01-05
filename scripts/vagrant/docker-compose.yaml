@@ -13,13 +13,13 @@ services:
     build: docker-runner/
 
     command:
-      - "sh"
-      - "-c"
+      - 'sh'
+      - '-c'
       - >-
-         ./prepare-node.sh && node /opt/hopr/packages/hoprd/lib/index.js --admin --adminHost 0.0.0.0
-         --healthCheck --healthCheckHost 0.0.0.0 --init --rest --restHost 0.0.0.0 --environment hardhat-localhost
-         --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses
-         --identity /var/hopr/identities/local-nat-node1.id --testUseWeakCrypto
+        ./prepare-node.sh && node /opt/hopr/packages/hoprd/lib/index.js --admin --adminHost 0.0.0.0
+        --healthCheck --healthCheckHost 0.0.0.0 --init --rest --restHost 0.0.0.0 --environment hardhat-localhost
+        --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses
+        --identity /var/hopr/identities/local-nat-node1.id --testUseWeakCrypto
 
     volumes:
       - '/opt/hopr:/opt/hopr'
@@ -38,8 +38,8 @@ services:
     build: docker-runner/
 
     command:
-      - "sh"
-      - "-c"
+      - 'sh'
+      - '-c'
       - >-
         ./prepare-node.sh && node /opt/hopr/packages/hoprd/lib/index.js --admin --adminHost 0.0.0.0
         --healthCheck --healthCheckHost 0.0.0.0 --init --rest --restHost 0.0.0.0 --environment hardhat-localhost
