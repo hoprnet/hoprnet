@@ -70,6 +70,9 @@ export async function createLibp2pInstance(
       },
       relay: {
         enabled: false
+      },
+      nat: {
+        enabled: false
       }
     },
     dialer: {

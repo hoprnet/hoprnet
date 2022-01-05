@@ -72,5 +72,4 @@ export type HoprConnectListeningOptions = undefined
 
 export type HoprConnectDialOptions = {
   signal?: AbortSignal
-  timeout?: number
 }

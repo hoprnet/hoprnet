@@ -1,9 +1,11 @@
 import type { Stream, StreamType } from '../types'
-import type { Multiaddr } from 'multiaddr'
 import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
 import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
 import type { Connection } from 'libp2p-interfaces/connection'
+import type PeerId from 'peer-id'
+
+import { Multiaddr } from 'multiaddr'
 
 export { parseAddress } from './addrs'
 export type { ValidAddress } from './addrs'
@@ -100,12 +102,12 @@ export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): Asyn
 }
 
 /**
- * Converts a Node.js address instance to format that is
+ * Converts a Node.js address instance to a format that is
  * understood by Multiaddr
  * @param addr a Node.js address instance
  * @returns
  */
-export function nodeToMultiaddr(addr: AddressInfo): Parameters<typeof Multiaddr.fromNodeAddress>[0] {
+export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): Multiaddr {
   let family: 4 | 6
   switch (addr.family) {
     case 'IPv4':
@@ -118,11 +120,20 @@ export function nodeToMultiaddr(addr: AddressInfo): Parameters<typeof Multiaddr.
       throw Error(`Invalid family. Got ${addr.family}`)
   }
 
-  return {
-    family,
-    address: addr.address,
-    port: addr.port
+  let ma = Multiaddr.fromNodeAddress(
+    {
+      family,
+      address: addr.address,
+      port: addr.port
+    },
+    'tcp'
+  )
+
+  if (peerId != undefined) {
+    ma = ma.encapsulate(`/p2p/${peerId.toB58String()}`)
   }
+
+  return ma
 }
 
 /**
