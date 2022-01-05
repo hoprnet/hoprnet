@@ -1152,7 +1152,7 @@ __metadata:
     "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
     "@types/mocha": 9.0.0
-    "@types/node": 16.11.14
+    "@types/node": 16.11.19
     "@types/simple-peer": 9.11.3
     "@types/yargs": 17.0.7
     abortable-iterator: 3.0.0
@@ -1171,6 +1171,7 @@ __metadata:
     mocha: 9.1.3
     multiaddr: 10.0.1
     multihashes: 4.0.3
+    nat-api: 0.3.1
     peer-id: 0.16.0
     prettier: 2.5.1
     rimraf: 3.0.2
@@ -2580,10 +2581,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:16.11.14, @types/node@npm:>=13.7.0":
+"@types/node@npm:*, @types/node@npm:>=13.7.0":
   version: 16.11.14
   resolution: "@types/node@npm:16.11.14"
   checksum: 0bd4333fb4e56532db7f5174732268b18089913ddbb0e97957228e64f9fe3babf9923c77ce6f07d3d354445cfbb8d31b95c1f8be3c0f7426308bd8b93d3aaa02
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:16.11.19":
+  version: 16.11.19
+  resolution: "@types/node@npm:16.11.19"
+  checksum: a9ba0cd1e61c8ad50f3fc9c2b37b795bf0286dacb39dcc985da90328abf0c5151dffe9932d20bc9a6a52c3ce7bfc1e5a7c2dc1416480fb84f1c2d70e25caeba0
   languageName: node
   linkType: hard
 
@@ -12679,7 +12687,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nat-api@npm:^0.3.1":
+"nat-api@npm:0.3.1, nat-api@npm:^0.3.1":
   version: 0.3.1
   resolution: "nat-api@npm:0.3.1"
   dependencies:
