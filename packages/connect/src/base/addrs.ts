@@ -1,9 +1,6 @@
-import { networkInterfaces } from 'os'
-import type { NetworkInterfaceInfo } from 'os'
+import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 import { isLocalhost, ipToU8aAddress, isPrivateAddress, isLinkLocaleAddress } from '@hoprnet/hopr-utils'
 
-import { nodeToMultiaddr } from '../utils'
-import { Multiaddr } from 'multiaddr'
 import Debug from 'debug'
 const log = Debug('hopr-connect')
 
@@ -14,6 +11,12 @@ type AddrOptions = {
   includePrivateIPv4?: boolean
   includeLocalhostIPv4?: boolean
   includeLocalhostIPv6?: boolean
+}
+
+type AddressType = {
+  address: string
+  family: 'IPv4' | 'IPv6'
+  port: number
 }
 
 function validateOptions(opts: AddrOptions) {
@@ -51,10 +54,9 @@ function getAddrsOfInterface(iface: string) {
 
 export function getAddrs(
   port: number,
-  peerId: string,
   options: AddrOptions,
   __fakeInterfaces?: ReturnType<typeof networkInterfaces>
-) {
+): AddressType[] {
   validateOptions(options)
 
   let interfaces: (NetworkInterfaceInfo[] | undefined)[]
@@ -65,7 +67,7 @@ export function getAddrs(
     interfaces = Object.values(__fakeInterfaces ?? networkInterfaces())
   }
 
-  const multiaddrs: Multiaddr[] = []
+  const multiaddrs: AddressType[] = []
 
   for (const iface of interfaces) {
     if (iface == undefined) {
@@ -102,9 +104,7 @@ export function getAddrs(
         continue
       }
 
-      multiaddrs.push(
-        Multiaddr.fromNodeAddress(nodeToMultiaddr({ ...address, port }), 'tcp').encapsulate(`/p2p/${peerId}`)
-      )
+      multiaddrs.push({ ...address, port })
     }
   }
 
