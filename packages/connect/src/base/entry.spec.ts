@@ -8,6 +8,10 @@ import { Multiaddr } from 'multiaddr'
 import { MAX_RELAYS_PER_NODE } from '../constants'
 import { PeerStoreType } from '../types'
 
+/**
+ * Decorated EntryNodes class that allows direct access
+ * to protected class elements
+ */
 class TestingEntryNodes extends EntryNodes {
   // @ts-ignore
   public availableEntryNodes: InstanceType<typeof EntryNodes>['availableEntryNodes']
@@ -45,7 +49,6 @@ function createFakeNetwork() {
 
   const connect = (addr: string) => {
     if (network.listeners(connectEvent(addr)).length >= 1) {
-      console.log(`emitting`)
       network.emit(connectEvent(addr))
       return Promise.resolve(true)
     } else {
@@ -246,7 +249,7 @@ describe('entry node functionality', function () {
 
     const entryNodes = new TestingEntryNodes(
       peerId,
-      [relay],
+      [],
       new EventEmitter(),
       async (ma: Multiaddr) => network.connect(ma.toString()) as any
     )
@@ -264,7 +267,6 @@ describe('entry node functionality', function () {
     assert(availableEntryNodes.length == 1)
     assert(availableEntryNodes[0].id.equals(relay.id))
 
-    console.log(availableEntryNodes)
     const usedRelays = entryNodes.getUsedRelays()
     assert(entryNodes.getUsedRelays().length == 1)
     assert(
@@ -275,7 +277,7 @@ describe('entry node functionality', function () {
     relayListener.removeAllListeners()
   })
 
-  it.only('do not emit listening event if nothing has changed', async function () {
+  it('do not emit listening event if nothing has changed', async function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
       [],

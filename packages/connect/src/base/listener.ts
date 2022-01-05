@@ -1,4 +1,10 @@
-import { createServer, type AddressInfo, type Socket as TCPSocket, type Server as TCPServer } from 'net'
+import {
+  createServer,
+  createConnection,
+  type AddressInfo,
+  type Socket as TCPSocket,
+  type Server as TCPServer
+} from 'net'
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 
 import { once, EventEmitter } from 'events'
@@ -14,11 +20,12 @@ import { Multiaddr } from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
-import { isAnyAddress } from '@hoprnet/hopr-utils'
+import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 import { TCPConnection } from './tcp'
 import { EntryNodes } from './entry'
-import { bindToPort, attemptClose } from '../utils'
+import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils'
 import type HoprConnect from '..'
+import { UpnpManager } from './upnp'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')
@@ -37,9 +44,10 @@ enum State {
 type Address = { port: number; address: string }
 
 class Listener extends EventEmitter implements InterfaceListener {
-  private __connections: MultiaddrConnection[]
+  protected __connections: MultiaddrConnection[]
   protected tcpSocket: TCPServer
   private udpSocket: UDPSocket
+  private upnpManager: UpnpManager
 
   private state: State
   private entry: EntryNodes
@@ -69,7 +77,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     initialNodes: PeerStoreType[] = [],
     private peerId: PeerId,
     private _interface: string | undefined,
-    private __runningLocally: boolean
+    private __runningLocally: boolean,
+    private __noUPNP: boolean
   ) {
     super()
 
@@ -88,6 +97,20 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.state = State.UNINITIALIZED
 
+    this.addrs = {
+      interface: [],
+      external: [],
+      relays: []
+    }
+
+    this._emitListening = (() => this.emit('listening')).bind(this)
+
+    this.entry = new EntryNodes(this.peerId, initialNodes, publicNodes, dialDirectly)
+
+    this.upnpManager = new UpnpManager()
+  }
+
+  attachSocketHandlers() {
     this.udpSocket.once('close', () => {
       if (![State.CLOSING, State.CLOSED].includes(this.state)) {
         console.trace(`UDP socket was closed earlier than expected. Please report this!`)
@@ -112,19 +135,9 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
     })
     this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
-
-    this.addrs = {
-      interface: [],
-      external: [],
-      relays: []
-    }
-
-    this._emitListening = (() => this.emit('listening')).bind(this)
-
-    this.entry = new EntryNodes(this.peerId, initialNodes, publicNodes, dialDirectly)
   }
 
-  async bind(ma: Multiaddr) {
+  async bind(ma: Multiaddr): Promise<void> {
     const protos = ma.tuples()
     let family: NetworkInterfaceInfo['family']
 
@@ -174,6 +187,99 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
   }
 
+  async isExposedHost(
+    externalIp: string,
+    port: number
+  ): Promise<{
+    udpMapped: boolean
+    tcpMapped: boolean
+  }> {
+    const UDP_TEST = new TextEncoder().encode('TEST_UDP')
+    const TCP_TEST = new TextEncoder().encode('TEST_TCP')
+
+    const waitForIncomingUdpPacket = defer<void>()
+    const waitForIncomingTcpPacket = defer<void>()
+
+    const TIMEOUT = 500
+
+    const abort = new AbortController()
+    const tcpTimeout = setTimeout(() => {
+      abort.abort()
+      waitForIncomingTcpPacket.reject()
+    }, TIMEOUT)
+    const udpTimeout = setTimeout(waitForIncomingUdpPacket.reject.bind(waitForIncomingUdpPacket), TIMEOUT)
+
+    const checkTcpMessage = (socket: TCPSocket) => {
+      socket.on('data', (data: Buffer) => {
+        if (u8aEquals(data, TCP_TEST)) {
+          clearTimeout(tcpTimeout)
+          waitForIncomingTcpPacket.resolve()
+        }
+      })
+    }
+    this.tcpSocket.on('connection', checkTcpMessage)
+
+    const checkUdpMessage = (msg: Buffer) => {
+      if (u8aEquals(msg, UDP_TEST)) {
+        clearTimeout(udpTimeout)
+        waitForIncomingUdpPacket.resolve()
+      }
+    }
+    this.udpSocket.on('message', checkUdpMessage)
+
+    const secondUdpSocket = createSocket('udp4')
+    secondUdpSocket.send(UDP_TEST, port, externalIp)
+
+    let done = false
+    const cleanUp = (): void => {
+      if (done) {
+        return
+      }
+      done = true
+      clearTimeout(tcpTimeout)
+      clearTimeout(udpTimeout)
+      this.udpSocket.removeListener('message', checkUdpMessage)
+      this.tcpSocket.removeListener('connection', checkTcpMessage)
+      tcpSocket.destroy()
+      secondUdpSocket.close()
+    }
+
+    const tcpSocket = createConnection({
+      port,
+      host: externalIp,
+      localPort: 9092,
+      signal: abort.signal
+    })
+      .on('connect', () => {
+        tcpSocket.write(TCP_TEST, (err: any) => {
+          if (err) {
+            log(`Failed to send TCP packet`, err)
+          }
+        })
+      })
+      .on('error', (err: any) => {
+        if (err && (err.code == undefined || err.code !== 'ABORT_ERR')) {
+          error(`Error while checking NAT situation`, err.message)
+        }
+      })
+
+    if (!done) {
+      const results = await Promise.allSettled([waitForIncomingUdpPacket.promise, waitForIncomingTcpPacket.promise])
+
+      cleanUp()
+
+      return {
+        udpMapped: results[0].status === 'fulfilled',
+        tcpMapped: results[1].status === 'fulfilled'
+      }
+    }
+
+    return {
+      udpMapped: false,
+      tcpMapped: false
+    }
+  }
+
   /**
    * Attaches the listener to TCP and UDP sockets
    * @param ma address to listen to
@@ -185,29 +291,54 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     await this.bind(ma)
 
-    const address = this.tcpSocket.address() as AddressInfo
+    const ownInterface = this.tcpSocket.address() as AddressInfo
 
-    this.addrs.interface.push(
-      ...getAddrs(address.port, this.peerId.toB58String(), {
-        useIPv4: true,
-        includePrivateIPv4: true,
-        includeLocalhostIPv4: true
-      })
+    const natSituation = await this.checkNATSituation(ownInterface.address, ownInterface.port)
+    const internalInterfaces = getAddrs(ownInterface.port, {
+      useIPv4: true,
+      includePrivateIPv4: true,
+      includeLocalhostIPv4: true
+    })
+
+    if (!natSituation.bidirectionalNAT) {
+      // If any of the interface addresses is the
+      // external address,
+      for (const [index, internalInterface] of internalInterfaces.entries()) {
+        if (internalInterface.address == natSituation.externalAddress) {
+          internalInterfaces.splice(index, 1)
+        }
+      }
+
+      this.addrs.external = [
+        nodeToMultiaddr(
+          {
+            address: natSituation.externalAddress,
+            port: natSituation.externalPort,
+            family: 'IPv4'
+          },
+          this.peerId
+        )
+      ]
+    }
+
+    this.addrs.interface = internalInterfaces.map((internalInterface) =>
+      nodeToMultiaddr(internalInterface, this.peerId)
     )
 
-    this.emit('listening')
+    this.attachSocketHandlers()
 
-    // Prevent from sending a STUN request to self
-    let usableStunServers = this.getPotentialStunServers(address.port, address.address)
-    await this.determinePublicIpAddress(usableStunServers)
+    this._emitListening()
 
-    this.entry.on('relay:changed', this._emitListening)
-    await this.entry.updatePublicNodes()
+    // Only add relay nodes if node is not directly reachable
+    if (natSituation.bidirectionalNAT || !natSituation.isExposed) {
+      this.entry.on('relay:changed', this._emitListening)
+      await this.entry.updatePublicNodes()
 
-    this.entry.start()
+      // Attach listeners
+      this.entry.start()
+    }
 
     this.state = State.LISTENING
-    // this.emit('listening')
   }
 
   /**
@@ -217,8 +348,12 @@ class Listener extends EventEmitter implements InterfaceListener {
   async close(): Promise<void> {
     this.state = State.CLOSING
 
+    // Remove listeners
     this.entry.stop()
     this.entry.off('relay:changed', this._emitListening)
+
+    // Unmap all mapped UPNP ports and release socket
+    this.upnpManager.stop()
 
     await Promise.all([this.closeUDP(), this.closeTCP()])
 
@@ -233,7 +368,7 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @returns list of addresses under which the node is available
    */
   getAddrs(): Multiaddr[] {
-    return [...this.addrs.external, ...this.entry.getUsedArrays(), ...this.addrs.interface]
+    return [...this.addrs.external, ...this.entry.getUsedRelays(), ...this.addrs.interface]
   }
 
   /**
@@ -324,7 +459,6 @@ class Listener extends EventEmitter implements InterfaceListener {
    */
   private async listenTCP(opts?: { host?: string; port: number }): Promise<number> {
     await bindToPort('TCP', this.tcpSocket, error, opts)
-
     return (this.tcpSocket.address() as AddressInfo).port
   }
 
@@ -374,73 +508,123 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param host [optional] the host on which we are listening
    * @returns Promise that resolves once STUN request came back or STUN timeout was reched
    */
-  private async determinePublicIpAddress(usableStunServers: Multiaddr[]): Promise<void> {
-    let externalAddress: Address | undefined
-    try {
-      externalAddress = await getExternalIp(usableStunServers, this.udpSocket, this.__runningLocally)
-    } catch (err: any) {
-      error(`Determining public IP failed`, err.message)
-      return
-    }
+  async checkNATSituation(
+    ownAddress: string,
+    ownPort: number
+  ): Promise<
+    | { bidirectionalNAT: true }
+    | { bidirectionalNAT: false; externalAddress: string; externalPort: number; isExposed: boolean }
+  > {
+    let externalAddress = this.__noUPNP ? undefined : await this.upnpManager.externalIp()
+    let externalPort: number | undefined
 
-    if (externalAddress == undefined) {
-      log(`STUN requests led to multiple ambiguous results, node seems to be behind a bidirectional NAT.`)
-      return
-    }
+    let isExposedHost: Awaited<ReturnType<Listener['isExposedHost']>> | undefined
+    if (externalAddress != undefined) {
+      // UPnP is supported, let's try to open the port
+      await this.upnpManager.map(ownPort)
 
-    const externalMultiaddr = Multiaddr.fromNodeAddress(
-      {
-        address: externalAddress.address,
-        port: externalAddress.port,
-        family: 4
-      },
-      'tcp'
-    ).encapsulate(`/p2p/${this.peerId}`)
+      // Don't trust the router blindly ...
+      isExposedHost = await this.isExposedHost(externalAddress, ownPort)
 
-    // Remove address but do not change address order
-    for (let i = 0; i < this.addrs.interface.length; i++) {
-      if (externalMultiaddr.equals(this.addrs.interface[i])) {
-        this.addrs.interface.splice(i, 1)
+      if (isExposedHost.tcpMapped || isExposedHost.udpMapped) {
+        // Either TCP or UDP were mapped
+        externalPort = ownPort
+      } else {
+        // Neither TCP nor UDP were reachable, maybe external IP / Port is wrong
+        // fallback to STUN to get better results
+        const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
+
+        let externalInterface: Address | undefined
+        try {
+          externalInterface = await getExternalIp(usableStunServers, this.udpSocket, this.__runningLocally)
+        } catch (err: any) {
+          console.log(err)
+          error(`Determining public IP failed`, err.message)
+        }
+
+        if (externalInterface != undefined) {
+          externalPort = externalInterface.port
+
+          isExposedHost = await this.isExposedHost(externalAddress, externalPort)
+        }
+      }
+    } else {
+      // UPnP is not supported, fallback to STUN
+      const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
+
+      let externalInterface: Address | undefined
+      try {
+        console.log(this.udpSocket)
+        externalInterface = await getExternalIp(usableStunServers, this.udpSocket, this.__runningLocally)
+      } catch (err: any) {
+        console.log(err)
+        error(`Determining public IP failed`, err.message)
+      }
+
+      if (externalInterface != undefined) {
+        externalPort = externalInterface.port
+        externalAddress = externalInterface.address
+
+        isExposedHost = await this.isExposedHost(externalInterface.address, externalInterface.port)
       }
     }
 
-    this.addrs.external.push(externalMultiaddr)
+    if (externalAddress && externalPort) {
+      return {
+        externalAddress,
+        externalPort,
+        isExposed: (isExposedHost?.udpMapped && isExposedHost?.tcpMapped) ?? false,
+        bidirectionalNAT: false
+      }
+    }
+
+    return {
+      bidirectionalNAT: true
+    }
   }
 
   /**
    * Returns a list of STUN servers that we can use to determine
    * our own public IP address
-   * @param port the port on which we are listening
-   * @param host [optional] the host on which we are listening
+   * @param ownPort the port on which we are listening
+   * @param ownHost [optional] the host on which we are listening
    * @returns a list of STUN servers, excluding ourself
    */
-  private getPotentialStunServers(port: number, host?: string): Multiaddr[] {
-    const result = []
+  private getUsableStunServers(ownHost: string, ownPort: number): Multiaddr[] {
+    const filtered = []
 
-    const availableNodes = this.entry.getAvailabeEntryNodes()
+    let usableNodes: PeerStoreType[] = this.entry.getAvailabeEntryNodes()
 
-    for (let i = 0; i < availableNodes.length; i++) {
-      if (availableNodes[i].id.equals(this.peerId)) {
+    if (usableNodes.length == 0) {
+      // Use unchecked nodes at startup
+      usableNodes = this.entry.getUncheckedEntryNodes()
+    }
+
+    for (const usableNode of usableNodes) {
+      if (usableNode.id.equals(this.peerId)) {
+        // Exclude self
         continue
       }
 
-      for (let j = 0; j < availableNodes[i].multiaddrs.length; j++) {
+      for (const multiaddr of usableNode.multiaddrs) {
         let cOpts: { host: string; port: number }
         try {
-          cOpts = availableNodes[i].multiaddrs[j].toOptions()
+          cOpts = multiaddr.toOptions()
         } catch (err) {
+          // Exclude unusable Multiaddrs
           continue
         }
 
-        if (cOpts.host === host && cOpts.port === port) {
+        if (cOpts.host === ownHost && cOpts.port === ownPort) {
+          // Exclude self
           continue
         }
 
-        result.push(availableNodes[i].multiaddrs[j])
+        filtered.push(multiaddr)
       }
     }
 
-    return result
+    return filtered
   }
 
   private getAddressForInterface(host: string, family: NetworkInterfaceInfo['family']): string {

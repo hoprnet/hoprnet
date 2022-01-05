@@ -37,8 +37,8 @@ function validateOptions(opts: AddrOptions) {
   }
 }
 
-function getAddrsOfInterface(iface: string) {
-  let ifaceAddrs = networkInterfaces()[iface]
+function getAddrsOfInterface(iface: string, __fakeInterfaces?: ReturnType<typeof networkInterfaces>) {
+  let ifaceAddrs = __fakeInterfaces ? __fakeInterfaces[iface] : networkInterfaces()[iface]
 
   if (ifaceAddrs == undefined) {
     log(
@@ -49,7 +49,7 @@ function getAddrsOfInterface(iface: string) {
     return []
   }
 
-  return ifaceAddrs
+  return ifaceAddrs ?? []
 }
 
 export function getAddrs(
@@ -62,7 +62,7 @@ export function getAddrs(
   let interfaces: (NetworkInterfaceInfo[] | undefined)[]
 
   if (options?.interface) {
-    interfaces = [getAddrsOfInterface(options.interface)]
+    interfaces = [getAddrsOfInterface(options.interface, __fakeInterfaces)]
   } else {
     interfaces = Object.values(__fakeInterfaces ?? networkInterfaces())
   }

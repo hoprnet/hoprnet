@@ -59,7 +59,11 @@ export class EntryNodes extends EventEmitter {
     this.usedRelays = []
   }
 
-  start() {
+  /**
+   * Attaches listeners that handle addition and removal of
+   * entry nodes
+   */
+  public start() {
     if (this.publicNodesEmitter != undefined) {
       this._onNewRelay = this.onNewRelay.bind(this)
       this._onRemoveRelay = this.onRemoveRelay.bind(this)
@@ -70,7 +74,10 @@ export class EntryNodes extends EventEmitter {
     }
   }
 
-  stop() {
+  /**
+   * Removes event listeners
+   */
+  public stop() {
     if (this.publicNodesEmitter != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
       this.publicNodesEmitter.removeListener('addPublicNode', this._onNewRelay as EntryNodes['onNewRelay'])
 
@@ -78,14 +85,24 @@ export class EntryNodes extends EventEmitter {
     }
   }
 
+  /**
+   * @returns a list of entry nodes that are currently used
+   */
   public getUsedRelays() {
     return this.usedRelays
   }
 
+  /**
+   * @returns a list of entry nodes that are considered to be online
+   */
   public getAvailabeEntryNodes() {
     return this.availableEntryNodes
   }
 
+  /**
+   * @returns a list of entry nodes that will be checked once the
+   * list of entry nodes is built or rebuilt next time
+   */
   public getUncheckedEntryNodes() {
     return this.uncheckedEntryNodes
   }
@@ -155,6 +172,10 @@ export class EntryNodes extends EventEmitter {
     }
   }
 
+  /**
+   * Filters list of unchecked entry nodes before contacting them
+   * @returns a filtered list of entry nodes
+   */
   private filterUncheckedNodes(): PeerStoreType[] {
     const knownNodes = new Set<string>(this.availableEntryNodes.map((entry: EntryNodeData) => entry.id.toB58String()))
     const nodesToCheck: PeerStoreType[] = []
@@ -256,7 +277,14 @@ export class EntryNodes extends EventEmitter {
     }
   }
 
-  async connectToRelay(
+  /**
+   * Attempts to connect to a relay node
+   * @param id peerId of the node to dial
+   * @param relay multiaddr to perform the dial
+   * @param timeout when to timeout on unsuccessful dial attempts
+   * @returns a PeerStoreEntry containing the measured latency
+   */
+  private async connectToRelay(
     id: PeerId,
     relay: Multiaddr,
     timeout: number

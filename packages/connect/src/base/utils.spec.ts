@@ -1,7 +1,11 @@
 import { once, type EventEmitter } from 'events'
 import { handleStunRequest } from './stun'
+import type { PeerStoreType } from '../types'
 import { createSocket, type RemoteInfo, type Socket } from 'dgram'
-import type { DeferType } from '@hoprnet/hopr-utils'
+import { type DeferType, privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
+import type PeerId from 'peer-id'
+import { Multiaddr } from 'multiaddr'
 
 interface Listening<ListenOpts> extends EventEmitter {
   listen: (opts: ListenOpts) => void
@@ -71,4 +75,25 @@ export function bindToUdpSocket(port?: number): Promise<Socket> {
       reject(err)
     }
   })
+}
+
+/**
+ * Sampes peerStore entries
+ * @param addr string representation of utilized address
+ * @param id peer id
+ * @returns a peerStoreEntry
+ */
+export function getPeerStoreEntry(addr: string, id = createPeerId()): PeerStoreType {
+  return {
+    id,
+    multiaddrs: [new Multiaddr(addr)]
+  }
+}
+
+/**
+ * Synchronous function to sample PeerIds
+ * @returns a PeerId
+ */
+export function createPeerId(): PeerId {
+  return privKeyToPeerId(u8aToHex(randomBytes(32)))
 }
