@@ -27,8 +27,7 @@ Vagrant.configure("2") do |config|
     nat.vm.synced_folder "/tmp/hopr-identities", "/var/hopr/identities", create: true
 
     nat.vm.provision "file",  source: "docker-compose.yaml", destination: "docker-compose.yaml"
-    nat.vm.provision "file",  source: "Dockerfile", destination: "Dockerfile"
-    nat.vm.provision "file",  source: "prepare-node.sh", destination: "prepare-node.sh"
+    nat.vm.provision "file",  source: "docker-runner/", destination: "docker-runner"
     nat.vm.provision "file",  source: "startup-nat-nodes.sh", destination: "startup-nat-nodes.sh"
   end
 

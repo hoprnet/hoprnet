@@ -10,7 +10,7 @@ networks:
 # Starts HOPRD behind NAT
 services:
   hoprd-nat-node-1:
-    build: .
+    build: docker-runner/
 
     command:
       - "sh"
@@ -29,13 +29,13 @@ services:
       - 'hopr-local-network-1'
 
     ports:
-      - '3000:3010'
-      - '3001:3011'
+      - '3010:3000'
+      - '3011:3001'
     environment:
       - 'DEBUG=hopr*'
 
   hoprd-nat-node-2:
-    build: .
+    build: docker-runner/
 
     command:
       - "sh"
@@ -54,7 +54,7 @@ services:
       - 'hopr-local-network-2'
 
     ports:
-      - '3000:3020'
-      - '3001:3021'
+      - '3020:3000'
+      - '3021:3001'
     environment:
       - 'DEBUG=hopr*'
