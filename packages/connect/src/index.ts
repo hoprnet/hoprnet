@@ -201,7 +201,8 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       this.initialNodes,
       this._peerId,
       this._interface,
-      this.__useLocalAddress
+      this.__useLocalAddress,
+      false
     )
   }
 
