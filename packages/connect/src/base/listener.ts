@@ -538,7 +538,6 @@ class Listener extends EventEmitter implements InterfaceListener {
         try {
           externalInterface = await getExternalIp(usableStunServers, this.udpSocket, this.__runningLocally)
         } catch (err: any) {
-          console.log(err)
           error(`Determining public IP failed`, err.message)
         }
 
@@ -554,10 +553,8 @@ class Listener extends EventEmitter implements InterfaceListener {
 
       let externalInterface: Address | undefined
       try {
-        console.log(this.udpSocket)
         externalInterface = await getExternalIp(usableStunServers, this.udpSocket, this.__runningLocally)
       } catch (err: any) {
-        console.log(err)
         error(`Determining public IP failed`, err.message)
       }
 

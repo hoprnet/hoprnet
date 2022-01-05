@@ -12,7 +12,7 @@ describe('test upnp', function () {
     // If the router does not support UPnP, the unit
     // awaits the timeout
     if (noUPnP) {
-      this.skip()
+      return
     }
     this.timeout(3e3)
     const upnp = new TestingUpnpManager()
@@ -38,7 +38,7 @@ describe('test upnp', function () {
     // If the router does not support UPnP, the unit
     // awaits the timeout
     if (noUPnP) {
-      this.skip()
+      return
     }
     this.timeout(3e3)
     const upnp = new TestingUpnpManager()
