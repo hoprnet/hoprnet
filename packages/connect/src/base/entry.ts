@@ -39,7 +39,7 @@ function isUsableRelay(ma: Multiaddr) {
 
 export class EntryNodes extends EventEmitter {
   protected availableEntryNodes: EntryNodeData[]
-  protected uncheckedNodes: PeerStoreType[]
+  protected uncheckedEntryNodes: PeerStoreType[]
 
   protected usedRelays: Multiaddr[]
 
@@ -54,7 +54,7 @@ export class EntryNodes extends EventEmitter {
   ) {
     super()
     this.availableEntryNodes = []
-    this.uncheckedNodes = initialNodes
+    this.uncheckedEntryNodes = initialNodes
 
     this.usedRelays = []
   }
@@ -71,19 +71,23 @@ export class EntryNodes extends EventEmitter {
   }
 
   stop() {
-    if (this.publicNodesEmitter != undefined) {
+    if (this.publicNodesEmitter != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
       this.publicNodesEmitter.removeListener('addPublicNode', this._onNewRelay as EntryNodes['onNewRelay'])
 
       this.publicNodesEmitter.removeListener('removePublicNode', this._onRemoveRelay as EntryNodes['onRemoveRelay'])
     }
   }
 
-  public getUsedArrays() {
+  public getUsedRelays() {
     return this.usedRelays
   }
 
   public getAvailabeEntryNodes() {
     return this.availableEntryNodes
+  }
+
+  public getUncheckedEntryNodes() {
+    return this.uncheckedEntryNodes
   }
 
   /**
@@ -100,7 +104,7 @@ export class EntryNodes extends EventEmitter {
       return
     }
 
-    for (const uncheckedNode of this.uncheckedNodes) {
+    for (const uncheckedNode of this.uncheckedEntryNodes) {
       if (uncheckedNode.id.equals(peer.id)) {
         log(`Received duplicate entry node ${peer.id.toB58String()}`)
         // TODO add difference to previous multiaddrs
@@ -108,7 +112,7 @@ export class EntryNodes extends EventEmitter {
       }
     }
 
-    this.uncheckedNodes.push({
+    this.uncheckedEntryNodes.push({
       id: peer.id,
       multiaddrs: peer.multiaddrs.filter(isUsableRelay)
     })
@@ -155,15 +159,15 @@ export class EntryNodes extends EventEmitter {
     const knownNodes = new Set<string>(this.availableEntryNodes.map((entry: EntryNodeData) => entry.id.toB58String()))
     const nodesToCheck: PeerStoreType[] = []
 
-    for (let i = 0; i < this.uncheckedNodes.length; i++) {
-      if (this.uncheckedNodes[i].id.equals(this.peerId)) {
+    for (const uncheckedNode of this.uncheckedEntryNodes) {
+      if (uncheckedNode.id.equals(this.peerId)) {
         continue
       }
 
-      const usableAddresses: Multiaddr[] = this.uncheckedNodes[i].multiaddrs.filter(isUsableRelay)
+      const usableAddresses: Multiaddr[] = uncheckedNode.multiaddrs.filter(isUsableRelay)
 
-      if (knownNodes.has(this.uncheckedNodes[i].id.toB58String())) {
-        const index = this.availableEntryNodes.findIndex((entry) => entry.id.equals(this.uncheckedNodes[i].id))
+      if (knownNodes.has(uncheckedNode.id.toB58String())) {
+        const index = this.availableEntryNodes.findIndex((entry) => entry.id.equals(uncheckedNode.id))
 
         if (index < 0) {
           continue
@@ -179,7 +183,7 @@ export class EntryNodes extends EventEmitter {
 
       // Ignore if entry nodes have more than one address
       nodesToCheck.push({
-        id: this.uncheckedNodes[i].id,
+        id: uncheckedNode.id,
         multiaddrs: [usableAddresses[0]]
       })
     }
@@ -222,7 +226,7 @@ export class EntryNodes extends EventEmitter {
     this.availableEntryNodes = results.slice(positiveOnes).map((result) => result.entry)
 
     // Reset list of unchecked nodes
-    this.uncheckedNodes = []
+    this.uncheckedEntryNodes = []
 
     const previous = new Set(this.usedRelays.map((ma) => ma.toString()))
 
@@ -235,8 +239,8 @@ export class EntryNodes extends EventEmitter {
       )
 
     let isDifferent = false
-    for (let i = 0; i < this.usedRelays.length; i++) {
-      if (!previous.has(this.usedRelays[i].toString())) {
+    for (const usedRelay of this.usedRelays) {
+      if (!previous.has(usedRelay.toString())) {
         isDifferent = true
         break
       }
@@ -257,13 +261,21 @@ export class EntryNodes extends EventEmitter {
     relay: Multiaddr,
     timeout: number
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
+    const abort = new AbortController()
     const start = Date.now()
 
-    let conn: Connection
+    const timeoutHandle = setTimeout(abort.abort.bind(abort), timeout)
+
+    let conn: Connection | undefined
     try {
-      conn = await this.dialDirectly(relay, { timeout })
+      conn = await this.dialDirectly(relay, { signal: abort.signal })
     } catch (err: any) {
       error(`error while contacting entry node.`, err.message)
+    } finally {
+      clearTimeout(timeoutHandle)
+    }
+
+    if (conn == undefined) {
       return {
         entry: {
           id,
