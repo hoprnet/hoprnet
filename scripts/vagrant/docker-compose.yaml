@@ -1,4 +1,4 @@
-version: "3.9"
+version: '3.9'
 
 # Start an internal-only bridge network to simulate NAT (NATwork)
 networks:
@@ -10,75 +10,73 @@ networks:
 # Starts HOPRD behind NAT
 services:
   hoprd-nat-node-1:
-    
     build: .
 
     command:
-      - "/opt/hopr/scripts/vagrant/startup-node.sh"
-      - "--admin"
-      - "--adminHost"
-      - "0.0.0.0"
-      - "--healthCheck"
-      - "--healthCheckHost"
-      - "0.0.0.0"
-      - "--init"
-      - "--rest"
-      - "--restHost"
-      - "0.0.0.0"
-      - "--environment"
-      - "hardhat-localhost"
-      - "--apiToken"
-      - "MyT0ken123^"
-      - "--password"
-      - "switzerland"
-      - "--testPreferLocalAddresses"
-   
+      - '/opt/hopr/scripts/vagrant/startup-node.sh'
+      - '--admin'
+      - '--adminHost'
+      - '0.0.0.0'
+      - '--healthCheck'
+      - '--healthCheckHost'
+      - '0.0.0.0'
+      - '--init'
+      - '--rest'
+      - '--restHost'
+      - '0.0.0.0'
+      - '--environment'
+      - 'hardhat-localhost'
+      - '--apiToken'
+      - 'MyT0ken123^'
+      - '--password'
+      - 'switzerland'
+      - '--testPreferLocalAddresses'
+
     volumes:
-      - "/opt/hopr:/opt/hopr"
-      - "/var/hopr/identities:/var/hopr/identities"
+      - '/opt/hopr:/opt/hopr'
+      - '/var/hopr/identities:/var/hopr/identities'
 
     networks:
-      - "hopr-local-network-1"
+      - 'hopr-local-network-1'
 
     ports:
-      - "3000:3010"
-      - "3001:3011"
+      - '3000:3010'
+      - '3001:3011'
     environment:
-      - "DEBUG=hopr*"
+      - 'DEBUG=hopr*'
 
   hoprd-nat-node-2:
+    build: .
 
-      build: .
+    command:
+      - '/opt/hopr/scripts/vagrant/startup-node.sh'
+      - '--admin'
+      - '--adminHost'
+      - '0.0.0.0'
+      - '--healthCheck'
+      - '--healthCheckHost'
+      - '0.0.0.0'
+      - '--init'
+      - '--rest'
+      - '--restHost'
+      - '0.0.0.0'
+      - '--environment'
+      - 'hardhat-localhost'
+      - '--apiToken'
+      - 'MyT0ken123^'
+      - '--password'
+      - 'switzerland'
+      - '--testPreferLocalAddresses'
 
-      command:
-        - "/opt/hopr/scripts/vagrant/startup-node.sh"
-        - "--admin"
-        - "--adminHost"
-        - "0.0.0.0"
-        - "--healthCheck"
-        - "--healthCheckHost"
-        - "0.0.0.0"
-        - "--init"
-        - "--rest"
-        - "--restHost"
-        - "0.0.0.0"
-        - "--environment"
-        - "hardhat-localhost"
-        - "--apiToken"
-        - "MyT0ken123^"
-        - "--password"
-        - "switzerland"
-        - "--testPreferLocalAddresses"
+    volumes:
+      - '/opt/hopr:/opt/hopr'
+      - '/var/hopr/identities:/var/hopr/identities'
 
-      volumes:
-        - "/opt/hopr:/opt/hopr"
-        - "/var/hopr/identities:/var/hopr/identities"
+    networks:
+      - 'hopr-local-network-2'
 
-      networks:
-        - "hopr-local-network-2"
-
-      ports:
-        - "3000:3020"
-        - "3001:3021"
-      environment:
-        - "DEBUG=hopr*"
+    ports:
+      - '3000:3020'
+      - '3001:3021'
+    environment:
+      - 'DEBUG=hopr*'
