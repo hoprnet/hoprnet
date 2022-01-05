@@ -1,19 +1,31 @@
 Vagrant.configure("2") do |config|
-  
+
+  config.vm.define "hardhat" do |hat|
+    hat.vm.box = "generic/ubuntu2004"
+    hat.vm.hostname = "hardhat.box"
+    hat.vm.network "private_network", ip: "192.168.101.10"
+
+    hat.vm.provision "shell", path: "setup-vm.sh"
+    hat.vm.synced_folder "../../", "/opt/hopr"
+    hat.vm.synced_folder "/tmp/hopr-identities", "/var/hopr/identities", create: true
+
+    hat.vm.provision "file", source: "startup-network.sh", destination: "startup-network.sh"
+    hat.vm.provision "file",  source: "faucet.sh", destination: "faucet.sh"
+  end
+
   config.vm.define "public" do |pub|
     pub.vm.box = "generic/ubuntu2004"
     pub.vm.hostname = "relay.box"
-    pub.vm.network "private_network", ip: "192.168.101.10"
-
-    #pub.vm.provision "file", source: "../..", destination: "/opt/hopr"
+    pub.vm.network "private_network", ip: "192.168.101.15"
 
     pub.vm.provision "shell", path: "setup-vm.sh"
     pub.vm.synced_folder "../../", "/opt/hopr"
     pub.vm.synced_folder "/tmp/hopr-identities", "/var/hopr/identities", create: true
 
-    pub.vm.provision "file", source: "startup-network.sh", destination: "startup-network.sh"
+    pub.vm.provision "shell", inline: "docker network create -d ipvlan --subnet=192.168.101.0/24 --ip-range=192.168.101.16/30 -o ipvlan_mode=l2 -o parent=eth1 hoprnet-isolated"
+    pub.vm.provision "file",  source: "docker-compose-pub.yaml", destination: "docker-compose.yaml"
+    pub.vm.provision "file",  source: "docker-runner/", destination: "docker-runner"
     pub.vm.provision "file",  source: "startup-public.sh", destination: "startup-public.sh"
-    pub.vm.provision "file",  source: "faucet.sh", destination: "faucet.sh"
   end
 
   config.vm.define "nat_nodes" do |nat|
@@ -21,13 +33,11 @@ Vagrant.configure("2") do |config|
     nat.vm.hostname = "natnodes.box"
     nat.vm.network "private_network", ip: "192.168.101.20"
 
-    #pub.vm.provision "file", source: "../..", destination: "/opt/hopr"
-
     nat.vm.provision "shell", path: "setup-vm.sh"
     nat.vm.synced_folder "../../", "/opt/hopr"
     nat.vm.synced_folder "/tmp/hopr-identities", "/var/hopr/identities", create: true
 
-    nat.vm.provision "file",  source: "docker-compose.yaml", destination: "docker-compose.yaml"
+    nat.vm.provision "file",  source: "docker-compose-nat.yaml", destination: "docker-compose.yaml"
     nat.vm.provision "file",  source: "docker-runner/", destination: "docker-runner"
     nat.vm.provision "file",  source: "startup-nat-nodes.sh", destination: "startup-nat-nodes.sh"
   end
