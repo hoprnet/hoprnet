@@ -121,6 +121,12 @@ This will fund all the nodes and they should all come up soon.
 After nodes have been funded, the **terminal window A** is not needed anymore and can be closed.
 This leaves you with terminal windows **B**, **C** and **D**.
 
+## Admin panel reachability
+
+- `hoprd-public-relay` can be reached by browser on `192.168.101.17:3000`
+- `hoprd-nat-node-1` can be reached by browser on `192.168.101.20:3010`
+- `hoprd-nat-node-2` can be reached by browser on `192.168.101.20:3020`
+
 ## Tear-down
 
 To stop all the running VMs go to the `scripts/vagrant` directory and run:
