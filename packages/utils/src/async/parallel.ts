@@ -45,6 +45,10 @@ export async function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
   args: Args[],
   concurrency: number
 ): Promise<Return[]> {
+  if (concurrency <= 0) {
+    return []
+  }
+
   let currentIndex = Math.min(concurrency, args.length)
 
   const workers: (WorkerType<Return> | undefined)[] = Array.from({ length: currentIndex }, (_, index: number) =>
@@ -68,7 +72,7 @@ export async function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
     if (currentIndex < args.length) {
       workers[functionResult.workerIndex] = decorateWorker(
         fn,
-        args[currentIndex - 1],
+        args[currentIndex],
         functionResult.workerIndex,
         currentIndex
       )

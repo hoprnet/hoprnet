@@ -1,4 +1,4 @@
-import { EntryNodes } from './entry'
+import { EntryNodes, ENTRY_NODES_MAX_PARALLEL_DIALS } from './entry'
 import type PeerId from 'peer-id'
 import assert from 'assert'
 import { createPeerId, getPeerStoreEntry } from './utils.spec'
@@ -154,7 +154,7 @@ describe('entry node functionality', function () {
     const network = createFakeNetwork()
 
     const relayNodes = Array.from<undefined, [Promise<any>, PeerStoreType, EventEmitter]>(
-      { length: MAX_RELAYS_PER_NODE },
+      { length: ENTRY_NODES_MAX_PARALLEL_DIALS + 1 },
       (_value: undefined, index: number) => {
         const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${index}`)
 
@@ -184,6 +184,7 @@ describe('entry node functionality', function () {
     assert(usedRelays.length == MAX_RELAYS_PER_NODE, `must expose ${MAX_RELAYS_PER_NODE} relay addresses`)
 
     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
+    assert(availableEntryNodes.length == ENTRY_NODES_MAX_PARALLEL_DIALS + 1)
     assert(
       relayNodes.every((relayNode) =>
         availableEntryNodes.some((availableEntryNode) => availableEntryNode.id.equals(relayNode[1].id))
@@ -278,12 +279,7 @@ describe('entry node functionality', function () {
   })
 
   it('do not emit listening event if nothing has changed', async function () {
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      [],
-      new EventEmitter(),
-      (async () => {}) as any //async (ma: Multiaddr) => network.connect(ma.toString()) as any
-    )
+    const entryNodes = new TestingEntryNodes(peerId, [], new EventEmitter(), (async () => {}) as any)
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 

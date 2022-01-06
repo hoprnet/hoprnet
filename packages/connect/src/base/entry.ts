@@ -37,6 +37,8 @@ function isUsableRelay(ma: Multiaddr) {
   )
 }
 
+export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
+
 export class EntryNodes extends EventEmitter {
   protected availableEntryNodes: EntryNodeData[]
   protected uncheckedEntryNodes: PeerStoreType[]
@@ -224,13 +226,13 @@ export class EntryNodes extends EventEmitter {
     const toCheck = nodesToCheck.concat(this.availableEntryNodes)
     const args: Parameters<typeof connectToRelay>[] = new Array(toCheck.length)
 
-    for (let i = 0; i < args.length; i++) {
-      args[i] = [toCheck[i].id, toCheck[i].multiaddrs[0], TIMEOUT]
+    for (const [index, nodeToCheck] of toCheck.entries()) {
+      args[index] = [nodeToCheck.id, nodeToCheck.multiaddrs[0], TIMEOUT]
     }
 
-    const CONCURRENCY = 14 // connections
+    // const CONCURRENCY = 14 // connections
 
-    const results = (await nAtATime(connectToRelay, args, CONCURRENCY)).sort(latencyCompare)
+    const results = (await nAtATime(connectToRelay, args, ENTRY_NODES_MAX_PARALLEL_DIALS)).sort(latencyCompare)
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
@@ -240,7 +242,7 @@ export class EntryNodes extends EventEmitter {
       results
         .slice(positiveOnes + MAX_RELAYS_PER_NODE)
         .map<[Connection, (arg: any) => void]>((result) => [result.conn as Connection, error]),
-      CONCURRENCY
+      ENTRY_NODES_MAX_PARALLEL_DIALS
     )
 
     // Take all entry nodes that appeared to be online

@@ -4,8 +4,9 @@ import type { PeerStoreType } from '../types'
 import { createSocket, type RemoteInfo, type Socket } from 'dgram'
 import { type DeferType, privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
+import { CODE_P2P } from '../constants'
 
 interface Listening<ListenOpts> extends EventEmitter {
   listen: (opts: ListenOpts) => void
@@ -84,9 +85,19 @@ export function bindToUdpSocket(port?: number): Promise<Socket> {
  * @returns a peerStoreEntry
  */
 export function getPeerStoreEntry(addr: string, id = createPeerId()): PeerStoreType {
+  let ma = new Multiaddr(addr)
+  const tuples = ma.tuples()
+  const index = tuples.findIndex((val) => val[0] == CODE_P2P)
+
+  if (index >= 0 && PeerId.createFromBytes(tuples[index][1] as Uint8Array).equals(id)) {
+    ma = ma.decapsulateCode(CODE_P2P).encapsulate(`/p2p/${id.toB58String()}`)
+  } else {
+    ma = ma.encapsulate(`/p2p/${id.toB58String()}`)
+  }
+
   return {
     id,
-    multiaddrs: [new Multiaddr(addr)]
+    multiaddrs: [ma]
   }
 }
 

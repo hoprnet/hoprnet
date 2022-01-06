@@ -24,7 +24,7 @@ describe('test nAtATime', function () {
 
     assert(result.length == CALLS, `must contain all results`)
     assert(
-      result.every((value, index) => value == index),
+      result.every((value, index) => Number.isInteger(value) && value == index),
       `must contain the right results`
     )
   })
@@ -39,7 +39,7 @@ describe('test nAtATime', function () {
 
     assert(result.length == CALLS, `must contain all results`)
     assert(
-      result.every((value, index) => value == index),
+      result.every((value, index) => Number.isInteger(value) && value == index),
       `must contain the right results`
     )
   })
@@ -54,7 +54,7 @@ describe('test nAtATime', function () {
 
     assert(result.length == CALLS, `must contain all results`)
     assert(
-      result.sort().every((value, index) => value == index),
+      result.sort().every((value, index) => Number.isInteger(value) && value == index),
       `must contain the right results`
     )
   })
@@ -71,11 +71,12 @@ describe('test nAtATime', function () {
     assert(typeof result[0] == 'object' && (result[0] as Error).message === '0', `must contain the right results`)
   })
 
-  it('test concurrency - edge cases', async function () {
+  it.only('test concurrency - edge cases', async function () {
     // Must return immediately
     assert((await nAtATime(testFunction, [], Infinity)).length == 0)
 
     // Must return immediately
     assert((await nAtATime(testFunction, [[10e3, 0, false]], 0)).length == 0)
+    assert((await nAtATime(testFunction, [[10e3, 0, false]], -1)).length == 0)
   })
 })
