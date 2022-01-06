@@ -24,7 +24,7 @@ import {
   MIN_NATIVE_BALANCE,
   u8aConcat,
   isMultiaddrLocal,
-  getIpv4LocalAddressClass
+  multiaddressCompareByClassFunction
 } from '@hoprnet/hopr-utils'
 import type {
   LibP2PHandlerFunction,
@@ -694,17 +694,15 @@ class Hopr extends EventEmitter {
 
     if (includeRouting) {
       let multiaddrs = await this.getAnnouncedAddresses()
-      multiaddrs.sort((a, b) => {
-        if (isMultiaddrLocal(a) && !isMultiaddrLocal(b)) return this.options.preferLocalAddresses ? -1 : 1
-        else if (!isMultiaddrLocal(a) && isMultiaddrLocal(b)) return this.options.preferLocalAddresses ? 1 : -1
-        else if (isMultiaddrLocal(a) && isMultiaddrLocal(b)) {
-          const clsA = getIpv4LocalAddressClass(a)
-          const clsB = getIpv4LocalAddressClass(b)
-          if (clsA == undefined) return 1
-          if (clsB == undefined) return -1
-          return clsA.localeCompare(clsB)
-        } else return 0
-      })
+
+      // If we need local addresses, sort them first according to their class
+      if (this.options.preferLocalAddresses) {
+        multiaddrs.sort(multiaddressCompareByClassFunction)
+      }
+      else {
+        // If we don't need local addresses, just throw them away
+        multiaddrs = multiaddrs.filter((ma) => !isMultiaddrLocal(ma))
+      }
 
       log(`available multiaddresses ${multiaddrs}`)
 

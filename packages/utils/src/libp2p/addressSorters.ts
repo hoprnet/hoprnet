@@ -46,6 +46,31 @@ export function getIpv4LocalAddressClass(address: Multiaddr): 'A' | 'B' | 'C' | 
   return undefined
 }
 
+
+/**
+ * Compare two multiaddresses based on their class: A class first, B class second, ...
+ * Local addresses take precedence over remote addresses.
+ * @param a
+ * @param b
+ */
+export function multiaddressCompareByClassFunction(a: Multiaddr, b: Multiaddr) {
+  if (isMultiaddrLocal(a) && isMultiaddrLocal(b)) {
+    // Sort based on private address class
+    const clsA = getIpv4LocalAddressClass(a)
+    const clsB = getIpv4LocalAddressClass(b)
+    if (clsA == undefined) return 1
+    if (clsB == undefined) return -1
+    return clsA.localeCompare(clsB)
+  }
+  else if (isMultiaddrLocal(a) && !isMultiaddrLocal(b)) {
+    return -1 // Local address takes precedence
+  }
+  else if (!isMultiaddrLocal(a) && isMultiaddrLocal(b)) {
+    return 1 // Local address takes precedence
+  }
+  else return 0
+}
+
 function addressesLocalFirstCompareFunction(a: Address, b: Address) {
   const isAPrivate = isMultiaddrLocal(a.multiaddr)
   const isBPrivate = isMultiaddrLocal(b.multiaddr)
