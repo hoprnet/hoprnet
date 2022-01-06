@@ -5,7 +5,7 @@ This Vagrant configuration create the following setup suitable for isolated loca
 ## Environment
 
 The setup consists of 3 different networks. The first one *192.168.101.0/24* simulates a public network (e.g Internet). The
-other two networks *10.10.0.0/24* and *172.24.0.0/24* are simulating local networks behind NAT and can reach the public network.
+other two networks *10.10.0.0/24* and *172.24.0.0/24* are simulating local networks behind NAT and can reach the simulated public network.
 
 Vagrant will deploy the following 3 VMs into the 192.168.101.0/24 network. Subsequently, docker-compose is used to 
 instantiate the HOPR nodes.
