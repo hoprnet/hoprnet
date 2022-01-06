@@ -2,6 +2,7 @@ import { Address } from 'libp2p/src/peer-store'
 import { isPrivateAddress, isLocalhost, ipToU8aAddress } from '../network'
 import { Multiaddr } from 'multiaddr'
 import type { NetworkInterfaceInfo } from 'os'
+import { log } from 'debug'
 
 /**
  * Checks if given Multiaddr encodes a private address
@@ -26,7 +27,8 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
 
     const u8aAddr = ipToU8aAddress(address, ipFamily)
     return isLocalhost(u8aAddr, ipFamily) || isPrivateAddress(u8aAddr, ipFamily)
-  } catch (e: any) {
+  } catch (err) {
+    log(`failed to determine address locality: ${err}`)
     return false
   }
 }
