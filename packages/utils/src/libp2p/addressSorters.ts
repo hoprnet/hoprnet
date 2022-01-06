@@ -2,6 +2,7 @@ import { Address } from 'libp2p/src/peer-store'
 import { isPrivateAddress, isLocalhost, ipToU8aAddress } from '../network'
 import { Multiaddr } from 'multiaddr'
 import type { NetworkInterfaceInfo } from 'os'
+import { log } from 'debug'
 
 /**
  * Checks if given Multiaddr encodes a private address
@@ -26,7 +27,8 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
 
     const u8aAddr = ipToU8aAddress(address, ipFamily)
     return isLocalhost(u8aAddr, ipFamily) || isPrivateAddress(u8aAddr, ipFamily)
-  } catch (e: any) {
+  } catch (err) {
+    log(`failed to determine address locality: ${err}`)
     return false
   }
 }
@@ -35,8 +37,7 @@ export function getIpv4LocalAddressClass(address: Multiaddr): 'A' | 'B' | 'C' | 
   if (isMultiaddrLocal(address)) {
     if (address.toString().startsWith('/ip4/10.')) return 'A'
 
-    if (/\/ip4\/172\.((1[6-9])|(2\d)|(3[0-1]))\./.test(address.toString()))
-      return 'B'
+    if (/\/ip4\/172\.((1[6-9])|(2\d)|(3[0-1]))\./.test(address.toString())) return 'B'
 
     if (address.toString().startsWith('/ip4/192.168.')) return 'C'
 
@@ -44,6 +45,27 @@ export function getIpv4LocalAddressClass(address: Multiaddr): 'A' | 'B' | 'C' | 
   }
 
   return undefined
+}
+
+/**
+ * Compare two multiaddresses based on their class: A class first, B class second, ...
+ * Local addresses take precedence over remote addresses.
+ * @param a
+ * @param b
+ */
+export function multiaddressCompareByClassFunction(a: Multiaddr, b: Multiaddr) {
+  if (isMultiaddrLocal(a) && isMultiaddrLocal(b)) {
+    // Sort based on private address class
+    const clsA = getIpv4LocalAddressClass(a)
+    const clsB = getIpv4LocalAddressClass(b)
+    if (clsA == undefined) return 1
+    if (clsB == undefined) return -1
+    return clsA.localeCompare(clsB)
+  } else if (isMultiaddrLocal(a) && !isMultiaddrLocal(b)) {
+    return -1 // Local address takes precedence
+  } else if (!isMultiaddrLocal(a) && isMultiaddrLocal(b)) {
+    return 1 // Local address takes precedence
+  } else return 0
 }
 
 function addressesLocalFirstCompareFunction(a: Address, b: Address) {
