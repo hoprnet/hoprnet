@@ -35,8 +35,7 @@ export function getIpv4LocalAddressClass(address: Multiaddr): 'A' | 'B' | 'C' | 
   if (isMultiaddrLocal(address)) {
     if (address.toString().startsWith('/ip4/10.')) return 'A'
 
-    if (/\/ip4\/172\.((1[6-9])|(2\d)|(3[0-1]))\./.test(address.toString()))
-      return 'B'
+    if (/\/ip4\/172\.((1[6-9])|(2\d)|(3[0-1]))\./.test(address.toString())) return 'B'
 
     if (address.toString().startsWith('/ip4/192.168.')) return 'C'
 
