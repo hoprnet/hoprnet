@@ -21,7 +21,7 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
         ipFamily = 'IPv6'
         break
       default:
-        throw Error(`Invalid address family in Multiaddr. Got ${family} but expected either '4' or '6'.`)
+        return false
     }
 
     const u8aAddr = ipToU8aAddress(address, ipFamily)
@@ -35,7 +35,8 @@ export function getIpv4LocalAddressClass(address: Multiaddr): 'A' | 'B' | 'C' | 
   if (isMultiaddrLocal(address)) {
     if (address.toString().startsWith('/ip4/10.')) return 'A'
 
-    if (address.toString().startsWith('/ip4/172.16')) return 'B'
+    if (/\/ip4\/172\.((1[6-9])|(2\d)|(3[0-1]))\./.test(address.toString()))
+      return 'B'
 
     if (address.toString().startsWith('/ip4/192.168.')) return 'C'
 

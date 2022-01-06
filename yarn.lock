@@ -1152,10 +1152,10 @@ __metadata:
     "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
     "@types/mocha": 9.0.0
-    "@types/node": 16.11.14
-    "@types/simple-peer": 9.11.3
+    "@types/node": 16.11.18
+    "@types/simple-peer": 9.11.4
     "@types/yargs": 17.0.7
-    abortable-iterator: 3.0.0
+    abortable-iterator: 3.0.1
     bl: 5.0.0
     chai: 4.3.4
     chai-spies: 1.0.0
@@ -1165,7 +1165,7 @@ __metadata:
     it-pair: 1.0.0
     it-pipe: 1.1.0
     it-pushable: 1.4.2
-    libp2p: 0.35.5
+    libp2p: 0.35.8
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.5
     mocha: 9.1.3
@@ -1209,7 +1209,7 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.7
+    typedoc-plugin-markdown: 3.11.8
     typescript: 4.5.4
   languageName: unknown
   linkType: soft
@@ -1235,7 +1235,7 @@ __metadata:
     heap-js: 2.1.6
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.35.5
+    libp2p: 0.35.8
     libp2p-kad-dht: 0.27.4
     libp2p-mplex: 0.10.5
     libp2p-tcp: 0.17.2
@@ -1249,7 +1249,7 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.7
+    typedoc-plugin-markdown: 3.11.8
     typescript: 4.5.4
   languageName: unknown
   linkType: soft
@@ -1273,7 +1273,7 @@ __metadata:
     peer-id: 0.16.0
     rimraf: 3.0.2
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.7
+    typedoc-plugin-markdown: 3.11.8
     typescript: 4.5.4
     yargs: 17.2.1
   bin:
@@ -1301,7 +1301,7 @@ __metadata:
     ethereum-waffle: 3.4.0
     ethers: 5.5.2
     hardhat: 2.8.0
-    hardhat-deploy: 0.9.14
+    hardhat-deploy: 0.9.24
     hardhat-gas-reporter: 1.0.6
     multiaddr: 10.0.1
     rimraf: 3.0.2
@@ -1310,7 +1310,7 @@ __metadata:
     ts-node: 10.4.0
     typechain: 6.0.5
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.7
+    typedoc-plugin-markdown: 3.11.8
     typescript: 4.5.4
   languageName: unknown
   linkType: soft
@@ -1337,7 +1337,7 @@ __metadata:
     jsonschema: 1.4.0
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.35.5
+    libp2p: 0.35.8
     libp2p-crypto: 0.21.0
     libp2p-kad-dht: 0.27.4
     libp2p-mplex: 0.10.5
@@ -1345,9 +1345,9 @@ __metadata:
     memdown: 6.1.1
     mocha: 9.1.3
     multiaddr: 10.0.1
-    multihashes: 4.0.1
+    multihashes: 4.0.3
     peer-id: 0.16.0
-    pino: 7.0.0
+    pino: 7.6.2
     pino-logflare: 0.3.12
     rewiremock: 3.14.3
     rimraf: 3.0.2
@@ -1355,7 +1355,7 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.7
+    typedoc-plugin-markdown: 3.11.8
     typescript: 4.5.4
   languageName: unknown
   linkType: soft
@@ -1385,7 +1385,7 @@ __metadata:
     jazzicon: 1.5.0
     js-cookie: 3.0.1
     key-did-provider-ed25519: 1.1.0
-    key-did-resolver: 1.2.1
+    key-did-resolver: 1.4.0
     mocha: 9.1.3
     next: 12.0.7
     peer-id: 0.16.0
@@ -1397,12 +1397,12 @@ __metadata:
     run-queue: 2.0.1
     sinon: 12.0.1
     strip-ansi: 6.0.1
-    swagger-ui-express: 4.2.0
+    swagger-ui-express: 4.3.0
     tiny-hashes: 1.0.1
     trace-unhandled: 2.0.1
     ts-node: 10.4.0
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.7
+    typedoc-plugin-markdown: 3.11.8
     typescript: 4.5.4
     ws: 8.3.0
     yamljs: 0.3.0
@@ -2580,10 +2580,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:16.11.14, @types/node@npm:>=13.7.0":
+"@types/node@npm:*, @types/node@npm:>=13.7.0":
   version: 16.11.14
   resolution: "@types/node@npm:16.11.14"
   checksum: 0bd4333fb4e56532db7f5174732268b18089913ddbb0e97957228e64f9fe3babf9923c77ce6f07d3d354445cfbb8d31b95c1f8be3c0f7426308bd8b93d3aaa02
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:16.11.18":
+  version: 16.11.18
+  resolution: "@types/node@npm:16.11.18"
+  checksum: f2e615c5f1320552e240170991bc4f6317bb83e7b413ee95ecd44ac42f774eb6cfbbfd5a366f4d6e472c79396afbdc22699c65f1e959426c63c5e72fedd6139f
   languageName: node
   linkType: hard
 
@@ -2718,12 +2725,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/simple-peer@npm:9.11.3":
-  version: 9.11.3
-  resolution: "@types/simple-peer@npm:9.11.3"
+"@types/simple-peer@npm:9.11.4":
+  version: 9.11.4
+  resolution: "@types/simple-peer@npm:9.11.4"
   dependencies:
     "@types/node": "*"
-  checksum: a1305522a86d01170edbc937668b85312c26bf55e6753a3999627c57af52dc2773bd57f0ef72246092d96f4e97bcdb2520891e0fdd8be6eb98edf251a925a189
+  checksum: 13cea3c319b2f02b80a3ae5b051714840e8c75e4884b22242991ba0116f2ef10ccdc588853299b1320608ac191ea575544c00e173988ead53c5de96f3131b2fc
   languageName: node
   linkType: hard
 
@@ -2823,7 +2830,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"abortable-iterator@npm:3.0.0, abortable-iterator@npm:^3.0.0":
+"abortable-iterator@npm:3.0.1":
+  version: 3.0.1
+  resolution: "abortable-iterator@npm:3.0.1"
+  dependencies:
+    get-iterator: ^1.0.2
+  checksum: 1c4e0379f0c0aaab15c975bf7ef175bc5900bcd85955d60f9c68a526c6f150b7ec2a87f642b6022ebe7dd2dbf630a690a2c0cc8211cd800ba16a4d3380f19b2e
+  languageName: node
+  linkType: hard
+
+"abortable-iterator@npm:^3.0.0":
   version: 3.0.0
   resolution: "abortable-iterator@npm:3.0.0"
   dependencies:
@@ -8837,9 +8853,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hardhat-deploy@npm:0.9.14":
-  version: 0.9.14
-  resolution: "hardhat-deploy@npm:0.9.14"
+"hardhat-deploy@npm:0.9.24":
+  version: 0.9.24
+  resolution: "hardhat-deploy@npm:0.9.24"
   dependencies:
     "@ethersproject/abi": ^5.4.0
     "@ethersproject/abstract-signer": ^5.4.1
@@ -8865,8 +8881,8 @@ __metadata:
     qs: ^6.9.4
   peerDependencies:
     "@ethersproject/hardware-wallets": ^5.0.14
-    hardhat: ^2.0.0
-  checksum: e638b502452fbcd65d43f1e39b0d836ea7f7199fac41425737566bfd34fa0b706cde36b377b77fb9834b04bf16ff4d55554464198be216359207e72f13badacf
+    hardhat: ^2.6.8
+  checksum: 5b592bc846097dc18c9e25df772f29ef0a304c09cf54142204db1f21825b51cf1642d1dae7bd5bf31b82bf2dbb8416d63f5a3696901d7a68ecf224b651dd20b7
   languageName: node
   linkType: hard
 
@@ -10670,7 +10686,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"json-stringify-safe@npm:^5.0.1, json-stringify-safe@npm:~5.0.1":
+"json-stringify-safe@npm:~5.0.1":
   version: 5.0.1
   resolution: "json-stringify-safe@npm:5.0.1"
   checksum: 48ec0adad5280b8a96bb93f4563aa1667fd7a36334f79149abd42446d0989f2ddc58274b479f4819f1f00617957e6344c886c55d05a4e15ebb4ab931e4a6a8ee
@@ -10873,15 +10889,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"key-did-resolver@npm:1.2.1":
-  version: 1.2.1
-  resolution: "key-did-resolver@npm:1.2.1"
+"key-did-resolver@npm:1.4.0":
+  version: 1.4.0
+  resolution: "key-did-resolver@npm:1.4.0"
   dependencies:
-    "@stablelib/ed25519": ^1.0.1
+    "@stablelib/ed25519": ^1.0.2
     multibase: ~4.0.2
     uint8arrays: ^2.0.5
     varint: ^6.0.0
-  checksum: f6bee2fb047a4b7b326dd57e6e515f19a36196c9cf34d2499ef6b19dd66a2fe55ba8a650733f31f48a129e5fef6e294b45d45746c4c2971acd9be19edbcf506c
+  checksum: a558900deb8e541b03a78027f5f32431b7369819e7cc0af50c519d9c9acd6b00c4436a2622a81c23a0d00bd69632cfbf7f5814b992b7eaee4a8afefd530041bf
   languageName: node
   linkType: hard
 
@@ -11425,9 +11441,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.35.5":
-  version: 0.35.5
-  resolution: "libp2p@npm:0.35.5"
+"libp2p@npm:0.35.8":
+  version: 0.35.8
+  resolution: "libp2p@npm:0.35.8"
   dependencies:
     "@vascosantos/moving-average": ^1.1.0
     abort-controller: ^3.0.0
@@ -11480,7 +11496,7 @@ __metadata:
     varint: ^6.0.0
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: 2a0d4c8af0431187e1b741a41e3803f3eb51b2cbc8ced60396cc5fd62a1002736ef3b2968231a403bd66bae4efd7521b984e9b885beea190577ef4085c3a9827
+  checksum: beb2dfab11fedc6eb06a6173c93db3e163ac24be0fb0b3a87e98be1e24c705d407a016e880aba6bf02890a77856d2807ffc044d494176f5ebc4cca9a468b8529
   languageName: node
   linkType: hard
 
@@ -12519,17 +12535,6 @@ __metadata:
   version: 9.4.10
   resolution: "multiformats@npm:9.4.10"
   checksum: 57093ef493696122d3f843bc683167f535687d327a07a2488ac9b23ca555ca049db99c4f8344aac09646b515c8e48edac92ab5dccd6622b0437760f0b8effe27
-  languageName: node
-  linkType: hard
-
-"multihashes@npm:4.0.1":
-  version: 4.0.1
-  resolution: "multihashes@npm:4.0.1"
-  dependencies:
-    multibase: ^4.0.1
-    uint8arrays: ^2.1.3
-    varint: ^5.0.2
-  checksum: bdc64208de5bc200326380584322cd39e9d605e3244b48faaa8f12839fa5dafefdeabf36f84f118c13d87937d34d3d04b1f8ddcf714c46c7563e4e815e613db5
   languageName: node
   linkType: hard
 
@@ -14185,16 +14190,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pino-abstract-transport@npm:v0.4.0":
-  version: 0.4.0
-  resolution: "pino-abstract-transport@npm:0.4.0"
-  dependencies:
-    duplexify: ^4.1.2
-    split2: ^3.2.2
-  checksum: 9df1bc78e143008cbb6ef8d4d82f336d149e62cf5e395bb0cf3accb8dc46de1380609e8d661186217e2747a2358d22f50b232640f89c94759efa3efffe0c763d
-  languageName: node
-  linkType: hard
-
 "pino-abstract-transport@npm:v0.5.0":
   version: 0.5.0
   resolution: "pino-abstract-transport@npm:0.5.0"
@@ -14261,23 +14256,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pino@npm:7.0.0":
-  version: 7.0.0
-  resolution: "pino@npm:7.0.0"
+"pino@npm:7.6.2":
+  version: 7.6.2
+  resolution: "pino@npm:7.6.2"
   dependencies:
     fast-redact: ^3.0.0
-    fastify-warning: ^0.2.0
-    get-caller-file: ^2.0.5
-    json-stringify-safe: ^5.0.1
     on-exit-leak-free: ^0.2.0
-    pino-abstract-transport: v0.4.0
+    pino-abstract-transport: v0.5.0
     pino-std-serializers: ^4.0.0
+    process-warning: ^1.0.0
     quick-format-unescaped: ^4.0.3
+    real-require: ^0.1.0
+    safe-stable-stringify: ^2.1.0
     sonic-boom: ^2.2.1
-    thread-stream: ^0.11.1
+    thread-stream: ^0.13.0
   bin:
     pino: bin.js
-  checksum: b00369ee2b10082b1a4022e38a0f4eef94ac69bf13150d94671c35a88f30eefb17dde9f35b82d8f0fbb0a2a9a35ec2226c6cff7e67422c54173c5cb9181205f3
+  checksum: a748bda5b56e4bb357a986b9878d95e24e6dfb3ed6b741dd80a8f1101d0b7defc5131057cb2297ca76bd7cbcdb1bdc2d0986631e3899e12833cec08e690c83a8
   languageName: node
   linkType: hard
 
@@ -14454,6 +14449,13 @@ __metadata:
   dependencies:
     fromentries: ^1.2.0
   checksum: 597769e3db6a8e2cb1cd64a952bbc150220588debac31c7cf1a9f620ce981e25583d8d70848d8a14953577608512984a8808c3be77e09af8ebdcdc14ec23a295
+  languageName: node
+  linkType: hard
+
+"process-warning@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "process-warning@npm:1.0.0"
+  checksum: c708a03241deec3cabaeee39c4f9ee8c4d71f1c5ef9b746c8252cdb952a6059068cfcdaf348399775244cbc441b6ae5e26a9c87ed371f88335d84f26d19180f9
   languageName: node
   linkType: hard
 
@@ -16436,7 +16438,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"split2@npm:^3.1.1, split2@npm:^3.2.2":
+"split2@npm:^3.1.1":
   version: 3.2.2
   resolution: "split2@npm:3.2.2"
   dependencies:
@@ -16948,21 +16950,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"swagger-ui-dist@npm:>3.52.5":
-  version: 4.1.2
-  resolution: "swagger-ui-dist@npm:4.1.2"
-  checksum: 477dbc06606c53912a44c9982c4df847a2e4732025a397c1840933fc0c116f184860b49aa6a2b67157d3c56a924f506a020d780cac7acdb606a343e0af21bf55
+"swagger-ui-dist@npm:>=4.1.3":
+  version: 4.1.3
+  resolution: "swagger-ui-dist@npm:4.1.3"
+  checksum: b44ca8000af338218ae11ad0309c408ed07b2de0d0c2c9a9391ba4fe9e0198bcd8ed5d89e9ddafd44de99389d47deba9eeac130187b4024b896e60f07258f0dc
   languageName: node
   linkType: hard
 
-"swagger-ui-express@npm:4.2.0":
-  version: 4.2.0
-  resolution: "swagger-ui-express@npm:4.2.0"
+"swagger-ui-express@npm:4.3.0":
+  version: 4.3.0
+  resolution: "swagger-ui-express@npm:4.3.0"
   dependencies:
-    swagger-ui-dist: ">3.52.5"
+    swagger-ui-dist: ">=4.1.3"
   peerDependencies:
     express: ">=4.0.0"
-  checksum: e87255305edc2e48629d836f5839ecf31d031fffaacf029e2f34ea0823b72a5031302aae0d6a51d4eda5963ab731768028b97b990fa0f5dcceefdd9de2073aba
+  checksum: 8d2e1e5389efff59f19fbea9156e8db676a77aa80812872899f46a6e97e697b4e0ea0baccc5ec0f266371a6e604c2289fc84f2edc623a37f51f2393553796a8b
   languageName: node
   linkType: hard
 
@@ -17135,13 +17137,6 @@ __metadata:
     promise: ^8.0.0
     qs: ^6.4.0
   checksum: a24a4fc95dd8591966bf3752f024f5cd4d53c2b2c29b23b4e40c3322df6a432d939bc17b589d8e9d760b90e92ab860f6f361a4dfcfe3542019e1615fb51afccc
-  languageName: node
-  linkType: hard
-
-"thread-stream@npm:^0.11.1":
-  version: 0.11.2
-  resolution: "thread-stream@npm:0.11.2"
-  checksum: ca5372b3029ffee24eb928c8d597c5ece114d07c1812a2e2c6a0fc00e4d5f3fad747b84c9a69e8805bfd3c930793378f0c4048a3f5d99ddbb9ee79576e623cdf
   languageName: node
   linkType: hard
 
@@ -17650,14 +17645,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc-plugin-markdown@npm:3.11.7":
-  version: 3.11.7
-  resolution: "typedoc-plugin-markdown@npm:3.11.7"
+"typedoc-plugin-markdown@npm:3.11.8":
+  version: 3.11.8
+  resolution: "typedoc-plugin-markdown@npm:3.11.8"
   dependencies:
     handlebars: ^4.7.7
   peerDependencies:
     typedoc: ">=0.22.0"
-  checksum: ae21f898edf3d68a33d723ca149bb6d81485bc63bad1eb215f0af28c56672b5cfb329bf2c7a4e9e3b9215a46afaf306238d481abca6f6d9f1f4e84f1b6a698cd
+  checksum: 8cd28b8d4e27890df5696c51ad9ca7f2987938aecbaf6f5f580784cf2bfdbbf44c1ff6509f6adc8f0854f325a5ff63289e7c6af988216ca1529cd8f0004d4d02
   languageName: node
   linkType: hard
 

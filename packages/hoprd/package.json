@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.85.0-next.42",
+  "version": "1.85.0-next.55",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -19,7 +19,7 @@
     "node": "16"
   },
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
     "build": "yarn clean && tsc -p . && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
@@ -48,7 +48,7 @@
     "jazzicon": "1.5.0",
     "js-cookie": "3.0.1",
     "key-did-provider-ed25519": "1.1.0",
-    "key-did-resolver": "1.2.1",
+    "key-did-resolver": "1.4.0",
     "next": "12.0.7",
     "peer-id": "0.16.0",
     "prop-types": "15.7.2",
@@ -57,7 +57,7 @@
     "rlp": "2.2.7",
     "run-queue": "2.0.1",
     "strip-ansi": "6.0.1",
-    "swagger-ui-express": "4.2.0",
+    "swagger-ui-express": "4.3.0",
     "tiny-hashes": "1.0.1",
     "trace-unhandled": "2.0.1",
     "ws": "8.3.0",
@@ -73,7 +73,7 @@
     "sinon": "12.0.1",
     "ts-node": "10.4.0",
     "typedoc": "0.22.10",
-    "typedoc-plugin-markdown": "3.11.7",
+    "typedoc-plugin-markdown": "3.11.8",
     "typescript": "4.5.4"
   },
   "mocha": {
