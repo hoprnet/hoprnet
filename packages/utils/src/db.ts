@@ -577,6 +577,6 @@ export class HoprDB {
       return false
     }
 
-    return storedId !== expectedId
+    return storedId === expectedId
   }
 }
