@@ -123,9 +123,9 @@ This leaves you with terminal windows **B**, **C** and **D**.
 
 ## Admin panel reachability
 
-- `hoprd-public-relay` can be reached by browser on `192.168.101.17:3000`
-- `hoprd-nat-node-1` can be reached by browser on `192.168.101.20:3010`
-- `hoprd-nat-node-2` can be reached by browser on `192.168.101.20:3020`
+- `hoprd-public-relay` can be reached by browser from host on `192.168.101.17:3000`
+- `hoprd-nat-node-1` can be reached by browser from host on `192.168.101.20:3010`
+- `hoprd-nat-node-2` can be reached by browser from host on `192.168.101.20:3020`
 
 Access token for all 3 is `MyT0ken123^` .
 
