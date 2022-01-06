@@ -10,8 +10,8 @@ services:
     build: docker-runner/
 
     command:
-      - "sh"
-      - "-c"
+      - 'sh'
+      - '-c'
       - >-
         ./prepare-node.sh && node /opt/hopr/packages/hoprd/lib/index.js --admin --adminHost 0.0.0.0
         --healthCheck --healthCheckHost 0.0.0.0 --init --rest --restHost 0.0.0.0 --environment hardhat-localhost
