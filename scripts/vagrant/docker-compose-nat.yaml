@@ -1,11 +1,22 @@
 version: '3.9'
 
-# Start an internal-only bridge network to simulate NAT (NATwork)
+# Start an internal-only bridge network to simulate NAT with different address ranges
 networks:
   hopr-local-network-1:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.10.0.0/24
+          gateway: 10.10.0.1
+
   hopr-local-network-2:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.24.0.0/24
+          gateway: 172.24.0.1
 
 # Starts HOPRD behind NAT
 services:

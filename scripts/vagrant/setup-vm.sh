@@ -21,3 +21,5 @@ apt-get -y install docker-ce docker-ce-cli containerd.io
 curl -sSL "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
 ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+
+docker pull node:16

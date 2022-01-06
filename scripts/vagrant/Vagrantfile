@@ -2,6 +2,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "hardhat" do |hat|
     hat.vm.box = "generic/ubuntu2004"
+    hat.vm.box_version = "3.6.4"
     hat.vm.hostname = "hardhat.box"
     hat.vm.network "private_network", ip: "192.168.101.10"
 
@@ -15,7 +16,8 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "public" do |pub|
     pub.vm.box = "generic/ubuntu2004"
-    pub.vm.hostname = "relay.box"
+    pub.vm.box_version = "3.6.4"
+    pub.vm.hostname = "public.box"
     pub.vm.network "private_network", ip: "192.168.101.15"
 
     pub.vm.provision "shell", path: "setup-vm.sh"
@@ -28,9 +30,10 @@ Vagrant.configure("2") do |config|
     pub.vm.provision "file",  source: "startup-public.sh", destination: "startup-public.sh"
   end
 
-  config.vm.define "nat_nodes" do |nat|
+  config.vm.define "nat-nodes" do |nat|
     nat.vm.box = "generic/ubuntu2004"
-    nat.vm.hostname = "natnodes.box"
+    nat.vm.box_version = "3.6.4"
+    nat.vm.hostname = "nat-nodes.box"
     nat.vm.network "private_network", ip: "192.168.101.20"
 
     nat.vm.provision "shell", path: "setup-vm.sh"
