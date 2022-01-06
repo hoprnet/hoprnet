@@ -139,3 +139,4 @@ vagrant halt
 
 This will try to gracefully stop the VMs. To restart the environment again, follow the steps in the Environment setup
 section again.
+Note that whenever the `hardhat` VM is stopped, all on-chain information is lost and nodes will need to be funded again.
