@@ -1,6 +1,5 @@
 import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
-import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
 import { randomInteger, limitConcurrency, u8aEquals, debug } from '@hoprnet/hopr-utils'
 import {
   HEARTBEAT_INTERVAL,
@@ -32,14 +31,9 @@ export default class Heartbeat {
       error(`Error while processing heartbeat request`, err)
     }
 
-    this.protocolHeartbeat = `hopr/${environmentId}/heartbeat`
+    this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat`
 
-    subscribe(
-      this.protocolHeartbeat,
-      this.handleHeartbeatRequest.bind(this) as LibP2PHandlerFunction<Promise<Uint8Array>>,
-      true,
-      errHandler
-    )
+    subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, errHandler)
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
@@ -89,14 +83,22 @@ export default class Heartbeat {
   }
 
   private tick() {
-    this.timeout = setTimeout(async () => {
+    const resetTimeout = async function (this: Heartbeat) {
       try {
         await this.checkNodes()
       } catch (e) {
         log('FATAL ERROR IN HEARTBEAT', e)
       }
-      this.tick()
-    }, randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE))
+      this.timeout = setTimeout(
+        resetTimeout,
+        randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE)
+      )
+    }.bind(this)
+
+    this.timeout = setTimeout(
+      resetTimeout,
+      randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE)
+    )
   }
 
   public start() {
