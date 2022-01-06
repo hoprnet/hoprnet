@@ -23,7 +23,8 @@ import {
   ChannelStatus,
   MIN_NATIVE_BALANCE,
   u8aConcat,
-  isMultiaddrLocal, getIpv4LocalAddressClass
+  isMultiaddrLocal,
+  getIpv4LocalAddressClass
 } from '@hoprnet/hopr-utils'
 import type {
   LibP2PHandlerFunction,
@@ -681,8 +682,6 @@ class Hopr extends EventEmitter {
     }, this.strategy.tickInterval)
   }
 
-
-
   /**
    * Announces address of node on-chain to be reachable by other nodes.
    * @dev Promise resolves before own announcement appears in the indexer
@@ -694,31 +693,23 @@ class Hopr extends EventEmitter {
     let addrToAnnounce: Multiaddr
 
     if (includeRouting) {
-      let multiaddrs = await this.getAnnouncedAddresses();
-      multiaddrs.sort((a,b) =>
-      {
-            if (isMultiaddrLocal(a) && !isMultiaddrLocal(b))
-              return this.options.preferLocalAddresses ? -1 : 1
-            else if (!isMultiaddrLocal(a) && isMultiaddrLocal(b))
-              return this.options.preferLocalAddresses ? 1 : -1
-            else if (isMultiaddrLocal(a) && isMultiaddrLocal(b)) {
-              const clsA = getIpv4LocalAddressClass(a)
-              const clsB = getIpv4LocalAddressClass(b)
-              if (clsA == undefined)
-                return 1
-              if (clsB == undefined)
-                return -1
-              return clsA.localeCompare(clsB)
-            }
-            else return 0
+      let multiaddrs = await this.getAnnouncedAddresses()
+      multiaddrs.sort((a, b) => {
+        if (isMultiaddrLocal(a) && !isMultiaddrLocal(b)) return this.options.preferLocalAddresses ? -1 : 1
+        else if (!isMultiaddrLocal(a) && isMultiaddrLocal(b)) return this.options.preferLocalAddresses ? 1 : -1
+        else if (isMultiaddrLocal(a) && isMultiaddrLocal(b)) {
+          const clsA = getIpv4LocalAddressClass(a)
+          const clsB = getIpv4LocalAddressClass(b)
+          if (clsA == undefined) return 1
+          if (clsB == undefined) return -1
+          return clsA.localeCompare(clsB)
+        } else return 0
       })
 
       log(`available multiaddresses ${multiaddrs}`)
 
-      const ip4 = multiaddrs
-                    .find((s) => s.toString().startsWith('/ip4/'))
-      const ip6 = multiaddrs
-                    .find((s) => s.toString().startsWith('/ip6/'))
+      const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
+      const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
 
       // Prefer IPv4 addresses over IPv6 addresses, if any
       addrToAnnounce = ip4 ?? ip6
