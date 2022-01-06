@@ -127,6 +127,8 @@ This leaves you with terminal windows **B**, **C** and **D**.
 - `hoprd-nat-node-1` can be reached by browser on `192.168.101.20:3010`
 - `hoprd-nat-node-2` can be reached by browser on `192.168.101.20:3020`
 
+Access token for all 3 is `MyT0ken123^` .
+
 ## Tear-down
 
 To stop all the running VMs go to the `scripts/vagrant` directory and run:
