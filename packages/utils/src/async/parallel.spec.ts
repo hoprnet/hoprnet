@@ -71,7 +71,7 @@ describe('test nAtATime', function () {
     assert(typeof result[0] == 'object' && (result[0] as Error).message === '0', `must contain the right results`)
   })
 
-  it.only('test concurrency - edge cases', async function () {
+  it('test concurrency - edge cases', async function () {
     // Must return immediately
     assert((await nAtATime(testFunction, [], Infinity)).length == 0)
 
