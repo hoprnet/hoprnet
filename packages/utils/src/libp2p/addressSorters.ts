@@ -21,7 +21,7 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
         ipFamily = 'IPv6'
         break
       default:
-        throw Error(`Invalid address family in Multiaddr. Got ${family} but expected either '4' or '6'.`)
+        return false
     }
 
     const u8aAddr = ipToU8aAddress(address, ipFamily)
