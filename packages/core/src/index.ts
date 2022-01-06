@@ -698,8 +698,7 @@ class Hopr extends EventEmitter {
       // If we need local addresses, sort them first according to their class
       if (this.options.preferLocalAddresses) {
         multiaddrs.sort(multiaddressCompareByClassFunction)
-      }
-      else {
+      } else {
         // If we don't need local addresses, just throw them away
         multiaddrs = multiaddrs.filter((ma) => !isMultiaddrLocal(ma))
       }
