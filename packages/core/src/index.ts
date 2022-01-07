@@ -96,7 +96,7 @@ export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROY
 
 export type Subscribe = ((
   protocol: string,
-  handler: LibP2PHandlerFunction<Promise<void>>,
+  handler: LibP2PHandlerFunction<Promise<void> | void>,
   includeReply: false,
   errHandler: (err: any) => void
 ) => void) &
