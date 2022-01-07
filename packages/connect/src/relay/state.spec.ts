@@ -4,20 +4,15 @@ import Pair from 'it-pair'
 import type { StreamType } from '../types'
 
 import assert from 'assert'
-import PeerId from 'peer-id'
 import { RelayState } from './state'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aEquals, privKeyToPeerId } from '@hoprnet/hopr-utils'
+
+const initiator = privKeyToPeerId('0x9feb47f140eb4ebc8b233214451dd097240699f50728a2cdc290643c2f71eb98')
+const relay = privKeyToPeerId('0x56f3a30e2736cf964dee9a2fa9575a59361b6be368bb7a52955dabd88327b983')
+const destination = privKeyToPeerId('0x7fb0147c1872c39818c88a3b08e93f314ce826138f2330d22ca0e24c33ff5a0c')
 
 describe('relay state management', function () {
-  let initiator: PeerId, relay: PeerId, destination: PeerId
-
-  before(async function () {
-    ;[initiator, relay, destination] = await Promise.all(
-      Array.from({ length: 3 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
-    )
-  })
-
   it('identifier generation', function () {
     assert(RelayState.getId(initiator, relay) === RelayState.getId(relay, initiator))
 
@@ -175,6 +170,64 @@ describe('relay state management', function () {
 
     // Let I/O operations happen
     await new Promise((resolve) => setTimeout(resolve))
+
+    assert(!state.exists(initiator, destination))
+  })
+})
+
+describe('relay state management - errors', function () {
+  it('new stream throws synchronously', async function () {
+    const state = new RelayState()
+
+    assert(!state.exists(initiator, destination))
+
+    assert(!(await state.isActive(initiator, destination)), 'empty state must not be active')
+    await assert.rejects(
+      async () =>
+        await state.createNew(
+          initiator,
+          destination,
+          {
+            source: (async function* () {})(),
+            sink: async (_source: any) => {
+              throw Error(`boom`)
+            }
+          },
+          {
+            source: (async function* () {})(),
+            sink: async (_source: any) => {
+              throw Error(`boom`)
+            }
+          }
+        ),
+      Error(`boom`)
+    )
+
+    assert(!state.exists(initiator, destination))
+  })
+
+  it('new stream throws asynchronously', async function () {
+    const state = new RelayState()
+
+    assert(!state.exists(initiator, destination))
+
+    assert(!(await state.isActive(initiator, destination)), 'empty state must not be active')
+    await assert.rejects(
+      async () =>
+        await state.createNew(
+          initiator,
+          destination,
+          {
+            source: (async function* () {})(),
+            sink: async (_source: any) => Promise.reject(Error(`boom`))
+          },
+          {
+            source: (async function* () {})(),
+            sink: async (_source: any) => Promise.reject(Error(`boom`))
+          }
+        ),
+      Error(`boom`)
+    )
 
     assert(!state.exists(initiator, destination))
   })

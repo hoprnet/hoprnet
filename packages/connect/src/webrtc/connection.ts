@@ -1,6 +1,4 @@
 import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
-import type ConnectionManager from 'libp2p/src/connection-manager'
-
 import type { Instance as SimplePeer } from 'simple-peer'
 import type PeerId from 'peer-id'
 import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
@@ -8,10 +6,11 @@ import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import type { RelayConnection } from '../relay/connection'
+import type Libp2p from 'libp2p'
 import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils'
 import abortable from 'abortable-iterator'
-import type { Stream, StreamResult, DialOptions, StreamType } from '../types'
+import type { Stream, StreamResult, StreamType, HoprConnectDialOptions } from '../types'
 import assert from 'assert'
 
 const DEBUG_PREFIX = `hopr-connect`
@@ -52,7 +51,6 @@ class WebRTCConnection implements MultiaddrConnection<StreamType> {
   private _sinkMigrated: boolean
 
   public destroyed: boolean
-
   public remoteAddr: MultiaddrConnection['remoteAddr']
   public localAddr: MultiaddrConnection['localAddr']
 
@@ -68,10 +66,10 @@ class WebRTCConnection implements MultiaddrConnection<StreamType> {
 
   constructor(
     private counterparty: PeerId,
-    private connectionManager: ConnectionManager,
+    private connectionManager: Pick<Libp2p['connectionManager'], 'connections'>,
     private relayConn: RelayConnection,
     private channel: SimplePeer,
-    private options?: DialOptions & { __noWebRTCUpgrade?: boolean }
+    private options?: HoprConnectDialOptions & { __noWebRTCUpgrade?: boolean }
   ) {
     this.conn = relayConn
 
@@ -85,8 +83,8 @@ class WebRTCConnection implements MultiaddrConnection<StreamType> {
     this._sourceMigrated = false
     this._sinkMigrated = false
 
-    this.remoteAddr = relayConn.remoteAddr
-    this.localAddr = relayConn.localAddr
+    this.localAddr = this.conn.localAddr
+    this.remoteAddr = this.conn.remoteAddr
 
     this.timeline = {
       open: Date.now()

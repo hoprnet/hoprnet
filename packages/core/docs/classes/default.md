@@ -33,6 +33,7 @@
 ### Methods
 
 - [addListener](default.md#addlistener)
+- [addPeerToDHT](default.md#addpeertodht)
 - [announce](default.md#announce)
 - [closeChannel](default.md#closechannel)
 - [connectionReport](default.md#connectionreport)
@@ -307,6 +308,30 @@ node_modules/@types/node/events.d.ts:299
 
 ___
 
+### addPeerToDHT
+
+▸ `Private` **addPeerToDHT**(`peer`): `Promise`<`void`\>
+
+Total hack.
+Libp2p seems to miss a channel that passes discovered peers
+to the DHT routing table.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `peer` | `PeerId` | peer to add to DHT routing table |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:391](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L391)
+
+___
+
 ### announce
 
 ▸ `Private` **announce**(`includeRouting?`): `Promise`<`void`\>
@@ -329,7 +354,11 @@ Promise that resolves once announce transaction has been published
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:691](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L691)
+=======
+[packages/core/src/index.ts:712](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L712)
+>>>>>>> release/budapest
 
 ___
 
@@ -349,7 +378,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:848](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L848)
+=======
+[packages/core/src/index.ts:858](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L858)
+>>>>>>> release/budapest
 
 ___
 
@@ -363,7 +396,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:644](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L644)
+=======
+[packages/core/src/index.ts:665](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L665)
+>>>>>>> release/budapest
 
 ___
 
@@ -448,7 +485,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:658](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L658)
+=======
+[packages/core/src/index.ts:679](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L679)
+>>>>>>> release/budapest
 
 ___
 
@@ -508,7 +549,11 @@ Fund a payment channel
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:822](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L822)
+=======
+[packages/core/src/index.ts:832](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L832)
+>>>>>>> release/budapest
 
 ___
 
@@ -522,7 +567,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:450](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L450)
+=======
+[packages/core/src/index.ts:471](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L471)
+>>>>>>> release/budapest
 
 ___
 
@@ -546,7 +595,11 @@ List of addresses that is announced to other nodes
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:486](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L486)
+=======
+[packages/core/src/index.ts:507](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L507)
+>>>>>>> release/budapest
 
 ___
 
@@ -560,7 +613,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:759](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L759)
+=======
+[packages/core/src/index.ts:769](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L769)
+>>>>>>> release/budapest
 
 ___
 
@@ -574,7 +631,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:755](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L755)
+=======
+[packages/core/src/index.ts:765](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L765)
+>>>>>>> release/budapest
 
 ___
 
@@ -594,7 +655,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:909](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L909)
+=======
+[packages/core/src/index.ts:919](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L919)
+>>>>>>> release/budapest
 
 ___
 
@@ -614,7 +679,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:913](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L913)
+=======
+[packages/core/src/index.ts:923](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L923)
+>>>>>>> release/budapest
 
 ___
 
@@ -628,7 +697,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:637](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L637)
+=======
+[packages/core/src/index.ts:658](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L658)
+>>>>>>> release/budapest
 
 ___
 
@@ -642,7 +715,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:929](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L929)
+=======
+[packages/core/src/index.ts:939](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L939)
+>>>>>>> release/budapest
 
 ___
 
@@ -656,7 +733,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:477](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L477)
+=======
+[packages/core/src/index.ts:498](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L498)
+>>>>>>> release/budapest
 
 ___
 
@@ -679,7 +760,11 @@ that will relay that message before it reaches its destination.
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:960](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L960)
+=======
+[packages/core/src/index.ts:970](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L970)
+>>>>>>> release/budapest
 
 ___
 
@@ -695,7 +780,11 @@ List the addresses on which the node is listening
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:517](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L517)
+=======
+[packages/core/src/index.ts:538](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L538)
+>>>>>>> release/budapest
 
 ___
 
@@ -732,7 +821,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:763](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L763)
+=======
+[packages/core/src/index.ts:773](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L773)
+>>>>>>> release/budapest
 
 ___
 
@@ -754,7 +847,11 @@ Gets the observed addresses of a given peer.
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:525](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L525)
+=======
+[packages/core/src/index.ts:546](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L546)
+>>>>>>> release/budapest
 
 ___
 
@@ -774,7 +871,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:917](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L917)
+=======
+[packages/core/src/index.ts:927](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L927)
+>>>>>>> release/budapest
 
 ___
 
@@ -788,7 +889,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:883](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L883)
+=======
+[packages/core/src/index.ts:893](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L893)
+>>>>>>> release/budapest
 
 ___
 
@@ -804,7 +909,11 @@ Returns the version of hopr-core.
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:457](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L457)
+=======
+[packages/core/src/index.ts:478](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L478)
+>>>>>>> release/budapest
 
 ___
 
@@ -827,7 +936,11 @@ If error provided is considered an out of funds error
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:344](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L344)
+=======
+[packages/core/src/index.ts:341](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L341)
+>>>>>>> release/budapest
 
 ___
 
@@ -905,7 +1018,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:313](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L313)
+=======
+[packages/core/src/index.ts:310](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L310)
+>>>>>>> release/budapest
 
 ___
 
@@ -1007,7 +1124,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:332](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L332)
+=======
+[packages/core/src/index.ts:329](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L329)
+>>>>>>> release/budapest
 
 ___
 
@@ -1031,7 +1152,11 @@ Called whenever a peer is announced
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:363](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L363)
+=======
+[packages/core/src/index.ts:360](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L360)
+>>>>>>> release/budapest
 
 ___
 
@@ -1051,7 +1176,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:751](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L751)
+=======
+[packages/core/src/index.ts:761](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L761)
+>>>>>>> release/budapest
 
 ___
 
@@ -1125,7 +1254,11 @@ Open a payment channel
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:783](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L783)
+=======
+[packages/core/src/index.ts:793](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L793)
+>>>>>>> release/budapest
 
 ___
 
@@ -1139,7 +1272,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:662](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L662)
+=======
+[packages/core/src/index.ts:683](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L683)
+>>>>>>> release/budapest
 
 ___
 
@@ -1163,7 +1300,11 @@ latency
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:619](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L619)
+=======
+[packages/core/src/index.ts:640](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L640)
+>>>>>>> release/budapest
 
 ___
 
@@ -1308,7 +1449,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:904](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L904)
+=======
+[packages/core/src/index.ts:914](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L914)
+>>>>>>> release/budapest
 
 ___
 
@@ -1468,7 +1613,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:534](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L534)
+=======
+[packages/core/src/index.ts:555](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L555)
+>>>>>>> release/budapest
 
 ___
 
@@ -1488,7 +1637,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:746](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L746)
+=======
+[packages/core/src/index.ts:756](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L756)
+>>>>>>> release/budapest
 
 ___
 
@@ -1541,7 +1694,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:925](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L925)
+=======
+[packages/core/src/index.ts:935](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L935)
+>>>>>>> release/budapest
 
 ___
 
@@ -1555,7 +1712,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:768](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L768)
+=======
+[packages/core/src/index.ts:778](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L778)
+>>>>>>> release/budapest
 
 ___
 
@@ -1619,7 +1780,11 @@ Shuts down the node and saves keys and peerBook in the database
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:464](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L464)
+=======
+[packages/core/src/index.ts:485](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L485)
+>>>>>>> release/budapest
 
 ___
 
@@ -1640,7 +1805,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:655](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L655)
+=======
+[packages/core/src/index.ts:676](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L676)
+>>>>>>> release/budapest
 
 ___
 
@@ -1654,7 +1823,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:386](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L386)
+=======
+[packages/core/src/index.ts:409](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L409)
+>>>>>>> release/budapest
 
 ___
 
@@ -1672,7 +1845,11 @@ MAX_DELAY is reached, this function will reject.
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:976](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L976)
+=======
+[packages/core/src/index.ts:986](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L986)
+>>>>>>> release/budapest
 
 ___
 
@@ -1686,7 +1863,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:1008](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1008)
+=======
+[packages/core/src/index.ts:1018](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1018)
+>>>>>>> release/budapest
 
 ___
 
@@ -1710,7 +1891,11 @@ Withdraw on-chain assets to a given address
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core/src/index.ts:940](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L940)
+=======
+[packages/core/src/index.ts:950](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L950)
+>>>>>>> release/budapest
 
 ___
 

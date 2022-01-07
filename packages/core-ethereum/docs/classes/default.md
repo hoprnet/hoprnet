@@ -18,7 +18,6 @@
 
 - [CHAIN\_NAME](default.md#chain_name)
 - [automaticChainCreation](default.md#automaticchaincreation)
-- [cachedGetBalance](default.md#cachedgetbalance)
 - [cachedGetNativeBalance](default.md#cachedgetnativebalance)
 - [chain](default.md#chain)
 - [indexer](default.md#indexer)
@@ -68,7 +67,6 @@
 - [smartContractInfo](default.md#smartcontractinfo)
 - [start](default.md#start)
 - [stop](default.md#stop)
-- [uncachedGetBalance](default.md#uncachedgetbalance)
 - [uncachedGetNativeBalance](default.md#uncachedgetnativebalance)
 - [waitForPublicNodes](default.md#waitforpublicnodes)
 - [withdraw](default.md#withdraw)
@@ -109,7 +107,11 @@ EventEmitter.constructor
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L125)
+=======
+[packages/core-ethereum/src/index.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L126)
+>>>>>>> release/budapest
 
 ___
 
@@ -119,6 +121,7 @@ ___
 
 ___
 
+<<<<<<< HEAD
 ### cachedGetBalance
 
 • `Private` **cachedGetBalance**: () => `Promise`<`Balance`\>
@@ -137,6 +140,8 @@ ___
 
 ___
 
+=======
+>>>>>>> release/budapest
 ### cachedGetNativeBalance
 
 • `Private` **cachedGetNativeBalance**: () => `Promise`<`NativeBalance`\>
@@ -151,7 +156,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L188)
+=======
+[packages/core-ethereum/src/index.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L189)
+>>>>>>> release/budapest
 
 ___
 
@@ -337,7 +346,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L135)
+=======
+[packages/core-ethereum/src/index.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L136)
+>>>>>>> release/budapest
 
 ___
 
@@ -357,7 +370,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:209](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L209)
+=======
+[packages/core-ethereum/src/index.ts:210](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L210)
+>>>>>>> release/budapest
 
 ___
 
@@ -492,7 +509,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:334](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L334)
+=======
+[packages/core-ethereum/src/index.ts:335](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L335)
+>>>>>>> release/budapest
 
 ___
 
@@ -514,7 +535,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:364](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L364)
+=======
+[packages/core-ethereum/src/index.ts:365](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L365)
+>>>>>>> release/budapest
 
 ___
 
@@ -534,21 +559,27 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L154)
+=======
+[packages/core-ethereum/src/index.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L155)
+>>>>>>> release/budapest
 
 ___
 
 ### getBalance
 
-▸ **getBalance**(`useCache?`): `Promise`<`Balance`\>
+▸ **getBalance**(`useIndexer?`): `Promise`<`Balance`\>
 
-Retrieves HOPR balance, optionally uses the cache.
+Retrieves HOPR balance, optionally uses the indexer.
+The difference from the two methods is that the latter relys on
+the coming events which require 8 blocks to be confirmed.
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `useCache` | `boolean` | `false` |
+| `useIndexer` | `boolean` | `false` |
 
 #### Returns
 
@@ -558,7 +589,11 @@ HOPR balance
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L172)
+=======
+[packages/core-ethereum/src/index.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L173)
+>>>>>>> release/budapest
 
 ___
 
@@ -601,7 +636,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L121)
+=======
+[packages/core-ethereum/src/index.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L122)
+>>>>>>> release/budapest
 
 ___
 
@@ -644,7 +683,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:192](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L192)
+=======
+[packages/core-ethereum/src/index.ts:193](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L193)
+>>>>>>> release/budapest
 
 ___
 
@@ -664,7 +707,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L150)
+=======
+[packages/core-ethereum/src/index.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L151)
+>>>>>>> release/budapest
 
 ___
 
@@ -678,7 +725,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:176](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L176)
+=======
+[packages/core-ethereum/src/index.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L177)
+>>>>>>> release/budapest
 
 ___
 
@@ -698,7 +749,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L158)
+=======
+[packages/core-ethereum/src/index.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L159)
+>>>>>>> release/budapest
 
 ___
 
@@ -712,7 +767,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L162)
+=======
+[packages/core-ethereum/src/index.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L163)
+>>>>>>> release/budapest
 
 ___
 
@@ -732,7 +791,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:326](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L326)
+=======
+[packages/core-ethereum/src/index.ts:327](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L327)
+>>>>>>> release/budapest
 
 ___
 
@@ -950,7 +1013,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:344](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L344)
+=======
+[packages/core-ethereum/src/index.ts:345](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L345)
+>>>>>>> release/budapest
 
 ___
 
@@ -1095,7 +1162,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:229](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L229)
+=======
+[packages/core-ethereum/src/index.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L230)
+>>>>>>> release/budapest
 
 ___
 
@@ -1116,7 +1187,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:272](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L272)
+=======
+[packages/core-ethereum/src/index.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L273)
+>>>>>>> release/budapest
 
 ___
 
@@ -1136,7 +1211,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:243](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L243)
+=======
+[packages/core-ethereum/src/index.ts:244](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L244)
+>>>>>>> release/budapest
 
 ___
 
@@ -1328,7 +1407,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L146)
+=======
+[packages/core-ethereum/src/index.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L147)
+>>>>>>> release/budapest
 
 ___
 
@@ -1349,7 +1432,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:196](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L196)
+=======
+[packages/core-ethereum/src/index.ts:197](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L197)
+>>>>>>> release/budapest
 
 ___
 
@@ -1379,6 +1466,7 @@ Stops the connector.
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L130)
 
 ___
@@ -1394,6 +1482,9 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/index.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L166)
+=======
+[packages/core-ethereum/src/index.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L131)
+>>>>>>> release/budapest
 
 ___
 
@@ -1411,7 +1502,11 @@ ETH balance
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L184)
+=======
+[packages/core-ethereum/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L185)
+>>>>>>> release/budapest
 
 ___
 
@@ -1425,7 +1520,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:205](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L205)
+=======
+[packages/core-ethereum/src/index.ts:206](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L206)
+>>>>>>> release/budapest
 
 ___
 
@@ -1447,7 +1546,11 @@ ___
 
 #### Defined in
 
+<<<<<<< HEAD
 [packages/core-ethereum/src/index.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L139)
+=======
+[packages/core-ethereum/src/index.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L140)
+>>>>>>> release/budapest
 
 ___
 

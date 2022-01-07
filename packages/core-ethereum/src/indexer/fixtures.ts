@@ -1,4 +1,4 @@
-import type { Event } from './types'
+import type { Event, TokenEvent } from './types'
 import BN from 'bn.js'
 import assert from 'assert'
 import { BigNumber } from 'ethers'
@@ -174,3 +174,29 @@ export const oneSmallTicket = new Ticket(
   UINT256.fromString('0'),
   new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 )
+
+export const PARTY_A_TRANSFER_INCOMING = {
+  event: 'Transfer',
+  transactionHash: '',
+  blockNumber: 1,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    from: PARTY_B.toAddress().toHex(),
+    to: PARTY_A.toAddress().toHex(),
+    value: BigNumber.from('3')
+  } as any
+} as TokenEvent<'Transfer'>
+
+export const PARTY_A_TRANSFER_OUTGOING = {
+  event: 'Transfer',
+  transactionHash: '',
+  blockNumber: 2,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    from: PARTY_A.toAddress().toHex(),
+    to: PARTY_B.toAddress().toHex(),
+    value: BigNumber.from('1')
+  } as any
+} as TokenEvent<'Transfer'>

@@ -4,11 +4,14 @@
 import yargs from 'yargs/yargs'
 import BN from 'bn.js'
 import { createChainWrapper } from '@hoprnet/hopr-core-ethereum'
-import { expandVars, moveDecimalPoint, Address, Balance, NativeBalance } from '@hoprnet/hopr-utils'
+import { expandVars, moveDecimalPoint, Address, Balance, NativeBalance, DeferType } from '@hoprnet/hopr-utils'
 import { utils } from 'ethers'
+import { TX_CONFIRMATION_WAIT } from '@hoprnet/hopr-core-ethereum/src/constants'
 
 const { PRIVATE_KEY } = process.env
 const PROTOCOL_CONFIG = require('../packages/core/protocol-config.json')
+
+type UnboxPromise<T extends Promise<any>> = T extends Promise<infer U> ? U : never
 
 function parseGasPrice(gasPrice: string) {
   const parsedGasPrice = gasPrice.split(' ')
@@ -16,6 +19,27 @@ function parseGasPrice(gasPrice: string) {
     return Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
   }
   return Number(parsedGasPrice[0])
+}
+
+// naive mock of indexer waiting for confirmation
+function createTxHandler(tx: string): DeferType<string> {
+  const deferred = {} as DeferType<string>
+  deferred.promise = new Promise((resolve, reject) => {
+    deferred.reject = () => {
+      console.log(`tx ${tx} is rejected`)
+      reject(tx)
+    }
+    setTimeout(() => {
+      deferred.resolve()
+    }, TX_CONFIRMATION_WAIT)
+
+    deferred.resolve = () => {
+      console.log(`tx ${tx} is resolved`)
+      resolve(tx)
+    }
+  })
+
+  return deferred
 }
 
 async function getNativeBalance(chain, address: string) {
@@ -26,7 +50,12 @@ async function getERC20Balance(chain, address: string) {
   return await chain.getBalance(Address.fromString(address))
 }
 
-async function fundERC20(chain, sender: string, receiver: string, targetBalanceStr: string) {
+async function fundERC20(
+  chain: UnboxPromise<ReturnType<typeof createChainWrapper>>,
+  sender: string,
+  receiver: string,
+  targetBalanceStr: string
+) {
   const senderBalance = await getNativeBalance(chain, sender)
   const balance = await getERC20Balance(chain, receiver)
   const targetBalanceNr = moveDecimalPoint(targetBalanceStr, Balance.DECIMALS)
@@ -53,10 +82,15 @@ async function fundERC20(chain, sender: string, receiver: string, targetBalanceS
   console.log(
     `transfer ${diff.toFormattedString()} from ${sender} to ${receiver} to top up ${balance.toFormattedString()}`
   )
-  await chain.withdraw('HOPR', receiver, diff.toString())
+  await chain.withdraw('HOPR', receiver, diff.toString(), (tx: string) => createTxHandler(tx))
 }
 
-async function fundNative(chain, sender: string, receiver: string, targetBalanceStr: string) {
+async function fundNative(
+  chain: UnboxPromise<ReturnType<typeof createChainWrapper>>,
+  sender: string,
+  receiver: string,
+  targetBalanceStr: string
+) {
   const senderBalance = await getNativeBalance(chain, sender)
   const balance = await getNativeBalance(chain, receiver)
   const targetBalanceNr = moveDecimalPoint(targetBalanceStr, Balance.DECIMALS)
@@ -83,7 +117,7 @@ async function fundNative(chain, sender: string, receiver: string, targetBalance
   console.log(
     `transfer ${diff.toFormattedString()} from ${sender} to ${receiver} to top up ${balance.toFormattedString()}`
   )
-  await chain.withdraw('NATIVE', receiver, diff.toString())
+  await chain.withdraw('NATIVE', receiver, diff.toString(), (tx: string) => createTxHandler(tx))
 }
 
 async function main() {
