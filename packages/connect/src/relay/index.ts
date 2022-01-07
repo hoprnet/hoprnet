@@ -291,8 +291,6 @@ class Relay {
       stream = await this.establishDirectConnection(destination, protocol, opts)
     }
 
-    console.log(`stream in dialDirectly`, stream)
-
     return stream
   }
 
@@ -315,7 +313,7 @@ class Relay {
       // Check that the address:
       // - matches the format (PeerStore might include addresses of other transport modules)
       // - is a direct address (PeerStore might include relay addresses)
-      if (this.filter([knownAddress.multiaddr]) && knownAddress.multiaddr.tuples()[0][0] != CODE_P2P) {
+      if (this.filter([knownAddress.multiaddr]).length > 0 && knownAddress.multiaddr.tuples()[0][0] != CODE_P2P) {
         usableAddresses.push(knownAddress.multiaddr)
       }
     }

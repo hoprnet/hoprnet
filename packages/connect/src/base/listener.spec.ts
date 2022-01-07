@@ -484,7 +484,7 @@ describe('error cases', function () {
         upgradeInbound: async (_maConn: MultiaddrConnection) => {
           await new Promise((resolve) => setTimeout(resolve, 100))
 
-          // Do sth unexpected
+          // Do sth. unexpected
           // @ts-ignore
           conn.nonExisting()
 
