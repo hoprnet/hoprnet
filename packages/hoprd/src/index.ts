@@ -304,7 +304,7 @@ async function main() {
 
       logs.log(`Node address: ${node.getId().toB58String()}`)
 
-      const ethAddr = (await node.getEthereumAddress()).toHex()
+      const ethAddr = node.getEthereumAddress().toHex()
       const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
       logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)

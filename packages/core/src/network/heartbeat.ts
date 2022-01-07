@@ -82,27 +82,29 @@ export default class Heartbeat {
     log(this.networkPeers.debugLog())
   }
 
-  private tick() {
-    const resetTimeout = async function (this: Heartbeat) {
+  private startHeartbeatInterval() {
+    const periodicCheck = async function (this: Heartbeat) {
       try {
         await this.checkNodes()
       } catch (e) {
         log('FATAL ERROR IN HEARTBEAT', e)
       }
       this.timeout = setTimeout(
-        resetTimeout,
+        periodicCheck,
+        // Prevent nodes from querying each other at the very same time
         randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE)
       )
     }.bind(this)
 
     this.timeout = setTimeout(
-      resetTimeout,
+      periodicCheck,
+      // Prevent nodes from querying each other at the very same time
       randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE)
     )
   }
 
   public start() {
-    this.tick()
+    this.startHeartbeatInterval()
     log(`Heartbeat started`)
   }
 

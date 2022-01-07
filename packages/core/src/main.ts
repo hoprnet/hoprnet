@@ -29,16 +29,15 @@ export async function createLibp2pInstance(
   publicNodesEmitter: PublicNodesEmitter
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
+
   if (options.preferLocalAddresses) {
     addressSorter = localAddressesFirst
     log('Preferring local addresses')
   } else {
-    // Overwrite libp2p's default addressSorter to make
-    // sure it doesn't fail on HOPR-flavored addresses
-    addressSorter = (x) => x
     log('Addresses are sorted by default')
   }
-  const libp2p = await LibP2P.create({
+
+  return await LibP2P.create({
     peerId,
     addresses: { listen: getAddrs(peerId, options).map((x) => x.toString()) },
     // libp2p modules
@@ -49,7 +48,6 @@ export async function createLibp2pInstance(
       dht: KadDHT
     },
     config: {
-      // @ts-ignore
       protocolPrefix: 'hopr',
       transport: {
         HoprConnect: {
@@ -65,13 +63,16 @@ export async function createLibp2pInstance(
       },
       dht: {
         enabled: true,
+        // Feed DHT with all previously announced nodes
         // @ts-ignore
         bootstrapPeers: initialNodes
       },
       relay: {
+        // Conflicts with HoprConnect's own mechanism
         enabled: false
       },
       nat: {
+        // Conflicts with HoprConnect's own mechanism
         enabled: false
       }
     },
@@ -80,7 +81,6 @@ export async function createLibp2pInstance(
       maxDialsPerPeer: 100
     }
   })
-  return libp2p
 }
 
 /*
