@@ -93,7 +93,9 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
       } as any
     },
     dialDirectly,
-    (multiaddrs: Multiaddr[]) => multiaddrs
+    (multiaddrs: Multiaddr[]) => multiaddrs,
+    undefined,
+    `testingEnvironment`
   )
 }
 

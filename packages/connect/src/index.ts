@@ -96,6 +96,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       this._dialDirectly,
       this.filter.bind(this),
       this._webRTCUpgrader,
+      opts.environment,
       opts.__noWebRTCUpgrade,
       opts.maxRelayedConnections,
       opts.__relayFreeTimeout
@@ -201,8 +202,10 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       this.initialNodes,
       this._peerId,
       this._interface,
-      this.__useLocalAddress,
-      false
+      {
+        runningLocally: false,
+        preferLocalAddresses: this.__useLocalAddress
+      }
     )
   }
 

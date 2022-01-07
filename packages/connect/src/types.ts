@@ -66,6 +66,7 @@ export type HoprConnectOptions = {
   maxRelayedConnections?: number
   __relayFreeTimeout?: number
   __useLocalAddresses?: boolean
+  environment?: string
 }
 
 export type HoprConnectListeningOptions = undefined

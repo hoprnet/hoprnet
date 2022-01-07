@@ -10,7 +10,7 @@ import { RelayState } from './state'
 import type { Relay } from '.'
 
 import debug from 'debug'
-import { DELIVERY } from '../constants'
+import { DELIVERY_PROTOCOL } from '../constants'
 
 export enum RelayHandshakeMessage {
   OK,
@@ -74,7 +74,7 @@ type HandleResponse =
 class RelayHandshake {
   private shaker: Handshake<StreamType>
 
-  constructor(stream: Stream) {
+  constructor(stream: Stream, private environment?: string) {
     this.shaker = handshake(stream)
   }
 
@@ -222,7 +222,7 @@ class RelayHandshake {
 
     let toDestination: Stream | undefined
     try {
-      toDestination = await getStreamToCounterparty(destination, DELIVERY)
+      toDestination = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.environment))
     } catch (err) {
       error(err)
     }

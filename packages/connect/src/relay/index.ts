@@ -9,7 +9,7 @@ import debug from 'debug'
 
 import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
 import chalk from 'chalk'
-import { RELAY_CIRCUIT_TIMEOUT, RELAY, DELIVERY, CODE_P2P } from '../constants'
+import { RELAY_CIRCUIT_TIMEOUT, RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P } from '../constants'
 import { RelayConnection } from './connection'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
@@ -55,6 +55,7 @@ class Relay {
     private dialDirectly: HoprConnect['dialDirectly'],
     private filter: HoprConnect['filter'],
     private webRTCUpgrader?: WebRTCUpgrader,
+    private environment?: string,
     private __noWebRTCUpgrade?: boolean,
     private maxRelayedConnections: number = DEFAULT_MAX_RELAYED_CONNECTIONS,
     private __relayFreeTimeout?: number
@@ -68,9 +69,9 @@ class Relay {
    *      at that point in time
    */
   start(): void {
-    this.libp2p.handle(DELIVERY, this.onDelivery.bind(this))
+    this.libp2p.handle(DELIVERY_PROTOCOL(this.environment), this.onDelivery.bind(this))
 
-    this.libp2p.handle(RELAY, this.onRelay.bind(this))
+    this.libp2p.handle(RELAY_PROTCOL(this.environment), this.onRelay.bind(this))
   }
 
   /**
@@ -88,7 +89,7 @@ class Relay {
     const abort = new AbortController()
     setTimeout(abort.abort.bind(abort), RELAY_CIRCUIT_TIMEOUT)
 
-    const baseConnection = await this.dialNodeDirectly(relay, RELAY, {
+    const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.environment), {
       signal: options?.signal
     })
 
@@ -101,7 +102,7 @@ class Relay {
       return
     }
 
-    const handshakeResult = await new RelayHandshake(baseConnection).initiate(relay, destination)
+    const handshakeResult = await new RelayHandshake(baseConnection, this.environment).initiate(relay, destination)
 
     if (!handshakeResult.success) {
       error(`Handshake led to empty stream. Giving up.`)
@@ -188,7 +189,7 @@ class Relay {
       return
     }
 
-    const shaker = new RelayHandshake(conn.stream as any)
+    const shaker = new RelayHandshake(conn.stream as any, this.environment)
 
     log(`handling relay request from ${conn.connection.remotePeer.toB58String()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
@@ -220,7 +221,9 @@ class Relay {
       return
     }
 
-    const handShakeResult = await new RelayHandshake(conn.stream as any).handle(conn.connection.remotePeer)
+    const handShakeResult = await new RelayHandshake(conn.stream as any, this.environment).handle(
+      conn.connection.remotePeer
+    )
 
     if (!handShakeResult.success) {
       return

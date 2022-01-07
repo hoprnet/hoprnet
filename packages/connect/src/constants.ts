@@ -65,5 +65,24 @@ export function isValidPrefix(prefix: RelayPrefix): boolean {
 
 export const MAX_RELAYS_PER_NODE = 5
 
-export const RELAY = `/${NAME}/relay/${version}`
-export const DELIVERY = `/${NAME}/delivery/${version}`
+/**
+ * @param environment [optional] isolate from nodes running in other environments
+ * @returns the relay request protocol string
+ */
+export function RELAY_PROTCOL(environment?: string) {
+  if (environment) {
+    return `/${NAME}/${environment}/relay/${version}`
+  }
+  return `/${NAME}/relay/${version}`
+}
+
+/**
+ * @param environment [optional] isolate from nodes running in other environments
+ * @returns the relay delivery protocol string
+ */
+export function DELIVERY_PROTOCOL(environment?: string) {
+  if (environment) {
+    return `/${NAME}/${environment}/delivery/${version}`
+  }
+  return `/${NAME}/delivery/${version}`
+}
