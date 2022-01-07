@@ -5,10 +5,11 @@ import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
 import type { Connection } from 'libp2p-interfaces/connection'
 import type PeerId from 'peer-id'
 
+import { isAnyAddress } from '@hoprnet/hopr-utils'
+
 import { Multiaddr } from 'multiaddr'
 
-export { parseAddress } from './addrs'
-export type { ValidAddress } from './addrs'
+export { parseAddress, type ValidAddress } from './addrs'
 export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
 
 function isAsyncStream<T>(iterator: AsyncIterable<T> | Iterable<T>): iterator is AsyncIterable<T> {
@@ -108,13 +109,24 @@ export function eagerIterator<T>(iterator: AsyncIterable<T> | Iterable<T>): Asyn
  * @returns
  */
 export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): Multiaddr {
+  let address: string
   let family: 4 | 6
   switch (addr.family) {
     case 'IPv4':
       family = 4
+      if (isAnyAddress(addr.address, 'IPv6')) {
+        address = '0.0.0.0'
+      } else {
+        address = addr.address
+      }
       break
     case 'IPv6':
       family = 6
+      if (isAnyAddress(addr.address, 'IPv4')) {
+        address = '::'
+      } else {
+        address = addr.address
+      }
       break
     default:
       throw Error(`Invalid family. Got ${addr.family}`)
@@ -123,7 +135,7 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
   let ma = Multiaddr.fromNodeAddress(
     {
       family,
-      address: addr.address,
+      address,
       port: addr.port
     },
     'tcp'

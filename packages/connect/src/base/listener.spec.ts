@@ -1,13 +1,12 @@
 import assert from 'assert'
-import { Listener } from './listener'
+import { Listener, type ListenerTestingOptions } from './listener'
 import { Multiaddr } from 'multiaddr'
 import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
 import type { Connection } from 'libp2p-interfaces/connection'
 import dgram, { type Socket } from 'dgram'
-import { createConnection } from 'net'
+import { createConnection, type AddressInfo } from 'net'
 import * as stun from 'webrtc-stun'
 import { once, EventEmitter } from 'events'
-import type { AddressInfo } from 'net'
 
 import { type NetworkInterfaceInfo, networkInterfaces } from 'os'
 import { u8aEquals, defer, type DeferType, toNetworkPrefix, u8aAddrToString } from '@hoprnet/hopr-utils'
@@ -43,6 +42,16 @@ class TestingListener extends Listener {
   }
 }
 
+const localHostBeingExposed: ListenerTestingOptions = {
+  runningLocally: true
+}
+
+const localHostCheckingNAT: ListenerTestingOptions = {
+  noUPNP: true,
+  runningLocally: false, // contact STUN servers
+  preferLocalAddresses: true // accept local addresses from STUN servers
+}
+
 /**
  * Creates a node and attaches message listener to it.
  * @param publicNodes emitter that emit an event on new public nodes
@@ -56,7 +65,6 @@ async function startNode(
   state: { msgReceived?: DeferType<void>; expectedMessageReceived?: DeferType<void> } = {},
   expectedMessage: Uint8Array | undefined = undefined,
   peerId = createPeerId(),
-  runningLocally: boolean,
   upgradeInbound: ((maConn: MultiaddrConnection) => Promise<Connection>) | undefined
 ) {
   const publicNodesEmitter = new EventEmitter() as PublicNodesEmitter
@@ -65,7 +73,6 @@ async function startNode(
     (async () => {}) as any,
     upgradeInbound ??
       (async (conn: MultiaddrConnection) => {
-        console.log(`msg received`)
         if (expectedMessage != undefined) {
           for await (const msg of conn.source) {
             if (u8aEquals(msg.slice(), expectedMessage)) {
@@ -81,8 +88,7 @@ async function startNode(
     initialNodes,
     peerId,
     undefined,
-    runningLocally ?? false,
-    true
+    localHostCheckingNAT
   )
 
   await listener.listen(new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
@@ -124,8 +130,7 @@ describe('check listening to sockets', function () {
         [peerStoreEntry, getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)],
         peerId,
         undefined,
-        true,
-        true
+        localHostCheckingNAT
       )
 
       let listeningMultiaddr: Multiaddr
@@ -170,7 +175,6 @@ describe('check listening to sockets', function () {
       },
       testMessage,
       undefined,
-      true,
       undefined
     )
 
@@ -186,7 +190,8 @@ describe('check listening to sockets', function () {
       }
     )
 
-    await msgReceived.promise
+    // Produces a timeout if not successful
+    await Promise.all([msgReceived.promise, expectedMessageReceived.promise])
 
     await Promise.all([node.listener, firstStunServer, secondStunServer].map(stopNode))
   })
@@ -198,6 +203,7 @@ describe('check listening to sockets', function () {
     for (const iface of Object.keys(usableInterfaces)) {
       const osIface = usableInterfaces[iface]
 
+      // Disable IPv6
       if (osIface == undefined || osIface.some((x) => x.internal) || !osIface.some((x) => x.family == 'IPv4')) {
         delete usableInterfaces[iface]
       }
@@ -215,6 +221,7 @@ describe('check listening to sockets', function () {
         return false
       }
 
+      // Disable IPv6
       if (addr.family == 'IPv6') {
         return false
       }
@@ -239,9 +246,7 @@ describe('check listening to sockets', function () {
       undefined,
       [getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
       peerId,
-      firstUsableInterfaceName,
-      false,
-      true
+      firstUsableInterfaceName
     )
 
     await assert.rejects(
@@ -273,7 +278,6 @@ describe('check listening to sockets', function () {
       undefined,
       undefined,
       undefined,
-      true,
       undefined
     )
 
@@ -330,7 +334,6 @@ describe('check listening to sockets', function () {
       },
       undefined,
       undefined,
-      true,
       undefined
     )
 
@@ -388,11 +391,38 @@ describe('check listening to sockets', function () {
       ],
       createPeerId(),
       undefined,
-      true,
-      false
+      localHostCheckingNAT
     )
     await listener.bind(new Multiaddr(`/ip4/0.0.0.0/tcp/9091`))
     await assert.doesNotReject(async () => await listener.checkNATSituation(`127.0.0.1`, 9091))
+    await Promise.all([listener, firstStunServer, secondStunServer].map(stopNode))
+  })
+
+  it('determine NAT situation in localMode', async function () {
+    const firstStunServer = await startStunServer(undefined)
+    const secondStunServer = await startStunServer(undefined)
+
+    const listener = new Listener(
+      (async () => {}) as any,
+      (() => {}) as any,
+      undefined,
+      [
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
+      ],
+      createPeerId(),
+      undefined,
+      localHostBeingExposed
+    )
+
+    await listener.bind(new Multiaddr(`/ip4/0.0.0.0/tcp/9091`))
+    const natResult = await listener.checkNATSituation(`127.0.0.1`, 9091)
+
+    assert(natResult.bidirectionalNAT === false)
+    assert(['::', '0.0.0.0'].includes(natResult.externalAddress))
+    assert(Number.isInteger(natResult.externalPort))
+    assert(natResult.isExposed === true)
+
     await Promise.all([listener, firstStunServer, secondStunServer].map(stopNode))
   })
 })
@@ -412,7 +442,6 @@ describe('error cases', function () {
       undefined,
       undefined,
       peer,
-      true,
       (() => {
         throw Error()
       }) as any
@@ -455,11 +484,13 @@ describe('error cases', function () {
         upgradeInbound: async (_maConn: MultiaddrConnection) => {
           await new Promise((resolve) => setTimeout(resolve, 100))
 
+          // Do sth unexpected
+          // @ts-ignore
+          conn.nonExisting()
+
           return {}
         }
-      } as any,
-      // Simulate an unexpected error while processing data
-      (conn: any) => conn.nonExisting()
+      } as any
     )
 
     const connectionEstablished = defer<void>()
