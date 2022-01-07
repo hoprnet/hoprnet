@@ -135,6 +135,13 @@ export class EntryNodes extends EventEmitter {
       id: peer.id,
       multiaddrs: peer.multiaddrs.filter(isUsableRelay)
     })
+
+    // Stop adding and checking relay nodes if we already have enough.
+    // Once a relay goes offline, the node will try to replace the offline relay.
+    if (this.usedRelays.length < MAX_RELAYS_PER_NODE) {
+      // Rebuild list of relay nodes later
+      setImmediate(this.updatePublicNodes.bind(this))
+    }
   }
 
   /**
@@ -169,7 +176,7 @@ export class EntryNodes extends EventEmitter {
     // Only rebuild list of relay nodes if we were using the
     // offline node
     if (inUse) {
-      // Rebuild later
+      // Rebuild list of relay nodes later
       setImmediate(this.updatePublicNodes.bind(this))
     }
   }
@@ -219,6 +226,7 @@ export class EntryNodes extends EventEmitter {
    * Called at startup and once an entry node is considered offline.
    */
   async updatePublicNodes(): Promise<void> {
+    log(`Updating list of used relay nodes ...`)
     const nodesToCheck = this.filterUncheckedNodes()
     const TIMEOUT = 3e3
 

@@ -9,7 +9,7 @@ import debug from 'debug'
 
 import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
 import chalk from 'chalk'
-import { RELAY_CIRCUIT_TIMEOUT, RELAY, DELIVERY } from '../constants'
+import { RELAY_CIRCUIT_TIMEOUT, RELAY, DELIVERY, CODE_P2P } from '../constants'
 import { RelayConnection } from './connection'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
@@ -291,6 +291,8 @@ class Relay {
       stream = await this.establishDirectConnection(destination, protocol, opts)
     }
 
+    console.log(`stream in dialDirectly`, stream)
+
     return stream
   }
 
@@ -310,7 +312,10 @@ class Relay {
     const usableAddresses: Multiaddr[] = []
 
     for (const knownAddress of this.libp2p.peerStore.get(destination)?.addresses ?? []) {
-      if (this.filter([knownAddress.multiaddr])) {
+      // Check that the address:
+      // - matches the format (PeerStore might include addresses of other transport modules)
+      // - is a direct address (PeerStore might include relay addresses)
+      if (this.filter([knownAddress.multiaddr]) && knownAddress.multiaddr.tuples()[0][0] != CODE_P2P) {
         usableAddresses.push(knownAddress.multiaddr)
       }
     }
@@ -330,7 +335,7 @@ class Relay {
 
       if (conn != undefined) {
         try {
-          stream = (await conn.newStream([protocol])) as any
+          stream = (await conn.newStream([protocol]))?.stream as any
         } catch (err) {
           continue
         }

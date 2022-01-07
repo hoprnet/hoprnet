@@ -329,8 +329,8 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this._emitListening()
 
-    // Only add relay nodes if node is not directly reachable
-    if (natSituation.bidirectionalNAT || !natSituation.isExposed) {
+    // Only add relay nodes if node is not directly reachable or running locally
+    if (this.__runningLocally || natSituation.bidirectionalNAT || !natSituation.isExposed) {
       this.entry.on('relay:changed', this._emitListening)
       await this.entry.updatePublicNodes()
 
@@ -515,6 +515,17 @@ class Listener extends EventEmitter implements InterfaceListener {
     | { bidirectionalNAT: true }
     | { bidirectionalNAT: false; externalAddress: string; externalPort: number; isExposed: boolean }
   > {
+    if (this.__runningLocally) {
+      const address = this.tcpSocket.address() as Address
+
+      // Pretend to be an exposed host if running locally, e.g. as part of an E2E test
+      return {
+        bidirectionalNAT: false,
+        externalAddress: address.address,
+        externalPort: address.port,
+        isExposed: true
+      }
+    }
     let externalAddress = this.__noUPNP ? undefined : await this.upnpManager.externalIp()
     let externalPort: number | undefined
 
