@@ -1,15 +1,12 @@
 import { Operation } from 'express-openapi'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import { encodeMessage } from '../../../commands/utils'
 
 export const parameters = []
 
 export const POST: Operation = [
     async (req, res, _next) => {
-        const message = encodeMessage(req.body.body)
-
         try {
-            const signedMessage = await req.context.node.signMessage(message)
+            const signedMessage = await req.context.node.signMessage(req.body.body)
             res.status(200).send({ signedMessage: u8aToHex(signedMessage) })
         } catch (err) {
             res.status(422).json({ error: err.message })
