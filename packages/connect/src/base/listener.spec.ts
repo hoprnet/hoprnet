@@ -322,50 +322,6 @@ describe('check listening to sockets', function () {
     await stopNode(stunServer)
   })
 
-  it('get the right addresses', async function () {
-    this.timeout(4e3) // for CI
-    const stunServer = await startStunServer(undefined)
-
-    const stunPeer = await getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
-    const relay = await startNode([stunPeer])
-
-    const node = await startNode([stunPeer])
-
-    let eventPromise = once(node.listener.emitter, '_newNodeRegistered')
-    node.publicNodesEmitter.emit('addPublicNode', {
-      id: relay.peerId,
-      multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)]
-    })
-
-    await eventPromise
-
-    eventPromise = once(node.listener.emitter, '_newNodeRegistered')
-    node.publicNodesEmitter.emit('addPublicNode', {
-      id: relay.peerId,
-      multiaddrs: [new Multiaddr(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}/p2p/${relay.peerId.toB58String()}`)]
-    })
-
-    await eventPromise
-
-    const addrsFromListener = node.listener.getAddrs()
-
-    const uniqueAddresses = new Set<string>(addrsFromListener.map((ma: Multiaddr) => ma.toString()))
-
-    assert(
-      uniqueAddresses.has(`/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`),
-      `Addresses must include relay address`
-    )
-
-    assert(
-      uniqueAddresses.has(`/ip4/127.0.0.1/tcp/${node.listener.getPort()}/p2p/${node.peerId.toB58String()}`),
-      `Addresses must include relay address`
-    )
-
-    assert(addrsFromListener.length == uniqueAddresses.size, `Addresses must not appear twice`)
-
-    await Promise.all([stopNode(relay.listener), stopNode(node.listener), stopNode(stunServer)])
-  })
-
   it('check connection tracking', async function () {
     const stunServer = await startStunServer(undefined)
     const stunPeer = getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
