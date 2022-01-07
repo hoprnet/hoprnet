@@ -13,28 +13,21 @@ import { Relay } from './relay'
 import { Filter } from './filter'
 import { Discovery } from './discovery'
 
-import type { PublicNodesEmitter, PeerStoreType, DialOptions } from './types'
+import type {
+  PublicNodesEmitter,
+  PeerStoreType,
+  HoprConnectListeningOptions,
+  HoprConnectDialOptions,
+  HoprConnectOptions
+} from './types'
 
 const log = Debug('hopr-connect')
 const verbose = Debug('hopr-connect:verbose')
 
-export type HoprConnectOptions = {
-  publicNodes?: PublicNodesEmitter
-  initialNodes?: PeerStoreType[]
-  interface?: string
-  __noDirectConnections?: boolean
-  __noWebRTCUpgrade?: boolean
-  maxRelayedConnections?: number
-  __relayFreeTimeout?: number
-  __useLocalAddresses?: boolean
-}
-
-type ListeningOptions = undefined
-
 /**
  * @class HoprConnect
  */
-class HoprConnect implements Transport<DialOptions, ListeningOptions> {
+class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListeningOptions> {
   get [Symbol.toStringTag]() {
     return 'HoprConnect'
   }
@@ -49,7 +42,8 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
   private __noDirectConnections: boolean
   private __noWebRTCUpgrade: boolean
   private __useLocalAddress: boolean
-  private _upgrader: Upgrader
+  private _upgradeOutbound: Upgrader['upgradeOutbound']
+  private _upgradeInbound: Upgrader['upgradeInbound']
   private _peerId: PeerId
   private relay: Relay
   private _webRTCUpgrader?: WebRTCUpgrader
@@ -83,7 +77,6 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
 
     this._addressFilter = new Filter(this._peerId)
 
-    this._upgrader = opts.upgrader
     this._interface = opts.interface
 
     if (USE_WEBRTC) {
@@ -92,14 +85,22 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
 
     this.discovery = new Discovery()
 
+    this._upgradeOutbound = opts.upgrader.upgradeOutbound.bind(opts.upgrader)
+    this._upgradeInbound = opts.upgrader.upgradeInbound.bind(opts.upgrader)
+
     this.relay = new Relay(
       this._libp2p,
+      this.dialDirectly.bind(this),
+      this.filter.bind(this),
       this.connHandler,
       this._webRTCUpgrader,
       opts.__noWebRTCUpgrade,
       opts.maxRelayedConnections,
       opts.__relayFreeTimeout
     )
+
+    // Assign event handler after relay object has been constructed
+    this.relay.start()
 
     // Used for testing
     this.__noDirectConnections = opts.__noDirectConnections ?? false
@@ -149,12 +150,10 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
    * @param options optional dial options
    * @returns An upgraded Connection
    */
-  async dial(ma: Multiaddr, options: DialOptions = {}): Promise<Connection> {
+  async dial(ma: Multiaddr, options: HoprConnectDialOptions = {}): Promise<Connection> {
     if (options.signal?.aborted) {
       throw new AbortError()
     }
-
-    log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
 
     const maTuples = ma.tuples()
 
@@ -192,7 +191,7 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
    * @param handler
    * @returns A TCP listener
    */
-  createListener(options: ListeningOptions, handler?: ConnectionHandler): Listener {
+  createListener(options: HoprConnectListeningOptions, handler?: ConnectionHandler): Listener {
     if (arguments.length == 1 && typeof options === 'function') {
       this.connHandler = options
     } else {
@@ -201,7 +200,10 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
 
     return new Listener(
       this.connHandler,
-      this._upgrader,
+      {
+        upgradeInbound: this._upgradeInbound,
+        upgradeOutbound: this._upgradeOutbound
+      },
       this.publicNodes,
       this.initialNodes,
       this._peerId,
@@ -218,7 +220,7 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
    * @param multiaddrs
    * @returns applicable Multiaddrs
    */
-  filter(multiaddrs: Multiaddr[]): Multiaddr[] {
+  public filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     if (this._libp2p.isStarted() && !this._addressFilter.addrsSet) {
       // Attaches addresses to AddressFilter
       // @TODO implement this in a cleaner way
@@ -238,14 +240,24 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
    * @param relays potential relays that we can use
    * @param options optional dial options
    */
-  private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
+  private async dialWithRelay(
+    relay: PeerId,
+    destination: PeerId,
+    options: HoprConnectDialOptions
+  ): Promise<Connection> {
+    log(
+      `Attempting to dial ${chalk.yellow(destination.toB58String())} using ${chalk.yellow(
+        relay.toB58String()
+      )} as relay`
+    )
+
     let conn = await this.relay.connect(relay, destination, options)
 
     if (conn == undefined) {
       throw Error(`Could not establish relayed connection.`)
     }
 
-    return await this._upgrader.upgradeOutbound(conn as any)
+    return await this._upgradeOutbound(conn as any)
   }
 
   /**
@@ -253,13 +265,15 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
    * @param ma destination
    * @param options optional dial options
    */
-  private async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
+  public async dialDirectly(ma: Multiaddr, options?: HoprConnectDialOptions): Promise<Connection> {
+    log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
+
     const maConn = await TCPConnection.create(ma, this._peerId, options)
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
-    return await this._upgrader.upgradeOutbound(maConn as any)
+    return await this._upgradeOutbound(maConn as any)
   }
 
   /**
@@ -290,6 +304,6 @@ class HoprConnect implements Transport<DialOptions, ListeningOptions> {
   }
 }
 
-export type { PublicNodesEmitter }
+export type { PublicNodesEmitter, HoprConnectOptions, HoprConnectDialOptions, HoprConnectListeningOptions }
 
 export default HoprConnect

@@ -24,7 +24,7 @@ class RelayState {
     this.relayedConnections = new Map()
   }
 
-  relayedConnectionCount() {
+  relayedConnectionCount(): number {
     return this.relayedConnections.size
   }
 
@@ -35,7 +35,7 @@ class RelayState {
    * @param destination other party of the relayed connection
    * @returns if there is already a relayed connection
    */
-  exists(source: PeerId, destination: PeerId) {
+  exists(source: PeerId, destination: PeerId): boolean {
     const id = RelayState.getId(source, destination)
 
     return this.relayedConnections.has(id)
@@ -97,12 +97,18 @@ class RelayState {
    * @param toSource duplex stream to source
    * @param toDestination duplex stream to destination
    */
-  createNew(source: PeerId, destination: PeerId, toSource: Stream, toDestination: Stream, __relayFreeTimeout?: number) {
+  async createNew(
+    source: PeerId,
+    destination: PeerId,
+    toSource: Stream,
+    toDestination: Stream,
+    __relayFreeTimeout?: number
+  ): Promise<void> {
     const toSourceContext = new RelayContext(toSource, __relayFreeTimeout)
     const toDestinationContext = new RelayContext(toDestination, __relayFreeTimeout)
 
-    toSourceContext.sink(toDestinationContext.source)
-    toDestinationContext.sink(toSourceContext.source)
+    let sourcePromise = toSourceContext.sink(toDestinationContext.source)
+    let destinationPromise = toDestinationContext.sink(toSourceContext.source)
 
     let relayedConnection: State = {
       [source.toB58String()]: toSourceContext,
@@ -116,6 +122,13 @@ class RelayState {
     toSourceContext.once('upgrade', this.cleanListener(destination, source))
 
     this.relayedConnections.set(RelayState.getId(source, destination), relayedConnection)
+
+    try {
+      await Promise.all([sourcePromise, destinationPromise])
+    } catch (err) {
+      this.relayedConnections.delete(RelayState.getId(source, destination))
+      throw err
+    }
   }
 
   /**

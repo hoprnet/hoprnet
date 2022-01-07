@@ -152,4 +152,17 @@ describe(`database tests`, function () {
     assert.rejects(async () => db.verifyEnvironmentId('wrong-id'))
     assert.doesNotReject(async () => db.verifyEnvironmentId.bind('test-env'))
   })
+
+  it('should store hopr balance', async function () {
+    assert((await db.getHoprBalance()).toBN().isZero())
+
+    await db.setHoprBalance(new Balance(new BN(10)))
+    assert.equal((await db.getHoprBalance()).toString(), '10')
+
+    await db.addHoprBalance(new Balance(new BN(1)))
+    assert.equal((await db.getHoprBalance()).toString(), '11')
+
+    await db.subHoprBalance(new Balance(new BN(2)))
+    assert.equal((await db.getHoprBalance()).toString(), '9')
+  })
 })

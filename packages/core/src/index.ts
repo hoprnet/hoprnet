@@ -220,8 +220,6 @@ class Hopr extends EventEmitter {
 
     recentlyAnnouncedNodes.forEach(this.onPeerAnnouncement.bind(this))
 
-    initialNodes.forEach(this.onPeerAnnouncement.bind(this))
-
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
       this.networkPeers.register(conn.remotePeer)
@@ -366,6 +364,10 @@ class Hopr extends EventEmitter {
       return
     }
 
+    // Total hack
+    // function cannot throw because it has a catch all
+    this.addPeerToDHT(peer.id)
+
     const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
       const tuples = ma.tuples()
       return tuples.length > 1 && tuples[0][0] != protocols.names['p2p'].code
@@ -381,20 +383,41 @@ class Hopr extends EventEmitter {
     }
   }
 
+  /**
+   * Total hack.
+   * Libp2p seems to miss a channel that passes discovered peers
+   * to the DHT routing table.
+   * @param peer peer to add to DHT routing table
+   */
+  private async addPeerToDHT(peer: PeerId): Promise<void> {
+    try {
+      await this.libp2p._dht._wan._routingTable.add(peer)
+      await this.libp2p._dht._lan._routingTable.add(peer)
+
+      await this.libp2p._dht._wan._routingTableRefresh.start()
+      await this.libp2p._dht._lan._routingTableRefresh.start()
+
+      await this.libp2p._dht._wan.refreshRoutingTable()
+      await this.libp2p._dht._lan.refreshRoutingTable()
+    } catch (err) {
+      // Catch and log all DHT errors, entirely unclear how to handle them
+      log(`Failed while populating the DHT routing table`, err)
+    }
+  }
+
   // On the strategy interval, poll the strategy to see what channel changes
   // need to be made.
   private async tickChannelStrategy() {
     verbose('strategy tick', this.status, this.strategy.name)
     if (this.status != 'RUNNING') {
-      return
+      throw new Error('node is not RUNNING')
     }
 
     const currentChannels: ChannelEntry[] | undefined = await this.getAllChannels()
     verbose('Channels obtained', currentChannels)
 
     if (currentChannels === undefined) {
-      log('invalid channels retrieved from database')
-      return
+      throw new Error('invalid channels retrieved from database')
     }
 
     for (const channel of currentChannels) {
@@ -405,8 +428,7 @@ class Hopr extends EventEmitter {
     try {
       balance = await this.getBalance()
     } catch (e) {
-      log('failed to getBalance, aborting tick')
-      return
+      throw new Error('failed to getBalance, aborting tick')
     }
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance.toBN(),
@@ -523,7 +545,7 @@ class Hopr extends EventEmitter {
    * @param peer peer to query for
    */
   public getObservedAddresses(peer: PeerId): Multiaddr[] {
-    return (this.libp2p.peerStore.get(peer).addresses ?? []).map((addr) => addr.multiaddr)
+    return (this.libp2p.peerStore.get(peer)?.addresses ?? []).map((addr) => addr.multiaddr)
   }
 
   /**

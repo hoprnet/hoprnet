@@ -59,7 +59,7 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
       // TODO: We assume the handlers are always called in order. This isn't a
       // given and might change in the future. Thus, they should be made order-erindependent.
       keyScheme: function (req: Request, _scopes, _securityDefinition) {
-        const apiToken = req.get('x-auth-token') || ''
+        const apiToken = decodeURI(req.get('x-auth-token') || '')
 
         if (!options.testNoAuthentication && options.apiToken !== undefined && apiToken !== options.apiToken) {
           // because this is not the last auth check, we just indicate that
