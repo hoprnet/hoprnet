@@ -1204,7 +1204,7 @@ __metadata:
     it-pair: 1.0.0
     it-pipe: 1.1.0
     it-pushable: 1.4.2
-    libp2p: "github:hoprnet/js-libp2p#0d4ea4a2750936ac5138c644caad29408f69cd72"
+    libp2p: 0.35.8
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.5
     mocha: 9.1.3
@@ -1274,7 +1274,7 @@ __metadata:
     heap-js: 2.1.6
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: "github:hoprnet/js-libp2p#0d4ea4a2750936ac5138c644caad29408f69cd72"
+    libp2p: 0.35.8
     libp2p-kad-dht: 0.27.4
     libp2p-mplex: 0.10.5
     libp2p-tcp: 0.17.2
@@ -1378,7 +1378,7 @@ __metadata:
     jsonschema: 1.4.0
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: "github:hoprnet/js-libp2p#0d4ea4a2750936ac5138c644caad29408f69cd72"
+    libp2p: 0.35.8
     libp2p-crypto: 0.21.0
     libp2p-kad-dht: 0.27.4
     libp2p-mplex: 0.10.5
@@ -11578,9 +11578,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p@github:hoprnet/js-libp2p#0d4ea4a2750936ac5138c644caad29408f69cd72":
-  version: 0.35.6
-  resolution: "libp2p@https://github.com/hoprnet/js-libp2p.git#commit=0d4ea4a2750936ac5138c644caad29408f69cd72"
+"libp2p@npm:0.35.8":
+  version: 0.35.8
+  resolution: "libp2p@npm:0.35.8"
   dependencies:
     "@vascosantos/moving-average": ^1.1.0
     abort-controller: ^3.0.0
@@ -11633,7 +11633,7 @@ __metadata:
     varint: ^6.0.0
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: 1e589804b198ce3ea636c717b5bc547e280786eca6cce3716d55c4c81a5535003cd70be45e349b169738fe0b251a39c0c11f58cc82b57d943a1a92bdaceb1ba7
+  checksum: beb2dfab11fedc6eb06a6173c93db3e163ac24be0fb0b3a87e98be1e24c705d407a016e880aba6bf02890a77856d2807ffc044d494176f5ebc4cca9a468b8529
   languageName: node
   linkType: hard
 
