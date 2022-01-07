@@ -367,7 +367,6 @@ an optional `-g` parameter which just generates the YAML file with configuration
 ./scripts/run-nat-node.sh -r prague -t MyT0ken123^ -d "hopr*" -g
 ```
 
-
 #### Running Tests on Google Cloud Platform
 
 In some unique cases, some bugs might not had been picked up by our end-to-end
