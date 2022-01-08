@@ -1,5 +1,5 @@
-import LibP2P from 'libp2p'
-import { AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
+import { default as LibP2P, type Connection } from 'libp2p'
+import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import MPLEX from 'libp2p-mplex'
 import KadDHT from 'libp2p-kad-dht'
@@ -37,22 +37,23 @@ export async function createLibp2pInstance(
     log('Addresses are sorted by default')
   }
 
-  return await LibP2P.create({
+  const libp2p = await LibP2P.create({
     peerId,
     addresses: { listen: getAddrs(peerId, options).map((x) => x.toString()) },
     // libp2p modules
     modules: {
-      transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
+      transport: [HoprConnect as any],
       streamMuxer: [MPLEX],
       connEncryption: [NOISE],
       dht: KadDHT
     },
     config: {
-      protocolPrefix: 'hopr',
+      protocolPrefix: `hopr/${options.environment.id}`,
       transport: {
         HoprConnect: {
           initialNodes,
           publicNodes: publicNodesEmitter,
+          environment: options.environment.id,
           // Tells hopr-connect to treat local and private addresses
           // as public addresses
           __useLocalAddresses: options.announceLocalAddresses
@@ -81,6 +82,34 @@ export async function createLibp2pInstance(
       maxDialsPerPeer: 100
     }
   })
+
+  // Isolate DHTs
+  const DHT_WAN_PREFIX = libp2p._dht._wan._protocol
+  const DHT_LAN_PREFIX = libp2p._dht._lan._protocol
+
+  if (DHT_WAN_PREFIX !== '/ipfs/kad/1.0.0' || DHT_LAN_PREFIX !== '/ipfs/lan/kad/1.0.0') {
+    throw Error(`Libp2p DHT implementation has changed. Cannot set DHT environments`)
+  }
+
+  const HOPR_DHT_WAN_PROTOCOL = `/hopr/${options.environment.id}/kad/1.0.0`
+  libp2p._dht._wan._protocol = HOPR_DHT_WAN_PROTOCOL
+  libp2p._dht._wan._network._protocol = HOPR_DHT_WAN_PROTOCOL
+  libp2p._dht._wan._topologyListener._protocol = HOPR_DHT_WAN_PROTOCOL
+
+  const HOPR_DHT_LAN_PROTOCOL = `/hopr/${options.environment.id}/lan/kad/1.0.0`
+  libp2p._dht._lan._protocol = HOPR_DHT_LAN_PROTOCOL
+  libp2p._dht._lan._network._protocol = HOPR_DHT_LAN_PROTOCOL
+  libp2p._dht._lan._topologyListener._protocol = HOPR_DHT_LAN_PROTOCOL
+
+  const onConnection = libp2p.upgrader.onConnection
+
+  // @TODO implement whitelisting support
+  libp2p.upgrader.onConnection = (conn: Connection) => {
+    // if (isWhitelisted()) {
+    onConnection(conn)
+    // }
+  }
+  return libp2p
 }
 
 /*
