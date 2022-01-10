@@ -397,7 +397,7 @@ ___
 
 #### Defined in
 
-[db.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L72)
+[db.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L73)
 
 ___
 
@@ -441,7 +441,7 @@ ___
 
 #### Defined in
 
-[db.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L67)
+[db.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L68)
 
 ___
 
@@ -457,7 +457,7 @@ ___
 
 #### Defined in
 
-[db.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L63)
+[db.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L64)
 
 ___
 
@@ -1311,7 +1311,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L240)
+[libp2p/dialHelper.ts:247](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L247)
 
 ___
 

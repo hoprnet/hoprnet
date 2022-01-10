@@ -232,7 +232,7 @@ const createChainMock = (
   } as unknown as ChainWrapper
 }
 
-class TestingIndexer extends Indexer {
+export class TestingIndexer extends Indexer {
   public restart(): Promise<void> {
     return super.restart()
   }
@@ -247,7 +247,7 @@ export const useFixtures = async (
   const db = HoprDB.createMock(ops.id)
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
-  const { hoprToken } = createHoprTokenMock()
+  const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock()
   const chain = createChainMock(provider, hoprChannels, hoprToken)
   return {
     db,
@@ -256,6 +256,7 @@ export const useFixtures = async (
     hoprChannels,
     hoprToken,
     newEvent,
+    newTokenEvent,
     indexer: new TestingIndexer(!ops.id ? PublicKey.createMock().toAddress() : ops.id.toAddress(), db, 1, 5),
     chain,
     OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>

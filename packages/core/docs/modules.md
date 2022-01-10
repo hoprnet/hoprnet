@@ -184,7 +184,7 @@ ___
 
 ### HEARTBEAT\_TIMEOUT
 
-• **HEARTBEAT\_TIMEOUT**: ``4000``
+• **HEARTBEAT\_TIMEOUT**: ``8000``
 
 #### Defined in
 
@@ -330,7 +330,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L91)
+[packages/core/src/main.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L90)
 
 ___
 
