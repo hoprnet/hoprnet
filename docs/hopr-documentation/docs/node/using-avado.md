@@ -13,7 +13,7 @@ Please delete the old package first, before deleting the package make sure you w
 
 While connected to your AVADO network or via a VPN, go to the following [link](http://my.avado/#/installer/%2Fipfs%2FQmQsXNc5NauDwMCN3rVQuoMStp24FPttXwwAQysDy58VkC). This will show a new package version. Just click the install button and wait until you see the success message. This may take some time.
 
-If you are unable to use the link above, search for this hash in the AVADO DappStore: 
+If you are unable to use the link above, search for this hash in the AVADO DappStore:
 
 ```
 /ipfs/QmQsXNc5NauDwMCN3rVQuoMStp24FPttXwwAQysDy58VkC

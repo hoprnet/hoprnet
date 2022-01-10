@@ -19,7 +19,7 @@ One solution is to disguise the origin and destination by sending the letter via
 
 ![Anonymous routing](/img/core/anonymous_routing.png)
 
-*Each person along the chain removes one layer of encryption before passing it on. No-one can tell where they are exactly in the chain.*
+_Each person along the chain removes one layer of encryption before passing it on. No-one can tell where they are exactly in the chain._
 
 This is a basic analogy for how onion routing works, as used in platforms like the Tor project, which you’ve probably heard of (Tor stands for The Onion Router). In onion routing, the envelopes are actually layers of encryption, so it’s impossible for anyone to open more than one layer, or to look ahead and spy on the route the message will take (or has taken). When you receive data, you only know which node it just came from and which node it goes to next.
 
@@ -33,12 +33,11 @@ You see, we need to protect against two types of attacker simultaneously: someon
 
 ## Packet Splitting
 
-One way to improve security is by splitting our message into different numbered **packets**. When all the packets arrive at the destination, the numbering can be used to reconstruct the entire message. This system is used in standard data transmission on the Internet, but it gains new power in a network like HOPR because you can choose to send each packet via a different route. This proliferation of routes makes it far harder to track what’s going on, and also decreases the information that malicious nodes can access. 
+One way to improve security is by splitting our message into different numbered **packets**. When all the packets arrive at the destination, the numbering can be used to reconstruct the entire message. This system is used in standard data transmission on the Internet, but it gains new power in a network like HOPR because you can choose to send each packet via a different route. This proliferation of routes makes it far harder to track what’s going on, and also decreases the information that malicious nodes can access.
 ![Packet spliting](/img/core/packet_spliting.gif)
 
-*Splitting data into numbered packets lets us send a message using many different routes, assembling it again at the destination.*
+_Splitting data into numbered packets lets us send a message using many different routes, assembling it again at the destination._
 
 Unfortunately, harder is not the same as impossible. Even with all this complexity, attackers can still use other metadata like timing, message size and connection logs to build up a coherent picture of traffic through the network. We need to do even better.
 
 Luckily, we can take this approach to the next level by introducing **mixing**, which adds a whole extra layer of complexity.
-

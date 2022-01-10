@@ -9,7 +9,7 @@ But we’re not quite at the end of the tunnel. Conceptually, proof of relay pro
 
 ## The Problem with Blockchain
 
-As  explained before, the theory behind **proof of relay** but didn’t talk about how this is actually implemented. It’s all very well to talk about “incentives” and “rewards”, but what form should these take? How should rewards be generated and claimed?
+As explained before, the theory behind **proof of relay** but didn’t talk about how this is actually implemented. It’s all very well to talk about “incentives” and “rewards”, but what form should these take? How should rewards be generated and claimed?
 
 It’s interesting to note that, until this point, none of these episodes have talked about blockchain at all. That might seem surprising since HOPR is a crypto project and most readers will have first been introduced to HOPR via the HOPR token. But nothing about the explanation so far required a blockchain.
 
@@ -37,7 +37,7 @@ This is usually a cost-saving measure, but it also has the advantage of decoupli
 
 ![Payment channels](/img/core/payment_channels.gif)
 
-*Payment channels and tickets work together to create an anonymous payout.*
+_Payment channels and tickets work together to create an anonymous payout._
 
 Betty and Chao open a payment channel between their nodes, and fund this with HOPR tokens.
 

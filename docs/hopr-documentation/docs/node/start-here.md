@@ -5,11 +5,10 @@ title: Start here
 
 # Start here
 
-
 :::caution Warning
-   The HOPR client software (hoprd) is still under heavy development. Please do *not* add funds to the node that you cannot lose.
+The HOPR client software (hoprd) is still under heavy development. Please do _not_ add funds to the node that you cannot lose.
 
-   For further questions, please visit our [Telegram channel](https://t.me/hoprnet)
+For further questions, please visit our [Telegram channel](https://t.me/hoprnet)
 :::
 
 To use the HOPR network, you will need a HOPR node. Currently, the only way to do so is running `hoprd`, a node.js process that implements the HOPR protocol and effectively transforms the device you are running it in into a HOPR node. Please bear in mind that by simply installing `hoprd`, you are not making your computer a HOPR node. It is required you run the service as an application and have a working internet connection.
@@ -69,21 +68,25 @@ It will open a new window session inside the same terminal window. Now you can e
 ```
 CTRL + B and press key D
 ```
+
 It will exit from a session window but it will not close the session itself.
 
 ```
 tmux ls
 ```
+
 It will list all your active sessions. The output should look similar to this:
 
 ```
 0: 1 windows (created Wed Nov 24 08:26:20 2021)
 ```
+
 You can see that it has one session which ID is 0.
 
 ```
 tmux attach-session -t <number> or <session name>
 ```
+
 It will enter the session, `<number>` or `<session name>` is the session ID or name.
 
 Example: `tmux attach-session -t 0`
@@ -91,6 +94,7 @@ Example: `tmux attach-session -t 0`
 ```
 tmux kill-session -t <number> or <session name>
 ```
+
 It will close your session and will back to terminal, `<number>` or `<session name>` is the session ID or name.
 
 Example: `tmux kill-session -t 0`
@@ -107,7 +111,7 @@ Check if screen is installed on your linux OS. Run command:
 screen --version
 ```
 
-It should output which version it is. 
+It should output which version it is.
 
 For example: `Screen version 4.08.00 (GNU) 05-Feb-20`
 
@@ -130,22 +134,28 @@ It will open a new window session inside the same terminal window. Press key `sp
 ```
 CTRL + A and press key D
 ```
+
 It will exit from a session window but it will not close the session itself.
+
 ```
 screen -ls
 ```
+
 It will list all your active sessions.
+
 ```
 Output
 There is a screen on:
 	5235.pts-0.hopr	(11/24/21 12:48:45)	(Detached)
 1 Socket in /run/screen/S-root.
 ```
+
 You can see that it has one session which ID is 5235.
 
 ```
 screen -r <number> or <session name>
 ```
+
 It will enter the session, `<number>` or `<session name>` is the session ID or name.
 
 Example: `screen -r 5235`
@@ -153,6 +163,7 @@ Example: `screen -r 5235`
 ```
 screen -S <number> or <session name> -X quit
 ```
+
 It will close your session and will back to terminal, `<number>` or `<session name>` is the session ID or name.
 
 Example: `screen -S 5235 -X quit`
@@ -182,4 +193,3 @@ The popular [Node Package Manager](https://www.npmjs.com/) (npm), which requires
 Using [Docker](https://www.docker.com/) you can run a `hoprd` within a container with a shared volume to store your node info.
 
 Regardless of which way you install `hoprd`, you will access it and interact with it through your browser. By default, `hoprd` exposes an admin interface available on `localhost:3000`, although flags can change these settings.
-

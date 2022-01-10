@@ -11,7 +11,7 @@ Like DAI and xDAI, HOPR and xHOPR exist in a 1:1 relationship on xDAI Chain and 
 <Tabs>
 <TabItem value="xhtoh" label="xHOPR to HOPR">
 
-:::tip 
+:::tip
 
 Your wallet needs to be connected to xDAI Chain. If you haven’t set that up yet, you can find the details [here](https://www.xdaichain.com/for-users/wallets/metamask/metamask-setup). You’ll need to select “Add Custom RPC” in your wallet and fill in the information.
 

@@ -17,7 +17,7 @@ Coming soon.
 
 Metadata is information like who sent and received the data, when it was sent, and how much and what kind of data was involved. This is vital, because metadata can be used by malicious actors in all kinds of attacks, from hacks to unwanted user profiling.
 
-### What’s so special about HOPR?	
+### What’s so special about HOPR?
 
 What makes HOPR special is that people are rewarded for helping to relay data: when your node acts as a “hop” on the route data takes through the network, you’re rewarded via the HOPR token. This is important, because until now it was assumed that you can’t have incentives and full privacy at the same time: privacy requires anonymity, but with anonymity comes a lot of opportunity to try and cheat the system. HOPR’s payment layer solves this problem with what we call proof of relay.
 
@@ -25,11 +25,11 @@ What makes HOPR special is that people are rewarded for helping to relay data: w
 
 At HOPR we're building a mixnet which has way superior privacy guarantees and is still incentivized and decentralized. This means you will have more decentralization and incentives than e.g. Tor but at the same time we also have much more privacy than VPNs because no single node in the HOPR network can leak your browsing history. In fact with HOPR we need only one honest relay node to deliver a packet privately.
 
-### Where can I find stats about HOPR? 
+### Where can I find stats about HOPR?
 
 You can find everything at [https://dune.xyz/hoprnet](https://dune.xyz/hoprnet)
 
-Is HOPR hiring?	
+Is HOPR hiring?
 
 Yes, We are always searching for new additions to add to our team [https://hoprnet.jobbase.io](https://hoprnet.jobbase.io)
 
@@ -47,19 +47,19 @@ The HOPR protocol allows users to run nodes which form a peer-to-peer privacy ne
 
 HOPR is complementary to a lot of protocols like Matrix but HOPR also provides network-level privacy for blockchain application for truly private transactions — on-chain and off-chain, that’s why we call it a layer 0 protocol.
 
-### Is HOPR PoS or PoW?	
+### Is HOPR PoS or PoW?
 
 HOPR is POS
 
-### What is Proof of Relay?	
+### What is Proof of Relay?
 
 Proof of relay mechanism helps to separate out the messaging and payment layers, breaking any linkability between them. It turns out there’s a very useful overlap between what stakers expect and what mixnets need to remain anonymous
 
-### What is Cover Traffic?	
+### What is Cover Traffic?
 
 Cover traffic - arbitrary data which helps boost metadata privacy for everyone in the network by obscuring usage levels.
 
-### When will HOPR launch the mainnet?	
+### When will HOPR launch the mainnet?
 
 HOPR is launched on the Ethereum mainnet
 
@@ -75,14 +75,14 @@ You can buy HOPR tokens from Uniswap / Ascendex
 
 ### What is the utility of the HOPR Token?
 
-"The HOPR token has three main uses: 
+"The HOPR token has three main uses:
 
 - Users can pay with HOPR tokens to send data through the HOPR network privately and securely.
 
 - Node runners can stake HOPR tokens in their nodes to be rewarded for relaying data. Node runners receive fees in HOPR for the data they help to relay, including a large number of tokens distributed in the form of cover traffic.
 
 - Finally, the HOPR token gives users voting power in the HOPR Association DAO
-"
+  "
 
 ### What is the diference between xHOPR and HOPR?
 
@@ -94,7 +94,7 @@ Yes the smart contracts are audited by Chain Security.
 
 ## HOPR Staking Questions
 
-### Can HOPR token be staked? 
+### Can HOPR token be staked?
 
 Yes, currently we have a staking event
 

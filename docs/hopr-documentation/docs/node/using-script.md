@@ -8,9 +8,9 @@ title: Using A Script
 The simplest way to get started with HOPR is to run our [script](https://github.com/hoprnet/hopr-sh) to install **hoprd**. The script will install all the required dependencies, including `node.js` version `16`. If you have [`nvm`](https://github.com/nvm-sh/nvm) installed, it will use it.
 
 :::caution Warning
-   Please bear in mind that at the time of writing, ``hoprd`` only has been tested in version ``16``.
+Please bear in mind that at the time of writing, `hoprd` only has been tested in version `16`.
 
-   If you are a MacOS M1 user, please refer to the [npm guide](using-npm), this script will not work for you.
+If you are a MacOS M1 user, please refer to the [npm guide](using-npm), this script will not work for you.
 :::
 
 ## Setup and install HOPRd
@@ -80,11 +80,12 @@ bash -c "$(curl -s https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setu
 
 ## Running HOPRd
 
-
 ### run hoprd
+
 ```bash
 DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --apiToken='<YOUR_SECRET_TOKEN>'
 ```
+
 :::danger Important
 
 If you want to secure your hoprd admin UI, in the command line you must use **--apiToken** tag.
@@ -92,6 +93,7 @@ If you want to secure your hoprd admin UI, in the command line you must use **--
 **<YOUR_SECRET_TOKEN\>** - Replace it with your own password (don't use "<\>").
 
 Password should contain:
+
 - at least 8 symbols
 - a lowercase letter
 - uppercase letter

@@ -11,7 +11,7 @@ Would you be happy for your neighbours to see this list? Your boss? Your bank? Y
 
 Now make it everything you’ve ever done online, stored **forever** for anyone willing to pay (or hack into it).
 
-That’s the reality of using the internet today. While the data we send is usually encrypted, the metadata — the data *about* what you’re sending, when, and who to — is all available to be hacked and tracked.
+That’s the reality of using the internet today. While the data we send is usually encrypted, the metadata — the data _about_ what you’re sending, when, and who to — is all available to be hacked and tracked.
 
 And the problem is getting worse. We generate millions of gigabytes of data every minute, almost all of it with exposed metadata, and this figure is only going to grow.
 It shouldn’t be this way. Users deserve privacy. Companies deserve tools to protect the privacy of their employees and customers. HOPR provides this privacy for everyone

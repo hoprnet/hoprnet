@@ -38,7 +38,7 @@ The **ETH address** is your native address, used for funding with native and HOP
 
 ## alias
 
-You can use the alias command to give an address a more memorable name. 
+You can use the alias command to give an address a more memorable name.
 
 ```
 alias [HOPR address] [alias]
@@ -49,11 +49,12 @@ alias [HOPR address] [alias]
 **alias** - alias or name, you want to assign to a HOPR address.
 
 Example:
+
 ```
-alias 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Bob 
+alias 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Bob
 ```
 
-Your node will assign the alias (name) to that address. You can now use that alias in commands like send or open payment channel, instead of typing the full address. 
+Your node will assign the alias (name) to that address. You can now use that alias in commands like send or open payment channel, instead of typing the full address.
 
 :::info
 
@@ -85,14 +86,13 @@ channels
 
 ## close
 
-This command will let you close an open channel. 
+This command will let you close an open channel.
 
 ```
 close [HOPR address]
 ```
 
 **HOPR address** - to close payment channel with HOPR node you have previously opened. Address starts with **16Uiu2HA...**.
-
 
 Once you’ve initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.
 
@@ -113,9 +113,11 @@ fund [HOPR address] [HOPR node amount] [HOPR counterparty node amount]
 **HOPR counterparty node amount** - funding payment channel on the counterparty node side.
 
 Example:
+
 ```
 open 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV 0.1 0
 ```
+
 :::info
 
 You can choose which payment channel side to fund for the specific node.
@@ -162,10 +164,10 @@ open [HOPR address] [amount]
 **amount** - the amount of HOPR tokens you are willing to fund the payment channel.
 
 Example:
+
 ```
 open 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV 0.04
 ```
-
 
 ## peers
 
@@ -179,14 +181,14 @@ Output will look similar to this:
 
 ```
 current nodes:
-- id: jTzjV, quality: 1.00 (backoff 2, 99% of 514) 
-- id: qmf5r, quality: 1.00 (backoff 2, 94% of 503) 
-- id: T7ZVk, quality: 1.00 (backoff 2, 96% of 511) 
+- id: jTzjV, quality: 1.00 (backoff 2, 99% of 514)
+- id: qmf5r, quality: 1.00 (backoff 2, 94% of 503)
+- id: T7ZVk, quality: 1.00 (backoff 2, 96% of 511)
 - id: MWXqD, quality: 1.00 (backoff 2, 86% of 493)
 ...
 
 22 peers have announced themselves on chain:
-    
+
 /ip4/34.65.239.77/tcp/9091/p2p/T7ZVk
 /ip4/34.65.27.47/tcp/9091/p2p/qmf5r
 /ip4/34.65.38.133/tcp/9091/p2p/XwAcq
@@ -214,7 +216,7 @@ ping [HOPR address]
 Output will look similar to this:
 
 ```
-Pong received in: 87 ms 
+Pong received in: 87 ms
 ```
 
 You should receive a pong and a latency report. This can be used to assess the health of the target node and your own node.
@@ -250,12 +252,13 @@ send ,[HOPR address] [message]
 
 :::info
 
-When running a command, make sure to use HOPR address and write a message without brackets "**[]**". 
+When running a command, make sure to use HOPR address and write a message without brackets "**[]**".
 Between comma sign (**,**) and HOPR address can't be any space.
 
 :::
 
 Example:
+
 ```
 send ,16Uiu2HAkuiKZnPRoeV8qjXNJaazo2D6G89UG4bLoyUmza1hM6psb Hello Bob!
 ```
@@ -274,18 +277,19 @@ Sending a direct message means it is free of charge, because it is not mixed and
 send [HOP address],[Recipient address] [message]
 ```
 
-**HOP address** - HOPR node address through which data packed will be relayed. 
+**HOP address** - HOPR node address through which data packed will be relayed.
 
 **Recipient address** - HOPR node address of a recipient, who will receive a message.
 
 :::info
 
 When running a command, make sure to use HOPR addresses and write a message without brackets "**[]**".
-Between comma sign (**,**) and HOPR addresses can't be any space. 
+Between comma sign (**,**) and HOPR addresses can't be any space.
 
 :::
 
 Example:
+
 ```
 send 16Uiu2HAmHxdher8zPBKLqRJjTH24e5YmzhZJHwrCYzcFmeGMWXqD,16Uiu2HAkuiKZnPRoeV8qjXNJaazo2D6G89UG4bLoyUmza1hM6psb Hello Bob!
 ```
@@ -294,7 +298,7 @@ Sending a HOP message means it will cost you some HOPR tokens, because it is mix
 
 ## settings
 
-Type settings to see your current settings. 
+Type settings to see your current settings.
 
 ```
 settings
@@ -307,30 +311,35 @@ includeRecipient  false    Prepends your address to all messages (true|false)
 strategy          passive  Set an automatic strategy for the node. (passive|promiscuous)
 ```
 
-This will show whether you’re currently including your address with sent messages (*includeRecipient true / false*), and your current channel opening strategy (*promiscuous / passive*).
+This will show whether you’re currently including your address with sent messages (_includeRecipient true / false_), and your current channel opening strategy (_promiscuous / passive_).
 
 To change your `includeRecipient` setting, type:
 
 ```
-settings includeRecipient true 
+settings includeRecipient true
 ```
+
 or
+
 ```
 settings includeRecipient false
 ```
+
 To change your funding strategyn type:
 
 ```
 settings strategy promiscuous
 ```
+
 or
+
 ```
 settings strategy passive
 ```
 
 **Passive and Promiscuous strategies**
 
-By default, hoprd runs in **passive** mode, this means that your node will not attempt to open or close any channels automatically. When you set your strategy to **promiscuous** mode, your node will attempt to open channels to a *randomly* selected group of nodes which you have a healthy connection to. At the same time, your node will also attempt to close channels that are running low on balance or are unhealthy.
+By default, hoprd runs in **passive** mode, this means that your node will not attempt to open or close any channels automatically. When you set your strategy to **promiscuous** mode, your node will attempt to open channels to a _randomly_ selected group of nodes which you have a healthy connection to. At the same time, your node will also attempt to close channels that are running low on balance or are unhealthy.
 
 ## sign
 
@@ -362,14 +371,13 @@ Tickets:
 - Redeemed:         0
 - Redeemed Value:   0.00 txHOPR
 - Losing Tickets:   0
-- Win Proportion:   0% 
-- Neglected:        0 
+- Win Proportion:   0%
+- Neglected:        0
 - Rejected:         0
 - Rejected Value:   0 txHOPR
 ```
 
 This will show Tickets statistics on the HOPR node.
-
 
 ## version
 
@@ -398,10 +406,13 @@ withdraw [amount] [native/hopr] [address]
 **address** - the receiver address which starts with **0x...**
 
 Example sending xDai tokens:
+
 ```
 withdraw 0.1 native 0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B
 ```
+
 Example sending HOPR tokens:
+
 ```
 withdraw 0.1 hopr 0xc8Aa5a085c23dfEa903312a73EfC30888bB61f0B
 ```

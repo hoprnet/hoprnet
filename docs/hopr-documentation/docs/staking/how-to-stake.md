@@ -41,7 +41,7 @@ Where to get HOPR tokens? You will find details [here](how-to-get-hopr).
 
 Want to convert HOPR with xHOPR or xHOPR to HOPR? You will find details [here](convert-hopr)
 
-Want to unwrap from wxHOPR to xHOPR or wrap from xHOPR to wxHOPR? You will find details [here](convert-hopr) 
+Want to unwrap from wxHOPR to xHOPR or wrap from xHOPR to wxHOPR? You will find details [here](convert-hopr)
 
 :::
 
@@ -59,7 +59,7 @@ Choose your wallet type. For this tutorial we’ll use MetaMask.
 
 ![Staking on HOPR smart contract](/img/staking/staking-3.png)
 
-A popup will appear. 
+A popup will appear.
 
 (**2**) Select the wallet you want to use as your staking address from the list
 
@@ -79,7 +79,7 @@ A popup will appear.
 
 ![Staking on HOPR smart contract](/img/staking/staking-6.png)
 
-(**8**) Another popup will appear. Press “Confirm” to stake your tokens. You’ll need some xDAI to pay the extremely small fee associated with this. (In this example, the fee was less than a cent.) 
+(**8**) Another popup will appear. Press “Confirm” to stake your tokens. You’ll need some xDAI to pay the extremely small fee associated with this. (In this example, the fee was less than a cent.)
 
 :::tip
 

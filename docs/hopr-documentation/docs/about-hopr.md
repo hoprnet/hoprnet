@@ -9,14 +9,14 @@ Decentralisation ensures that the network is independent, with no one in a posit
 
 <iframe width="100%" height="415" src="https://www.youtube.com/embed/2ftZdR09KbU" title="HOPR Token and the HOPR Network" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen=""></iframe>
 
-## Message Layer 
+## Message Layer
 
 The message layer of the HOPR protocol is designed to solve the problem of how to send a message – or, to be more technically precise, a “data packet” – from one point in a network to another without revealing from where, from whom or when the packet was sent, or where it is going. This is tricky, analogous to posting a letter with - out a to or from address and no stamp, and expecting it to be delivered to the right place on time.
 
 HOPR solves this problem by not sending packets directly from point A to B, but rather through a series of intermediate steps that can be described as from A to receiver Z by way of nodes B, C and D. This process is known as hopping, and gives HOPR its name.
 
 ![Packet spliting](/img/core/packet_spliting.gif)
-*HOPR gets its name from the fact that it provides metadata privacy by sending data packets through multiple nodes - or “hops” – in the network.*
+_HOPR gets its name from the fact that it provides metadata privacy by sending data packets through multiple nodes - or “hops” – in the network._
 
 ## Payment Layer
 
@@ -35,7 +35,7 @@ HOPR’s innovation is to make each consecutive pair of nodes in a chain reliant
 When data is sent through the HOPR network, a payment is generated for each node in the chain. This is locked with a cryptographic key. If you have the whole key, you can claim your payment. But if any part of it is missing, it’s worthless.
 
 ![Proof of Relay](/img/core/proof_of_relay.gif)
-*As the data passes along the chain, consecutive pairs of nodes swap key halves with each other. This forces everyone to play by the rules.*
+_As the data passes along the chain, consecutive pairs of nodes swap key halves with each other. This forces everyone to play by the rules._
 
 This simple but extremely powerful innovation unlocks a whole world of possibilities. With proof of relay, we can finally build a fully incentivized private mixnet that can grow to an unlimited scale, because we don’t have to rely on finding trustworthy altruistic people to run it.
 

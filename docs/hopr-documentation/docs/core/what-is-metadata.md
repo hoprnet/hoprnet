@@ -1,6 +1,6 @@
 ---
 id: what-is-metadata
-title: What is Metadata? 
+title: What is Metadata?
 ---
 
 The [HOPR protocol](https://hoprnet.org) is special because it protects both your data AND your connection metadata. But what is this metadata, and why is protecting it so important?
@@ -27,6 +27,6 @@ If I can see which stores you’re shopping at, which apps you’re using, and w
 
 But who is actually seeing this metadata? Every time you go online, dozens of different companies and services all see and potentially log this metadata. There’s internet service providers (ISPs), telecom companies, DNS servers that make the Internet work and content delivery networks (CDNs) such as Cloudflare that actually serve most of the web’s content. These services all gather and store information about you, most of the time, without your consent.
 
-And the way modern web services are all interlinked means this list has only grown. For example, if you visit a website with an embedded YouTube video, then Google will be notified of your visit *even if you don’t click the video*. This information can easily be linked to your name via your IP address, which Google knows thanks to your Google account, and added to the detailed dossier that Google maintains on you. And it’s not just Google. The same thing happens with Facebook, or a blog hosting site like Medium, or instant messaging platforms. None of this requires cookies or any extra code, and changing your privacy settings won’t do anything to stop it. It’s just how the Internet works today.
+And the way modern web services are all interlinked means this list has only grown. For example, if you visit a website with an embedded YouTube video, then Google will be notified of your visit _even if you don’t click the video_. This information can easily be linked to your name via your IP address, which Google knows thanks to your Google account, and added to the detailed dossier that Google maintains on you. And it’s not just Google. The same thing happens with Facebook, or a blog hosting site like Medium, or instant messaging platforms. None of this requires cookies or any extra code, and changing your privacy settings won’t do anything to stop it. It’s just how the Internet works today.
 
 And that’s before we even get into problems like hackers, government overreach and the huge problem of how to securely handle and protect metadata if you’re an online business, now that regulators have started to take notice.

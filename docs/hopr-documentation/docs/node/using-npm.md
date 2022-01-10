@@ -45,11 +45,10 @@ $ nvm use 16
 If everything was done properly, you can run `node --version` to see your current `node` version, alongside running basic commands as shown when running simply `node` in your terminal.
 
 :::info INFO
-   MacOS M1 users will need to follow an extra set of instructions from [NVM](https://github.com/nvm-sh/nvm#macos-troubleshooting) to allow them to use Node.js 16.
+MacOS M1 users will need to follow an extra set of instructions from [NVM](https://github.com/nvm-sh/nvm#macos-troubleshooting) to allow them to use Node.js 16.
 :::
 
 ![node](/img/node/node.gif)
-
 
 ## Installing HOPRd using NPM
 
@@ -61,18 +60,20 @@ $ npm install @hoprnet/hoprd@wildhorn-v2
 
 ## Running HOPRd
 
-
 ### run hoprd
+
 ```bash
 DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --apiToken='<YOUR_SECRET_TOKEN>'
 ```
+
 :::danger Important
 
-If you want to secure your hoprd admin UI, in the command line you must use **--apiToken** tag. 
+If you want to secure your hoprd admin UI, in the command line you must use **--apiToken** tag.
 
 **<YOUR_SECRET_TOKEN\>** - Replace it with your own password (don't use "<\>").
 
 Password should contain:
+
 - at least 8 symbols
 - a lowercase letter
 - uppercase letter

@@ -1,6 +1,6 @@
 ---
 id: mixnets
-title: Mixnets 
+title: Mixnets
 ---
 
 Splitting the data into packets and sending each one on a different route through a network of relay nodes is a good first step to solving the problem of sending data privately, but it’s still possible for a powerful attacker to gather enough information to de-anonymize the network.
@@ -22,7 +22,7 @@ Instead of relaying each packet separately, each node can combine multiple packe
 Here’s what it might look like from the perspective of a single node:
 ![Mixing packets](/img/core/mixing_packets.gif)
 
-Here a HOPR node is receiving packets that come from three *different* data transmissions, represented in yellow, light blue and dark blue. As the packets come into the node in groups they are split apart, recombined, and these new combinations of packets are sent out to different nodes as they head to their destination.
+Here a HOPR node is receiving packets that come from three _different_ data transmissions, represented in yellow, light blue and dark blue. As the packets come into the node in groups they are split apart, recombined, and these new combinations of packets are sent out to different nodes as they head to their destination.
 
 **Remember:** although the individual packets are separated in the animation above so you can more easily follow the mixing process, they’re actually all lumped together on each connection. An outsider can’t track any one packet’s route through the node. Some packets are even temporarily held back until future mixing cycles, to disrupt any link between timings of packets entering and leaving a node.
 

@@ -7,11 +7,11 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 :::info INFO
-   The instructions below are for Linux and macOS, however, due to the nature of Docker, you may also run this on Windows.
+The instructions below are for Linux and macOS, however, due to the nature of Docker, you may also run this on Windows.
 :::
 
 :::caution WARNING
-   The docker image is in alpha stage. The following instructions may not work for you.
+The docker image is in alpha stage. The following instructions may not work for you.
 :::
 
 The Docker setup allows you quickly get started with **HOPRd** without having to download any other software requirements in your machine. This allows you to quickly get started using the system, but has some hardware requirements to be aware of.
@@ -26,7 +26,6 @@ Before doing anything else, you need to install [Docker Desktop](https://hub.doc
 <TabItem value="linux" label="Linux">
 
 Depending of your distribution, please follow the official guidelines for how to install and run Docker on your workstation.
-
 
 - [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 - [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
@@ -60,6 +59,7 @@ Then start a container:
 ```bash
 docker run --pull always -ti -v $HOME/.hoprd-db-wildhorn-v2:/app/db -p 9091:9091 -p 3000:3000 -p 8080:8080 hopr/hoprd:wildhorn-v2 --password='h0pR-w1ldhorn-v2' --init --announce --identity /app/db/.hopr-id-wildhorn-v2 --apiToken='<YOUR_SECRET_TOKEN>'
 ```
+
 Also all ports are mapped to your local host, assuming you stick to the default port numbers.
 
 :::danger Important
@@ -69,6 +69,7 @@ If you want to secure your hoprd admin UI, in the command line you must use **--
 **<YOUR_SECRET_TOKEN\>** - Replace it with your own password (don't use "<\>").
 
 Password should contain:
+
 - at least 8 symbols
 - a lowercase letter
 - uppercase letter

@@ -1,6 +1,6 @@
 ---
 id: incentives
-title: Incentives 
+title: Incentives
 ---
 
 Encryption, mixing, remixing, and relaying is very computationally expensive compared to just sending data directly and openly. We need a way to cover these costs or the network can never grow and thrive.
@@ -31,7 +31,7 @@ It’s these relayers who need to be paid, so the most logical idea is to includ
 
 ![Mixing packets](/img/core/mixing_packets.gif)
 
-*Alejandro pays to send data down the whole chain. At each hop, the relay node claims their share of payment then sends the rest to the next relayer.*
+_Alejandro pays to send data down the whole chain. At each hop, the relay node claims their share of payment then sends the rest to the next relayer._
 
 In doing this, we need to make sure that we don’t introduce payment metadata on the blockchain that allows an attacker to make identifying links between anyone along the chain. If someone can track the payment trail, they could discover that Alejandro was sending data to Zoe. HOPR obscures this payment metadata using tickets with a randomized reward, rather like a lottery ticket. We’ll talk about how and why that works in a future episode.
 

@@ -11,7 +11,7 @@ The HOPR client software (hoprd) is still under heavy development. Please do not
 
 :::
 
-This is a hoprd admin user interface, which is browser based. To get the access to it you have to setup and run a hoprd node, details [here](start-here). 
+This is a hoprd admin user interface, which is browser based. To get the access to it you have to setup and run a hoprd node, details [here](start-here).
 
 Access to the admin UI: [http://localhost:3000](http://localhost:3000)
 
@@ -52,25 +52,33 @@ Instead of using HOPR address, we can assign HOPR address to a specific name, th
 ```
 alias 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Bob
 ```
+
 The output will look similar to this:
+
 ```
 Set alias 'Bob' to 'jTzjV'.
 ```
+
 Do the same with Alice:
 
 ```
 alias 16Uiu2HAm35DuQk2Cvp9aLpRTD43ZubLqtbAwf242w2YmAe8FskLs Alice
 ```
+
 The output will look similar to this:
+
 ```
 Set alias 'Alice' to 'FskLs'.
 ```
+
 To check if you added alias correctly run command `alias` and it should give a list of assigned alias.
 
 ```
 alias
 ```
+
 The output will look similar to this:
+
 ```
 me ->  M6psb
 Bob -> jTzjV
@@ -126,7 +134,7 @@ ping 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV
 Output will look similar to this:
 
 ```
-Pong received in: 84 ms 
+Pong received in: 84 ms
 ```
 
 This means, you have successfully pinged the node and the latency was only 84 ms. If your output was similar to this: `Could not ping node. Timeout.`, this means your node was not able to ping the node. Try another node until you will receive a successful ping pong message.
@@ -144,6 +152,7 @@ Between comma sign (**,**) and HOPR address can't be any space.
 ```
 send ,16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV Hello Bob!
 ```
+
 Output will look similar to this:
 
 ```
@@ -170,7 +179,7 @@ Successfully opened channel 0xb0e3f7d81f0bd6d1783f3d44cf11653128e4f9ee95b98d49a0
 
 ```
 
-This means it has successfully opened channel. The hash you see in the output is your opened payment channel ID and not the hash you can check on the blockchain. 
+This means it has successfully opened channel. The hash you see in the output is your opened payment channel ID and not the hash you can check on the blockchain.
 
 Between `Opening channel...` message and `Successfully opened channel ...` message can take some time, because it requires some block confirmations on the chain.
 
@@ -193,7 +202,7 @@ Balance:                0.03 txHOPR
 No open channels to node.
 ```
 
-This means you have one opened payment channel which has status `Open` and it has a balance with 0.03 HOPR tokens. 
+This means you have one opened payment channel which has status `Open` and it has a balance with 0.03 HOPR tokens.
 
 If you will see payment channel status output similar to this: `WaitingForCommitment` it means it is not ready for connection and you have to wait until the channel status will change to `Open`.
 
@@ -208,15 +217,16 @@ Between comma sign (**,**) and HOPR addresses can't be any space.
 ```
 send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV,16Uiu2HAkuiKZnPRoeV8qjXNJaazo2D6G89UG4bLoyUmza1hM6psb This is a feature message for me!
 ```
+
 Output will look similar to this:
 
 ```
 Message sent
- 
+
 #### NODE RECEIVED MESSAGE [2021-12-11T19:53:37.393Z] ####
- 
-Message: This is a feature message for me! 
- 
+
+Message: This is a feature message for me!
+
 Latency: 445ms
 ```
 
@@ -242,8 +252,8 @@ Tickets:
 - Redeemed:         0
 - Redeemed Value:   0.00 txHOPR
 - Losing Tickets:   0
-- Win Proportion:   0% 
-- Neglected:        0 
+- Win Proportion:   0%
+- Neglected:        0
 - Rejected:         0
 - Rejected Value:   0 txHOPR
 ```
@@ -266,7 +276,7 @@ We added alias for Bob and Alice. We can use Alice name instead of HOPR address.
 fund Alice 2 0
 ```
 
-At the end of command you can see **2** and **0** 
+At the end of command you can see **2** and **0**
 
 **2** - First digit means, we funded payment channel on our side with 2 HOPR tokens.
 
@@ -278,6 +288,7 @@ Output will look similar to this:
 Funding channel...
 Successfully funded channel to FskLs
 ```
+
 Let's check the payment channels on your node. See the [7th step](guide-using-a-hoprd-node#7-check-opened-channels-list).
 
 From the channels list you will see opened **outgoing** payment channel with Alice with balance of 2 HOPR tokens.
@@ -290,6 +301,7 @@ To:                     FskLs
 Status:                 Open
 Balance:                2 txHOPR
 ```
+
 Now let's fund payment channel with Alice, this time we will fund Alice side.
 
 ```
@@ -308,7 +320,8 @@ Output will look similar to this:
 Funding channel...
 Successfully funded channel to FskLs
 ```
-No check again the payment channels on your node. See the [7th step](guide-using-a-hoprd-node#7-check-opened-channels-list). 
+
+No check again the payment channels on your node. See the [7th step](guide-using-a-hoprd-node#7-check-opened-channels-list).
 
 From the channels list you will see opened **incoming** payment channel from Alice with a balance of 3 HOPR tokens.
 
@@ -338,7 +351,7 @@ You can fund payment channel on both sides at the same time. This was an example
 
 :::info
 
-Before sending 2-HOP message you have to open payment channel with Alice, see the [6th step](guide-using-a-hoprd-node#6-open-payment-channel-with-bob). 
+Before sending 2-HOP message you have to open payment channel with Alice, see the [6th step](guide-using-a-hoprd-node#6-open-payment-channel-with-bob).
 
 Note: Between comma sign (**,**) and HOPR addresses can't be any space.
 
@@ -352,11 +365,11 @@ Output will look similar to this:
 
 ```
 Message sent
- 
+
 #### NODE RECEIVED MESSAGE [2021-12-11T20:23:10.391Z] ####
- 
-Message: This is a feature message for me, but this time I used Bob and Alice nodes to relay data packets! 
- 
+
+Message: This is a feature message for me, but this time I used Bob and Alice nodes to relay data packets!
+
 Latency: 845ms
 ```
 
@@ -368,7 +381,7 @@ This means, you used Bob's and Alice nodes to send message to yourself. Technica
 close 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV
 ```
 
-You will **initiate** channel closure, but you will not close it finally. Once you’ve initiated channel closure, you have to wait for a specified closure time, then you may send the command again to **finalize** closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets. 
+You will **initiate** channel closure, but you will not close it finally. Once you’ve initiated channel closure, you have to wait for a specified closure time, then you may send the command again to **finalize** closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.
 
 Output will look similar to this:
 
