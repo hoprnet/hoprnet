@@ -89,7 +89,7 @@ gcloud builds submit --config cloudbuild.yaml \
   --substitutions=_PACKAGE_VERSION=${package_version},_IMAGE_VERSION=${image_version},_DOCKER_IMAGE=${docker_image}
 
 log "verify bundled version"
-declare v=$(docker run --pull always ${docker_image_full} --version 2> /dev/null | sed -n '3p')
+declare v=$(docker run --pull always -v /var/run/docker.sock:/var/run/docker.sock ${docker_image_full} --version 2> /dev/null | sed -n '3p')
 if [ "${v}" != "${package_version}" ]; then
   log "bundled version ${v}, expected ${package_version}"
   exit 1

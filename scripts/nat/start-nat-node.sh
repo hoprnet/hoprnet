@@ -1,23 +1,23 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-set -Eeuo pipefail
-
-if [[ $(id -u) -ne 0 ]] ; then
+if [ $(id -u) -ne 0 ] ; then
   >&2 echo "ERROR: Must run as root!"
   exit 1
 fi
 
-if [[ $# -lt 1 ]]; then
-  >&2 echo "ERROR: Must specify release!"
+if [ -z "$HOPR_RELEASE" ]; then
+  >&2 echo "ERROR: Specify HOPR_RELEASE environment variable"
   exit 1
 fi
 
-readonly release=$1
-shift
+#echo "Starting HOPR release '$HOPR_RELEASE' behind NAT..."
 
-echo "Starting HOPR release $release behind NAT..."
+readonly network_name="hopr-nat"
 
-docker network create -d bridge hopr-nat
+if [ "$(docker network ls | grep -c "$network_name" )" = "0" ]; then
+  docker network create -d bridge hopr-nat
+fi
+
 docker run --pull always -v /var/hoprd/:/app/db -p 3000:3000 -p 3001:3001 \
  -e "DEBUG=hopr*,-hopr-connect*" -e "GCLOUD=1" \
- --network=hopr-nat "gcr.io/hoprassociation/hoprd:$release" "$@"
+ --network=hopr-nat "gcr.io/hoprassociation/hoprd:$HOPR_RELEASE" "$@"
