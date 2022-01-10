@@ -79,6 +79,11 @@ if [ -z "${releases}" ] && [ "${force:-}" != "true" ]; then
 fi
 
 if [ "${package}" = "hoprd-nat" ]; then
+  # First build the hoprd image we depend on
+  cd "${mydir}/../packages/hoprd"
+  gcloud builds submit --config cloudbuild.yaml \
+    --substitutions=_PACKAGE_VERSION=${package_version},_IMAGE_VERSION=${image_version},_DOCKER_IMAGE="gcr.io/hoprassociation/hoprd"
+
   cd "${mydir}/nat"
 else
   # go into package directory, make sure to remove prefix when needed
@@ -88,7 +93,7 @@ fi
 gcloud builds submit --config cloudbuild.yaml \
   --substitutions=_PACKAGE_VERSION=${package_version},_IMAGE_VERSION=${image_version},_DOCKER_IMAGE=${docker_image}
 
-log "verify bundled version"
+log "verify bundled version of ${docker_image_full}"
 declare v=$(docker run --pull always -v /var/run/docker.sock:/var/run/docker.sock ${docker_image_full} --version 2> /dev/null | sed -n '3p')
 if [ "${v}" != "${package_version}" ]; then
   log "bundled version ${v}, expected ${package_version}"
