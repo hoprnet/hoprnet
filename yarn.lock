@@ -3657,7 +3657,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@overnightjs/logger@npm:^1.2.0":
+"@overnightjs/logger@npm:1.2.1":
   version: 1.2.1
   resolution: "@overnightjs/logger@npm:1.2.1"
   dependencies:
@@ -8309,10 +8309,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"colors@npm:^1.1.2, colors@npm:^1.3.3":
-  version: 1.4.0
-  resolution: "colors@npm:1.4.0"
-  checksum: 98aa2c2418ad87dedf25d781be69dc5fc5908e279d9d30c34d8b702e586a0474605b3a189511482b9d5ed0d20c867515d22749537f7bc546256c6014f3ebdcec
+"colors@npm:1.3.3":
+  version: 1.3.3
+  resolution: "colors@npm:1.3.3"
+  checksum: c57f0aa2b71a836435fb0cd8ac4b9f4025ff5411cb027ffcbaa2274347fd00ed52b9d66904f46be73086c27ac31bad9500da675250c95182568454b392f87ee5
   languageName: node
   linkType: hard
 
