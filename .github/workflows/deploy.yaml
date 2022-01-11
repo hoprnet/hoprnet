@@ -168,6 +168,42 @@ jobs:
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
 
+  build_hoprd_nat_docker:
+    name: Build HOPRD NAT Docker
+    runs-on: ubuntu-latest
+    needs: [build_deploy_sc_npm]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
+      - name: Setup Google Cloud Credentials
+        uses: google-github-actions/setup-gcloud@v0.3.0
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+
+      - name: Pull recent Git changes
+        if: ${{ !env.ACT }}
+        run: |
+          # need to pull changes because we've updated the package versions in
+          # the job publish_npm beforehand
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          git pull origin "${branch}" --rebase
+
+      - name: Build Docker image
+        run: ./scripts/build-docker.sh -p hoprd-nat
+
+      - name: Send notification if anything failed on master or release branches
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"
+
   build_hopr_cover_traffic_daemon_docker:
     name: Build HOPR cover traffic daemon docker
     runs-on: ubuntu-latest
