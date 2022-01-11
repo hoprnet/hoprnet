@@ -83,6 +83,12 @@ const config = {
           }
         ]
       },
+       algolia: {
+         appId: 'YOUR_APP_ID',
+         apiKey: 'YOUR_SEARCH_API_KEY',
+         indexName: 'docs-hoprnet-org',
+         contextualSearch: true
+      },
       footer: {
         /** style: 'dark',
         links: [
