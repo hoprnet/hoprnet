@@ -6,7 +6,7 @@ export const parameters = []
 export const POST: Operation = [
   async (req, res, _next) => {
     try {
-      const signedMessage = await req.context.node.signMessage(req.body.body)
+      const signedMessage = await req.context.node.signMessage(req.body.message)
       res.status(200).send({ signedMessage: u8aToHex(signedMessage) })
     } catch (err) {
       res.status(422).json({ error: err.message })
@@ -26,12 +26,12 @@ POST.apiDoc = {
         schema: {
           type: 'object',
           properties: {
-            body: {
-              description: 'The message body which should be sent.',
+            message: {
+              description: 'The message which should be sent.',
               type: 'string'
             }
           },
-          required: ['body']
+          required: ['message']
         }
       }
     }
