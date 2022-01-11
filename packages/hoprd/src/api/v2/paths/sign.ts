@@ -38,7 +38,14 @@ POST.apiDoc = {
   },
   responses: {
     '200': {
-      description: 'The message was signed successfully.'
+      description: 'The message was signed successfully.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/SignedMessage'
+          }
+        }
+      }
     }
   }
 }
