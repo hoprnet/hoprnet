@@ -8,7 +8,8 @@
     "packages/cover-traffic-daemon",
     "packages/ethereum",
     "packages/utils",
-    "packages/hoprd"
+    "packages/hoprd",
+    "docs/hopr-documentation"
   ],
   "scripts": {
     "build": "yarn workspace @hoprnet/hopr-ethereum run build:sol:types && echo \"Building Typescript files\" && tsc --build tsconfig.build.json && yarn workspace @hoprnet/hoprd run buildAdmin",
