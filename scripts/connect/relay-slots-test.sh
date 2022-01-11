@@ -56,7 +56,7 @@ start_node tests/node \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --useLocalAddress true
+  --preferLocalAddresses true
 
 # run bob (client)
 # should be able to receive 'test' from alice through charly
@@ -79,7 +79,7 @@ start_node tests/node "${bob_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --useLocalAddress true
+  --preferLocalAddresses true
 
 # run charly
 # should able to serve as a bootstrap
@@ -91,7 +91,7 @@ start_node tests/node "${charly_log}" \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
   --maxRelayedConnections 1 \
-  --useLocalAddress true \
+  --preferLocalAddresses true \
   --relayFreeTimeout 2000 # to simulate relay being busy
 
 # run dave (client)
@@ -119,7 +119,7 @@ start_node tests/node "${dave_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --useLocalAddress true
+  --preferLocalAddresses true
 
 # run ed (client)
 # should try connecting to bob through relay charly after alice finishes talking to bob and succeed
@@ -146,7 +146,7 @@ start_node tests/node "${ed_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --useLocalAddress true
+  --preferLocalAddresses true
 
 # wait till nodes finish communicating
 wait_for_regex "${alice_log}" "all tasks executed"
