@@ -3,12 +3,13 @@
 
 const lightCodeTheme = require('prism-react-renderer/themes/github')
 const darkCodeTheme = require('prism-react-renderer/themes/dracula')
+const { CHOOSE_DOCS_VERSION_ID, DOCS_URL } = require("./consts")
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'HOPR',
   tagline: 'HOPR docs',
-  url: 'https://docs.hoprnet.org',
+  url: DOCS_URL,
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -58,6 +59,14 @@ const config = {
           src: 'img/HOPR_logo.svg'
         },
         items: [
+          {
+            type: 'dropdown',
+            label: 'Version',
+            id: CHOOSE_DOCS_VERSION_ID,
+            position: 'left',
+            href: 'version',
+            items: []
+          },
           {
             type: 'doc',
             docId: 'intro',
