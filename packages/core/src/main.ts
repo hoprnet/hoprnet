@@ -6,9 +6,9 @@ import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
 import { debug } from '@hoprnet/hopr-utils'
-import Hopr, { HoprOptions, VERSION } from '.'
+import Hopr, { type HoprOptions, VERSION } from '.'
 import { getAddrs } from './identity'
-import HoprConnect, { type HoprConnectOptions, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import HoprConnect, { type HoprConnectConfig, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
 import type { Multiaddr } from 'multiaddr'
 
 const log = debug(`hopr-core:create-hopr`)
@@ -26,7 +26,7 @@ export async function createLibp2pInstance(
   peerId: PeerId,
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
-  publicNodesEmitter: PublicNodesEmitter
+  publicNodes: PublicNodesEmitter
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
 
@@ -51,16 +51,20 @@ export async function createLibp2pInstance(
       protocolPrefix: `hopr/${options.environment.id}`,
       transport: {
         HoprConnect: {
-          initialNodes,
-          publicNodes: publicNodesEmitter,
-          environment: options.environment.id,
-          // Tells hopr-connect to treat local and private addresses
-          // as public addresses
-          __useLocalAddresses: options.announceLocalAddresses
-          // @dev Use these settings to simulate NAT behavior
-          // __noDirectConnections: true,
-          // __noWebRTCUpgrade: false
-        } as HoprConnectOptions
+          config: {
+            initialNodes,
+            publicNodes,
+            environment: options.environment.id
+          },
+          testing: {
+            // Tells hopr-connect to treat local and private addresses
+            // as public addresses
+            __useLocalAddresses: options.announceLocalAddresses
+            // @dev Use these settings to simulate NAT behavior
+            // __noDirectConnections: true,
+            // __noWebRTCUpgrade: false
+          }
+        } as HoprConnectConfig
       },
       dht: {
         enabled: true,

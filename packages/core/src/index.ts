@@ -1,6 +1,6 @@
 import { type default as LibP2P, type Connection } from 'libp2p'
 
-import type { HoprConnectOptions } from '@hoprnet/hopr-connect'
+import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
 
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
@@ -142,7 +142,7 @@ class Hopr extends EventEmitter {
     private db: HoprDB,
     private connector: HoprCoreEthereum,
     private options: HoprOptions,
-    private publicNodesEmitter: HoprConnectOptions['publicNodes'] = new EventEmitter()
+    private publicNodesEmitter: HoprConnectConfig['config']['publicNodes'] = new EventEmitter()
   ) {
     super()
 
@@ -358,7 +358,7 @@ class Hopr extends EventEmitter {
 
     const dialables = peer.multiaddrs.filter((ma: Multiaddr) => {
       const tuples = ma.tuples()
-      return tuples.length > 1 && tuples[0][0] != protocols.names['p2p'].code
+      return tuples.length > 1 && tuples[0][0] != protocols('p2p').code
     })
 
     // @ts-ignore wrong type
