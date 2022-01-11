@@ -6,8 +6,8 @@ export const parameters = []
 export const POST: Operation = [
   async (req, res, _next) => {
     try {
-      const signedMessage = await req.context.node.signMessage(req.body.message)
-      res.status(200).send({ signedMessage: u8aToHex(signedMessage) })
+      const signature = await req.context.node.signMessage(req.body.message)
+      res.status(200).send({ signature: u8aToHex(signature) })
     } catch (err) {
       res.status(422).json({ error: err.message })
     }
@@ -26,12 +26,12 @@ POST.apiDoc = {
         schema: {
           type: 'object',
           properties: {
-            message: {
-              description: 'The message which should be sent.',
+            signature: {
+              description: 'The signature of the sent message.',
               type: 'string'
             }
           },
-          required: ['message']
+          required: ['signature']
         }
       }
     }
@@ -42,7 +42,7 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/SignedMessage'
+            $ref: '#/components/schemas/Signature'
           }
         }
       }
