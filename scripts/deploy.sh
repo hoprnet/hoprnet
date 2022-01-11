@@ -20,10 +20,12 @@ declare branch cluster_size package_version docker_image
 : ${HOPRD_PASSWORD:?"env var missing"}
 : ${FUNDING_PRIV_KEY:?"env var missing"}
 
+# docker_image and cluster_size are configurable through script arguments
+docker_image="${1:-gcr.io/hoprassociation/hoprd}"
+cluster_size=${2:-3}
+
 branch=$(git rev-parse --abbrev-ref HEAD)
-cluster_size=3
 package_version=$(${mydir}/get-package-version.sh)
-docker_image="gcr.io/hoprassociation/hoprd"
 api_token="${HOPRD_API_TOKEN}"
 password="${HOPRD_PASSWORD}"
 
