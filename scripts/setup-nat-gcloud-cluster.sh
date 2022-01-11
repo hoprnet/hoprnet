@@ -126,7 +126,7 @@ for ip in ${node_ips}; do
 done
 
 for ip in ${node_ips}; do
-  wait_for_port "9091" "${ip}"
+  wait_for_port "3001" "${ip}"
 done
 # }}}
 

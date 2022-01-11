@@ -120,6 +120,7 @@ cd "${mydir}/../packages/${stripped_package%-nat}"
 build_and_tag_image ${docker_image%-nat} ${image_version} ${package_version}
 
 if [ "${package}" = "hoprd-nat" ]; then
+  # Build hoprd-nat with exactly the same version as hoprd
   cd "${mydir}/nat"
   build_and_tag_image ${docker_image} ${image_version} ${package_version}
 fi
