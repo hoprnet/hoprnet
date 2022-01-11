@@ -5,6 +5,7 @@
 ### Changes
 
 - Fixed behavior when no network was found or invalid password is entered ([#3147](https://github.com/hoprnet/hoprnet/pull/3147))
+- Added new API v2 endpoint `/messages/sign` to support message authentication ([#3243](https://github.com/hoprnet/hoprnet/pull/3243))
 
 ---
 
