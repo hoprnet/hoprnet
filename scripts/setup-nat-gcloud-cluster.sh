@@ -13,14 +13,14 @@ set -Eeuo pipefail
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-declare -x HOPR_LOG_ID="setup-gcloud-cluster"
+declare -x HOPR_LOG_ID="setup-nat-gcloud-cluster"
 source "${mydir}/utils.sh"
 source "${mydir}/gcloud.sh"
 source "${mydir}/testnet.sh"
 
 usage() {
   msg
-  msg "This script can be used to setup a cluster of nodes on gcloud and run"
+  msg "This script can be used to setup a cluster of nodes behind NAT on gcloud and run"
   msg "an initial setup script against these nodes. Once testing has"
   msg "completed the script can be used to cleanup the cluster as well."
   msg

@@ -21,7 +21,7 @@ usage() {
   msg
 }
 
-declare image_version package_version docker_image releases branch docker_image_full package force no_tags
+declare image_version package_version docker_image releases branch package force no_tags
 
 while (( "$#" )); do
   case "$1" in
@@ -62,8 +62,42 @@ branch=$(git rev-parse --abbrev-ref HEAD)
 image_version="$(date +%s)"
 package_version="$("${mydir}/get-package-version.sh")"
 docker_image="gcr.io/hoprassociation/${package}"
-docker_image_full="${docker_image}:${image_version}"
 releases=""
+
+build_and_tag_image() {
+  local built_docker_image="$1"
+  local built_image_version="$2"
+  local required_pkg_version="$3"
+  local docker_image_full="${built_docker_image}:${built_image_version}"
+
+  gcloud builds submit --config cloudbuild.yaml \
+      --substitutions=_PACKAGE_VERSION=${required_pkg_version},_IMAGE_VERSION=${built_image_version},_DOCKER_IMAGE=${built_docker_image}
+
+  log "verify bundled version of ${docker_image_full}"
+  local v=$(docker run --pull always -v /var/run/docker.sock:/var/run/docker.sock ${docker_image_full} --version 2> /dev/null | sed -n '3p')
+  if [ "${v}" != "${required_pkg_version}" ]; then
+    log "bundled version ${v}, expected ${required_pkg_version}"
+    exit 1
+  fi
+
+  if [ -z "${releases}" ]; then
+    # stopping here after forced build
+    log "no releases were configured for branch ${branch}"
+    exit 0
+  fi
+
+  if ! [ "${no_tags:-}" = "true" ]; then
+    log "attach additional tag ${required_pkg_version} to docker image ${docker_image_full}"
+    gcloud container images add-tag ${docker_image_full} ${built_docker_image}:${required_pkg_version}
+
+    for release in ${releases}; do
+      log "attach additional tag ${release} to docker image ${docker_image_full}"
+      gcloud container images add-tag ${docker_image_full} ${built_docker_image}:${release}
+    done
+  else
+    log "skip tagging as requested"
+  fi
+}
 
 for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
@@ -78,43 +112,18 @@ if [ -z "${releases}" ] && [ "${force:-}" != "true" ]; then
   exit 1
 fi
 
+# go into package directory, make sure to remove prefix and suffix when needed
+declare stripped_package=${package#hopr-}
+cd "${mydir}/../packages/${stripped_package%-nat}"
+
+# In case we build hoprd-nat, we need to build hoprd first with the same version as a prerequisite
+build_and_tag_image ${docker_image%-nat} ${image_version} ${package_version}
+
 if [ "${package}" = "hoprd-nat" ]; then
-  # First build the hoprd image we depend on
-  cd "${mydir}/../packages/hoprd"
-  gcloud builds submit --config cloudbuild.yaml \
-    --substitutions=_PACKAGE_VERSION=${package_version},_IMAGE_VERSION=${image_version},_DOCKER_IMAGE="gcr.io/hoprassociation/hoprd"
-
   cd "${mydir}/nat"
-else
-  # go into package directory, make sure to remove prefix when needed
-  cd "${mydir}/../packages/${package#hopr-}"
+  build_and_tag_image ${docker_image} ${image_version} ${package_version}
 fi
 
-gcloud builds submit --config cloudbuild.yaml \
-  --substitutions=_PACKAGE_VERSION=${package_version},_IMAGE_VERSION=${image_version},_DOCKER_IMAGE=${docker_image}
 
-log "verify bundled version of ${docker_image_full}"
-declare v=$(docker run --pull always -v /var/run/docker.sock:/var/run/docker.sock ${docker_image_full} --version 2> /dev/null | sed -n '3p')
-if [ "${v}" != "${package_version}" ]; then
-  log "bundled version ${v}, expected ${package_version}"
-  exit 1
-fi
 
-if [ -z "${releases}" ]; then
-  # stopping here after forced build
-  log "no releases were configured for branch ${branch}"
-  exit 0
-fi
-
-if ! [ "${no_tags:-}" = "true" ]; then
-  log "attach additional tag ${package_version} to docker image ${docker_image_full}"
-  gcloud container images add-tag ${docker_image_full} ${docker_image}:${package_version}
-
-  for release in ${releases}; do
-    log "attach additional tag ${release} to docker image ${docker_image_full}"
-    gcloud container images add-tag ${docker_image_full} ${docker_image}:${release}
-  done
-else
-  log "skip tagging as requested"
-fi
 
