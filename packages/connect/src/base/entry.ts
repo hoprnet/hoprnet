@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events'
-import type { PeerStoreType, PublicNodesEmitter } from '../types'
+import type { HoprConnectOptions, PeerStoreType } from '../types'
 import Debug from 'debug'
-import { red } from 'chalk'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, CODE_UDP, MAX_RELAYS_PER_NODE } from '../constants'
 import type { Connection } from 'libp2p-interfaces/connection'
@@ -37,6 +36,8 @@ function isUsableRelay(ma: Multiaddr) {
   )
 }
 
+export const RELAY_CHANGED_EVENT = 'relay:changed'
+
 export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
 
 export class EntryNodes extends EventEmitter {
@@ -50,13 +51,12 @@ export class EntryNodes extends EventEmitter {
 
   constructor(
     private peerId: PeerId,
-    initialNodes: PeerStoreType[],
-    private publicNodesEmitter: PublicNodesEmitter | undefined,
-    private dialDirectly: HoprConnect['dialDirectly']
+    private dialDirectly: HoprConnect['dialDirectly'],
+    private options: HoprConnectOptions
   ) {
     super()
     this.availableEntryNodes = []
-    this.uncheckedEntryNodes = initialNodes
+    this.uncheckedEntryNodes = options.initialNodes ?? []
 
     this.usedRelays = []
   }
@@ -66,13 +66,12 @@ export class EntryNodes extends EventEmitter {
    * entry nodes
    */
   public start() {
-    if (this.publicNodesEmitter != undefined) {
+    if (this.options.publicNodes != undefined) {
       this._onNewRelay = this.onNewRelay.bind(this)
       this._onRemoveRelay = this.onRemoveRelay.bind(this)
 
-      this.publicNodesEmitter.on('addPublicNode', this._onNewRelay)
-
-      this.publicNodesEmitter.on('removePublicNode', this._onRemoveRelay)
+      this.options.publicNodes.on('addPublicNode', this._onNewRelay)
+      this.options.publicNodes.on('removePublicNode', this._onRemoveRelay)
     }
   }
 
@@ -80,10 +79,10 @@ export class EntryNodes extends EventEmitter {
    * Removes event listeners
    */
   public stop() {
-    if (this.publicNodesEmitter != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
-      this.publicNodesEmitter.removeListener('addPublicNode', this._onNewRelay as EntryNodes['onNewRelay'])
+    if (this.options.publicNodes != undefined && this._onNewRelay != undefined && this._onRemoveRelay != undefined) {
+      this.options.publicNodes.removeListener('addPublicNode', this._onNewRelay as EntryNodes['onNewRelay'])
 
-      this.publicNodesEmitter.removeListener('removePublicNode', this._onRemoveRelay as EntryNodes['onRemoveRelay'])
+      this.options.publicNodes.removeListener('removePublicNode', this._onRemoveRelay as EntryNodes['onRemoveRelay'])
     }
   }
 
@@ -158,20 +157,12 @@ export class EntryNodes extends EventEmitter {
 
     let inUse = false
     const peerB58String = peer.toB58String()
-    for (const [index, relayAddr] of this.usedRelays.entries()) {
+    for (const relayAddr of this.usedRelays) {
       // remove second part of relay address to get relay peerId
       if (relayAddr.decapsulateCode(CODE_P2P).getPeerId() === peerB58String) {
-        // Remove node without changing order
-        this.usedRelays.splice(index, 1)
         inUse = true
       }
     }
-
-    log(
-      `relay ${peer.toB58String()} ${red(`removed`)}. Current addrs:\n\t${this.usedRelays
-        .map((addr: Multiaddr) => addr.toString())
-        .join(`\n\t`)}`
-    )
 
     // Only rebuild list of relay nodes if we were using the
     // offline node
@@ -259,7 +250,7 @@ export class EntryNodes extends EventEmitter {
     // Reset list of unchecked nodes
     this.uncheckedEntryNodes = []
 
-    const previous = new Set(this.usedRelays.map((ma) => ma.toString()))
+    const previous = new Set(this.usedRelays.map((ma) => ma.decapsulateCode(CODE_P2P).toString()))
 
     this.usedRelays = this.availableEntryNodes
       // select only those entry nodes with smallest latencies
@@ -270,10 +261,15 @@ export class EntryNodes extends EventEmitter {
       )
 
     let isDifferent = false
-    for (const usedRelay of this.usedRelays) {
-      if (!previous.has(usedRelay.toString())) {
-        isDifferent = true
-        break
+
+    if (this.usedRelays.length != previous.size) {
+      isDifferent = true
+    } else {
+      for (const usedRelay of this.usedRelays) {
+        if (!previous.has(usedRelay.toString())) {
+          isDifferent = true
+          break
+        }
       }
     }
 
@@ -283,7 +279,7 @@ export class EntryNodes extends EventEmitter {
         log(`\t${ma.toString()}`)
       }
 
-      this.emit('relay:changed')
+      this.emit(RELAY_CHANGED_EVENT)
     }
   }
 

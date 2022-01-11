@@ -8,7 +8,7 @@ import {
 import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 
 import { once, EventEmitter } from 'events'
-import type { PeerStoreType, PublicNodesEmitter } from '../types'
+import type { PeerStoreType, HoprConnectOptions, HoprConnectTestingOptions } from '../types'
 import Debug from 'debug'
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 
@@ -22,7 +22,7 @@ import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
 import { isAnyAddress, u8aEquals, defer } from '@hoprnet/hopr-utils'
 import { TCPConnection } from './tcp'
-import { EntryNodes } from './entry'
+import { EntryNodes, RELAY_CHANGED_EVENT } from './entry'
 import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils'
 import type HoprConnect from '..'
 import { UpnpManager } from './upnp'
@@ -42,12 +42,6 @@ enum State {
 }
 
 type Address = { port: number; address: string }
-
-export type ListenerTestingOptions = {
-  runningLocally?: boolean
-  preferLocalAddresses?: boolean
-  noUPNP?: boolean
-}
 
 class Listener extends EventEmitter implements InterfaceListener {
   protected __connections: MultiaddrConnection[]
@@ -81,12 +75,9 @@ class Listener extends EventEmitter implements InterfaceListener {
   constructor(
     dialDirectly: HoprConnect['dialDirectly'],
     private upgradeInbound: Upgrader['upgradeInbound'],
-    publicNodes: PublicNodesEmitter | undefined,
-    initialNodes: PeerStoreType[] = [],
     private peerId: PeerId,
-    private iface: string | undefined,
-    // Only for unit testing and E2E testing
-    private __testingOptions: ListenerTestingOptions = {}
+    private options: HoprConnectOptions,
+    private testingOptions: HoprConnectTestingOptions
   ) {
     super()
 
@@ -113,7 +104,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this._emitListening = (() => this.emit('listening')).bind(this)
 
-    this.entry = new EntryNodes(this.peerId, initialNodes, publicNodes, dialDirectly)
+    this.entry = new EntryNodes(this.peerId, dialDirectly, this.options)
 
     this.upnpManager = new UpnpManager()
   }
@@ -338,8 +329,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     this._emitListening()
 
     // Only add relay nodes if node is not directly reachable or running locally
-    if (this.__testingOptions.runningLocally || natSituation.bidirectionalNAT || !natSituation.isExposed) {
-      this.entry.on('relay:changed', this._emitListening)
+    if (this.testingOptions.__runningLocally || natSituation.bidirectionalNAT || !natSituation.isExposed) {
+      this.entry.on(RELAY_CHANGED_EVENT, this._emitListening)
       await this.entry.updatePublicNodes()
 
       // Attach listeners
@@ -358,7 +349,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     // Remove listeners
     this.entry.stop()
-    this.entry.off('relay:changed', this._emitListening)
+    this.entry.off(RELAY_CHANGED_EVENT, this._emitListening)
 
     // Unmap all mapped UPNP ports and release socket
     this.upnpManager.stop()
@@ -523,7 +514,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     | { bidirectionalNAT: true }
     | { bidirectionalNAT: false; externalAddress: string; externalPort: number; isExposed: boolean }
   > {
-    if (this.__testingOptions.runningLocally) {
+    if (this.testingOptions.__runningLocally) {
       const address = this.tcpSocket.address() as Address
 
       // Pretend to be an exposed host if running locally, e.g. as part of an E2E test
@@ -534,7 +525,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         isExposed: true
       }
     }
-    let externalAddress = this.__testingOptions.noUPNP ? undefined : await this.upnpManager.externalIp()
+    let externalAddress = this.testingOptions.__noUPNP ? undefined : await this.upnpManager.externalIp()
     let externalPort: number | undefined
 
     let isExposedHost: Awaited<ReturnType<Listener['isExposedHost']>> | undefined
@@ -558,7 +549,7 @@ class Listener extends EventEmitter implements InterfaceListener {
           externalInterface = await getExternalIp(
             usableStunServers,
             this.udpSocket,
-            this.__testingOptions.preferLocalAddresses
+            this.testingOptions.__preferLocalAddresses
           )
         } catch (err: any) {
           error(`Determining public IP failed`, err.message)
@@ -579,7 +570,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         externalInterface = await getExternalIp(
           usableStunServers,
           this.udpSocket,
-          this.__testingOptions.preferLocalAddresses
+          this.testingOptions.__preferLocalAddresses
         )
       } catch (err: any) {
         error(`Determining public IP failed`, err.message)
@@ -652,7 +643,7 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   private getAddressForInterface(host: string, family: NetworkInterfaceInfo['family']): string {
-    if (this.iface == undefined) {
+    if (this.options.interface == undefined) {
       return host
     }
 
@@ -662,16 +653,18 @@ class Listener extends EventEmitter implements InterfaceListener {
       throw Error(`Machine seems to have no network interfaces.`)
     }
 
-    if (osInterfaces[this.iface] == undefined) {
-      throw Error(`Machine does not have requested interface ${this.iface}`)
+    if (osInterfaces[this.options.interface] == undefined) {
+      throw Error(`Machine does not have requested interface ${this.options.interface}`)
     }
 
-    const usableInterfaces = osInterfaces[this.iface]?.filter(
+    const usableInterfaces = osInterfaces[this.options.interface]?.filter(
       (iface: NetworkInterfaceInfo) => iface.family == family && !iface.internal
     )
 
     if (usableInterfaces == undefined || usableInterfaces.length == 0) {
-      throw Error(`Desired interface <${this.iface}> does not exist or does not have any external addresses.`)
+      throw Error(
+        `Desired interface <${this.options.interface}> does not exist or does not have any external addresses.`
+      )
     }
 
     const index = usableInterfaces.findIndex((iface) => host === iface.address)
@@ -679,7 +672,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     if (!isAnyAddress(host, family) && index < 0) {
       throw Error(
         `Could not bind to interface ${
-          this.iface
+          this.options.interface
         } on address ${host} because it was configured with a different addresses: ${usableInterfaces
           .map((iface) => iface.address)
           .join(`, `)}`

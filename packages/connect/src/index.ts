@@ -1,14 +1,13 @@
 import Debug from 'debug'
-import { CODE_IP4, CODE_IP6, CODE_P2P, USE_WEBRTC } from './constants'
+import { CODE_IP4, CODE_IP6, CODE_P2P } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import type { Connection } from 'libp2p-interfaces/connection'
 import type { Upgrader, Transport, ConnectionHandler } from 'libp2p-interfaces/transport'
-import type { default as libp2p } from 'libp2p'
+import type libp2p from 'libp2p'
 import chalk from 'chalk'
 import { TCPConnection, Listener } from './base'
-import { WebRTCUpgrader } from './webrtc'
 import { Relay } from './relay'
 import { Filter } from './filter'
 import { Discovery } from './discovery'
@@ -18,11 +17,17 @@ import type {
   PeerStoreType,
   HoprConnectListeningOptions,
   HoprConnectDialOptions,
-  HoprConnectOptions
+  HoprConnectOptions,
+  HoprConnectTestingOptions
 } from './types'
 
 const log = Debug('hopr-connect')
 const verbose = Debug('hopr-connect:verbose')
+
+type HoprConnectConfig = {
+  config?: HoprConnectOptions
+  testing?: HoprConnectTestingOptions
+}
 
 /**
  * @class HoprConnect
@@ -34,23 +39,17 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
   public discovery: Discovery
 
-  private publicNodes?: PublicNodesEmitter
-  private initialNodes?: PeerStoreType[]
-
-  private relayPeerIds?: Set<string>
-
-  private __noDirectConnections: boolean
-  private __noWebRTCUpgrade: boolean
-  private __useLocalAddress: boolean
+  private relayPeerIds: Set<string>
 
   private _dialDirectly: HoprConnect['dialDirectly']
   private _upgradeOutbound: Upgrader['upgradeOutbound']
   private _upgradeInbound: Upgrader['upgradeInbound']
 
+  private options: HoprConnectOptions
+  private testingOptions: HoprConnectTestingOptions
+
   private _peerId: PeerId
   private relay: Relay
-  private _webRTCUpgrader?: WebRTCUpgrader
-  private _interface?: string
   private _addressFilter: Filter
   private _libp2p: libp2p
 
@@ -58,7 +57,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     opts: {
       upgrader: Upgrader
       libp2p: libp2p
-    } & HoprConnectOptions
+    } & HoprConnectConfig
   ) {
     if (!opts.upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
@@ -68,21 +67,13 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       throw new Error('Transport module needs access to libp2p.')
     }
 
-    this.publicNodes = opts.publicNodes
-    this.initialNodes = opts.initialNodes
+    this.options = opts.config ?? {}
+    this.testingOptions = opts.testing ?? {}
 
     this._peerId = opts.libp2p.peerId
-
-    // @TODO only store references to needed parts of libp2p
     this._libp2p = opts.libp2p
 
     this._addressFilter = new Filter(this._peerId)
-
-    this._interface = opts.interface
-
-    if (USE_WEBRTC) {
-      this._webRTCUpgrader = new WebRTCUpgrader(this.publicNodes, this.initialNodes)
-    }
 
     this.discovery = new Discovery()
 
@@ -91,58 +82,41 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
     this._dialDirectly = this.dialDirectly.bind(this)
 
-    this.relay = new Relay(
-      this._libp2p,
-      this._dialDirectly,
-      this.filter.bind(this),
-      this._webRTCUpgrader,
-      opts.environment,
-      opts.__noWebRTCUpgrade,
-      opts.maxRelayedConnections,
-      opts.__relayFreeTimeout
-    )
+    this.relay = new Relay(this._libp2p, this._dialDirectly, this.filter.bind(this), this.options, this.testingOptions)
 
     // Assign event handler after relay object has been constructed
     this.relay.start()
-
-    // Used for testing
-    this.__noDirectConnections = opts.__noDirectConnections ?? false
-    this.__noWebRTCUpgrade = opts.__noWebRTCUpgrade ?? false
-    this.__useLocalAddress = opts.__useLocalAddresses ?? false
 
     try {
       const { version } = require('../package.json')
 
       log(`HoprConnect: `, version)
     } catch {
-      console.error(`Cannot find package.json to load version tag. Exitting.`)
-      return
+      throw Error(`Cannot find package.json to load version tag. Exitting.`)
     }
 
-    if (this.__noDirectConnections) {
-      // Whenever we don't allow direct connections, we need to store
-      // the known relays and make sure that we allow direct connections
-      // to them.
-      this.relayPeerIds = new Set<string>()
+    this.relayPeerIds = new Set<string>()
 
-      for (const initialNode of this.initialNodes ?? []) {
-        this.relayPeerIds ??= new Set<string>()
+    if (!!this.testingOptions.__noDirectConnections) {
+      // For testing, maintain a list of usable relay nodes.
+      // Block direct connections to nodes that are not on the list
+
+      for (const initialNode of this.options.initialNodes ?? []) {
         this.relayPeerIds.add(initialNode.id.toB58String())
       }
 
-      this.publicNodes?.on('addPublicNode', (peer: PeerStoreType) => {
-        this.relayPeerIds ??= new Set<string>()
+      this.options.publicNodes?.on('addPublicNode', (peer: PeerStoreType) => {
         this.relayPeerIds.add(peer.id.toB58String())
       })
-
-      verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
     }
 
-    if (this.__noWebRTCUpgrade) {
+    verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
+
+    if (!!this.testingOptions.__noWebRTCUpgrade) {
       verbose(`DEBUG mode: no WebRTC upgrade`)
     }
 
-    if (this.__useLocalAddress) {
+    if (!!this.testingOptions.__preferLocalAddresses) {
       verbose(`DEBUG mode: treat local addresses as public addresses.`)
     }
   }
@@ -195,18 +169,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @returns A TCP listener
    */
   createListener(_options: HoprConnectListeningOptions, _handler?: ConnectionHandler): Listener {
-    return new Listener(
-      this._dialDirectly,
-      this._upgradeInbound,
-      this.publicNodes,
-      this.initialNodes,
-      this._peerId,
-      this._interface,
-      {
-        runningLocally: false,
-        preferLocalAddresses: this.__useLocalAddress
-      }
-    )
+    return new Listener(this._dialDirectly, this._upgradeInbound, this._peerId, this.options, this.testingOptions)
   }
 
   /**
@@ -254,6 +217,26 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       throw Error(`Could not establish relayed connection.`)
     }
 
+    // const logger = {
+    //   ...conn,
+    //   source: (async function* () {
+    //     for await (const msg of conn.source) {
+    //       console.log(`receiving`, new TextDecoder().decode(msg.slice()))
+    //       yield msg
+    //     }
+    //   })(),
+    //   sink: (source: any) => {
+    //     return conn?.sink(
+    //       (async function* () {
+    //         for await (const msg of source) {
+    //           console.log(`sending`, new TextDecoder().decode(msg.slice()))
+    //           yield msg
+    //         }
+    //       })()
+    //     )
+    //   }
+    // }
+
     return await this._upgradeOutbound(conn as any)
   }
 
@@ -283,10 +266,9 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       // Forces the node to only use relayed connections and
       // don't try a direct dial attempt.
       // @dev Used for testing
-      this.__noDirectConnections &&
-      (this.relayPeerIds == undefined ||
-        this.relayPeerIds.size == 0 ||
-        (maPeerId != null && !this.relayPeerIds.has(maPeerId)))
+      !!this.testingOptions.__noDirectConnections &&
+      maPeerId != null &&
+      !this.relayPeerIds.has(maPeerId)
     ) {
       return false
     }
@@ -301,6 +283,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
   }
 }
 
-export type { PublicNodesEmitter, HoprConnectOptions, HoprConnectDialOptions, HoprConnectListeningOptions }
+export type { PublicNodesEmitter, HoprConnectConfig, HoprConnectDialOptions, HoprConnectListeningOptions }
 
 export default HoprConnect

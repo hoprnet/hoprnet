@@ -1,6 +1,5 @@
 import Multiaddr from 'multiaddr'
 
-// @ts-ignore
 const { name, version } = require('../package.json')
 
 // Use name without organisation prefix
@@ -24,7 +23,6 @@ export const RELAY_CONTACT_TIMEOUT = 3000 // ms
 
 // Either set on ALL nodes to true or NONE
 // @dev mixed operation is neither tested nor implemented
-export const USE_WEBRTC = true
 export const WEBRTC_TIMEOUT = 2400 // ms
 
 // Use default UTF-8 text encoding

@@ -17,13 +17,15 @@ async function getPeerStoreEntry(addr: string): Promise<PeerStoreType> {
 
 describe('webrtc upgrader', function () {
   it('add public nodes', async function () {
-    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
+    const publicNodes = new EventEmitter() as PublicNodesEmitter
 
-    const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
+    const webRTCUpgrader = new WebRTCUpgrader({ publicNodes })
+
+    webRTCUpgrader.start()
 
     const testPeer = await getPeerStoreEntry(`/ip4/1.2.3.4/udp/12345`)
 
-    publicNodeEmitter.emit(`addPublicNode`, testPeer)
+    publicNodes.emit(`addPublicNode`, testPeer)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -35,7 +37,7 @@ describe('webrtc upgrader', function () {
 
     const secondPeer = await getPeerStoreEntry(`/ip4/1.2.3.5/udp/12345`)
 
-    publicNodeEmitter.emit(`addPublicNode`, secondPeer)
+    publicNodes.emit(`addPublicNode`, secondPeer)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -45,17 +47,21 @@ describe('webrtc upgrader', function () {
         webRTCUpgrader.rtcConfig.iceServers[0].urls === multiaddrToIceServer(secondPeer.multiaddrs[0]) &&
         webRTCUpgrader.rtcConfig.iceServers[1].urls === multiaddrToIceServer(testPeer.multiaddrs[0])
     )
+
+    webRTCUpgrader.stop()
   })
 
   it('add public nodes more than once', async function () {
-    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
+    const publicNodes = new EventEmitter() as PublicNodesEmitter
 
-    const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
+    const webRTCUpgrader = new WebRTCUpgrader({ publicNodes })
+
+    webRTCUpgrader.start()
 
     const testPeer = await getPeerStoreEntry(`/ip4/1.2.3.4/udp/12345`)
 
-    publicNodeEmitter.emit(`addPublicNode`, testPeer)
-    publicNodeEmitter.emit(`addPublicNode`, testPeer)
+    publicNodes.emit(`addPublicNode`, testPeer)
+    publicNodes.emit(`addPublicNode`, testPeer)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -64,14 +70,18 @@ describe('webrtc upgrader', function () {
       webRTCUpgrader.rtcConfig?.iceServers?.length == 1 &&
         webRTCUpgrader.rtcConfig.iceServers[0].urls === multiaddrToIceServer(testPeer.multiaddrs[0])
     )
+
+    webRTCUpgrader.stop()
   })
 
   it('add public nodes to initial nodes', async function () {
-    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
+    const publicNodes = new EventEmitter() as PublicNodesEmitter
 
     const initialPeer = await getPeerStoreEntry(`/ip4/1.2.3.4/udp/12345`)
 
-    const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter, [initialPeer])
+    const webRTCUpgrader = new WebRTCUpgrader({ publicNodes, initialNodes: [initialPeer] })
+
+    webRTCUpgrader.start()
 
     assert(
       webRTCUpgrader.rtcConfig?.iceServers?.length == 1 &&
@@ -80,7 +90,7 @@ describe('webrtc upgrader', function () {
 
     const nextPeer = await getPeerStoreEntry(`/ip4/1.2.3.5/udp/12345`)
 
-    publicNodeEmitter.emit(`addPublicNode`, nextPeer)
+    publicNodes.emit(`addPublicNode`, nextPeer)
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -90,17 +100,21 @@ describe('webrtc upgrader', function () {
         webRTCUpgrader.rtcConfig.iceServers[0].urls === multiaddrToIceServer(nextPeer.multiaddrs[0]) &&
         webRTCUpgrader.rtcConfig.iceServers[1].urls === multiaddrToIceServer(initialPeer.multiaddrs[0])
     )
+
+    webRTCUpgrader.stop()
   })
 
   it('add public nodes - edge cases', async function () {
-    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
+    const publicNodes = new EventEmitter() as PublicNodesEmitter
 
-    const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
+    const webRTCUpgrader = new WebRTCUpgrader({ publicNodes })
+
+    webRTCUpgrader.start()
 
     const peerId = createPeerId()
     const invalidMultiaddr = new Multiaddr(`/ip4/1.2.3.4/p2p/${peerId.toB58String()}`)
 
-    publicNodeEmitter.emit(`addPublicNode`, { id: peerId, multiaddrs: [invalidMultiaddr] })
+    publicNodes.emit(`addPublicNode`, { id: peerId, multiaddrs: [invalidMultiaddr] })
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
@@ -109,23 +123,27 @@ describe('webrtc upgrader', function () {
 
     const secondInvalidMultiaddr = new Multiaddr(`/ip6/::/udp/12345`)
 
-    publicNodeEmitter.emit(`addPublicNode`, { id: peerId, multiaddrs: [secondInvalidMultiaddr] })
+    publicNodes.emit(`addPublicNode`, { id: peerId, multiaddrs: [secondInvalidMultiaddr] })
 
     // Let Events happen
     await new Promise((resolve) => setTimeout(resolve))
 
     assert(webRTCUpgrader.rtcConfig?.iceServers.length == 0)
+
+    webRTCUpgrader.stop()
   })
 
   it('limit available STUN servers', async function () {
-    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
+    const publicNodes = new EventEmitter() as PublicNodesEmitter
 
-    const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
+    const webRTCUpgrader = new WebRTCUpgrader({ publicNodes })
+
+    webRTCUpgrader.start()
 
     for (let i = 0; i <= MAX_STUN_SERVERS; i++) {
       const peer = await getPeerStoreEntry(`/ip4/1.2.3.4/udp/${i + 1}`)
 
-      publicNodeEmitter.emit(`addPublicNode`, peer)
+      publicNodes.emit(`addPublicNode`, peer)
 
       if (i < MAX_STUN_SERVERS) {
         assert(
@@ -136,12 +154,16 @@ describe('webrtc upgrader', function () {
     }
 
     assert(webRTCUpgrader.rtcConfig?.iceServers?.length == MAX_STUN_SERVERS)
+
+    webRTCUpgrader.stop()
   })
 
   it('remove offline STUN servers', async function () {
-    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
+    const publicNodes = new EventEmitter() as PublicNodesEmitter
 
-    const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
+    const webRTCUpgrader = new WebRTCUpgrader({ publicNodes })
+
+    webRTCUpgrader.start()
 
     const ATTEMPTS = Math.min(MAX_STUN_SERVERS, 3)
 
@@ -151,7 +173,7 @@ describe('webrtc upgrader', function () {
       const multiaddr = new Multiaddr(`/ip4/1.2.3.4/udp/${i}/p2p/${peerId.toB58String()}`)
       peerIds.push(peerId)
 
-      publicNodeEmitter.emit(`addPublicNode`, { id: peerId, multiaddrs: [multiaddr] })
+      publicNodes.emit(`addPublicNode`, { id: peerId, multiaddrs: [multiaddr] })
 
       assert(
         webRTCUpgrader.rtcConfig?.iceServers?.length == i + 1 &&
@@ -160,23 +182,29 @@ describe('webrtc upgrader', function () {
     }
 
     for (let i = 0; i < ATTEMPTS; i++) {
-      publicNodeEmitter.emit(`removePublicNode`, peerIds[i])
+      publicNodes.emit(`removePublicNode`, peerIds[i])
 
       assert((webRTCUpgrader.rtcConfig?.iceServers?.length as any) == ATTEMPTS - i - 1)
     }
 
     assert((webRTCUpgrader.rtcConfig?.iceServers?.length as any) == 0)
+
+    webRTCUpgrader.stop()
   })
 
   it('remove offline STUN servers - edge cases', function () {
-    const publicNodeEmitter = new EventEmitter() as PublicNodesEmitter
+    const publicNodes = new EventEmitter() as PublicNodesEmitter
 
-    const webRTCUpgrader = new WebRTCUpgrader(publicNodeEmitter)
+    const webRTCUpgrader = new WebRTCUpgrader({ publicNodes })
+
+    webRTCUpgrader.start()
 
     const peerId = createPeerId()
 
-    publicNodeEmitter.emit(`removePublicNode`, peerId)
+    publicNodes.emit(`removePublicNode`, peerId)
 
     assert((webRTCUpgrader.rtcConfig?.iceServers?.length as any) == undefined)
+
+    webRTCUpgrader.stop()
   })
 })

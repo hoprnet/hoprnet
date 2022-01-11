@@ -1,4 +1,4 @@
-import { EntryNodes, ENTRY_NODES_MAX_PARALLEL_DIALS } from './entry'
+import { EntryNodes, ENTRY_NODES_MAX_PARALLEL_DIALS, RELAY_CHANGED_EVENT } from './entry'
 import type PeerId from 'peer-id'
 import assert from 'assert'
 import { createPeerId, getPeerStoreEntry } from './utils.spec'
@@ -6,7 +6,7 @@ import { once, EventEmitter } from 'events'
 import { Multiaddr } from 'multiaddr'
 
 import { MAX_RELAYS_PER_NODE } from '../constants'
-import { PeerStoreType } from '../types'
+import type { PeerStoreType, PublicNodesEmitter } from '../types'
 
 /**
  * Decorated EntryNodes class that allows direct access
@@ -68,9 +68,9 @@ describe('entry node functionality', function () {
   it('add public nodes', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
-      [],
-      new EventEmitter(),
-      (async () => new Promise((resolve) => setImmediate(resolve))) as any
+      // Make sure that call is indeed asynchronous
+      (async () => new Promise((resolve) => setImmediate(resolve))) as any,
+      {}
     )
 
     const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
@@ -92,9 +92,8 @@ describe('entry node functionality', function () {
   it('remove an offline node', function () {
     const entryNodes = new TestingEntryNodes(
       peerId,
-      [],
-      new EventEmitter(),
-      (async () => new Promise((resolve) => setImmediate(resolve))) as any
+      (async () => new Promise((resolve) => setImmediate(resolve))) as any,
+      {}
     )
 
     const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
@@ -122,12 +121,9 @@ describe('entry node functionality', function () {
 
     const connectPromise = once(relayListener, 'connected')
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      [relay],
-      new EventEmitter(),
-      async (ma: Multiaddr) => network.connect(ma.toString()) as any
-    )
+    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {
+      initialNodes: [relay]
+    })
 
     await entryNodes.updatePublicNodes()
 
@@ -168,12 +164,9 @@ describe('entry node functionality', function () {
 
     const additionalOfflineNodes = [getPeerStoreEntry(`/ip4/127.0.0.1/tcp/23`)]
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes),
-      new EventEmitter(),
-      async (ma: Multiaddr) => network.connect(ma.toString()) as any
-    )
+    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {
+      initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
+    })
 
     await entryNodes.updatePublicNodes()
 
@@ -205,12 +198,7 @@ describe('entry node functionality', function () {
 
     const newNodeListener = network.listen(newNode.multiaddrs[0].toString())
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      [],
-      new EventEmitter(),
-      async (ma: Multiaddr) => network.connect(ma.toString()) as any
-    )
+    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {})
 
     entryNodes.uncheckedEntryNodes.push(newNode)
 
@@ -222,7 +210,7 @@ describe('entry node functionality', function () {
 
     const connectPromise = once(newNodeListener, 'connected')
 
-    const updatePromise = once(entryNodes, 'relay:changed')
+    const updatePromise = once(entryNodes, RELAY_CHANGED_EVENT)
     entryNodes.onRemoveRelay(relay.id)
 
     await Promise.all([connectPromise, updatePromise])
@@ -248,12 +236,7 @@ describe('entry node functionality', function () {
 
     const connectPromise = once(relayListener, 'connected')
 
-    const entryNodes = new TestingEntryNodes(
-      peerId,
-      [],
-      new EventEmitter(),
-      async (ma: Multiaddr) => network.connect(ma.toString()) as any
-    )
+    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {})
 
     const fakeNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
 
@@ -279,7 +262,7 @@ describe('entry node functionality', function () {
   })
 
   it('do not emit listening event if nothing has changed', async function () {
-    const entryNodes = new TestingEntryNodes(peerId, [], new EventEmitter(), (async () => {}) as any)
+    const entryNodes = new TestingEntryNodes(peerId, (async () => {}) as any, {})
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 
@@ -301,5 +284,33 @@ describe('entry node functionality', function () {
     assert(
       usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
     )
+  })
+
+  it('events should trigger actions', async function () {
+    const network = createFakeNetwork()
+
+    const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+
+    const publicNodes = new EventEmitter() as PublicNodesEmitter
+    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {
+      publicNodes
+    })
+
+    entryNodes.start()
+
+    publicNodes.emit('addPublicNode', relay)
+
+    await once(entryNodes, RELAY_CHANGED_EVENT)
+
+    publicNodes.emit('removePublicNode', relay.id)
+
+    await once(entryNodes, RELAY_CHANGED_EVENT)
+
+    entryNodes.once(RELAY_CHANGED_EVENT, () => assert.fail('Must not throw the relay:changed event'))
+
+    await entryNodes.updatePublicNodes()
+
+    entryNodes.stop()
+    network.close()
   })
 })

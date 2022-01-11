@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { Listener, type ListenerTestingOptions } from './listener'
+import { Listener } from './listener'
 import { Multiaddr } from 'multiaddr'
 import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
 import type { Connection } from 'libp2p-interfaces/connection'
@@ -11,7 +11,7 @@ import { once, EventEmitter } from 'events'
 import { type NetworkInterfaceInfo, networkInterfaces } from 'os'
 import { u8aEquals, defer, type DeferType, toNetworkPrefix, u8aAddrToString } from '@hoprnet/hopr-utils'
 
-import type { PublicNodesEmitter, PeerStoreType } from '../types'
+import type { PublicNodesEmitter, PeerStoreType, HoprConnectTestingOptions } from '../types'
 
 import { stopNode, startStunServer, getPeerStoreEntry, createPeerId } from './utils.spec'
 
@@ -42,14 +42,14 @@ class TestingListener extends Listener {
   }
 }
 
-const localHostBeingExposed: ListenerTestingOptions = {
-  runningLocally: true
+const localHostBeingExposed: HoprConnectTestingOptions = {
+  __runningLocally: true
 }
 
-const localHostCheckingNAT: ListenerTestingOptions = {
-  noUPNP: true,
-  runningLocally: false, // contact STUN servers
-  preferLocalAddresses: true // accept local addresses from STUN servers
+const localHostCheckingNAT: HoprConnectTestingOptions = {
+  __noUPNP: true,
+  __runningLocally: false, // contact STUN servers
+  __preferLocalAddresses: true // accept local addresses from STUN servers
 }
 
 /**
@@ -67,7 +67,7 @@ async function startNode(
   peerId = createPeerId(),
   upgradeInbound: ((maConn: MultiaddrConnection) => Promise<Connection>) | undefined
 ) {
-  const publicNodesEmitter = new EventEmitter() as PublicNodesEmitter
+  const publicNodes = new EventEmitter() as PublicNodesEmitter
 
   const listener = new TestingListener(
     (async () => {}) as any,
@@ -84,10 +84,11 @@ async function startNode(
         state?.msgReceived?.resolve()
         return conn as any
       }),
-    publicNodesEmitter,
-    initialNodes,
     peerId,
-    undefined,
+    {
+      publicNodes,
+      initialNodes
+    },
     localHostCheckingNAT
   )
 
@@ -96,7 +97,7 @@ async function startNode(
   return {
     peerId,
     listener,
-    publicNodesEmitter
+    publicNodesEmitter: publicNodes
   }
 }
 
@@ -126,10 +127,10 @@ describe('check listening to sockets', function () {
       listener = new TestingListener(
         (async () => {}) as any,
         undefined as any,
-        undefined,
-        [peerStoreEntry, getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)],
         peerId,
-        undefined,
+        {
+          initialNodes: [peerStoreEntry, getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)]
+        },
         localHostCheckingNAT
       )
 
@@ -243,10 +244,12 @@ describe('check listening to sockets', function () {
       {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
       } as any,
-      undefined,
-      [getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
       peerId,
-      firstUsableInterfaceName
+      {
+        interface: firstUsableInterfaceName,
+        initialNodes: [getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)]
+      },
+      localHostBeingExposed
     )
 
     await assert.rejects(
@@ -384,13 +387,13 @@ describe('check listening to sockets', function () {
     const listener = new Listener(
       (async () => {}) as any,
       (() => {}) as any,
-      undefined,
-      [
-        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
-        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
-      ],
       createPeerId(),
-      undefined,
+      {
+        initialNodes: [
+          getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
+          getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
+        ]
+      },
       localHostCheckingNAT
     )
     await listener.bind(new Multiaddr(`/ip4/0.0.0.0/tcp/9091`))
@@ -405,13 +408,13 @@ describe('check listening to sockets', function () {
     const listener = new Listener(
       (async () => {}) as any,
       (() => {}) as any,
-      undefined,
-      [
-        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
-        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
-      ],
       createPeerId(),
-      undefined,
+      {
+        initialNodes: [
+          getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
+          getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
+        ]
+      },
       localHostBeingExposed
     )
 

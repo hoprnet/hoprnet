@@ -94,8 +94,8 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
     },
     dialDirectly,
     (multiaddrs: Multiaddr[]) => multiaddrs,
-    undefined,
-    `testingEnvironment`
+    { environment: `testingEnvironment` },
+    { __noWebRTCUpgrade: true }
   )
 }
 
