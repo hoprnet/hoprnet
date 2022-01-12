@@ -23,6 +23,7 @@ declare branch cluster_size package_version docker_image
 # docker_image and cluster_size are configurable through script arguments
 docker_image="${1:-gcr.io/hoprassociation/hoprd}"
 cluster_size=${2:-3}
+cluster_tag=${3:-}
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 package_version=$(${mydir}/get-package-version.sh)
@@ -55,7 +56,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       fi
 
       declare version_maj_min cluster_name
-      cluster_name="${release_id}"
+      cluster_name="${release_id}${cluster_tag}"
       if [ "${version_major}" != "null" ] && [ "${version_minor}" != "null" ]; then
         version_maj_min="${version_major}.${version_minor}"
         cluster_name="${cluster_name}-${version_maj_min//./-}"
