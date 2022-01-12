@@ -3,7 +3,7 @@
 
 const lightCodeTheme = require('prism-react-renderer/themes/github')
 const darkCodeTheme = require('prism-react-renderer/themes/dracula')
-const { CHOOSE_DOCS_VERSION_ID, DOCS_URL } = require("./consts")
+const { CHOOSE_DOCS_VERSION_ID, DOCS_URL } = require('./consts')
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -33,18 +33,18 @@ const config = {
           routeBasePath: '/',
           // Please change this to your repo.
           editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/',
-            versions: {
-                current: {
-                      label: 'Current',
-                      path: '',
-                      banner: 'none',
-                    },
-                'v1.85': {
-                      label: 'Android SDK v1.0.0',
-                      path: 'version-v1.85',
-                      banner: 'unmaintained',
-                    },
+          versions: {
+            current: {
+              label: 'Current',
+              path: '',
+              banner: 'none'
+            },
+            'v1.85': {
+              label: 'Android SDK v1.0.0',
+              path: 'version-v1.85',
+              banner: 'unmaintained'
             }
+          }
         },
         blog: {
           showReadingTime: true,
@@ -71,12 +71,12 @@ const config = {
           src: 'img/HOPR_logo.svg'
         },
         items: [
-            {
-                      type: 'docsVersionDropdown',
-                      position: 'left',
-                      dropdownItemsAfter: [],
-                      dropdownActiveClassDisabled: true,
-                    },
+          {
+            type: 'docsVersionDropdown',
+            position: 'left',
+            dropdownItemsAfter: [],
+            dropdownActiveClassDisabled: true
+          },
           {
             type: 'doc',
             docId: 'intro',
@@ -102,11 +102,11 @@ const config = {
           }
         ]
       },
-       algolia: {
-         appId: 'YOUR_APP_ID',
-         apiKey: 'YOUR_SEARCH_API_KEY',
-         indexName: 'docs-hoprnet-org',
-         contextualSearch: true
+      algolia: {
+        appId: 'YOUR_APP_ID',
+        apiKey: 'YOUR_SEARCH_API_KEY',
+        indexName: 'docs-hoprnet-org',
+        contextualSearch: true
       },
       footer: {
         /** style: 'dark',

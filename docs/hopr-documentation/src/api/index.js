@@ -1,1 +1,1 @@
-export * as github from "./github";
+export * as github from './github'

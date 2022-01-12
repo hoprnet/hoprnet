@@ -1,6 +1,6 @@
-import React from "react";
-import { DocsVersion } from "../portals";
-import Navbar from "@theme-original/Navbar";
+import React from 'react'
+import { DocsVersion } from '../portals'
+import Navbar from '@theme-original/Navbar'
 
 function CustomNavbar() {
   return (
@@ -8,7 +8,7 @@ function CustomNavbar() {
       <DocsVersion />
       <Navbar />
     </>
-  );
+  )
 }
 
-export default CustomNavbar;
+export default CustomNavbar

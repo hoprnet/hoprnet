@@ -1,1 +1,1 @@
-export { default as DocsVersion } from "./DocsVersion";
+export { default as DocsVersion } from './DocsVersion'

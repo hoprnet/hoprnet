@@ -1,6 +1,6 @@
-import { ENDPOINTS, BASE_URL } from "./consts";
-import { createClient } from "../client";
+import { ENDPOINTS, BASE_URL } from './consts'
+import { createClient } from '../client'
 
-const client = createClient(BASE_URL);
+const client = createClient(BASE_URL)
 
-export const getReleases = () => client.get(ENDPOINTS.releases);
+export const getReleases = () => client.get(ENDPOINTS.releases)
