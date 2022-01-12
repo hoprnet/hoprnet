@@ -22,4 +22,4 @@ curl -sSL "https://github.com/docker/compose/releases/download/1.29.2/docker-com
 chmod +x /usr/local/bin/docker-compose
 ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 
-docker pull node:16
+docker pull node:16-slim
