@@ -1025,5 +1025,5 @@ export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
 export { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from './environment'
-export { libp2pMock } from './libp2p.mock'
+export { createLibp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'

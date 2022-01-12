@@ -1,46 +1,68 @@
 import type LibP2P from 'libp2p'
 import PeerStore from 'libp2p/src/peer-store'
 import AddressManager from 'libp2p/src/address-manager'
-import { debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
+import { debug } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
-export const privateKey = '0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332'
-export const mockPeerId: PeerId = privKeyToPeerId(privateKey)
-export const samplePeerId = PeerId.createFromB58String('16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7')
-export const sampleMultiaddrs = new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${samplePeerId.toB58String()}`)
+function createLibp2pMock(peerId: PeerId): LibP2P {
+  const libp2pLogger = debug(`hopr:mocks:libp2p`)
 
-const libp2pLogger = debug(`hopr:mocks:libp2p`)
-let libp2p: LibP2P
+  const libp2p = {} as unknown as LibP2P
 
-libp2p = {} as unknown as LibP2P
-libp2p._options = Object.assign({}, libp2p._options, {
-  addresses: {
-    announceFilter: () => [sampleMultiaddrs]
+  libp2p.peerId = peerId
+
+  libp2p._options = Object.assign({}, libp2p._options, {
+    addresses: {
+      announceFilter: () => [new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peerId.toB58String()}`)]
+    }
+  })
+  libp2p.start = () => {
+    libp2pLogger(`Libp2p start method called`)
+    return Promise.resolve()
   }
-})
-libp2p.start = () => {
-  libp2pLogger(`Libp2p start method called`)
-  return Promise.resolve()
-}
-libp2p.stop = () => {
-  libp2pLogger(`Libp2p stop method called`)
-  return Promise.resolve()
-}
-libp2p.handle = () => {
-  libp2pLogger(`Libp2 handle method called`)
-}
-libp2p.hangUp = () => {
-  libp2pLogger(`Libp2 hangUp method called`)
-  return Promise.resolve()
-}
-libp2p.connectionManager = {} as unknown as LibP2P['connectionManager']
-libp2p.connectionManager.on = (event: string) => {
-  libp2pLogger(`Connection manager event handler called with event "${event}"`)
-  return libp2p.connectionManager
-}
-libp2p.peerStore = new PeerStore({ peerId: samplePeerId })
-libp2p.addressManager = new AddressManager(mockPeerId, { announce: [sampleMultiaddrs.toString()] })
+  libp2p.stop = () => {
+    libp2pLogger(`Libp2p stop method called`)
+    return Promise.resolve()
+  }
+  libp2p.handle = () => {
+    libp2pLogger(`Libp2 handle method called`)
+  }
+  libp2p.hangUp = () => {
+    libp2pLogger(`Libp2 hangUp method called`)
+    return Promise.resolve()
+  }
+  libp2p.connectionManager = {} as unknown as LibP2P['connectionManager']
+  libp2p.connectionManager.on = (event: string) => {
+    libp2pLogger(`Connection manager event handler called with event "${event}"`)
+    return libp2p.connectionManager
+  }
+  libp2p.peerStore = new PeerStore({ peerId })
+  libp2p.addressManager = new AddressManager(peerId, {
+    announce: [new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peerId.toB58String()}`).toString()]
+  })
 
-const libp2pMock = libp2p
-export { libp2pMock }
+  libp2p.upgrader = {} as any
+
+  // Add DHT environments
+  libp2p._dht = {}
+  libp2p._dht._wan = {}
+  libp2p._dht._wan._network = {}
+  libp2p._dht._wan._topologyListener = {}
+  libp2p._dht._lan = {}
+  libp2p._dht._lan._network = {}
+  libp2p._dht._lan._topologyListener = {}
+
+  libp2p._dht._wan._network._protocol =
+    libp2p._dht._wan._topologyListener._protocol =
+    libp2p._dht._wan._protocol =
+      '/ipfs/kad/1.0.0'
+  libp2p._dht._lan._network._protocol =
+    libp2p._dht._lan._topologyListener._protocol =
+    libp2p._dht._lan._protocol =
+      '/ipfs/lan/kad/1.0.0'
+
+  return libp2p
+}
+
+export { createLibp2pMock }
