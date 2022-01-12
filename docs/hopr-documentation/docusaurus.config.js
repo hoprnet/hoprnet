@@ -32,7 +32,19 @@ const config = {
           sidebarPath: require.resolve('./sidebars.js'),
           routeBasePath: '/',
           // Please change this to your repo.
-          editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/'
+          editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/',
+            versions: {
+                current: {
+                      label: 'Current',
+                      path: '',
+                      banner: 'none',
+                    },
+                'v1.85': {
+                      label: 'Android SDK v1.0.0',
+                      path: 'version-v1.85',
+                      banner: 'unmaintained',
+                    },
+            }
         },
         blog: {
           showReadingTime: true,
@@ -59,14 +71,12 @@ const config = {
           src: 'img/HOPR_logo.svg'
         },
         items: [
-          {
-            type: 'dropdown',
-            label: 'Version',
-            id: CHOOSE_DOCS_VERSION_ID,
-            position: 'left',
-            href: 'version',
-            items: []
-          },
+            {
+                      type: 'docsVersionDropdown',
+                      position: 'left',
+                      dropdownItemsAfter: [],
+                      dropdownActiveClassDisabled: true,
+                    },
           {
             type: 'doc',
             docId: 'intro',
