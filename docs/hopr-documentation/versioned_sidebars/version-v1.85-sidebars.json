@@ -1,0 +1,140 @@
+{
+  "version-v1.85/tutorialSidebar": [
+    {
+      "type": "category",
+      "label": "About HOPR",
+      "items": [
+        {
+          "type": "doc",
+          "id": "version-v1.85/about-hopr"
+        }
+      ],
+      "collapsible": true,
+      "collapsed": true
+    },
+    {
+      "type": "category",
+      "label": "Installing a hoprd node",
+      "items": [
+        {
+          "type": "doc",
+          "id": "version-v1.85/node/start-here"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/node/using-script"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/node/using-avado"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/node/using-npm"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/node/using-docker"
+        }
+      ],
+      "collapsible": true,
+      "collapsed": true
+    },
+    {
+      "type": "category",
+      "label": "Run a hoprd node",
+      "items": [
+        {
+          "type": "doc",
+          "id": "version-v1.85/node/guide-using-a-hoprd-node"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/node/hoprd-commands"
+        }
+      ],
+      "collapsible": true,
+      "collapsed": true
+    },
+    {
+      "type": "category",
+      "label": "HOPR core concepts",
+      "items": [
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/what-is-hopr"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/what-is-metadata"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/anonymous-routing"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/mixnets"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/incentives"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/proof-of-relay"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/tickets-and-payment-channels"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/probabilistic-payments"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/incentives"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/cover-traffic"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/cover-traffic-nodes"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/core/balancing-cover-traffic"
+        }
+      ],
+      "collapsible": true,
+      "collapsed": true
+    },
+    {
+      "type": "category",
+      "label": "Staking",
+      "items": [
+        {
+          "type": "doc",
+          "id": "version-v1.85/staking/how-to-get-hopr"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/staking/how-to-stake"
+        },
+        {
+          "type": "doc",
+          "id": "version-v1.85/staking/convert-hopr"
+        }
+      ],
+      "collapsible": true,
+      "collapsed": true
+    },
+    {
+      "type": "doc",
+      "id": "version-v1.85/faq"
+    }
+  ]
+}
