@@ -34,7 +34,8 @@ import {
   type Address,
   type DialOpts,
   type Hash,
-  type HalfKeyChallenge
+  type HalfKeyChallenge,
+  multiaddressCompareByClassFunction
 } from '@hoprnet/hopr-utils'
 import { type default as HoprCoreEthereum, type Indexer } from '@hoprnet/hopr-core-ethereum'
 import type BN from 'bn.js'
@@ -408,15 +409,14 @@ class Hopr extends EventEmitter {
   private async tickChannelStrategy() {
     verbose('strategy tick', this.status, this.strategy.name)
     if (this.status != 'RUNNING') {
-      return
+      throw new Error('node is not RUNNING')
     }
 
     const currentChannels: ChannelEntry[] | undefined = await this.getAllChannels()
     verbose('Channels obtained', currentChannels)
 
     if (currentChannels === undefined) {
-      log('invalid channels retrieved from database')
-      return
+      throw new Error('invalid channels retrieved from database')
     }
 
     for (const channel of currentChannels) {
@@ -427,8 +427,7 @@ class Hopr extends EventEmitter {
     try {
       balance = await this.getBalance()
     } catch (e) {
-      log('failed to getBalance, aborting tick')
-      return
+      throw new Error('failed to getBalance, aborting tick')
     }
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance.toBN(),
@@ -706,7 +705,7 @@ class Hopr extends EventEmitter {
 
   /**
    * Announces address of node on-chain to be reachable by other nodes.
-   * @dev Promise resolves before own announcment appears in the indexer
+   * @dev Promise resolves before own announcement appears in the indexer
    * @param includeRouting publish routable address if true
    * @returns Promise that resolves once announce transaction has been published
    */
@@ -715,7 +714,17 @@ class Hopr extends EventEmitter {
     let addrToAnnounce: Multiaddr
 
     if (includeRouting) {
-      const multiaddrs = await this.getAnnouncedAddresses()
+      let multiaddrs = await this.getAnnouncedAddresses()
+
+      // If we need local addresses, sort them first according to their class
+      if (this.options.testing?.preferLocalAddresses) {
+        multiaddrs.sort(multiaddressCompareByClassFunction)
+      } else {
+        // If we don't need local addresses, just throw them away
+        multiaddrs = multiaddrs.filter((ma) => !isMultiaddrLocal(ma))
+      }
+
+      log(`available multiaddresses ${multiaddrs}`)
 
       const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
       const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
@@ -750,6 +759,7 @@ class Hopr extends EventEmitter {
       log(`announcing ${includeRouting && isRoutableAddress ? 'with' : 'without'} routing`)
 
       await this.connector.announce(addrToAnnounce)
+      log(`announced address ${addrToAnnounce}`)
     } catch (err) {
       log('announce failed')
       await this.isOutOfFunds(err)

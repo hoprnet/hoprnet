@@ -54,6 +54,7 @@ const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
 const ENVIRONMENT_KEY = encoder.encode('environment_id')
+const HOPR_BALANCE_KEY = encoder.encode('hopr-balance')
 
 enum PendingAcknowledgementPrefix {
   Relayer = 0,
@@ -578,5 +579,21 @@ export class HoprDB {
     }
 
     return storedId === expectedId
+  }
+
+  public async getHoprBalance(): Promise<Balance> {
+    return this.getCoercedOrDefault(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO())
+  }
+
+  public async setHoprBalance(value: Balance): Promise<void> {
+    return this.put(HOPR_BALANCE_KEY, value.serialize())
+  }
+
+  public async addHoprBalance(value: Balance): Promise<void> {
+    return this.addBalance(HOPR_BALANCE_KEY, value)
+  }
+
+  public async subHoprBalance(value: Balance): Promise<void> {
+    return this.subBalance(HOPR_BALANCE_KEY, value)
   }
 }

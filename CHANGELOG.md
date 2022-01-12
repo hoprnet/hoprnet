@@ -1,4 +1,12 @@
-## Next
+<a name="1.86"></a>
+
+## [1.86]
+
+### Changes
+
+- Fixed behavior when no network was found or invalid password is entered ([#3147](https://github.com/hoprnet/hoprnet/pull/3147))
+
+---
 
 <a name="1.85"></a>
 
@@ -12,7 +20,7 @@
 ### Bugfixes
 
 - Fix nodes talking to nodes deployed in other environments ([#3127](https://github.com/hoprnet/hoprnet/pull/3127))
-- Fix issues with STUN code ([#3080](https://github.com/hoprnet/hoprnet/pull/3124))
+- Fix issues with STUN code ([#3124](https://github.com/hoprnet/hoprnet/pull/3124))
 - Fixes various issues with indexer ([#3132](https://github.com/hoprnet/hoprnet/pull/3132), [#3129](https://github.com/hoprnet/hoprnet/pull/3129), [#3111](https://github.com/hoprnet/hoprnet/pull/3111), [#3043](https://github.com/hoprnet/hoprnet/pull/3043))
 - Improve handling of provider errors ([#3116](https://github.com/hoprnet/hoprnet/pull/3116))
 - Improved unit tests and e2e tests and mocks ([#3115](https://github.com/hoprnet/hoprnet/pull/3115), [#3118](https://github.com/hoprnet/hoprnet/pull/3118), [#3097](https://github.com/hoprnet/hoprnet/pull/3097), [#3020](https://github.com/hoprnet/hoprnet/pull/3020))

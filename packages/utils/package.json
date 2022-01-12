@@ -1,14 +1,14 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.85.25",
+  "version": "1.86.0-next.6",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
@@ -38,9 +38,9 @@
     "libp2p-crypto": "0.21.0",
     "memdown": "6.1.1",
     "multiaddr": "10.0.1",
-    "multihashes": "4.0.1",
+    "multihashes": "4.0.3",
     "peer-id": "0.16.0",
-    "pino": "7.0.0",
+    "pino": "7.6.2",
     "pino-logflare": "0.3.12",
     "secp256k1": "4.0.2"
   },
@@ -50,7 +50,7 @@
     "@types/pino": "7.0.4",
     "bl": "5.0.0",
     "chai": "4.3.4",
-    "libp2p": "github:hoprnet/js-libp2p#0d4ea4a2750936ac5138c644caad29408f69cd72",
+    "libp2p": "0.35.8",
     "libp2p-kad-dht": "0.27.4",
     "libp2p-mplex": "0.10.5",
     "libp2p-tcp": "0.17.2",
@@ -60,7 +60,7 @@
     "sinon": "12.0.1",
     "ts-node": "10.4.0",
     "typedoc": "0.22.10",
-    "typedoc-plugin-markdown": "3.11.7",
+    "typedoc-plugin-markdown": "3.11.8",
     "typescript": "4.5.4"
   },
   "mocha": {

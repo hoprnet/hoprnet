@@ -6,9 +6,9 @@ import fs from 'fs'
 
 export type ChannelData = {
   channel: ChannelEntry
-  // number of attempts of a node to send out packets.
+  // number of attempts of a channel to receive and send CT packets as the 1st hop (aka the recipient of CT channel)
   sendAttempts: number
-  // number of attempts of a node to forward packets.
+  // number of attempts of a channel to forward packets (aka as intermediate hops other than the 1st hop).
   forwardAttempts: number
 }
 
@@ -27,12 +27,14 @@ export type State = {
   block: BN
   // number of failed messages indexed by the base58-encoded string of node id.
   messageFails: Record<string, number>
+  // number of messages being successfully sent out by the CT node
+  messageTotalSuccess: number
 }
 
 export type PeerData = {
   id: any //PeerId type, as implemented in IPFS
   pub: PublicKey
-  multiaddrs: any // Multiaddress type
+  multiaddrs: any[] // Multiaddress type
 }
 
 export class PersistedState {
@@ -55,6 +57,7 @@ export class PersistedState {
         channels: {},
         ctChannels: [],
         messageFails: {},
+        messageTotalSuccess: 0,
         block: new BN('0')
       }
     }
@@ -74,6 +77,7 @@ export class PersistedState {
         openFrom: p.openFrom
       })),
       messageFails: {},
+      messageTotalSuccess: 0,
       block: new BN(json.block)
     }
 
@@ -261,23 +265,35 @@ export class PersistedState {
   }
 
   /**
-   * Increase the number of attempts for a node to send out packets by 1
-   * @param _p Public key of the message sender.
+   * Increase the number of attempts for a channel to send out packets (as the 1st hop, aka the destination of CT channel) by 1
+   * @param source Public key of the message sender.
+   * @param destination Public key of the message sender.
    */
-  async incrementSent(_p: PublicKey) {
-    // const s = await this.get()
-    // TODO: init
-    //s.channels[p.toB58String()].sendAttempts ++
+  async incrementSent(source: PublicKey, destination: PublicKey) {
+    const s = this.get()
+    const channel = findChannel(source, destination, s)
+    if (channel) {
+      const channelId = channel.getId().toHex()
+      const prev = s.channels[channelId].sendAttempts || 0
+      s.channels[channelId].sendAttempts = prev + 1
+      this.set(s)
+    }
   }
 
   /**
-   * Increase the number of attempts for a node to fowward packets by 1
-   * @param _p Public key of the message forwarder.
+   * Increase the number of attempts for a channel to forward packets by 1
+   * @param source Public key of the message sender.
+   * @param destination Public key of the message sender.
    */
-  async incrementForwards(_p: PublicKey) {
-    //const s = await this.get()
-    // TODO: init
-    //s.ctSent[p.toB58String()].forwardAttempts++
+  async incrementForwards(source: PublicKey, destination: PublicKey) {
+    const s = this.get()
+    const channel = findChannel(source, destination, s)
+    if (channel) {
+      const channelId = channel.getId().toHex()
+      const prev = s.channels[channelId].forwardAttempts || 0
+      s.channels[channelId].forwardAttempts = prev + 1
+      this.set(s)
+    }
   }
 
   /**
@@ -287,6 +303,24 @@ export class PersistedState {
   openChannelCount(): number {
     const s = this.get()
     return Object.values(s.channels).filter((x) => x.channel.status != ChannelStatus.Closed).length
+  }
+
+  /**
+   * Get the number of total messages that are sent out from the current CT node
+   * @returns number of total messages. If none, returns zero.
+   */
+  messageTotalSuccess(): number {
+    return this.get().messageTotalSuccess || 0
+  }
+
+  /**
+   * Update the total number of sent messages from the current CT node
+   */
+  incrementMessageTotalSuccess(): void {
+    const s = this.get()
+    const prev = s.messageTotalSuccess || 0
+    s.messageTotalSuccess = prev + 1
+    this.set(s)
   }
 
   /**
