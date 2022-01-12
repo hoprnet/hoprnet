@@ -10,7 +10,7 @@ if [ -z "$HOPR_RELEASE" ]; then
   exit 1
 fi
 
-if [ ! -f "/var/run/docker.sock" ]; then
+if [ ! -S "/var/run/docker.sock" ]; then
   >&2 echo "ERROR: /var/run/docker.sock must be mounted"
   exit 1
 fi

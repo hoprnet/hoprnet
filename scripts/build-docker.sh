@@ -70,6 +70,8 @@ build_and_tag_image() {
   local required_pkg_version="$3"
   local docker_image_full="${built_docker_image}:${built_image_version}"
 
+  log "start building ${docker_image_full}"
+
   gcloud builds submit --config cloudbuild.yaml \
       --substitutions=_PACKAGE_VERSION=${required_pkg_version},_IMAGE_VERSION=${built_image_version},_DOCKER_IMAGE=${built_docker_image}
 
@@ -83,20 +85,21 @@ build_and_tag_image() {
   if [ -z "${releases}" ]; then
     # stopping here after forced build
     log "no releases were configured for branch ${branch}"
-    exit 0
-  fi
-
-  if ! [ "${no_tags:-}" = "true" ]; then
-    log "attach additional tag ${required_pkg_version} to docker image ${docker_image_full}"
-    gcloud container images add-tag ${docker_image_full} ${built_docker_image}:${required_pkg_version}
-
-    for release in ${releases}; do
-      log "attach additional tag ${release} to docker image ${docker_image_full}"
-      gcloud container images add-tag ${docker_image_full} ${built_docker_image}:${release}
-    done
   else
-    log "skip tagging as requested"
+    if ! [ "${no_tags:-}" = "true" ]; then
+      log "attach additional tag ${required_pkg_version} to docker image ${docker_image_full}"
+      gcloud container images add-tag ${docker_image_full} ${built_docker_image}:${required_pkg_version}
+
+      for release in ${releases}; do
+        log "attach additional tag ${release} to docker image ${docker_image_full}"
+        gcloud container images add-tag ${docker_image_full} ${built_docker_image}:${release}
+      done
+    else
+      log "skip tagging as requested"
+    fi
   fi
+
+  log "finished build of ${docker_image_full}"
 }
 
 for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
@@ -124,7 +127,3 @@ if [ "${package}" = "hoprd-nat" ]; then
   cd "${mydir}/nat"
   build_and_tag_image ${docker_image} ${image_version} ${package_version}
 fi
-
-
-
-
