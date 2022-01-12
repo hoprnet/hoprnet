@@ -59,6 +59,7 @@ class Relay {
     private options: HoprConnectOptions,
     private testingOptions: HoprConnectTestingOptions
   ) {
+    log(`relay testing options`, testingOptions)
     this.relayState = new RelayState()
 
     this.options.maxRelayedConnections ??= DEFAULT_MAX_RELAYED_CONNECTIONS
@@ -93,12 +94,15 @@ class Relay {
     destination: PeerId,
     options?: HoprConnectDialOptions
   ): Promise<MultiaddrConnection | undefined> {
+    log(`connect relay ${relay.toB58String()}`)
     const abort = new AbortController()
-    setTimeout(abort.abort.bind(abort), RELAY_CIRCUIT_TIMEOUT)
+    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CIRCUIT_TIMEOUT)
 
     const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), {
       signal: options?.signal
     })
+
+    clearTimeout(timeout)
 
     if (baseConnection == undefined) {
       error(
@@ -120,7 +124,11 @@ class Relay {
       throw new AbortError()
     }
 
-    return this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
+    const conn = this.upgradeOutbound(relay, destination, handshakeResult.stream, options)
+
+    log(`successfully established relay connection to ${relay.toB58String()}`)
+
+    return conn
   }
 
   private upgradeOutbound(
@@ -129,6 +137,7 @@ class Relay {
     stream: Stream,
     opts?: HoprConnectDialOptions
   ): MultiaddrConnection {
+    log(`outbound !!this.testingOptions.__noWebRTCUpgrade`, !!this.testingOptions.__noWebRTCUpgrade)
     // Attempt to upgrade to WebRTC if available
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
@@ -161,6 +170,8 @@ class Relay {
   }
 
   private upgradeInbound(initiator: PeerId, relay: PeerId, stream: Stream) {
+    log(`inbound !!this.testingOptions.__noWebRTCUpgrade`, this.testingOptions.__noWebRTCUpgrade)
+
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
         stream,
@@ -242,7 +253,7 @@ class Relay {
       handShakeResult.counterparty,
       conn.connection.remotePeer,
       handShakeResult.stream
-    ) as any
+    )
 
     try {
       await this.libp2p.upgrader.upgradeInbound(newConn)

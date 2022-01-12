@@ -215,26 +215,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       throw Error(`Could not establish relayed connection.`)
     }
 
-    // const logger = {
-    //   ...conn,
-    //   source: (async function* () {
-    //     for await (const msg of conn.source) {
-    //       console.log(`receiving`, new TextDecoder().decode(msg.slice()))
-    //       yield msg
-    //     }
-    //   })(),
-    //   sink: (source: any) => {
-    //     return conn?.sink(
-    //       (async function* () {
-    //         for await (const msg of source) {
-    //           console.log(`sending`, new TextDecoder().decode(msg.slice()))
-    //           yield msg
-    //         }
-    //       })()
-    //     )
-    //   }
-    // }
-
     return await this._upgradeOutbound(conn as any)
   }
 
