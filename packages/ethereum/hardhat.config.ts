@@ -105,8 +105,8 @@ const hardhatConfig: HardhatUserConfig = {
           runs: 200
         },
         outputSelection: {
-          "*": {
-            "*": ["storageLayout"]
+          '*': {
+            '*': ['storageLayout']
           }
         }
       }
