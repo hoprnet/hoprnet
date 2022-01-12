@@ -422,6 +422,27 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@defi-wonderland/smock@npm:^2.0.7":
+  version: 2.0.7
+  resolution: "@defi-wonderland/smock@npm:2.0.7"
+  dependencies:
+    "@nomiclabs/ethereumjs-vm": ^4.2.2
+    diff: ^5.0.0
+    lodash.isequal: ^4.5.0
+    lodash.isequalwith: ^4.4.0
+    rxjs: ^7.2.0
+    semver: ^7.3.5
+  peerDependencies:
+    "@ethersproject/abi": ^5
+    "@ethersproject/abstract-provider": ^5
+    "@ethersproject/abstract-signer": ^5
+    "@nomiclabs/hardhat-ethers": ^2
+    ethers: ^5
+    hardhat: ^2
+  checksum: 2f4aa6c4a95f889d14c02c6b6041434b5a5f1b1558344e8d613246168b89d9f60f1cc0431d5bd0123d59a779f9f3f147e05048cefdabbab0e397215bbf8d3f2a
+  languageName: node
+  linkType: hard
+
 "@ensdomains/ens@npm:^0.4.4":
   version: 0.4.5
   resolution: "@ensdomains/ens@npm:0.4.5"
@@ -1326,6 +1347,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-ethereum@workspace:packages/ethereum"
   dependencies:
+    "@defi-wonderland/smock": ^2.0.7
     "@ethersproject/wallet": 5.5.0
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@nomiclabs/hardhat-ethers": 2.0.3
@@ -1674,6 +1696,29 @@ __metadata:
     "@nodelib/fs.scandir": 2.1.5
     fastq: ^1.6.0
   checksum: 190c643f156d8f8f277bf2a6078af1ffde1fd43f498f187c2db24d35b4b4b5785c02c7dc52e356497b9a1b65b13edc996de08de0b961c32844364da02986dc53
+  languageName: node
+  linkType: hard
+
+"@nomiclabs/ethereumjs-vm@npm:^4.2.2":
+  version: 4.2.2
+  resolution: "@nomiclabs/ethereumjs-vm@npm:4.2.2"
+  dependencies:
+    async: ^2.1.2
+    async-eventemitter: ^0.2.2
+    core-js-pure: ^3.0.1
+    ethereumjs-account: ^3.0.0
+    ethereumjs-block: ^2.2.2
+    ethereumjs-blockchain: ^4.0.3
+    ethereumjs-common: ^1.5.0
+    ethereumjs-tx: ^2.1.2
+    ethereumjs-util: ^6.2.0
+    fake-merkle-patricia-tree: ^1.0.1
+    functional-red-black-tree: ^1.0.1
+    merkle-patricia-tree: 3.0.0
+    rustbn.js: ~0.2.0
+    safe-buffer: ^5.1.1
+    util.promisify: ^1.0.0
+  checksum: 958e003813081947db14579af83f20139dc72c826fc128fade44cb87856eac32b9ff04be7ee20e708aa9ab8f2050df625d8edf298fbed5fbdbcc316c69ddd2fa
   languageName: node
   linkType: hard
 
@@ -11741,6 +11786,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lodash.isequal@npm:^4.5.0":
+  version: 4.5.0
+  resolution: "lodash.isequal@npm:4.5.0"
+  checksum: da27515dc5230eb1140ba65ff8de3613649620e8656b19a6270afe4866b7bd461d9ba2ac8a48dcc57f7adac4ee80e1de9f965d89d4d81a0ad52bb3eec2609644
+  languageName: node
+  linkType: hard
+
+"lodash.isequalwith@npm:^4.4.0":
+  version: 4.4.0
+  resolution: "lodash.isequalwith@npm:4.4.0"
+  checksum: 428ba7a57c47ec05e2dd18c03a4b4c45dac524a46af7ce3f412594bfc7be6a5acaa51acf9ea113d0002598e9aafc6e19ee8d20bc28363145fcb4d21808c9039f
+  languageName: node
+  linkType: hard
+
 "lodash.merge@npm:^4.6.1":
   version: 4.6.2
   resolution: "lodash.merge@npm:4.6.2"
@@ -15751,6 +15810,15 @@ __metadata:
   dependencies:
     tslib: ^2.1.0
   checksum: 78e3eecb1644dd83adabc8d956f879dca62eb19c8afcd6acac71cf6d94534c33ea201e65387494fdeb1332395cba081e194f5a9699d58a5d48e416b8b52372aa
+  languageName: node
+  linkType: hard
+
+"rxjs@npm:^7.2.0":
+  version: 7.5.2
+  resolution: "rxjs@npm:7.5.2"
+  dependencies:
+    tslib: ^2.1.0
+  checksum: daf1fe7289de500b25d822fd96cde3c138c7902e8bf0e6aa12a3e70847a5cabeeb4d677f10e19387e1db44b12c5b1be0ff5c79b8cd63ed6ce891d765e566cf4d
   languageName: node
   linkType: hard
 

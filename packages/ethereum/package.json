@@ -18,7 +18,7 @@
     "accounts": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat accounts",
     "network": "TS_NODE_PROJECT=./tsconfig.hardhat.json DEVELOPMENT=true hardhat node",
     "test": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat test",
-    "coverage": "TS_NODE_PROJECT=./tsconfig.hardhat.json hardhat coverage",
+    "coverage": "TS_NODE_PROJECT=./tsconfig.hardhat.json HOPR_ENVIRONMENT_ID=hardhat-localhost HOPR_HARDHAT_TAG=testing hardhat coverage",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -32,6 +32,7 @@
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
   },
   "devDependencies": {
+    "@defi-wonderland/smock": "^2.0.7",
     "@ethersproject/wallet": "5.5.0",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@nomiclabs/hardhat-ethers": "2.0.3",
