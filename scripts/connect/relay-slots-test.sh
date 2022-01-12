@@ -88,7 +88,7 @@ start_node tests/node "${charly_log}" \
   "[]" \
   --port ${charly_port} \
   --identityName 'charly' \
-  --noDirectConnections true \
+  --noDirectConnections false \
   --noWebRTCUpgrade false \
   --maxRelayedConnections 1 \
   --preferLocalAddresses true \

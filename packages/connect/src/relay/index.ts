@@ -96,7 +96,7 @@ class Relay {
     const abort = new AbortController()
     setTimeout(abort.abort.bind(abort), RELAY_CIRCUIT_TIMEOUT)
 
-    const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), false, {
+    const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), {
       signal: options?.signal
     })
 
@@ -109,10 +109,7 @@ class Relay {
       return
     }
 
-    const handshakeResult = await new RelayHandshake(baseConnection, this.options, this.testingOptions).initiate(
-      relay,
-      destination
-    )
+    const handshakeResult = await new RelayHandshake(baseConnection, this.options).initiate(relay, destination)
 
     if (!handshakeResult.success) {
       error(`Handshake led to empty stream. Giving up.`)
@@ -199,7 +196,7 @@ class Relay {
       return
     }
 
-    const shaker = new RelayHandshake(conn.stream as any, this.options, this.testingOptions)
+    const shaker = new RelayHandshake(conn.stream as any, this.options)
 
     log(`handling relay request from ${conn.connection.remotePeer.toB58String()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
@@ -231,7 +228,7 @@ class Relay {
       return
     }
 
-    const handShakeResult = await new RelayHandshake(conn.stream as any, this.options, this.testingOptions).handle(
+    const handShakeResult = await new RelayHandshake(conn.stream as any, this.options).handle(
       conn.connection.remotePeer
     )
 
@@ -296,7 +293,6 @@ class Relay {
   private async dialNodeDirectly(
     destination: PeerId,
     protocol: string,
-    noDirectConnection: boolean,
     opts?: HoprConnectDialOptions
   ): Promise<Stream | undefined> {
     let stream = await this.tryExistingConnection(destination, protocol)
@@ -304,7 +300,7 @@ class Relay {
     // Only establish a new connection if we don't have any.
     // Don't establish a new direct connection to the recipient when using
     // simulated NAT
-    if (!noDirectConnection && stream == undefined) {
+    if (stream == undefined) {
       stream = await this.establishDirectConnection(destination, protocol, opts)
     }
 

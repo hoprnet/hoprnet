@@ -69,27 +69,37 @@ type PeerStoreAddress = {
   multiaddrs: Multiaddr[]
 }
 
-export class HoprOptions {
-  constructor(
-    public environment: ResolvedEnvironment,
-    public announce?: boolean,
-    public dbPath?: string,
-    public createDbIfNotExist?: boolean,
-    public forceCreateDB?: boolean,
-    public password?: string,
-    public connector?: HoprCoreEthereum,
-    public strategy?: ChannelStrategy,
-    public hosts?: {
-      ip4?: NetOptions
-      ip6?: NetOptions
-    },
-    // You almost certainly want this to be false, this is so we can test with
-    // local testnets, and announce 127.0.0.1 addresses.
-    public announceLocalAddresses?: boolean,
-    // when true, addresses will be sorted local first
-    // when false, addresses will be sorted public first
-    public preferLocalAddresses?: boolean
-  ) {}
+export type HoprOptions = {
+  environment: ResolvedEnvironment
+  announce?: boolean
+  dbPath?: string
+  createDbIfNotExist?: boolean
+  forceCreateDB?: boolean
+  password?: string
+  connector?: HoprCoreEthereum
+  strategy?: ChannelStrategy
+  hosts?: {
+    ip4?: NetOptions
+    ip6?: NetOptions
+  }
+  testing?: {
+    // when true, assume that the node is running in an isolated network and does
+    // not need any connection to nodes outside of the subnet
+    // default: false
+    announceLocalAddresses?: boolean
+    // when true, assume a testnet with multiple nodes running on the same machine
+    // or in the same private IPv4 network
+    // default: false
+    preferLocalAddresses?: boolean
+    // when true, intentionally fail on direct connections
+    // to test NAT behavior
+    // default: false
+    noDirectConnections?: boolean
+    // when true, even if a direct WebRTC connection is possible,
+    // don't do the upgrade to it to test bidirectional NAT
+    // default: false
+    noWebRTCUpgrade?: boolean
+  }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -505,7 +515,7 @@ class Hopr extends EventEmitter {
       //
       // We also have a setting announceLocalAddresses that inverts this so we
       // can test on closed local networks.
-      if (this.options.announceLocalAddresses) {
+      if (this.options.testing?.announceLocalAddresses) {
         return addrs.filter((ma) => ma.toString().includes('127.0.0.1')) // TODO - proper filtering
       }
       return addrs.filter((ma) => !ma.toString().includes('127.0.0.1')) // TODO - proper filtering
@@ -715,7 +725,10 @@ class Hopr extends EventEmitter {
 
       // Submit P2P address if IPv4 or IPv6 address is not routable because link-locale, reserved or private address
       // except if testing locally, e.g. as part of an integration test
-      if (addrToAnnounce == undefined || (isMultiaddrLocal(addrToAnnounce) && !this.options.preferLocalAddresses)) {
+      if (
+        addrToAnnounce == undefined ||
+        (isMultiaddrLocal(addrToAnnounce) && !this.options.testing?.preferLocalAddresses)
+      ) {
         addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
       } else {
         isRoutableAddress = true

@@ -1,4 +1,4 @@
-import type { HoprConnectOptions, HoprConnectTestingOptions, Stream, StreamType } from '../types'
+import type { HoprConnectOptions, Stream, StreamType } from '../types'
 import handshake from 'it-handshake'
 import type { Handshake } from 'it-handshake'
 import type PeerId from 'peer-id'
@@ -74,11 +74,7 @@ type HandleResponse =
 class RelayHandshake {
   private shaker: Handshake<StreamType>
 
-  constructor(
-    stream: Stream,
-    private options: HoprConnectOptions = {},
-    private testingOptions: HoprConnectTestingOptions = {}
-  ) {
+  constructor(stream: Stream, private options: HoprConnectOptions = {}) {
     this.shaker = handshake(stream)
   }
 
@@ -226,11 +222,7 @@ class RelayHandshake {
 
     let toDestination: Stream | undefined
     try {
-      toDestination = await getStreamToCounterparty(
-        destination,
-        DELIVERY_PROTOCOL(this.options.environment),
-        !!this.testingOptions.__noDirectConnections
-      )
+      toDestination = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment))
     } catch (err) {
       error(err)
     }

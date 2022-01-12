@@ -79,9 +79,10 @@ start_node tests/node "${charly_log}" \
   "[]" \
   --port ${charly_port} \
   --identityName 'charly' \
-  --noDirectConnections true \
   --noWebRTCUpgrade true \
-  --preferLocalAddresses true
+  --preferLocalAddresses true \
+  --noWebRTCUpgrade true \
+  --noDirectConnections false
 
 # wait till nodes finish communicating
 wait_for_regex "${alice_log}" "all tasks executed"

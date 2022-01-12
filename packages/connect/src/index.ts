@@ -14,7 +14,6 @@ import { Discovery } from './discovery'
 
 import type {
   PublicNodesEmitter,
-  PeerStoreType,
   HoprConnectListeningOptions,
   HoprConnectDialOptions,
   HoprConnectOptions,
@@ -38,8 +37,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
   }
 
   public discovery: Discovery
-
-  private relayPeerIds: Set<string>
 
   private _dialDirectly: HoprConnect['dialDirectly']
   private _upgradeOutbound: Upgrader['upgradeOutbound']
@@ -95,22 +92,23 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       throw Error(`Cannot find package.json to load version tag. Exitting.`)
     }
 
-    this.relayPeerIds = new Set<string>()
-
     if (!!this.testingOptions.__noDirectConnections) {
-      // For testing, maintain a list of usable relay nodes.
-      // Block direct connections to nodes that are not on the list
+      verbose(`DEBUG mode: always using relayed or WebRTC connections.`)
 
-      for (const initialNode of this.options.initialNodes ?? []) {
-        this.relayPeerIds.add(initialNode.id.toB58String())
+      const onConnection = this._libp2p.upgrader.onConnection
+
+      this._libp2p.upgrader.onConnection = (conn) => {
+        if (conn.remoteAddr.toString().startsWith(`/p2p/`)) {
+          onConnection(conn)
+          return
+        }
+
+        if (conn.stat.direction === 'outbound') {
+          onConnection(conn)
+          return
+        }
       }
-
-      this.options.publicNodes?.on('addPublicNode', (peer: PeerStoreType) => {
-        this.relayPeerIds.add(peer.id.toB58String())
-      })
     }
-
-    verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
 
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       verbose(`DEBUG mode: no WebRTC upgrade`)
@@ -261,18 +259,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @param ma Multiaddr to check
    */
   private shouldAttemptDirectDial(ma: Multiaddr): boolean {
-    const maPeerId = ma.getPeerId()
-    if (
-      // Forces the node to only use relayed connections and
-      // don't try a direct dial attempt.
-      // @dev Used for testing
-      !!this.testingOptions.__noDirectConnections &&
-      maPeerId != null &&
-      !this.relayPeerIds.has(maPeerId)
-    ) {
-      return false
-    }
-
     let protoNames = ma.protoNames()
     if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(protoNames[0])) {
       // We cannot call other protocols directly

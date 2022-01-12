@@ -30,7 +30,7 @@ export async function createLibp2pInstance(
 ): Promise<LibP2P> {
   let addressSorter: AddressSorter
 
-  if (options.preferLocalAddresses) {
+  if (options.testing?.preferLocalAddresses) {
     addressSorter = localAddressesFirst
     log('Preferring local addresses')
   } else {
@@ -57,12 +57,17 @@ export async function createLibp2pInstance(
             environment: options.environment.id
           },
           testing: {
-            // Tells hopr-connect to treat local and private addresses
-            // as public addresses
-            __useLocalAddresses: options.announceLocalAddresses
-            // @dev Use these settings to simulate NAT behavior
-            // __noDirectConnections: true,
-            // __noWebRTCUpgrade: false
+            // Treat local and private addresses as public addresses
+            __useLocalAddresses: options.testing?.announceLocalAddresses,
+            // Use local addresses to dial other nodes and reply to
+            // STUN queries with local and private addresses
+            __preferLocalAddresses: options.testing?.preferLocalAddresses,
+            // Prevent nodes from dialing each other directly
+            // but allow direct connection towards relays
+            __noDirectConnections: options.testing?.noDirectConnections,
+            // Do not upgrade to a direct WebRTC connection, even if it
+            // is available. Used to test behavior of bidirectional NATs
+            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade
           }
         } as HoprConnectConfig
       },

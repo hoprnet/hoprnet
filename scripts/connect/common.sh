@@ -41,7 +41,7 @@ function start_node() {
   local script=${3}
   local rest_args=${@:4}
 
-  DEBUG=hopr-connect*,simple-peer \
+  DEBUG="hopr-connect*,simple-peer" \
     yarn ts-node packages/connect/${filename} \
     ${rest_args} \
     --script "${script}" > "${log_file}" \
@@ -84,7 +84,7 @@ function remove_logs() {
 }
 
 function ensure_ports() {
-  for port in ${alice_port} ${alice2_port} ${bob_port} ${charly_port} ${dave_port}; do
+  for port in ${alice_port} ${alice2_port} ${bob_port} ${charly_port} ${dave_port} ${ed_port}; do
     ensure_port_is_free ${port}
   done
 }
