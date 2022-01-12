@@ -5,6 +5,8 @@ cd /opt/hopr/ || exit 1
 declare log_file="/tmp/hardhat.logs"
 
 if [ "$(curl -s -o /dev/null -w ''%{http_code}'' $provider_ip:8545)" != "200" ]; then
+	# make sure other instances are killed
+	sudo pkill node || :
 	# Start the HardHat network on localhost
 	echo "Starting HardHat network..."
 	HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network > ${log_file} 2>&1 &
@@ -13,7 +15,7 @@ fi
 while [[
 	"$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ||
 	! -f "${log_file}" ||
-  -z $(grep "Started HTTP and WebSocket JSON-RPC server" "${log_file}" || echo "")
+  -z "$(grep "Started HTTP and WebSocket JSON-RPC server" "${log_file}" || echo "")"
 	]] ; do
 	echo "Waiting for hardhat network to come up..."
 	sleep 5;
