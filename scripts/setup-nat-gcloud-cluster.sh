@@ -54,7 +54,7 @@ usage() {
 
 declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
-declare cluster_id="${3:-${environment}-nat-nodes-${RANDOM}-${RANDOM}}"
+declare cluster_id="${3:-${environment}-nat-${RANDOM}-${RANDOM}}"
 declare docker_image=${4:-gcr.io/hoprassociation/hoprd-nat:${environment}}
 
 declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}%${RANDOM}%${RANDOM}Token}"

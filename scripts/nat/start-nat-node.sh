@@ -26,7 +26,7 @@ fi
 
 # Fork here and pass all the environment variables down into the forked image
 env > env.list
-docker run --pull always -v /var/hoprd/:/app/db -p 3000:3000 -p 3001:3001 \
+docker run --pull always -v /var/hoprd/:/app/db -p 3000:3000 -p 3001:3001 -p 8080:8080 \
  --network=hopr-nat \
  --env-file ./env.list \
  "gcr.io/hoprassociation/hoprd:$HOPR_RELEASE" "$@"
