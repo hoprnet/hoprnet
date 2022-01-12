@@ -2930,7 +2930,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@google-cloud/common@npm:^3.0.0":
+"@google-cloud/common@npm:^3.0.0, @google-cloud/common@npm:^3.4.1":
   version: 3.8.1
   resolution: "@google-cloud/common@npm:3.8.1"
   dependencies:
@@ -2947,11 +2947,45 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@google-cloud/profiler@npm:4.1.5":
-  version: 4.1.5
-  resolution: "@google-cloud/profiler@npm:4.1.5"
+"@google-cloud/logging-min@npm:^9.6.3":
+  version: 9.6.6
+  resolution: "@google-cloud/logging-min@npm:9.6.6"
+  dependencies:
+    "@google-cloud/common": ^3.4.1
+    "@google-cloud/paginator": ^3.0.0
+    "@google-cloud/projectify": ^2.0.0
+    "@google-cloud/promisify": ^2.0.0
+    arrify: ^2.0.1
+    dot-prop: ^6.0.0
+    eventid: ^2.0.0
+    extend: ^3.0.2
+    gcp-metadata: ^4.0.0
+    google-auth-library: ^7.0.0
+    google-gax: ^2.24.1
+    on-finished: ^2.3.0
+    pumpify: ^2.0.1
+    stream-events: ^1.0.5
+    uuid: ^8.0.0
+  checksum: cd27265dba9a852387609238c622811e8a1a8808f8e02828004cacc37eeff7c0474425923d529b65fd2ad940df07fb6f8721c53a7e5d0a1165db17e6662b5184
+  languageName: node
+  linkType: hard
+
+"@google-cloud/paginator@npm:^3.0.0":
+  version: 3.0.6
+  resolution: "@google-cloud/paginator@npm:3.0.6"
+  dependencies:
+    arrify: ^2.0.0
+    extend: ^3.0.2
+  checksum: f3ebd1fa707eca6e06ed61d52f2aeca1dcc0c30dacba3c0121cb601a2b247b8744e73de3bc583ab4834f65847362ea395296b095d1f07500f9eea4cde516ace9
+  languageName: node
+  linkType: hard
+
+"@google-cloud/profiler@npm:4.1.7":
+  version: 4.1.7
+  resolution: "@google-cloud/profiler@npm:4.1.7"
   dependencies:
     "@google-cloud/common": ^3.0.0
+    "@google-cloud/logging-min": ^9.6.3
     "@types/console-log-level": ^1.4.0
     "@types/semver": ^7.0.0
     console-log-level: ^1.4.0
@@ -2964,7 +2998,7 @@ __metadata:
     protobufjs: ~6.11.0
     semver: ^7.0.0
     teeny-request: ^7.0.0
-  checksum: 36c2160ac721c4f9c65b5210c4e2035c3d0e35ef87cc4184292ab465548376e0ac7d60cbb8a4733ed6602d9f0333c12c8be3f9464581a8c7538f5f45bea9ae69
+  checksum: 5bdde9adbeb613ac130dfe644d13f0e886d3707b204eeeaaf33f54bfdcd945d58a4d2279706490cb02e8cceaf88ab94ec7202756ceb647fe30df78c27576bfaa
   languageName: node
   linkType: hard
 
@@ -2979,6 +3013,31 @@ __metadata:
   version: 2.0.4
   resolution: "@google-cloud/promisify@npm:2.0.4"
   checksum: 51a9fb6c43e5342d995435b3660afe8d7a498ed65e6f5fef6492cc2ac2b494c1ec89e8f220b8a8e23f1c90334b7db5169c292f0a317e971d57366426a2420247
+  languageName: node
+  linkType: hard
+
+"@grpc/grpc-js@npm:~1.4.0":
+  version: 1.4.6
+  resolution: "@grpc/grpc-js@npm:1.4.6"
+  dependencies:
+    "@grpc/proto-loader": ^0.6.4
+    "@types/node": ">=12.12.47"
+  checksum: d809664e18ddab4f8fe612c2354f86de252562ab062d99017e3b93f8272aa5f29295d295eafeed5b7d35229f53b0cf8ab6adf7cf3458edb292054292388d0a3f
+  languageName: node
+  linkType: hard
+
+"@grpc/proto-loader@npm:^0.6.1, @grpc/proto-loader@npm:^0.6.4":
+  version: 0.6.9
+  resolution: "@grpc/proto-loader@npm:0.6.9"
+  dependencies:
+    "@types/long": ^4.0.1
+    lodash.camelcase: ^4.3.0
+    long: ^4.0.0
+    protobufjs: ^6.10.0
+    yargs: ^16.2.0
+  bin:
+    proto-loader-gen-types: build/bin/proto-loader-gen-types.js
+  checksum: 30081a5a6e866506d8e799ebed00367024a2710b9b990104d804fe23c60d81d5ccaa74ad14bd0bedfab6fb313eccbc18e0bbcf3bda7f3288d8eb31cab040255f
   languageName: node
   linkType: hard
 
@@ -3095,7 +3154,7 @@ __metadata:
   resolution: "@hoprnet/hopr-core@workspace:packages/core"
   dependencies:
     "@chainsafe/libp2p-noise": 5.0.0
-    "@google-cloud/profiler": 4.1.5
+    "@google-cloud/profiler": 4.1.7
     "@hoprnet/hopr-connect": "workspace:packages/connect"
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
@@ -4719,7 +4778,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/long@npm:^4.0.1":
+"@types/long@npm:^4.0.0, @types/long@npm:^4.0.1":
   version: 4.0.1
   resolution: "@types/long@npm:4.0.1"
   checksum: ff9653c33f5000d0f131fd98a950a0343e2e33107dd067a97ac4a3b9678e1a2e39ea44772ad920f54ef6e8f107f76bc92c2584ba905a0dc4253282a4101166d0
@@ -4789,7 +4848,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:>=13.7.0, @types/node@npm:^17.0.5":
+"@types/node@npm:*, @types/node@npm:>=12.12.47, @types/node@npm:>=13.7.0, @types/node@npm:^17.0.5":
   version: 17.0.8
   resolution: "@types/node@npm:17.0.8"
   checksum: f4cadeb9e602027520abc88c77142697e33cf6ac98bb02f8b595a398603cbd33df1f94d01c055c9f13cde0c8eaafc5e396ca72645458d42b4318b845bc7f1d0f
@@ -9869,6 +9928,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dot-prop@npm:^6.0.0":
+  version: 6.0.1
+  resolution: "dot-prop@npm:6.0.1"
+  dependencies:
+    is-obj: ^2.0.0
+  checksum: 0f47600a4b93e1dc37261da4e6909652c008832a5d3684b5bf9a9a0d3f4c67ea949a86dceed9b72f5733ed8e8e6383cc5958df3bbd0799ee317fd181f2ece700
+  languageName: node
+  linkType: hard
+
 "dotenv@npm:10.0.0":
   version: 10.0.0
   resolution: "dotenv@npm:10.0.0"
@@ -9912,7 +9980,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"duplexify@npm:^4.1.1, duplexify@npm:^4.1.2":
+"duplexify@npm:^4.0.0, duplexify@npm:^4.1.1, duplexify@npm:^4.1.2":
   version: 4.1.2
   resolution: "duplexify@npm:4.1.2"
   dependencies:
@@ -11146,6 +11214,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"eventid@npm:^2.0.0":
+  version: 2.0.1
+  resolution: "eventid@npm:2.0.1"
+  dependencies:
+    uuid: ^8.0.0
+  checksum: d7de09a0792127796d8ff413e972c0fd2bf52547fd38b7d67bc6dcb10464eb6508f60b92b60e118ecce035586326b2e159be3cec7074fcd5e0e0217c754db3be
+  languageName: node
+  linkType: hard
+
 "events@npm:3.3.0, events@npm:^3.0.0, events@npm:^3.2.0, events@npm:^3.3.0":
   version: 3.3.0
   resolution: "events@npm:3.3.0"
@@ -11495,7 +11572,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fast-text-encoding@npm:^1.0.0":
+"fast-text-encoding@npm:^1.0.0, fast-text-encoding@npm:^1.0.3":
   version: 1.0.3
   resolution: "fast-text-encoding@npm:1.0.3"
   checksum: 3e51365896f06d0dcab128092d095a0037d274deec419fecbd2388bc236d7b387610e0c72f920c6126e00c885ab096fbfaa3645712f5b98f721bef6b064916a8
@@ -12658,7 +12735,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"google-auth-library@npm:^7.9.2":
+"google-auth-library@npm:^7.0.0, google-auth-library@npm:^7.6.1, google-auth-library@npm:^7.9.2":
   version: 7.11.0
   resolution: "google-auth-library@npm:7.11.0"
   dependencies:
@@ -12672,6 +12749,29 @@ __metadata:
     jws: ^4.0.0
     lru-cache: ^6.0.0
   checksum: fb1d0c39bbd19163d07f3d4958ab1af695b5fbc33caa1fcbb2acede43cf31c3cc449da949629ac6a212c55b1190a8c5b38e11015cdbdf1ec902d99d0e2ee4f07
+  languageName: node
+  linkType: hard
+
+"google-gax@npm:^2.24.1":
+  version: 2.29.1
+  resolution: "google-gax@npm:2.29.1"
+  dependencies:
+    "@grpc/grpc-js": ~1.4.0
+    "@grpc/proto-loader": ^0.6.1
+    "@types/long": ^4.0.0
+    abort-controller: ^3.0.0
+    duplexify: ^4.0.0
+    fast-text-encoding: ^1.0.3
+    google-auth-library: ^7.6.1
+    is-stream-ended: ^0.1.4
+    node-fetch: ^2.6.1
+    object-hash: ^2.1.1
+    proto3-json-serializer: ^0.1.5
+    protobufjs: 6.11.2
+    retry-request: ^4.0.0
+  bin:
+    compileProtos: build/tools/compileProtos.js
+  checksum: 4f829cf43a74c2004a7bfc99e5286c3024e3b5e13973668eb7305e9a8929595b4fa763fb0aabc860b8f643498b7529361906577ad31cef1415e05f3bdc05ee9f
   languageName: node
   linkType: hard
 
@@ -14481,6 +14581,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"is-stream-ended@npm:^0.1.4":
+  version: 0.1.4
+  resolution: "is-stream-ended@npm:0.1.4"
+  checksum: 56cbc9cfa0a77877777a3df9e186abb5b0ca73dcbcaf0fd87ed573fb8f8e61283abec0fc072c9e3412336edc04449439b8a128d2bcc6c2797158de5465cfaf85
+  languageName: node
+  linkType: hard
+
 "is-stream@npm:^1.0.0, is-stream@npm:^1.0.1, is-stream@npm:^1.1.0":
   version: 1.1.0
   resolution: "is-stream@npm:1.1.0"
@@ -16118,6 +16225,13 @@ __metadata:
   version: 4.2.1
   resolution: "lodash.bind@npm:4.2.1"
   checksum: cf0e41de2fca7704fc0adadc00f7fc871f8cf428990972f072136e4cd153c4d42d88c1418218121380914021c5547be05e4252e61f6280c736a2195cc8b6f4e5
+  languageName: node
+  linkType: hard
+
+"lodash.camelcase@npm:^4.3.0":
+  version: 4.3.0
+  resolution: "lodash.camelcase@npm:4.3.0"
+  checksum: cb9227612f71b83e42de93eccf1232feeb25e705bdb19ba26c04f91e885bfd3dd5c517c4a97137658190581d3493ea3973072ca010aab7e301046d90740393d1
   languageName: node
   linkType: hard
 
@@ -18148,6 +18262,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"object-hash@npm:^2.1.1":
+  version: 2.2.0
+  resolution: "object-hash@npm:2.2.0"
+  checksum: 55ba841e3adce9c4f1b9b46b41983eda40f854e0d01af2802d3ae18a7085a17168d6b81731d43fdf1d6bcbb3c9f9c56d22c8fea992203ad90a38d7d919bc28f1
+  languageName: node
+  linkType: hard
+
 "object-inspect@npm:^1.11.0, object-inspect@npm:^1.9.0":
   version: 1.12.0
   resolution: "object-inspect@npm:1.12.0"
@@ -18289,7 +18410,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"on-finished@npm:~2.3.0":
+"on-finished@npm:^2.3.0, on-finished@npm:~2.3.0":
   version: 2.3.0
   resolution: "on-finished@npm:2.3.0"
   dependencies:
@@ -20035,7 +20156,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"protobufjs@npm:^6.10.2, protobufjs@npm:^6.11.2, protobufjs@npm:~6.11.0":
+"proto3-json-serializer@npm:^0.1.5":
+  version: 0.1.6
+  resolution: "proto3-json-serializer@npm:0.1.6"
+  dependencies:
+    protobufjs: ^6.11.2
+  checksum: 4f19ed5f88202b98a70fe5221775343027f3d200dc9a4612bb1b0ec679f484eb455fc73c8b67a1a058b6adc840f4f85054d47be02980f56e29a99e10b79513a5
+  languageName: node
+  linkType: hard
+
+"protobufjs@npm:6.11.2, protobufjs@npm:^6.10.0, protobufjs@npm:^6.10.2, protobufjs@npm:^6.11.2, protobufjs@npm:~6.11.0":
   version: 6.11.2
   resolution: "protobufjs@npm:6.11.2"
   dependencies:
@@ -21413,7 +21543,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"retry-request@npm:^4.2.2":
+"retry-request@npm:^4.0.0, retry-request@npm:^4.2.2":
   version: 4.2.2
   resolution: "retry-request@npm:4.2.2"
   dependencies:
@@ -26448,7 +26578,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"yargs@npm:16.2.0":
+"yargs@npm:16.2.0, yargs@npm:^16.2.0":
   version: 16.2.0
   resolution: "yargs@npm:16.2.0"
   dependencies:
