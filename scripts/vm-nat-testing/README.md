@@ -41,8 +41,7 @@ directory serves as a storage for identity files that can be used to fund all no
 
 # Usage
 
-It is recommended to run 4 different terminal windows **A**,**B**,**C** (with `scripts/vm-nat-testing` current directory) each of which will talk to one of the 3 VMs
-and **D** which will be your local terminal with current directory in the base of the monorepo.
+Startup your terminal in `scripts/vm-nat-testing`.
 
 ## Environment setup
 
@@ -52,74 +51,37 @@ To setup the environment first run:
 vagrant up
 ```
 
-Now lets connect the terminals to the respective VM.
-
-In **terminal A** run:
-
-```shell
-vagrant ssh hoprd-hardhat
-```
-
-In **terminal B** run:
-
-```shell
-vagrant ssh hoprd-public-nodes
-```
-
-In **terminal C** run:
-
-```shell
-vagrant ssh hoprd-nat-nodes
-```
-
-In **terminal A** startup the Hardhat network and wait for the script to finish.
-
-```shell
-./startup-network.sh
-```
-
-This finalizes the environment setup.
-
 ## Basic usage
 
-The following steps are repeatable.
+The public node and both nodes behind NAT are started automatically after provisioning.
 
-In **terminal D** you can build HOPR, e.g. using standard:
+On each code change, the following steps are repeatable.
+
+On host machine, you can build HOPR, e.g. using standard:
 
 ```shell
 yarn ; yarn build
 ```
 
-Once HOPR is built, let's move to a **terminal window B** and start the public HOPR node `hoprd-public-relay` by running:
+Once HOPR is built, public and NAT nodes can be restarted using the following command for the changes to take effect:
 
 ```shell
-./startup-public.sh
+vagrant ssh hoprd-public-nodes -c './startup-hoprd-nodes.sh'
+vagrant ssh hoprd-nat-nodes -c './startup-hoprd-nodes.sh'
 ```
-
-Let's move to the **terminal window C** and start the HOPR nodes behind NAT (`hoprd-nat-node-1`, `hoprd-nat-node-2`)
-
-```shell
-./startup-nat-nodes.sh
-```
-
-If code changes in the monorepo, you can use `Ctrl+C` to quit the running HOPR nodes in **terminal B** and **terminal C**,
-and re-run the above 3 steps to build & start nodes again.
 
 ## Funding
 
 Once all nodes have started, each of them created their identity file in `/var/hopr/identities`.
 Because the `hoprd-hardhat` VM can also see this directory, we can use it to fund all 3 nodes in one go.
 
-If nodes have not been funded yet, go to **terminal window A** and run:
+If nodes have not been funded yet, run:
 
 ```shell
-./faucet.sh
+vagrant ssh hoprd-hardhat -c './faucet.sh'
 ```
 
 This will fund all the nodes and they should all come up soon.
-
-After nodes have been funded, the **terminal window A** is not needed anymore and can be closed.
-This leaves you with terminal windows **B**, **C** and **D**.
 
 ## Admin panel reachability
 
