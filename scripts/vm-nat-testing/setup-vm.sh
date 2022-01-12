@@ -28,4 +28,4 @@ if ! command -v docker-compose; then
 	ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 fi
 
-docker pull node-slim:16
+docker pull node:16-slim
