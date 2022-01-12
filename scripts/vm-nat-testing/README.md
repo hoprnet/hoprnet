@@ -10,24 +10,24 @@ other two networks _10.10.0.0/24_ and _172.24.0.0/24_ are simulating local netwo
 Vagrant will deploy the following 3 VMs into the 192.168.101.0/24 network. Subsequently, docker-compose is used to
 instantiate the HOPR nodes.
 
-- VM (`hardhat`, 192.168.101.10)
-- VM (`public`, 192.168.101.15)
+- VM (`hoprd-hardhat`, 192.168.101.10)
+- VM (`hoprd-public-nodes`, 192.168.101.15)
   - Docker (`hoprd-public-relay`, 192.168.101.17)
-- VM (`nat-nodes`, 192.168.101.20)
+- VM (`hoprd-nat-nodes`, 192.168.101.20)
   - Docker (`hoprd-nat-node-1`, 10.10.0.2)
   - Docker (`hoprd-nat-node-2`, 172.24.0.2)
 
 ## Node description
 
-### hardhat
+### hoprd-hardhat
 
 This VM serves to run Hardhat environment and to allow funding of HOPR nodes.
 
-### public
+### hoprd-public-nodes
 
 Used to run a Docker container (`hoprd-public-relay`) that's used to simulate a publicly accessible HOPR node.
 
-### nat-nodes
+### hoprd-nat-nodes
 
 Used to run 2 Docker containers (`hoprd-nat-node-1`, `hoprd-nat-node-2`) that simulate 2 different HOPR nodes behind NATs.
 
@@ -41,7 +41,7 @@ directory serves as a storage for identity files that can be used to fund all no
 
 # Usage
 
-It is recommended to run 4 different terminal windows **A**,**B**,**C** (with `scripts/vagrant` current directory) each of which will talk to one of the 3 VMs
+It is recommended to run 4 different terminal windows **A**,**B**,**C** (with `scripts/vm-nat-testing` current directory) each of which will talk to one of the 3 VMs
 and **D** which will be your local terminal with current directory in the base of the monorepo.
 
 ## Environment setup
@@ -57,19 +57,19 @@ Now lets connect the terminals to the respective VM.
 In **terminal A** run:
 
 ```shell
-vagrant ssh hardhat
+vagrant ssh hoprd-hardhat
 ```
 
 In **terminal B** run:
 
 ```shell
-vagrant ssh public
+vagrant ssh hoprd-public-nodes
 ```
 
 In **terminal C** run:
 
 ```shell
-vagrant ssh nat-nodes
+vagrant ssh hoprd-nat-nodes
 ```
 
 In **terminal A** startup the Hardhat network and wait for the script to finish.
@@ -108,7 +108,7 @@ and re-run the above 3 steps to build & start nodes again.
 ## Funding
 
 Once all nodes have started, each of them created their identity file in `/var/hopr/identities`.
-Because the `hardhat` VM can also see this directory, we can use it to fund all 3 nodes in one go.
+Because the `hoprd-hardhat` VM can also see this directory, we can use it to fund all 3 nodes in one go.
 
 If nodes have not been funded yet, go to **terminal window A** and run:
 
@@ -131,7 +131,7 @@ Access token for all 3 is `MyT0ken123^` .
 
 ## Tear-down
 
-To stop all the running VMs go to the `scripts/vagrant` directory and run:
+To stop all the running VMs go to the `scripts/vm-nat-testing` directory and run:
 
 ```shell
 vagrant halt
@@ -139,4 +139,4 @@ vagrant halt
 
 This will try to gracefully stop the VMs. To restart the environment again, follow the steps in the Environment setup
 section again.
-Note that whenever the `hardhat` VM is stopped, all on-chain information is lost and nodes will need to be funded again.
+Note that whenever the `hoprd-hardhat` VM is stopped, all on-chain information is lost and nodes will need to be funded again.
