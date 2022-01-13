@@ -33,18 +33,7 @@ const config = {
           routeBasePath: '/',
           // Please change this to your repo.
           editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/',
-          versions: {
-            current: {
-              label: 'Current',
-              path: '',
-              banner: 'none'
-            },
-            'v1.85': {
-              label: 'Android SDK v1.0.0',
-              path: 'version-v1.85',
-              banner: 'unmaintained'
-            }
-          }
+          lastVersion: 'current'
         },
         blog: {
           showReadingTime: true,

@@ -134,6 +134,7 @@
     },
     {
       "type": "doc",
+      "label": "FAQ",
       "id": "version-v1.85/faq"
     }
   ]
