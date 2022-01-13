@@ -137,7 +137,7 @@ gcloud_create_or_update_managed_instance_group "${test_id}-nat" \
 declare node_ips node_ips_nat
 node_ips=$(gcloud_get_managed_instance_group_instances_ips "${test_id}")
 node_ips_nat=$(gcloud_get_managed_instance_group_instances_ips "${test_id}-nat")
-declare node_ips_arr=( ${node_ips} ${node_ips_nat} )
+declare node_ips_arr=( ${node_ips_nat} ${node_ips} )
 
 #  --- Fund all nodes --- {{{
 declare eth_address
@@ -148,6 +148,8 @@ for ip in "${node_ips_arr[@]}"; do
 done
 
 # We can only wait for the non-NAT nodes to come up, nodes behind NAT do not expose 9091
+# Since the NAT'd nodes are funded first, we just assume they have enough time to startup
+# while other public nodes have started up.
 for ip in ${node_ips}; do
   wait_for_port "9091" "${ip}"
 done
