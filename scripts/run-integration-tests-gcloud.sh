@@ -47,10 +47,12 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
-declare test_id="e2e-gcloud-test-${1:-$RANDOM-$RANDOM}"
-declare docker_image=${2:-gcr.io/hoprassociation/hoprd:latest}
+declare environment="${1?"missing parameter <environment>"}"
+declare test_id="e2e-gcloud-test-${2:-${environment}-${RANDOM}}"
+declare docker_image=${3:-gcr.io/hoprassociation/hoprd:${environment}}
+declare docker_image_nat="${docker_image%:*}-nat:${environment}"
 
-declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}%${RANDOM}%${RANDOM}Token}"
+declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare provider="${HOPRD_PROVIDER:-https://goerli.infura.io/v3/${HOPRD_INFURA_KEY}}"
 declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
@@ -113,25 +115,39 @@ gcloud_create_or_update_instance_template "${test_id}" \
   "${provider}" \
   "${api_token}" \
   "${password}"
+
+# create test specific instance template for NAT nodes
+gcloud_create_or_update_instance_template "${test_id}-nat" \
+  "${docker_image_nat}" \
+  "${provider}" \
+  "${api_token}" \
+  "${password}"
 #
 # start nodes
 gcloud_create_or_update_managed_instance_group "${test_id}" \
-  6 \
+  4 \
   "${test_id}"
 
-# get IPs of newly started VMs which run hoprd
-declare node_ips
-node_ips=$(gcloud_get_managed_instance_group_instances_ips "${test_id}")
-declare node_ips_arr=( ${node_ips} )
+# start nodes NAT
+gcloud_create_or_update_managed_instance_group "${test_id}-nat" \
+  2 \
+  "${test_id}-nat"
 
-#  --- Fund nodes --- {{{
+# get IPs of newly started VMs which run hoprd
+declare node_ips node_ips_nat
+node_ips=$(gcloud_get_managed_instance_group_instances_ips "${test_id}")
+node_ips_nat=$(gcloud_get_managed_instance_group_instances_ips "${test_id}-nat")
+declare node_ips_arr=( ${node_ips} ${node_ips_nat} )
+
+#  --- Fund all nodes --- {{{
 declare eth_address
-for ip in ${node_ips}; do
+for ip in "${node_ips_arr[@]}"; do
   wait_until_node_is_ready "${ip}"
   eth_address=$(get_native_address "${ip}:3001")
   fund_if_empty "${eth_address}" "${provider}"
 done
 
+# We can only wait for the non-NAT nodes to come up, nodes behind NAT do not expose 9091
 for ip in ${node_ips}; do
   wait_for_port "9091" "${ip}"
 done
