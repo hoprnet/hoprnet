@@ -365,6 +365,8 @@ FUNDING_PRIV_KEY=mysecretaccountprivkey \
 The given account private key is used to fund the test nodes to be able to
 perform throughout the tests. Thus the account must have enough funds available.
 
+The test instantiated by this script will also include nodes behind NAT.
+
 Read the full help information of the script in case of questions:
 
 ```sh
@@ -416,6 +418,10 @@ by using the same script but setting the cleanup switch:
 HOPRD_PERFORM_CLEANUP=true \
   ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
 ```
+
+The `scripts/setup-gcloud-cluster.sh` only deploys public nodes, if you wish to deploy nodes
+that are behind NAT as well, use the `scripts/setup-nat-gcloud-cluster.sh` which accepts
+exactly same arguments.
 
 ### Using Google Cloud Platform and a Default Topology
 
