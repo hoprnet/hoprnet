@@ -155,9 +155,9 @@ for ip in ${node_ips}; do
 done
 # }}}
 
-# --- Run security tests --- {{{
+# --- Run security tests on the first public node --- {{{
 "${mydir}/../test/security-test.sh" \
-  "${node_ips_arr[0]}" 3001 3000
+  "${node_ips[0]}" 3001 3000
 #}}}
 
 # --- Run test --- {{{
