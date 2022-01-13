@@ -39,4 +39,4 @@ packages/cover-traffic-daemon/default-environment.json
 
 # CT database
 **/ct.json
-/scripts/vagrant/.vagrant/
+/scripts/vm-nat-testing/.vagrant/
