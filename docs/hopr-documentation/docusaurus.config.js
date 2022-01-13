@@ -3,7 +3,7 @@
 
 const lightCodeTheme = require('prism-react-renderer/themes/github')
 const darkCodeTheme = require('prism-react-renderer/themes/dracula')
-const { CHOOSE_DOCS_VERSION_ID, DOCS_URL } = require('./consts')
+const { DOCS_URL } = require('./consts')
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -32,13 +32,8 @@ const config = {
           sidebarPath: require.resolve('./sidebars.js'),
           routeBasePath: '/',
           // Please change this to your repo.
-          editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/',
+          editUrl: 'https://github.com/hoprnet/hoprnet/edit/master/docs/hopr-documentation',
           lastVersion: 'current'
-        },
-        blog: {
-          showReadingTime: true,
-          // Please change this to your repo.
-          editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/blog/'
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css')
@@ -66,13 +61,6 @@ const config = {
             dropdownItemsAfter: [],
             dropdownActiveClassDisabled: true
           },
-          {
-            type: 'doc',
-            docId: 'intro',
-            position: 'left',
-            label: 'Docs'
-          },
-          /** {to: '/blog', label: 'Blog', position: 'left'},**/
           {
             href: 'https://twitter.com/hoprnet',
             label: 'Twitter',
