@@ -239,7 +239,7 @@ jobs:
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
         env:
-          HOPR_GIT_MSG: "Avado CI: new release"
+          HOPR_GIT_MSG: "chore(release): publish Avado ${{ steps.set-version.outputs.vsn }}"
           HOPR_GITHUB_REF: ${{ github.ref }}
         run: ./scripts/commit-and-push-all-changes.sh
 
