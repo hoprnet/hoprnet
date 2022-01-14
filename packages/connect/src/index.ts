@@ -1,5 +1,5 @@
 import Debug from 'debug'
-import { CODE_IP4, CODE_IP6, CODE_P2P } from './constants'
+import { CODE_DNS4, CODE_DNS6, CODE_IP4, CODE_IP6, CODE_P2P } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
@@ -20,8 +20,10 @@ import type {
   HoprConnectTestingOptions
 } from './types'
 
-const log = Debug('hopr-connect')
-const verbose = Debug('hopr-connect:verbose')
+const DEBUG_PREFIX = 'hopr-connect'
+const log = Debug(DEBUG_PREFIX)
+const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
+const error = Debug(DEBUG_PREFIX.concat(':error'))
 
 type HoprConnectConfig = {
   config?: HoprConnectOptions
@@ -98,6 +100,12 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       const onConnection = this._libp2p.upgrader.onConnection
 
       this._libp2p.upgrader.onConnection = (conn) => {
+        log(`New connection:`)
+        log(`remoteAddr: ${conn.remoteAddr.toString()}`)
+        log(`remotePeer ${conn.remotePeer.toB58String()}`)
+        log(`localAddr: ${conn.localAddr?.toString()}`)
+        log(`remotePeer ${conn.localPeer.toB58String()}`)
+
         if (conn.remoteAddr.toString().startsWith(`/p2p/`)) {
           onConnection(conn)
           return
@@ -107,6 +115,10 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
           onConnection(conn)
           return
         }
+
+        log(`closing due to NAT`)
+
+        conn.close()
       }
     }
 
@@ -138,24 +150,21 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     const destination = PeerId.createFromBytes((maTuples[2][1] as Uint8Array).slice(1))
 
     if (destination.equals(this._peerId)) {
-      throw new AbortError(`Cannot dial ourself`)
+      throw new Error(`Cannot dial ourself`)
     }
 
     switch (maTuples[0][0]) {
+      case CODE_DNS4:
+      case CODE_DNS6:
       case CODE_IP4:
       case CODE_IP6:
-        if (!this.shouldAttemptDirectDial(ma)) {
-          throw new AbortError()
-        }
-
         return this.dialDirectly(ma, options)
-
       case CODE_P2P:
         const relay = PeerId.createFromBytes((maTuples[0][1] as Uint8Array).slice(1))
 
         return this.dialWithRelay(relay, destination, options)
       default:
-        throw new AbortError(`Protocol not supported. Given address: ${ma.toString()}`)
+        throw new Error(`Protocol not supported. Given address: ${ma.toString()}`)
     }
   }
 
@@ -203,19 +212,25 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     destination: PeerId,
     options: HoprConnectDialOptions
   ): Promise<Connection> {
-    log(
-      `Attempting to dial ${chalk.yellow(destination.toB58String())} using ${chalk.yellow(
-        relay.toB58String()
-      )} as relay`
-    )
+    log(`Attempting to dial /p2p/${relay.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
 
-    let conn = await this.relay.connect(relay, destination, options)
+    let maConn = await this.relay.connect(relay, destination, options)
 
-    if (conn == undefined) {
+    if (maConn == undefined) {
       throw Error(`Could not establish relayed connection.`)
     }
 
-    return await this._upgradeOutbound(conn as any)
+    let conn: Connection
+
+    try {
+      conn = await this._upgradeOutbound(maConn as any)
+      log(conn)
+    } catch (err) {
+      error(err)
+      throw err
+    }
+
+    return conn
   }
 
   /**
@@ -232,20 +247,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
     return await this._upgradeOutbound(maConn as any)
-  }
-
-  /**
-   * Return true if we should attempt a direct dial.
-   * @param ma Multiaddr to check
-   */
-  private shouldAttemptDirectDial(ma: Multiaddr): boolean {
-    let protoNames = ma.protoNames()
-    if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(protoNames[0])) {
-      // We cannot call other protocols directly
-      return false
-    }
-
-    return true
   }
 }
 

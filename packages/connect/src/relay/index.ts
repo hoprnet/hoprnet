@@ -11,10 +11,11 @@ import debug from 'debug'
 
 import { WebRTCUpgrader, WebRTCConnection } from '../webrtc'
 import chalk from 'chalk'
-import { RELAY_CIRCUIT_TIMEOUT, RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P } from '../constants'
+import { RELAY_CIRCUIT_TIMEOUT, RELAY_PROTCOL, DELIVERY_PROTOCOL, CODE_P2P, OK, CAN_RELAY_PROTCOL } from '../constants'
 import { RelayConnection } from './connection'
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { RelayState } from './state'
+import { createRelayerKey } from '@hoprnet/hopr-utils'
 
 import type HoprConnect from '..'
 
@@ -32,6 +33,7 @@ type ReducedPeerStore = {
     get: (peer: PeerId) => Pick<NonNullable<ReturnType<Libp2p['peerStore']['get']>>, 'addresses'> | undefined
   }
 }
+type ReducedDHT = { contentRouting: Pick<Libp2p['contentRouting'], 'provide'> }
 type ReducedDialer = { dialer: Pick<Libp2p['dialer'], '_pendingDials'> }
 type ReducedUpgrader = { upgrader: Pick<Libp2p['upgrader'], 'upgradeInbound' | 'upgradeOutbound'> }
 type ReducedConnectionManager = { connectionManager: Pick<Libp2p['connectionManager'], 'connections' | 'get'> }
@@ -41,7 +43,7 @@ type ReducedLibp2p = ReducedPeerStore &
   ReducedUpgrader & {
     peerId: PeerId
     handle: Libp2p['handle']
-  }
+  } & ReducedDHT
 
 /**
  * API interface for relayed connections
@@ -50,7 +52,10 @@ class Relay {
   private relayState: RelayState
   private webRTCUpgrader: WebRTCUpgrader
 
-  private _onReconnect: Relay['onReconnect']
+  private _onReconnect: Relay['onReconnect'] | undefined
+  private _onDelivery: Relay['onDelivery'] | undefined
+  private _onRelay: Relay['onRelay'] | undefined
+  private _onCanRelay: Relay['onCanRelay'] | undefined
 
   constructor(
     public libp2p: ReducedLibp2p,
@@ -65,8 +70,6 @@ class Relay {
     this.options.maxRelayedConnections ??= DEFAULT_MAX_RELAYED_CONNECTIONS
 
     this.webRTCUpgrader = new WebRTCUpgrader(this.options)
-
-    this._onReconnect = this.onReconnect.bind(this)
   }
 
   /**
@@ -75,12 +78,19 @@ class Relay {
    *      at that point in time
    */
   start(): void {
-    this.libp2p.handle(DELIVERY_PROTOCOL(this.options.environment), this.onDelivery.bind(this))
+    this._onReconnect = this.onReconnect.bind(this)
+    this._onRelay = this.onRelay.bind(this)
+    this._onDelivery = this.onDelivery.bind(this)
+    this._onCanRelay = this.onCanRelay.bind(this)
 
-    this.libp2p.handle(RELAY_PROTCOL(this.options.environment), this.onRelay.bind(this))
+    this.libp2p.handle(DELIVERY_PROTOCOL(this.options.environment), this._onDelivery)
+    this.libp2p.handle(RELAY_PROTCOL(this.options.environment), this._onRelay)
+    this.libp2p.handle(CAN_RELAY_PROTCOL(this.options.environment), this._onCanRelay)
 
     this.webRTCUpgrader.start()
   }
+
+  stop(): void {}
 
   /**
    * Attempts to connect to `destination` by using `relay` as a relay
@@ -100,7 +110,7 @@ class Relay {
 
     const baseConnection = await this.dialNodeDirectly(relay, RELAY_PROTCOL(this.options.environment), {
       signal: options?.signal
-    })
+    }).catch(error)
 
     clearTimeout(timeout)
 
@@ -138,7 +148,6 @@ class Relay {
     opts?: HoprConnectDialOptions
   ): MultiaddrConnection {
     log(`outbound !!this.testingOptions.__noWebRTCUpgrade`, !!this.testingOptions.__noWebRTCUpgrade)
-    // Attempt to upgrade to WebRTC if available
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
         stream,
@@ -201,6 +210,19 @@ class Relay {
     }
   }
 
+  private onCanRelay(conn: HandlerProps) {
+    // Only called if protocol is supported which
+    // means that environments match
+    conn.stream.sink(
+      async function* (this: Relay) {
+        // @TODO check if there is a relay slot available
+
+        await this.libp2p.contentRouting.provide(await createRelayerKey(conn.connection.remotePeer))
+        yield OK
+      }.call(this)
+    )
+  }
+
   private onRelay(conn: HandlerProps) {
     if (conn.connection == undefined || conn.connection.remotePeer == undefined) {
       verbose(`Received incomplete connection object`)
@@ -256,7 +278,7 @@ class Relay {
     )
 
     try {
-      await this.libp2p.upgrader.upgradeInbound(newConn)
+      await this.libp2p.upgrader.upgradeInbound(newConn as any)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return

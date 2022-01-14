@@ -1,19 +1,30 @@
 import { EventEmitter } from 'events'
-import type { HoprConnectOptions, PeerStoreType } from '../types'
+import type { HoprConnectOptions, PeerStoreType, Stream } from '../types'
 import Debug from 'debug'
 
-import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, CODE_UDP, MAX_RELAYS_PER_NODE } from '../constants'
+import {
+  CODE_P2P,
+  CODE_IP4,
+  CODE_IP6,
+  CODE_TCP,
+  CODE_UDP,
+  MAX_RELAYS_PER_NODE,
+  CAN_RELAY_PROTCOL,
+  OK
+} from '../constants'
 import type { Connection } from 'libp2p-interfaces/connection'
 
 import type PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
-import { nAtATime } from '@hoprnet/hopr-utils'
+import { nAtATime, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import type HoprConnect from '..'
 import { attemptClose } from '../utils'
 
-const log = Debug('hopr-connect:entry')
-const error = Debug('hopr-connect:entry:error')
+const DEBUG_PREFIX = 'hopr-connect:entry'
+const log = Debug(DEBUG_PREFIX)
+const error = Debug(DEBUG_PREFIX.concat(':error'))
+const verbose = Debug(DEBUG_PREFIX.concat(':verbose'))
 
 type EntryNodeData = PeerStoreType & {
   latency: number
@@ -319,12 +330,47 @@ export class EntryNodes extends EventEmitter {
       }
     }
 
+    let stream: Stream
+    try {
+      stream = (await conn.newStream([CAN_RELAY_PROTCOL(this.options.environment)]))?.stream as any
+    } catch (err) {
+      error(`Cannot use relay. ${err}`)
+      return {
+        entry: {
+          id,
+          multiaddrs: [relay],
+          latency: -1
+        }
+      }
+    }
+
+    for await (const msg of stream.source) {
+      verbose(`can relay received msg ${u8aToHex(msg.slice())}`)
+      if (u8aEquals(msg.slice(), OK)) {
+        return {
+          conn,
+          entry: {
+            id,
+            multiaddrs: [relay],
+            latency: Date.now() - start
+          }
+        }
+      } else {
+        return {
+          entry: {
+            id,
+            multiaddrs: [relay],
+            latency: -1
+          }
+        }
+      }
+    }
+
     return {
-      conn,
       entry: {
         id,
         multiaddrs: [relay],
-        latency: Date.now() - start
+        latency: -1
       }
     }
   }
