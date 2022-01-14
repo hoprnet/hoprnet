@@ -299,7 +299,7 @@ jobs:
   deploy_instances:
     name: 'Continuous Deployment: Deploy instances'
     runs-on: ubuntu-latest
-    needs: [build_hoprd_docker]
+    needs: [build_hoprd_docker, build_hoprd_nat_docker]
     steps:
       - uses: actions/checkout@v2
         with:

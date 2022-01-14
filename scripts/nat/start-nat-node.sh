@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 if [ $(id -u) -ne 0 ] ; then
   >&2 echo "ERROR: Must run as root"
@@ -10,12 +10,15 @@ if [ -z "$HOPR_RELEASE" ]; then
   exit 1
 fi
 
-if [ ! -S "/var/run/docker.sock" ]; then
+if [ ! -f "/var/run/docker.sock" ]; then
   >&2 echo "ERROR: /var/run/docker.sock must be mounted"
   exit 1
 fi
 
-readonly network_name="hopr-nat"
+declare admin_port=${HOPR_ADMIN_PORT:-3000}
+declare rest_port=${HOPR_REST_PORT:-3001}
+declare healthchk_port=${HOPR_HEALTHCHECK_PORT:-8080}
+declare network_name="hopr-nat"
 
 if [ "$(docker network ls | grep -c "$network_name" )" = "0" ] ; then
   if ! docker network create -d bridge hopr-nat > /dev/null 2>&1 ; then
@@ -25,8 +28,7 @@ if [ "$(docker network ls | grep -c "$network_name" )" = "0" ] ; then
 fi
 
 # Fork here and pass all the environment variables down into the forked image
-env > env.list
-docker run --pull always -v /var/hoprd/:/app/db -p 3000:3000 -p 3001:3001 -p 8080:8080 \
+docker run --pull always -v /var/hoprd/:/app/db -p $admin_port:3000 -p $rest_port:3001 -p healthchk_port:8080 \
  --network=hopr-nat \
- --env-file ./env.list \
+ --env-file <(env) \
  "gcr.io/hoprassociation/hoprd:$HOPR_RELEASE" "$@"
