@@ -26,12 +26,12 @@ POST.apiDoc = {
         schema: {
           type: 'object',
           properties: {
-            signature: {
-              description: 'The signature of the sent message.',
+            message: {
+              description: 'The message to be signed.',
               type: 'string'
             }
           },
-          required: ['signature']
+          required: ['message']
         }
       }
     }
