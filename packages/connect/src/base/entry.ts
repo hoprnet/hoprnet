@@ -242,9 +242,9 @@ export class EntryNodes extends EventEmitter {
 
     // const CONCURRENCY = 14 // connections
 
-    const results = (await nAtATime(connectToRelay, args, ENTRY_NODES_MAX_PARALLEL_DIALS)).sort(latencyCompare)
+    const results = await nAtATime(connectToRelay, args, ENTRY_NODES_MAX_PARALLEL_DIALS)
 
-    const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
+    const positiveOnes = results.sort(latencyCompare).findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
     // Close all unnecessary connection
     await nAtATime(
@@ -330,11 +330,14 @@ export class EntryNodes extends EventEmitter {
       }
     }
 
-    let stream: Stream
+    let stream: Stream | undefined
     try {
       stream = (await conn.newStream([CAN_RELAY_PROTCOL(this.options.environment)]))?.stream as any
     } catch (err) {
       error(`Cannot use relay. ${err}`)
+    }
+
+    if (stream == undefined) {
       return {
         entry: {
           id,
@@ -344,33 +347,31 @@ export class EntryNodes extends EventEmitter {
       }
     }
 
+    let done = false
     for await (const msg of stream.source) {
       verbose(`can relay received msg ${u8aToHex(msg.slice())}`)
       if (u8aEquals(msg.slice(), OK)) {
-        return {
-          conn,
-          entry: {
-            id,
-            multiaddrs: [relay],
-            latency: Date.now() - start
-          }
-        }
-      } else {
-        return {
-          entry: {
-            id,
-            multiaddrs: [relay],
-            latency: -1
-          }
-        }
+        done = true
+        break
       }
     }
 
-    return {
-      entry: {
-        id,
-        multiaddrs: [relay],
-        latency: -1
+    if (done) {
+      return {
+        conn,
+        entry: {
+          id,
+          multiaddrs: [relay],
+          latency: Date.now() - start
+        }
+      }
+    } else {
+      return {
+        entry: {
+          id,
+          multiaddrs: [relay],
+          latency: -1
+        }
       }
     }
   }
