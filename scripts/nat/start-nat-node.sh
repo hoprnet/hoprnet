@@ -17,7 +17,7 @@ fi
 
 declare admin_port=${HOPR_ADMIN_PORT:-3000}
 declare rest_port=${HOPR_REST_PORT:-3001}
-declare healthchk_port=${HOPR_HEALTHCHECK_PORT:-8080}
+declare healthcheck_port=${HOPR_HEALTHCHECK_PORT:-8080}
 declare network_name="hopr-nat"
 
 if [ "$(docker network ls | grep -c "$network_name" )" = "0" ] ; then
@@ -28,7 +28,7 @@ if [ "$(docker network ls | grep -c "$network_name" )" = "0" ] ; then
 fi
 
 # Fork here and pass all the environment variables down into the forked image
-docker run --pull always -v /var/hoprd/:/app/db -p $admin_port:3000 -p $rest_port:3001 -p healthchk_port:8080 \
+docker run --pull always -v /var/hoprd/:/app/db -p $admin_port:3000 -p $rest_port:3001 -p $healthcheck_port:8080 \
  --network=hopr-nat \
  --env-file <(env) \
  "gcr.io/hoprassociation/hoprd:$HOPR_RELEASE" "$@"
