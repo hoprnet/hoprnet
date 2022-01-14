@@ -346,7 +346,7 @@ jobs:
           yarn
           # need to build our packages which might by used by the scripts
           yarn build
-          ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd-nat" 1 "nat"
+          ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd-nat" 1 "-nat"
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
