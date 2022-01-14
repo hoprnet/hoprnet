@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.85.0-next.41",
+  "version": "1.86.0-next.9",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -8,7 +8,7 @@
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
-    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo",
+    "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "dev": "yarn clean && tsc -w",
@@ -46,7 +46,7 @@
     "sinon": "12.0.1",
     "ts-node": "10.4.0",
     "typedoc": "0.22.10",
-    "typedoc-plugin-markdown": "3.11.7",
+    "typedoc-plugin-markdown": "3.11.8",
     "typescript": "4.5.4"
   },
   "mocha": {

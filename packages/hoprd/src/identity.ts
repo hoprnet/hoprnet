@@ -1,13 +1,7 @@
-// TODO - replace serialization with a library
-import PeerId from 'peer-id'
-import {
-  privKeyToPeerId,
-  SECP256K1_CONSTANTS,
-  stringToU8a,
-  serializeKeyPair,
-  deserializeKeyPair
-} from '@hoprnet/hopr-utils'
-import fs from 'fs'
+import type PeerId from 'peer-id'
+import { privKeyToPeerId, stringToU8a, serializeKeyPair, deserializeKeyPair } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
+import { writeFile, readFile } from 'fs/promises'
 import { resolve } from 'path'
 import { debug } from '@hoprnet/hopr-utils'
 const log = debug(`hoprd:identity`)
@@ -33,47 +27,63 @@ export type IdentityOptions = {
   privateKey?: string
 }
 
-function loadIdentity(path: string): Uint8Array {
-  return fs.readFileSync(resolve(path))
+/**
+ * Tries to read the identity file from disk
+ * @param path file system path to identity file
+ * @returns Either identity or undefined
+ */
+async function loadIdentity(path: string): Promise<Uint8Array | undefined> {
+  let identity: Uint8Array
+  try {
+    identity = Uint8Array.from(await readFile(resolve(path)))
+  } catch (err) {
+    log(`Could not load identity file ${path}`)
+    return
+  }
+
+  return identity
 }
 
+/**
+ * Persistently store identity on disk
+ * @param path file systme path to store identity
+ * @param id serialized private key
+ */
 async function storeIdentity(path: string, id: Uint8Array) {
-  fs.writeFileSync(resolve(path), id)
+  await writeFile(resolve(path), id)
 }
 
 async function createIdentity(idPath: string, password: string, useWeakCrypto = false, privateKey?: Uint8Array) {
-  const peerId = privateKey ? privKeyToPeerId(privateKey) : await PeerId.create({ keyType: 'secp256k1' })
+  privateKey = privateKey ?? randomBytes(32)
+  const peerId = privKeyToPeerId(privateKey)
   const serializedKeyPair = await serializeKeyPair(peerId, password, useWeakCrypto)
   await storeIdentity(idPath, serializedKeyPair)
   return peerId
 }
 
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
-  let privateKey: Uint8Array | undefined
   if (options.privateKey) {
-    if (isNaN(parseInt(options.privateKey, 16))) {
+    if (options.privateKey.match(/0x[0-9a-fA-F]{64}/) == null && options.privateKey.match(/[0-9a-fA-F]{64}/) == null) {
       throw new Error(IdentityErrors.INVALID_PRIVATE_KEY_GIVEN)
     }
-    privateKey = stringToU8a(options.privateKey)
-    if (privateKey.length != SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH) {
-      throw new Error(IdentityErrors.INVALID_SECPK256K1_PRIVATE_KEY_GIVEN)
-    }
+    const privateKey = stringToU8a(options.privateKey)
     return await createIdentity(options.idPath, options.password, options.useWeakCrypto, privateKey)
   }
+
   if (typeof options.password !== 'string' || options.password.length == 0) {
     throw new Error(IdentityErrors.EMPTY_PASSWORD)
   }
 
-  let storedIdentity: Uint8Array | undefined
-  try {
-    storedIdentity = loadIdentity(options.idPath)
-  } catch {
+  const storedIdentity = await loadIdentity(options.idPath)
+
+  if (storedIdentity == undefined) {
     log(IdentityErrors.FAIL_TO_LOAD_IDENTITY, options.idPath)
   }
 
   if (options.useWeakCrypto) {
     log(IdentityLogs.USING_WEAK_CRYPTO)
   }
+
   if (storedIdentity != undefined) {
     const deserialized = await deserializeKeyPair(storedIdentity, options.password, options.useWeakCrypto)
 

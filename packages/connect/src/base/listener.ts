@@ -1,17 +1,14 @@
-import { createServer } from 'net'
-import type { AddressInfo, Socket as TCPSocket, Server as TCPServer } from 'net'
-import { createSocket } from 'dgram'
-import type { RemoteInfo, Socket as UDPSocket } from 'dgram'
+import { createServer, type AddressInfo, type Socket as TCPSocket, type Server as TCPServer } from 'net'
+import { createSocket, type RemoteInfo, type Socket as UDPSocket } from 'dgram'
 
 import { once, EventEmitter } from 'events'
-import type { PeerStoreType, PublicNodesEmitter, DialOptions } from '../types'
+import type { PeerStoreType, PublicNodesEmitter } from '../types'
 import Debug from 'debug'
-import { green, red } from 'chalk'
+import { red } from 'chalk'
 import { networkInterfaces } from 'os'
 import type { NetworkInterfaceInfo } from 'os'
 
-import AbortController from 'abort-controller'
-import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, CODE_UDP, RELAY_CONTACT_TIMEOUT } from '../constants'
+import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP, CODE_UDP } from '../constants'
 import type { Connection } from 'libp2p-interfaces/connection'
 import type { MultiaddrConnection, Upgrader, Listener as InterfaceListener } from 'libp2p-interfaces/transport'
 
@@ -28,7 +25,7 @@ const error = Debug('hopr-connect:listener:error')
 const verbose = Debug('hopr-connect:verbose:listener')
 
 // @TODO to be adjusted
-const MAX_RELAYS_PER_NODE = 7
+export const MAX_RELAYS_PER_NODE = 5
 const SOCKET_CLOSE_TIMEOUT = 500
 
 /**
@@ -73,16 +70,17 @@ type Address = { port: number; address: string }
 
 class Listener extends EventEmitter implements InterfaceListener {
   private __connections: MultiaddrConnection[]
-  private tcpSocket: TCPServer
+  protected tcpSocket: TCPServer
   private udpSocket: UDPSocket
 
   private state: State
 
   private listeningAddr?: Multiaddr
 
-  private publicNodes: NodeEntry[]
+  protected publicNodes: NodeEntry[]
+  protected uncheckedNodes: PeerStoreType[]
 
-  private addrs: {
+  protected addrs: {
     interface: Multiaddr[]
     external: Multiaddr[]
     relays: Multiaddr[]
@@ -99,7 +97,7 @@ class Listener extends EventEmitter implements InterfaceListener {
    */
   constructor(
     private handler: ((conn: Connection) => void) | undefined,
-    private upgrader: Upgrader,
+    private upgrader: Pick<Upgrader, 'upgradeInbound' | 'upgradeOutbound'>,
     publicNodes: PublicNodesEmitter | undefined,
     private initialNodes: PeerStoreType[] = [],
     private peerId: PeerId,
@@ -109,6 +107,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     super()
 
     this.publicNodes = []
+    this.uncheckedNodes = initialNodes
 
     this.__connections = []
     this.upgrader = upgrader
@@ -157,8 +156,6 @@ class Listener extends EventEmitter implements InterfaceListener {
       relays: []
     }
 
-    initialNodes?.forEach(this.onNewRelay.bind(this))
-
     publicNodes?.on('addPublicNode', this.onNewRelay.bind(this))
 
     publicNodes?.on('removePublicNode', this.onRemoveRelay.bind(this))
@@ -168,43 +165,28 @@ class Listener extends EventEmitter implements InterfaceListener {
    * Called once there is a new relay opportunity known
    * @param ma Multiaddr of node that is added as a relay opportunity
    */
-  private onNewRelay(peer: PeerStoreType) {
-    if (this.publicNodes.length > MAX_RELAYS_PER_NODE || peer.id.equals(this.peerId)) {
+  protected onNewRelay(peer: PeerStoreType) {
+    if (peer.id.equals(this.peerId)) {
       return
     }
 
-    const usableAddresses = peer.multiaddrs.filter(isUsableRelay)
-
-    if (usableAddresses.length == 0) {
+    if (peer.multiaddrs == undefined || peer.multiaddrs.length == 0) {
+      log(`Received entry node ${peer.id.toB58String()} without any multiaddr`)
       return
     }
 
-    let entry = this.publicNodes.find((entry: NodeEntry) => entry.id.equals(peer.id))
-
-    if (entry != undefined) {
-      const newAddresses = usableAddresses.filter((ma: Multiaddr) => !entry!.multiaddrs.includes(ma))
-
-      if (newAddresses.length == 0) {
-        // Nothing added so we can stop
+    for (const uncheckedNode of this.uncheckedNodes) {
+      if (uncheckedNode.id.equals(peer.id)) {
+        log(`Received duplicate entry node ${peer.id.toB58String()}`)
+        // TODO add difference to previous multiaddrs
         return
       }
-
-      entry.multiaddrs = newAddresses.concat(entry.multiaddrs)
-    } else {
-      entry = {
-        id: peer.id,
-        multiaddrs: peer.multiaddrs,
-        latency: Infinity
-      }
-
-      this.publicNodes.push(entry)
     }
 
-    if (this.state != State.LISTENING) {
-      once(this, 'listening').then(() => this.updatePublicNodes(peer.id))
-    } else {
-      setImmediate(() => this.updatePublicNodes(peer.id))
-    }
+    this.uncheckedNodes.push({
+      id: peer.id,
+      multiaddrs: peer.multiaddrs.filter(isUsableRelay)
+    })
   }
 
   /**
@@ -212,54 +194,131 @@ class Listener extends EventEmitter implements InterfaceListener {
    * @param ma Multiaddr of node that is considered to be offline now
    */
   protected onRemoveRelay(peer: PeerId) {
-    this.publicNodes = this.publicNodes.filter((entry: NodeEntry) => !entry.id.equals(peer))
+    for (const [index, publicNode] of this.publicNodes.entries()) {
+      if (publicNode.id.equals(peer)) {
+        // Remove node without changing order
+        this.publicNodes.splice(index, 1)
+      }
+    }
 
-    this.addrs.relays = this.publicNodes.map(this.publicNodesToRelayMultiaddr.bind(this))
+    let inUse = false
+    const peerB58String = peer.toB58String()
+    for (const [index, relayAddr] of this.addrs.relays.entries()) {
+      // remove second part of relay address to get relay peerId
+      if (relayAddr.decapsulateCode(CODE_P2P).getPeerId() === peerB58String) {
+        // Remove node without changing order
+        this.addrs.relays.splice(index, 1)
+        inUse = true
+      }
+    }
 
     log(
       `relay ${peer.toB58String()} ${red(`removed`)}. Current addrs:\n\t${this.addrs.relays
         .map((addr: Multiaddr) => addr.toString())
         .join(`\n\t`)}`
     )
+
+    // Only rebuild list of relay nodes if we were using the
+    // offline node
+    if (inUse) {
+      // Rebuild later
+      setImmediate(this.updatePublicNodes.bind(this))
+    }
   }
 
-  protected async updatePublicNodes(peer: PeerId): Promise<void> {
-    // Get previously known nodes and filter all nodes that have
-    // either the same address (ip:port) or the same peerId
-    const entry = this.publicNodes.find((entry: NodeEntry) => entry.id.equals(peer))
+  /**
+   * Updates the list of exposed entry nodes.
+   * Called at startup and once an entry node is considered offline.
+   */
+  protected async updatePublicNodes(): Promise<void> {
+    const knownNodes = new Set<string>(this.publicNodes.map((entry: NodeEntry) => entry.id.toB58String()))
+    const nodesToCheck: PeerStoreType[] = []
 
-    if (entry == undefined) {
-      return
+    for (const uncheckedNode of this.uncheckedNodes) {
+      if (uncheckedNode.id.equals(this.peerId)) {
+        continue
+      }
+
+      const usableAddresses: Multiaddr[] = uncheckedNode.multiaddrs.filter(isUsableRelay)
+
+      if (knownNodes.has(uncheckedNode.id.toB58String())) {
+        const index = this.publicNodes.findIndex((entry) => entry.id.equals(uncheckedNode.id))
+
+        if (index < 0) {
+          continue
+        }
+
+        // Overwrite previous addresses. E.g. a node was restarted
+        // and now announces with a different address
+        this.publicNodes[index].multiaddrs = usableAddresses
+
+        // Nothing to do. Public nodes are added later
+        continue
+      }
+
+      // Ignore if entry nodes have more than one address
+      nodesToCheck.push({
+        id: uncheckedNode.id,
+        multiaddrs: [usableAddresses[0]]
+      })
     }
 
-    const abort = new AbortController()
-    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CONTACT_TIMEOUT)
+    const TIMEOUT = 3e3
 
-    const latency = await this.connectToRelay(entry.multiaddrs[0], { signal: abort.signal })
+    const results = await Promise.allSettled(
+      nodesToCheck.concat(this.publicNodes).map(async (entry: PeerStoreType): Promise<NodeEntry> => {
+        let latency = await this.connectToRelay(entry.multiaddrs[0], TIMEOUT)
 
-    clearTimeout(timeout)
-
-    // Negative latency === timeout
-    if (latency < 0) {
-      this.publicNodes = this.publicNodes.filter((entry: NodeEntry) => !entry.id.equals(peer.id))
-      return
-    }
-
-    entry.latency = latency
-
-    this.publicNodes = this.publicNodes.sort(latencyCompare)
-
-    this.addrs.relays = this.publicNodes.map(this.publicNodesToRelayMultiaddr.bind(this))
-
-    log(
-      `relay ${peer.toB58String()} ${green(`added`)}. Current addrs:\n\t${this.addrs.relays
-        .map((addr: Multiaddr) => addr.toString())
-        .join(`\n\t`)}`
+        return {
+          ...entry,
+          latency
+        }
+      })
     )
-  }
 
-  private publicNodesToRelayMultiaddr(entry: NodeEntry) {
-    return new Multiaddr(`/p2p/${entry.id}/p2p-circuit/p2p/${this.peerId}`)
+    let values: NodeEntry[] = []
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value.latency >= 0) {
+        values.push(result.value)
+      }
+    }
+
+    // Take all entry nodes that appeared to be online
+    this.publicNodes = values.sort(latencyCompare)
+
+    // Reset list of unchecked nodes
+    this.uncheckedNodes = []
+
+    const previous = new Set(this.addrs.relays.map((ma) => ma.toString()))
+
+    this.addrs.relays = this.publicNodes
+      // select only those entry nodes with smallest latencies
+      .slice(0, MAX_RELAYS_PER_NODE)
+      .map(
+        (entry: NodeEntry) =>
+          new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
+      )
+
+    let isDifferent = false
+    for (const current of this.addrs.relays) {
+      if (!previous.has(current.toString())) {
+        isDifferent = true
+        break
+      }
+    }
+
+    if (isDifferent) {
+      log(`Current relay addresses:`)
+      for (const ma of this.addrs.relays) {
+        log(`\t${ma.toString()}`)
+      }
+
+      if (this.state == State.LISTENING) {
+        // updates libp2p's peer record and lets libp2p push
+        // the updated peer record to all connected peers
+        this.emit('listening')
+      }
+    }
   }
 
   /**
@@ -332,6 +391,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     // Prevent from sending a STUN request to self
     let usableStunServers = this.getUsableStunServers(address.port, address.address)
     await this.determinePublicIpAddress(usableStunServers)
+    await this.updatePublicNodes()
 
     this.state = State.LISTENING
     this.emit('listening')
@@ -362,15 +422,6 @@ class Listener extends EventEmitter implements InterfaceListener {
         // Filter empty entries
         .filter((addr) => addr)
     )
-  }
-
-  /**
-   * Get listening port
-   * @dev used for testing
-   * @returns if listening, return port number, otherwise -1
-   */
-  getPort(): number {
-    return (this.tcpSocket.address() as AddressInfo)?.port ?? -1
   }
 
   /**
@@ -714,14 +765,14 @@ class Listener extends EventEmitter implements InterfaceListener {
     return usableInterfaces[0].address
   }
 
-  private async connectToRelay(relay: Multiaddr, opts?: DialOptions): Promise<number> {
+  private async connectToRelay(relay: Multiaddr, timeout: number): Promise<number> {
     let conn: Connection | undefined
     let maConn: TCPConnection | undefined
 
     const start = Date.now()
 
     try {
-      maConn = await TCPConnection.create(relay, this.peerId, opts)
+      maConn = await TCPConnection.create(relay, this.peerId, { timeout })
     } catch (err) {
       if (maConn != undefined) {
         await attemptClose(maConn as any)

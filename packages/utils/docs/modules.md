@@ -123,6 +123,7 @@
 - [generateKeyShares](modules.md#generatekeyshares)
 - [getB58String](modules.md#getb58string)
 - [getHeaderLength](modules.md#getheaderlength)
+- [getIpv4LocalAddressClass](modules.md#getipv4localaddressclass)
 - [getLocalAddresses](modules.md#getlocaladdresses)
 - [getLocalHosts](modules.md#getlocalhosts)
 - [getNetworkPrefix](modules.md#getnetworkprefix)
@@ -151,6 +152,7 @@
 - [loadJson](modules.md#loadjson)
 - [localAddressesFirst](modules.md#localaddressesfirst)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
+- [multiaddressCompareByClassFunction](modules.md#multiaddresscomparebyclassfunction)
 - [oneAtATime](modules.md#oneatatime)
 - [parseHosts](modules.md#parsehosts)
 - [parseJSON](modules.md#parsejson)
@@ -217,7 +219,7 @@
 
 #### Defined in
 
-[libp2p/addressSorters.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L63)
+[libp2p/addressSorters.ts:100](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L100)
 
 ___
 
@@ -395,7 +397,7 @@ ___
 
 #### Defined in
 
-[db.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L72)
+[db.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L73)
 
 ___
 
@@ -439,7 +441,7 @@ ___
 
 #### Defined in
 
-[db.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L67)
+[db.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L68)
 
 ___
 
@@ -455,7 +457,7 @@ ___
 
 #### Defined in
 
-[db.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L63)
+[db.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L64)
 
 ___
 
@@ -1309,7 +1311,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L240)
+[libp2p/dialHelper.ts:247](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L247)
 
 ___
 
@@ -1484,6 +1486,26 @@ ___
 #### Defined in
 
 [crypto/packet/index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L28)
+
+___
+
+### getIpv4LocalAddressClass
+
+▸ **getIpv4LocalAddressClass**(`address`): ``"A"`` \| ``"B"`` \| ``"C"`` \| ``"D"`` \| `undefined`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | `Multiaddr` |
+
+#### Returns
+
+``"A"`` \| ``"B"`` \| ``"C"`` \| ``"D"`` \| `undefined`
+
+#### Defined in
+
+[libp2p/addressSorters.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L36)
 
 ___
 
@@ -1860,7 +1882,7 @@ true if address is a private ip address
 
 #### Defined in
 
-[libp2p/addressSorters.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L11)
+[libp2p/addressSorters.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L12)
 
 ___
 
@@ -2110,7 +2132,7 @@ Take an array of addresses and sorts such that private addresses are first
 
 #### Defined in
 
-[libp2p/addressSorters.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L59)
+[libp2p/addressSorters.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L96)
 
 ___
 
@@ -2132,6 +2154,30 @@ ___
 #### Defined in
 
 [math/moveDecimalPoint.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/math/moveDecimalPoint.ts#L3)
+
+___
+
+### multiaddressCompareByClassFunction
+
+▸ **multiaddressCompareByClassFunction**(`a`, `b`): `number`
+
+Compare two multiaddresses based on their class: A class first, B class second, ...
+Local addresses take precedence over remote addresses.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `a` | `Multiaddr` |
+| `b` | `Multiaddr` |
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[libp2p/addressSorters.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L56)
 
 ___
 
