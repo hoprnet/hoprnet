@@ -67,7 +67,18 @@ export const MAX_RELAYS_PER_NODE = 5
  * @param environment [optional] isolate from nodes running in other environments
  * @returns the relay request protocol string
  */
-export function RELAY_PROTCOL(environment?: string) {
+export function CAN_RELAY_PROTCOL(environment?: string): string {
+  if (environment) {
+    return `/${NAME}/${environment}/can-relay/${version}`
+  }
+  return `/${NAME}/can-relay/${version}`
+}
+
+/**
+ * @param environment [optional] isolate from nodes running in other environments
+ * @returns the relay request protocol string
+ */
+export function RELAY_PROTCOL(environment?: string): string {
   if (environment) {
     return `/${NAME}/${environment}/relay/${version}`
   }
@@ -78,7 +89,7 @@ export function RELAY_PROTCOL(environment?: string) {
  * @param environment [optional] isolate from nodes running in other environments
  * @returns the relay delivery protocol string
  */
-export function DELIVERY_PROTOCOL(environment?: string) {
+export function DELIVERY_PROTOCOL(environment?: string): string {
   if (environment) {
     return `/${NAME}/${environment}/delivery/${version}`
   }

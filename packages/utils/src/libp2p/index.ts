@@ -11,12 +11,13 @@ import { debug } from '../process'
 import pipe from 'it-pipe'
 import { dial } from './dialHelper'
 
-export * from './privKeyToPeerId'
-export * from './pubKeyToPeerId'
 export * from './addressSorters'
-export * from './verifySignatureFromPeerId'
 export * from './dialHelper'
 export * from './pickVersion'
+export * from './pubKeyToPeerId'
+export * from './privKeyToPeerId'
+export * from './relayCode'
+export * from './verifySignatureFromPeerId'
 
 /**
  * Regular expresion used to match b58Strings
