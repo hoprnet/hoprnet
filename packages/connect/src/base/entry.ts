@@ -242,11 +242,14 @@ export class EntryNodes extends EventEmitter {
 
     // const CONCURRENCY = 14 // connections
 
-    const results = await nAtATime(connectToRelay, args, ENTRY_NODES_MAX_PARALLEL_DIALS)
+    const results = (await nAtATime(connectToRelay, args, ENTRY_NODES_MAX_PARALLEL_DIALS)).filter(
+      // Filter all unsuccessful dials
+      (value) => !(value instanceof Error)
+    )
 
     const positiveOnes = results.sort(latencyCompare).findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
-    // Close all unnecessary connection
+    // Close all unnecessary connections
     await nAtATime(
       attemptClose,
       results
