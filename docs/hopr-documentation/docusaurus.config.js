@@ -3,12 +3,13 @@
 
 const lightCodeTheme = require('prism-react-renderer/themes/github')
 const darkCodeTheme = require('prism-react-renderer/themes/dracula')
+const { DOCS_URL } = require('./consts')
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'HOPR',
   tagline: 'HOPR docs',
-  url: 'https://docs.hoprnet.org',
+  url: DOCS_URL,
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -31,12 +32,8 @@ const config = {
           sidebarPath: require.resolve('./sidebars.js'),
           routeBasePath: '/',
           // Please change this to your repo.
-          editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/'
-        },
-        blog: {
-          showReadingTime: true,
-          // Please change this to your repo.
-          editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/blog/'
+          editUrl: 'https://github.com/hoprnet/hoprnet/edit/master/docs/hopr-documentation',
+          lastVersion: 'current'
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css')
@@ -59,12 +56,11 @@ const config = {
         },
         items: [
           {
-            type: 'doc',
-            docId: 'intro',
+            type: 'docsVersionDropdown',
             position: 'left',
-            label: 'Docs'
+            dropdownItemsAfter: [],
+            dropdownActiveClassDisabled: true
           },
-          /** {to: '/blog', label: 'Blog', position: 'left'},**/
           {
             href: 'https://twitter.com/hoprnet',
             label: 'Twitter',
@@ -82,6 +78,12 @@ const config = {
             className: 'header-github-link'
           }
         ]
+      },
+      algolia: {
+        appId: 'YOUR_APP_ID',
+        apiKey: 'YOUR_SEARCH_API_KEY',
+        indexName: 'docs-hoprnet-org',
+        contextualSearch: true
       },
       footer: {
         /** style: 'dark',
