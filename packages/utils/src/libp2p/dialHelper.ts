@@ -5,11 +5,13 @@ import type PeerId from 'peer-id'
 import type LibP2P from 'libp2p'
 import type { Address } from 'libp2p/src/peer-store/address-book'
 import type { TimeoutOpts } from '../async'
+import { Multiaddr } from 'multiaddr'
 
 import { abortableTimeout } from '../async'
 
 import { debug } from '../process'
 import { green } from 'chalk'
+import { createRelayerKey } from '.'
 
 const logError = debug(`hopr-core:libp2p:error`)
 
@@ -58,7 +60,7 @@ type ReducedPeerStore = {
     get: (peer: PeerId) => Pick<NonNullable<ReturnType<LibP2P['peerStore']['get']>>, 'addresses'> | undefined
   }
 }
-type ReducedDHT = { peerRouting: Pick<LibP2P['peerRouting'], '_routers' | 'findPeer'> }
+type ReducedDHT = { contentRouting: Pick<LibP2P['contentRouting'], 'routers' | 'findProviders'> }
 type ReducedLibp2p = ReducedDHT & ReducedPeerStore & Pick<LibP2P, 'dialProtocol'>
 
 function printPeerStoreAddresses(msg: string, addresses: Address[]): void {
@@ -111,7 +113,10 @@ async function attemptDial(
   return { status: InternalDialStatus.CONTINUE }
 }
 
-type DHTResponse = Awaited<ReturnType<LibP2P['peerRouting']['findPeer']>>
+type Relayers = {
+  id: PeerId
+  multiaddrs: Multiaddr[]
+}
 
 /**
  * Performs a DHT query and handles possible errors
@@ -123,11 +128,17 @@ async function queryDHT(
   libp2p: ReducedDHT,
   destination: PeerId,
   opts: Required<TimeoutOpts>
-): Promise<DialResponse | { status: InternalDialStatus.CONTINUE; dhtResponse: DHTResponse }> {
-  let dhtResponse: DHTResponse
+): Promise<DialResponse | { status: InternalDialStatus.CONTINUE; relayers: Multiaddr[] }> {
+  const relayers: Relayers[] = []
+
+  const key = await createRelayerKey(destination)
+  console.log(`fetching `, key.toJSON())
   try {
-    // Let libp2p populate its internal peerStore with fresh addresses
-    dhtResponse = await libp2p.peerRouting.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
+    for await (const relayer of libp2p.contentRouting.findProviders(key, {
+      timeout: DEFAULT_DHT_QUERY_TIMEOUT
+    })) {
+      relayers.push(relayer)
+    }
   } catch (err) {
     logError(`Error while querying the DHT for ${destination.toB58String()}.`)
     if (err?.message) {
@@ -136,7 +147,7 @@ async function queryDHT(
   }
 
   // Libp2p's return types tend to change every now and then
-  if (dhtResponse == null) {
+  if (relayers.length == 0) {
     return { status: DialStatus.DHT_ERROR, query: destination }
   }
 
@@ -144,7 +155,12 @@ async function queryDHT(
     return { status: DialStatus.ABORTED }
   }
 
-  return { status: InternalDialStatus.CONTINUE, dhtResponse }
+  return {
+    status: InternalDialStatus.CONTINUE,
+    relayers: relayers.map(
+      (relay: Relayers) => new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${destination.toB58String()}`)
+    )
+  }
 }
 
 /**
@@ -179,7 +195,7 @@ async function doDial(
   }
 
   // Stop if there is no DHT available
-  if (libp2p.peerRouting._routers.length == 0) {
+  if (libp2p.contentRouting.routers.length == 0) {
     printPeerStoreAddresses(
       `Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT. Giving up`,
       knownAddresses
@@ -203,7 +219,7 @@ async function doDial(
   const knownAddressSet = new Set(knownAddresses.map((address) => address.multiaddr.toString()))
 
   let newAddresses = 0
-  for (const multiaddr of dhtResult.dhtResponse.multiaddrs) {
+  for (const multiaddr of dhtResult.relayers) {
     if (!knownAddressSet.has(multiaddr.toString())) {
       newAddresses++
     }
@@ -220,16 +236,24 @@ async function doDial(
     return { status: DialStatus.DIAL_ERROR, dhtContacted: true }
   }
 
-  dialResult = await attemptDial(libp2p, destination, protocol, opts)
+  let conn: Awaited<ReturnType<LibP2P['dialProtocol']>>
 
-  if (dialResult.status !== InternalDialStatus.CONTINUE) {
-    knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
+  for (const relay of dhtResult.relayers) {
+    try {
+      conn = await libp2p.dialProtocol(relay, [protocol])
+      if (conn != null) {
+        break
+      }
+    } catch (err) {
+      continue
+    }
+  }
 
-    printPeerStoreAddresses(
-      `New addresses of ${destination.toB58String()} from the DHT did not lead to a connection`,
-      knownAddresses
-    )
-    return dialResult
+  if (conn != null) {
+    return {
+      status: DialStatus.SUCCESS,
+      resp: conn
+    }
   }
 
   return { status: DialStatus.DIAL_ERROR, dhtContacted: true }

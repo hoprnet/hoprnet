@@ -217,7 +217,9 @@ class Relay {
       async function* (this: Relay) {
         // @TODO check if there is a relay slot available
 
-        await this.libp2p.contentRouting.provide(await createRelayerKey(conn.connection.remotePeer))
+        const key = await createRelayerKey(conn.connection.remotePeer)
+
+        await this.libp2p.contentRouting.provide(key)
         yield OK
       }.call(this)
     )
