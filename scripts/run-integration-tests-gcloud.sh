@@ -71,16 +71,6 @@ function cleanup {
   exit $EXIT_CODE
 }
 
-function fund_ip() {
-  local ip="${1}"
-  local eth_address
-
-  wait_until_node_is_ready "${ip}"
-  eth_address=$(get_native_address "${ip}:3001")
-  fund_if_empty "${eth_address}" "${environment}"
-  wait_for_port "9091" "${ip}"
-}
-
 if [ "${run_cleanup_only}" = "1" ] || [ "${run_cleanup_only}" = "true" ]; then
   cleanup
 
@@ -154,10 +144,10 @@ done
 
 # --- Run security tests on the first public node --- {{{
 "${mydir}/../test/security-test.sh" \
-  "${node_ips[0]}" 3001 3000
+  "${node_ips[0]}" 3001 3000 3001 "${api_token}"
 #}}}
 
 # --- Run test --- {{{
-"${mydir}/../test/integration-test.sh" \
+HOPRD_API_TOKEN="${api_token}" "${mydir}/../test/integration-test.sh" \
   ${node_ips_arr[@]/%/:3001}
 # }}}
