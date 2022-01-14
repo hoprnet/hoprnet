@@ -196,6 +196,10 @@ async function doDial(
 
   // Stop if there is no DHT available
   if (libp2p.contentRouting.routers.length == 0) {
+    console.trace()
+    console.log(libp2p)
+    console.log(libp2p.contentRouting)
+
     printPeerStoreAddresses(
       `Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT. Giving up`,
       knownAddresses
