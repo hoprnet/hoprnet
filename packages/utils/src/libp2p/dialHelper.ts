@@ -132,7 +132,7 @@ async function queryDHT(
   const relayers: Relayers[] = []
 
   const key = await createRelayerKey(destination)
-  console.log(`fetching `, key.toJSON())
+  console.log(`fetching`, key)
   try {
     for await (const relayer of libp2p.contentRouting.findProviders(key, {
       timeout: DEFAULT_DHT_QUERY_TIMEOUT

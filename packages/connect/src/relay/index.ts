@@ -220,6 +220,7 @@ class Relay {
         const key = await createRelayerKey(conn.connection.remotePeer)
 
         await this.libp2p.contentRouting.provide(key)
+        console.log(`announced`, key)
         yield OK
       }.call(this)
     )
