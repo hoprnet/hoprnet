@@ -266,27 +266,16 @@ jobs:
           HOPR_PACKAGE: hoprd
 
       - name: Build Avado
-        working-directory: packages/avado
         env:
-          HOPR_GIT_MSG: "placeholder"
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
         run: |
-          docker-compose build
-          sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#c11c4bd
-          avadosdk increase minor
-          sed -i "s/version\"[ ]*:[ ]*\"[0-9]*\.[0-9]*\.[0-9]*\"/version\": \"${AVADO_VERSION}\"/" \
-            ./dappnode_package.json
-          cat ./dappnode_package.json | grep 'version'
-          sudo avadosdk build --provider http://80.208.229.228:5001
-          git add dappnode_package.json docker-compose.yml releases.json
-          git commit -m "chore(release): publish Avado ${AVADO_VERSION}"
-          # http://go.ava.do/install/<IPFS HASH>
+          ./scripts/build_avado.sh ${AVADO_VERSION}
 
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
         env:
-          HOPR_GIT_MSG: "Avado CI: new release"
+          HOPR_GIT_MSG: "chore(release): publish Avado ${{ steps.set-version.outputs.vsn }}"
           HOPR_GITHUB_REF: ${{ github.ref }}
         run: ./scripts/commit-and-push-all-changes.sh
 

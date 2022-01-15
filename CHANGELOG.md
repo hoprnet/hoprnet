@@ -5,6 +5,7 @@
 ### Changes
 
 - Fixed behavior when no network was found or invalid password is entered ([#3147](https://github.com/hoprnet/hoprnet/pull/3147))
+- Added new API v2 endpoint `/messages/sign` to support message authentication ([#3243](https://github.com/hoprnet/hoprnet/pull/3243))
 
 ---
 
@@ -16,6 +17,7 @@
 
 - Rest API v2 ([#3093](https://github.com/hoprnet/hoprnet/pull/3093)), see [API specification](./packages/hoprd/rest-api-v2-spec.yaml)
 - Update ping to use Blake2s instead of SHA256 for response computation (([#3080](https://github.com/hoprnet/hoprnet/pull/3080)))
+- Fix broken AVADO build ([#3150](https://github.com/hoprnet/hoprnet/pull/3150))
 
 ### Bugfixes
 
