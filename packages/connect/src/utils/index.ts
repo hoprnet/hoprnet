@@ -114,6 +114,8 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
   switch (addr.family) {
     case 'IPv4':
       family = 4
+      // Node.js tends answer `socket.address()` calls on `udp4`
+      // sockets with `::1` instead of `127.0.0.1`
       if (isAnyAddress(addr.address, 'IPv6')) {
         address = '0.0.0.0'
       } else {
@@ -122,6 +124,8 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
       break
     case 'IPv6':
       family = 6
+      // Make sure that we use the right any address,
+      // even if this is IPv4 any address
       if (isAnyAddress(addr.address, 'IPv4')) {
         address = '::'
       } else {

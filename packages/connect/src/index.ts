@@ -99,6 +99,12 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
       const onConnection = this._libp2p.upgrader.onConnection
 
+      // Simulated NAT:
+      // If we don't allow direct connections (being a NATed node), then a connection
+      // can happen if outgoing, i.e. by establishing a connection to someone else
+      // we populate the address mapping of the router.
+      // Or, if we get contacted by a relay to which we already have an *outgoing*
+      // connection that gets reused.
       this._libp2p.upgrader.onConnection = (conn) => {
         log(`New connection:`)
         log(`remoteAddr: ${conn.remoteAddr.toString()}`)
@@ -118,6 +124,8 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
         log(`closing due to NAT`)
 
+        // Close the NATed connection as there is no need to keep
+        // unused connections open.
         conn.close()
       }
     }
@@ -227,6 +235,8 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
       log(conn)
     } catch (err) {
       error(err)
+      // libp2p needs this error to understand that this connection attempt failed but we
+      // want to log it for debugging purposes
       throw err
     }
 

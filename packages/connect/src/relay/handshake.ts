@@ -264,7 +264,13 @@ class RelayHandshake {
         destinationShaker.rest()
 
         try {
-          await state.createNew(source, destination, this.shaker.stream, destinationShaker.stream, __relayFreeTimeout)
+          await state.createNew(
+            source,
+            destination,
+            this.shaker.stream,
+            destinationShaker.stream,
+            this.options.relayFreeTimeout
+          )
         } catch (err) {
           error(
             `Cannot established relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,

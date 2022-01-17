@@ -73,7 +73,7 @@ class Relay {
   }
 
   /**
-   * Assigns the event listener to the constructed object.
+   * Assigns the event listeners to the constructed object.
    * @dev Must not happen in the constructor because `this` is not ready
    *      at that point in time
    */
@@ -90,7 +90,12 @@ class Relay {
     this.webRTCUpgrader.start()
   }
 
-  stop(): void {}
+  /**
+   * Unassigns event listeners
+   */
+  stop(): void {
+    this.webRTCUpgrader.start()
+  }
 
   /**
    * Attempts to connect to `destination` by using `relay` as a relay
@@ -147,7 +152,6 @@ class Relay {
     stream: Stream,
     opts?: HoprConnectDialOptions
   ): MultiaddrConnection {
-    log(`outbound !!this.testingOptions.__noWebRTCUpgrade`, !!this.testingOptions.__noWebRTCUpgrade)
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
         stream,
@@ -179,8 +183,6 @@ class Relay {
   }
 
   private upgradeInbound(initiator: PeerId, relay: PeerId, stream: Stream) {
-    log(`inbound !!this.testingOptions.__noWebRTCUpgrade`, this.testingOptions.__noWebRTCUpgrade)
-
     if (!!this.testingOptions.__noWebRTCUpgrade) {
       return new RelayConnection({
         stream,
@@ -241,12 +243,7 @@ class Relay {
       log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)
       shaker.reject(RelayHandshakeMessage.FAIL_RELAY_FULL)
     } else {
-      shaker.negotiate(
-        conn.connection.remotePeer,
-        this.dialNodeDirectly.bind(this),
-        this.relayState,
-        this.options.relayFreeTimeout
-      )
+      shaker.negotiate(conn.connection.remotePeer, this.dialNodeDirectly.bind(this), this.relayState)
     }
   }
 
@@ -281,6 +278,7 @@ class Relay {
     )
 
     try {
+      // Will call internal libp2p event handler, so no further action required
       await this.libp2p.upgrader.upgradeInbound(newConn as any)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)

@@ -79,7 +79,7 @@ export function bindToUdpSocket(port?: number): Promise<Socket> {
 }
 
 /**
- * Sampes peerStore entries
+ * Samples peerStore entries
  * @param addr string representation of utilized address
  * @param id peer id
  * @returns a peerStoreEntry

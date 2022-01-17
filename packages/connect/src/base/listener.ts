@@ -58,7 +58,6 @@ class Listener extends EventEmitter implements InterfaceListener {
   protected addrs: {
     interface: Multiaddr[]
     external: Multiaddr[]
-    relays: Multiaddr[]
   }
 
   /**
@@ -98,8 +97,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.addrs = {
       interface: [],
-      external: [],
-      relays: []
+      external: []
     }
 
     this._emitListening = (() => this.emit('listening')).bind(this)
