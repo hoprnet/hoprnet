@@ -4,6 +4,7 @@
 const lightCodeTheme = require('prism-react-renderer/themes/github')
 const darkCodeTheme = require('prism-react-renderer/themes/dracula')
 const { DOCS_URL } = require('./consts')
+const { DOCS_ALGOLIA_APP_ID, DOCS_ALGOLIA_API_KEY } = process.env
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -80,9 +81,9 @@ const config = {
         ]
       },
       algolia: {
-        appId: 'YOUR_APP_ID',
-        apiKey: 'YOUR_SEARCH_API_KEY',
-        indexName: 'docs-hoprnet-org',
+        appId: DOCS_ALGOLIA_APP_ID,
+        apiKey: DOCS_ALGOLIA_API_KEY,
+        indexName: 'docs_hoprnet_org',
         contextualSearch: true
       },
       footer: {
