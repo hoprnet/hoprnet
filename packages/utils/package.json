@@ -29,7 +29,7 @@
     "chalk": "4.1.2",
     "debug": "4.3.3",
     "ethers": "5.5.2",
-    "futoin-hkdf": "1.4.2",
+    "futoin-hkdf": "1.4.3",
     "hjson": "3.2.2",
     "it-pipe": "1.1.0",
     "jsonschema": "1.4.0",
