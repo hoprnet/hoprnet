@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# This is a thin wrapper script for the Docker HOPRd container
+# to start in a different network on GCloud.
+# Per default, the Docker containers in GCloud VMs are started in with --network=host and this cannot
+# be changed. To simulate a node behind NAT, this script creates a dedicated bridge network, and then starting
+# the HOPRd Docker image bound to that network. The P2P port 9091 is intentionally not exposed.
+
 if [ $(id -u) -ne 0 ] ; then
   >&2 echo "ERROR: Must run as root"
   exit 1
@@ -19,9 +25,9 @@ fi
 declare admin_port=${HOPRD_ADMIN_PORT:-3000}
 declare rest_port=${HOPRD_REST_PORT:-3001}
 declare healthcheck_port=${HOPRD_HEALTHCHECK_PORT:-8080}
-
 declare network_name="hopr-nat"
 
+# Create an isolated network to force NAT
 if [ "$(docker network ls | grep -c "${network_name}" )" = "0" ] ; then
   if ! docker network create -d bridge ${network_name} > /dev/null 2>&1 ; then
     >&2 echo "ERROR: Failed to create network for NAT"
@@ -30,7 +36,6 @@ if [ "$(docker network ls | grep -c "${network_name}" )" = "0" ] ; then
 fi
 
 # Fork here and pass all the environment variables down into the forked image
-# NOTE: The lib2p2 port is not published to prevent bypassing NAT from the outside
 docker run --pull always -v /var/hoprd/:/app/db -p ${admin_port}:3000 -p ${rest_port}:3001 -p ${healthcheck_port}:8080 \
  --network=${network_name} \
  --env-file <(env) \

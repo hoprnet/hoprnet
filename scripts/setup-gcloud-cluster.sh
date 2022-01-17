@@ -30,6 +30,7 @@ usage() {
   msg "      <init_script>\t\tpath to a script which is called with all node API endpoints as parameters"
   msg "      <cluster_id>\t\tuses a random value as default"
   msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:<environment>' as default"
+  msg "      <cluster_size>\t\tnumber of nodes in the deployed cluster, default is 6."
   msg
   msg "Required environment variables"
   msg "------------------------------"
@@ -56,11 +57,15 @@ declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
 declare cluster_id="${3:-${environment}-topology-${RANDOM}-${RANDOM}}"
 declare docker_image=${4:-gcr.io/hoprassociation/hoprd:${environment}}
+declare cluster_size=${5:-6}
 
 declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
+
+# Append environment as Docker image version, if not specified
+[[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${environment}"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -109,7 +114,7 @@ gcloud_create_or_update_instance_template \
 # start nodes
 gcloud_create_or_update_managed_instance_group  \
   "${cluster_id}" \
-  6 \
+  ${cluster_size} \
   "${cluster_id}"
 
 # get IPs of newly started VMs which run hoprd
@@ -125,9 +130,12 @@ for ip in ${node_ips}; do
   fund_if_empty "${eth_address}" "${environment}"
 done
 
-for ip in ${node_ips}; do
-  wait_for_port "9091" "${ip}"
-done
+# We cannot poll for NAT nodes, because they do not expose 9091 to the outside world
+if [[ "${docker_image}" != *-nat:* ]]; then
+  for ip in ${node_ips}; do
+    wait_for_port "9091" "${ip}"
+  done
+fi
 # }}}
 
 # --- Call init script--- {{{
