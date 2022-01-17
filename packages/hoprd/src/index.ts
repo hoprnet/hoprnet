@@ -180,6 +180,12 @@ const argv = yargs(process.argv.slice(2))
     default: false,
     hidden: true
   })
+  .option('testNoUPNP', {
+    boolean: true,
+    describe: 'NAT traversal testing: disable automatic detection of external IP address using UPNP',
+    default: false,
+    hidden: true
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -210,7 +216,8 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses,
       noWebRTCUpgrade: argv.testNoWebRTCUpgrade,
-      noDirectConnections: argv.testNoDirectConnections
+      noDirectConnections: argv.testNoDirectConnections,
+      noUPNP: argv.testNoUPNP
     }
   }
 

@@ -67,7 +67,9 @@ export async function createLibp2pInstance(
             __noDirectConnections: options.testing?.noDirectConnections,
             // Do not upgrade to a direct WebRTC connection, even if it
             // is available. Used to test behavior of bidirectional NATs
-            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade
+            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade,
+            // Prevent usage of UPNP to determine external IP address
+            __noUPNP: options.testing?.noUPNP
           }
         } as HoprConnectConfig
       },

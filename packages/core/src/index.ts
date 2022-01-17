@@ -100,6 +100,10 @@ export type HoprOptions = {
     // don't do the upgrade to it to test bidirectional NAT
     // default: false
     noWebRTCUpgrade?: boolean
+    // when true, disable usage of UPNP to automatically detect
+    // external IP
+    // default: false
+    noUPNP?: boolean
   }
 }
 

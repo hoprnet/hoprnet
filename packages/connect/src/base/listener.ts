@@ -293,6 +293,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     const ownInterface = this.tcpSocket.address() as AddressInfo
 
     const natSituation = await this.checkNATSituation(ownInterface.address, ownInterface.port)
+
+    log(`NAT situation detected: `, natSituation)
     const internalInterfaces = getAddrs(ownInterface.port, {
       useIPv4: true,
       includePrivateIPv4: true,
@@ -588,7 +590,11 @@ class Listener extends EventEmitter implements InterfaceListener {
       return {
         externalAddress,
         externalPort,
-        isExposed: (isExposedHost?.udpMapped && isExposedHost?.tcpMapped) ?? false,
+        // If we don't allow direct connections, then the host can obviously
+        // not be considered to be exposed
+        isExposed: this.testingOptions.__noDirectConnections
+          ? false
+          : (isExposedHost?.udpMapped && isExposedHost?.tcpMapped) ?? false,
         bidirectionalNAT: false
       }
     }
