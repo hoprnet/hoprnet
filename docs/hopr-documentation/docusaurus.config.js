@@ -4,6 +4,18 @@
 const lightCodeTheme = require('prism-react-renderer/themes/github')
 const darkCodeTheme = require('prism-react-renderer/themes/dracula')
 const { DOCS_URL } = require('./consts')
+const { DOCS_ALGOLIA_APP_ID, DOCS_ALGOLIA_API_KEY } = process.env
+
+let extraThemeConfig = {}
+// only configure Algolia if credentials are given
+if (DOCS_ALGOLIA_APP_ID && DOCS_ALGOLIA_API_KEY) {
+  extraThemeConfig.algolia = {
+    appId: DOCS_ALGOLIA_APP_ID,
+    apiKey: DOCS_ALGOLIA_API_KEY,
+    indexName: 'docs_hoprnet_org',
+    contextualSearch: true
+  }
+}
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -14,8 +26,8 @@ const config = {
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: '/img/hopr_icon.svg',
-  organizationName: 'hoprnet', // Usually your GitHub org/user name.
-  projectName: 'hopr-docs', // Usually your repo name.
+  organizationName: 'hoprnet',
+  projectName: 'hopr-docs',
 
   stylesheets: [
     'https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@200;300;400;500;600;700&display=swap',
@@ -31,7 +43,6 @@ const config = {
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
           routeBasePath: '/',
-          // Please change this to your repo.
           editUrl: 'https://github.com/hoprnet/hoprnet/edit/master/docs/hopr-documentation',
           lastVersion: 'current'
         },
@@ -79,55 +90,8 @@ const config = {
           }
         ]
       },
-      algolia: {
-        appId: 'YOUR_APP_ID',
-        apiKey: 'YOUR_SEARCH_API_KEY',
-        indexName: 'docs-hoprnet-org',
-        contextualSearch: true
-      },
+      ...extraThemeConfig,
       footer: {
-        /** style: 'dark',
-        links: [
-          {
-            title: 'Docs',
-            items: [
-              {
-                label: 'Tutorial',
-                to: '/docs/intro',
-              },
-            ],
-          },
-          {
-            title: 'Community',
-            items: [
-              {
-                label: 'Stack Overflow',
-                href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-              },
-              {
-                label: 'Discord',
-                href: 'https://discordapp.com/invite/docusaurus',
-              },
-              {
-                label: 'Twitter',
-                href: 'https://twitter.com/docusaurus',
-              },
-            ],
-          },
-          {
-            title: 'More',
-            items: [
-              {
-                label: 'Blog',
-                to: '/blog',
-              },
-              {
-                label: 'GitHub',
-                href: 'https://github.com/facebook/docusaurus',
-              },
-            ],
-          },
-        ],**/
         copyright: `©${new Date().getFullYear()} HOPR Association, all rights reserved`
       },
       prism: {
