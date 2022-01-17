@@ -3483,7 +3483,7 @@ __metadata:
     chalk: 4.1.2
     debug: 4.3.3
     ethers: 5.5.2
-    futoin-hkdf: 1.4.2
+    futoin-hkdf: 1.4.3
     hjson: 3.2.2
     it-pipe: 1.1.0
     jsonschema: 1.4.0
@@ -12465,10 +12465,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"futoin-hkdf@npm:1.4.2":
-  version: 1.4.2
-  resolution: "futoin-hkdf@npm:1.4.2"
-  checksum: 273c7368ae1adb39bdf13eeee0ba504b0a28a27bd13838497e802e4fe47a6687290d649c5b82a1cde4981a939747f0e684236bccf4f5a05b4ce14105b90490f1
+"futoin-hkdf@npm:1.4.3":
+  version: 1.4.3
+  resolution: "futoin-hkdf@npm:1.4.3"
+  checksum: ec5a4bd414ef2108c2edaa62ef42b2353c0657168a7eb3702b390fbc82ec4b9c24f8ad42493af91efca3fee24f2d1225dadaf79525eba2308e8caaf959a581ad
   languageName: node
   linkType: hard
 
