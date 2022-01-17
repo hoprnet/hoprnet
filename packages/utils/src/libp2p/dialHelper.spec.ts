@@ -176,7 +176,7 @@ describe('test dialHelper', function () {
     await Promise.all([peerA.stop(), peerB.stop(), peerC.stop()])
   })
 
-  it.only('DHT does not find any new addresses', async function () {
+  it('DHT does not find any new addresses', async function () {
     const peerStore = getPeerStore()
     const peerA = {
       contentRouting: {
