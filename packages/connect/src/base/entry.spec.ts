@@ -72,7 +72,7 @@ function createFakeNetwork() {
   }
 }
 
-describe.only('entry node functionality', function () {
+describe('entry node functionality', function () {
   const peerId = createPeerId()
   it('add public nodes', function () {
     const entryNodes = new TestingEntryNodes(
