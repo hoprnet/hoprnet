@@ -23,7 +23,7 @@ declare branch cluster_size package_version docker_image
 # docker_image and cluster_size are configurable through script arguments
 docker_image="${1:-gcr.io/hoprassociation/hoprd}"
 cluster_size=${2:-3}
-cluster_tag=$3 # optional cluster tag
+cluster_tag=${3:-} # optional cluster tag
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 package_version=$(${mydir}/get-package-version.sh)

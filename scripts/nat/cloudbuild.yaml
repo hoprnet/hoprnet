@@ -5,7 +5,7 @@ steps:
       - '.'
       - '--tag=$_DOCKER_IMAGE:$_IMAGE_VERSION'
       - '--build-arg=PACKAGE_VERSION=$_PACKAGE_VERSION'
-      - '--build-arg=HOPR_RELEASE=$_IMAGE_VERSION'
+      - '--build-arg=HOPRD_RELEASE=$_IMAGE_VERSION'
 options:
   logStreamingOption: STREAM_ON
 images:

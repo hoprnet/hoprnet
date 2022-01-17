@@ -64,7 +64,26 @@ package_version="$("${mydir}/get-package-version.sh")"
 docker_image="gcr.io/hoprassociation/${package}"
 releases=""
 
+test_package_version_of_image() {
+
+  local built_docker_image="$1"
+  local built_image_version="$2"
+  local required_pkg_version="$3"
+  local docker_image_full="${built_docker_image}:${built_image_version}"
+
+  log "verify bundled version of ${docker_image_full}"
+  local v=$(docker run --pull always -v /var/run/docker.sock:/var/run/docker.sock ${docker_image_full} --version 2> /dev/null | sed -n '3p')
+  if [ "${v}" != "${required_pkg_version}" ]; then
+    log "bundled version ${v}, expected ${required_pkg_version}"
+    return 1
+  fi
+
+  log "bundled version in ${docker_image_full} is ${v}"
+  return 0
+}
+
 build_and_tag_image() {
+
   local built_docker_image="$1"
   local built_image_version="$2"
   local required_pkg_version="$3"
@@ -75,11 +94,8 @@ build_and_tag_image() {
   gcloud builds submit --config cloudbuild.yaml \
       --substitutions=_PACKAGE_VERSION=${required_pkg_version},_IMAGE_VERSION=${built_image_version},_DOCKER_IMAGE=${built_docker_image}
 
-  log "verify bundled version of ${docker_image_full}"
-  local v=$(docker run --pull always -v /var/run/docker.sock:/var/run/docker.sock ${docker_image_full} --version 2> /dev/null | sed -n '3p')
-  if [ "${v}" != "${required_pkg_version}" ]; then
-    log "bundled version ${v}, expected ${required_pkg_version}"
-    exit 1
+  if ! test_package_version_of_image ${built_docker_image} ${built_image_version} ${required_pkg_version} ; then
+    exit 0
   fi
 
   if [ -z "${releases}" ]; then
@@ -119,8 +135,10 @@ fi
 declare stripped_package=${package#hopr-}
 cd "${mydir}/../packages/${stripped_package%-nat}"
 
-# In case we build hoprd-nat, we need to build hoprd first with the same version as a prerequisite
-build_and_tag_image ${docker_image%-nat} ${image_version} ${package_version}
+# In case we build hoprd-nat, we need to build hoprd first with the same version as a prerequisite (if not already available)
+if [[ "${package}" != "hoprd-nat" ]] || ! test_package_version_of_image ${docker_image%-nat} ${image_version} ${package_version} ; then
+  build_and_tag_image ${docker_image%-nat} ${image_version} ${package_version}
+fi
 
 if [ "${package}" = "hoprd-nat" ]; then
   # Build hoprd-nat with exactly the same version as hoprd
