@@ -92,7 +92,7 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
     try {
       this.conn.end()
     } catch (err) {
-      console.log(err)
+      error(`Error while trying to close TCP connection`, err)
     }
 
     await closePromise

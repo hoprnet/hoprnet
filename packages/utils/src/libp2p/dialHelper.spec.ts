@@ -163,7 +163,6 @@ describe('test dialHelper', function () {
 
     let result = await dialHelper(peerA, Chris, TEST_PROTOCOL)
 
-    console.log(result)
     assert(result.status === DialStatus.SUCCESS, `Dial must be successful`)
 
     pipe(TEST_MESSAGE, result.resp.stream.sink)
