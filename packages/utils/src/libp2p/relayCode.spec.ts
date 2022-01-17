@@ -11,15 +11,25 @@ import type PeerId from 'peer-id'
 
 import { createRelayerKey } from './relayCode'
 import { privKeyToPeerId } from './privKeyToPeerId'
+import assert from 'assert'
 
 const peerA = privKeyToPeerId('0x06243fcfd7d7ba9364c9903b95cb8cfb3a3e6e95a80c96656598bda6942ae1c2')
 const peerB = privKeyToPeerId('0x0e5574d6fcb05bc06542daeaa231639d26753f366b02fdc072944e728cbd4647')
 const peerC = privKeyToPeerId('0x462684d27c3573981dd8b62ec4fbb92446dbb1797ef1278208f99216995015d5')
 
+/**
+ * Synchronous method to sample peerIds
+ * @returns a random peerId
+ */
 function getPeerId(): PeerId {
   return privKeyToPeerId(randomBytes(32))
 }
 
+/**
+ * Creates and starts a minimal libp2p instance
+ * @param id peerId of the node to create
+ * @returns a started libp2p instance with a DHT
+ */
 async function getNode(id = getPeerId()): Promise<Libp2p> {
   const node = await Libp2p.create({
     addresses: {
@@ -53,10 +63,6 @@ async function getNode(id = getPeerId()): Promise<Libp2p> {
     }
   })
 
-  //   node.handle(TEST_PROTOCOL, async ({ stream }) => {
-  //     await pipe(stream.source, stream.sink)
-  //   })
-
   await node.start()
 
   return node
@@ -68,21 +74,28 @@ describe('relay code generation', function () {
     const nodeB = await getNode(peerB)
     const nodeC = await getNode(peerC)
 
-    console.log(nodeA.multiaddrs)
-    console.log(nodeB.multiaddrs)
     await nodeA.dial(nodeB.multiaddrs[0])
     const CIDA = await createRelayerKey(nodeA.peerId)
 
     await nodeA.contentRouting.provide(CIDA)
 
-    for await (const result of nodeB.contentRouting.findProviders(CIDA)) {
-      console.log(`result`, result)
+    const fetchedFromNodeB = []
+    for await (const resultB of nodeB.contentRouting.findProviders(CIDA)) {
+      fetchedFromNodeB.push(resultB)
     }
 
+    assert(fetchedFromNodeB.length > 0, `Node B must be able to perform the DHT query`)
+
+    // Add PeerC to the network
     await nodeB.dial(nodeC.multiaddrs[0])
 
-    for await (const result of nodeC.contentRouting.findProviders(CIDA)) {
-      console.log(`result`, result)
+    const fetchedFromNodeC = []
+    for await (const resultC of nodeC.contentRouting.findProviders(CIDA)) {
+      fetchedFromNodeC.push(resultC)
     }
+
+    assert(fetchedFromNodeC.length > 0, `Node C must be able to perform the DHT query`)
+
+    await Promise.all([nodeA.stop(), nodeB.stop(), nodeC.stop()])
   })
 })

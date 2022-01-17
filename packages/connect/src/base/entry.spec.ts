@@ -5,7 +5,7 @@ import { createPeerId, getPeerStoreEntry } from './utils.spec'
 import { once, EventEmitter } from 'events'
 import { Multiaddr } from 'multiaddr'
 
-import { MAX_RELAYS_PER_NODE } from '../constants'
+import { MAX_RELAYS_PER_NODE, OK } from '../constants'
 import type { PeerStoreType, PublicNodesEmitter } from '../types'
 
 /**
@@ -50,7 +50,16 @@ function createFakeNetwork() {
   const connect = (addr: string) => {
     if (network.listeners(connectEvent(addr)).length >= 1) {
       network.emit(connectEvent(addr))
-      return Promise.resolve(true)
+      return Promise.resolve({
+        newStream: (_protocols: string[]) =>
+          Promise.resolve({
+            stream: {
+              source: (async function* () {
+                yield OK
+              })()
+            }
+          })
+      })
     } else {
       return Promise.resolve(undefined)
     }
@@ -63,7 +72,7 @@ function createFakeNetwork() {
   }
 }
 
-describe('entry node functionality', function () {
+describe.only('entry node functionality', function () {
   const peerId = createPeerId()
   it('add public nodes', function () {
     const entryNodes = new TestingEntryNodes(
