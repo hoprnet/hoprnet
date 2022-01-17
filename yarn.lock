@@ -3304,7 +3304,7 @@ __metadata:
     "@types/mocha": 9.0.0
     "@types/node": 16.11.18
     "@types/simple-peer": 9.11.4
-    "@types/yargs": 17.0.7
+    "@types/yargs": 17.0.8
     abortable-iterator: 3.0.1
     bl: 5.0.0
     chai: 4.3.4
@@ -3330,7 +3330,7 @@ __metadata:
     typescript: 4.5.4
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
-    yargs: 17.2.1
+    yargs: 17.3.1
   languageName: unknown
   linkType: soft
 
@@ -3413,7 +3413,7 @@ __metadata:
     "@types/express": 4
     "@types/mocha": 9.0.0
     "@types/rimraf": 3.0.2
-    "@types/yargs": 17.0.7
+    "@types/yargs": 17.0.8
     bignumber.js: 9.0.2
     bn.js: 5.2.0
     chai: 4.3.4
@@ -3427,7 +3427,7 @@ __metadata:
     typedoc: 0.22.10
     typedoc-plugin-markdown: 3.11.8
     typescript: 4.5.4
-    yargs: 17.2.1
+    yargs: 17.3.1
   bin:
     hopr-cover-traffic-daemon: lib/index.js
   languageName: unknown
@@ -3522,7 +3522,7 @@ __metadata:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/cors": 2.8.12
     "@types/mocha": 9.0.0
-    "@types/yargs": 17.0.7
+    "@types/yargs": 17.0.8
     bn.js: 5.2.0
     body-parser: 1.19.1
     bs58: 4.0.1
@@ -3558,7 +3558,7 @@ __metadata:
     typescript: 4.5.4
     ws: 8.3.0
     yamljs: 0.3.0
-    yargs: 17.2.1
+    yargs: 17.3.1
   bin:
     hoprd: lib/index.js
   languageName: unknown
@@ -5358,12 +5358,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/yargs@npm:17.0.7":
-  version: 17.0.7
-  resolution: "@types/yargs@npm:17.0.7"
+"@types/yargs@npm:17.0.8":
+  version: 17.0.8
+  resolution: "@types/yargs@npm:17.0.8"
   dependencies:
     "@types/yargs-parser": "*"
-  checksum: 520e803720b2a626338c0e2b61825dd1b956910fec4d855018c17e62cf9fb41eb67bcf122ba5c6fb569b1bfac73520d5d73e8be502b87f9a551619df441b1875
+  checksum: 63d06700ffbed745f00d7994eb92416649c8a3ead22f26446979d383f3af52fa9400bb185268f3a44a2348749098ffe33a8185ca676b77bc3206c63b8b73fd01
   languageName: node
   linkType: hard
 
@@ -13613,7 +13613,7 @@ __metadata:
     rimraf: 3.0.2
     ts-node: 10.4.0
     typescript: 4.5.4
-    yargs: 17.2.1
+    yargs: 17.3.1
   languageName: unknown
   linkType: soft
 
@@ -26631,6 +26631,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"yargs-parser@npm:^21.0.0":
+  version: 21.0.0
+  resolution: "yargs-parser@npm:21.0.0"
+  checksum: 1e205fca1cb7a36a1585e2b94a64e641c12741b53627d338e12747f4dca3c3610cdd9bb235040621120548dd74c3ef03a8168d52a1eabfedccbe4a62462b6731
+  languageName: node
+  linkType: hard
+
 "yargs-unparser@npm:1.6.0":
   version: 1.6.0
   resolution: "yargs-unparser@npm:1.6.0"
@@ -26706,18 +26713,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"yargs@npm:17.2.1":
-  version: 17.2.1
-  resolution: "yargs@npm:17.2.1"
+"yargs@npm:17.3.1":
+  version: 17.3.1
+  resolution: "yargs@npm:17.3.1"
   dependencies:
     cliui: ^7.0.2
     escalade: ^3.1.1
     get-caller-file: ^2.0.5
     require-directory: ^2.1.1
-    string-width: ^4.2.0
+    string-width: ^4.2.3
     y18n: ^5.0.5
-    yargs-parser: ^20.2.2
-  checksum: 451aac46f82da776f436018feed0244bc0e7b4355f7e397bcb53d34c691b177c0d71db3dda9653760e1bc240254d8b763a252ff918ef9e235a8d202e2909c4eb
+    yargs-parser: ^21.0.0
+  checksum: 64fc2e32c56739f1d14d2d24acd17a6944c3c8e3e3558f09fc1953ac112e868cc16013d282886b9d5be22187f8b9ed4f60741a6b1011f595ce2718805a656852
   languageName: node
   linkType: hard
 
