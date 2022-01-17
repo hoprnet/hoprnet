@@ -13,7 +13,10 @@ import { debug } from '../process'
 import { green } from 'chalk'
 import { createRelayerKey } from '.'
 
-const logError = debug(`hopr-core:libp2p:error`)
+const DEBUG_PREFIX = `hopr-core:libp2p`
+
+const log = debug(DEBUG_PREFIX)
+const logError = debug(DEBUG_PREFIX.concat(`:error`))
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 10000
 
@@ -132,7 +135,7 @@ async function queryDHT(
   const relayers: Relayers[] = []
 
   const key = await createRelayerKey(destination)
-  console.log(`fetching key for node ${destination.toB58String()}`, key)
+  log(`fetching relay keys for node ${destination.toB58String()} from DHT.`, key)
   try {
     for await (const relayer of libp2p.contentRouting.findProviders(key, {
       timeout: DEFAULT_DHT_QUERY_TIMEOUT
@@ -150,6 +153,8 @@ async function queryDHT(
   if (relayers.length == 0) {
     return { status: DialStatus.DHT_ERROR, query: destination }
   }
+
+  log(`found ${relayers.map((relay) => relay.id.toB58String()).join(` ,`)} for node ${destination.toB58String()}.`)
 
   if (opts.signal.aborted) {
     return { status: DialStatus.ABORTED }
@@ -196,10 +201,6 @@ async function doDial(
 
   // Stop if there is no DHT available
   if (libp2p.contentRouting.routers.length == 0) {
-    console.trace()
-    console.log(libp2p)
-    console.log(libp2p.contentRouting)
-
     printPeerStoreAddresses(
       `Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT. Giving up`,
       knownAddresses
@@ -242,9 +243,12 @@ async function doDial(
 
   let conn: Awaited<ReturnType<LibP2P['dialProtocol']>>
 
-  for (const relay of dhtResult.relayers) {
+  for (const relayAddress of dhtResult.relayers) {
     try {
-      conn = await libp2p.dialProtocol(relay, [protocol])
+      // Try to establish a stream using the provided relay address
+      // will contact relay and relay will attempt to exchange data
+      // with the destination
+      conn = await libp2p.dialProtocol(relayAddress, [protocol])
       if (conn != null) {
         break
       }
