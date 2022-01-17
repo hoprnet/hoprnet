@@ -80,12 +80,6 @@ const config = {
           }
         ]
       },
-      algolia: {
-        appId: DOCS_ALGOLIA_APP_ID,
-        apiKey: DOCS_ALGOLIA_API_KEY,
-        indexName: 'docs_hoprnet_org',
-        contextualSearch: true
-      },
       footer: {
         /** style: 'dark',
         links: [
@@ -136,6 +130,16 @@ const config = {
         darkTheme: darkCodeTheme
       }
     })
+}
+
+// only configure Algolia if credentials are given
+if (DOCS_ALGOLIA_APP_ID && DOCS_ALGOLIA_API_KEY) {
+  config.algolia = {
+    appId: DOCS_ALGOLIA_APP_ID,
+    apiKey: DOCS_ALGOLIA_API_KEY,
+    indexName: 'docs_hoprnet_org',
+    contextualSearch: true
+  }
 }
 
 module.exports = config
