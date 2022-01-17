@@ -420,7 +420,7 @@ HOPRD_PERFORM_CLEANUP=true \
 ```
 
 The default Docker image in `scripts/setup-gcloud-cluster.sh` deploys GCloud public nodes. If you wish to deploy GCloud nodes
-that are behind NAT, you need to specify a NAT-variant of the `hoprd` image (note the `-nat` suffix in the image name): 
+that are behind NAT, you need to specify a NAT-variant of the `hoprd` image (note the `-nat` suffix in the image name):
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
