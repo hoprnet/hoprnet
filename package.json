@@ -49,7 +49,7 @@
     "rimraf": "3.0.2",
     "ts-node": "10.4.0",
     "typescript": "4.5.4",
-    "yargs": "17.2.1"
+    "yargs": "17.3.1"
   },
   "resolutions": {
     "@overnightjs/logger": "1.2.1",

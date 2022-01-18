@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.86.0-next.6",
+  "version": "1.86.0-next.16",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -28,7 +28,7 @@
     "lib"
   ],
   "dependencies": {
-    "@openzeppelin/contracts": "4.3.3",
+    "@openzeppelin/contracts": "4.4.2",
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.4.2"
   },
   "devDependencies": {
