@@ -300,35 +300,15 @@ for i in `seq 1 10`; do
 done
 
 # redeem tickets
+for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
+  log "Node ${node} should now redeem tickets"
+  result=$(run_command ${node} "redeemTickets" "Redeemed all tickets" 600)
+  log "-- ${result}"
+done
 
-log "Node 2 should now redeem tickets"
-result=$(run_command ${api2} "redeemTickets" "Redeemed all tickets" 600)
-log "-- ${result}"
-
-log "Node 3 should now redeem tickets"
-result=$(run_command ${api3} "redeemTickets" "Redeemed all tickets" 600)
-log "-- ${result}"
-
-log "Node 4 should now redeem tickets"
-result=$(run_command ${api4} "redeemTickets" "Redeemed all tickets" 600)
-log "-- ${result}"
-
-log "Node 5 should now redeem tickets"
-result=$(run_command ${api5} "redeemTickets" "Redeemed all tickets" 600)
-log "-- ${result}"
-
-log "Node 2 should now have no tickets"
-result=$(run_command ${api2} "tickets" "Unredeemed:       0" 600)
-log "-- ${result}"
-
-log "Node 3 should now have no tickets"
-result=$(run_command ${api3} "tickets" "Unredeemed:       0" 600)
-log "-- ${result}"
-
-log "Node 4 should now have no tickets"
-result=$(run_command ${api4} "tickets" "Unredeemed:       0" 600)
-log "-- ${result}"
-
-log "Node 5 should now have no tickets"
-result=$(run_command ${api5} "tickets" "Unredeemed:       0" 600)
-log "-- ${result}"
+# check for unredeemed tickets
+for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
+  log "Node ${node} should now have no tickets"
+  result=$(run_command ${node} "tickets" "Unredeemed:       0" 600)
+  log "-- ${result}"
+done
