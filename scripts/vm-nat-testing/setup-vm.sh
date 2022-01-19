@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 
 apt-get update
-apt-get -y install ca-certificates curl gnupg lsb-release net-tools iputils-ping socat traceroute
+apt-get -y install apt-utils ca-certificates curl gnupg lsb-release net-tools iputils-ping socat traceroute
 
 # Install NodeJS
 if ! command -v npm; then
 	curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
 	apt-get -y install nodejs
 
-	npm install -g npm
-	npm install -g yarn
+    # Get node.js package managers
+    corepack enable
 fi
 
 # Install Docker
 if ! command -v docker; then
-	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 	apt-get update
 	apt-get -y install docker-ce docker-ce-cli containerd.io
