@@ -362,9 +362,7 @@ class Indexer extends EventEmitter {
           case 'Transfer(address,address,uint256)':
             // handle HOPR token transfer
             this.indexEvent('withdraw-hopr', [event.transactionHash])
-            console.log('ON TRANSFER START')
             await this.onTransfer(event as TokenEvent<'Transfer'>)
-            console.log('ON TRANSFER END')
             break
           case 'TicketRedeemed':
           case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
