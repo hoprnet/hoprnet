@@ -298,3 +298,37 @@ for i in `seq 1 10`; do
   log "Node 1 send message to node 5"
   send_message "${api1}" "${addr5}" "hello, world" "" 600
 done
+
+# redeem tickets
+
+log "Node 2 should now redeem tickets"
+result=$(run_command ${api2} "redeemTickets" "Redeemed all tickets" 600)
+log "-- ${result}"
+
+log "Node 3 should now redeem tickets"
+result=$(run_command ${api3} "redeemTickets" "Redeemed all tickets" 600)
+log "-- ${result}"
+
+log "Node 4 should now redeem tickets"
+result=$(run_command ${api4} "redeemTickets" "Redeemed all tickets" 600)
+log "-- ${result}"
+
+log "Node 5 should now redeem tickets"
+result=$(run_command ${api5} "redeemTickets" "Redeemed all tickets" 600)
+log "-- ${result}"
+
+log "Node 2 should now have no tickets"
+result=$(run_command ${api2} "tickets" "Unredeemed:       0" 600)
+log "-- ${result}"
+
+log "Node 3 should now have no tickets"
+result=$(run_command ${api3} "tickets" "Unredeemed:       0" 600)
+log "-- ${result}"
+
+log "Node 4 should now have no tickets"
+result=$(run_command ${api4} "tickets" "Unredeemed:       0" 600)
+log "-- ${result}"
+
+log "Node 5 should now have no tickets"
+result=$(run_command ${api5} "tickets" "Unredeemed:       0" 600)
+log "-- ${result}"
