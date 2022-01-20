@@ -1,3 +1,5 @@
-build/
-!build/Dockerfile
-build_*
+/build/
+!/build/Dockerfile
+
+# Avado package builds
+/build_*
