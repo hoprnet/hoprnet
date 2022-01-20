@@ -35,8 +35,6 @@ usage() {
   msg
   msg "HOPRD_API_TOKEN\t\t\tused as api token for all nodes, defaults to a random value"
   msg "HOPRD_PASSWORD\t\t\tused as password for all nodes, defaults to a random value"
-  msg "HOPRD_PROVIDER\t\t\tused as provider for all nodes, defaults to infura/goerli"
-  msg "              \t\t\twhich requires the additional env var HOPRD_INFURA_KEY to be set"
   msg "HOPRD_RUN_CLEANUP_ONLY\t\tset to 'true' to execute the cleanup process only"
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_SKIP_CLEANUP\t\tset to 'true' to skip the cleanup process and keep resources running"
@@ -47,12 +45,13 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
-declare test_id="e2e-gcloud-test-${1:-$RANDOM-$RANDOM}"
-declare docker_image=${2:-gcr.io/hoprassociation/hoprd:latest}
+declare environment="${1?"missing parameter <environment>"}"
+declare test_id="e2e-gcloud-test-${2:-${environment}-${RANDOM}}"
+declare docker_image=${3:-gcr.io/hoprassociation/hoprd:${environment}}
+declare docker_image_nat="${docker_image%:*}-nat:${docker_image#*:}"
 
-declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}%${RANDOM}%${RANDOM}Token}"
+declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
-declare provider="${HOPRD_PROVIDER:-https://goerli.infura.io/v3/${HOPRD_INFURA_KEY}}"
 declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 declare run_cleanup_only="${HOPRD_RUN_CLEANUP_ONLY:-false}"
@@ -70,16 +69,6 @@ function cleanup {
   gcloud_delete_instance_template "${test_id}"
 
   exit $EXIT_CODE
-}
-
-function fund_ip() {
-  local ip="${1}"
-  local eth_address
-
-  wait_until_node_is_ready "${ip}"
-  eth_address=$(get_native_address "${ip}:3001")
-  fund_if_empty "${eth_address}" "${provider}"
-  wait_for_port "9091" "${ip}"
 }
 
 if [ "${run_cleanup_only}" = "1" ] || [ "${run_cleanup_only}" = "true" ]; then
@@ -100,7 +89,7 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
   log "\ttest_id: ${test_id}"
   log "\tapi_token: ${api_token}"
   log "\tpassword: ${password}"
-  log "\tprovider: ${provider}"
+  log "\tenvironment: ${environment}"
   log "\tskip_cleanup: ${skip_cleanup}"
   log "\tshow_prestartinfo: ${show_prestartinfo}"
   log "\trun_cleanup_only: ${run_cleanup_only}"
@@ -110,39 +99,55 @@ fi
 # create test specific instance template
 gcloud_create_or_update_instance_template "${test_id}" \
   "${docker_image}" \
-  "${provider}" \
+  "${environment}" \
+  "${api_token}" \
+  "${password}"
+
+# create test specific instance template for NAT nodes
+gcloud_create_or_update_instance_template "${test_id}-nat" \
+  "${docker_image_nat}" \
+  "${environment}" \
   "${api_token}" \
   "${password}"
 #
 # start nodes
 gcloud_create_or_update_managed_instance_group "${test_id}" \
-  6 \
+  4 \
   "${test_id}"
 
-# get IPs of newly started VMs which run hoprd
-declare node_ips
-node_ips=$(gcloud_get_managed_instance_group_instances_ips "${test_id}")
-declare node_ips_arr=( ${node_ips} )
+# start nodes NAT
+gcloud_create_or_update_managed_instance_group "${test_id}-nat" \
+  2 \
+  "${test_id}-nat"
 
-#  --- Fund nodes --- {{{
+# get IPs of newly started VMs which run hoprd
+declare node_ips node_ips_nat
+node_ips=$(gcloud_get_managed_instance_group_instances_ips "${test_id}")
+node_ips_nat=$(gcloud_get_managed_instance_group_instances_ips "${test_id}-nat")
+declare node_ips_arr=( ${node_ips_nat} ${node_ips} )
+
+#  --- Fund all nodes --- {{{
 declare eth_address
-for ip in ${node_ips}; do
+for ip in "${node_ips_arr[@]}"; do
   wait_until_node_is_ready "${ip}"
-  eth_address=$(get_native_address "${ip}:3001")
-  fund_if_empty "${eth_address}" "${provider}"
+  eth_address=$(get_native_address "${api_token}@${ip}:3001")
+  fund_if_empty "${eth_address}" "${environment}"
 done
 
+# We can only wait for the non-NAT nodes to come up, nodes behind NAT do not expose 9091
+# Since the NAT'd nodes are funded first, we just assume they have enough time to startup
+# while other public nodes have started up.
 for ip in ${node_ips}; do
   wait_for_port "9091" "${ip}"
 done
 # }}}
 
-# --- Run security tests --- {{{
+# --- Run security tests on the first public node --- {{{
 "${mydir}/../test/security-test.sh" \
-  "${node_ips_arr[0]}" 3001 3000
+  "${node_ips[0]}" 3001 3000 3001 "${api_token}"
 #}}}
 
 # --- Run test --- {{{
-"${mydir}/../test/integration-test.sh" \
+HOPRD_API_TOKEN="${api_token}" "${mydir}/../test/integration-test.sh" \
   ${node_ips_arr[@]/%/:3001}
 # }}}
