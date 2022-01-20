@@ -41,7 +41,7 @@
     "wrtc": "0.4.7"
   },
   "devDependencies": {
-    "@chainsafe/libp2p-noise": "5.0.0",
+    "@chainsafe/libp2p-noise": "5.0.2",
     "@types/bl": "5.0.2",
     "@types/chai": "4.3.0",
     "@types/chai-spies": "1.0.3",
