@@ -154,7 +154,7 @@ async function queryDHT(
     return { status: DialStatus.DHT_ERROR, query: destination }
   }
 
-  log(`found ${relayers.map((relay) => relay.id.toB58String()).join(` ,`)} for node ${destination.toB58String()}.`)
+  log(`found ${relayers.map((relay) => relay.id.toB58String()).join(' ,')} for node ${destination.toB58String()}.`)
 
   if (opts.signal.aborted) {
     return { status: DialStatus.ABORTED }
