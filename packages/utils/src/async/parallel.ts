@@ -1,7 +1,7 @@
 type WorkerType<Return> = Promise<{
   resultIndex: number
   workerIndex: number
-  value: Return
+  value: Return | Error
 }>
 
 /**
@@ -57,7 +57,7 @@ export async function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
 
   let activeWorkers = currentIndex
 
-  const results = new Array<Return>(args.length)
+  const results = new Array<Return | Error>(args.length)
 
   while (activeWorkers > 0) {
     let functionResult: Awaited<WorkerType<Return>>
