@@ -3,15 +3,21 @@ Vagrant.configure("2") do |config|
   # on macOS M1 machines we must use the arm64 image
   arch = %x( uname -m )
   if arch.match(/arm64/) then
-    config.vm.box = "bento/ubuntu-20.04-arm64"
+    config.vm.box = "generic/ubuntu2004-arm64"
   else
-    config.vm.box = "bento/ubuntu-20.04"
+    config.vm.box = "generic/ubuntu2004"
   end
 
   # shared configuration for all VMs
   config.vm.provision "shell", path: "setup-vm.sh", privileged: true
   config.vm.synced_folder "../../", "/opt/hopr"
-  config.vm.box_version = "202112.19.0"
+
+  config.vm.provider :libvirt do |virt, override|
+    # Use NFS export on Linux
+    override.vm.synced_folder "../../", "/opt/hopr", type: "nfs"
+    # No need for any remote desktop environment
+    virt.graphics_type = "none"
+  end
 
   config.vm.define "hoprd-hardhat" do |hat|
     hat.vm.hostname = "hardhat.box"
