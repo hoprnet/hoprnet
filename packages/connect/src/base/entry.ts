@@ -244,8 +244,8 @@ export class EntryNodes extends EventEmitter {
 
     const results = (await nAtATime(connectToRelay, args, ENTRY_NODES_MAX_PARALLEL_DIALS))
       .filter(
-        // Filter all unsuccessful dials
-        (value) => !(value instanceof Error)
+        // Filter all unsuccessful dials that cause an error
+        (value): value is { entry: EntryNodeData; conn: Connection | undefined } => !(value instanceof Error)
       )
       .sort(latencyCompare)
 

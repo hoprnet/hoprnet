@@ -44,7 +44,7 @@ export async function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
   fn: (...args: Args) => Promise<Return>,
   args: Args[],
   concurrency: number
-): Promise<Return[]> {
+): Promise<(Return | Error)[]> {
   if (concurrency <= 0) {
     return []
   }
