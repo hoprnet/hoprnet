@@ -39,6 +39,12 @@ on the host machine will automatically propagate to the VMs.
 The host directory `/tmp/hopr-identities` (created automatically on host) is mapped to `/var/hopr/identities` on all 3 guest VMs. This
 directory serves as a storage for identity files that can be used to fund all nodes.
 
+# Installation
+
+- install Vagrant, see https://www.vagrantup.com/docs/installation
+
+On \*nix system, you might want to use `libvirt`, see Vagrant [libvirt plugin](https://github.com/vagrant-libvirt/vagrant-libvirt#installation).
+
 # Usage
 
 Startup your terminal in `scripts/vm-nat-testing`.
@@ -49,6 +55,12 @@ To setup the environment first run:
 
 ```shell
 vagrant up
+```
+
+On \*nix systems:
+
+```shell
+vagrant up --provider=libvirt
 ```
 
 ## Basic usage

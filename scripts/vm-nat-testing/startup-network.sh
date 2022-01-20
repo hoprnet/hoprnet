@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
 
-cd /opt/hopr/ || exit 1
+declare hopr_dir="/opt/hopr"
 
-declare log_file="/tmp/hardhat.logs"
+cd ${hopr_dir} || exit 1
 
-if [ "$(curl -s -o /dev/null -w ''%{http_code}'' $provider_ip:8545)" != "200" ]; then
-	# make sure other instances are killed
+declare hardhat_rpc_log="/tmp/hardhat.logs"
+
+if [ "$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ]; then
+	# make sure other node instances are killed
 	sudo pkill node || :
 	# Start the HardHat network on localhost
 	echo "Starting HardHat network..."
-	HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network > ${log_file} 2>&1 &
+	TS_NODE_PROJECT=${hopr_dir}/packages/ethereum/tsconfig.hardhat.json \
+	HOPR_ENVIRONMENT_ID=hardhat-localhost \
+	DEVELOPMENT=true \
+	yarn workspace @hoprnet/hopr-ethereum hardhat node > ${hardhat_rpc_log} 2>&1 &
 fi
 
 while [[
 	"$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ||
-	! -f "${log_file}" ||
-  -z "$(grep "Started HTTP and WebSocket JSON-RPC server" "${log_file}" || echo "")"
+	! -f "${hardhat_rpc_log}" ||
+  -z "$(grep "Started HTTP and WebSocket JSON-RPC server" "${hardhat_rpc_log}" || echo "")"
 	]] ; do
 	echo "Waiting for hardhat network to come up..."
 	sleep 5;
