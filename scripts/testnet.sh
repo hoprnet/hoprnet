@@ -15,8 +15,12 @@ source "${mydir}/utils.sh"
 source "${mydir}/gcloud.sh"
 source "${mydir}/dns.sh"
 
-declare min_funds=0.01291
-declare min_funds_hopr=0.5
+# Native (e.g. XDAI)
+declare min_funds=0.1
+
+# HOPR tokens
+# a topology node uses 0.5 HOPR to open channels, the rest are left in reserve
+declare min_funds_hopr=1
 
 # $1=role (ie. node-4)
 # $2=network name
@@ -48,37 +52,17 @@ fund_if_empty() {
   local address="${1}"
   local environment="${2}"
 
-  # start funding in parallel
-  PRIVATE_KEY="${FUNDING_PRIV_KEY}" ${mydir}/fund-address.ts \
-	  --environment ${environment} --address ${address} --target ${min_funds} &
+  # start funding in sequence (nonce-tracker will not be able to keep track of nonce in two processes)
+  # we need to use yarn explicitely to ensure packages can be resolved properly
+  PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
+	  --environment ${environment} --address ${address} --target ${min_funds}
 
-  PRIVATE_KEY="${FUNDING_PRIV_KEY}" ${mydir}/fund-address.ts \
-	  --environment ${environment} --address ${address} --target ${min_funds_hopr} --erc20 &
+  sleep 10
 
-  # wait until both funding procedures have completed
-  wait
-}
+  PRIVATE_KEY="${FUNDING_PRIV_KEY}" yarn --silent run ts-node ${mydir}/fund-address.ts \
+	  --environment ${environment} --address ${address} --target ${min_funds_hopr} --erc20
 
-# $1=IP
-# $2=optional: port, defaults to 3001
-get_eth_address(){
-  local ip=${1}
-  local port=${2:-3001}
-  local cmd="curl --silent --max-time 5 ${ip}:${port}/api/v1/address/eth"
-
-  # try every 5 seconds for 5 minutes
-  try_cmd "${cmd}" 30 5 true
-}
-
-# $1=IP
-# $2=optional: port, defaults to 3001
-get_hopr_address() {
-  local ip=${1}
-  local port=${2:-3001}
-  local cmd="curl --silent --max-time 5 ${ip}:${port}/api/v1/address/hopr"
-
-  # try every 5 seconds for 5 minutes
-  try_cmd "${cmd}" 30 5 true
+  sleep 10
 }
 
 # $1=IP
@@ -180,7 +164,7 @@ start_testnode() {
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
   wait_until_node_is_ready ${ip}
-  eth_address=$(get_eth_address "${ip}")
+  eth_address=$(get_native_address "${ip}:3001")
   fund_if_empty "${eth_address}" "${environment_id}"
 }
 

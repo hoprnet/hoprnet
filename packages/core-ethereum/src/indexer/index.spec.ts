@@ -1,183 +1,12 @@
-import type { providers as Providers, Wallet } from 'ethers'
-import type { HoprChannels, HoprToken } from '@hoprnet/hopr-ethereum'
-import type { Event, TokenEvent } from './types'
-import type { ChainWrapper } from '../ethereum'
+import { BigNumber } from 'ethers'
 import assert from 'assert'
-import EventEmitter from 'events'
-import Indexer from '.'
-import { Address, ChannelEntry, Hash, HoprDB, generateChannelId, ChannelStatus, defer } from '@hoprnet/hopr-utils'
+import { ChannelEntry, Hash, ChannelStatus, defer } from '@hoprnet/hopr-utils'
+
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
 import { PARTY_A, PARTY_B } from '../fixtures'
-import { BigNumber } from 'ethers'
-
-const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
-  let latestBlockNumber = ops.latestBlockNumber ?? 0
-
-  const provider = new EventEmitter() as unknown as Providers.WebSocketProvider
-  provider.getBlockNumber = async (): Promise<number> => latestBlockNumber
-
-  return {
-    provider,
-    newBlock() {
-      latestBlockNumber++
-      provider.emit('block', latestBlockNumber)
-    }
-  }
-}
-
-const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
-  const pastEvents = ops.pastEvents ?? []
-  const channels: any = {}
-  const pubkeys: any = {}
-
-  const handleEvent = (ev) => {
-    if (ev.event == 'ChannelUpdated') {
-      const updateEvent = ev as Event<'ChannelUpdated'>
-
-      const eventChannelId = generateChannelId(
-        Address.fromString(updateEvent.args.source),
-        Address.fromString(updateEvent.args.destination)
-      )
-      channels[eventChannelId.toHex()] = updateEvent.args.newState
-    } else if (ev.event == 'Announce') {
-      pubkeys[ev.args.account] = ev.args.multiaddr
-    } else {
-      //throw new Error("MISSING EV HANDLER IN TEST")
-    }
-  }
-
-  class FakeChannels extends EventEmitter {
-    async channels(channelId: string) {
-      for (let ev of pastEvents) {
-        handleEvent(ev)
-      }
-      return channels[channelId]
-    }
-
-    async bumpChannel(_counterparty: string, _comm: string) {
-      let newEvent = {
-        event: 'ChannelUpdated',
-        transactionHash: '',
-        blockNumber: 3,
-        transactionIndex: 0,
-        logIndex: 0,
-        args: {
-          source: PARTY_B.toAddress().toHex(),
-          destination: PARTY_A.toAddress().toHex(),
-          newState: {
-            balance: BigNumber.from('3'),
-            commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
-            ticketEpoch: BigNumber.from('1'),
-            ticketIndex: BigNumber.from('0'),
-            status: 2,
-            channelEpoch: BigNumber.from('0'),
-            closureTime: BigNumber.from('0')
-          }
-        } as any
-      } as Event<'ChannelUpdated'>
-      handleEvent(newEvent)
-      this.emit('*', newEvent)
-    }
-
-    async queryFilter() {
-      return pastEvents
-    }
-  }
-
-  const hoprChannels = new FakeChannels() as unknown as HoprChannels
-
-  return {
-    hoprChannels,
-    pubkeys,
-    newEvent(event: Event<any>) {
-      pastEvents.push(event)
-      hoprChannels.emit('*', event)
-    }
-  }
-}
-const createHoprTokenMock = () => {
-  class FakeToken extends EventEmitter {
-    async transfer() {
-      let newEvent = {
-        event: 'Transfer',
-        transactionHash: '',
-        blockNumber: 8,
-        transactionIndex: 0,
-        logIndex: 0,
-        args: {
-          source: PARTY_A.toAddress().toHex(),
-          destination: PARTY_B.toAddress().toHex(),
-          balance: BigNumber.from('1')
-        } as any
-      } as TokenEvent<'Transfer'>
-      this.emit('*', newEvent)
-    }
-  }
-
-  const hoprToken = new FakeToken() as unknown as HoprToken
-
-  return {
-    hoprToken,
-    newEvent(event: Event<any>) {
-      hoprToken.emit('*', event)
-    }
-  }
-}
-
-const createChainMock = (
-  provider: Providers.WebSocketProvider,
-  hoprChannels: HoprChannels,
-  hoprToken: HoprToken,
-  account?: Wallet
-): ChainWrapper => {
-  return {
-    getLatestBlockNumber: () => provider.getBlockNumber(),
-    subscribeBlock: (cb) => provider.on('block', cb),
-    subscribeError: (cb) => {
-      provider.on('error', cb)
-      hoprChannels.on('error', cb)
-    },
-    subscribeChannelEvents: (cb) => hoprChannels.on('*', cb),
-    subscribeTokenEvents: (cb) => hoprToken.on('*', cb),
-    getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) => [],
-    updateConfirmedTransaction: (_hash: string) => {},
-    unsubscribe: () => {
-      provider.removeAllListeners()
-      hoprChannels.removeAllListeners()
-    },
-    getChannels: () => hoprChannels,
-    getWallet: () => account ?? fixtures.ACCOUNT_A,
-    setCommitment: (counterparty: Address, commitment: Hash) =>
-      hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex())
-  } as unknown as ChainWrapper
-}
-
-const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
-  const latestBlockNumber = ops.latestBlockNumber ?? 0
-  const pastEvents = ops.pastEvents ?? []
-
-  const db = HoprDB.createMock()
-  const { provider, newBlock } = createProviderMock({ latestBlockNumber })
-  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
-  const { hoprToken } = createHoprTokenMock()
-  const chain = createChainMock(provider, hoprChannels, hoprToken)
-  return {
-    db,
-    provider,
-    newBlock,
-    hoprChannels,
-    newEvent,
-    indexer: new Indexer(Address.fromString(fixtures.ACCOUNT_A.address), db, 1, 5),
-    chain,
-    OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
-      Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
-    ),
-    COMMITTED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.COMMITTED_EVENT, (a: Address) =>
-      Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
-    )
-  }
-}
+import type { Event } from './types'
+import { useFixtures } from './index.mock'
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
@@ -188,11 +17,49 @@ describe('test indexer', function () {
   })
 
   it('should stop indexer', async function () {
-    const { indexer, chain } = await useFixtures()
+    const { indexer, chain, hoprChannels, hoprToken, provider } = await useFixtures()
 
     await indexer.start(chain, 0)
-    await indexer.stop()
+
+    // Make sure that it assigns event listeners
+    assert(hoprChannels.listeners('*').length > 0)
+    assert(hoprToken.listeners('*').length > 0)
+    assert(hoprChannels.listeners('error').length > 0)
+    assert(hoprToken.listeners('error').length > 0)
+    assert(provider.listeners('error').length > 0)
+    assert(provider.listeners('block').length > 0)
+
+    indexer.stop()
+
+    // Make sure that it does the cleanup properly
+    assert(hoprChannels.listeners('*').length == 0)
+    assert(hoprToken.listeners('*').length == 0)
+    assert(hoprChannels.listeners('error').length == 0)
+    assert(hoprToken.listeners('error').length == 0)
+    assert(provider.listeners('error').length == 0)
+    assert(provider.listeners('block').length == 0)
+
     assert.strictEqual(indexer.status, 'stopped')
+  })
+
+  it('should restart the indexer', async function () {
+    const { indexer, chain, hoprChannels, hoprToken, provider } = await useFixtures()
+
+    await indexer.start(chain, 0)
+
+    for (let i = 0; i < 5; i++) {
+      await indexer.restart()
+    }
+
+    indexer.stop()
+
+    // Make sure that it does the cleanup properly
+    assert(hoprChannels.listeners('*').length == 0)
+    assert(hoprToken.listeners('*').length == 0)
+    assert(hoprChannels.listeners('error').length == 0)
+    assert(hoprToken.listeners('error').length == 0)
+    assert(provider.listeners('error').length == 0)
+    assert(provider.listeners('block').length == 0)
   })
 
   it('should process 1 past event', async function () {
@@ -302,6 +169,25 @@ describe('test indexer', function () {
     assert.strictEqual(indexer.status, 'started')
   })
 
+  it('should handle provider error and resend queuing transactions', async function () {
+    const { indexer, provider, chain } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+    })
+
+    await indexer.start(chain, 0)
+    provider.emit('error', new Error('ECONNRESET'))
+
+    assert.strictEqual(indexer.status, 'stopped')
+
+    const started = defer<void>()
+    indexer.on('status', (status: string) => {
+      if (status === 'started') started.resolve()
+    })
+    await started.promise
+    assert.strictEqual(indexer.status, 'started')
+  })
+
   it('should contract error by restarting', async function () {
     const { indexer, hoprChannels, chain } = await useFixtures({
       latestBlockNumber: 4,
@@ -324,7 +210,8 @@ describe('test indexer', function () {
     this.timeout(5000)
     const { indexer, newEvent, newBlock, chain } = await useFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT],
+      id: fixtures.PARTY_A
     })
 
     const opened = defer<void>()
@@ -455,5 +342,201 @@ describe('test indexer', function () {
 
     const channel = await db.getChannel(COMMITTED_CHANNEL.getId())
     expectChannelsToBeEqual(channel, COMMITTED_CHANNEL)
+  })
+
+  it('should process TicketRedeemed event and reduce outstanding balance for sender', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ],
+      id: fixtures.PARTY_A
+    })
+    // sender node has pending ticket...
+    await db.markPending(fixtures.oneLargeTicket)
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '2')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+  })
+
+  it('should process TicketRedeemed event and not reduce outstanding balance for sender when db has no outstanding balance', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ],
+      id: fixtures.PARTY_A
+    })
+    // sender node has pending ticket...
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+  })
+
+  it('should process TicketRedeemed event and not reduce outstanding balance for recipient', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ],
+      id: fixtures.PARTY_B
+    })
+    // recipient node has no ticket...
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+  })
+
+  it('should process TicketRedeemed event and not reduce outstanding balance for a third node', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ]
+    })
+    // recipient node has no ticket...
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+  })
+
+  it('should process TicketRedeemed event and reduce outstanding balance to zero for sender when some history is missing', async function () {
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [
+        fixtures.PARTY_A_INITIALIZED_EVENT,
+        fixtures.PARTY_B_INITIALIZED_EVENT,
+        fixtures.OPENED_EVENT,
+        fixtures.COMMITTED_EVENT
+      ],
+      id: fixtures.PARTY_A
+    })
+    // sender node has some pending tickets, but not the entire history...
+    await db.markPending(fixtures.oneSmallTicket)
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '1')
+
+    const blockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 7) blockMined.resolve()
+    })
+    await indexer.start(chain, 0)
+
+    newEvent(fixtures.UPDATED_WHEN_REDEEMED_EVENT)
+    newEvent(fixtures.TICKET_REDEEMED_EVENT)
+    newBlock()
+    newBlock()
+    newBlock()
+
+    await blockMined.promise
+    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+  })
+
+  it('should process Transfer events and reduce balance', async function () {
+    const { indexer, chain, newBlock, newTokenEvent, db } = await useFixtures({
+      latestBlockNumber: 0,
+      pastEvents: [],
+      id: fixtures.PARTY_A
+    })
+
+    const secondBlockMined = defer<void>()
+    const thirdBlockMined = defer<void>()
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 2) secondBlockMined.resolve()
+      else if (blockNumber === 3) thirdBlockMined.resolve()
+    })
+
+    await indexer.start(chain, 0)
+
+    assert.equal((await db.getHoprBalance()).toString(), '0')
+
+    newTokenEvent(fixtures.PARTY_A_TRANSFER_INCOMING) // +3
+    newBlock()
+    newBlock()
+
+    await secondBlockMined.promise
+
+    newTokenEvent(fixtures.PARTY_A_TRANSFER_OUTGOING) // -1
+    newBlock()
+    newBlock()
+
+    await thirdBlockMined.promise
+
+    assert.equal((await db.getHoprBalance()).toString(), '2')
   })
 })

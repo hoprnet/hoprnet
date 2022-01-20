@@ -5,17 +5,21 @@ import { decode } from 'rlp'
 import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
+import { setTimeout } from 'timers/promises'
 
-import Hopr, { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
+import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 import setupAPI from './api'
+import setupHealthcheck from './healthcheck'
 import { AdminServer } from './admin'
 import { Commands } from './commands'
 import { LogStream } from './logs'
 import { getIdentity } from './identity'
 
-import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import type { HoprOptions } from '@hoprnet/hopr-core'
+import { setLogger } from 'trace-unhandled'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -41,6 +45,7 @@ const argv = yargs(process.argv.slice(2))
     default: defaultEnvironment()
   })
   .option('host', {
+    string: true,
     describe: 'The network host to run the HOPR node on.',
     default: '0.0.0.0:9091'
   })
@@ -56,15 +61,17 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('rest', {
     boolean: true,
-    describe: 'Run a rest interface on localhost:3001, requires --apiToken',
+    describe: 'Expose the Rest API on localhost:3001, requires --apiToken',
     default: false
   })
   .option('restHost', {
-    describe: 'Updates the host for the rest server',
+    string: true,
+    describe: 'Set host IP to which the Rest API server will bind',
     default: 'localhost'
   })
   .option('restPort', {
-    describe: 'Updates the port for the rest server',
+    number: true,
+    describe: 'Set host port to which the Rest API server will bind',
     default: 3001
   })
   .option('healthCheck', {
@@ -73,10 +80,12 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .option('healthCheckHost', {
+    string: true,
     describe: 'Updates the host for the healthcheck server',
     default: 'localhost'
   })
   .option('healthCheckPort', {
+    number: true,
     describe: 'Updates the port for the healthcheck server',
     default: 8080
   })
@@ -86,28 +95,32 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .option('forwardLogsProvider', {
+    string: true,
     describe: 'A provider url for the logging sink node to use',
     default: 'https://ceramic-clay.3boxlabs.com'
   })
   .option('password', {
+    string: true,
     describe: 'A password to encrypt your keys',
     default: ''
   })
   .option('apiToken', {
-    describe: 'A REST API token and admin panel password for user authentication',
     string: true,
+    describe: 'A REST API token and admin panel password for user authentication',
     default: undefined
   })
   .option('privateKey', {
-    describe: 'A private key to be used for your HOPR node',
     string: true,
+    describe: 'A private key to be used for your HOPR node',
     default: undefined
   })
   .option('identity', {
+    string: true,
     describe: 'The path to the identity file',
     default: DEFAULT_ID_PATH
   })
   .option('run', {
+    string: true,
     describe: 'Run a single hopr command, same syntax as in hopr-admin',
     default: ''
   })
@@ -117,6 +130,7 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .option('data', {
+    string: true,
     describe: 'manually specify the database directory to use',
     default: ''
   })
@@ -126,10 +140,12 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .option('adminHost', {
+    string: true,
     describe: 'Host to listen to for admin console',
     default: 'localhost'
   })
   .option('adminPort', {
+    string: true,
     describe: 'Port to listen to for admin console',
     default: 3000
   })
@@ -153,6 +169,24 @@ const argv = yargs(process.argv.slice(2))
     describe: 'no remote authentication for easier testing',
     default: false
   })
+  .option('testNoDirectConnections', {
+    boolean: true,
+    describe: 'NAT traversal testing: prevent nodes from establishing direct TCP connections',
+    default: false,
+    hidden: true
+  })
+  .option('testNoWebRTCUpgrade', {
+    boolean: true,
+    describe: 'NAT traversal testing: prevent nodes from establishing direct TCP connections',
+    default: false,
+    hidden: true
+  })
+  .option('testNoUPNP', {
+    boolean: true,
+    describe: 'NAT traversal testing: disable automatic detection of external IP address using UPNP',
+    default: false,
+    hidden: true
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -173,14 +207,19 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
+function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
     announce: argv.announce,
     hosts: parseHosts(),
-    announceLocalAddresses: argv.testAnnounceLocalAddresses,
-    preferLocalAddresses: argv.testPreferLocalAddresses,
-    environment
+    environment,
+    testing: {
+      announceLocalAddresses: argv.testAnnounceLocalAddresses,
+      preferLocalAddresses: argv.testPreferLocalAddresses,
+      noWebRTCUpgrade: argv.testNoWebRTCUpgrade,
+      noDirectConnections: argv.testNoDirectConnections,
+      noUPNP: argv.testNoUPNP
+    }
   }
 
   if (argv.password !== undefined) {
@@ -194,8 +233,9 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
 }
 
 function addUnhandledPromiseRejectionHandler() {
-  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+  require('trace-unhandled/register')
+  setLogger((msg) => {
+    console.error(msg)
     process.exit(1)
   })
 }
@@ -216,8 +256,11 @@ async function main() {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
       let [decoded, time] = decode(msg) as [Buffer, Buffer]
-      logs.log('Message:', decoded.toString())
-      logs.log('Latency:', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+      logs.log(`Message: ${decoded.toString()}`)
+      logs.log(`Latency: ${Date.now() - parseInt(time.toString('hex'), 16)}ms`)
+
+      // also send it tagged as message for apps to use
+      logs.logMessage(decoded.toString())
     } catch (err) {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())
@@ -258,88 +301,94 @@ async function main() {
   }
 
   const environment = resolveEnvironment(argv.environment)
-  let options = await generateNodeOptions(environment)
+  let options = generateNodeOptions(environment)
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
     process.exit(0)
   }
 
-  // 1. Find or create an identity
-  const peerId = await getIdentity({
-    initialize: argv.init,
-    idPath: argv.identity,
-    password: argv.password,
-    useWeakCrypto: argv.testUseWeakCrypto,
-    privateKey: argv.privateKey
-  })
-
-  // 2. Create node instance
   try {
+    // 1. Find or create an identity
+    const peerId = await getIdentity({
+      initialize: argv.init,
+      idPath: argv.identity,
+      password: argv.password,
+      useWeakCrypto: argv.testUseWeakCrypto,
+      privateKey: argv.privateKey
+    })
+
+    // 2. Create node instance
+
     logs.log('Creating HOPR Node')
-    node = createHoprNode(peerId, options)
+    node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
     node.on('hopr:message', logMessageToNode)
+    node.on('hopr:connector:created', () => {
+      // 2.b - Connector has been created, and we can now trigger the next set of steps.
+      logs.log('Connector has been loaded properly.')
+      node.emit('hopr:monitoring:start')
+    })
+    node.on('hopr:monitoring:start', async () => {
+      // 3. start all monitoring services, and continue with the rest of the setup.
 
-    // 2.1 start all monitoring services
-
-    if (argv.rest) {
-      setupAPI(node, logs, argv)
-    }
-
-    if (argv.healthCheck) {
-      const http = require('http')
-      const service = require('restana')()
-      service.get('/healthcheck/v1/version', (_, res) => res.send(node.getVersion()))
-      const hostname = argv.healthCheckHost
-      const port = argv.healthCheckPort
-      const server = http.createServer(service).on('error', (err) => {
-        throw err
-      })
-      server.listen(port, hostname, (err) => {
-        if (err) throw err
-        logs.log(`Healthcheck server on ${hostname} listening on port ${port}`)
-      })
-    }
-
-    logs.log(`Node address: ${node.getId().toB58String()}`)
-
-    const ethAddr = (await node.getEthereumAddress()).toHex()
-    const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
-
-    logs.log(`Node is not started, please fund this node ${ethAddr} with atleast ${fundsReq}`)
-
-    // 2.5 Await funding of wallet.
-    await node.waitForFunds()
-    logs.log('Node has been funded, starting...')
-
-    // 3. Start the node.
-    await node.start()
-    cmds = new Commands(node)
-
-    if (adminServer) {
-      adminServer.registerNode(node, cmds)
-    }
-
-    logs.logStatus('READY')
-    logs.log('Node has started!')
-
-    if (argv.run && argv.run !== '') {
-      // Run a single command and then exit.
-      // We support multiple semicolon separated commands
-      let toRun = argv.run.split(';')
-
-      for (let c of toRun) {
-        console.error('$', c)
-        if (c === 'daemonize') {
-          return
-        }
-        await cmds.execute((msg) => {
-          logs.log(msg)
-        }, c)
+      if (argv.rest) {
+        setupAPI(node, logs, argv)
       }
-      await node.stop()
-      process.exit(0)
-    }
+
+      if (argv.healthCheck) {
+        setupHealthcheck(node, logs, argv.healthCheckHost, argv.healthCheckPort)
+      }
+
+      logs.log(`Node address: ${node.getId().toB58String()}`)
+
+      const ethAddr = node.getEthereumAddress().toHex()
+      const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
+
+      logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
+
+      // 2.5 Await funding of wallet.
+      await node.waitForFunds()
+      logs.log('Node has been funded, starting...')
+
+      // 3. Start the node.
+      await node.start()
+      cmds = new Commands(node)
+
+      if (adminServer) {
+        adminServer.registerNode(node, cmds)
+      }
+
+      logs.logStatus('READY')
+      logs.log('Node has started!')
+
+      if (argv.run && argv.run !== '') {
+        // Run a single command and then exit.
+        // We support multiple semicolon separated commands
+        let toRun = argv.run.split(';').map((c: string) =>
+          // Remove obsolete ' and "
+          c.replace(/"/g, '')
+        )
+
+        for (let c of toRun) {
+          console.error('$', c)
+          if (c === 'daemonize') {
+            return
+          }
+          await cmds.execute((msg) => {
+            logs.log(msg)
+          }, c)
+        }
+        // Wait for actions to take place
+        await setTimeout(1e3)
+        await node.stop()
+        return
+      }
+    })
+
+    // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
+    logs.log(`Ready to request on-chain connector to connect to provider.`)
+    node.subscribeOnConnector('connector:created', () => node.emit('hopr:connector:created'))
+    node.emitOnConnector('connector:create')
   } catch (e) {
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)

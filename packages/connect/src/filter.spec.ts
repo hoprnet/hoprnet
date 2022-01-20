@@ -1,10 +1,13 @@
 import type { Network } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from 'multiaddr'
-import PeerId from 'peer-id'
 import { Filter } from './filter'
 import assert from 'assert'
-import { toNetworkPrefix } from '@hoprnet/hopr-utils'
+import { toNetworkPrefix, privKeyToPeerId } from '@hoprnet/hopr-utils'
+
+let firstPeer = privKeyToPeerId(`0x22f7c3c101db7a73c42d3adecbd2700173f19a249b5ef115c25020b091822083`)
+let secondPeer = privKeyToPeerId(`0xbb25701334f6f989ab51322d0064b3755fc3a65770e4a240df163c355bd8cd26`)
+let thirdPeer = privKeyToPeerId(`0x175590e95d378e66572e09bc9d8badffe087ae962fc7551f17380293d1ca2fc5`)
 
 class TestFilter extends Filter {
   /**
@@ -18,13 +21,7 @@ class TestFilter extends Filter {
 }
 
 describe('test addr filtering', function () {
-  let firstPeer: PeerId, secondPeer: PeerId
   let filter: TestFilter
-
-  before(async function () {
-    firstPeer = await PeerId.create({ keyType: 'secp256k1' })
-    secondPeer = await PeerId.create({ keyType: 'secp256k1' })
-  })
 
   beforeEach(function () {
     filter = new TestFilter(firstPeer)
@@ -46,6 +43,16 @@ describe('test addr filtering', function () {
       filter.filter(new Multiaddr(`/p2p/${secondPeer.toB58String()}/p2p-circuit/p2p/${secondPeer.toB58String()}`)) ==
         false,
       'Should not accept loopbacks'
+    )
+
+    filter.setAddrs(
+      [new Multiaddr(`/ip4/1.1.1.1/tcp/123/p2p/${firstPeer.toB58String()}`)],
+      [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${firstPeer.toB58String()}`)]
+    )
+
+    assert(
+      filter.filter(new Multiaddr(`/p2p/${secondPeer.toB58String()}/p2p-circuit/p2p/${thirdPeer.toB58String()}`)) ==
+        true
     )
   })
 

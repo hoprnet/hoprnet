@@ -77,7 +77,7 @@ function fund_ip() {
   local eth_address
 
   wait_until_node_is_ready "${ip}"
-  eth_address=$(get_eth_address "${ip}")
+  eth_address=$(get_native_address "${ip}:3001")
   fund_if_empty "${eth_address}" "${provider}"
   wait_for_port "9091" "${ip}"
 }
@@ -128,7 +128,7 @@ declare node_ips_arr=( ${node_ips} )
 declare eth_address
 for ip in ${node_ips}; do
   wait_until_node_is_ready "${ip}"
-  eth_address=$(get_eth_address "${ip}")
+  eth_address=$(get_native_address "${ip}:3001")
   fund_if_empty "${eth_address}" "${provider}"
 done
 

@@ -110,7 +110,7 @@ export async function deserializeKeyPair(
   try {
     w = await Wallet.fromEncryptedJson(encodedString, password)
   } catch (err) {
-    logError(`Key deserialization faild,`, err)
+    //logError(`Key deserialization failed,`, err)
 
     return {
       success: false,

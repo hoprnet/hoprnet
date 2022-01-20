@@ -25,6 +25,7 @@ usage() {
 declare wait_delay=2
 declare wait_max_wait=1000
 declare skip_cleanup="false"
+declare api_token="e2e-API-token^^"
 
 while (( "$#" )); do
   case "$1" in
@@ -86,7 +87,6 @@ declare node6_id="${node6_dir}.id"
 declare node7_id="${node7_dir}.id"
 
 declare password="e2e-test"
-declare ct_private_key="0x123456"
 
 declare ct_db_file="${tmp}/hopr-ct-db.json"
 
@@ -146,8 +146,7 @@ function setup_node() {
     --admin \
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \
-    --announce \
-    --api-token "e2e-API-token^^" \
+    --api-token "${api_token}" \
     --data="${dir}" \
     --host="127.0.0.1:${node_port}" \
     --identity="${id}" \
@@ -158,17 +157,22 @@ function setup_node() {
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
+    --testNoUPNP \
     ${additional_args} \
     > "${log}" 2>&1 &
 }
 
 # $1 = node log file
-# $2 = health check port
-# $3 = OPTIONAL: additional args to ct daemon
+# $2 = private key, must be hex string of length 66
+# $3 = health check port
+# $4 = data directory
+# $5 = OPTIONAL: additional args to ct daemon
 function setup_ct_node() {
   local log=${1}
-  local health_check_port=${2}
-  local additional_args=${3:-""}
+  local private_key=${2}
+  local health_check_port=${3}
+  local dir=${4}
+  local additional_args=${5:-""}
 
   log "Run CT node -> ${log}"
 
@@ -178,9 +182,10 @@ function setup_ct_node() {
   log "Additional args: \"${additional_args}\""
 
   DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
-    --privateKey "${ct_private_key}" \
+    --privateKey "${private_key}" \
     --dbFile "${ct_db_file}" \
-    --healthCheckHost "127.0.0.1" \
+    --data="${dir}" \
+    --healthCheck \
     --healthCheckPort "${health_check_port}" \
     ${additional_args} \
      > "${log}" 2>&1 &
@@ -251,8 +256,11 @@ rm -Rfv \
 
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" yarn workspace @hoprnet/hopr-ethereum hardhat node \
-  --network hardhat --show-stack-traces > \
+HOPR_ENVIRONMENT_ID="hardhat-localhost" \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat node \
+  --network hardhat \
+  --show-stack-traces > \
   "${hardhat_rpc_log}" 2>&1 &
 
 wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
@@ -268,14 +276,31 @@ cp -R \
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
-setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
-setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2" # should not be able to talk to the rest
-setup_ct_node "${ct_node1_log}" 20000
+setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
+setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce --testNoAuthentication"
+setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "--announce"
+setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections"
+setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections"
+setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2" # should not be able to talk to the rest
+setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
+# }}}
+
+declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
+log "CT node1 address: ${ct_node1_address}"
+
+log "Funding nodes"
+
+#  --- Fund nodes --- {{{
+HOPR_ENVIRONMENT_ID=hardhat-localhost \
+TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
+yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
+  --identity-prefix "${node_prefix}" \
+  --identity-directory "${tmp}" \
+  --use-local-identities \
+  --network hardhat \
+  --address "${ct_node1_address}" \
+  --password "${password}"
 # }}}
 
 log "Waiting for nodes startup"
@@ -289,21 +314,6 @@ wait_for_regex ${node4_log} "using blockchain address"
 wait_for_regex ${node5_log} "using blockchain address"
 wait_for_regex ${node6_log} "using blockchain address"
 wait_for_regex ${node7_log} "using blockchain address"
-declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
-# }}}
-
-log "CT node1 address: ${ct_node1_address}"
-
-log "Funding nodes"
-
-#  --- Fund nodes --- {{{
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-  --identity-prefix "${node_prefix}" \
-  --identity-directory "${tmp}" \
-  --use-local-identities \
-  --network hardhat \
-  --address "${ct_node1_address}" \
-  --password "${password}"
 # }}}
 
 log "Waiting for port binding"
@@ -322,11 +332,11 @@ log "All nodes came up online"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 19501 19502
+  127.0.0.1 13301 19501 19502 "${api_token}"
 # }}}
 
 # --- Run protocol test --- {{{
-${mydir}/../test/integration-test.sh \
+HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
   "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
@@ -339,5 +349,5 @@ grep -E "Running on: hardhat" "${node6_log}"
 
 # -- CT test {{{
 ${mydir}/../test/ct-test.sh \
-  "${ct_node1_log}" "127.0.0.01" 20000
+  "${ct_node1_log}" "127.0.0.1" 20000
 # }}}

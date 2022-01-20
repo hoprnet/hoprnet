@@ -1,6 +1,5 @@
-import net from 'net'
+import net, { type Socket, type AddressInfo } from 'net'
 import abortable, { AbortError } from 'abortable-iterator'
-import type { Socket, AddressInfo } from 'net'
 import Debug from 'debug'
 import { nodeToMultiaddr } from '../utils'
 import { once } from 'events'
@@ -13,11 +12,11 @@ export const SOCKET_CLOSE_TIMEOUT = 1000
 
 import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
 
-import { Multiaddr } from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
 import { toU8aStream } from '../utils'
 import type PeerId from 'peer-id'
-import type { Stream, StreamType, DialOptions } from '../types'
+import type { Stream, StreamType, HoprConnectDialOptions } from '../types'
 
 /**
  * Class to encapsulate TCP sockets
@@ -36,10 +35,8 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
     close?: number
   }
 
-  constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: DialOptions) {
-    this.localAddr = Multiaddr.fromNodeAddress(nodeToMultiaddr(this.conn.address() as AddressInfo), 'tcp').encapsulate(
-      `/p2p/${self.toB58String()}`
-    )
+  constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: HoprConnectDialOptions) {
+    this.localAddr = nodeToMultiaddr(this.conn.address() as AddressInfo, self)
 
     this.timeline = {
       open: Date.now()
@@ -95,7 +92,7 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
     try {
       this.conn.end()
     } catch (err) {
-      console.log(err)
+      error(`Error while trying to close TCP connection`, err)
     }
 
     await closePromise
@@ -126,7 +123,7 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
    * @param options.signal Used to abort dial requests
    * @returns Resolves a TCP Socket
    */
-  public static create(ma: Multiaddr, self: PeerId, options?: DialOptions): Promise<TCPConnection> {
+  public static create(ma: Multiaddr, self: PeerId, options?: HoprConnectDialOptions): Promise<TCPConnection> {
     if (options?.signal?.aborted) {
       throw new AbortError()
     }
@@ -157,15 +154,9 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
         done()
       }
 
-      const onAbort = () => {
-        log('connection aborted %j', cOpts)
-        done(new AbortError())
-      }
-
       const done = (err?: Error) => {
         rawSocket?.removeListener('timeout', onTimeout)
         rawSocket?.removeListener('connect', onConnect)
-        options?.signal?.removeEventListener('abort', onAbort)
 
         if (err) {
           rawSocket?.destroy()
@@ -178,13 +169,12 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
       rawSocket = net
         .createConnection({
           host: cOpts.host,
-          port: cOpts.port
+          port: cOpts.port,
+          signal: options?.signal
         })
         .on('error', onError)
         .on('timeout', onTimeout)
         .on('connect', onConnect)
-
-      options?.signal?.addEventListener('abort', onAbort)
     })
   }
 
@@ -193,13 +183,15 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
       throw Error(`Could not determine remote address`)
     }
 
-    const remoteAddr = Multiaddr.fromNodeAddress(
-      nodeToMultiaddr({
+    // PeerId of remote peer is not yet known,
+    // will be available after encryption is set up
+    const remoteAddr = nodeToMultiaddr(
+      {
         address: socket.remoteAddress,
         port: socket.remotePort,
         family: socket.remoteFamily
-      }),
-      'tcp'
+      },
+      undefined
     )
 
     return new TCPConnection(remoteAddr, self, socket)

@@ -9,6 +9,18 @@
     "version_major": "1",
     "version_minor": "83"
   },
+  "prague": {
+    "git_ref": "^release/prague$",
+    "environment_id": "prague",
+    "version_major": "1",
+    "version_minor": "84"
+  },
+  "budapest": {
+    "git_ref": "^release/budapest$",
+    "environment_id": "budapest",
+    "version_major": "1",
+    "version_minor": "85"
+  },
   "debug-goerli": {
     "git_ref": "^debug-deploy/.*",
     "environment_id": "debug-goerli"

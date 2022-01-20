@@ -5,9 +5,8 @@ import sinon from 'sinon'
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
 import { sampleData } from './state.mock'
-import { sampleOptions } from '@hoprnet/hopr-core'
-import { chainMock } from '@hoprnet/hopr-core-ethereum'
-import { libp2pMock } from '@hoprnet/hopr-core'
+import { sampleOptions, createLibp2pMock } from '@hoprnet/hopr-core'
+import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
 
 const namespace = 'hopr:test:cover-traffic'
 const log = debug(namespace)
@@ -22,13 +21,14 @@ describe('cover-traffic daemon', async function () {
     function stubLibp2p() {
       sinon.stub(LibP2P, 'create').callsFake(() => {
         log('libp2p stub started')
-        return Promise.resolve(libp2pMock)
+        return Promise.resolve(createLibp2pMock(mockPeerId))
       })
     }
     data = sampleData
     stubLibp2p()
-    log('Mocked chain', chainMock)
-    node = new Hopr(mockPeerId, dbMock, chainMock, sampleOptions)
+    const connectorMock = createConnectorMock(mockPeerId)
+    log('Mocked chain', connectorMock)
+    node = new Hopr(mockPeerId, dbMock, connectorMock, sampleOptions)
   })
 
   afterEach(function () {

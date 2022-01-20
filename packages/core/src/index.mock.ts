@@ -1,3 +1,5 @@
-import { HoprOptions } from '.'
+import type { HoprOptions } from '.'
 
-export const sampleOptions = { environment: { id: '1' } } as unknown as HoprOptions
+export const sampleOptions = {
+  environment: { id: 'local-testnet', network: { id: 'hardhat' } }
+} as unknown as HoprOptions

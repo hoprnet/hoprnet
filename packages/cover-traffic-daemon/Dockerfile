@@ -1,11 +1,12 @@
 # Run hopr-cover-traffic-daemon within a single container using npm
 
 # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-buster-slim@sha256:a5eecf2ee53935cb7974dfff42260d97289d61be9d7a2062c693be93c0cdcd7a as build
+FROM node:16-buster-slim@sha256:158eb4c4873c6ec690d6a556558aa78298ae4016040dfd3c759a23ba5ca20fb6 as build
 
 # python is used by some nodejs dependencies as an installation requirement
 RUN apt-get update && \
     apt-get install -y \
+    git \
     python3 \
     build-essential
 
@@ -28,7 +29,7 @@ ENV npm_config_build_from_source false
 RUN yarn add @hoprnet/hopr-cover-traffic-daemon@${PACKAGE_VERSION}
 
 # use slim version of node on Debian buster for smaller image sizes
-FROM node:16-buster-slim@sha256:a5eecf2ee53935cb7974dfff42260d97289d61be9d7a2062c693be93c0cdcd7a as runtime
+FROM node:16-buster-slim@sha256:158eb4c4873c6ec690d6a556558aa78298ae4016040dfd3c759a23ba5ca20fb6 as runtime
 
 # we use tini as process 1 to catch signals properly, which is also built into
 # D<Plug>_ocker by default

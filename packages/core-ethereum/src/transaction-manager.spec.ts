@@ -12,16 +12,30 @@ describe('transaction-manager', function () {
     transactionManager = new TransactionManager()
   })
 
-  it('should add transaction to pending', function () {
-    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
+  it('should add transaction to queuing', function () {
+    transactionManager.addToQueuing(TX[0], TX[1], PAYLOAD)
 
+    expect(transactionManager.queuing.size).to.equal(1)
+    expect(transactionManager.queuing.get(TX[0]).nonce).to.equal(TX[1].nonce)
+    expect(transactionManager.pending.size).to.equal(0)
+    expect(transactionManager.mined.size).to.equal(0)
+    expect(transactionManager.confirmed.size).to.equal(0)
+  })
+
+  it('should move transaction from queuing to pending', function () {
+    transactionManager.addToQueuing(TX[0], TX[1], PAYLOAD)
+    transactionManager.moveFromQueuingToPending(TX[0])
+
+    expect(transactionManager.queuing.size).to.equal(0)
     expect(transactionManager.pending.size).to.equal(1)
     expect(transactionManager.pending.get(TX[0]).nonce).to.equal(TX[1].nonce)
+    expect(transactionManager.mined.size).to.equal(0)
     expect(transactionManager.confirmed.size).to.equal(0)
   })
 
   it('should move transaction from pending to mined', function () {
-    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
+    transactionManager.addToQueuing(TX[0], TX[1], PAYLOAD)
+    transactionManager.moveFromQueuingToPending(TX[0])
     transactionManager.moveFromPendingToMined(TX[0])
 
     expect(transactionManager.pending.size).to.equal(0)
@@ -31,7 +45,8 @@ describe('transaction-manager', function () {
   })
 
   it('should move transaction from mined to confirmed', function () {
-    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
+    transactionManager.addToQueuing(TX[0], TX[1], PAYLOAD)
+    transactionManager.moveFromQueuingToPending(TX[0])
     transactionManager.moveFromPendingToMined(TX[0])
     transactionManager.moveFromMinedToConfirmed(TX[0])
 
@@ -42,7 +57,8 @@ describe('transaction-manager', function () {
   })
 
   it('should remove transaction from pending', function () {
-    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
+    transactionManager.addToQueuing(TX[0], TX[1], PAYLOAD)
+    transactionManager.moveFromQueuingToPending(TX[0])
     transactionManager.remove(TX[0])
 
     expect(transactionManager.pending.size).to.equal(0)
@@ -51,7 +67,8 @@ describe('transaction-manager', function () {
   })
 
   it('should remove transaction from mined', function () {
-    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
+    transactionManager.addToQueuing(TX[0], TX[1], PAYLOAD)
+    transactionManager.moveFromQueuingToPending(TX[0])
     transactionManager.moveFromPendingToMined(TX[0])
     transactionManager.remove(TX[0])
 
@@ -61,7 +78,8 @@ describe('transaction-manager', function () {
   })
 
   it('should remove transaction from confirmed', function () {
-    transactionManager.addToPending(TX[0], TX[1], PAYLOAD)
+    transactionManager.addToQueuing(TX[0], TX[1], PAYLOAD)
+    transactionManager.moveFromQueuingToPending(TX[0])
     transactionManager.moveFromPendingToMined(TX[0])
     transactionManager.moveFromMinedToConfirmed(TX[0])
     transactionManager.remove(TX[0])
@@ -81,7 +99,8 @@ describe('transaction-manager', function () {
 
     // add them to confirmed
     for (const [hash, tx] of txs) {
-      transactionManager.addToPending(hash, tx, PAYLOAD)
+      transactionManager.addToQueuing(hash, tx, PAYLOAD)
+      transactionManager.moveFromQueuingToPending(hash)
       transactionManager.moveFromPendingToMined(hash)
       transactionManager.moveFromMinedToConfirmed(hash)
     }
@@ -93,5 +112,19 @@ describe('transaction-manager', function () {
     expect(transactionManager.confirmed.size).to.equal(5)
     expect(Array.from(transactionManager.confirmed.keys())).to.not.include(txs[0][0])
     expect(Array.from(transactionManager.confirmed.keys())).to.not.include(txs[1][0])
+  })
+
+  it('should getAllQueuingTxs', function () {
+    transactionManager.addToQueuing(TX[0], TX[1], PAYLOAD)
+    const allQueuingTxs = transactionManager.getAllQueuingTxs()
+
+    expect(allQueuingTxs.length).to.equal(1)
+    expect(allQueuingTxs.pop()).to.eql({
+      to: PAYLOAD.to,
+      data: PAYLOAD.data,
+      value: PAYLOAD.value,
+      nonce: TX[1].nonce,
+      gasPrice: TX[1].gasPrice
+    })
   })
 })

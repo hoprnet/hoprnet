@@ -7,8 +7,6 @@ db
 *.swp
 .vercel
 
-.DS_Store
-
 test/local-fixtures
 
 # logs
@@ -38,3 +36,7 @@ packages/utils/lib/types/
 # used only in release and should not be tracked
 packages/hoprd/default-environment.json
 packages/cover-traffic-daemon/default-environment.json
+
+# CT database
+**/ct.json
+/scripts/vm-nat-testing/.vagrant/
