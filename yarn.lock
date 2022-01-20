@@ -1747,24 +1747,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@chainsafe/libp2p-noise@npm:5.0.0":
-  version: 5.0.0
-  resolution: "@chainsafe/libp2p-noise@npm:5.0.0"
+"@chainsafe/libp2p-noise@npm:5.0.2":
+  version: 5.0.2
+  resolution: "@chainsafe/libp2p-noise@npm:5.0.2"
   dependencies:
     "@stablelib/chacha20poly1305": ^1.0.1
     "@stablelib/hkdf": ^1.0.1
     "@stablelib/sha256": ^1.0.1
     "@stablelib/x25519": ^1.0.1
+    bl: ^5.0.0
     debug: ^4.3.1
     it-buffer: ^0.1.3
     it-length-prefixed: ^5.0.3
     it-pair: ^1.0.0
-    it-pb-rpc: ^0.1.11
+    it-pb-rpc: ^0.2.0
     it-pipe: ^1.1.0
     peer-id: ^0.16.0
     protobufjs: ^6.11.2
     uint8arrays: ^3.0.0
-  checksum: 8af67b39b9ff6741a6ebea7ed8118b3e765302324cf451ce2df033a75fb6d1e5973e01d46d2b47b4721f4ce85867dd0487c7ca05e9b2d161c8e7d6b38339e097
+  checksum: 9e462469ebc8eebcbba4f31c3424b862b5788bf0a627fd1e799cc5cc9caf10899e37e572004976b0e30d88836f713526f502617433cefeb57997903d1966ae29
   languageName: node
   linkType: hard
 
@@ -3082,7 +3083,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:packages/connect"
   dependencies:
-    "@chainsafe/libp2p-noise": 5.0.0
+    "@chainsafe/libp2p-noise": 5.0.2
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/bl": 5.0.2
     "@types/chai": 4.3.0
@@ -3104,7 +3105,7 @@ __metadata:
     it-pushable: 1.4.2
     libp2p: 0.35.8
     libp2p-interfaces: 2.0.0
-    libp2p-mplex: 0.10.5
+    libp2p-mplex: 0.10.7
     mocha: 9.1.3
     multiaddr: 10.0.1
     multihashes: 4.0.3
@@ -3156,7 +3157,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-core@workspace:packages/core"
   dependencies:
-    "@chainsafe/libp2p-noise": 5.0.0
+    "@chainsafe/libp2p-noise": 5.0.2
     "@google-cloud/profiler": 4.1.7
     "@hoprnet/hopr-connect": "workspace:packages/connect"
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
@@ -3174,8 +3175,8 @@ __metadata:
     leveldown: 6.1.0
     levelup: 5.1.1
     libp2p: 0.35.8
-    libp2p-kad-dht: 0.27.4
-    libp2p-mplex: 0.10.5
+    libp2p-kad-dht: 0.27.6
+    libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.1.3
@@ -3259,7 +3260,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-utils@workspace:packages/utils"
   dependencies:
-    "@chainsafe/libp2p-noise": 5.0.0
+    "@chainsafe/libp2p-noise": 5.0.2
     "@types/mocha": 9.0.0
     "@types/pino": 7.0.4
     abort-controller: ~3.0.0
@@ -3279,8 +3280,8 @@ __metadata:
     levelup: 5.1.1
     libp2p: 0.35.8
     libp2p-crypto: 0.21.0
-    libp2p-kad-dht: 0.27.4
-    libp2p-mplex: 0.10.5
+    libp2p-kad-dht: 0.27.6
+    libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.1.3
@@ -5371,6 +5372,15 @@ __metadata:
   dependencies:
     get-iterator: ^1.0.2
   checksum: 1c4e0379f0c0aaab15c975bf7ef175bc5900bcd85955d60f9c68a526c6f150b7ec2a87f642b6022ebe7dd2dbf630a690a2c0cc8211cd800ba16a4d3380f19b2e
+  languageName: node
+  linkType: hard
+
+"abortable-iterator@npm:^3.0.2":
+  version: 3.0.2
+  resolution: "abortable-iterator@npm:3.0.2"
+  dependencies:
+    get-iterator: ^1.0.2
+  checksum: 949ec28b43b08959ee7d1e963f7cec28a2f5ca4e6d3fb0bb1fb5965968e3606fd8465cac6fcff4388ef3d791886881ef4fd6116d399f6c0cd1e17704cde320c4
   languageName: node
   linkType: hard
 
@@ -14900,14 +14910,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pb-rpc@npm:^0.1.11":
-  version: 0.1.13
-  resolution: "it-pb-rpc@npm:0.1.13"
+"it-pb-rpc@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "it-pb-rpc@npm:0.2.0"
   dependencies:
-    is-buffer: ^2.0.5
     it-handshake: ^2.0.0
-    it-length-prefixed: ^5.0.2
-  checksum: 4a8e9a8deae80307fe53ea7400237f644ad858acb56adced325b2a11d0ccfa9eb53ae1d98cdcde96978cf750dbcbd4c4cb397421cd9c68a7dc958106c084854c
+    it-length-prefixed: ^5.0.3
+  checksum: c6b93eda2fdae800cf9dd7428fd87fafe718b67fbba45c5f5b5200724fcffda7d2f2d6c5e621935502d237405a8c70e1310fe9bc10eef308c66ee9ab5a5bcac2
   languageName: node
   linkType: hard
 
@@ -15882,9 +15891,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-kad-dht@npm:0.27.4":
-  version: 0.27.4
-  resolution: "libp2p-kad-dht@npm:0.27.4"
+"libp2p-kad-dht@npm:0.27.6":
+  version: 0.27.6
+  resolution: "libp2p-kad-dht@npm:0.27.6"
   dependencies:
     any-signal: ^2.1.2
     datastore-core: ^6.0.7
@@ -15919,23 +15928,22 @@ __metadata:
     timeout-abort-controller: ^2.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: d12f2db9ec40cfc10457633644ea92b6d4d3390964dcdeff44f7ed1194b814a75c62cf4906ca6b57be9116c7612558810831e28a5eebf971bce656e576f756f5
+  checksum: 4d242f1fd3c1b50fb5742d2565906d4f39ad1db3694098aed74fcaee114a0e74e847258460dfdd1a85051b312ceb8f337f3c81ed50eededc1897eca7d5e6cdf5
   languageName: node
   linkType: hard
 
-"libp2p-mplex@npm:0.10.5":
-  version: 0.10.5
-  resolution: "libp2p-mplex@npm:0.10.5"
+"libp2p-mplex@npm:0.10.7":
+  version: 0.10.7
+  resolution: "libp2p-mplex@npm:0.10.7"
   dependencies:
-    abort-controller: ^3.0.0
-    abortable-iterator: ^3.0.0
+    abortable-iterator: ^3.0.2
     bl: ^5.0.0
     debug: ^4.3.1
     err-code: ^3.0.1
     it-pipe: ^1.1.0
     it-pushable: ^1.4.1
     varint: ^6.0.0
-  checksum: f7ca8a7c1165775db07f2ce3ed7b187bcb2b5917fc07e9dbd201c62b450a9e9cc3945c6ae9f1c7fcae3635b2395e9cf534e1ac0c0c004f51c118b8a8a7c7d946
+  checksum: f425401f254ca389572b889f4675cfc9cdbe317d97dbb7cc8403901c59813f1dc41a7f141d3945d15a32a537bb31925b826517522ecb9864013e007a3e7d7c06
   languageName: node
   linkType: hard
 

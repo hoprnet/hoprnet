@@ -28,7 +28,7 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
     modules: {
       transport: [TCP],
       streamMuxer: [MPLEX],
-      connEncryption: [NOISE],
+      connEncryption: [NOISE as any],
       dht: withDHT ? KadDHT : undefined
     },
     metrics: {
