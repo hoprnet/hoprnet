@@ -364,7 +364,10 @@ async function main() {
       if (argv.run && argv.run !== '') {
         // Run a single command and then exit.
         // We support multiple semicolon separated commands
-        let toRun = argv.run.split(';')
+        let toRun = argv.run.split(';').map((c: string) =>
+          // Remove obsolete ' and "
+          c.replace(/"/g, '')
+        )
 
         for (let c of toRun) {
           console.error('$', c)
