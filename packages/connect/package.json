@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "abortable-iterator": "3.0.1",
+    "abortable-iterator": "3.0.2",
     "bl": "5.0.0",
     "debug": "4.3.3",
     "heap-js": "2.1.6",
@@ -50,7 +50,7 @@
     "@types/node": "16.11.21",
     "@types/simple-peer": "9.11.4",
     "@types/yargs": "17.0.8",
-    "abortable-iterator": "3.0.1",
+    "abortable-iterator": "3.0.2",
     "chai": "4.3.4",
     "chai-spies": "1.0.0",
     "it-pair": "1.0.0",
