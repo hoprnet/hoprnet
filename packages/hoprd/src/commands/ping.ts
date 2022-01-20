@@ -30,10 +30,7 @@ export default class Ping extends AbstractCommand {
 
     let out = ''
 
-    let pingResult: {
-      info: string
-      latency: number
-    }
+    let pingResult: Awaited<ReturnType<Hopr['ping']>>
 
     let error: any
 
@@ -44,7 +41,7 @@ export default class Ping extends AbstractCommand {
     }
 
     if (pingResult.latency >= 0) {
-      return log(`${out}Pong received in: ${styleValue(pingResult.latency)} ms ${pingResult.info}`)
+      return log(`${out}Pong received in: ${styleValue(pingResult.latency)} ms ${pingResult?.info ?? ''}`)
     }
 
     if (error && error.message) {

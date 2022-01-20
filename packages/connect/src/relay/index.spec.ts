@@ -49,8 +49,11 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
         })
 
         return {
-          sink: BtoA.sink,
-          source: AtoB.source
+          protocol,
+          stream: {
+            sink: BtoA.sink,
+            source: AtoB.source
+          }
         }
       }
     } as any
@@ -77,7 +80,7 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
           return {
             addresses: [
               {
-                multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peer.toB58String()}`),
+                multiaddr: new Multiaddr(`/ip4/127.0.0.1/tcp/1/p2p/${peer.toB58String()}`),
                 isCertified: true
               }
             ]
@@ -87,11 +90,15 @@ function getPeer(peerId: PeerId, network: EventEmitter) {
       dialer: {} as any,
       connectionManager: {
         get: () => null
-      } as any
+      } as any,
+      contentRouting: {
+        provide: (_key: any) => Promise.resolve()
+      }
     },
     dialDirectly,
     (multiaddrs: Multiaddr[]) => multiaddrs,
-    () => {}
+    { environment: `testingEnvironment` },
+    { __noWebRTCUpgrade: true }
   )
 }
 

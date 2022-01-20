@@ -6,7 +6,7 @@ export const parameters = []
 export const POST: Operation = [
   async (req, res, _next) => {
     try {
-      const signature = await req.context.node.signMessage(req.body.message)
+      const signature = await req.context.node.signMessage(new TextEncoder().encode(req.body.message))
       res.status(200).send({ signature: u8aToHex(signature) })
     } catch (err) {
       res.status(422).json({ error: err.message })
