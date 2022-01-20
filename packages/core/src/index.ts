@@ -27,6 +27,7 @@ import {
   durations,
   isErrorOutOfFunds,
   debug,
+  retimer,
   type LibP2PHandlerFunction,
   type AcknowledgedTicket,
   type ChannelEntry,
@@ -57,8 +58,10 @@ import { Packet } from './messages'
 import type { ResolvedEnvironment } from './environment'
 import { createLibp2pInstance } from './main'
 
-const log = debug(`hopr-core`)
-const verbose = debug('hopr-core:verbose')
+const DEBUG_PREFIX = `hopr-core`
+const log = debug(DEBUG_PREFIX)
+const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
+const error = debug(DEBUG_PREFIX.concat(`:error`))
 
 interface NetOptions {
   ip: string
@@ -699,12 +702,11 @@ class Hopr extends EventEmitter {
       log('Clearing out logging timeout.')
       clearTimeout(logTimeout)
       log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
-      this.checkTimeout = setTimeout(periodicCheck, this.strategy.tickInterval)
     }.bind(this)
 
     log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
 
-    this.checkTimeout = setTimeout(periodicCheck, this.strategy.tickInterval)
+    this.checkTimeout = retimer(periodicCheck, () => this.strategy.tickInterval)
   }
 
   /**
@@ -766,7 +768,7 @@ class Hopr extends EventEmitter {
       log(`announced address ${addrToAnnounce}`)
     } catch (err) {
       log('announce failed')
-      await this.isOutOfFunds(err)
+      this.isOutOfFunds(err)
       throw new Error(`Failed to announce: ${err}`)
     }
   }
@@ -775,8 +777,12 @@ class Hopr extends EventEmitter {
     log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
 
-    this.connector.on('ticket:win', (ack) => {
-      this.strategy.onWinningTicket(ack, this.connector)
+    this.connector.on('ticket:win', async (ack) => {
+      try {
+        await this.strategy.onWinningTicket(ack, this.connector)
+      } catch (err) {
+        error(`Strategy error while handling winning ticket`, err)
+      }
     })
   }
 

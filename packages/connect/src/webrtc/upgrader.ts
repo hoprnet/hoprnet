@@ -187,7 +187,7 @@ class WebRTCUpgrader {
       done(new AbortError())
     }
 
-    const done = async (err?: Error) => {
+    const done = (err?: Error) => {
       channel.removeListener('connect', done)
       channel.removeListener('error', done)
 

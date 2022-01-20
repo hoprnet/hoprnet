@@ -130,9 +130,13 @@ describe('entry node functionality', function () {
 
     const connectPromise = once(relayListener, 'connected')
 
-    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {
-      initialNodes: [relay]
-    })
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      {
+        initialNodes: [relay]
+      }
+    )
 
     await entryNodes.updatePublicNodes()
 
@@ -173,9 +177,13 @@ describe('entry node functionality', function () {
 
     const additionalOfflineNodes = [getPeerStoreEntry(`/ip4/127.0.0.1/tcp/23`)]
 
-    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {
-      initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
-    })
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      {
+        initialNodes: relayNodes.map((relayNode) => relayNode[1]).concat(additionalOfflineNodes)
+      }
+    )
 
     await entryNodes.updatePublicNodes()
 
@@ -207,7 +215,11 @@ describe('entry node functionality', function () {
 
     const newNodeListener = network.listen(newNode.multiaddrs[0].toString())
 
-    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {})
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      {}
+    )
 
     entryNodes.uncheckedEntryNodes.push(newNode)
 
@@ -245,7 +257,11 @@ describe('entry node functionality', function () {
 
     const connectPromise = once(relayListener, 'connected')
 
-    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {})
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      {}
+    )
 
     const fakeNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
 
@@ -301,9 +317,13 @@ describe('entry node functionality', function () {
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 
     const publicNodes = new EventEmitter() as PublicNodesEmitter
-    const entryNodes = new TestingEntryNodes(peerId, async (ma: Multiaddr) => network.connect(ma.toString()) as any, {
-      publicNodes
-    })
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      {
+        publicNodes
+      }
+    )
 
     entryNodes.start()
 

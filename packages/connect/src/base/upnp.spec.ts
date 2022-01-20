@@ -17,15 +17,9 @@ describe('test upnp', function () {
     this.timeout(3e3)
     const upnp = new TestingUpnpManager()
 
-    const DEFAULT_TIMEOUT = upnp.client._upnpClient.timeout
-
-    assert(DEFAULT_TIMEOUT != undefined, `nat-api implementation has changed!`)
-
-    const start = Date.now()
     const result = await upnp.externalIp()
 
     if (result == undefined) {
-      assert(Date.now() - start >= DEFAULT_TIMEOUT)
       noUPnP = true
     } else {
       assert(result.match(/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/), `result must be an IP address`)

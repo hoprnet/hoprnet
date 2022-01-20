@@ -1,6 +1,6 @@
 import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
-import { randomInteger, limitConcurrency, u8aEquals, debug } from '@hoprnet/hopr-utils'
+import { randomInteger, limitConcurrency, u8aEquals, debug, retimer } from '@hoprnet/hopr-utils'
 import {
   HEARTBEAT_INTERVAL,
   HEARTBEAT_TIMEOUT,
@@ -89,18 +89,15 @@ export default class Heartbeat {
       } catch (e) {
         log('FATAL ERROR IN HEARTBEAT', e)
       }
-      this.timeout = setTimeout(
-        periodicCheck,
-        // Prevent nodes from querying each other at the very same time
-        randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE)
-      )
     }.bind(this)
 
-    this.timeout = setTimeout(
+    this.timeout = retimer(
       periodicCheck,
       // Prevent nodes from querying each other at the very same time
-      randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE)
+      () => randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE)
     )
+
+    setTimeout(periodicCheck)
   }
 
   public start() {

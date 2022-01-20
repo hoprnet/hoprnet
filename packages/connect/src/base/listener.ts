@@ -100,7 +100,9 @@ class Listener extends EventEmitter implements InterfaceListener {
       external: []
     }
 
-    this._emitListening = (() => this.emit('listening')).bind(this)
+    this._emitListening = function (this: Listener) {
+      this.emit('listening')
+    }.bind(this)
 
     this.entry = new EntryNodes(this.peerId, dialDirectly, this.options)
 
@@ -351,10 +353,12 @@ class Listener extends EventEmitter implements InterfaceListener {
     this.entry.stop()
     this.entry.off(RELAY_CHANGED_EVENT, this._emitListening)
 
-    // Unmap all mapped UPNP ports and release socket
-    this.upnpManager.stop()
-
-    await Promise.all([this.closeUDP(), this.closeTCP()])
+    await Promise.all([
+      // Unmap all mapped UPNP ports and release socket
+      this.upnpManager.stop(),
+      this.closeUDP(),
+      this.closeTCP()
+    ])
 
     this.state = State.CLOSED
     this.emit('close')

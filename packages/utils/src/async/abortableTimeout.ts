@@ -16,36 +16,30 @@ export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
 ): Promise<Result | AbortMsg | TimeoutMsg> {
   const abort = new AbortController()
 
-  // forward abort request
-  const onOuterAbort = abort.abort.bind(abort)
-  opts.signal?.addEventListener('abort', () => {
-    onOuterAbort()
-    opts.signal?.removeEventListener('abort', onOuterAbort)
-  })
-
   let done = false
 
-  let onAbort: () => void
-  let cleanUp: () => void
+  const onceDone = defer<AbortMsg | TimeoutMsg>()
 
-  const abortableTimeout = defer<AbortMsg | TimeoutMsg>()
-
-  const timeout = setTimeout(() => {
+  const cleanUp = () => {
     done = true
-    cleanUp()
-    abort.abort()
-    abortableTimeout.resolve(timeoutMsg)
-  }, opts.timeout)
-
-  onAbort = () => {
-    done = true
-    cleanUp()
-    abortableTimeout.resolve(abortMsg)
+    abort.signal.removeEventListener('abort', onAbort)
   }
 
-  cleanUp = () => {
-    clearTimeout(timeout)
-    abort.signal.removeEventListener('abort', onAbort)
+  const onTimeout = () => {
+    if (done) {
+      return
+    }
+    cleanUp()
+    abort.abort()
+    onceDone.resolve(timeoutMsg)
+  }
+
+  const onAbort = () => {
+    if (done) {
+      return
+    }
+    cleanUp()
+    onceDone.resolve(abortMsg)
   }
 
   abort.signal.addEventListener('abort', onAbort)
@@ -77,5 +71,17 @@ export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
     return result
   }
 
-  return Promise.race([abortableTimeout.promise, resultFunction()])
+  // forward abort request
+  const onOuterAbort = abort.abort.bind(abort)
+  opts.signal?.addEventListener('abort', () => {
+    onOuterAbort()
+    opts.signal?.removeEventListener('abort', onOuterAbort)
+  })
+
+  // Let the timeout run through and let the handler do nothing, i.e. `done = true`
+  // instead of clearing the timeout with `clearTimeout` which becomes an expensive
+  // operation when using many timeouts
+  setTimeout(onTimeout, opts.timeout)
+
+  return Promise.race([onceDone.promise, resultFunction()])
 }
