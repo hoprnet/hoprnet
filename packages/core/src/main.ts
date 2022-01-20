@@ -44,7 +44,7 @@ export async function createLibp2pInstance(
     modules: {
       transport: [HoprConnect as any],
       streamMuxer: [MPLEX],
-      connEncryption: [NOISE],
+      connEncryption: [NOISE as any],
       dht: KadDHT
     },
     config: {

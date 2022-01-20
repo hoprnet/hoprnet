@@ -3105,7 +3105,7 @@ __metadata:
     it-pushable: 1.4.2
     libp2p: 0.35.8
     libp2p-interfaces: 2.0.0
-    libp2p-mplex: 0.10.5
+    libp2p-mplex: 0.10.7
     mocha: 9.1.3
     multiaddr: 10.0.1
     multihashes: 4.0.3
@@ -3175,8 +3175,8 @@ __metadata:
     leveldown: 6.1.0
     levelup: 5.1.1
     libp2p: 0.35.8
-    libp2p-kad-dht: 0.27.4
-    libp2p-mplex: 0.10.5
+    libp2p-kad-dht: 0.28.6
+    libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.1.3
@@ -3280,8 +3280,8 @@ __metadata:
     levelup: 5.1.1
     libp2p: 0.35.8
     libp2p-crypto: 0.21.0
-    libp2p-kad-dht: 0.27.4
-    libp2p-mplex: 0.10.5
+    libp2p-kad-dht: 0.28.6
+    libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.1.3
@@ -5375,6 +5375,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"abortable-iterator@npm:^3.0.2":
+  version: 3.0.2
+  resolution: "abortable-iterator@npm:3.0.2"
+  dependencies:
+    get-iterator: ^1.0.2
+  checksum: 949ec28b43b08959ee7d1e963f7cec28a2f5ca4e6d3fb0bb1fb5965968e3606fd8465cac6fcff4388ef3d791886881ef4fd6116d399f6c0cd1e17704cde320c4
+  languageName: node
+  linkType: hard
+
 "abstract-leveldown@npm:3.0.0":
   version: 3.0.0
   resolution: "abstract-leveldown@npm:3.0.0"
@@ -5816,13 +5825,20 @@ __metadata:
   languageName: node
   linkType: hard
 
-"any-signal@npm:^2.1.1, any-signal@npm:^2.1.2":
+"any-signal@npm:^2.1.1":
   version: 2.1.2
   resolution: "any-signal@npm:2.1.2"
   dependencies:
     abort-controller: ^3.0.0
     native-abort-controller: ^1.0.3
   checksum: 498603e30357f82e438ddc972086b3180ddbaf5ea9772f535d103b754711eb13d4c24577e497d5a1146e571ee38f167c316ace7dc1a03b62a8a8c7677e9d660f
+  languageName: node
+  linkType: hard
+
+"any-signal@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "any-signal@npm:3.0.0"
+  checksum: b59f11271d17391c740a903c3f422b9bda77f3d011e106b9733e298685ab9489af9b6c1b300cb778048ddad3dfdc74168f738670bf5f3cf90e04650bb822ed60
   languageName: node
   linkType: hard
 
@@ -9189,9 +9205,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"datastore-core@npm:^6.0.7":
-  version: 6.0.7
-  resolution: "datastore-core@npm:6.0.7"
+"datastore-core@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "datastore-core@npm:7.0.0"
   dependencies:
     debug: ^4.1.1
     err-code: ^3.0.1
@@ -9204,7 +9220,7 @@ __metadata:
     it-pushable: ^1.4.2
     it-take: ^1.0.1
     uint8arrays: ^3.0.0
-  checksum: 565c37e3f0a5500bb9e96f27be68f14bb5250d2885f536b1adc69f0dfa21dc7795fc98ad029219b425bcc1979535ac48f9925079cee493a6dc708e75df931e4a
+  checksum: 09c54eda5156ddb21df0aa5c5c3a4e1a6e08db9d6d9282994775710cdfb25e6e689e694759e7b39260b620d570a370f25b74afaac76bfb2e7467b1ddfffd5321
   languageName: node
   linkType: hard
 
@@ -15882,12 +15898,33 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-kad-dht@npm:0.27.4":
-  version: 0.27.4
-  resolution: "libp2p-kad-dht@npm:0.27.4"
+"libp2p-interfaces@npm:^4.0.0":
+  version: 4.0.6
+  resolution: "libp2p-interfaces@npm:4.0.6"
   dependencies:
-    any-signal: ^2.1.2
-    datastore-core: ^6.0.7
+    abortable-iterator: ^3.0.0
+    debug: ^4.3.1
+    err-code: ^3.0.1
+    it-length-prefixed: ^5.0.2
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
+    libp2p-crypto: ^0.21.0
+    multiaddr: ^10.0.0
+    multiformats: ^9.1.2
+    p-queue: ^6.6.2
+    peer-id: ^0.16.0
+    protobufjs: ^6.10.2
+    uint8arrays: ^3.0.0
+  checksum: 55f6c87d6278fc148863666e9f3baa0b3e232840da22440fca28b7d064c03bb9b66d7df1b3f317a25bb3ddf1776c0e6c7311c1b1ade428f2209d5d912da6f666
+  languageName: node
+  linkType: hard
+
+"libp2p-kad-dht@npm:0.28.6":
+  version: 0.28.6
+  resolution: "libp2p-kad-dht@npm:0.28.6"
+  dependencies:
+    any-signal: ^3.0.0
+    datastore-core: ^7.0.0
     debug: ^4.3.1
     err-code: ^3.0.0
     hashlru: ^2.3.0
@@ -15904,11 +15941,10 @@ __metadata:
     it-take: ^1.0.2
     k-bucket: ^5.1.0
     libp2p-crypto: ^0.21.0
-    libp2p-interfaces: ^2.0.1
+    libp2p-interfaces: ^4.0.0
     libp2p-record: ^0.10.4
     multiaddr: ^10.0.0
     multiformats: ^9.4.5
-    native-abort-controller: ^1.0.4
     p-defer: ^3.0.0
     p-map: ^4.0.0
     p-queue: ^6.6.2
@@ -15916,26 +15952,25 @@ __metadata:
     private-ip: ^2.3.3
     protobufjs: ^6.10.2
     streaming-iterables: ^6.0.0
-    timeout-abort-controller: ^2.0.0
+    timeout-abort-controller: ^3.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
-  checksum: d12f2db9ec40cfc10457633644ea92b6d4d3390964dcdeff44f7ed1194b814a75c62cf4906ca6b57be9116c7612558810831e28a5eebf971bce656e576f756f5
+  checksum: 8328593afa6c67d42bfef07eb6d8cefd963af71ed1664359f26577f87138ec1406be01dd14c3348fb3963af5b426047771d66de5217f5ba01eecfeb77263c894
   languageName: node
   linkType: hard
 
-"libp2p-mplex@npm:0.10.5":
-  version: 0.10.5
-  resolution: "libp2p-mplex@npm:0.10.5"
+"libp2p-mplex@npm:0.10.7":
+  version: 0.10.7
+  resolution: "libp2p-mplex@npm:0.10.7"
   dependencies:
-    abort-controller: ^3.0.0
-    abortable-iterator: ^3.0.0
+    abortable-iterator: ^3.0.2
     bl: ^5.0.0
     debug: ^4.3.1
     err-code: ^3.0.1
     it-pipe: ^1.1.0
     it-pushable: ^1.4.1
     varint: ^6.0.0
-  checksum: f7ca8a7c1165775db07f2ce3ed7b187bcb2b5917fc07e9dbd201c62b450a9e9cc3945c6ae9f1c7fcae3635b2395e9cf534e1ac0c0c004f51c118b8a8a7c7d946
+  checksum: f425401f254ca389572b889f4675cfc9cdbe317d97dbb7cc8403901c59813f1dc41a7f141d3945d15a32a537bb31925b826517522ecb9864013e007a3e7d7c06
   languageName: node
   linkType: hard
 
@@ -23699,6 +23734,15 @@ __metadata:
     native-abort-controller: ^1.0.4
     retimer: ^3.0.0
   checksum: 7f57cb6d5f4dcdcefe9c89deacc70c07ecafdba32d51333eca6aaf91e70bbff7e6ad13d9c098480d27a6f360383685f84819a3f475a5cfe8d3f3c7da465d1da7
+  languageName: node
+  linkType: hard
+
+"timeout-abort-controller@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "timeout-abort-controller@npm:3.0.0"
+  dependencies:
+    retimer: ^3.0.0
+  checksum: c74387e6472a1e151d89b4af8c2a18ac72d566f3cd6ec9b203e3cda969fb5c54acba0a8d20cda8e9772efda52e27bea59c3423bab785b65f0287c9419184607e
   languageName: node
   linkType: hard
 
