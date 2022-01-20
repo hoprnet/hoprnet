@@ -9,7 +9,7 @@
   "main": "lib/index.js",
   "scripts": {
     "clean": "rimraf ./lib ./tsconfig.tsbuildinfo ./tsconfig.spec.tsbuildinfo",
-    "test": "mocha --parallel",
+    "test": "mocha",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
     "docs:generate": "typedoc",
@@ -52,7 +52,7 @@
     "bl": "5.0.0",
     "chai": "4.3.4",
     "libp2p": "0.35.8",
-    "libp2p-kad-dht": "0.28.6",
+    "libp2p-kad-dht": "0.27.6",
     "libp2p-mplex": "0.10.7",
     "libp2p-tcp": "0.17.2",
     "mocha": "9.1.3",
