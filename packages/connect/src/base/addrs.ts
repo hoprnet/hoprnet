@@ -37,6 +37,12 @@ function validateOptions(opts: AddrOptions) {
   }
 }
 
+/**
+ * Checks the OS's network interfaces and returns the addresses of the requested interface
+ * @param iface interface to use, e.g. `eth0`
+ * @param __fakeInterfaces [testing] overwrite Node.js library function with test input
+ * @returns
+ */
 function getAddrsOfInterface(iface: string, __fakeInterfaces?: ReturnType<typeof networkInterfaces>) {
   let ifaceAddrs = __fakeInterfaces ? __fakeInterfaces[iface] : networkInterfaces()[iface]
 
@@ -52,6 +58,14 @@ function getAddrsOfInterface(iface: string, __fakeInterfaces?: ReturnType<typeof
   return ifaceAddrs ?? []
 }
 
+/**
+ * Checks the OS's network interfaces and return all desired addresses, such as local IPv4 addresses,
+ * public IPv6 addresses etc.
+ * @param port port to use
+ * @param options which addresses to use
+ * @param __fakeInterfaces [testing] overwrite Node.js library function with test input
+ * @returns
+ */
 export function getAddrs(
   port: number,
   options: AddrOptions,
