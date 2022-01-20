@@ -38,6 +38,7 @@
     "libp2p-crypto": "0.21.0",
     "memdown": "6.1.1",
     "multiaddr": "10.0.1",
+    "multiformats": "9.5.8",
     "multihashes": "4.0.3",
     "peer-id": "0.16.0",
     "pino": "7.6.2",

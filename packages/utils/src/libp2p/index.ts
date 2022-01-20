@@ -11,12 +11,13 @@ import { debug } from '../process'
 import pipe from 'it-pipe'
 import { dial } from './dialHelper'
 
-export * from './privKeyToPeerId'
-export * from './pubKeyToPeerId'
 export * from './addressSorters'
-export * from './verifySignatureFromPeerId'
 export * from './dialHelper'
 export * from './pickVersion'
+export * from './pubKeyToPeerId'
+export * from './privKeyToPeerId'
+export * from './relayCode'
+export * from './verifySignatureFromPeerId'
 
 /**
  * Regular expresion used to match b58Strings
@@ -175,7 +176,7 @@ type HandlerFunction<T> = (args: LibP2PHandlerArgs) => T
 type ErrHandler = (msg: any) => void
 
 type generateHandler = ((
-  handlerFunction: LibP2PHandlerFunction<Promise<void>>,
+  handlerFunction: LibP2PHandlerFunction<Promise<void> | void>,
   errHandler: ErrHandler,
   includeReply: false
 ) => HandlerFunction<void>) &
@@ -186,7 +187,7 @@ type generateHandler = ((
   ) => HandlerFunction<Promise<void>>)
 
 function generateHandler(
-  handlerFunction: LibP2PHandlerFunction<Promise<void | Uint8Array>>,
+  handlerFunction: LibP2PHandlerFunction<Promise<void | Uint8Array> | void>,
   errHandler: ErrHandler,
   includeReply = false
 ): HandlerFunction<void> | HandlerFunction<Promise<void>> {
@@ -240,7 +241,7 @@ function generateHandler(
 export type libp2pSubscribe = ((
   libp2p: LibP2P,
   protocol: string,
-  handler: LibP2PHandlerFunction<Promise<void>>,
+  handler: LibP2PHandlerFunction<Promise<void> | void>,
   errHandler: ErrHandler,
   includeReply: false
 ) => void) &
@@ -255,7 +256,7 @@ export type libp2pSubscribe = ((
 export function libp2pSubscribe(
   libp2p: LibP2P,
   protocol: string,
-  handler: LibP2PHandlerFunction<Promise<void | Uint8Array>>,
+  handler: LibP2PHandlerFunction<Promise<void | Uint8Array> | void>,
   errHandler: ErrHandler,
   includeReply = false
 ): void {
