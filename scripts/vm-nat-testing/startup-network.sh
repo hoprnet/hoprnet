@@ -6,8 +6,8 @@ cd ${hopr_dir} || exit 1
 
 declare hardhat_rpc_log="/tmp/hardhat.logs"
 
-if [ "$(curl -s -o /dev/null -w ''%{http_code}'' $provider_ip:8545)" != "200" ]; then
-	# make sure other instances are killed
+if [ "$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ]; then
+	# make sure other node instances are killed
 	sudo pkill node || :
 	# Start the HardHat network on localhost
 	echo "Starting HardHat network..."
