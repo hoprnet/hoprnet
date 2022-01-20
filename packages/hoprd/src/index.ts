@@ -5,6 +5,7 @@ import { decode } from 'rlp'
 import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
+import { setTimeout } from 'timers/promises'
 
 import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
@@ -374,8 +375,10 @@ async function main() {
             logs.log(msg)
           }, c)
         }
+        // Wait for actions to take place
+        await setTimeout(1e3)
         await node.stop()
-        process.exit(0)
+        return
       }
     })
 
