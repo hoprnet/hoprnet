@@ -371,6 +371,7 @@ async function main() {
           if (c === 'daemonize') {
             return
           }
+          console.log(`command: `, c)
           await cmds.execute((msg) => {
             logs.log(msg)
           }, c)
