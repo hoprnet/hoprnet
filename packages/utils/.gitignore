@@ -1,12 +1,8 @@
 # Exclude node.js stuff
-node_modules
-
-
-# Exclude OSX files
-**/.DS_Store
+/node_modules
 
 # Exclude built Typescript files
-lib
+/lib
 
 # Exclude built npm packages
-*.tgz
+/*.tgz
