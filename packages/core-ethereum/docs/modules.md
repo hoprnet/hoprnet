@@ -22,13 +22,13 @@
 
 - [CONFIRMATIONS](modules.md#confirmations)
 - [INDEXER\_BLOCK\_RANGE](modules.md#indexer_block_range)
-- [connectorMock](modules.md#connectormock)
 - [sampleChainOptions](modules.md#samplechainoptions)
 
 ### Functions
 
 - [bumpCommitment](modules.md#bumpcommitment)
 - [createChainWrapper](modules.md#createchainwrapper)
+- [createConnectorMock](modules.md#createconnectormock)
 - [findCommitmentPreImage](modules.md#findcommitmentpreimage)
 - [initializeCommitment](modules.md#initializecommitment)
 - [useFixtures](modules.md#usefixtures)
@@ -52,7 +52,7 @@
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L48)
+[packages/core-ethereum/src/index.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L45)
 
 ___
 
@@ -72,7 +72,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L33)
+[packages/core-ethereum/src/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L30)
 
 ## Variables
 
@@ -93,16 +93,6 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/constants.ts#L8)
-
-___
-
-### connectorMock
-
-• **connectorMock**: [`default`](classes/default.md)
-
-#### Defined in
-
-[packages/core-ethereum/src/index.mock.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.mock.ts#L12)
 
 ___
 
@@ -161,6 +151,26 @@ ___
 #### Defined in
 
 [packages/core-ethereum/src/ethereum.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L33)
+
+___
+
+### createConnectorMock
+
+▸ **createConnectorMock**(`peer`): [`default`](classes/default.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `peer` | `PeerId` |
+
+#### Returns
+
+[`default`](classes/default.md)
+
+#### Defined in
+
+[packages/core-ethereum/src/index.mock.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.mock.ts#L8)
 
 ___
 
