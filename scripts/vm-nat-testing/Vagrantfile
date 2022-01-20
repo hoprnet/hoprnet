@@ -12,9 +12,9 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", path: "setup-vm.sh", privileged: true
   config.vm.synced_folder "../../", "/opt/hopr"
 
-  config.vm.provider :libvirt do |v, override, libvirt|
+  config.vm.provider "libvirt" do |v, override|
     # Use NFS export on Linux
-    config.vm.synced_folder "../../", "/opt/hopr", type: "nfs"
+    override.vm.synced_folder "../../", "/opt/hopr", type: "nfs"
     # No need for any remote desktop environment
     libvirt.graphics_type = "none"
   end
