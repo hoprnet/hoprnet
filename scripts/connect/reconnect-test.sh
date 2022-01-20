@@ -47,7 +47,7 @@ start_node tests/node \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade true \
-  --useLocalAddress true
+  --preferLocalAddresses true
 
 # run bob (client)
 # should be able to receive 'test' from alice through charly
@@ -55,7 +55,7 @@ start_node tests/node \
 start_node tests/node "${bob_log}" \
   "[ {
         'cmd': 'wait',
-        'waitForSecs': 2
+        'waitForSecs': 5
       },
       {
         'cmd': 'dial',
@@ -70,7 +70,7 @@ start_node tests/node "${bob_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade true \
-  --useLocalAddress true
+  --preferLocalAddresses true
 
 # run charly
 # should able to serve as a bootstrap
@@ -79,9 +79,10 @@ start_node tests/node "${charly_log}" \
   "[]" \
   --port ${charly_port} \
   --identityName 'charly' \
-  --noDirectConnections true \
-  --noWebRTCUpgrade false \
-  --useLocalAddress true
+  --noWebRTCUpgrade true \
+  --preferLocalAddresses true \
+  --noWebRTCUpgrade true \
+  --noDirectConnections false
 
 # wait till nodes finish communicating
 wait_for_regex "${alice_log}" "all tasks executed"
@@ -117,12 +118,13 @@ start_node tests/node \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade true \
-  --useLocalAddress true
+  --preferLocalAddresses true
 
 # wait for the second alice to finish sending
 wait_for_regex "${alice2_log}" "all tasks executed"
 
 # bob should have received RESTART status msg
+log "wait for RESTART"
 wait_for_regex "${bob_log}" "RESTART received. Ending stream"
 
 # bob should have received both messages from alice1 and alice2

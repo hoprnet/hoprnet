@@ -1,4 +1,4 @@
-import { connectorMock } from '@hoprnet/hopr-core-ethereum'
+import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
 import { dbMock, debug } from '@hoprnet/hopr-utils'
 import chai, { expect } from 'chai'
 import chaiAsPromised from 'chai-as-promised'
@@ -22,6 +22,7 @@ describe('hopr core (instance)', async function () {
   it('should be able to start a hopr node instance without crashing', async function () {
     this.timeout(5000)
     log('Creating hopr node...')
+    const connectorMock = createConnectorMock(peerId)
     const node = new Hopr(peerId, dbMock, connectorMock, sampleOptions)
     log('Node created with Id', node.getId().toB58String())
     expect(node instanceof Hopr)

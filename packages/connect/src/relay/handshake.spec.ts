@@ -1,7 +1,7 @@
 import { RelayHandshake, RelayHandshakeMessage } from './handshake'
 import { u8aEquals, defer, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import Pair from 'it-pair'
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 import assert from 'assert'
 import type { Stream, StreamType } from '../types'
 

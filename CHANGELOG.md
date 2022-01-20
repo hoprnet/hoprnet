@@ -6,6 +6,11 @@
 
 - Fixed behavior when no network was found or invalid password is entered ([#3147](https://github.com/hoprnet/hoprnet/pull/3147))
 - Added new API v2 endpoint `/messages/sign` to support message authentication ([#3243](https://github.com/hoprnet/hoprnet/pull/3243))
+- Fixed NAT-to-NAT connection using entry nodes ([#3237](https://github.com/hoprnet/hoprnet/pull/3237))
+- Removed recursive reset of periodic checks and replaced recursive util function by iterative counterparts ([#3237](https://github.com/hoprnet/hoprnet/pull/3237))
+- Use UPNP to determine external IP address ([#3237](https://github.com/hoprnet/hoprnet/pull/3237))
+- Use a relay tag to announce in the DHT that a node acts as a relayer for a specific node ([#3237](https://github.com/hoprnet/hoprnet/pull/3237))
+- Added simulated NAT to E2E tests ([#3237](https://github.com/hoprnet/hoprnet/pull/3237))
 - Automatic deployment of NAT nodes to GCloud ([#3165](https://github.com/hoprnet/hoprnet/issues/3165))
 
 ---

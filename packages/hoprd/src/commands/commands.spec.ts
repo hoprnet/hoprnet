@@ -98,7 +98,7 @@ describe('Commands', () => {
 
   it('close channel', async () => {
     let mockNode: any = sinon.fake()
-    mockNode.smartContractInfo = async () => ({
+    mockNode.smartContractInfo = () => ({
       channelClosureSecs: 300
     })
     mockNode.closeChannel = sinon.fake(async () => ({
@@ -113,7 +113,7 @@ describe('Commands', () => {
     let mockNode: any = sinon.fake()
     mockNode.getAnnouncedAddresses = async () => []
     mockNode.getListeningAddresses = () => []
-    mockNode.smartContractInfo = async () => ({
+    mockNode.smartContractInfo = () => ({
       channelClosureSecs: 300
     })
     let cmds = new mod.Commands(mockNode)

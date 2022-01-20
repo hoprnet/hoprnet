@@ -1,4 +1,4 @@
-import type { Stream, StreamType } from '../types'
+import type { HoprConnectOptions, Stream, StreamType } from '../types'
 import handshake from 'it-handshake'
 import type { Handshake } from 'it-handshake'
 import type PeerId from 'peer-id'
@@ -10,7 +10,7 @@ import { RelayState } from './state'
 import type { Relay } from '.'
 
 import debug from 'debug'
-import { DELIVERY } from '../constants'
+import { DELIVERY_PROTOCOL } from '../constants'
 
 export enum RelayHandshakeMessage {
   OK,
@@ -74,7 +74,7 @@ type HandleResponse =
 class RelayHandshake {
   private shaker: Handshake<StreamType>
 
-  constructor(stream: Stream) {
+  constructor(stream: Stream, private options: HoprConnectOptions = {}) {
     this.shaker = handshake(stream)
   }
 
@@ -104,14 +104,8 @@ class RelayHandshake {
     let chunk: StreamType | undefined
     try {
       chunk = await this.shaker.read()
-    } catch (err) {
-      error(`Error while reading answer from ${green(relay.toB58String())}.`)
-      if (err instanceof Error) {
-        error(err.message)
-      } else {
-        console.trace()
-        error(`Non-error instance was thrown.`, err)
-      }
+    } catch (err: any) {
+      error(`Error while reading answer from ${green(relay.toB58String())}.`, err.message)
     }
 
     if (chunk == null || chunk.length == 0) {
@@ -228,7 +222,7 @@ class RelayHandshake {
 
     let toDestination: Stream | undefined
     try {
-      toDestination = await getStreamToCounterparty(destination, DELIVERY)
+      toDestination = await getStreamToCounterparty(destination, DELIVERY_PROTOCOL(this.options.environment))
     } catch (err) {
       error(err)
     }
@@ -270,7 +264,13 @@ class RelayHandshake {
         destinationShaker.rest()
 
         try {
-          await state.createNew(source, destination, this.shaker.stream, destinationShaker.stream, __relayFreeTimeout)
+          await state.createNew(
+            source,
+            destination,
+            this.shaker.stream,
+            destinationShaker.stream,
+            this.options.relayFreeTimeout
+          )
         } catch (err) {
           error(
             `Cannot established relayed connection between ${destination.toB58String()} and ${source.toB58String()}`,
@@ -318,14 +318,8 @@ class RelayHandshake {
 
     try {
       initiator = pubKeyToPeerId(chunk.slice())
-    } catch (err) {
-      error(`Could not decode sender peerId.`)
-      if (err instanceof Error) {
-        error(err.message)
-      } else {
-        console.trace()
-        error(`Non-error instance was thrown.`, err)
-      }
+    } catch (err: any) {
+      error(`Could not decode sender peerId.`, err.message)
     }
 
     if (initiator == null) {
