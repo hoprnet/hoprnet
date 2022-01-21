@@ -1,7 +1,7 @@
 import chai, { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
-import { FakeContract, smock } from '@defi-wonderland/smock'
-import { BaseContract, Contract, Signer } from 'ethers'
+import { smock } from '@defi-wonderland/smock'
+import { Contract, Signer } from 'ethers'
 import { HoprNetworkRegistry } from '../src/types'
 import { INITIAL_MIN_STAKE } from '../deploy/06_HoprNetworkRegistry'
 
@@ -91,7 +91,7 @@ const createFakeStakeV2Contract = async (participants: string[]) => {
   return stakeV2Fake
 }
 
-const useFixtures = deployments.createFixture(async (hre) => {
+const useFixtures = deployments.createFixture(async (_hre) => {
   const [_deployer, owner, ...signers] = await ethers.getSigners()
   const participants = signers.slice(3, 10) // 7 participants
 
@@ -119,10 +119,7 @@ const useFixtures = deployments.createFixture(async (hre) => {
 describe('HoprNetworkRegistry', () => {
   let owner: Signer
   let participants: Signer[]
-  let ownerAddress: string
   let participantAddresses: string[]
-
-  let stakeV2Fake: FakeContract<BaseContract>
   let hoprNetworkRegistry: Contract
 
   describe('Owner can update important parameters of the contract', () => {
@@ -130,11 +127,8 @@ describe('HoprNetworkRegistry', () => {
       ;({
         owner,
         participants,
-        ownerAddress,
         participantAddresses,
-        stakeV2Fake,
         hoprNetworkRegistry,
-        ownerAddress,
         participantAddresses
       } = await useFixtures())
     })
@@ -237,11 +231,8 @@ describe('HoprNetworkRegistry', () => {
       ;({
         owner,
         participants,
-        ownerAddress,
         participantAddresses,
-        stakeV2Fake,
         hoprNetworkRegistry,
-        ownerAddress,
         participantAddresses
       } = await useFixtures())
       // add eligible NFT
@@ -291,11 +282,8 @@ describe('HoprNetworkRegistry', () => {
       ;({
         owner,
         participants,
-        ownerAddress,
         participantAddresses,
-        stakeV2Fake,
         hoprNetworkRegistry,
-        ownerAddress,
         participantAddresses
       } = await useFixtures())
       // add eligible NFT

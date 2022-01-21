@@ -73,11 +73,15 @@ for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref"
       deployments_path="${mydir}/../packages/ethereum/deployments/${environment_id}/${network_id}"
       token_contract_address="$(cat "${deployments_path}/HoprToken.json" | jq -r ".address")"
       channels_contract_address="$(cat "${deployments_path}/HoprChannels.json" | jq -r ".address")"
+      registry_contract_address="$(cat "${deployments_path}/HoprNetworkRegistry.json" | jq -r ".address")"
 
       cat "${protocol_config}" | jq ".environments.\"${environment_id}\".token_contract_address = \"${token_contract_address}\"" > "${protocol_config}.new"
       mv "${protocol_config}.new" "${protocol_config}"
 
       cat "${protocol_config}" | jq ".environments.\"${environment_id}\".channels_contract_address = \"${channels_contract_address}\"" > "${protocol_config}.new"
+      mv "${protocol_config}.new" "${protocol_config}"
+
+      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".registry_contract_address = \"${registry_contract_address}\"" > "${protocol_config}.new"
       mv "${protocol_config}.new" "${protocol_config}"
 
     done

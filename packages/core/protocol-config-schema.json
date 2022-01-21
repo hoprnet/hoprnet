@@ -43,6 +43,7 @@
             "channel_contract_deploy_block",
             "token_contract_address",
             "channels_contract_address",
+            "stake_v2_contract_address",
             "registry_contract_address",
             "network_registry_admin_address",
             "tags"
