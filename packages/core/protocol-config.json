@@ -6,6 +6,9 @@
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
+      "stake_v2_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "hardhat-localhost2": {
@@ -14,6 +17,9 @@
       "token_contract_address": "${HARDHAT_TOKEN_CONTACT_ADDRESS}",
       "channels_contract_address": "${HARDHAT_CHANNELS_CONTACT_ADDRESS}",
       "minted_token_receiver_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
+      "stake_v2_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "master-goerli": {
@@ -22,6 +28,9 @@
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
       "channels_contract_address": "0x456641ee4DFA49986c5D893aD22a59eE8D101F33",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
+      "stake_v2_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "debug-goerli": {
@@ -30,6 +39,9 @@
       "token_contract_address": "0xC3Ff0A2C4F404D6a9B31a7ABc2a41E616bd4F34C",
       "channels_contract_address": "0x5daae235eEAeA72D9116702A615c2Be89D00D91b",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
+      "stake_v2_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["development"]
     },
     "tuttlingen": {
@@ -37,6 +49,9 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
+      "stake_v2_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
+      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["production"]
     },
     "prague": {
@@ -44,6 +59,9 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
+      "stake_v2_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
+      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["production"]
     },
     "budapest": {
@@ -51,6 +69,9 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
+      "stake_v2_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
+      "registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
+      "network_registry_admin_address": "0x2402da10A6172ED018AEEa22CA60EDe1F766655C",
       "tags": ["production"]
     }
   },

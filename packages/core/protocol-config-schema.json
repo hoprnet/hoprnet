@@ -22,6 +22,15 @@
             "minted_token_receiver_address": {
               "type": "string"
             },
+            "stake_v2_contract_address": {
+              "type": "string"
+            },
+            "registry_contract_address": {
+              "type": "string"
+            },
+            "network_registry_admin_address": {
+              "type": "string"
+            },
             "tags": {
               "type": "array",
               "items": {
@@ -34,6 +43,8 @@
             "channel_contract_deploy_block",
             "token_contract_address",
             "channels_contract_address",
+            "registry_contract_address",
+            "network_registry_admin_address",
             "tags"
           ],
           "additionalProperties": false

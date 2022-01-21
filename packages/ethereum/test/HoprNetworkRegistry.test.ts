@@ -1,18 +1,19 @@
 import chai, { expect } from 'chai'
-import { ethers } from 'hardhat'
+import { deployments, ethers } from 'hardhat'
 import { FakeContract, smock } from '@defi-wonderland/smock';
 import { BaseContract, Contract, Signer } from 'ethers';
+import { HoprNetworkRegistry } from '../src/types';
 
 chai.should(); // if you like should syntax
 chai.use(smock.matchers);
 
 const NFT_TYPE = [1, 2];
 const NFT_RANK = [123, 456];
-const INITIAL_MIN_STAKE = 1500;
+export const INITIAL_MIN_STAKE = 1500;
 
 const hoprAddress = (i: number) => `16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x${i}`;
 
-const createFakeStakeV2Contract = async (participants: string[]) => {
+const createFakeStakeV2Contract = async (participants: string[], contractAddress: string) => {
     const stakeV2Fake = await smock.fake([
         {
             "inputs": [
@@ -62,7 +63,9 @@ const createFakeStakeV2Contract = async (participants: string[]) => {
             "stateMutability": "view",
             "type": "function"
           },
-    ]);
+    ], {
+      address: contractAddress
+    });
 
     participants.forEach((participant, participantIndex) => {
         // no one has NFTs of {NFT_TYPE[0], NFT_RANK[0]} nor NFT_TYPE[1], NFT_RANK[1]
@@ -89,12 +92,35 @@ const createFakeStakeV2Contract = async (participants: string[]) => {
     return stakeV2Fake;
 }
 
+const useFixtures = deployments.createFixture(async (hre) => {
+  const [deployer, owner, ...signers] = await ethers.getSigners();
+  const participants = signers.slice(3,10); // 7 participants
+
+  const ownerAddress = await owner.getAddress();
+  const participantAddresses = await Promise.all(participants.map(h => h.getAddress()));
+
+  // deploy network registry
+  const hoprNetworkRegistry = (await (await ethers.getContractFactory('HoprNetworkRegistry')).deploy()) as HoprNetworkRegistry
+  const fakeStakeAddress = await hoprNetworkRegistry.STAKE_CONTRACT();
+  // mock staking contract
+  const stakeV2Fake = await createFakeStakeV2Contract(participantAddresses, fakeStakeAddress);
+
+  return {
+    deployer,
+    owner,
+    participants,
+    ownerAddress,
+    participantAddresses,
+    stakeV2Fake,
+    hoprNetworkRegistry
+  }
+})
+
 describe('HoprNetworkRegistry', () => {
     let deployer: Signer;
     let owner: Signer;
     let participants: Signer[];
     
-    let deployerAddress: string;
     let ownerAddress: string;
     let participantAddresses: string[];
     
@@ -106,7 +132,6 @@ describe('HoprNetworkRegistry', () => {
         [deployer, owner, ...signers] = await ethers.getSigners();
         participants = signers.slice(3,10); // 7 participants
 
-        deployerAddress = await deployer.getAddress();
         ownerAddress = await owner.getAddress();
         participantAddresses = await Promise.all(participants.map(h => h.getAddress()));
 
