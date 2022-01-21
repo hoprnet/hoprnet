@@ -229,7 +229,7 @@ gcloud_create_or_update_instance_template() {
       --image-family=cos-stable \
       --image-project=cos-cloud \
       --container-image="${image}" \
-      --container-env=^,@^DEBUG=hopr\*,-hopr-connect\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
       --container-mount-host-path=mount-path=/var/run/docker.sock,host-path=/var/run/docker.sock \
       --container-restart-policy=always \
