@@ -73,7 +73,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       log "\tcluster name: ${cluster_name}"
       log "\tcluster template name: ${cluster_template_name}"
 
-      if [ "${cluster-tag}" = "-nat" ]; then
+      if [ "${cluster_tag}" = "-nat" ]; then
         gcloud_create_or_update_instance_template "${cluster_template_name}" \
           "${docker_image_full}" \
           "${environment_id}" \
