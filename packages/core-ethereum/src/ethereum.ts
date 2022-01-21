@@ -33,7 +33,8 @@ export type SendTransactionReturn = {
 export async function createChainWrapper(
   networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
   privateKey: Uint8Array,
-  checkDuplicate: Boolean = true
+  checkDuplicate: Boolean = true,
+  timeout = TX_CONFIRMATION_WAIT
 ) {
   const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
@@ -42,7 +43,7 @@ export async function createChainWrapper(
   const wallet = new Wallet(privateKey).connect(provider)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()
-  const providerChainId = await provider.getNetwork().then((res) => res.chainId)
+  const providerChainId = (await provider.getNetwork()).chainId
 
   // ensure chain id matches our expectation
   if (networkInfo.chainId !== providerChainId) {
@@ -115,7 +116,7 @@ export async function createChainWrapper(
     log('essentialTxPayload %o', essentialTxPayload)
 
     let initiatedHash: string
-    let deferredListener
+    let deferredListener: DeferType<string>
     try {
       if (checkDuplicate) {
         const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
@@ -144,7 +145,11 @@ export async function createChainWrapper(
       transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
-      if (deferredListener) deferredListener.reject()
+
+      if (deferredListener) {
+        deferredListener.reject()
+      }
+
       transactions.remove(initiatedHash)
       nonceLock.releaseLock()
       throw error
@@ -156,7 +161,7 @@ export async function createChainWrapper(
 
     try {
       // wait for the tx to be mined
-      await provider.waitForTransaction(transaction.hash, 1, TX_CONFIRMATION_WAIT)
+      await provider.waitForTransaction(transaction.hash, 1, timeout)
     } catch (error) {
       log(error)
       // remove listener but not throwing error message
