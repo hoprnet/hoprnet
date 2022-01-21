@@ -43,7 +43,7 @@ export class Alias extends AbstractCommand {
     if (error) return log(styleValue(error, 'failure'))
 
     try {
-      let peerId = await checkPeerIdInput(id)
+      let peerId = checkPeerIdInput(id)
       state.aliases.set(name, peerId)
 
       return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`)

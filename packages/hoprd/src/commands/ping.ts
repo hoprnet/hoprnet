@@ -23,7 +23,7 @@ export default class Ping extends AbstractCommand {
 
     let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(query, state)
+      peerId = checkPeerIdInput(query, state)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

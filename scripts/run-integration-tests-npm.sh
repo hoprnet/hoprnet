@@ -283,7 +283,7 @@ ensure_port_is_free 19097
 
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rfv \
+rm -Rf \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2" \
   "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost" \

@@ -249,7 +249,7 @@ ensure_port_is_free 20000
 
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rfv \
+rm -Rf \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
@@ -275,6 +275,9 @@ cp -R \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
 
+# static address because static private key
+declare ct_node1_address="0xDe913EeED23Bce5274eAD3dE8c196A41176fbd49"
+
 #  --- Run nodes --- {{{
 setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
 setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce --testNoAuthentication"
@@ -283,14 +286,12 @@ setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "--test
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2" # should not be able to talk to the rest
-setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
+setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}" 
 # }}}
 
-declare ct_node1_address=$(wait_for_regex ${ct_node1_log} "Address: " | cut -d " " -f 4)
 log "CT node1 address: ${ct_node1_address}"
 
 log "Funding nodes"
-
 #  --- Fund nodes --- {{{
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
@@ -301,19 +302,6 @@ yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --network hardhat \
   --address "${ct_node1_address}" \
   --password "${password}"
-# }}}
-
-log "Waiting for nodes startup"
-
-#  --- Wait until started --- {{{
-# Wait until node has recovered its private key
-wait_for_regex ${node1_log} "using blockchain address"
-wait_for_regex ${node2_log} "using blockchain address"
-wait_for_regex ${node3_log} "using blockchain address"
-wait_for_regex ${node4_log} "using blockchain address"
-wait_for_regex ${node5_log} "using blockchain address"
-wait_for_regex ${node6_log} "using blockchain address"
-wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 log "Waiting for port binding"
