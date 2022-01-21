@@ -145,7 +145,7 @@ export async function createChainWrapper(
       transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
- deferredListener && deferredListener.reject()
+      deferredListener && deferredListener.reject()
       transactions.remove(initiatedHash)
       nonceLock.releaseLock()
       throw error
