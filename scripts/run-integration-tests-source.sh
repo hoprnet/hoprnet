@@ -293,13 +293,13 @@ log "CT node1 address: ${ct_node1_address}"
 
 # DO NOT MOVE THIS STEP
 #  --- Wait until private key has been created or recovered --- {{{
-wait_for_regex ${node1_log} "using blockchain address"
-wait_for_regex ${node2_log} "using blockchain address"
-wait_for_regex ${node3_log} "using blockchain address"
-wait_for_regex ${node4_log} "using blockchain address"
-wait_for_regex ${node5_log} "using blockchain address"
-wait_for_regex ${node6_log} "using blockchain address"
-wait_for_regex ${node7_log} "using blockchain address"
+wait_for_regex ${node1_log} "please fund this node"
+wait_for_regex ${node2_log} "please fund this node"
+wait_for_regex ${node3_log} "please fund this node"
+wait_for_regex ${node4_log} "please fund this node"
+wait_for_regex ${node5_log} "please fund this node"
+wait_for_regex ${node6_log} "please fund this node"
+wait_for_regex ${node7_log} "please fund this node"
 # }}}
 
 log "Funding nodes"
