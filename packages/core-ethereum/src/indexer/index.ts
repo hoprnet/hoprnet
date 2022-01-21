@@ -49,6 +49,7 @@ class Indexer extends EventEmitter {
   private unsubscribeErrors: () => void
   private unsubscribeTokenEvents: () => void
   private unsubscribeChannelEvents: () => void
+  private unsubscribeRegistryEvents: () => void
   private unsubscribeBlock: () => void
 
   constructor(
@@ -122,10 +123,10 @@ class Indexer extends EventEmitter {
         this.onNewEvents([tokenEvent])
       }
     })
-    this.subscribeRegistryEvents = this.chain.subscribeRegistryEvents((registryEvent: TypedEvent<any, any>) => {
+    this.unsubscribeRegistryEvents = this.chain.subscribeRegistryEvents((registryEvent: TypedEvent<any, any>) => {
       if (
-        registryEvent === 'AddedToWhitelist' ||
-        registryEvent === 'OwnerAddedToWhitelist'
+        registryEvent.event === 'AddedToWhitelist' ||
+        registryEvent.event === 'OwnerAddedToWhitelist'
       ) {
         // TODO: validate HoprMultiaddr string
         // if valid
@@ -157,6 +158,7 @@ class Indexer extends EventEmitter {
 
     this.unsubscribeChannelEvents()
     this.unsubscribeTokenEvents()
+    this.unsubscribeRegistryEvents()
     this.unsubscribeBlock()
     this.unsubscribeErrors()
 

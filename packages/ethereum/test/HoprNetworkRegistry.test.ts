@@ -10,7 +10,8 @@ chai.use(smock.matchers)
 
 const NFT_TYPE = [1, 2]
 const NFT_RANK = [123, 456]
-
+const HIGH_STAKE = 2000
+const LOW_STAKE = 100
 
 const hoprAddress = (i: number) => `16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x${i}`
 
@@ -82,9 +83,9 @@ const createFakeStakeV2Contract = async (participants: string[]) => {
 
     if ([0, 1, 4].findIndex((element) => element === participantIndex) > -1) {
       // participants at index 0, 1, 4 have 2000 staked tokens and others have 100 staked tokens
-      stakeV2Fake.stakedHoprTokens.whenCalledWith(participant).returns(2000)
+      stakeV2Fake.stakedHoprTokens.whenCalledWith(participant).returns(HIGH_STAKE)
     } else {
-      stakeV2Fake.stakedHoprTokens.whenCalledWith(participant).returns(100)
+      stakeV2Fake.stakedHoprTokens.whenCalledWith(participant).returns(LOW_STAKE)
     }
   })
 
@@ -178,9 +179,9 @@ describe('HoprNetworkRegistry', () => {
           .ownerAddToWhitelist([hoprAddress(0), hoprAddress(1)], participantAddresses.slice(0, 2), [300, 1800])
       )
         .to.emit(hoprNetworkRegistry, 'OwnerAddedToWhitelist')
-        .withArgs(participantAddresses[0], 300, hoprAddress(0))
+        .withArgs(participantAddresses[0], hoprAddress(0), 300)
         .to.emit(hoprNetworkRegistry, 'OwnerAddedToWhitelist')
-        .withArgs(participantAddresses[1], 1800, hoprAddress(1))
+        .withArgs(participantAddresses[1], hoprAddress(1), 1800)
     })
     it('fail to let owner to whitelist when hoprAddresses and stakers have different length', async () => {
       await expect(
@@ -219,15 +220,6 @@ describe('HoprNetworkRegistry', () => {
 
   describe('Self whitelist', () => {
     before(async () => {
-      // const fixture = await useFixtures()
-      // owner = fixture.owner
-      // participants = fixture.participants
-      // ownerAddress = fixture.ownerAddress
-      // participantAddresses = fixture.participantAddresses
-      // stakeV2Fake = fixture.stakeV2Fake
-      // hoprNetworkRegistry = fixture.hoprNetworkRegistry
-      // ownerAddress = fixture.ownerAddress
-      // participantAddresses = fixture.participantAddresses
       ;({
         owner,
         participants,
@@ -241,7 +233,7 @@ describe('HoprNetworkRegistry', () => {
     it('whitelist staker with stake of high threshold and eligible NFT', async () => {
       await expect(hoprNetworkRegistry.connect(participants[0]).addToWhitelist(hoprAddress(0)))
         .to.emit(hoprNetworkRegistry, 'AddedToWhitelist')
-        .withArgs(participantAddresses[0], hoprAddress(0))
+        .withArgs(participantAddresses[0], hoprAddress(0), HIGH_STAKE)
 
       expect(await hoprNetworkRegistry.isWhitelisted(hoprAddress(0))).to.equal(true)
     })
@@ -266,15 +258,15 @@ describe('HoprNetworkRegistry', () => {
           .ownerAddToWhitelist(
             [hoprAddress(1), hoprAddress(2), hoprAddress(3)],
             participantAddresses.slice(1, 4),
-            [2000, 100, 100]
+            [HIGH_STAKE, LOW_STAKE, LOW_STAKE]
           )
       )
         .to.emit(hoprNetworkRegistry, 'OwnerAddedToWhitelist')
-        .withArgs(participantAddresses[1], 2000, hoprAddress(1))
+        .withArgs(participantAddresses[1], hoprAddress(1), HIGH_STAKE)
         .to.emit(hoprNetworkRegistry, 'OwnerAddedToWhitelist')
-        .withArgs(participantAddresses[2], 100, hoprAddress(2))
+        .withArgs(participantAddresses[2], hoprAddress(2), LOW_STAKE)
         .to.emit(hoprNetworkRegistry, 'OwnerAddedToWhitelist')
-        .withArgs(participantAddresses[3], 100, hoprAddress(3))
+        .withArgs(participantAddresses[3], hoprAddress(3), LOW_STAKE)
     })
   })
   describe('Integration test', () => {
@@ -295,13 +287,13 @@ describe('HoprNetworkRegistry', () => {
         .ownerAddToWhitelist(
           [hoprAddress(1), hoprAddress(2), hoprAddress(3)],
           participantAddresses.slice(1, 4),
-          [2000, 100, 100]
+          [HIGH_STAKE, LOW_STAKE, LOW_STAKE]
         )
     })
 
-    describe('Lower threshold to 100', () => {
+    describe(`Lower threshold to ${LOW_STAKE}`, () => {
       beforeEach(async () => {
-        await hoprNetworkRegistry.connect(owner).ownerUpdateThreshold(100)
+        await hoprNetworkRegistry.connect(owner).ownerUpdateThreshold(LOW_STAKE)
       })
       const whitelisted = [0, 1, 2, 3]
       const nonWitelisted = [4, 5, 6]
@@ -330,7 +322,7 @@ describe('HoprNetworkRegistry', () => {
             hoprNetworkRegistry.connect(participants[accountIndex]).addToWhitelist(hoprAddress(accountIndex))
           )
             .to.emit(hoprNetworkRegistry, 'AddedToWhitelist')
-            .withArgs(participantAddresses[accountIndex], hoprAddress(accountIndex))
+            .withArgs(participantAddresses[accountIndex], hoprAddress(accountIndex), LOW_STAKE)
 
           expect(await hoprNetworkRegistry.isWhitelisted(hoprAddress(accountIndex))).to.equal(true)
         })
@@ -466,7 +458,7 @@ describe('HoprNetworkRegistry', () => {
             hoprNetworkRegistry.connect(participants[accountIndex]).addToWhitelist(hoprAddress(accountIndex))
           )
             .to.emit(hoprNetworkRegistry, 'AddedToWhitelist')
-            .withArgs(participantAddresses[accountIndex], hoprAddress(accountIndex))
+            .withArgs(participantAddresses[accountIndex], hoprAddress(accountIndex), HIGH_STAKE)
 
           expect(await hoprNetworkRegistry.isWhitelisted(hoprAddress(accountIndex))).to.equal(true)
         })

@@ -1,7 +1,7 @@
 import type { ContractTransaction, BaseContract } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import { providers, utils, errors, Wallet, BigNumber, ethers } from 'ethers'
-import type { HoprToken, HoprChannels, TypedEvent } from '@hoprnet/hopr-ethereum'
+import type { HoprToken, HoprChannels, HoprNetworkRegistry, TypedEvent } from '@hoprnet/hopr-ethereum'
 import { getContractData } from '@hoprnet/hopr-ethereum'
 import {
   Address,
@@ -19,7 +19,6 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager, { TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants'
-import { HoprNetworkRegistry } from '@hoprnet/hopr-ethereum/src/types'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
