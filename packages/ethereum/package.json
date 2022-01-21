@@ -47,7 +47,7 @@
     "ethers": "5.5.2",
     "hardhat": "2.8.0",
     "hardhat-deploy": "0.9.27",
-    "hardhat-gas-reporter": "1.0.6",
+    "hardhat-gas-reporter": "1.0.7",
     "multiaddr": "10.0.1",
     "rimraf": "3.0.2",
     "solidity-coverage": "0.7.17",
