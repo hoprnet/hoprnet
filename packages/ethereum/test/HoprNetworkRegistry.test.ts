@@ -3,13 +3,14 @@ import { deployments, ethers } from 'hardhat'
 import { FakeContract, smock } from '@defi-wonderland/smock'
 import { BaseContract, Contract, Signer } from 'ethers'
 import { HoprNetworkRegistry } from '../src/types'
+import { INITIAL_MIN_STAKE } from '../deploy/06_HoprNetworkRegistry'
 
 chai.should() // if you like should syntax
 chai.use(smock.matchers)
 
 const NFT_TYPE = [1, 2]
 const NFT_RANK = [123, 456]
-export const INITIAL_MIN_STAKE = 1500
+
 
 const hoprAddress = (i: number) => `16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x${i}`
 

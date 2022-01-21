@@ -1,6 +1,7 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeploymentTypes } from '../src'
-import { INITIAL_MIN_STAKE } from '../test/HoprNetworkRegistry.test'
+
+export const INITIAL_MIN_STAKE = 1500
 
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
 const minStakes: {
@@ -22,12 +23,13 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
   const adminAddress =
     network.name == 'hardhat' ? deployer.address : environmentConfig['network_registry_admin_address']
 
-  console.log(JSON.stringify(environmentConfig))
-
-  await deployments.deploy('HoprNetworkRegistry', {
+  const networkRegistry = await deployments.deploy('HoprNetworkRegistry', {
     from: deployer.address,
+    log: true,
     args: [environmentConfig['stake_v2_contract_address'], adminAddress, minStakes[deploymentType]]
   })
+
+  console.log(`"HoprNetworkRegistry" deployed at ${networkRegistry.address}`)
 }
 
 main.dependencies = ['preDeploy']
