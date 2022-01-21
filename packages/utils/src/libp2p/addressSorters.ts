@@ -1,8 +1,7 @@
-import { Address } from 'libp2p/src/peer-store'
+import { type Address } from 'libp2p/src/peer-store'
 import { isPrivateAddress, isLocalhost, ipToU8aAddress } from '../network'
-import { Multiaddr } from 'multiaddr'
+import { type Multiaddr } from 'multiaddr'
 import type { NetworkInterfaceInfo } from 'os'
-import { log } from 'debug'
 
 /**
  * Checks if given Multiaddr encodes a private address
@@ -10,27 +9,26 @@ import { log } from 'debug'
  * @returns true if address is a private ip address
  */
 export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
-  try {
-    const { address, family } = multiaddr.nodeAddress()
-
-    let ipFamily: NetworkInterfaceInfo['family']
-    switch (family) {
-      case 4:
-        ipFamily = 'IPv4'
-        break
-      case 6:
-        ipFamily = 'IPv6'
-        break
-      default:
-        return false
-    }
-
-    const u8aAddr = ipToU8aAddress(address, ipFamily)
-    return isLocalhost(u8aAddr, ipFamily) || isPrivateAddress(u8aAddr, ipFamily)
-  } catch (err) {
-    log(`failed to determine address locality: ${err}`)
+  if (multiaddr.toString().startsWith(`/p2p/`)) {
     return false
   }
+
+  const { address, family } = multiaddr.nodeAddress()
+
+  let ipFamily: NetworkInterfaceInfo['family']
+  switch (family) {
+    case 4:
+      ipFamily = 'IPv4'
+      break
+    case 6:
+      ipFamily = 'IPv6'
+      break
+    default:
+      return false
+  }
+
+  const u8aAddr = ipToU8aAddress(address, ipFamily)
+  return isLocalhost(u8aAddr, ipFamily) || isPrivateAddress(u8aAddr, ipFamily)
 }
 
 export function getIpv4LocalAddressClass(address: Multiaddr): 'A' | 'B' | 'C' | 'D' | undefined {

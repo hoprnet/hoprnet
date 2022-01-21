@@ -149,8 +149,8 @@ describe(`database tests`, function () {
 
   it('should verify environment', async function () {
     await db.setEnvironmentId('test-env')
-    assert.rejects(async () => db.verifyEnvironmentId('wrong-id'))
-    assert.doesNotReject(async () => db.verifyEnvironmentId.bind('test-env'))
+    assert((await db.verifyEnvironmentId('wrong-id')) === false, `must fail for wrong id`)
+    assert((await db.verifyEnvironmentId('test-env')) === true, `must not fail for correct id`)
   })
 
   it('should store hopr balance', async function () {

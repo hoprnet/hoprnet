@@ -23,9 +23,6 @@ import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './consta
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
 import { IndexerEvents } from './indexer/types'
-import { connectorMock } from './index.mock'
-import { useFixtures } from './indexer/index.mock'
-import { sampleChainOptions } from './ethereum.mock'
 import ChainWrapperSingleton from './chain'
 
 const log = debug('hopr-core-ethereum')
@@ -178,7 +175,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     return useIndexer ? this.db.getHoprBalance() : this.chain.getBalance(this.publicKey.toAddress())
   }
 
-  public getPublicKey() {
+  public getPublicKey(): PublicKey {
     return this.publicKey
   }
 
@@ -383,19 +380,20 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 }
 
+export { createConnectorMock } from './index.mock'
+export { useFixtures } from './indexer/index.mock'
+export { sampleChainOptions } from './ethereum.mock'
+
 export {
   ChannelEntry,
   ChannelCommitmentInfo,
   Indexer,
   ChainWrapperSingleton,
   ChainWrapper,
-  connectorMock,
   createChainWrapper,
   initializeCommitment,
   findCommitmentPreImage,
   bumpCommitment,
   INDEXER_BLOCK_RANGE,
-  CONFIRMATIONS,
-  useFixtures,
-  sampleChainOptions
+  CONFIRMATIONS
 }

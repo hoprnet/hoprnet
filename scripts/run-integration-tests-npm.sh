@@ -155,7 +155,6 @@ function setup_node() {
     --admin \
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \
-    --announce \
     --api-token "${api_token}" \
     --data="${dir}" \
     --host="127.0.0.1:${node_port}" \
@@ -167,6 +166,7 @@ function setup_node() {
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
+    --testNoUPNP \
     ${additional_args} \
     > "${log}" 2>&1 &
 
@@ -317,14 +317,14 @@ log "Hardhat node started (127.0.0.1:8545)"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
-setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
-setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
+setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce --testNoAuthentication"
+setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "--announce"
+setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections"
+setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections"
+setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
 # should not be able to talk to the rest
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2"
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
 # }}}
 
 #  --- Fund nodes --- {{{

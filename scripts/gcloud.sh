@@ -160,10 +160,11 @@ gcloud_cleanup_docker_images() {
 # $3 - optional: environment id
 # $4 - optional: api token
 # $5 - optional: password
-# $6 - optional: private key
-# $7 - optional: no args
+# $6 - optional: announce
+# $7 - optional: private key
+# $8 - optional: no args
 gcloud_create_or_update_instance_template() {
-  local args name mount_path image rpc api_token password host_path no_args private_key
+  local args name mount_path image rpc api_token password host_path no_args private_key announce
   local extra_args=""
 
   name="${1}"
@@ -174,12 +175,15 @@ gcloud_create_or_update_instance_template() {
   api_token="${4:-}"
   password="${5:-}"
 
+  # if set, let the node announce with a routable address on-chain
+  announce="${6:-}"
+
   # this parameter is mostly used on by CT nodes, although hoprd nodes also
   # support it
-  private_key="${6:-}"
+  private_key="${7:-}"
 
   # if set no additional arguments are used to start the container
-  no_args="${7:-}"
+  no_args="${8:-}"
 
   args=""
   # the environment is optional, since each docker image has a default environment set
@@ -196,7 +200,11 @@ gcloud_create_or_update_instance_template() {
   fi
 
   if [ -n "${private_key}" ]; then
-    extra_args="${extra_args} --container-arg=--privateKey --container-arg=\"${private_key}\""
+    extra_args="${extra_args} --container-arg=\"--privateKey\" --container-arg=\"${private_key}\""
+  fi
+
+  if [ -n "${announce}" ]; then
+    extra_args="${extra_args} --container-arg=\"--announce\""
   fi
 
   mount_path="/app/db"
@@ -221,8 +229,9 @@ gcloud_create_or_update_instance_template() {
       --image-family=cos-stable \
       --image-project=cos-cloud \
       --container-image="${image}" \
-      --container-env=^,@^DEBUG=hopr\*,-hopr-connect\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
+      --container-mount-host-path=mount-path=/var/run/docker.sock,host-path=/var/run/docker.sock \
       --container-restart-policy=always \
       ${args} \
       ${extra_args}
@@ -239,10 +248,10 @@ gcloud_create_or_update_instance_template() {
       --container-image="${image}" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
+      --container-mount-host-path=mount-path=/var/run/docker.sock,host-path=/var/run/docker.sock \
       --container-restart-policy=always \
       --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
-      --container-arg="--announce" \
       --container-arg="--healthCheck" \
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \

@@ -61,16 +61,28 @@ export type HoprConnectOptions = {
   publicNodes?: PublicNodesEmitter
   initialNodes?: PeerStoreType[]
   interface?: string
-  __noDirectConnections?: boolean
-  __noWebRTCUpgrade?: boolean
   maxRelayedConnections?: number
-  __relayFreeTimeout?: number
-  __useLocalAddresses?: boolean
+  environment?: string
+  relayFreeTimeout?: number
+}
+
+export type HoprConnectTestingOptions = {
+  // Simulated NAT: only connect directly to relays
+  __noDirectConnections?: boolean
+  // Simulated NAT: ignore WebRTC upgrade
+  __noWebRTCUpgrade?: boolean
+  // Local mode: only use local address, i.e. don't try to
+  // determine any external / public IP addresses
+  __preferLocalAddresses?: boolean
+  // Local mode: running a local testnet on the same machine
+  // hence the local interface is treated as an exposed host
+  __runningLocally?: boolean
+  // Disable UPNP support
+  __noUPNP?: boolean
 }
 
 export type HoprConnectListeningOptions = undefined
 
 export type HoprConnectDialOptions = {
   signal?: AbortSignal
-  timeout?: number
 }

@@ -4,22 +4,20 @@
 import yargs from 'yargs/yargs'
 import BN from 'bn.js'
 import { createChainWrapper } from '@hoprnet/hopr-core-ethereum'
-import { expandVars, moveDecimalPoint, Address, Balance, NativeBalance, DeferType } from '@hoprnet/hopr-utils'
-import { utils } from 'ethers'
-import { TX_CONFIRMATION_WAIT } from '@hoprnet/hopr-core-ethereum/src/constants'
+import {
+  expandVars,
+  moveDecimalPoint,
+  Address,
+  Balance,
+  NativeBalance,
+  DeferType,
+  stringToU8a
+} from '@hoprnet/hopr-utils'
+import { resolveEnvironment } from '@hoprnet/hopr-core'
 
 const { PRIVATE_KEY } = process.env
-const PROTOCOL_CONFIG = require('../packages/core/protocol-config.json')
 
-type UnboxPromise<T extends Promise<any>> = T extends Promise<infer U> ? U : never
-
-function parseGasPrice(gasPrice: string) {
-  const parsedGasPrice = gasPrice.split(' ')
-  if (parsedGasPrice.length > 1) {
-    return Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
-  }
-  return Number(parsedGasPrice[0])
-}
+type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
 // naive mock of indexer waiting for confirmation
 function createTxHandler(tx: string): DeferType<string> {
@@ -29,10 +27,6 @@ function createTxHandler(tx: string): DeferType<string> {
       console.log(`tx ${tx} is rejected`)
       reject(tx)
     }
-    setTimeout(() => {
-      deferred.resolve()
-    }, TX_CONFIRMATION_WAIT)
-
     deferred.resolve = () => {
       console.log(`tx ${tx} is resolved`)
       resolve(tx)
@@ -42,20 +36,15 @@ function createTxHandler(tx: string): DeferType<string> {
   return deferred
 }
 
-async function getNativeBalance(chain, address: string) {
+async function getNativeBalance(chain: ChainWrapper, address: string) {
   return await chain.getNativeBalance(Address.fromString(address))
 }
 
-async function getERC20Balance(chain, address: string) {
+async function getERC20Balance(chain: ChainWrapper, address: string) {
   return await chain.getBalance(Address.fromString(address))
 }
 
-async function fundERC20(
-  chain: UnboxPromise<ReturnType<typeof createChainWrapper>>,
-  sender: string,
-  receiver: string,
-  targetBalanceStr: string
-) {
+async function fundERC20(chain: ChainWrapper, sender: string, receiver: string, targetBalanceStr: string) {
   const senderBalance = await getNativeBalance(chain, sender)
   const balance = await getERC20Balance(chain, receiver)
   const targetBalanceNr = moveDecimalPoint(targetBalanceStr, Balance.DECIMALS)
@@ -82,15 +71,10 @@ async function fundERC20(
   console.log(
     `transfer ${diff.toFormattedString()} from ${sender} to ${receiver} to top up ${balance.toFormattedString()}`
   )
-  await chain.withdraw('HOPR', receiver, diff.toString(), (tx: string) => createTxHandler(tx))
+  await chain.withdraw('HOPR', receiver, diff.toString(), createTxHandler)
 }
 
-async function fundNative(
-  chain: UnboxPromise<ReturnType<typeof createChainWrapper>>,
-  sender: string,
-  receiver: string,
-  targetBalanceStr: string
-) {
+async function fundNative(chain: ChainWrapper, sender: string, receiver: string, targetBalanceStr: string) {
   const senderBalance = await getNativeBalance(chain, sender)
   const balance = await getNativeBalance(chain, receiver)
   const targetBalanceNr = moveDecimalPoint(targetBalanceStr, Balance.DECIMALS)
@@ -117,7 +101,7 @@ async function fundNative(
   console.log(
     `transfer ${diff.toFormattedString()} from ${sender} to ${receiver} to top up ${balance.toFormattedString()}`
   )
-  await chain.withdraw('NATIVE', receiver, diff.toString(), (tx: string) => createTxHandler(tx))
+  await chain.withdraw('NATIVE', receiver, diff.toString(), createTxHandler)
 }
 
 async function main() {
@@ -128,12 +112,12 @@ async function main() {
       type: 'string'
     })
     .option('address', {
-      describe: 'ETH address',
+      describe: 'ETH address of the recipient',
       demandOption: true,
       type: 'string'
     })
     .option('erc20', {
-      describe: 'whether to fund ERC20 token instead of native',
+      describe: 'if set, fund erc20 token instead of native topken',
       demandOption: false,
       type: 'boolean',
       default: false
@@ -145,7 +129,7 @@ async function main() {
     })
     .parseSync()
 
-  const environment = PROTOCOL_CONFIG.environments[argv.environment]
+  const environment = resolveEnvironment(argv.environment)
   if (!environment) {
     console.error(`Cannot find environment ${environment}`)
     process.exit(1)
@@ -157,16 +141,18 @@ async function main() {
   }
 
   // instantiate chain object based on given environment and private key
-  const network = PROTOCOL_CONFIG.networks[environment.network_id]
   const chainOptions = {
-    chainId: network.chain_id,
-    environment: argv.environment,
-    gasPrice: parseGasPrice(network.gas_price),
-    network: environment.network_id,
-    provider: expandVars(network.default_provider, process.env)
+    chainId: environment.network.chain_id,
+    environment: environment.id,
+    gasPrice: environment.network.gasPrice,
+    network: environment.network.id,
+    provider: expandVars(environment.network.default_provider, process.env)
   }
-  const privKey = utils.arrayify(PRIVATE_KEY)
-  const chain = await createChainWrapper(chainOptions, privKey)
+
+  const privKey = stringToU8a(PRIVATE_KEY)
+
+  // Wait as long as it takes to mine the transaction, i.e. timeout=0
+  const chain = await createChainWrapper(chainOptions, privKey, true, 0)
   const sender = chain.getPublicKey().toAddress().toString()
 
   // maybe fund ERC20
@@ -179,9 +165,10 @@ async function main() {
 }
 
 main()
-  .then((_result) => {
+  .then(() => {
     console.log('Funding process succeeded')
   })
   .catch((err) => {
-    console.log(`Error during script execution: ${err}`)
+    console.error(`Error during script execution: ${err}`)
+    process.exit(1)
   })

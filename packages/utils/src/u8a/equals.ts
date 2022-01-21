@@ -5,76 +5,103 @@
  * @param b second array
  * @param arrays additional arrays
  */
-export function u8aEquals(a: Uint8Array, b: Uint8Array, ...arrays: Uint8Array[]) {
-  const aLength = a.length
+export function u8aEquals(...arrays: (Uint8Array | undefined)[]) {
+  const aLength = arrays.length
 
-  if (aLength != b.length) {
-    return false
+  if (aLength <= 1) {
+    return true
   }
 
-  let canUse32 = a.byteOffset % 4 == 0 && b.byteOffset % 4 == 0
-  let canUse16 = a.byteOffset % 2 == 0 && b.byteOffset % 2 == 0
-
-  if (arrays?.length) {
-    for (const arr of arrays) {
-      if (arr == undefined) {
+  if (arrays[0] == undefined) {
+    for (let i = 1; i < aLength; i++) {
+      if (arrays[i] != undefined) {
         return false
       }
-      canUse32 = canUse32 && arr.byteOffset % 4 == 0
-      canUse16 = canUse16 && arr.byteOffset % 2 == 0
+    }
+    return true
+  }
 
-      if (aLength != arr.length) {
+  const firstLength = arrays[0].length
+
+  if (firstLength == 0) {
+    for (let i = 1; i < aLength; i++) {
+      if (arrays[i] == undefined) {
         return false
+      }
+
+      if (arrays[i].length != 0) {
+        return false
+      }
+    }
+    return true
+  }
+
+  let canUse64 = arrays[0].byteOffset % 8 == 0
+  let canUse32 = arrays[0].byteOffset % 4 == 0
+  let canUse16 = arrays[0].byteOffset % 2 == 0
+
+  for (let i = 1; i < aLength; i++) {
+    if (arrays[i] == undefined) {
+      return false
+    }
+    if (firstLength != arrays[i].length) {
+      return false
+    }
+
+    canUse64 = canUse64 && arrays[i].byteOffset % 8 == 0
+    canUse32 = canUse32 && arrays[i].byteOffset % 4 == 0
+    canUse16 = canUse16 && arrays[i].byteOffset % 2 == 0
+  }
+
+  const views: DataView[] = Array.from(
+    { length: aLength },
+    (_, i: number) => new DataView(arrays[i].buffer, arrays[i].byteOffset, firstLength)
+  )
+
+  let index = 0
+
+  if (canUse64) {
+    for (; index + 8 <= firstLength; index += 8) {
+      const first = views[0].getBigUint64(index)
+
+      for (let i = 1; i < aLength; i++) {
+        if (first != views[i].getBigUint64(index)) {
+          return false
+        }
       }
     }
   }
 
-  let index = 0
-
   if (canUse32) {
-    for (; index + 4 <= aLength; index += 4) {
-      let aArr = new Uint32Array(a.buffer, a.byteOffset + index, 1)[0]
+    for (; index + 4 <= firstLength; index += 4) {
+      const first = views[0].getUint32(index)
 
-      if (aArr != new Uint32Array(b.buffer, b.byteOffset + index, 1)[0]) {
-        return false
-      }
-      if (arrays?.length) {
-        for (const arr of arrays) {
-          if (aArr != new Uint32Array(arr.buffer, arr.byteOffset + index, 1)[0]) {
-            return false
-          }
+      for (let i = 1; i < aLength; i++) {
+        if (first != views[i].getUint32(index)) {
+          return false
         }
       }
     }
   }
 
   if (canUse16) {
-    for (; index + 2 <= aLength; index += 2) {
-      let aArr = new Uint16Array(a.buffer, a.byteOffset + index, 1)[0]
+    for (; index + 2 <= firstLength; index += 2) {
+      const first = views[0].getUint16(index)
 
-      if (aArr != new Uint16Array(b.buffer, b.byteOffset + index, 1)[0]) {
-        return false
-      }
-      if (arrays?.length) {
-        for (const arr of arrays) {
-          if (aArr != new Uint16Array(arr.buffer, arr.byteOffset + index, 1)[0]) {
-            return false
-          }
+      for (let i = 1; i < aLength; i++) {
+        if (first != views[i].getUint16(index)) {
+          return false
         }
       }
     }
   }
 
-  for (; index < aLength; index++) {
-    if (a[index] != b[index]) {
-      return false
-    }
+  if (firstLength & 1) {
+    const first = views[0].getUint8(index)
 
-    if (arrays?.length) {
-      for (const arr of arrays) {
-        if (a[index] != arr[index]) {
-          return false
-        }
+    for (let i = 1; i < aLength; i++) {
+      if (first != views[i].getUint8(index)) {
+        return false
       }
     }
   }
