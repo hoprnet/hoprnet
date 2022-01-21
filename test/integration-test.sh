@@ -300,17 +300,21 @@ for i in `seq 1 10`; do
 done
 
 # redeem tickets
-for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
-  log "Node ${node} should now redeem tickets"
-  result=$(run_command "${node}" "redeemTickets" "Redeemed all tickets" 600)
-  log "-- ${result}"
-done
+log "Node 2 should redeem all tickets"
+result=$(run_command "${api2}" "redeemTickets" "Redeemed all tickets" 600)
+log "--${result}"
 
-# check for unredeemed tickets
-for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
-  log "Node ${node} should now have no tickets"
-  run_command "${node}" "tickets" "Unredeemed:       0" 600
-done
+log "Node 3 should redeem all tickets"
+result=$(run_command "${api3}" "redeemTickets" "Redeemed all tickets" 600)
+log "--${result}"
+
+log "Node 4 should redeem all tickets"
+result=$(run_command "${api4}" "redeemTickets" "Redeemed all tickets" 600)
+log "--${result}"
+
+log "Node 5 should redeem all tickets"
+result=$(run_command "${api5}" "redeemTickets" "Redeemed all tickets" 600)
+log "--${result}"
 
 # initiate channel closures
 log "Node 1 close channel to Node 2"
@@ -334,22 +338,25 @@ result=$(run_command "${api5}" "close ${addr1}" "Initiated channel closure" 600)
 log "-- ${result}"
 
 # close channels
+echo "Waiting 1 minure for cool-off period"
+sleep 60
+
 log "Node 1 close channel to Node 2"
-result=$(run_command "${api1}" "close ${addr2}" "Channel closed" 600)
+result=$(run_command "${api1}" "close ${addr2}" "Channel is already closed" 600)
 log "--${result}"
 
 log "Node 2 close channel to Node 3"
-result=$(run_command "${api2}" "close ${addr3}" "Channel closed" 600)
+result=$(run_command "${api2}" "close ${addr3}" "Channel is already closed" 600)
 log "--${result}"
 
 log "Node 3 close channel to Node 4"
-result=$(run_command "${api3}" "close ${addr4}" "Channel closed" 600)
+result=$(run_command "${api3}" "close ${addr4}" "Channel is already closed" 600)
 log "--${result}"
 
 log "Node 4 close channel to Node 5"
-result=$(run_command "${api4}" "close ${addr5}" "Channel closed" 600)
+result=$(run_command "${api4}" "close ${addr5}" "Channel is already closed" 600)
 log "--${result}"
 
 log "Node 5 close channel to Node 1"
-result=$(run_command "${api5}" "close ${addr1}" "Channel closed" 600)
+result=$(run_command "${api5}" "close ${addr1}" "Channel is already closed" 600)
 log "--${result}"
