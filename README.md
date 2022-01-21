@@ -365,6 +365,8 @@ FUNDING_PRIV_KEY=mysecretaccountprivkey \
 The given account private key is used to fund the test nodes to be able to
 perform throughout the tests. Thus the account must have enough funds available.
 
+The test instantiated by this script will also include nodes behind NAT.
+
 Read the full help information of the script in case of questions:
 
 ```sh
@@ -404,9 +406,9 @@ To launch nodes using the `xDai` network one would execute (with the
 placeholders replaced accordingly):
 
 ```sh
-HOPRD_PROVIDER="<URL_TO_AN_XDAI_ENDPOINT>" \
-HOPRD_TOKEN_CONTRACT="<ADDRESS_OF_TOKEN_CONTRACT_ON_XDAI>" \
-  ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+HOPRD_API_TOKEN="<ADMIN_AUTH_HTTP_TOKEN>" \
+HOPRD_PASSWORD="<IDENTITY_FILE_PASSWORD>" \
+  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
 ```
 
 A previously started cluster can be destroyed, which includes all running nodes,
@@ -414,8 +416,18 @@ by using the same script but setting the cleanup switch:
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
 ```
+
+The default Docker image in `scripts/setup-gcloud-cluster.sh` deploys GCloud public nodes. If you wish to deploy GCloud nodes
+that are behind NAT, you need to specify a NAT-variant of the `hoprd` image (note the `-nat` suffix in the image name):
+
+```sh
+HOPRD_PERFORM_CLEANUP=true \
+  ./scripts/setup-gcloud-cluster.sh environment "" my-nat-cluster gcr.io/hoprassociation/hoprd-nat
+```
+
+Note that if the Docker image version is not specified, the script will use the `environment` as version.
 
 ### Using Google Cloud Platform and a Default Topology
 
