@@ -58,6 +58,14 @@ npx hardhat coverage
 
 > tip: see coverage results by launching `./coverage/index.html`
 
+# Deploy
+
+To deploy locally, run
+
+```bash
+yarn prepack && yarn deploy:local
+```
+
 # Migrating
 
 For public network migrations (rinkeby, kovan, [etc](./utils/networks.ts)), you will have to create a [.env](./.env.example) file within the root directory of this project.
