@@ -202,6 +202,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     network: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
+    hoprNetworkRegistryAddress: string
     channelClosureSecs: number
   } {
     return this.chain.getInfo()

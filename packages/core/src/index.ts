@@ -791,6 +791,7 @@ class Hopr extends EventEmitter {
     network: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
+    hoprNetworkRegistryAddress: string
     channelClosureSecs: number
   }> {
     return this.connector.smartContractInfo()

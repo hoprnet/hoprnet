@@ -122,6 +122,18 @@ class Indexer extends EventEmitter {
         this.onNewEvents([tokenEvent])
       }
     })
+    this.subscribeRegistryEvents = this.chain.subscribeRegistryEvents((registryEvent: TypedEvent<any, any>) => {
+      if (
+        registryEvent === 'AddedToWhitelist' ||
+        registryEvent === 'OwnerAddedToWhitelist'
+      ) {
+        // TODO: validate HoprMultiaddr string
+        // if valid
+        this.onNewEvents([registryEvent])
+      } else {
+        this.onNewEvents([registryEvent])
+      }
+    })
 
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)

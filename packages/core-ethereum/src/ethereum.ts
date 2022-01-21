@@ -19,6 +19,7 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager, { TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants'
+import { HoprNetworkRegistry } from '@hoprnet/hopr-ethereum/src/types'
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -51,6 +52,7 @@ export async function createChainWrapper(
 
   const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
   const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
+  const hoprNetworkRegistryDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprNetworkRegistry')
 
   const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, wallet) as HoprToken
 
@@ -59,6 +61,12 @@ export async function createChainWrapper(
     hoprChannelsDeployment.abi,
     wallet
   ) as HoprChannels
+
+  const networkRegistry = new ethers.Contract(
+    hoprNetworkRegistryDeployment.address,
+    hoprNetworkRegistryDeployment.abi,
+    wallet
+  ) as HoprNetworkRegistry
 
   const genesisBlock = (await provider.getTransaction(hoprChannelsDeployment.transactionHash)).blockNumber
   const channelClosureSecs = await channels.secsClosure()
@@ -466,10 +474,18 @@ export async function createChainWrapper(
         token.off('*', cb)
       }
     }, // subscribe all the Transfer events from current nodes in HoprToken.
+    subscribeRegistryEvents: (cb: (event: TypedEvent<any, any>) => void | Promise<void>): (() => void) => {
+      networkRegistry.on('*', cb)
+
+      return () => {
+        networkRegistry.off('*', cb)
+      }
+    },
     unsubscribe: () => {
       provider.removeAllListeners()
       channels.removeAllListeners()
       token.removeAllListeners()
+      networkRegistry.removeAllListeners()
     },
     getChannels: () => channels,
     getPrivateKey: () => utils.arrayify(wallet.privateKey),
@@ -478,6 +494,7 @@ export async function createChainWrapper(
       network: networkInfo.network,
       hoprTokenAddress: hoprTokenDeployment.address,
       hoprChannelsAddress: hoprChannelsDeployment.address,
+      hoprNetworkRegistryAddress: hoprNetworkRegistryDeployment.address,
       channelClosureSecs
     }),
     updateConfirmedTransaction: (hash: string) => transactions.moveToConfirmed(hash),

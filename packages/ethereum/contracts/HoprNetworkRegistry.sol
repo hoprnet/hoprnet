@@ -29,8 +29,8 @@ contract HoprNetworkRegistry is Ownable {
   NftTypeAndRank[] public eligibleNftTypeAndRank;
   uint256 public stakeThreshold;
 
-  event AddedToWhitelist(address indexed staker, string HoprMultiaddr);
-  event OwnerAddedToWhitelist(address indexed staker, uint256 indexed amount, string HoprMultiaddr);
+  event AddedToWhitelist(address indexed staker, string HoprMultiaddr, uint256 indexed stake);
+  event OwnerAddedToWhitelist(address indexed staker, string HoprMultiaddr, uint256 indexed amount);
   event OwnerRemovedFromWhitelist(address indexed staker);
   event AddedNftTypeAndRank(uint256 indexed nftType, uint256 indexed nftRank);
   event RemovedNftTypeAndRank(uint256 indexed nftType, uint256 indexed nftRank);
@@ -43,6 +43,7 @@ contract HoprNetworkRegistry is Ownable {
   ) {
     STAKE_CONTRACT = IStake(stakeContract);
     stakeThreshold = minStake;
+    emit UpdatedThreshold(stakeThreshold);
     transferOwnership(newOwner);
   }
 
@@ -62,7 +63,7 @@ contract HoprNetworkRegistry is Ownable {
         stakerToMultiaddr[msg.sender] = hoprAddress;
         multiaddrToStaker[hoprAddress] = msg.sender;
         // stakedAmount[msg.sender] = amount; // DO NOT register staked token amount for participants of staking program
-        emit AddedToWhitelist(msg.sender, hoprAddress);
+        emit AddedToWhitelist(msg.sender, hoprAddress, amount);
         return true;
       }
     }
@@ -95,7 +96,7 @@ contract HoprNetworkRegistry is Ownable {
       stakerToMultiaddr[staker] = hoprAddress;
       multiaddrToStaker[hoprAddress] = staker;
       stakedAmount[staker] = amount;
-      emit OwnerAddedToWhitelist(staker, amount, hoprAddress);
+      emit OwnerAddedToWhitelist(staker, hoprAddress, amount);
     }
   }
 
