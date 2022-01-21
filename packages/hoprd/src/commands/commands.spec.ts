@@ -46,7 +46,6 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     await assertMatch(cmds, 'send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world', /.*/)
     assert(mockNode.sendMessage.calledOnce, 'send message not called')
-    console.log(cmds)
     await assertMatch(
       cmds,
       'send unknown-alias Hello, world',
