@@ -104,12 +104,14 @@ fi
 # }}}
 
 # create test specific instance template
+# announce on-chain with routable address
 gcloud_create_or_update_instance_template \
   "${cluster_id}" \
   "${docker_image}" \
   "${environment}" \
   "${api_token}" \
-  "${password}"
+  "${password}" \
+  "true"
 
 # start nodes
 gcloud_create_or_update_managed_instance_group  \

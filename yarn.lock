@@ -5366,25 +5366,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"abortable-iterator@npm:3.0.2":
-  version: 3.0.2
-  resolution: "abortable-iterator@npm:3.0.2"
-  dependencies:
-    get-iterator: ^1.0.2
-  checksum: 949ec28b43b08959ee7d1e963f7cec28a2f5ca4e6d3fb0bb1fb5965968e3606fd8465cac6fcff4388ef3d791886881ef4fd6116d399f6c0cd1e17704cde320c4
-  languageName: node
-  linkType: hard
-
-"abortable-iterator@npm:^3.0.0":
-  version: 3.0.1
-  resolution: "abortable-iterator@npm:3.0.1"
-  dependencies:
-    get-iterator: ^1.0.2
-  checksum: 1c4e0379f0c0aaab15c975bf7ef175bc5900bcd85955d60f9c68a526c6f150b7ec2a87f642b6022ebe7dd2dbf630a690a2c0cc8211cd800ba16a4d3380f19b2e
-  languageName: node
-  linkType: hard
-
-"abortable-iterator@npm:^3.0.2":
+"abortable-iterator@npm:3.0.2, abortable-iterator@npm:^3.0.0, abortable-iterator@npm:^3.0.2":
   version: 3.0.2
   resolution: "abortable-iterator@npm:3.0.2"
   dependencies:
