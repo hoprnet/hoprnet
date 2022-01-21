@@ -125,13 +125,7 @@ describe('HoprNetworkRegistry', () => {
 
   describe('Owner can update important parameters of the contract', () => {
     before(async () => {
-      ;({
-        owner,
-        participants,
-        participantAddresses,
-        hoprNetworkRegistry,
-        participantAddresses
-      } = await useFixtures())
+      ;({ owner, participants, participantAddresses, hoprNetworkRegistry, participantAddresses } = await useFixtures())
     })
     it('owner to add eligible NFTs {type: 0, rank: 1}', async () => {
       // const {deployer, owner, participants, ownerAddress, participantAddresses, stakeV2Fake, hoprNetworkRegistry } = await useFixtures()
@@ -220,13 +214,7 @@ describe('HoprNetworkRegistry', () => {
 
   describe('Self whitelist', () => {
     before(async () => {
-      ;({
-        owner,
-        participants,
-        participantAddresses,
-        hoprNetworkRegistry,
-        participantAddresses
-      } = await useFixtures())
+      ;({ owner, participants, participantAddresses, hoprNetworkRegistry, participantAddresses } = await useFixtures())
       // add eligible NFT
       await hoprNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })
@@ -255,11 +243,11 @@ describe('HoprNetworkRegistry', () => {
       await expect(
         hoprNetworkRegistry
           .connect(owner)
-          .ownerAddToWhitelist(
-            [hoprAddress(1), hoprAddress(2), hoprAddress(3)],
-            participantAddresses.slice(1, 4),
-            [HIGH_STAKE, LOW_STAKE, LOW_STAKE]
-          )
+          .ownerAddToWhitelist([hoprAddress(1), hoprAddress(2), hoprAddress(3)], participantAddresses.slice(1, 4), [
+            HIGH_STAKE,
+            LOW_STAKE,
+            LOW_STAKE
+          ])
       )
         .to.emit(hoprNetworkRegistry, 'OwnerAddedToWhitelist')
         .withArgs(participantAddresses[1], hoprAddress(1), HIGH_STAKE)
@@ -271,24 +259,18 @@ describe('HoprNetworkRegistry', () => {
   })
   describe('Integration test', () => {
     beforeEach(async () => {
-      ;({
-        owner,
-        participants,
-        participantAddresses,
-        hoprNetworkRegistry,
-        participantAddresses
-      } = await useFixtures())
+      ;({ owner, participants, participantAddresses, hoprNetworkRegistry, participantAddresses } = await useFixtures())
       // add eligible NFT
       await hoprNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
       // whitelist participant 0, 1, 2, 3
       await hoprNetworkRegistry.connect(participants[0]).addToWhitelist(hoprAddress(0))
       await hoprNetworkRegistry
         .connect(owner)
-        .ownerAddToWhitelist(
-          [hoprAddress(1), hoprAddress(2), hoprAddress(3)],
-          participantAddresses.slice(1, 4),
-          [HIGH_STAKE, LOW_STAKE, LOW_STAKE]
-        )
+        .ownerAddToWhitelist([hoprAddress(1), hoprAddress(2), hoprAddress(3)], participantAddresses.slice(1, 4), [
+          HIGH_STAKE,
+          LOW_STAKE,
+          LOW_STAKE
+        ])
     })
 
     describe(`Lower threshold to ${LOW_STAKE}`, () => {

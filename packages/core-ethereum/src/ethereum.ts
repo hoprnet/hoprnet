@@ -51,7 +51,11 @@ export async function createChainWrapper(
 
   const hoprTokenDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprToken')
   const hoprChannelsDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprChannels')
-  const hoprNetworkRegistryDeployment = getContractData(networkInfo.network, networkInfo.environment, 'HoprNetworkRegistry')
+  const hoprNetworkRegistryDeployment = getContractData(
+    networkInfo.network,
+    networkInfo.environment,
+    'HoprNetworkRegistry'
+  )
 
   const token = new ethers.Contract(hoprTokenDeployment.address, hoprTokenDeployment.abi, wallet) as HoprToken
 

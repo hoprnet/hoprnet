@@ -12,5 +12,7 @@ export type Event<T extends EventNames> = extractEventArgs<ReturnType<Pick<HoprC
 export type TokenEventNames = keyof HoprToken['filters']
 export type TokenEvent<T extends TokenEventNames> = extractEventArgs<ReturnType<Pick<HoprToken['filters'], T>[T]>>
 export type RegistryEventNames = keyof HoprNetworkRegistry['filters']
-export type RegistryEvent<T extends RegistryEventNames> = extractEventArgs<ReturnType<Pick<HoprNetworkRegistry['filters'], T>[T]>>
+export type RegistryEvent<T extends RegistryEventNames> = extractEventArgs<
+  ReturnType<Pick<HoprNetworkRegistry['filters'], T>[T]>
+>
 export type IndexerEvents = 'announce' | 'withdraw-hopr' | 'withdraw-native' | 'channel-updated'

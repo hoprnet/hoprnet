@@ -124,10 +124,7 @@ class Indexer extends EventEmitter {
       }
     })
     this.unsubscribeRegistryEvents = this.chain.subscribeRegistryEvents((registryEvent: TypedEvent<any, any>) => {
-      if (
-        registryEvent.event === 'AddedToWhitelist' ||
-        registryEvent.event === 'OwnerAddedToWhitelist'
-      ) {
+      if (registryEvent.event === 'AddedToWhitelist' || registryEvent.event === 'OwnerAddedToWhitelist') {
         // TODO: validate HoprMultiaddr string
         // if valid
         this.onNewEvents([registryEvent])
