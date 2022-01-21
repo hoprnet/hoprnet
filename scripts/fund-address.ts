@@ -184,4 +184,5 @@ main()
   })
   .catch((err) => {
     console.log(`Error during script execution: ${err}`)
+    process.exit(1)
   })
