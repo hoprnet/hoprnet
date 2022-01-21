@@ -73,11 +73,21 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       log "\tcluster name: ${cluster_name}"
       log "\tcluster template name: ${cluster_template_name}"
 
-      gcloud_create_or_update_instance_template "${cluster_template_name}" \
-        "${docker_image_full}" \
-        "${environment_id}" \
-        "${api_token}" \
-        "${password}"
+      if [ "${cluster-tag}" = "-nat" ]; then
+        gcloud_create_or_update_instance_template "${cluster_template_name}" \
+          "${docker_image_full}" \
+          "${environment_id}" \
+          "${api_token}" \
+          "${password}"
+      else 
+        # announce on-chain with routable address
+        gcloud_create_or_update_instance_template "${cluster_template_name}" \
+          "${docker_image_full}" \
+          "${environment_id}" \
+          "${api_token}" \
+          "${password}" \
+          "true"
+      fi
 
       gcloud_create_or_update_managed_instance_group "${cluster_name}" \
         ${cluster_size} \
