@@ -1,83 +1,83 @@
 import chai, { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
-import { FakeContract, smock } from '@defi-wonderland/smock';
-import { BaseContract, Contract, Signer } from 'ethers';
-import { HoprNetworkRegistry } from '../src/types';
+import { FakeContract, smock } from '@defi-wonderland/smock'
+import { BaseContract, Contract, Signer } from 'ethers'
+import { HoprNetworkRegistry } from '../src/types'
 
 chai.should() // if you like should syntax
 chai.use(smock.matchers)
 
-const NFT_TYPE = [1, 2];
-const NFT_RANK = [123, 456];
-export const INITIAL_MIN_STAKE = 1500;
+const NFT_TYPE = [1, 2]
+const NFT_RANK = [123, 456]
+export const INITIAL_MIN_STAKE = 1500
 
 const hoprAddress = (i: number) => `16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x${i}`
 
 const createFakeStakeV2Contract = async (participants: string[]) => {
-    const stakeV2Fake = await smock.fake([
+  const stakeV2Fake = await smock.fake([
+    {
+      inputs: [
         {
-            "inputs": [
-              {
-                "internalType": "address",
-                "name": "_account",
-                "type": "address"
-              }
-            ],
-            "name": "stakedHoprTokens",
-            "outputs": [
-              {
-                "internalType": "uint256",
-                "name": "",
-                "type": "uint256"
-              }
-            ],
-            "stateMutability": "view",
-            "type": "function"
-          },
-          {
-            "inputs": [
-              {
-                "internalType": "uint256",
-                "name": "nftTypeIndex",
-                "type": "uint256"
-              },
-              {
-                "internalType": "uint256",
-                "name": "boostNumerator",
-                "type": "uint256"
-              },
-              {
-                "internalType": "address",
-                "name": "hodler",
-                "type": "address"
-              }
-            ],
-            "name": "isNftTypeAndRankRedeemed3",
-            "outputs": [
-              {
-                "internalType": "bool",
-                "name": "",
-                "type": "bool"
-              }
-            ],
-            "stateMutability": "view",
-            "type": "function"
-          },
-    ]);
-
-    participants.forEach((participant, participantIndex) => {
-        // no one has NFTs of {NFT_TYPE[0], NFT_RANK[0]} nor NFT_TYPE[1], NFT_RANK[1]
-        stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[1], NFT_RANK[1], participant).returns(false);
-        stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[0], NFT_RANK[0], participant).returns(false);
-        
-        if ([0, 2, 5].findIndex(element => element === participantIndex) > -1) {
-            // participants at index 0, 2, 5 hold {NFT_TYPE[0], NFT_RANK[1]} and others have {NFT_TYPE[1], NFT_RANK[0]}
-            stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[0], NFT_RANK[1], participant).returns(true);
-            stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[1], NFT_RANK[0], participant).returns(false);
-        } else {
-            stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[0], NFT_RANK[1], participant).returns(false);
-            stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[1], NFT_RANK[0], participant).returns(true);
+          internalType: 'address',
+          name: '_account',
+          type: 'address'
         }
+      ],
+      name: 'stakedHoprTokens',
+      outputs: [
+        {
+          internalType: 'uint256',
+          name: '',
+          type: 'uint256'
+        }
+      ],
+      stateMutability: 'view',
+      type: 'function'
+    },
+    {
+      inputs: [
+        {
+          internalType: 'uint256',
+          name: 'nftTypeIndex',
+          type: 'uint256'
+        },
+        {
+          internalType: 'uint256',
+          name: 'boostNumerator',
+          type: 'uint256'
+        },
+        {
+          internalType: 'address',
+          name: 'hodler',
+          type: 'address'
+        }
+      ],
+      name: 'isNftTypeAndRankRedeemed3',
+      outputs: [
+        {
+          internalType: 'bool',
+          name: '',
+          type: 'bool'
+        }
+      ],
+      stateMutability: 'view',
+      type: 'function'
+    }
+  ])
+
+  participants.forEach((participant, participantIndex) => {
+    // no one has NFTs of {NFT_TYPE[0], NFT_RANK[0]} nor NFT_TYPE[1], NFT_RANK[1]
+    stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[1], NFT_RANK[1], participant).returns(false)
+    stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[0], NFT_RANK[0], participant).returns(false)
+
+    if ([0, 2, 5].findIndex((element) => element === participantIndex) > -1) {
+      // participants at index 0, 2, 5 hold {NFT_TYPE[0], NFT_RANK[1]} and others have {NFT_TYPE[1], NFT_RANK[0]}
+      stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[0], NFT_RANK[1], participant).returns(true)
+      stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[1], NFT_RANK[0], participant).returns(false)
+    } else {
+      stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[0], NFT_RANK[1], participant).returns(false)
+      stakeV2Fake.isNftTypeAndRankRedeemed3.whenCalledWith(NFT_TYPE[1], NFT_RANK[0], participant).returns(true)
+    }
 
     if ([0, 1, 4].findIndex((element) => element === participantIndex) > -1) {
       // participants at index 0, 1, 4 have 2000 staked tokens and others have 100 staked tokens
@@ -91,21 +91,19 @@ const createFakeStakeV2Contract = async (participants: string[]) => {
 }
 
 const useFixtures = deployments.createFixture(async (hre) => {
-  const [_deployer, owner, ...signers] = await ethers.getSigners();
-  const participants = signers.slice(3,10); // 7 participants
+  const [_deployer, owner, ...signers] = await ethers.getSigners()
+  const participants = signers.slice(3, 10) // 7 participants
 
-  const ownerAddress = await owner.getAddress();
-  const participantAddresses = await Promise.all(participants.map(h => h.getAddress()));
+  const ownerAddress = await owner.getAddress()
+  const participantAddresses = await Promise.all(participants.map((h) => h.getAddress()))
 
   // mock staking contract
-  const stakeV2Fake = await createFakeStakeV2Contract(participantAddresses);
+  const stakeV2Fake = await createFakeStakeV2Contract(participantAddresses)
 
   // deploy network registry
-  const hoprNetworkRegistry = (await (await ethers.getContractFactory('HoprNetworkRegistry')).deploy(
-    stakeV2Fake.address,
-    ownerAddress,
-    INITIAL_MIN_STAKE
-  )) as HoprNetworkRegistry
+  const hoprNetworkRegistry = (await (
+    await ethers.getContractFactory('HoprNetworkRegistry')
+  ).deploy(stakeV2Fake.address, ownerAddress, INITIAL_MIN_STAKE)) as HoprNetworkRegistry
 
   return {
     owner,
@@ -118,17 +116,26 @@ const useFixtures = deployments.createFixture(async (hre) => {
 })
 
 describe('HoprNetworkRegistry', () => {
-    let owner: Signer;
-    let participants: Signer[];
-    let ownerAddress: string;
-    let participantAddresses: string[];
-    
-    let stakeV2Fake: FakeContract<BaseContract>;
-    let hoprNetworkRegistry: Contract;
+  let owner: Signer
+  let participants: Signer[]
+  let ownerAddress: string
+  let participantAddresses: string[]
+
+  let stakeV2Fake: FakeContract<BaseContract>
+  let hoprNetworkRegistry: Contract
 
   describe('Owner can update important parameters of the contract', () => {
     before(async () => {
-      ({owner, participants, ownerAddress, participantAddresses, stakeV2Fake, hoprNetworkRegistry, ownerAddress, participantAddresses} = await useFixtures())
+      ;({
+        owner,
+        participants,
+        ownerAddress,
+        participantAddresses,
+        stakeV2Fake,
+        hoprNetworkRegistry,
+        ownerAddress,
+        participantAddresses
+      } = await useFixtures())
     })
     it('owner to add eligible NFTs {type: 0, rank: 1}', async () => {
       // const {deployer, owner, participants, ownerAddress, participantAddresses, stakeV2Fake, hoprNetworkRegistry } = await useFixtures()
@@ -226,7 +233,16 @@ describe('HoprNetworkRegistry', () => {
       // hoprNetworkRegistry = fixture.hoprNetworkRegistry
       // ownerAddress = fixture.ownerAddress
       // participantAddresses = fixture.participantAddresses
-      ({owner, participants, ownerAddress, participantAddresses, stakeV2Fake, hoprNetworkRegistry, ownerAddress, participantAddresses} = await useFixtures())
+      ;({
+        owner,
+        participants,
+        ownerAddress,
+        participantAddresses,
+        stakeV2Fake,
+        hoprNetworkRegistry,
+        ownerAddress,
+        participantAddresses
+      } = await useFixtures())
       // add eligible NFT
       await hoprNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
     })
@@ -271,7 +287,16 @@ describe('HoprNetworkRegistry', () => {
   })
   describe('Integration test', () => {
     beforeEach(async () => {
-      ({owner, participants, ownerAddress, participantAddresses, stakeV2Fake, hoprNetworkRegistry, ownerAddress, participantAddresses} = await useFixtures())
+      ;({
+        owner,
+        participants,
+        ownerAddress,
+        participantAddresses,
+        stakeV2Fake,
+        hoprNetworkRegistry,
+        ownerAddress,
+        participantAddresses
+      } = await useFixtures())
       // add eligible NFT
       await hoprNetworkRegistry.connect(owner).ownerAddNftTypeAndRank(NFT_TYPE[0], NFT_RANK[1])
       // whitelist participant 0, 1, 2, 3
