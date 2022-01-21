@@ -26,7 +26,7 @@ const main = async function (hre: HardhatRuntimeEnvironment) {
   const networkRegistry = await deployments.deploy('HoprNetworkRegistry', {
     from: deployer.address,
     log: true,
-    args: [environmentConfig['stake_v2_contract_address'], adminAddress, minStakes[deploymentType]]
+    args: [environmentConfig['stake_v2_contract_address'], adminAddress, minStakes[deploymentType] ?? 0]
   })
 
   console.log(`"HoprNetworkRegistry" deployed at ${networkRegistry.address}`)
