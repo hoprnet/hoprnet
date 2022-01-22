@@ -103,7 +103,7 @@ async function createTransaction(
   return txs
 }
 
-type CLIOPts = {
+export type FaucetCLIOPts = {
   address?: string
   password: string
   useLocalIdentities: boolean
@@ -116,10 +116,10 @@ type CLIOPts = {
  * Faucets HOPR and ETH tokens to a local account with HOPR
  */
 async function main(
-  opts: CLIOPts,
+  opts: FaucetCLIOPts,
   { network, ethers, deployments, environment }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
-) {
+): Promise<void> {
   if (environment == undefined) {
     console.error(`HOPR_ENVIRONMENT_ID is not set. Run with "HOPR_ENVIRONMENT_ID=<environment> ..."`)
     process.exit(1)

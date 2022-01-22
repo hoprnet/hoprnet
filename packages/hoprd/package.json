@@ -24,8 +24,8 @@
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
-    "start": "node lib/index.js --admin --init --rest",
-    "dev": "yarn build && NODE_ENV=development yarn start",
+    "start": "ts-node src/index --admin --init --rest",
+    "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },

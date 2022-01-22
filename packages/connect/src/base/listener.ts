@@ -246,7 +246,6 @@ class Listener extends EventEmitter implements InterfaceListener {
     const tcpSocket = createConnection({
       port,
       host: externalIp,
-      localPort: 9092,
       signal: abort.signal
     })
       .on('connect', () => {

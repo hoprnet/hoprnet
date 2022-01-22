@@ -19,7 +19,7 @@ import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
 import { utils } from 'ethers'
-import faucet from './tasks/faucet'
+import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import getAccounts from './tasks/getAccounts'
 
 import { expandVars } from '@hoprnet/hopr-utils'
@@ -140,7 +140,7 @@ const hardhatConfig: HardhatUserConfig = {
 const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
 const DEFAULT_FUND_AMOUNT = '1'
 
-task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', faucet)
+task<FaucetCLIOPts>('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', faucet)
   .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
   .addFlag('useLocalIdentities', `Fund all identities stored in identity directory`)
