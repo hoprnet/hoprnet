@@ -3089,7 +3089,7 @@ __metadata:
     "@types/chai": 4.3.0
     "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     "@types/node": 16.11.21
     "@types/simple-peer": 9.11.4
     "@types/yargs": 17.0.8
@@ -3106,7 +3106,7 @@ __metadata:
     libp2p: 0.35.8
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.7
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: 10.0.1
     multihashes: 4.0.3
     nat-api: 0.3.1
@@ -3130,7 +3130,7 @@ __metadata:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@sinonjs/referee": 9.1.1
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     async-mutex: 0.3.2
     bn.js: 5.2.0
     chai: 4.3.4
@@ -3139,7 +3139,7 @@ __metadata:
     debug: 4.3.3
     ethers: 5.5.2
     heap-js: 2.1.6
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: 10.0.1
     nyc: 15.1.0
     peer-id: 0.16.0
@@ -3164,7 +3164,7 @@ __metadata:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/chai-as-promised": 7.1.4
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     abort-controller: 3.0.0
     bn.js: 5.2.0
     chai: 4.3.4
@@ -3179,7 +3179,7 @@ __metadata:
     libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: 10.0.1
     nyc: 15.1.0
     peer-id: 0.16.0
@@ -3200,14 +3200,14 @@ __metadata:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/express": 4
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     "@types/rimraf": 3.0.2
     "@types/yargs": 17.0.8
     bignumber.js: 9.0.2
     bn.js: 5.2.0
     chai: 4.3.4
     express: 4.17.1
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: ^10.0.1
     nyc: 15.1.0
     peer-id: ^0.16.0
@@ -3261,7 +3261,7 @@ __metadata:
   resolution: "@hoprnet/hopr-utils@workspace:packages/utils"
   dependencies:
     "@chainsafe/libp2p-noise": 5.0.2
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     "@types/pino": 7.0.4
     abort-controller: ~3.0.0
     bignumber.js: 9.0.2
@@ -3284,7 +3284,7 @@ __metadata:
     libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: 10.0.1
     multiformats: 9.5.8
     multihashes: 4.0.3
@@ -3311,7 +3311,7 @@ __metadata:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/cors": 2.8.12
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     "@types/yargs": 17.0.8
     bn.js: 5.2.0
     body-parser: 1.19.1
@@ -3328,7 +3328,7 @@ __metadata:
     js-cookie: 3.0.1
     key-did-provider-ed25519: 1.1.0
     key-did-resolver: 1.4.0
-    mocha: 9.1.3
+    mocha: 9.1.4
     next: 12.0.7
     peer-id: 0.16.0
     prop-types: 15.7.2
@@ -4845,10 +4845,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/mocha@npm:9.0.0":
-  version: 9.0.0
-  resolution: "@types/mocha@npm:9.0.0"
-  checksum: 73e6edaba045bc250b69085a770d5029edfed006ed8e75344435474a2cb8d38064acd7b34b6cc62756caa845a5cf335bde66db11e8c8c6565c62a790e933704a
+"@types/mocha@npm:9.1.0":
+  version: 9.1.0
+  resolution: "@types/mocha@npm:9.1.0"
+  checksum: 21e1000dafcfe387c6812be41c44a47b48c27a74d5a70c3d5ef1bb5c88eadadfc74dba06e93f160e7248c8a57b3977b590f82504c801c9927816ecd4668023c0
   languageName: node
   linkType: hard
 
@@ -17180,9 +17180,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mocha@npm:9.1.3":
-  version: 9.1.3
-  resolution: "mocha@npm:9.1.3"
+"mocha@npm:9.1.4":
+  version: 9.1.4
+  resolution: "mocha@npm:9.1.4"
   dependencies:
     "@ungap/promise-all-settled": 1.1.2
     ansi-colors: 4.1.1
@@ -17211,7 +17211,7 @@ __metadata:
   bin:
     _mocha: bin/_mocha
     mocha: bin/mocha
-  checksum: 4185038f1d49c7c5ab2f8d77e42c182a77ed78f08f0ce713cc34919bc89b618ed9d6d4f24cbb92049f0d2ed03fb1a2a5b20e0fb07f8cf4a86ba83eb99dacde99
+  checksum: 8b3cc4333d03dd42e6d3b78e5cfdfb980b287a734e6a543564af95a6977d69c1c0dff203fab55d54caeaf5b9c1b966612e2f2fd29f4b9f1436a5924d6f80aa39
   languageName: node
   linkType: hard
 
