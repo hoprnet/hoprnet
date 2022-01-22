@@ -1,4 +1,13 @@
-import type { HardhatRuntimeEnvironment, HardhatConfig, SolcUserConfig, HardhatUserConfig } from 'hardhat/types'
+import type {
+  HardhatRuntimeEnvironment,
+  HardhatConfig,
+  SolcUserConfig,
+  HardhatUserConfig,
+  NetworksUserConfig,
+  NetworkUserConfig,
+  HttpNetworkUserConfig,
+  HardhatNetworkUserConfig
+} from 'hardhat/types'
 // load env variables
 require('dotenv').config()
 // load hardhat plugins
@@ -10,9 +19,10 @@ import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 import '@typechain/hardhat'
 import { utils } from 'ethers'
+import faucet from './tasks/faucet'
+import getAccounts from './tasks/getAccounts'
 
-// Import typescript file directly since hopr-utils has probably not been built yet
-import { expandVars } from '../utils/src/utils'
+import { expandVars } from '@hoprnet/hopr-utils'
 
 // rest
 import { task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
@@ -34,15 +44,14 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 //
 // https://hardhat.org/hardhat-network/reference/#config
 // https://github.com/wighawag/hardhat-deploy/blob/master/README.md
-function networkToHardhatNetwork(name: String, input: any): any {
-  let cfg: any = {
+function networkToHardhatNetwork(name: String, input: any): NetworkUserConfig {
+  let cfg: NetworkUserConfig = {
     chainId: input.chain_id,
     gasMultiplier: input.gas_multiplier,
     live: input.live,
     tags: input.tags,
     // used by hardhat-deploy
-    saveDeployments: true,
-    mining: undefined
+    saveDeployments: true
   }
 
   if (input.gas_price) {
@@ -56,9 +65,9 @@ function networkToHardhatNetwork(name: String, input: any): any {
 
   if (name !== 'hardhat') {
     try {
-      cfg.url = expandVars(input.default_provider, process.env)
+      ;(cfg as HttpNetworkUserConfig).url = expandVars(input.default_provider, process.env)
     } catch (_) {
-      cfg.url = 'invalid_url'
+      ;(cfg as HttpNetworkUserConfig).url = 'invalid_url'
     }
   }
 
@@ -71,8 +80,8 @@ function networkToHardhatNetwork(name: String, input: any): any {
   if (HOPR_HARDHAT_TAG) {
     cfg.tags = [HOPR_HARDHAT_TAG]
   }
-  if (cfg.tags.indexOf('development') >= 0) {
-    cfg.mining = {
+  if (cfg.tags && cfg.tags.indexOf('development') >= 0) {
+    ;(cfg as HardhatNetworkUserConfig).mining = {
       auto: true, // every transaction will trigger a new block (without this deployments fail)
       interval: [1000, 3000] // mine new block every 1 - 3s
     }
@@ -80,13 +89,16 @@ function networkToHardhatNetwork(name: String, input: any): any {
   return cfg
 }
 
-const networks = {}
-
-const environment = PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] || {}
+const networks: NetworksUserConfig = {}
 
 for (const [networkId, network] of Object.entries(PROTOCOL_CONFIG.networks)) {
+  if (
+    PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] &&
+    PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].network_id === networkId
+  ) {
+    network['tags'] = PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].tags
+  }
   // environment could be undefined at this point
-  network['tags'] = environment.tags || []
   const hardhatNetwork = networkToHardhatNetwork(networkId, network)
   networks[networkId] = hardhatNetwork
 }
@@ -128,9 +140,7 @@ const hardhatConfig: HardhatUserConfig = {
 const DEFAULT_IDENTITY_DIRECTORY = '/tmp'
 const DEFAULT_FUND_AMOUNT = '1'
 
-task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) =>
-  (await import('./tasks/faucet')).default(args[0], args[1], args[2])
-)
+task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', faucet)
   .addOptionalParam<string>('address', 'HoprToken address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', DEFAULT_FUND_AMOUNT, types.string)
   .addFlag('useLocalIdentities', `Fund all identities stored in identity directory`)
@@ -148,9 +158,7 @@ task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR 
   )
   .addOptionalParam<string>('identityPrefix', `only use identity files with prefix`, undefined, types.string)
 
-task('accounts', 'View unlocked accounts', async (...args: any[]) =>
-  (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
-)
+task('accounts', 'View unlocked accounts', getAccounts)
 
 function getSortedFiles(dependenciesGraph) {
   const tsort = require('tsort')

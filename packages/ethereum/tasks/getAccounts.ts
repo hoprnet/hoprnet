@@ -1,7 +1,4 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import type { HoprToken } from '../src/types'
-
-import { getContractData, Networks } from '../src'
 
 /**
  * Display unlocked accounts alongside with how much
@@ -9,14 +6,12 @@ import { getContractData, Networks } from '../src'
  */
 async function main(
   _params,
-  { network, ethers, environment }: HardhatRuntimeEnvironment,
+  { network, ethers, deployments }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
-  const contracts = getContractData(network.name as Networks, environment, 'HoprToken')
-  if (!contracts?.[network.name]) throw Error(`cannot find HoprToken address for network ${network.name}`)
-  const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(
-    contracts[network.name].HoprToken.address
-  ) as HoprToken
+  const contract = await deployments.get('HoprToken')
+
+  const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(contract.address)
 
   console.log('Running task "accounts" with config:', {
     network: network.name
