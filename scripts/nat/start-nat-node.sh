@@ -41,8 +41,8 @@ fi
 docker stop ${container_name} 2> /dev/null || true
 
 # Fork here and pass all the environment variables down into the forked image
-docker run --pull always -v /var/hoprd/:/app/db -p ${admin_port}:3000 -p ${rest_port}:3001 -p ${healthcheck_port}:8080 \
- --name=${container_name} --rm --restart=unless-stopped \
+docker run -d --pull always -v /var/hoprd/:/app/db -p ${admin_port}:3000 -p ${rest_port}:3001 -p ${healthcheck_port}:8080 \
+ --name=${container_name} --rm --restart=on-failure \
  --network=${network_name} \
  --env-file <(env) \
  "gcr.io/hoprassociation/hoprd:$HOPRD_RELEASE" "$@"
