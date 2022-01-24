@@ -1681,6 +1681,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@ceramicnetwork/common@npm:^1.11.0":
+  version: 1.11.0
+  resolution: "@ceramicnetwork/common@npm:1.11.0"
+  dependencies:
+    "@ceramicnetwork/streamid": ^1.3.9
+    "@overnightjs/logger": 1.2.1
+    abort-controller: ^3.0.0
+    caip: ~1.0.0
+    cids: ~1.1.6
+    colors: 1.3.3
+    cross-fetch: ^3.1.4
+    flat: ^5.0.2
+    lodash.clonedeep: ^4.5.0
+    logfmt: ^1.3.2
+    rxjs: ^7.0.0
+    uint8arrays: ^2.0.5
+  checksum: 43931b663ef4bd785e4524c489ca3272e369abd1a8028b21ae4c5b4edba9740853e17477c5823b553091fc3f3aa1b85b0a7e9a6bc8345e70dcf8b9a2b76d74bb
+  languageName: node
+  linkType: hard
+
 "@ceramicnetwork/http-client@npm:1.5.2":
   version: 1.5.2
   resolution: "@ceramicnetwork/http-client@npm:1.5.2"
@@ -1707,16 +1727,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ceramicnetwork/stream-tile@npm:1.5.2":
-  version: 1.5.2
-  resolution: "@ceramicnetwork/stream-tile@npm:1.5.2"
+"@ceramicnetwork/stream-tile@npm:1.5.7":
+  version: 1.5.7
+  resolution: "@ceramicnetwork/stream-tile@npm:1.5.7"
   dependencies:
-    "@ceramicnetwork/common": ^1.10.0
-    "@ceramicnetwork/streamid": ^1.3.5
+    "@ceramicnetwork/common": ^1.11.0
+    "@ceramicnetwork/streamid": ^1.3.9
     "@stablelib/random": ^1.0.0
     fast-json-patch: ^2.2.1
     uint8arrays: ^2.0.5
-  checksum: 68dfc3089cc1f2f6312179e47a3a5292a762a09f67adbb695ec082bfd55492fd77637c5c0b43993a212c329be93f42fd56ac2753727f39464a3433abe92d6677
+  checksum: da1294a64e3becca6982a9bfa1df119235853295a18b3fe199593d403cca3aa07e67b871d904d130f3d659f3b6c3f32bf3f8532ecccd55afd75ec9964e45ef07
   languageName: node
   linkType: hard
 
@@ -1744,6 +1764,20 @@ __metadata:
     uint8arrays: ^2.0.5
     varint: ^6.0.0
   checksum: 8b7f39bf67e834dd82c91c8f7e71d6f01748705af4a67588060bbcbbb7c429179bed1f9fe9337470951355f0fb322f72e619f45958dff269a61226f4cfa991f4
+  languageName: node
+  linkType: hard
+
+"@ceramicnetwork/streamid@npm:^1.3.9":
+  version: 1.3.9
+  resolution: "@ceramicnetwork/streamid@npm:1.3.9"
+  dependencies:
+    cids: ~1.1.6
+    ipld-dag-cbor: ^0.17.0
+    multibase: ~4.0.2
+    typescript-memoize: ^1.0.0-alpha.4
+    uint8arrays: ^2.0.5
+    varint: ^6.0.0
+  checksum: 030cd674a2aa82b99c344a39269467a6d528d175892d733f630997eab2ce5a2eff2dd2eb4cc90b5e8bd502f60d24643df35d481862e2a73b79ef7a1f5b011a6b
   languageName: node
   linkType: hard
 
@@ -3307,7 +3341,7 @@ __metadata:
   resolution: "@hoprnet/hoprd@workspace:packages/hoprd"
   dependencies:
     "@ceramicnetwork/http-client": 1.5.2
-    "@ceramicnetwork/stream-tile": 1.5.2
+    "@ceramicnetwork/stream-tile": 1.5.7
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/cors": 2.8.12

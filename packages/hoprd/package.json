@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@ceramicnetwork/http-client": "1.5.2",
-    "@ceramicnetwork/stream-tile": "1.5.2",
+    "@ceramicnetwork/stream-tile": "1.5.7",
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "bn.js": "5.2.0",
