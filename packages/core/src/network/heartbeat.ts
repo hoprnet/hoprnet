@@ -17,7 +17,7 @@ const error = debug('hopr-core:heartbeat:error')
 const PING_HASH_ALGORITHM = 'blake2s256'
 
 export default class Heartbeat {
-  private timeout: NodeJS.Timeout
+  private stopHeartbeatInterval: (() => void) | undefined
   private protocolHeartbeat: string
 
   constructor(
@@ -91,7 +91,7 @@ export default class Heartbeat {
       }
     }.bind(this)
 
-    this.timeout = retimer(
+    this.stopHeartbeatInterval = retimer(
       periodicCheck,
       // Prevent nodes from querying each other at the very same time
       () => randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE)
@@ -106,7 +106,7 @@ export default class Heartbeat {
   }
 
   public stop() {
-    clearTimeout(this.timeout)
+    this.stopHeartbeatInterval?.()
     log(`Heartbeat stopped`)
   }
 

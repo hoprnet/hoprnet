@@ -3,7 +3,7 @@
  * @param fn function to apply after every timeout
  * @param newTimeout function that returns the new timeout
  */
-export function retimer(fn: () => void, newTimeout: () => number): NodeJS.Timeout {
+export function retimer(fn: () => void, newTimeout: () => number): () => void {
   let timeout: NodeJS.Timeout
 
   const again = () => {
@@ -12,5 +12,5 @@ export function retimer(fn: () => void, newTimeout: () => number): NodeJS.Timeou
   }
   timeout = setTimeout(again, newTimeout())
 
-  return timeout
+  return () => clearTimeout(timeout)
 }
