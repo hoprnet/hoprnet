@@ -13,7 +13,6 @@ if [ "$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ]; th
 	echo "Starting HardHat network..."
 	TS_NODE_PROJECT=${hopr_dir}/packages/ethereum/tsconfig.hardhat.json \
 	HOPR_ENVIRONMENT_ID=hardhat-localhost \
-	DEVELOPMENT=true \
 	yarn workspace @hoprnet/hopr-ethereum hardhat node > ${hardhat_rpc_log} 2>&1 &
 fi
 
