@@ -1,13 +1,16 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import { HoprToken } from '../src/types'
-import { utils, constants } from 'ethers'
+import type { HoprToken } from '../src/types'
 
 const PROTOCOL_CONFIG = require('../../core/protocol-config.json')
 
-const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, network, getNamedAccounts, environment } = hre
-
+const main: DeployFunction = async function ({
+  ethers,
+  deployments,
+  network,
+  getNamedAccounts,
+  environment
+}: HardhatRuntimeEnvironment) {
   const environmentConfig = PROTOCOL_CONFIG.environments[environment]
   const mintedTokenReceiver = environmentConfig['minted_token_receiver_address']
 
@@ -38,9 +41,9 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         console.log('Minting tokens to', mintedTokenReceiver)
         const mintTx = hoprToken.mint(
           mintedTokenReceiver,
-          utils.parseEther('130000000'),
-          constants.HashZero,
-          constants.HashZero
+          ethers.utils.parseEther('130000000'),
+          ethers.constants.HashZero,
+          ethers.constants.HashZero
         )
 
         if (network.tags.development) {

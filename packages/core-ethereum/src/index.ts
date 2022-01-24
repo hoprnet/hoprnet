@@ -184,7 +184,6 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns ETH balance
    */
   private uncachedGetNativeBalance = () => {
-    log('Chain [inside cached hopr-ethereum]', this.chain)
     return this.chain.getNativeBalance(this.publicKey.toAddress())
   }
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(

@@ -197,12 +197,10 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    */
   public filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     if (this._libp2p.isStarted() && !this._addressFilter.addrsSet) {
-      // Attaches addresses to AddressFilter
-      // @TODO implement this in a cleaner way
-      try {
-        const addrs = this._libp2p.transportManager.getAddrs()
-        this._addressFilter.setAddrs(addrs, this._libp2p.addressManager.getListenAddrs())
-      } catch {}
+      this._addressFilter.setAddrs(
+        this._libp2p.transportManager.getAddrs(),
+        this._libp2p.addressManager.getListenAddrs()
+      )
     }
     return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
       this._addressFilter.filter.bind(this._addressFilter)
