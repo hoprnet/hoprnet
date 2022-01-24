@@ -21,8 +21,8 @@
     ],
     "restart": "always",
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
-    "hash": "/ipfs/QmQCvppWHy8B4ZoLcpMeuLakDLLAWubBZbrtrzyB77j8Ly",
-    "size": 78707420
+    "hash": "/ipfs/QmfSEjvRK7jnTA2c5F9Qp9ieCfKaE3QeiJGxjH2geaapKi",
+    "size": 78399868
   },
   "author": "HOPR",
   "license": "GPL-3.0",
@@ -32,5 +32,5 @@
     "Admin interface": "http://hopr.my.ava.do:3000",
     "Rest API V2": "http://hopr.my.ava.do:3001/api/v2/_swagger/"
   },
-  "builddate": "2022-01-24T14:06:07.362Z"
+  "builddate": "2022-01-24T16:53:40.867Z"
 }
