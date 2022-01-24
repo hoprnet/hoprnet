@@ -3246,7 +3246,7 @@ __metadata:
     hardhat-gas-reporter: 1.0.7
     multiaddr: 10.0.1
     rimraf: 3.0.2
-    solidity-coverage: 0.7.17
+    solidity-coverage: 0.7.18
     ts-generator: 0.1.1
     ts-node: 10.4.0
     typechain: 6.0.5
@@ -22522,9 +22522,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"solidity-coverage@npm:0.7.17":
-  version: 0.7.17
-  resolution: "solidity-coverage@npm:0.7.17"
+"solidity-coverage@npm:0.7.18":
+  version: 0.7.18
+  resolution: "solidity-coverage@npm:0.7.18"
   dependencies:
     "@solidity-parser/parser": ^0.13.2
     "@truffle/provider": ^0.2.24
@@ -22547,7 +22547,7 @@ __metadata:
     web3-utils: ^1.3.0
   bin:
     solidity-coverage: plugins/bin.js
-  checksum: 8bc04823943483ad84457d52a6c046dadfd861ef9cf4d0864cfaecf882d33fd26a73120f05f01b2ac14a0c62e93ced0dbd2908c85840c0c86b06b200e89a5519
+  checksum: f0ae865e355776cb34877fe49c1a83ea093862b2ac2aef32a8e0fc6ee258836d1c407e4dace0262b769a33da65ed930cf309d2bc15b31166ea86ad25f9e110f9
   languageName: node
   linkType: hard
 

@@ -50,7 +50,7 @@
     "hardhat-gas-reporter": "1.0.7",
     "multiaddr": "10.0.1",
     "rimraf": "3.0.2",
-    "solidity-coverage": "0.7.17",
+    "solidity-coverage": "0.7.18",
     "ts-generator": "0.1.1",
     "ts-node": "10.4.0",
     "typechain": "6.0.5",
