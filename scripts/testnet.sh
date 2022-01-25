@@ -56,13 +56,13 @@ fund_if_empty() {
   # we need to use yarn explicitely to ensure packages can be resolved properly
   local fundNativeCmd="PRIVATE_KEY=${FUNDING_PRIV_KEY} yarn --silent run ts-node ${mydir}/fund-address.ts \
 	  --environment ${environment} --address ${address} --target ${min_funds}"
-  try_cmd fundNativeCmd 3
+  try_cmd "${fundNativeCmd}" 3
 
   sleep 10
 
   local fundErc20Cmd="PRIVATE_KEY=${FUNDING_PRIV_KEY} yarn --silent run ts-node ${mydir}/fund-address.ts \
 	  --environment ${environment} --address ${address} --target ${min_funds_hopr} --erc20"
-  try_cmd fundErc20Cmd 3
+  try_cmd "${fundErc20Cmd}" 3
 
   sleep 10
 }
