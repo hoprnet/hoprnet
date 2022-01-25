@@ -2691,7 +2691,7 @@ ___
 
 ### retimer
 
-▸ **retimer**(`fn`, `newTimeout`): `NodeJS.Timeout`
+▸ **retimer**(`fn`, `newTimeout`): () => `void`
 
 Repeatedly apply a function after a timeout
 
@@ -2704,7 +2704,15 @@ Repeatedly apply a function after a timeout
 
 #### Returns
 
-`NodeJS.Timeout`
+`fn`
+
+▸ (): `void`
+
+Repeatedly apply a function after a timeout
+
+##### Returns
+
+`void`
 
 #### Defined in
 

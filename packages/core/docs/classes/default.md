@@ -16,7 +16,6 @@
 
 ### Properties
 
-- [checkTimeout](default.md#checktimeout)
 - [environment](default.md#environment)
 - [forward](default.md#forward)
 - [heartbeat](default.md#heartbeat)
@@ -24,6 +23,7 @@
 - [libp2p](default.md#libp2p)
 - [networkPeers](default.md#networkpeers)
 - [status](default.md#status)
+- [stopPeriodicCheck](default.md#stopperiodiccheck)
 - [strategy](default.md#strategy)
 - [captureRejectionSymbol](default.md#capturerejectionsymbol)
 - [captureRejections](default.md#capturerejections)
@@ -121,16 +121,6 @@ EventEmitter.constructor
 
 ## Properties
 
-### checkTimeout
-
-• `Private` **checkTimeout**: `Timeout`
-
-#### Defined in
-
-[packages/core/src/index.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L141)
-
-___
-
 ### environment
 
 • **environment**: [`ResolvedEnvironment`](../modules.md#resolvedenvironment)
@@ -198,6 +188,24 @@ ___
 #### Defined in
 
 [packages/core/src/index.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L139)
+
+___
+
+### stopPeriodicCheck
+
+• `Private` **stopPeriodicCheck**: () => `void`
+
+#### Type declaration
+
+▸ (): `void`
+
+##### Returns
+
+`void`
+
+#### Defined in
+
+[packages/core/src/index.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L141)
 
 ___
 
