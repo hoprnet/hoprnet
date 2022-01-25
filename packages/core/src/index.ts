@@ -62,7 +62,7 @@ import { createLibp2pInstance } from './main'
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
 const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
-const error = debug(DEBUG_PREFIX.concat(`:error`))
+// const error = debug(DEBUG_PREFIX.concat(`:error`))
 
 interface NetOptions {
   ip: string
@@ -774,13 +774,13 @@ class Hopr extends EventEmitter {
     log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
 
-    this.connector.on('ticket:win', async (ack) => {
-      try {
-        await this.strategy.onWinningTicket(ack, this.connector)
-      } catch (err) {
-        error(`Strategy error while handling winning ticket`, err)
-      }
-    })
+    // this.connector.on('ticket:win', async (ack) => {
+    //   try {
+    //     await this.strategy.onWinningTicket(ack, this.connector)
+    //   } catch (err) {
+    //     error(`Strategy error while handling winning ticket`, err)
+    //   }
+    // })
   }
 
   public getChannelStrategy(): string {

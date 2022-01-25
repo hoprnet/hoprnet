@@ -134,7 +134,7 @@ function setup_node() {
   # Set NODE_ENV=development to rebuild hopr-admin next files
   # at runtime. Necessary to start multiple instances of hoprd
   # in parallel
-  DEBUG="hopr*" NODE_ENV=development node packages/hoprd/lib/index.js \
+  DEBUG="hopr*,-hopr-connect*,-*heartbeat,-*libp2p*,-*indexer,-*hoprd*" NODE_ENV=development node packages/hoprd/lib/index.js \
     --admin \
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \

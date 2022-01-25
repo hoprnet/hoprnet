@@ -143,7 +143,7 @@ for (( i=0; i<${#endpoints_arr[@]}; i++ )); do
 
   if [ -n "${other_endpoint}" ] && [ "$i" -lt "2" ] ; then
     log "${endpoint} opening channel to other node at ${other_endpoint}"
-    run_command ${endpoint} "open ${peers["${other_endpoint}"]} 0.1" "Successfully opened channel" 600 &
+    run_command ${endpoint} "open ${peers["${other_endpoint}"]} 1" "Successfully opened channel" 600 &
   fi
 done
 
