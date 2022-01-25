@@ -514,19 +514,26 @@ class Hopr extends EventEmitter {
    * List of addresses that is announced to other nodes
    * @dev returned list can change at runtime
    * @param peer peer to query for, default self
+   * @param timeout [optional] custom timeout for DHT query
    */
-  public async getAnnouncedAddresses(peer: PeerId = this.getId()): Promise<Multiaddr[]> {
+  public async getAnnouncedAddresses(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
     if (peer.equals(this.getId())) {
       return this.libp2p.multiaddrs
     }
 
     const knownAddresses = this.libp2p.peerStore.get(peer)?.addresses?.map((addr) => addr.multiaddr) ?? []
 
-    for await (const relayer of this.libp2p.contentRouting.findProviders(await createRelayerKey(peer))) {
-      const relayAddress = new Multiaddr(`/p2p/${relayer.id.toB58String()}/p2p-circuit/p2p/${peer.toB58String()}`)
-      if (knownAddresses.findIndex((ma) => ma.equals(relayAddress)) < 0) {
-        knownAddresses.push(relayAddress)
+    try {
+      for await (const relayer of this.libp2p.contentRouting.findProviders(await createRelayerKey(peer), {
+        timeout
+      })) {
+        const relayAddress = new Multiaddr(`/p2p/${relayer.id.toB58String()}/p2p-circuit/p2p/${peer.toB58String()}`)
+        if (knownAddresses.findIndex((ma) => ma.equals(relayAddress)) < 0) {
+          knownAddresses.push(relayAddress)
+        }
       }
+    } catch (err) {
+      log(`Could not find any relayer key for ${peer.toB58String()}`)
     }
 
     return knownAddresses

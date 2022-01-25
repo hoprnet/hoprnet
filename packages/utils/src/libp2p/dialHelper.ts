@@ -100,7 +100,7 @@ async function attemptDial(
   } catch (err) {
     logError(`Error while dialing ${destination.toB58String()} directly.`)
     if (err?.message) {
-      logError(`Dial error: ${err.message}`)
+      logError(`Dial error:`, err)
     }
   }
 
