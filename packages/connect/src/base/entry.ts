@@ -3,23 +3,23 @@ import type { HoprConnectOptions, PeerStoreType, Stream } from '../types'
 import Debug from 'debug'
 
 import {
-  CODE_P2P,
   CODE_IP4,
   CODE_IP6,
   CODE_TCP,
   CODE_UDP,
   MAX_RELAYS_PER_NODE,
   CAN_RELAY_PROTCOL,
-  OK
+  OK,
+  DEFAULT_DHT_ENTRY_RENEWAL
 } from '../constants'
 import type { Connection } from 'libp2p-interfaces/connection'
 
 import type PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
-import { nAtATime, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { nAtATime, retimer, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import type HoprConnect from '..'
-import { attemptClose } from '../utils'
+import { attemptClose, relayFromRelayAddress } from '../utils'
 
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
@@ -54,6 +54,7 @@ export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
 export class EntryNodes extends EventEmitter {
   protected availableEntryNodes: EntryNodeData[]
   protected uncheckedEntryNodes: PeerStoreType[]
+  private stopDHTRenewal: (() => void) | undefined
 
   protected usedRelays: Multiaddr[]
 
@@ -84,6 +85,8 @@ export class EntryNodes extends EventEmitter {
       this.options.publicNodes.on('addPublicNode', this._onNewRelay)
       this.options.publicNodes.on('removePublicNode', this._onRemoveRelay)
     }
+
+    this.startDHTRenewInterval()
   }
 
   /**
@@ -95,6 +98,24 @@ export class EntryNodes extends EventEmitter {
 
       this.options.publicNodes.removeListener('removePublicNode', this._onRemoveRelay as EntryNodes['onRemoveRelay'])
     }
+
+    this.stopDHTRenewal?.()
+  }
+
+  private startDHTRenewInterval() {
+    const renewDHTEntries = async function (this: EntryNodes) {
+      for (const usedRelay of this.usedRelays) {
+        const relay = relayFromRelayAddress(usedRelay)
+        const relayEntry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
+
+        if (relayEntry == undefined) {
+          throw Error(`Unknown relay`)
+        }
+        await this.connectToRelay(relay, relayEntry.multiaddrs[0], 5e3)
+      }
+    }.bind(this)
+
+    this.stopDHTRenewal = retimer(renewDHTEntries, () => this.options.dhtRenewalTimeout ?? DEFAULT_DHT_ENTRY_RENEWAL)
   }
 
   /**
@@ -167,10 +188,9 @@ export class EntryNodes extends EventEmitter {
     }
 
     let inUse = false
-    const peerB58String = peer.toB58String()
     for (const relayAddr of this.usedRelays) {
       // remove second part of relay address to get relay peerId
-      if (relayAddr.decapsulateCode(CODE_P2P).getPeerId() === peerB58String) {
+      if (relayFromRelayAddress(relayAddr).equals(peer)) {
         inUse = true
       }
     }
@@ -240,8 +260,6 @@ export class EntryNodes extends EventEmitter {
       args[index] = [nodeToCheck.id, nodeToCheck.multiaddrs[0], TIMEOUT]
     }
 
-    // const CONCURRENCY = 14 // connections
-
     const results = (await nAtATime(connectToRelay, args, ENTRY_NODES_MAX_PARALLEL_DIALS))
       .filter(
         // Filter all unsuccessful dials that cause an error
@@ -266,7 +284,7 @@ export class EntryNodes extends EventEmitter {
     // Reset list of unchecked nodes
     this.uncheckedEntryNodes = []
 
-    const previous = new Set(this.usedRelays.map((ma) => ma.decapsulateCode(CODE_P2P).toString()))
+    const previous = new Set<string>(this.usedRelays.map((ma) => relayFromRelayAddress(ma).toB58String()))
 
     this.usedRelays = this.availableEntryNodes
       // select only those entry nodes with smallest latencies
@@ -282,7 +300,7 @@ export class EntryNodes extends EventEmitter {
       isDifferent = true
     } else {
       for (const usedRelay of this.usedRelays) {
-        if (!previous.has(usedRelay.toString())) {
+        if (!previous.has(relayFromRelayAddress(usedRelay).toB58String())) {
           isDifferent = true
           break
         }
@@ -313,8 +331,13 @@ export class EntryNodes extends EventEmitter {
   ): Promise<{ entry: EntryNodeData; conn?: Connection }> {
     const abort = new AbortController()
     const start = Date.now()
+    let finished = false
 
-    const timeoutHandle = setTimeout(abort.abort.bind(abort), timeout)
+    setTimeout(() => {
+      if (!finished) {
+        abort.abort()
+      }
+    }, timeout)
 
     let conn: Connection | undefined
     try {
@@ -322,7 +345,8 @@ export class EntryNodes extends EventEmitter {
     } catch (err: any) {
       error(`error while contacting entry node.`, err.message)
     } finally {
-      clearTimeout(timeoutHandle)
+      // Prevent timeout from doing anything
+      finished = true
     }
 
     if (conn == undefined) {
