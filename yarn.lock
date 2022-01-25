@@ -3089,7 +3089,7 @@ __metadata:
     "@types/chai": 4.3.0
     "@types/chai-spies": 1.0.3
     "@types/debug": 4.1.7
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     "@types/node": 16.11.21
     "@types/simple-peer": 9.11.4
     "@types/yargs": 17.0.8
@@ -3106,7 +3106,7 @@ __metadata:
     libp2p: 0.35.8
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.7
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: 10.0.1
     multihashes: 4.0.3
     nat-api: 0.3.1
@@ -3116,7 +3116,7 @@ __metadata:
     simple-peer: 9.11.0
     stream-to-it: 0.2.4
     ts-node: 10.4.0
-    typescript: 4.5.4
+    typescript: 4.5.5
     webrtc-stun: 3.0.0
     wrtc: 0.4.7
     yargs: 17.3.1
@@ -3130,7 +3130,7 @@ __metadata:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@sinonjs/referee": 9.1.1
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     async-mutex: 0.3.2
     bn.js: 5.2.0
     chai: 4.3.4
@@ -3139,7 +3139,7 @@ __metadata:
     debug: 4.3.3
     ethers: 5.5.2
     heap-js: 2.1.6
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: 10.0.1
     nyc: 15.1.0
     peer-id: 0.16.0
@@ -3148,8 +3148,8 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.8
-    typescript: 4.5.4
+    typedoc-plugin-markdown: 3.11.12
+    typescript: 4.5.5
   languageName: unknown
   linkType: soft
 
@@ -3164,7 +3164,7 @@ __metadata:
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/chai-as-promised": 7.1.4
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     abort-controller: 3.0.0
     bn.js: 5.2.0
     chai: 4.3.4
@@ -3179,7 +3179,7 @@ __metadata:
     libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: 10.0.1
     nyc: 15.1.0
     peer-id: 0.16.0
@@ -3188,8 +3188,8 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.8
-    typescript: 4.5.4
+    typedoc-plugin-markdown: 3.11.12
+    typescript: 4.5.5
   languageName: unknown
   linkType: soft
 
@@ -3200,22 +3200,22 @@ __metadata:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/express": 4
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     "@types/rimraf": 3.0.2
     "@types/yargs": 17.0.8
     bignumber.js: 9.0.2
     bn.js: 5.2.0
     chai: 4.3.4
     express: 4.17.1
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: ^10.0.1
     nyc: 15.1.0
     peer-id: ^0.16.0
     proxyquire: ^2.1.3
     rimraf: 3.0.2
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.8
-    typescript: 4.5.4
+    typedoc-plugin-markdown: 3.11.12
+    typescript: 4.5.5
     yargs: 17.3.1
   bin:
     hopr-cover-traffic-daemon: lib/index.js
@@ -3241,18 +3241,18 @@ __metadata:
     dotenv: 10.0.0
     ethereum-waffle: 3.4.0
     ethers: 5.5.2
-    hardhat: 2.8.0
-    hardhat-deploy: 0.9.24
-    hardhat-gas-reporter: 1.0.6
+    hardhat: 2.8.3
+    hardhat-deploy: 0.9.27
+    hardhat-gas-reporter: 1.0.7
     multiaddr: 10.0.1
     rimraf: 3.0.2
-    solidity-coverage: 0.7.17
+    solidity-coverage: 0.7.18
     ts-generator: 0.1.1
     ts-node: 10.4.0
     typechain: 6.0.5
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.8
-    typescript: 4.5.4
+    typedoc-plugin-markdown: 3.11.12
+    typescript: 4.5.5
   languageName: unknown
   linkType: soft
 
@@ -3261,7 +3261,7 @@ __metadata:
   resolution: "@hoprnet/hopr-utils@workspace:packages/utils"
   dependencies:
     "@chainsafe/libp2p-noise": 5.0.2
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     "@types/pino": 7.0.4
     abort-controller: ~3.0.0
     bignumber.js: 9.0.2
@@ -3284,7 +3284,7 @@ __metadata:
     libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
-    mocha: 9.1.3
+    mocha: 9.1.4
     multiaddr: 10.0.1
     multiformats: 9.5.8
     multihashes: 4.0.3
@@ -3297,8 +3297,8 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.8
-    typescript: 4.5.4
+    typedoc-plugin-markdown: 3.11.12
+    typescript: 4.5.5
   languageName: unknown
   linkType: soft
 
@@ -3311,7 +3311,7 @@ __metadata:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@types/cors": 2.8.12
-    "@types/mocha": 9.0.0
+    "@types/mocha": 9.1.0
     "@types/yargs": 17.0.8
     bn.js: 5.2.0
     body-parser: 1.19.1
@@ -3328,7 +3328,7 @@ __metadata:
     js-cookie: 3.0.1
     key-did-provider-ed25519: 1.1.0
     key-did-resolver: 1.4.0
-    mocha: 9.1.3
+    mocha: 9.1.4
     next: 12.0.7
     peer-id: 0.16.0
     prop-types: 15.7.2
@@ -3344,8 +3344,8 @@ __metadata:
     trace-unhandled: 2.0.1
     ts-node: 10.4.0
     typedoc: 0.22.10
-    typedoc-plugin-markdown: 3.11.8
-    typescript: 4.5.4
+    typedoc-plugin-markdown: 3.11.12
+    typescript: 4.5.5
     ws: 8.3.0
     yamljs: 0.3.0
     yargs: 17.3.1
@@ -4845,10 +4845,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/mocha@npm:9.0.0":
-  version: 9.0.0
-  resolution: "@types/mocha@npm:9.0.0"
-  checksum: 73e6edaba045bc250b69085a770d5029edfed006ed8e75344435474a2cb8d38064acd7b34b6cc62756caa845a5cf335bde66db11e8c8c6565c62a790e933704a
+"@types/mocha@npm:9.1.0":
+  version: 9.1.0
+  resolution: "@types/mocha@npm:9.1.0"
+  checksum: 21e1000dafcfe387c6812be41c44a47b48c27a74d5a70c3d5ef1bb5c88eadadfc74dba06e93f160e7248c8a57b3977b590f82504c801c9927816ecd4668023c0
   languageName: node
   linkType: hard
 
@@ -10531,14 +10531,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eth-gas-reporter@npm:^0.2.23":
-  version: 0.2.23
-  resolution: "eth-gas-reporter@npm:0.2.23"
+"eth-gas-reporter@npm:^0.2.24":
+  version: 0.2.24
+  resolution: "eth-gas-reporter@npm:0.2.24"
   dependencies:
     "@ethersproject/abi": ^5.0.0-beta.146
     "@solidity-parser/parser": ^0.14.0
     cli-table3: ^0.5.0
-    colors: ^1.1.2
+    colors: 1.4.0
     ethereumjs-util: 6.2.0
     ethers: ^4.0.40
     fs-readdir-recursive: ^1.1.0
@@ -10555,7 +10555,7 @@ __metadata:
   peerDependenciesMeta:
     "@codechecks/client":
       optional: true
-  checksum: 7095fc10133cc245b76d91aaa88bcf80cfad12cb08735a00b389f51022e13c398bd1a10a0b887ab6f4ed8b6ba2ec38f6c2ab6cedcc96aa85c2acbc8427a3373b
+  checksum: f906e475f66f5ebcd37b7fe3b5df7e6cabfcfd6b0a336b60ec5b57e723ff346e6702fa8993ee6443c5d4d70877487eda257c425e9b50f409ad8f904d6e839e55
   languageName: node
   linkType: hard
 
@@ -12872,9 +12872,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hardhat-deploy@npm:0.9.24":
-  version: 0.9.24
-  resolution: "hardhat-deploy@npm:0.9.24"
+"hardhat-deploy@npm:0.9.27":
+  version: 0.9.27
+  resolution: "hardhat-deploy@npm:0.9.27"
   dependencies:
     "@ethersproject/abi": ^5.4.0
     "@ethersproject/abstract-signer": ^5.4.1
@@ -12901,26 +12901,26 @@ __metadata:
   peerDependencies:
     "@ethersproject/hardware-wallets": ^5.0.14
     hardhat: ^2.6.8
-  checksum: 5b592bc846097dc18c9e25df772f29ef0a304c09cf54142204db1f21825b51cf1642d1dae7bd5bf31b82bf2dbb8416d63f5a3696901d7a68ecf224b651dd20b7
+  checksum: 9944fa9d11bd94f11852a77cfc76282e90df45659d9e0bfffb78e24c9417151c4bebc8cf31041c5dec1266813139e2b8af8ccf4f5524a0700f8449b5d6a888bc
   languageName: node
   linkType: hard
 
-"hardhat-gas-reporter@npm:1.0.6":
-  version: 1.0.6
-  resolution: "hardhat-gas-reporter@npm:1.0.6"
+"hardhat-gas-reporter@npm:1.0.7":
+  version: 1.0.7
+  resolution: "hardhat-gas-reporter@npm:1.0.7"
   dependencies:
     array-uniq: 1.0.3
-    eth-gas-reporter: ^0.2.23
+    eth-gas-reporter: ^0.2.24
     sha1: ^1.1.1
   peerDependencies:
     hardhat: ^2.0.2
-  checksum: 4b4269ee9ed8e9da156fd1e6d99420103255ec4fb57e881978645fd85fe5171b176e0329139db6b8693c03bfbbe36478fb4f2999409eb5fb02decdab033cdcea
+  checksum: 0e077e6ed587a6d5a360a121964957fe92c995741b8bfac87d34d127f50d76efdb5875f17a6376189ec07684e3bc72c7a6a27f5995c02e59b325caff80ec5592
   languageName: node
   linkType: hard
 
-"hardhat@npm:2.8.0":
-  version: 2.8.0
-  resolution: "hardhat@npm:2.8.0"
+"hardhat@npm:2.8.3":
+  version: 2.8.3
+  resolution: "hardhat@npm:2.8.3"
   dependencies:
     "@ethereumjs/block": ^3.6.0
     "@ethereumjs/blockchain": ^5.5.0
@@ -12953,9 +12953,9 @@ __metadata:
     immutable: ^4.0.0-rc.12
     io-ts: 1.10.4
     lodash: ^4.17.11
-    merkle-patricia-tree: ^4.2.0
+    merkle-patricia-tree: ^4.2.2
     mnemonist: ^0.38.0
-    mocha: ^7.1.2
+    mocha: ^7.2.0
     node-fetch: ^2.6.0
     qs: ^6.7.0
     raw-body: ^2.4.1
@@ -12971,7 +12971,7 @@ __metadata:
     ws: ^7.4.6
   bin:
     hardhat: internal/cli/cli.js
-  checksum: 6caea11941302affeb5ba3adaa86a81a5bfb8d02b9569dbad16888db6f49901962bafd7087696cd9b016b6e502e23c0a4b015178aea28a270918dfc4e84a63bc
+  checksum: 760faf9c91d5c6cb5035bf9e62d14fb52cae6a995b86195457cf1d41a1fb73c4ec1ef9c7e8e033e335495d65265a072ddef4a4b56b1cbaa94c18fc87edf91e16
   languageName: node
   linkType: hard
 
@@ -13370,7 +13370,7 @@ __metadata:
     prettier: 2.5.1
     rimraf: 3.0.2
     ts-node: 10.4.0
-    typescript: 4.5.4
+    typescript: 4.5.5
     yargs: 17.3.1
   languageName: unknown
   linkType: soft
@@ -16844,7 +16844,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"merkle-patricia-tree@npm:^4.2.0, merkle-patricia-tree@npm:^4.2.2":
+"merkle-patricia-tree@npm:^4.2.2":
   version: 4.2.2
   resolution: "merkle-patricia-tree@npm:4.2.2"
   dependencies:
@@ -17180,9 +17180,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mocha@npm:9.1.3":
-  version: 9.1.3
-  resolution: "mocha@npm:9.1.3"
+"mocha@npm:9.1.4":
+  version: 9.1.4
+  resolution: "mocha@npm:9.1.4"
   dependencies:
     "@ungap/promise-all-settled": 1.1.2
     ansi-colors: 4.1.1
@@ -17211,11 +17211,11 @@ __metadata:
   bin:
     _mocha: bin/_mocha
     mocha: bin/mocha
-  checksum: 4185038f1d49c7c5ab2f8d77e42c182a77ed78f08f0ce713cc34919bc89b618ed9d6d4f24cbb92049f0d2ed03fb1a2a5b20e0fb07f8cf4a86ba83eb99dacde99
+  checksum: 8b3cc4333d03dd42e6d3b78e5cfdfb980b287a734e6a543564af95a6977d69c1c0dff203fab55d54caeaf5b9c1b966612e2f2fd29f4b9f1436a5924d6f80aa39
   languageName: node
   linkType: hard
 
-"mocha@npm:^7.1.1, mocha@npm:^7.1.2":
+"mocha@npm:^7.1.1, mocha@npm:^7.2.0":
   version: 7.2.0
   resolution: "mocha@npm:7.2.0"
   dependencies:
@@ -22522,9 +22522,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"solidity-coverage@npm:0.7.17":
-  version: 0.7.17
-  resolution: "solidity-coverage@npm:0.7.17"
+"solidity-coverage@npm:0.7.18":
+  version: 0.7.18
+  resolution: "solidity-coverage@npm:0.7.18"
   dependencies:
     "@solidity-parser/parser": ^0.13.2
     "@truffle/provider": ^0.2.24
@@ -22547,7 +22547,7 @@ __metadata:
     web3-utils: ^1.3.0
   bin:
     solidity-coverage: plugins/bin.js
-  checksum: 8bc04823943483ad84457d52a6c046dadfd861ef9cf4d0864cfaecf882d33fd26a73120f05f01b2ac14a0c62e93ced0dbd2908c85840c0c86b06b200e89a5519
+  checksum: f0ae865e355776cb34877fe49c1a83ea093862b2ac2aef32a8e0fc6ee258836d1c407e4dace0262b769a33da65ed930cf309d2bc15b31166ea86ad25f9e110f9
   languageName: node
   linkType: hard
 
@@ -24201,14 +24201,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc-plugin-markdown@npm:3.11.8":
-  version: 3.11.8
-  resolution: "typedoc-plugin-markdown@npm:3.11.8"
+"typedoc-plugin-markdown@npm:3.11.12":
+  version: 3.11.12
+  resolution: "typedoc-plugin-markdown@npm:3.11.12"
   dependencies:
     handlebars: ^4.7.7
   peerDependencies:
     typedoc: ">=0.22.0"
-  checksum: 8cd28b8d4e27890df5696c51ad9ca7f2987938aecbaf6f5f580784cf2bfdbbf44c1ff6509f6adc8f0854f325a5ff63289e7c6af988216ca1529cd8f0004d4d02
+  checksum: 74f3e68e5fef4a39f0618b753283dfbbca54f01cb4297c7ec156985b5902952eec0e969a870ffcdb1829a2452729cc9ed68f7d2438a89c09fd6919990d281c91
   languageName: node
   linkType: hard
 
@@ -24236,23 +24236,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:4.5.4":
-  version: 4.5.4
-  resolution: "typescript@npm:4.5.4"
+"typescript@npm:4.5.5":
+  version: 4.5.5
+  resolution: "typescript@npm:4.5.5"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 59f3243f9cd6fe3161e6150ff6bf795fc843b4234a655dbd938a310515e0d61afd1ac942799e7415e4334255e41c2c49b7dd5d9fd38a17acd25a6779ca7e0961
+  checksum: 506f4c919dc8aeaafa92068c997f1d213b9df4d9756d0fae1a1e7ab66b585ab3498050e236113a1c9e57ee08c21ec6814ca7a7f61378c058d79af50a4b1f5a5e
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@4.5.4#~builtin<compat/typescript>":
-  version: 4.5.4
-  resolution: "typescript@patch:typescript@npm%3A4.5.4#~builtin<compat/typescript>::version=4.5.4&hash=493e53"
+"typescript@patch:typescript@4.5.5#~builtin<compat/typescript>":
+  version: 4.5.5
+  resolution: "typescript@patch:typescript@npm%3A4.5.5#~builtin<compat/typescript>::version=4.5.5&hash=493e53"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 2e488dde7d2c4a2fa2e79cf2470600f8ce81bc0563c276b72df8ff412d74456ae532ba824650ae936ce207440c79720ddcfaa25e3cb4477572b8534fa4e34d49
+  checksum: c05c318d79c690f101d7ffb34cd6c7d6bbd884d3af9cefe7749ad0cd6be43c7082f098280982ca945dcba23fde34a08fed9602bb26540936baf8c0520727d3ba
   languageName: node
   linkType: hard
 

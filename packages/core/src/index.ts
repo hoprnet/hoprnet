@@ -36,7 +36,8 @@ import {
   type DialOpts,
   type Hash,
   type HalfKeyChallenge,
-  multiaddressCompareByClassFunction
+  multiaddressCompareByClassFunction,
+  createRelayerKey
 } from '@hoprnet/hopr-utils'
 import { type default as HoprCoreEthereum, type Indexer } from '@hoprnet/hopr-core-ethereum'
 import type BN from 'bn.js'
@@ -137,7 +138,7 @@ export type SendMessage = ((
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
 
-  private checkTimeout: NodeJS.Timeout
+  private stopPeriodicCheck: (() => void) | undefined
   private strategy: ChannelStrategy
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
@@ -492,7 +493,7 @@ class Hopr extends EventEmitter {
   public async stop(): Promise<void> {
     this.status = 'DESTROYED'
     verbose('Stopping checking timeout')
-    clearTimeout(this.checkTimeout)
+    this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
     await Promise.all([this.heartbeat.stop(), this.connector.stop()])
     verbose('Stopping database & libp2p')
@@ -513,33 +514,29 @@ class Hopr extends EventEmitter {
    * List of addresses that is announced to other nodes
    * @dev returned list can change at runtime
    * @param peer peer to query for, default self
+   * @param timeout [optional] custom timeout for DHT query
    */
-  public async getAnnouncedAddresses(peer: PeerId = this.getId()): Promise<Multiaddr[]> {
+  public async getAnnouncedAddresses(peer: PeerId = this.getId(), timeout = 5e3): Promise<Multiaddr[]> {
     if (peer.equals(this.getId())) {
-      const addrs = this.libp2p.multiaddrs
-
-      // Most of the time we want to only return 'public' addresses, that is,
-      // addresses that have a good chance of being reachable by other nodes,
-      // therefore only ones that include a public IP etc.
-      //
-      // We also have a setting announceLocalAddresses that inverts this so we
-      // can test on closed local networks.
-      if (this.options.testing?.announceLocalAddresses) {
-        return addrs.filter((ma) => ma.toString().includes('127.0.0.1')) // TODO - proper filtering
-      }
-      return addrs.filter((ma) => !ma.toString().includes('127.0.0.1')) // TODO - proper filtering
+      return this.libp2p.multiaddrs
     }
 
-    let dhtResult: Awaited<ReturnType<LibP2P['peerRouting']['findPeer']>>
+    const knownAddresses = this.libp2p.peerStore.get(peer)?.addresses?.map((addr) => addr.multiaddr) ?? []
 
     try {
-      dhtResult = await this.libp2p.peerRouting.findPeer(peer)
+      for await (const relayer of this.libp2p.contentRouting.findProviders(await createRelayerKey(peer), {
+        timeout
+      })) {
+        const relayAddress = new Multiaddr(`/p2p/${relayer.id.toB58String()}/p2p-circuit/p2p/${peer.toB58String()}`)
+        if (knownAddresses.findIndex((ma) => ma.equals(relayAddress)) < 0) {
+          knownAddresses.push(relayAddress)
+        }
+      }
     } catch (err) {
-      log(`Cannot find any announced addresses for peer ${peer.toB58String()} in the DHT.`)
-      return []
+      log(`Could not find any relayer key for ${peer.toB58String()}`)
     }
 
-    return dhtResult.multiaddrs
+    return knownAddresses
   }
 
   /**
@@ -709,47 +706,51 @@ class Hopr extends EventEmitter {
 
     log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
 
-    this.checkTimeout = retimer(periodicCheck, () => this.strategy.tickInterval)
+    this.stopPeriodicCheck = retimer(periodicCheck, () => this.strategy.tickInterval)
   }
 
   /**
    * Announces address of node on-chain to be reachable by other nodes.
    * @dev Promise resolves before own announcement appears in the indexer
-   * @param includeRouting publish routable address if true
-   * @returns Promise that resolves once announce transaction has been published
+   * @param announceRoutableAddress publish routable address if true
+   * @returns a Promise that resolves once announce transaction has been published
    */
-  private async announce(includeRouting = false): Promise<void> {
-    let isRoutableAddress = false
+  private async announce(announceRoutableAddress = false): Promise<void> {
+    let routableAddressAvailable = false
+
+    // Address that we will announce soon
     let addrToAnnounce: Multiaddr
 
-    if (includeRouting) {
+    if (announceRoutableAddress) {
       let multiaddrs = await this.getAnnouncedAddresses()
 
-      // If we need local addresses, sort them first according to their class
-      if (this.options.testing?.preferLocalAddresses) {
+      if (this.options.testing?.announceLocalAddresses) {
+        multiaddrs = multiaddrs.filter((ma) => isMultiaddrLocal(ma))
+      } else if (this.options.testing?.preferLocalAddresses) {
+        // If we need local addresses, sort them first according to their class
         multiaddrs.sort(multiaddressCompareByClassFunction)
       } else {
         // If we don't need local addresses, just throw them away
         multiaddrs = multiaddrs.filter((ma) => !isMultiaddrLocal(ma))
       }
 
-      log(`available multiaddresses ${multiaddrs}`)
+      log(`available multiaddresses for on-chain announcement:`)
+      for (const ma of multiaddrs) {
+        log(`\t${ma.toString()}`)
+      }
 
-      const ip4 = multiaddrs.find((s) => s.toString().startsWith('/ip4/'))
-      const ip6 = multiaddrs.find((s) => s.toString().startsWith('/ip6/'))
+      const ip4 = multiaddrs.find((ma) => ma.toString().startsWith('/ip4/'))
+      const ip6 = multiaddrs.find((ma) => ma.toString().startsWith('/ip6/'))
 
       // Prefer IPv4 addresses over IPv6 addresses, if any
       addrToAnnounce = ip4 ?? ip6
 
       // Submit P2P address if IPv4 or IPv6 address is not routable because link-locale, reserved or private address
       // except if testing locally, e.g. as part of an integration test
-      if (
-        addrToAnnounce == undefined ||
-        (isMultiaddrLocal(addrToAnnounce) && !this.options.testing?.preferLocalAddresses)
-      ) {
+      if (addrToAnnounce == undefined) {
         addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
       } else {
-        isRoutableAddress = true
+        routableAddressAvailable = true
       }
     } else {
       addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toB58String())
@@ -765,7 +766,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      log(`announcing ${includeRouting && isRoutableAddress ? 'with' : 'without'} routing`)
+      log(`announcing ${announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'} routing`)
 
       await this.connector.announce(addrToAnnounce)
       log(`announced address ${addrToAnnounce}`)

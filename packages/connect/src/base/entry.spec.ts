@@ -96,6 +96,8 @@ describe('entry node functionality', function () {
 
     const usedRelays = entryNodes.getUsedRelays()
     assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
+
+    entryNodes.stop()
   })
 
   it('remove an offline node', function () {
@@ -119,6 +121,8 @@ describe('entry node functionality', function () {
 
     const usedRelays = entryNodes.getUsedRelays()
     assert(usedRelays == undefined || usedRelays.length == 0, `must not expose any internal addrs`)
+
+    entryNodes.stop()
   })
 
   it('contact potential relays and update relay addresses', async function () {
@@ -157,6 +161,7 @@ describe('entry node functionality', function () {
 
     relayListener.removeAllListeners()
     network.close()
+    entryNodes.stop()
   })
 
   it('expose limited number of relay addresses', async function () {
@@ -205,6 +210,7 @@ describe('entry node functionality', function () {
     // cleanup
     relayNodes.forEach((relayNode) => relayNode[2].removeAllListeners())
     network.close()
+    entryNodes.stop()
   })
 
   it('update nodes once node became offline', async function () {
@@ -247,6 +253,7 @@ describe('entry node functionality', function () {
 
     newNodeListener.removeAllListeners()
     network.close()
+    entryNodes.stop()
   })
 
   it('take those nodes that are online', async function () {
@@ -284,6 +291,7 @@ describe('entry node functionality', function () {
 
     network.close()
     relayListener.removeAllListeners()
+    entryNodes.stop()
   })
 
   it('do not emit listening event if nothing has changed', async function () {
@@ -309,6 +317,7 @@ describe('entry node functionality', function () {
     assert(
       usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
     )
+    entryNodes.stop()
   })
 
   it('events should trigger actions', async function () {
@@ -339,6 +348,44 @@ describe('entry node functionality', function () {
 
     await entryNodes.updatePublicNodes()
 
+    entryNodes.stop()
+    network.close()
+  })
+
+  it('renew DHT entry', async function () {
+    const network = createFakeNetwork()
+
+    const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+
+    const connectEmitter = network.listen(relay.multiaddrs[0].toString())
+
+    let renews = 0
+
+    connectEmitter.on('connected', () => renews++)
+
+    const publicNodes: PublicNodesEmitter = new EventEmitter()
+
+    const CUSTOM_DHT_RENEWAL_TIMEOUT = 100 // very short timeout
+
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      {
+        dhtRenewalTimeout: CUSTOM_DHT_RENEWAL_TIMEOUT,
+        publicNodes
+      }
+    )
+
+    entryNodes.start()
+
+    publicNodes.emit('addPublicNode', relay)
+
+    await new Promise((resolve) => setTimeout(resolve, 1e3))
+
+    // depends on scheduler
+    assert([9, 10].includes(renews), `Should capture at least 9 renews but not more than 10`)
+
+    connectEmitter.removeAllListeners()
     entryNodes.stop()
     network.close()
   })

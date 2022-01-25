@@ -30,7 +30,7 @@ export class OpenChannel extends AbstractCommand {
 
     let counterparty: PeerId
     try {
-      counterparty = await checkPeerIdInput(counterpartyStr, state)
+      counterparty = checkPeerIdInput(counterpartyStr, state)
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

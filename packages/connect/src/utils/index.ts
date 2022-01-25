@@ -3,11 +3,12 @@ import type { AddressInfo, Server as TCPServer } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
 import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
 import type { Connection } from 'libp2p-interfaces/connection'
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 
 import { isAnyAddress } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from 'multiaddr'
+import { CODE_CIRCUIT, CODE_P2P } from '../constants'
 
 export { parseAddress, type ValidAddress } from './addrs'
 export { encodeWithLengthPrefix, decodeWithLengthPrefix } from './lengthPrefix'
@@ -115,7 +116,7 @@ export function nodeToMultiaddr(addr: AddressInfo, peerId: PeerId | undefined): 
     case 'IPv4':
       family = 4
       // Node.js tends answer `socket.address()` calls on `udp4`
-      // sockets with `::1` instead of `127.0.0.1`
+      // sockets with `::` instead of `0.0.0.0`
       if (isAnyAddress(addr.address, 'IPv6')) {
         address = '0.0.0.0'
       } else {
@@ -238,4 +239,20 @@ export async function attemptClose(maConn: MultiaddrConnection | Connection, log
   } catch (err) {
     logError?.('an error occurred while closing the connection', err)
   }
+}
+
+/**
+ * Extracts the relay PeerId from a relay address
+ * @param ma relay Address
+ * @returns
+ */
+export function relayFromRelayAddress(ma: Multiaddr): PeerId {
+  const tuples = ma.tuples()
+
+  if (tuples.length != 3 || tuples[0][0] != CODE_P2P || tuples[1][0] != CODE_CIRCUIT || tuples[2][0] != CODE_P2P) {
+    throw Error(`Cannot extract relay from non-relay address. Given address ${ma.toString()}`)
+  }
+
+  // Remove length prefix
+  return PeerId.createFromBytes(tuples[0][1]?.slice(1) as Uint8Array)
 }

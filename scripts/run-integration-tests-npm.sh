@@ -283,7 +283,7 @@ ensure_port_is_free 19097
 
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rfv \
+rm -Rf \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2" \
   "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost" \
@@ -327,6 +327,17 @@ setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--anno
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
 # }}}
 
+# DO NOT MOVE THIS STEP
+#  --- Wait until private key has been created or recovered --- {{{
+wait_for_regex ${node1_log} "please fund this node"
+wait_for_regex ${node2_log} "please fund this node"
+wait_for_regex ${node3_log} "please fund this node"
+wait_for_regex ${node4_log} "please fund this node"
+wait_for_regex ${node5_log} "please fund this node"
+wait_for_regex ${node6_log} "please fund this node"
+wait_for_regex ${node7_log} "please fund this node"
+# }}}
+
 #  --- Fund nodes --- {{{
 HOPR_ENVIRONMENT_ID=hardhat-localhost \
 TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
@@ -336,17 +347,6 @@ yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --use-local-identities \
   --network hardhat \
   --password "${password}"
-# }}}
-
-#  --- Wait until started --- {{{
-# Wait until node has recovered its private key
-wait_for_regex ${node1_log} "using blockchain address"
-wait_for_regex ${node2_log} "using blockchain address"
-wait_for_regex ${node3_log} "using blockchain address"
-wait_for_regex ${node4_log} "using blockchain address"
-wait_for_regex ${node5_log} "using blockchain address"
-wait_for_regex ${node6_log} "using blockchain address"
-wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{

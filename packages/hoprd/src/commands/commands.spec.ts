@@ -1,11 +1,10 @@
 import * as mod from './index'
 import assert from 'assert'
-// @ts-ignore
 import sinon from 'sinon'
 
-const assertMatch = async (cmds, command, pattern: RegExp) => {
+const assertMatch = async (cmds: mod.Commands, command: string, pattern: RegExp) => {
   let response = ''
-  await cmds.execute((l) => (response += l), command)
+  await cmds.execute((log: string) => (response += log), command)
   assert(response.match(pattern), `executing: (${command}) => ${response} should match ${pattern}`)
 }
 
@@ -47,7 +46,11 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     await assertMatch(cmds, 'send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world', /.*/)
     assert(mockNode.sendMessage.calledOnce, 'send message not called')
-    await assertMatch(cmds, 'send unknown-alias Hello, world', /invalid/i)
+    await assertMatch(
+      cmds,
+      'send unknown-alias Hello, world',
+      /\<alias\> is neither a valid alias nor a valid Hopr address string/
+    )
 
     await assertMatch(cmds, 'alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test', /.*/)
     await assertMatch(cmds, 'alias 16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW test2', /.*/)

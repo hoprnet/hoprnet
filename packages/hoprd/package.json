@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.86.0-next.26",
+  "version": "1.86.0-next.43",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -24,8 +24,8 @@
     "buildAdmin": "HOPRD_GIT_COMMIT=$(git rev-parse --short HEAD) next build hopr-admin",
     "test": "NODE_OPTIONS=\"--trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
-    "start": "node lib/index.js --admin --init --rest",
-    "dev": "yarn build && NODE_ENV=development yarn start",
+    "start": "ts-node src/index --admin --init --rest",
+    "dev": "NODE_ENV=development yarn start --environment hardhat-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --testNoAuthentication",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -66,15 +66,15 @@
   },
   "devDependencies": {
     "@types/cors": "2.8.12",
-    "@types/mocha": "9.0.0",
+    "@types/mocha": "9.1.0",
     "@types/yargs": "17.0.8",
-    "mocha": "9.1.3",
+    "mocha": "9.1.4",
     "rimraf": "3.0.2",
     "sinon": "12.0.1",
     "ts-node": "10.4.0",
     "typedoc": "0.22.10",
-    "typedoc-plugin-markdown": "3.11.8",
-    "typescript": "4.5.4"
+    "typedoc-plugin-markdown": "3.11.12",
+    "typescript": "4.5.5"
   },
   "mocha": {
     "extension": [

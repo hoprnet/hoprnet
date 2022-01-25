@@ -34,6 +34,10 @@ export async function createLibp2pInstance(
     addressSorter = localAddressesFirst
     log('Preferring local addresses')
   } else {
+    // Overwrite address sorter with identity function since
+    // libp2p's own address sorter function is unable to handle
+    // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
+    addressSorter = (addr) => addr
     log('Addresses are sorted by default')
   }
 
