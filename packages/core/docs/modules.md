@@ -352,7 +352,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L133)
+[packages/core/src/main.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L137)
 
 ___
 
