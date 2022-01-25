@@ -138,7 +138,7 @@ export type SendMessage = ((
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
 
-  private checkTimeout: NodeJS.Timeout
+  private stopPeriodicCheck: (() => void) | undefined
   private strategy: ChannelStrategy
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
@@ -493,7 +493,7 @@ class Hopr extends EventEmitter {
   public async stop(): Promise<void> {
     this.status = 'DESTROYED'
     verbose('Stopping checking timeout')
-    clearTimeout(this.checkTimeout)
+    this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
     await Promise.all([this.heartbeat.stop(), this.connector.stop()])
     verbose('Stopping database & libp2p')
@@ -699,7 +699,7 @@ class Hopr extends EventEmitter {
 
     log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
 
-    this.checkTimeout = retimer(periodicCheck, () => this.strategy.tickInterval)
+    this.stopPeriodicCheck = retimer(periodicCheck, () => this.strategy.tickInterval)
   }
 
   /**

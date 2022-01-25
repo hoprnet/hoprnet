@@ -98,4 +98,31 @@ describe('relay code generation', function () {
 
     await Promise.all([nodeA.stop(), nodeB.stop(), nodeC.stop()])
   })
+
+  // Check that nodes can renew keys in the DHT
+  it('renew CID key', async function () {
+    const nodeA = await getNode(peerA)
+    const nodeB = await getNode(peerB)
+    const nodeC = await getNode(peerC)
+
+    await nodeA.dial(nodeB.multiaddrs[0])
+    await nodeB.dial(nodeC.multiaddrs[0])
+
+    const CIDA = await createRelayerKey(nodeA.peerId)
+
+    const ATTEMPTS = 3
+
+    for (let i = 0; i < ATTEMPTS; i++) {
+      await nodeA.contentRouting.provide(CIDA)
+
+      const fetchedFromNodeC = []
+      for await (const resultC of nodeC.contentRouting.findProviders(CIDA)) {
+        fetchedFromNodeC.push(resultC)
+      }
+
+      assert(fetchedFromNodeC.length > 0, `Node C must be able to perform the DHT query. Attempt #${i + 1}`)
+    }
+
+    await Promise.all([nodeA.stop(), nodeB.stop(), nodeC.stop()])
+  })
 })

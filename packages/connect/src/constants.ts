@@ -21,9 +21,12 @@ export const CLOSE_TIMEOUT = 6000 // ms
 export const RELAY_CIRCUIT_TIMEOUT = 6000 // ms
 export const RELAY_CONTACT_TIMEOUT = 3000 // ms
 
-// Either set on ALL nodes to true or NONE
-// @dev mixed operation is neither tested nor implemented
 export const WEBRTC_TIMEOUT = 2400 // ms
+
+// Keys in the DHT have a TTL of 24 hours, hence
+// relay keys need to be reset on daily base.
+// Interval to renew the DHT entry
+export const DEFAULT_DHT_ENTRY_RENEWAL = 8 * 60 * 60 * 1000 // 8 hours
 
 // Use default UTF-8 text encoding
 const encoder = new TextEncoder()
