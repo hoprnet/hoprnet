@@ -106,12 +106,12 @@ export class EntryNodes extends EventEmitter {
     const renewDHTEntries = async function (this: EntryNodes) {
       for (const usedRelay of this.usedRelays) {
         const relay = relayFromRelayAddress(usedRelay)
-        const entry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
+        const relayEntry = this.availableEntryNodes.find((entry: EntryNodeData) => entry.id.equals(relay))
 
-        if (entry == undefined) {
+        if (relayEntry == undefined) {
           throw Error(`Unknown relay`)
         }
-        await this.connectToRelay(relay, entry.multiaddrs[0], 5e3)
+        await this.connectToRelay(relay, relayEntry.multiaddrs[0], 5e3)
       }
     }.bind(this)
 
