@@ -46,7 +46,7 @@ export type ChainOptions = {
   provider: string
   maxConfirmations?: number
   chainId: number
-  gasPrice?: number
+  gasPrice?: string
   network: string
   environment: string
 }

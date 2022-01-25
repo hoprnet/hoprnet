@@ -7,7 +7,7 @@ export default class ChainWrapperSingleton {
   private static instance: ChainWrapper
   private constructor() {}
   public static async create(
-    networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
+    networkInfo: { provider: string; chainId: number; gasPrice?: string; network: string; environment: string },
     privateKey: Uint8Array,
     checkDuplicate: Boolean = true
   ): Promise<ChainWrapper> {

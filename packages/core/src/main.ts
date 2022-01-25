@@ -157,7 +157,7 @@ export async function createHoprNode(
     {
       chainId: options.environment.network.chain_id,
       environment: options.environment.id,
-      gasPrice: options.environment.network.gasPrice,
+      gasPrice: options.environment.network.gas_price,
       network: options.environment.network.id,
       provider
     },
