@@ -1,29 +1,19 @@
 import assert from 'assert'
-import { Listener, MAX_RELAYS_PER_NODE } from './listener'
+import { Listener } from './listener'
 import { Multiaddr } from 'multiaddr'
-import type { MultiaddrConnection, Upgrader } from 'libp2p-interfaces/transport'
+import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
+import type { Connection } from 'libp2p-interfaces/connection'
 import dgram, { type Socket } from 'dgram'
-import PeerId from 'peer-id'
-import { createConnection } from 'net'
+import { createConnection, type AddressInfo } from 'net'
 import * as stun from 'webrtc-stun'
 import { once, EventEmitter } from 'events'
-import { randomBytes } from 'crypto'
-import type { AddressInfo } from 'net'
 
 import { type NetworkInterfaceInfo, networkInterfaces } from 'os'
-import {
-  u8aEquals,
-  defer,
-  type DeferType,
-  toNetworkPrefix,
-  u8aAddrToString,
-  privKeyToPeerId,
-  u8aToHex
-} from '@hoprnet/hopr-utils'
+import { u8aEquals, defer, type DeferType, toNetworkPrefix, u8aAddrToString } from '@hoprnet/hopr-utils'
 
-import type { PublicNodesEmitter, PeerStoreType } from '../types'
+import type { PublicNodesEmitter, PeerStoreType, HoprConnectTestingOptions } from '../types'
 
-import { waitUntilListening, stopNode, startStunServer } from './utils.spec'
+import { stopNode, startStunServer, getPeerStoreEntry, createPeerId } from './utils.spec'
 
 /**
  * Decorated Listener class that allows access to
@@ -31,25 +21,20 @@ import { waitUntilListening, stopNode, startStunServer } from './utils.spec'
  */
 class TestingListener extends Listener {
   // @ts-ignore
-  public uncheckedNodes: InstanceType<typeof Listener>['uncheckedNodes']
-  // @ts-ignore
-  public publicNodes: InstanceType<typeof Listener>['publicNodes']
-
-  // @ts-ignore
   public addrs: InstanceType<typeof Listener>['addrs']
 
   // @ts-ignore
   public tcpSocket: InstanceType<typeof Listener>['tcpSocket']
 
-  public onNewRelay(...args: Parameters<InstanceType<typeof Listener>['onNewRelay']>) {
-    return super.onNewRelay(...args)
-  }
-  public onRemoveRelay(peer: PeerId) {
-    return super.onRemoveRelay(peer)
-  }
-
-  public async updatePublicNodes() {
-    return super.updatePublicNodes()
+  // @ts-ignore
+  public __connections: InstanceType<typeof Listener>['__connections']
+  /**
+   * Get amount of currently open connections
+   * @dev used for testing
+   * @returns amount of currently open connections
+   */
+  getConnections(): number {
+    return this.__connections.length
   }
 
   public getPort(): number {
@@ -57,25 +42,19 @@ class TestingListener extends Listener {
   }
 }
 
-function getPeerStoreEntry(addr: string, id = createPeerId()): PeerStoreType {
-  return {
-    id,
-    multiaddrs: [new Multiaddr(addr)]
-  }
+const localHostBeingExposed: HoprConnectTestingOptions = {
+  __runningLocally: true
 }
 
-/**
- * Synchronous function to sample PeerIds
- * @returns a PeerId
- */
-function createPeerId(): PeerId {
-  return privKeyToPeerId(u8aToHex(randomBytes(32)))
+const localHostCheckingNAT: HoprConnectTestingOptions = {
+  __noUPNP: true,
+  __runningLocally: false, // contact STUN servers
+  __preferLocalAddresses: true // accept local addresses from STUN servers
 }
 
 /**
  * Creates a node and attaches message listener to it.
  * @param publicNodes emitter that emit an event on new public nodes
- * @param initialNodes nodes that are initially known
  * @param state check message reception and content of message
  * @param expectedMessage message to check for, or undefined to skip this check
  * @param peerId peerId of the node
@@ -86,16 +65,14 @@ async function startNode(
   state: { msgReceived?: DeferType<void>; expectedMessageReceived?: DeferType<void> } = {},
   expectedMessage: Uint8Array | undefined = undefined,
   peerId = createPeerId(),
-  upgrader?: Upgrader,
-  handler?: (conn: any) => any | Promise<any>,
-  runningLocally?: boolean
+  upgradeInbound: ((maConn: MultiaddrConnection) => Promise<Connection>) | undefined
 ) {
-  const publicNodesEmitter = new EventEmitter() as PublicNodesEmitter
+  const publicNodes = new EventEmitter() as PublicNodesEmitter
 
   const listener = new TestingListener(
-    handler,
-    upgrader ?? {
-      upgradeInbound: async (conn: MultiaddrConnection) => {
+    (async () => {}) as any,
+    upgradeInbound ??
+      (async (conn: MultiaddrConnection) => {
         if (expectedMessage != undefined) {
           for await (const msg of conn.source) {
             if (u8aEquals(msg.slice(), expectedMessage)) {
@@ -106,28 +83,28 @@ async function startNode(
 
         state?.msgReceived?.resolve()
         return conn as any
-      },
-      upgradeOutbound: async (conn: MultiaddrConnection) => conn as any
-    },
-    publicNodesEmitter,
-    initialNodes,
+      }),
     peerId,
-    undefined,
-    runningLocally ?? false
+    {
+      publicNodes,
+      initialNodes
+    },
+    localHostCheckingNAT
   )
 
-  await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
+  await listener.listen(new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
 
   return {
     peerId,
     listener,
-    publicNodesEmitter
+    publicNodesEmitter: publicNodes
   }
 }
 
 describe('check listening to sockets', function () {
   it('recreate the socket and perform STUN requests', async function () {
     this.timeout(10e3) // 3 seconds should be more than enough
+    const secondStunServer = await startStunServer(undefined)
 
     let listener: TestingListener
     const peerId = createPeerId()
@@ -146,15 +123,15 @@ describe('check listening to sockets', function () {
 
     let port: number | undefined
 
-    for (let i = 0; i < 3; i++) {
+    for (const peerStoreEntry of peerStoreEntries) {
       listener = new TestingListener(
-        undefined,
+        (async () => {}) as any,
         undefined as any,
-        undefined,
-        [peerStoreEntries[i]],
         peerId,
-        undefined,
-        false
+        {
+          initialNodes: [peerStoreEntry, getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)]
+        },
+        localHostCheckingNAT
       )
 
       let listeningMultiaddr: Multiaddr
@@ -165,7 +142,8 @@ describe('check listening to sockets', function () {
         listeningMultiaddr = new Multiaddr(`/ip4/127.0.0.1/tcp/${port}/p2p/${peerId.toB58String()}`)
       }
 
-      await waitUntilListening(listener, listeningMultiaddr)
+      await listener.listen(listeningMultiaddr)
+
       if (port == undefined) {
         // Store the port to which we have listened before
         port = listener.getPort()
@@ -175,23 +153,30 @@ describe('check listening to sockets', function () {
     }
 
     await Promise.all(msgReceived.map((received) => received.promise))
-    await Promise.all(stunServers.map(stopNode))
+    await Promise.all(stunServers.concat(secondStunServer).map(stopNode))
   })
 
   it('check that node is reachable', async function () {
-    const stunServer = await startStunServer(undefined)
+    const firstStunServer = await startStunServer(undefined)
+    const secondStunServer = await startStunServer(undefined)
+
     const msgReceived = defer<void>()
     const expectedMessageReceived = defer<void>()
 
     const testMessage = new TextEncoder().encode('test')
 
     const node = await startNode(
-      [getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+      [
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
+      ],
       {
         msgReceived,
         expectedMessageReceived
       },
-      testMessage
+      testMessage,
+      undefined,
+      undefined
     )
 
     const socket = createConnection(
@@ -206,9 +191,10 @@ describe('check listening to sockets', function () {
       }
     )
 
-    await msgReceived.promise
+    // Produces a timeout if not successful
+    await Promise.all([msgReceived.promise, expectedMessageReceived.promise])
 
-    await Promise.all([stopNode(node.listener), stopNode(stunServer)])
+    await Promise.all([node.listener, firstStunServer, secondStunServer].map(stopNode))
   })
 
   it('should bind to specific interfaces', async function () {
@@ -218,6 +204,7 @@ describe('check listening to sockets', function () {
     for (const iface of Object.keys(usableInterfaces)) {
       const osIface = usableInterfaces[iface]
 
+      // Disable IPv6
       if (osIface == undefined || osIface.some((x) => x.internal) || !osIface.some((x) => x.family == 'IPv4')) {
         delete usableInterfaces[iface]
       }
@@ -235,6 +222,7 @@ describe('check listening to sockets', function () {
         return false
       }
 
+      // Disable IPv6
       if (addr.family == 'IPv6') {
         return false
       }
@@ -252,15 +240,16 @@ describe('check listening to sockets', function () {
     const peerId = createPeerId()
 
     const listener = new Listener(
-      undefined,
+      (async () => {}) as any,
       {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
       } as any,
-      undefined,
-      [getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
       peerId,
-      firstUsableInterfaceName,
-      false
+      {
+        interface: firstUsableInterfaceName,
+        initialNodes: [getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)]
+      },
+      localHostBeingExposed
     )
 
     await assert.rejects(
@@ -281,14 +270,24 @@ describe('check listening to sockets', function () {
 
   it('check that node speaks STUN', async function () {
     const msgReceived = defer<void>()
-    const stunServer = await startStunServer(undefined)
+    const firstStunServer = await startStunServer(undefined)
+    const secondStunServer = await startStunServer(undefined)
 
-    const node = await startNode([getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)])
+    const node = await startNode(
+      [
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
+      ],
+      undefined,
+      undefined,
+      undefined,
+      undefined
+    )
 
-    const socket = dgram.createSocket({ type: 'udp4' })
+    const stunServerSocket = dgram.createSocket({ type: 'udp4' })
     const tid = stun.generateTransactionId()
 
-    socket.on('message', (msg) => {
+    stunServerSocket.on('message', (msg) => {
       const res = stun.createBlank()
 
       // if msg is valid STUN message
@@ -302,8 +301,6 @@ describe('check listening to sockets', function () {
           }
         }
       }
-
-      socket.close()
     })
 
     const req = stun.createBindingRequest(tid).setFingerprintAttribute()
@@ -314,47 +311,55 @@ describe('check listening to sockets', function () {
 
     assert(localAddress != null, `Listener must be available on localhost`)
 
-    socket.send(req.toBuffer(), localAddress.toOptions().port, `localhost`)
+    stunServerSocket.send(req.toBuffer(), localAddress.toOptions().port, `localhost`)
 
     await msgReceived.promise
 
-    await stopNode(node.listener)
-    await stopNode(stunServer)
+    stunServerSocket.close()
+
+    await Promise.all([node.listener, firstStunServer, secondStunServer].map(stopNode))
   })
 
   it('check connection tracking', async function () {
-    const stunServer = await startStunServer(undefined)
-    const stunPeer = getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)
+    const firstStunServer = await startStunServer(undefined)
+    const secondStunServer = await startStunServer(undefined)
     const msgReceived = defer<void>()
     const expectedMessageReceived = defer<void>()
 
-    const node = await startNode([stunPeer], {
-      msgReceived,
-      expectedMessageReceived
-    })
+    const node = await startNode(
+      [
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
+      ],
+      {
+        msgReceived,
+        expectedMessageReceived
+      },
+      undefined,
+      undefined,
+      undefined
+    )
 
-    const bothConnectionsOpened = defer()
-    let connections = 0
+    const firstConnectionDone = defer<void>()
+    const secondConnectionDone = defer<void>()
 
-    node.listener.on('connection', () => {
-      connections++
+    const socketOne = createConnection(
+      {
+        host: '127.0.0.1',
+        port: node.listener.getPort()
+      },
+      firstConnectionDone.resolve.bind(firstConnectionDone)
+    )
 
-      if (connections == 2) {
-        bothConnectionsOpened.resolve()
-      }
-    })
+    const socketTwo = createConnection(
+      {
+        host: '127.0.0.1',
+        port: node.listener.getPort()
+      },
+      secondConnectionDone.resolve.bind(secondConnectionDone)
+    )
 
-    const socketOne = createConnection({
-      host: '127.0.0.1',
-      port: node.listener.getPort()
-    })
-
-    const socketTwo = createConnection({
-      host: '127.0.0.1',
-      port: node.listener.getPort()
-    })
-
-    await bothConnectionsOpened.promise
+    await Promise.all([firstConnectionDone.promise, secondConnectionDone.promise])
 
     assert(node.listener.getConnections() == 2)
 
@@ -372,211 +377,80 @@ describe('check listening to sockets', function () {
 
     assert(node.listener.getConnections() == 0, `Connection must have been removed`)
 
-    await Promise.all([stopNode(node.listener), stopNode(stunServer)])
-  })
-})
-
-describe('entry node functionality', function () {
-  it('add public nodes', async function () {
-    const node = await startNode()
-
-    const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
-
-    node.listener.onNewRelay(peerStoreEntry)
-    // Should filter duplicate
-    node.listener.onNewRelay(peerStoreEntry)
-
-    assert(node.listener.uncheckedNodes.length == 1, `Unchecked nodes must contain one entry`)
-    assert(node.listener.uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
-    assert(
-      node.listener.uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length,
-      `must not contain more multiaddrs`
-    )
-
-    assert(
-      node.listener.addrs.relays == undefined || node.listener.addrs.relays.length == 0,
-      `must not expose any internal addrs`
-    )
-
-    await stopNode(node.listener)
+    await Promise.all([node.listener, firstStunServer, secondStunServer].map(stopNode))
   })
 
-  it('remove an offline node', async function () {
-    const node = await startNode()
+  it('determine NAT situation', async function () {
+    const firstStunServer = await startStunServer(undefined)
+    const secondStunServer = await startStunServer(undefined)
 
-    const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
-
-    node.listener.publicNodes.push({
-      ...peerStoreEntry,
-      latency: 23
-    })
-
-    node.listener.onRemoveRelay(peerStoreEntry.id)
-
-    assert(node.listener.publicNodes.length == 0, `must remove node from public nodes`)
-
-    assert(
-      node.listener.addrs.relays == undefined || node.listener.addrs.relays.length == 0,
-      `must not expose any internal addrs`
+    const listener = new Listener(
+      (async () => {}) as any,
+      (() => {}) as any,
+      createPeerId(),
+      {
+        initialNodes: [
+          getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
+          getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
+        ]
+      },
+      localHostCheckingNAT
     )
-
-    await stopNode(node.listener)
+    await listener.bind(new Multiaddr(`/ip4/0.0.0.0/tcp/9091`))
+    await assert.doesNotReject(async () => await listener.checkNATSituation(`127.0.0.1`, 9091))
+    await Promise.all([listener, firstStunServer, secondStunServer].map(stopNode))
   })
 
-  it('contact potential relays and update relay addresses', async function () {
-    const relayContacted = defer<void>()
+  it('determine NAT situation in localMode', async function () {
+    const firstStunServer = await startStunServer(undefined)
+    const secondStunServer = await startStunServer(undefined)
 
-    const relay = await startNode(undefined, {
-      msgReceived: relayContacted
-    })
-
-    const node = await startNode([getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}`, relay.peerId)])
-
-    await relayContacted.promise
-
-    assert(node.listener.publicNodes.length == 1, `must contain exactly one public node`)
-    assert(node.listener.publicNodes[0].id.equals(relay.peerId), `must contain correct peerId`)
-    assert(node.listener.publicNodes[0].latency >= 0, `latency must be non-negative`)
-
-    assert(node.listener.addrs.relays != undefined, `must expose relay addrs`)
-    assert(node.listener.addrs.relays.length == 1, `must expose exactly one relay addrs`)
-    assert(
-      node.listener.addrs.relays[0].toString() ===
-        `/p2p/${relay.peerId.toB58String()}/p2p-circuit/p2p/${node.peerId.toB58String()}`,
-      `must expose the right relay address`
+    const listener = new Listener(
+      (async () => {}) as any,
+      (() => {}) as any,
+      createPeerId(),
+      {
+        initialNodes: [
+          getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
+          getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
+        ]
+      },
+      localHostBeingExposed
     )
 
-    await Promise.all([stopNode(relay.listener), stopNode(node.listener)])
-  })
+    await listener.bind(new Multiaddr(`/ip4/0.0.0.0/tcp/9091`))
+    const natResult = await listener.checkNATSituation(`127.0.0.1`, 9091)
 
-  it('expose limited number of relay addresses', async function () {
-    this.timeout(10e3)
+    assert(natResult.bidirectionalNAT === false)
+    assert(['::', '0.0.0.0'].includes(natResult.externalAddress))
+    assert(Number.isInteger(natResult.externalPort))
+    assert(natResult.isExposed === true)
 
-    const relayNodes = await Promise.all(
-      Array.from<any, Promise<[DeferType<void>, Awaited<ReturnType<typeof startNode>>]>>(
-        { length: MAX_RELAYS_PER_NODE },
-        async () => {
-          const relayContacted = defer<void>()
-
-          const relay = await startNode(undefined, {
-            msgReceived: relayContacted
-          })
-
-          return [relayContacted, relay]
-        }
-      )
-    )
-
-    const node = await startNode(
-      relayNodes.map((relayNode) =>
-        getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${relayNode[1].listener.getPort()}`, relayNode[1].peerId)
-      )
-    )
-
-    await Promise.all(relayNodes.map((relayNode) => relayNode[0].promise))
-
-    assert(node.listener.addrs.relays != undefined, `must expose relay addresses`)
-    assert(
-      node.listener.addrs.relays.length == MAX_RELAYS_PER_NODE,
-      `must expose ${MAX_RELAYS_PER_NODE} relay addresses`
-    )
-
-    assert(
-      relayNodes.every((relayNode) =>
-        node.listener.publicNodes.some((publicNode) => publicNode.id.equals(relayNode[1].peerId))
-      ),
-      `must contain all relay nodes`
-    )
-
-    await Promise.all(
-      relayNodes
-        .map((relayNode) => relayNode[1])
-        .concat(node)
-        .map((node) => stopNode(node.listener))
-    )
-  })
-
-  it('update nodes once node became offline', async function () {
-    const node = await startNode()
-
-    const newNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/12345`)
-
-    const relayContacted = defer<void>()
-
-    const relay = await startNode(undefined, {
-      msgReceived: relayContacted
-    })
-
-    node.listener.publicNodes.push({
-      ...newNode,
-      latency: 23
-    })
-
-    assert(node.listener.publicNodes.length == 1)
-
-    node.listener.uncheckedNodes.push(getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}`, relay.peerId))
-
-    node.listener.onRemoveRelay(newNode.id)
-
-    // @ts-ignore
-    assert(node.listener.publicNodes.length == 0)
-
-    await relayContacted.promise
-
-    // Add some propagtion delay
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    assert(node.listener.publicNodes.length == 1)
-
-    await Promise.all([stopNode(node.listener), stopNode(relay.listener)])
-  })
-
-  it('take those nodes that are online', async function () {
-    const node = await startNode()
-
-    const relayContacted = defer<void>()
-
-    const relay = await startNode(undefined, {
-      msgReceived: relayContacted
-    })
-
-    const fakeNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/12345`)
-
-    node.listener.uncheckedNodes.push(getPeerStoreEntry(`/ip4/127.0.0.1/tcp/${relay.listener.getPort()}`, relay.peerId))
-    node.listener.uncheckedNodes.push(fakeNode)
-
-    node.listener.updatePublicNodes()
-
-    await relayContacted.promise
-
-    // Add some propagtion delay
-    await new Promise((resolve) => setTimeout(resolve, 50))
-
-    assert(node.listener.publicNodes.length == 1)
-    assert(node.listener.publicNodes[0].id.equals(relay.peerId))
-
-    await Promise.all([stopNode(node.listener), stopNode(relay.listener)])
+    await Promise.all([listener, firstStunServer, secondStunServer].map(stopNode))
   })
 })
 
 describe('error cases', function () {
   it('throw error while upgrading the connection', async () => {
+    this.timeout(10e3)
     const peer = createPeerId()
-    const stunServer = await startStunServer(undefined)
+    const firstStunServer = await startStunServer(undefined)
+    const secondStunServer = await startStunServer(undefined)
 
     const node = await startNode(
-      [getPeerStoreEntry(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+      [
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${firstStunServer.address().port}`),
+        getPeerStoreEntry(`/ip4/127.0.0.1/udp/${secondStunServer.address().port}`)
+      ],
       undefined,
       undefined,
       peer,
-      {
-        upgradeInbound: async (_maConn: MultiaddrConnection) => {
-          await new Promise((resolve) => setTimeout(resolve, 100))
-
-          throw Error('foo')
-        }
-      } as any
+      (() => {
+        throw Error()
+      }) as any
     )
 
+    const connectionEstablished = defer<void>()
     const socket = createConnection(
       {
         host: '127.0.0.1',
@@ -585,13 +459,17 @@ describe('error cases', function () {
       async () => {
         await new Promise((resolve) => setTimeout(resolve, 200))
 
+        connectionEstablished.resolve()
+
         socket.end()
       }
     )
 
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    await connectionEstablished.promise
 
-    await Promise.all([node.listener, stunServer].map(stopNode))
+    socket.destroy()
+
+    await Promise.all([node.listener, firstStunServer, secondStunServer].map(stopNode))
   })
 
   it('throw unexpected error', async function () {
@@ -609,13 +487,16 @@ describe('error cases', function () {
         upgradeInbound: async (_maConn: MultiaddrConnection) => {
           await new Promise((resolve) => setTimeout(resolve, 100))
 
+          // Do sth. unexpected
+          // @ts-ignore
+          conn.nonExisting()
+
           return {}
         }
-      } as any,
-      // Simulate an unexpected error while processing data
-      (conn: any) => conn.nonExisting()
+      } as any
     )
 
+    const connectionEstablished = defer<void>()
     const socket = createConnection(
       {
         host: '127.0.0.1',
@@ -624,11 +505,13 @@ describe('error cases', function () {
       async () => {
         await new Promise((resolve) => setTimeout(resolve, 200))
 
+        connectionEstablished.resolve()
+
         socket.end()
       }
     )
 
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    await connectionEstablished.promise
 
     await Promise.all([node.listener, stunServer].map(stopNode))
   })

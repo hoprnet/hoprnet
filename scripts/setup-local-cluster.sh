@@ -227,6 +227,14 @@ setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
 # }}}
 
+log "Waiting for nodes bootstrap"
+
+wait_for_regex ${node1_log} "unfunded"
+wait_for_regex ${node2_log} "unfunded"
+wait_for_regex ${node3_log} "unfunded"
+wait_for_regex ${node4_log} "unfunded"
+wait_for_regex ${node5_log} "unfunded"
+
 log "Funding nodes"
 
 #  --- Fund nodes --- {{{

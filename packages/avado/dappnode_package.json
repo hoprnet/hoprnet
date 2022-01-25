@@ -1,7 +1,7 @@
 {
   "name": "hopr.avado.dnp.dappnode.eth",
-  "version": "1.85.27",
-  "description": "The HOPR protocol ensures everyone has control of their privacy, data, and identity. By running a HOPR Node, you can obtain HOPR tokens by relaying data and connect to the HOPR Network.",
+  "version": "0.100.0",
+  "description": "HOPR is an open incentivized mixnet which enables privacy-preserving point-to-point data exchange. HOPR is similar to Tor but actually private, decentralized and economically sustainable.",
   "avatar": "/ipfs/QmX8oTreTovBjr3QmV4UT5nfNbjYxJJJy3dswYVgcYattE",
   "type": "service",
   "autoupdate": true,
@@ -16,17 +16,21 @@
       "3000:3000/tcp",
       "3001:3001/tcp",
       "8080:8080/tcp",
-      "9091:9091/tcp"
+      "9091:9091/tcp",
+      "9091:9091/udp"
     ],
-    "path": "hopr.avado.dnp.dappnode.eth_1.85.27.tar.xz",
-    "hash": "/ipfs/Qmf6xgpRgHPQ1DXWVDeFmn8RmtsfQBMsx68EvANwHgkD6c",
-    "size": 83963040,
-    "restart": "always"
+    "restart": "always",
+    "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
+    "hash": "/ipfs/QmfSEjvRK7jnTA2c5F9Qp9ieCfKaE3QeiJGxjH2geaapKi",
+    "size": 78399868
   },
   "author": "HOPR",
-  "license": "(C)",
+  "license": "GPL-3.0",
   "dependencies": {},
   "links": {
-    "OnboardingWizard": "http://hopr.my.ava.do:3000"
-  }
+    "homepage": "https://hoprnet.org",
+    "Admin interface": "http://hopr.my.ava.do:3000",
+    "Rest API V2": "http://hopr.my.ava.do:3001/api/v2/_swagger/"
+  },
+  "builddate": "2022-01-24T16:53:40.867Z"
 }

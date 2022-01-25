@@ -155,7 +155,6 @@ function setup_node() {
     --admin \
     --adminHost "127.0.0.1" \
     --adminPort ${admin_port} \
-    --announce \
     --api-token "${api_token}" \
     --data="${dir}" \
     --host="127.0.0.1:${node_port}" \
@@ -167,6 +166,7 @@ function setup_node() {
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
+    --testNoUPNP \
     ${additional_args} \
     > "${log}" 2>&1 &
 
@@ -283,7 +283,7 @@ ensure_port_is_free 19097
 
 # --- Cleanup old contract deployments {{{
 log "Removing artifacts from old contract deployments"
-rm -Rfv \
+rm -Rf \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2" \
   "${npm_install_dir}/node_modules/@hoprnet/hopr-ethereum/deployments/hardhat-localhost" \
@@ -317,14 +317,25 @@ log "Hardhat node started (127.0.0.1:8545)"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--testNoAuthentication"
-setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
-setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
-setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--run \"info;balance\""
+setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
+setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce --testNoAuthentication"
+setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "--announce"
+setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections"
+setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections"
+setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
 # should not be able to talk to the rest
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--environment hardhat-localhost2"
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
+# }}}
+
+# DO NOT MOVE THIS STEP
+#  --- Wait until private key has been created or recovered --- {{{
+wait_for_regex ${node1_log} "please fund this node"
+wait_for_regex ${node2_log} "please fund this node"
+wait_for_regex ${node3_log} "please fund this node"
+wait_for_regex ${node4_log} "please fund this node"
+wait_for_regex ${node5_log} "please fund this node"
+wait_for_regex ${node6_log} "please fund this node"
+wait_for_regex ${node7_log} "please fund this node"
 # }}}
 
 #  --- Fund nodes --- {{{
@@ -336,17 +347,6 @@ yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
   --use-local-identities \
   --network hardhat \
   --password "${password}"
-# }}}
-
-#  --- Wait until started --- {{{
-# Wait until node has recovered its private key
-wait_for_regex ${node1_log} "using blockchain address"
-wait_for_regex ${node2_log} "using blockchain address"
-wait_for_regex ${node3_log} "using blockchain address"
-wait_for_regex ${node4_log} "using blockchain address"
-wait_for_regex ${node5_log} "using blockchain address"
-wait_for_regex ${node6_log} "using blockchain address"
-wait_for_regex ${node7_log} "using blockchain address"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{

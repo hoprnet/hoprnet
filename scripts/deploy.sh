@@ -20,10 +20,13 @@ declare branch cluster_size package_version docker_image
 : ${HOPRD_PASSWORD:?"env var missing"}
 : ${FUNDING_PRIV_KEY:?"env var missing"}
 
+# docker_image and cluster_size are configurable through script arguments
+docker_image="${1:-gcr.io/hoprassociation/hoprd}"
+cluster_size=${2:-3}
+cluster_tag=${3:-} # optional cluster tag
+
 branch=$(git rev-parse --abbrev-ref HEAD)
-cluster_size=3
 package_version=$(${mydir}/get-package-version.sh)
-docker_image="gcr.io/hoprassociation/hoprd"
 api_token="${HOPRD_API_TOKEN}"
 password="${HOPRD_PASSWORD}"
 
@@ -53,7 +56,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       fi
 
       declare version_maj_min cluster_name
-      cluster_name="${release_id}"
+      cluster_name="${release_id}${cluster_tag}"
       if [ "${version_major}" != "null" ] && [ "${version_minor}" != "null" ]; then
         version_maj_min="${version_major}.${version_minor}"
         cluster_name="${cluster_name}-${version_maj_min//./-}"
@@ -70,11 +73,22 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       log "\tcluster name: ${cluster_name}"
       log "\tcluster template name: ${cluster_template_name}"
 
-      gcloud_create_or_update_instance_template "${cluster_template_name}" \
-        "${docker_image_full}" \
-        "${environment_id}" \
-        "${api_token}" \
-        "${password}"
+      if [ "${cluster_tag}" = "-nat" ]; then
+        log "\tNATed node, no announcements"
+        gcloud_create_or_update_instance_template "${cluster_template_name}" \
+          "${docker_image_full}" \
+          "${environment_id}" \
+          "${api_token}" \
+          "${password}"
+      else 
+        # announce on-chain with routable address
+        gcloud_create_or_update_instance_template "${cluster_template_name}" \
+          "${docker_image_full}" \
+          "${environment_id}" \
+          "${api_token}" \
+          "${password}" \
+          "true"
+      fi
 
       gcloud_create_or_update_managed_instance_group "${cluster_name}" \
         ${cluster_size} \

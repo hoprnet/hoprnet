@@ -1,9 +1,8 @@
 version: '3.4'
 services:
   hopr.avado.dnp.dappnode.eth:
-    build:
-      context: .
-      dockerfile: ./Dockerfile
+    build: ./build
+    image: 'hopr.avado.dnp.dappnode.eth:0.100.0'
     environment:
       DEBUG: hopr*
     restart: always
@@ -20,6 +19,5 @@ services:
     dns:
       - 172.33.1.2
       - 8.8.8.8
-    image: 'hopr.avado.dnp.dappnode.eth:1.85.27'
 volumes:
   db: {}

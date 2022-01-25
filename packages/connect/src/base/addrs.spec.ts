@@ -1,36 +1,50 @@
 import { getAddrs } from './addrs'
-import PeerId from 'peer-id'
 import assert from 'assert'
-import { networkInterfaces } from 'os'
 
 describe('addrs', function () {
-  let pId: PeerId
-  const INVALID_NETWORK_INTERFACE = Object.keys(networkInterfaces()).join().concat(`foo`)
-  const VALID_NETWORK_INTERFACE = Object.keys(networkInterfaces())[0]
-
-  before(async function () {
-    pId = await PeerId.create({ keyType: 'secp256k1' })
-  })
-
-  it('should understand network interface', function () {
+  it('should understand network interfaces', function () {
     assert(
-      getAddrs(9091, pId.toB58String(), {
-        interface: INVALID_NETWORK_INTERFACE,
-        useIPv4: true,
-        includeLocalhostIPv4: true
-      }).length == 0,
+      getAddrs(
+        9091,
+        {
+          interface: 'myNonExistingFakeInterface',
+          useIPv4: true,
+          includeLocalhostIPv4: true
+        },
+        {
+          myFakeInterface: [
+            {
+              address: '10.0.27.191',
+              netmask: '255.0.0.0',
+              family: 'IPv4'
+            } as any
+          ]
+        }
+      ).length == 0,
       'Should not output any addresses if the specified network interface does not exist'
     )
 
     assert(
-      getAddrs(9091, pId.toB58String(), {
-        interface: VALID_NETWORK_INTERFACE,
-        useIPv4: true,
-        useIPv6: true,
-        includeLocalhostIPv4: true,
-        includeLocalhostIPv6: true,
-        includePrivateIPv4: true
-      }).length >= 1,
+      getAddrs(
+        9091,
+        {
+          interface: 'myFakeInterface',
+          useIPv4: true,
+          useIPv6: true,
+          includeLocalhostIPv4: true,
+          includeLocalhostIPv6: true,
+          includePrivateIPv4: true
+        },
+        {
+          myFakeInterface: [
+            {
+              address: '10.0.27.191',
+              netmask: '255.0.0.0',
+              family: 'IPv4'
+            } as any
+          ]
+        }
+      ).length >= 1,
       'Should output at least one address if the specified network interface exists'
     )
   })
@@ -39,7 +53,6 @@ describe('addrs', function () {
     assert(
       getAddrs(
         9091,
-        pId.toB58String(),
         {
           useIPv6: true,
           useIPv4: true,
@@ -63,7 +76,6 @@ describe('addrs', function () {
     assert(
       getAddrs(
         9091,
-        pId.toB58String(),
         {
           useIPv4: true
         },
@@ -83,7 +95,6 @@ describe('addrs', function () {
     assert(
       getAddrs(
         9091,
-        pId.toB58String(),
         {
           useIPv4: true
         },
@@ -103,19 +114,19 @@ describe('addrs', function () {
 
   it('try configuration edge cases', function () {
     assert.throws(() =>
-      getAddrs(12345, pId.toB58String(), {
+      getAddrs(12345, {
         useIPv4: false,
         includeLocalhostIPv4: true
       })
     )
 
     assert.throws(() =>
-      getAddrs(12345, pId.toB58String(), {
+      getAddrs(12345, {
         useIPv6: false,
         includeLocalhostIPv6: true
       })
     )
 
-    assert.throws(() => getAddrs(12345, pId.toB58String(), {}))
+    assert.throws(() => getAddrs(12345, {}))
   })
 })

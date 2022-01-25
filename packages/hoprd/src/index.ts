@@ -5,6 +5,7 @@ import { decode } from 'rlp'
 import path from 'path'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
+import { setTimeout } from 'timers/promises'
 
 import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
@@ -44,6 +45,7 @@ const argv = yargs(process.argv.slice(2))
     default: defaultEnvironment()
   })
   .option('host', {
+    string: true,
     describe: 'The network host to run the HOPR node on.',
     default: '0.0.0.0:9091'
   })
@@ -63,10 +65,12 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .option('restHost', {
+    string: true,
     describe: 'Set host IP to which the Rest API server will bind',
     default: 'localhost'
   })
   .option('restPort', {
+    number: true,
     describe: 'Set host port to which the Rest API server will bind',
     default: 3001
   })
@@ -76,10 +80,12 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .option('healthCheckHost', {
+    string: true,
     describe: 'Updates the host for the healthcheck server',
     default: 'localhost'
   })
   .option('healthCheckPort', {
+    number: true,
     describe: 'Updates the port for the healthcheck server',
     default: 8080
   })
@@ -89,28 +95,32 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .option('forwardLogsProvider', {
+    string: true,
     describe: 'A provider url for the logging sink node to use',
     default: 'https://ceramic-clay.3boxlabs.com'
   })
   .option('password', {
+    string: true,
     describe: 'A password to encrypt your keys',
     default: ''
   })
   .option('apiToken', {
-    describe: 'A REST API token and admin panel password for user authentication',
     string: true,
+    describe: 'A REST API token and admin panel password for user authentication',
     default: undefined
   })
   .option('privateKey', {
-    describe: 'A private key to be used for your HOPR node',
     string: true,
+    describe: 'A private key to be used for your HOPR node',
     default: undefined
   })
   .option('identity', {
+    string: true,
     describe: 'The path to the identity file',
     default: DEFAULT_ID_PATH
   })
   .option('run', {
+    string: true,
     describe: 'Run a single hopr command, same syntax as in hopr-admin',
     default: ''
   })
@@ -120,6 +130,7 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .option('data', {
+    string: true,
     describe: 'manually specify the database directory to use',
     default: ''
   })
@@ -129,10 +140,12 @@ const argv = yargs(process.argv.slice(2))
     default: false
   })
   .option('adminHost', {
+    string: true,
     describe: 'Host to listen to for admin console',
     default: 'localhost'
   })
   .option('adminPort', {
+    string: true,
     describe: 'Port to listen to for admin console',
     default: 3000
   })
@@ -156,6 +169,24 @@ const argv = yargs(process.argv.slice(2))
     describe: 'no remote authentication for easier testing',
     default: false
   })
+  .option('testNoDirectConnections', {
+    boolean: true,
+    describe: 'NAT traversal testing: prevent nodes from establishing direct TCP connections',
+    default: false,
+    hidden: true
+  })
+  .option('testNoWebRTCUpgrade', {
+    boolean: true,
+    describe: 'NAT traversal testing: prevent nodes from establishing direct TCP connections',
+    default: false,
+    hidden: true
+  })
+  .option('testNoUPNP', {
+    boolean: true,
+    describe: 'NAT traversal testing: disable automatic detection of external IP address using UPNP',
+    default: false,
+    hidden: true
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -176,14 +207,19 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-async function generateNodeOptions(environment: ResolvedEnvironment): Promise<HoprOptions> {
+function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
     announce: argv.announce,
     hosts: parseHosts(),
-    announceLocalAddresses: argv.testAnnounceLocalAddresses,
-    preferLocalAddresses: argv.testPreferLocalAddresses,
-    environment
+    environment,
+    testing: {
+      announceLocalAddresses: argv.testAnnounceLocalAddresses,
+      preferLocalAddresses: argv.testPreferLocalAddresses,
+      noWebRTCUpgrade: argv.testNoWebRTCUpgrade,
+      noDirectConnections: argv.testNoDirectConnections,
+      noUPNP: argv.testNoUPNP
+    }
   }
 
   if (argv.password !== undefined) {
@@ -265,23 +301,24 @@ async function main() {
   }
 
   const environment = resolveEnvironment(argv.environment)
-  let options = await generateNodeOptions(environment)
+  let options = generateNodeOptions(environment)
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
     process.exit(0)
   }
 
-  // 1. Find or create an identity
-  const peerId = await getIdentity({
-    initialize: argv.init,
-    idPath: argv.identity,
-    password: argv.password,
-    useWeakCrypto: argv.testUseWeakCrypto,
-    privateKey: argv.privateKey
-  })
-
-  // 2. Create node instance
   try {
+    // 1. Find or create an identity
+    const peerId = await getIdentity({
+      initialize: argv.init,
+      idPath: argv.identity,
+      password: argv.password,
+      useWeakCrypto: argv.testUseWeakCrypto,
+      privateKey: argv.privateKey
+    })
+
+    // 2. Create node instance
+
     logs.log('Creating HOPR Node')
     node = await createHoprNode(peerId, options, false)
     logs.logStatus('PENDING')
@@ -304,7 +341,7 @@ async function main() {
 
       logs.log(`Node address: ${node.getId().toB58String()}`)
 
-      const ethAddr = (await node.getEthereumAddress()).toHex()
+      const ethAddr = node.getEthereumAddress().toHex()
       const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
 
       logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
@@ -327,7 +364,10 @@ async function main() {
       if (argv.run && argv.run !== '') {
         // Run a single command and then exit.
         // We support multiple semicolon separated commands
-        let toRun = argv.run.split(';')
+        let toRun = argv.run.split(';').map((c: string) =>
+          // Remove obsolete ' and "
+          c.replace(/"/g, '')
+        )
 
         for (let c of toRun) {
           console.error('$', c)
@@ -338,8 +378,10 @@ async function main() {
             logs.log(msg)
           }, c)
         }
+        // Wait for actions to take place
+        await setTimeout(1e3)
         await node.stop()
-        process.exit(0)
+        return
       }
     })
 

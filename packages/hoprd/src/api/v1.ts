@@ -13,8 +13,8 @@ export default function setupApiV1(service: Application, urlPath: string, node: 
   router.use(bodyParser.text({ type: '*/*' }))
 
   router.get('/version', (_, res) => res.send(node.getVersion()))
-  router.get('/address/eth', async (_, res) => res.send((await node.getEthereumAddress()).toHex()))
-  router.get('/address/hopr', async (_, res) => res.send(node.getId().toB58String()))
+  router.get('/address/eth', (_, res) => res.send(node.getEthereumAddress().toHex()))
+  router.get('/address/hopr', (_, res) => res.send(node.getId().toB58String()))
 
   const cmds = new Commands(node)
   router.post('/command', async (req, res) => {
