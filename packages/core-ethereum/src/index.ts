@@ -210,22 +210,20 @@ export default class HoprEthereum extends EventEmitter {
     // sequentially.
     const tickets = await this.db.getAcknowledgedTickets({ channel })
     log(`redeeming ${tickets.length} tickets from ${channel.source.toB58String()}`)
-    try {
-      for (const ticket of tickets) {
-        log('redeeming ticket', ticket)
-        const result = await this.redeemTicket(channel.source, ticket)
-        if (result.status !== 'SUCCESS') {
-          log('Error redeeming ticket', result)
-          // We need to abort as tickets require ordered redemption.
-          return
-        }
-        log('ticket was redeemed')
+
+    for (const ticket of tickets) {
+      log('redeeming ticket', ticket)
+      const result = await this.redeemTicket(channel.source, ticket)
+
+      if (result.status !== 'SUCCESS') {
+        log('Error redeeming ticket', result)
+        // We need to abort as tickets require ordered redemption.
+        if (result.status === 'ERROR') throw result.error
+        return
       }
-    } catch (e) {
-      // We are going to swallow the error here, as more than one consumer may
-      // be inspecting this same promise.
-      log('Error when redeeming tickets, aborting', e)
+      log('ticket was redeemed')
     }
+
     log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
   }
 
