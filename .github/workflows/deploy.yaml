@@ -79,7 +79,7 @@ jobs:
 
       # Pushing a PR to a release branch should increment the patch version in
       # accordance with semver.
-      - name: '[NPM] Publish patch version (On pushes to release branches)'npm
+      - name: '[NPM] Publish patch version (On pushes to release branches)'
         if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
         run: ./scripts/publish-version.sh patch
         env:
