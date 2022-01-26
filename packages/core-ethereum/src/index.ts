@@ -89,7 +89,9 @@ export default class HoprCoreEthereum extends EventEmitter {
       // Emit event to make sure connector is aware the chain was created properly.
       this.emit('connector:created')
     } catch (err) {
-      log('error: failed to create provider chain wrapper', err)
+      const errMsg = 'failed to create provider chain wrapper'
+      log(`error: ${errMsg}`, err)
+      throw Error(errMsg)
     }
   }
 
