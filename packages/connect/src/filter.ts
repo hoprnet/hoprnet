@@ -10,7 +10,7 @@ import {
   checkNetworks,
   isLinkLocaleAddress,
   u8aAddrToString,
-  getPrivateAddresses
+  getPrivateAddresses, isLocalhost
 } from '@hoprnet/hopr-utils'
 import { parseAddress } from './utils'
 
@@ -71,6 +71,7 @@ export class Filter {
           if (!this.listeningFamilies.includes(parsed.address.type)) {
             this.listeningFamilies.push(parsed.address.type)
           }
+          break
         case 'p2p':
           continue
       }
@@ -118,15 +119,16 @@ export class Filter {
       return false
     }
 
+    // Resolve p2p addresses first
     if (parsed.address.type === 'p2p') {
-      const address = parsed.address
+      const p2pAddress = parsed.address
 
-      if (u8aEquals(address.node, this.peerId.marshalPubKey())) {
+      if (u8aEquals(p2pAddress.node, this.peerId.marshalPubKey())) {
         log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
         return false
       }
 
-      if (u8aEquals(address.relayer, this.peerId.marshalPubKey())) {
+      if (u8aEquals(p2pAddress.relayer, this.peerId.marshalPubKey())) {
         log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
         return false
       }
@@ -139,6 +141,14 @@ export class Filter {
     if (address.node != undefined && u8aEquals(address.node, this.peerId.marshalPubKey())) {
       log(`Prevented self-dial. Used addr: ${ma.toString()}`)
       return false
+    }
+
+    // Allow to dial localhost only if the port is different from all of those we're listening on
+    if (isLocalhost(address.address, address.type) && this.announcedAddrs != undefined &&
+       this.announcedAddrs.some((announced) => announced.type == address.type && announced.port == address.port))
+    {
+      // Do not log anything to prevent too much log pollution
+      return false;
     }
 
     assert(this.announcedAddrs != undefined && this.listeningFamilies != undefined)
