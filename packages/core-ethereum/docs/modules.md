@@ -45,7 +45,7 @@
 | :------ | :------ |
 | `chainId` | `number` |
 | `environment` | `string` |
-| `gasPrice?` | `number` |
+| `gasPrice?` | `string` |
 | `maxConfirmations?` | `number` |
 | `network` | `string` |
 | `provider` | `string` |
@@ -138,7 +138,7 @@ ___
 | `networkInfo` | `Object` | `undefined` |
 | `networkInfo.chainId` | `number` | `undefined` |
 | `networkInfo.environment` | `string` | `undefined` |
-| `networkInfo.gasPrice?` | `number` | `undefined` |
+| `networkInfo.gasPrice?` | `string` | `undefined` |
 | `networkInfo.network` | `string` | `undefined` |
 | `networkInfo.provider` | `string` | `undefined` |
 | `privateKey` | `Uint8Array` | `undefined` |

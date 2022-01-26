@@ -130,7 +130,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L28)
+[packages/core/src/environment.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L27)
 
 ___
 
@@ -424,7 +424,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L42)
+[packages/core/src/environment.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L41)
 
 ___
 
@@ -438,4 +438,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L36)
+[packages/core/src/environment.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L35)
