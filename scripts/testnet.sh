@@ -54,9 +54,9 @@ fund_if_empty() {
 
   # start funding in sequence (nonce-tracker will not be able to keep track of nonce in two processes)
   # we need to use yarn explicitely to ensure packages can be resolved properly
-  local fundNativeCmd="PRIVATE_KEY=${FUNDING_PRIV_KEY} yarn --silent run ts-node ${mydir}/fund-address.ts \
+  local fundNativeCmd="yarn --silent run ts-node ${mydir}/fund-address.ts \
 	  --environment ${environment} --address ${address} --targetERC20 ${min_funds_hopr} --targetNative ${min_funds}"
-  try_cmd "${fundNativeCmd}" 3
+  PRIVATE_KEY=${FUNDING_PRIV_KEY} try_cmd "${fundNativeCmd}" 3
 }
 
 # $1=IP
