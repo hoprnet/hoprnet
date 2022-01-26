@@ -310,16 +310,19 @@ jobs:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
-
-      - name: Run deploy script for public nodes
-        if: ${{ !env.ACT }}
+        
+      - name: Initialize, install packages and build
         run: |
           # get latest version
           git pull
           # need to install tools first which may be used during deployment
           yarn
-          # need to build our packages which might by used by the scripts
+          # need to build our packages which might by used by the scripts, such as the fund script
           yarn build
+
+      - name: Run deploy script for public nodes
+        if: ${{ !env.ACT }}
+        run: |
           ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 3
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
@@ -329,12 +332,6 @@ jobs:
       - name: Run deploy script for nodes behind NAT
         if: ${{ !env.ACT }}
         run: |
-          # get latest version
-          git pull
-          # need to install tools first which may be used during deployment
-          yarn
-          # need to build our packages which might by used by the scripts
-          yarn build
           ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd-nat" 2 "-nat"
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
