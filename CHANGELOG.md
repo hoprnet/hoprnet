@@ -1,6 +1,6 @@
 <a name="1.86"></a>
 
-## [1.86]
+## [1.86](https://github.com/hoprnet/hoprnet/compare/release/budapest...hoprnet:release/athens) (2022-01-26)
 
 ### Changes
 
