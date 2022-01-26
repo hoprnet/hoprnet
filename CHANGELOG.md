@@ -13,7 +13,7 @@
 - Added simulated NAT to E2E tests ([#3237](https://github.com/hoprnet/hoprnet/pull/3237))
 - Automatic deployment of NAT nodes to GCloud ([#3165](https://github.com/hoprnet/hoprnet/issues/3165))
 - Automatically extend TTL of relay tokens in the DHT ([#3304](https://github.com/hoprnet/hoprnet/issues/3304))
-- Do not dial localhost unless the port is different from the one's we're listening on ([#3321](https://github.com/hoprnet/hoprnet/pull/3321))
+- Do not dial localhost unless the port is different from the ones we're listening on ([#3321](https://github.com/hoprnet/hoprnet/pull/3321))
 
 ---
 
