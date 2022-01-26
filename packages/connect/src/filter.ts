@@ -160,8 +160,9 @@ export class Filter {
     // Allow to dial localhost only if the port is different from all of those we're listening on
     if (
       isLocalhost(address.address, address.type) &&
-      this.announcedAddrs.some((announced) => announced.type === address.type
+      this.announcedAddrs.some((announced) => announced.type != 'p2p'
         && isLocalhost(announced.address, announced.type)
+        && announced.type === address.type
         && announced.port == address.port)
     ) {
       // Do not log anything to prevent too much log pollution
