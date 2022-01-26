@@ -70,19 +70,19 @@ npm install @hoprnet/hoprd@1.73
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-goerli` tag represents the `master` branch, while the `budapest` tag
+The `master-goerli` tag represents the `master` branch, while the `athens` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:budapest
+docker pull gcr.io/hoprassociation/hoprd:athens
 ```
 
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:budapest'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:athens'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -124,28 +124,28 @@ $ hoprd --help
 Options:
   --help                        Show help  [boolean]
   --version                     Show version number  [boolean]
-  --environment                 Environment id which the node shall run on  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest"] [default: ""]
-  --host                        The network host to run the HOPR node on.  [default: "0.0.0.0:9091"]
+  --environment                 Environment id which the node shall run on  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens"] [default: ""]
+  --host                        The network host to run the HOPR node on.  [string] [default: "0.0.0.0:9091"]
   --announce                    Announce public IP to the network  [boolean] [default: false]
   --admin                       Run an admin interface on localhost:3000, requires --apiToken  [boolean] [default: false]
   --rest                        Expose the Rest API on localhost:3001, requires --apiToken  [boolean] [default: false]
-  --restHost                    Updates the host for the rest server  [default: "localhost"]
-  --restPort                    Updates the port for the rest server  [default: 3001]
+  --restHost                    Set host IP to which the Rest API server will bind  [string] [default: "localhost"]
+  --restPort                    Set host port to which the Rest API server will bind  [number] [default: 3001]
   --healthCheck                 Run a health check end point on localhost:8080  [boolean] [default: false]
-  --healthCheckHost             Updates the host for the healthcheck server  [default: "localhost"]
-  --healthCheckPort             Updates the port for the healthcheck server  [default: 8080]
+  --healthCheckHost             Updates the host for the healthcheck server  [string] [default: "localhost"]
+  --healthCheckPort             Updates the port for the healthcheck server  [number] [default: 8080]
   --forwardLogs                 Forwards all your node logs to a public available sink  [boolean] [default: false]
-  --forwardLogsProvider         A provider url for the logging sink node to use  [default: "https://ceramic-clay.3boxlabs.com"]
-  --password                    A password to encrypt your keys  [default: ""]
+  --forwardLogsProvider         A provider url for the logging sink node to use  [string] [default: "https://ceramic-clay.3boxlabs.com"]
+  --password                    A password to encrypt your keys  [string] [default: ""]
   --apiToken                    A REST API token and admin panel password for user authentication  [string]
   --privateKey                  A private key to be used for your HOPR node  [string]
-  --identity                    The path to the identity file  [default: "$HOME/.hopr-identity"]
-  --run                         Run a single hopr command, same syntax as in hopr-admin  [default: ""]
+  --identity                    The path to the identity file  [string] [default: "/home/tino/.hopr-identity"]
+  --run                         Run a single hopr command, same syntax as in hopr-admin  [string] [default: ""]
   --dryRun                      List all the options used to run the HOPR node, but quit instead of starting  [boolean] [default: false]
-  --data                        manually specify the database directory to use  [default: ""]
+  --data                        manually specify the database directory to use  [string] [default: ""]
   --init                        initialize a database if it doesn't already exist  [boolean] [default: false]
-  --adminHost                   Host to listen to for admin console  [default: "localhost"]
-  --adminPort                   Port to listen to for admin console  [default: 3000]
+  --adminHost                   Host to listen to for admin console  [string] [default: "localhost"]
+  --adminPort                   Port to listen to for admin console  [string] [default: 3000]
   --testAnnounceLocalAddresses  For testing local testnets. Announce local addresses.  [boolean] [default: false]
   --testPreferLocalAddresses    For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
   --testUseWeakCrypto           weaker crypto for faster node startup  [boolean] [default: false]
@@ -437,7 +437,7 @@ script to the creation script:
 ```sh
 ./scripts/setup-gcloud-cluster.sh \
   my-custom-cluster-without-name \
-  gcr.io/hoprassociation/hoprd:budapest \
+  gcr.io/hoprassociation/hoprd:athens \
   `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
 
