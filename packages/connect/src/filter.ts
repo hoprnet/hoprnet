@@ -162,7 +162,7 @@ export class Filter {
       isLocalhost(address.address, address.type) &&
       this.announcedAddrs.some(
         (announced) =>
-          announced.type != 'p2p' &&
+          announced.type !== 'p2p' &&
           isLocalhost(announced.address, announced.type) &&
           announced.type === address.type &&
           announced.port == address.port
