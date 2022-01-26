@@ -183,6 +183,19 @@ describe('test addr filtering', function () {
     )
   })
 
+  it('dial localhost', function () {
+    filter.setAddrs(
+      [new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`)],
+      [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${firstPeer.toB58String()}`)]
+    )
+
+    assert(filter.addrsSet)
+
+    assert(filter.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${secondPeer.toB58String()}`)) == false)
+
+    assert(filter.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/456/p2p/${secondPeer.toB58String()}`)) == true)
+  })
+
   it('invalid addresses & invalid ports', function () {
     filter.setAddrs(
       [new Multiaddr(`/ip4/1.1.1.1/tcp/123/p2p/${firstPeer.toB58String()}`)],
