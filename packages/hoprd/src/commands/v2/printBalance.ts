@@ -1,7 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { AbstractCommand } from './abstractCommand'
-import { styleValue } from './utils'
-import { CommandE } from './v2'
+import { CommandE, isError } from '.'
+import { AbstractCommand } from '../abstractCommand'
+import { styleValue } from '../utils'
+import { getBalances } from './logic/balance'
 
 export default class PrintBalance extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -22,18 +23,20 @@ export default class PrintBalance extends AbstractCommand {
    */
   public async execute(log): Promise<void> {
     const hoprPrefix = 'HOPR Balance:'
-    const hoprBalance = (await this.node.getBalance()).toFormattedString()
-
     const nativePrefix = 'ETH Balance:'
-    const nativeBalance = (await this.node.getNativeBalance()).toFormattedString()
+
+    const balances = await getBalances(this.node)
+    if (isError(balances)) {
+      return log('Error getting balances')
+    }
 
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 
     // TODO: use 'NativeBalance' and 'Balance' to display currencies
     return log(
       [
-        `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')}`,
-        `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')}`
+        `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(balances.hopr, 'number')}`,
+        `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(balances.native, 'number')}`
       ].join('\n')
     )
   }
