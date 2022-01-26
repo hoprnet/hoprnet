@@ -1,7 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { AbstractCommand, GlobalState } from './abstractCommand'
-import { checkPeerIdInput, getPaddingLength, styleValue } from './utils'
-import { CommandE } from './v2'
+import { CommandE } from '.'
+import { AbstractCommand, GlobalState } from '../abstractCommand'
+import { getPaddingLength, styleValue } from '../utils'
+import { setAlias } from './logic/alias'
 
 export class Alias extends AbstractCommand {
   private parameters = ['PeerId', 'Name']
@@ -21,13 +22,13 @@ export class Alias extends AbstractCommand {
   async execute(log, query: string, state: GlobalState): Promise<void> {
     // view aliases
     if (!query) {
-      const names = Array.from(state.aliases.keys()).map((name) => `${name} -> `)
-
       // no aliases found
-      if (names.length === 0) {
+      if (state.aliases.size === 0) {
         return log(`No aliases found.\nTo set an alias use, ${this.usage(this.parameters)}`)
       }
 
+      // NOTE: this one can be aslo extracted as getAllAliases function and put into v2 pureLogic folder
+      const names = Array.from(state.aliases.keys()).map((name) => `${name} -> `)
       const peerIds = Array.from(state.aliases.values())
       const paddingLength = getPaddingLength(names, false)
 
@@ -43,13 +44,7 @@ export class Alias extends AbstractCommand {
     const [error, id, name] = this._assertUsage(query, this.parameters)
     if (error) return log(styleValue(error, 'failure'))
 
-    try {
-      let peerId = checkPeerIdInput(id)
-      state.aliases.set(name, peerId)
-
-      return log(`Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`)
-    } catch (error) {
-      return log(styleValue(error.message, 'failure'))
-    }
+    setAlias({ peerId: id, alias: name, state, log })
+    return
   }
 }

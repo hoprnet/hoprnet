@@ -11,11 +11,14 @@ import type { Application, Request } from 'express'
 import type Hopr from '@hoprnet/hopr-core'
 
 import type { LogStream } from './../logs'
+import { CommandsV2 } from '../commands/v2'
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
 export default function setupApiV2(service: Application, urlPath: string, node: Hopr, logs: LogStream, options: any) {
+  const commandsV2 = new CommandsV2(node)
+
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
 
@@ -25,7 +28,7 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
   // assign internal objects to each requests so they can be accessed within
   // handlers
   service.use(urlPath, (req, _res, next) => {
-    req.context = new Context(node, logs)
+    req.context = new Context(node, logs, commandsV2)
     next()
   })
   // because express-openapi uses relative paths we need to figure out where
@@ -104,7 +107,7 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
 // In order to pass custom objects along with each request we build a context
 // which is attached during request processing.
 export class Context {
-  constructor(public node: Hopr, public logs: LogStream) {}
+  constructor(public node: Hopr, public logs: LogStream, public commands?: CommandsV2) {}
 }
 
 declare global {
