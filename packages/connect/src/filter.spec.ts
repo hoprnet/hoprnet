@@ -185,7 +185,10 @@ describe('test addr filtering', function () {
 
   it('dial localhost', function () {
     filter.setAddrs(
-      [new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`)],
+      [
+        new Multiaddr(`/ip4/127.0.0.1/tcp/123/p2p/${firstPeer.toB58String()}`),
+        new Multiaddr(`/p2p/${secondPeer.toB58String()}/p2p-circuit/p2p/${firstPeer.toB58String()}`)
+      ],
       [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${firstPeer.toB58String()}`)]
     )
 
