@@ -126,8 +126,12 @@ async function main() {
     })
     .parseSync()
 
+  if (!argv.targetERC20 && !argv.targetNative) {
+    console.error(`Running fund script without a fund option.`)
+    process.exit(1)
+  }
+
   const environment = resolveEnvironment(argv.environment)
-  console.log(environment, argv)
   if (!environment) {
     console.error(`Cannot find environment ${environment}`)
     process.exit(1)
@@ -160,11 +164,6 @@ async function main() {
 
   if (argv.targetNative) {
     await fundNative(chain, sender, argv.address, argv.targetNative)
-  }
-
-  if (!argv.targetERC20 && !argv.targetNative) {
-    console.error(`Running fund script without a fund option.`)
-    process.exit(1)
   }
 }
 
