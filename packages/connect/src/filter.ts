@@ -143,14 +143,6 @@ export class Filter {
       return false
     }
 
-    // Allow to dial localhost only if the port is different from all of those we're listening on
-    if (isLocalhost(address.address, address.type) && this.announcedAddrs != undefined &&
-       this.announcedAddrs.some((announced) => announced.type == address.type && announced.port == address.port))
-    {
-      // Do not log anything to prevent too much log pollution
-      return false;
-    }
-
     assert(this.announcedAddrs != undefined && this.listeningFamilies != undefined)
 
     if (!this.listeningFamilies.includes(address.type)) {
@@ -162,6 +154,14 @@ export class Filter {
     if (INVALID_PORTS.includes(address.port)) {
       log(`Tried to dial invalid port ${address.port}`)
       return false
+    }
+
+    // Allow to dial localhost only if the port is different from all of those we're listening on
+    if (isLocalhost(address.address, address.type) &&
+      this.announcedAddrs.some((announced) => announced.type == address.type && announced.port == address.port))
+    {
+      // Do not log anything to prevent too much log pollution
+      return false;
     }
 
     // Allow multiple nodes on same host - independent of address type
