@@ -647,9 +647,9 @@ class Hopr extends EventEmitter {
   public async ping(destination: PeerId): Promise<{ info?: string; latency: number }> {
     let start = Date.now()
     try {
-      const success = await this.heartbeat.pingNode(destination)
-      if (success) {
-        return { latency: Date.now() - start }
+      const pingResult = await this.heartbeat.pingNode(destination)
+      if (pingResult.lastSeen >= 0) {
+        return { latency: pingResult.lastSeen - start }
       } else {
         return { info: 'failure', latency: -1 }
       }
