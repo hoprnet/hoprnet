@@ -36,17 +36,39 @@ describe('test PeerStore', async function () {
     assert(networkPeers.qualityOf(id) < Q, 'initial peers have low quality')
     assert(networkPeers.length() === 1)
 
-    await networkPeers.ping(id, () => Promise.resolve(true)) // 0.3
-    await networkPeers.ping(id, () => Promise.resolve(true)) // 0.4
-    await networkPeers.ping(id, () => Promise.resolve(true)) // 0.5
-    await networkPeers.ping(id, () => Promise.resolve(true)) // 0.6
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.3
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.4
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.5
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.6
     assert(networkPeers.qualityOf(id) > Q, 'after 4 successful ping, peer is good quality')
 
-    await networkPeers.ping(id, () => Promise.resolve(false)) //0.5
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: -1
+    }) // 0.5
     assert(networkPeers.qualityOf(id) <= Q, 'after 1 failed pings, peer is bad quality')
 
-    await networkPeers.ping(id, () => Promise.resolve(true))
-    await networkPeers.ping(id, () => Promise.resolve(true))
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.5
+
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    }) // 0.6
     assert(networkPeers.qualityOf(id) > Q, 'after 2 more pings, peer is good again')
   })
 
@@ -64,13 +86,22 @@ describe('test PeerStore', async function () {
     console.log('at start', networkPeers.debugLog())
 
     while (networkPeers.qualityOf(id) <= NETWORK_QUALITY_THRESHOLD) {
-      await networkPeers.ping(id, () => Promise.resolve(true))
+      networkPeers.updateRecord({
+        destination: id,
+        lastSeen: Date.now()
+      })
     }
 
-    await networkPeers.ping(id, () => Promise.resolve(true))
+    networkPeers.updateRecord({
+      destination: id,
+      lastSeen: Date.now()
+    })
 
     while (networkPeers.qualityOf(id) >= NETWORK_QUALITY_THRESHOLD) {
-      await networkPeers.ping(id, () => Promise.resolve(false))
+      networkPeers.updateRecord({
+        destination: id,
+        lastSeen: -1
+      })
     }
 
     console.log('at end', networkPeers.debugLog())

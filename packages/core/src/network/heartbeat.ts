@@ -133,7 +133,6 @@ export default class Heartbeat {
       .pingSince(thresholdTime)
       .map<[destination: PeerId, signal: AbortSignal]>((peerToPing: PeerId) => [peerToPing, abort.signal])
 
-    console.log(`pingWork`, pingWork)
     const pingResults = await nAtATime(this._pingNode, pingWork, this.config.maxParallelHeartbeats)
 
     finished = true
