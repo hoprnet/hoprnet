@@ -50,7 +50,7 @@
     "@types/mocha": "9.1.0",
     "@types/pino": "7.0.4",
     "bl": "5.0.0",
-    "chai": "4.3.4",
+    "chai": "4.3.6",
     "libp2p": "0.35.8",
     "libp2p-kad-dht": "0.27.6",
     "libp2p-mplex": "0.10.7",
