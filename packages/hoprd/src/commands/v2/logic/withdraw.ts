@@ -23,14 +23,15 @@ const validateWithdrawArgs = async ({
 }): Promise<WithdrawArgs | Error> => {
   const validCurrency = currency.toUpperCase() as 'NATIVE' | 'HOPR'
   if (!['NATIVE', 'HOPR'].includes(validCurrency)) {
-    log(
-      styleValue(`Incorrect currency provided: '${validCurrency}', correct options are: 'native', 'hopr'.`, 'failure')
-    )
+    log &&
+      log(
+        styleValue(`Incorrect currency provided: '${validCurrency}', correct options are: 'native', 'hopr'.`, 'failure')
+      )
     return new Error('incorrectCurrency')
   }
 
   if (isNaN(Number(amount))) {
-    log(styleValue(`Incorrect amount provided: '${amount}'.`, 'failure'))
+    log && log(styleValue(`Incorrect amount provided: '${amount}'.`, 'failure'))
     return new Error('incorrectAmount')
   }
 
@@ -75,12 +76,13 @@ export const withdraw = async ({
   const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
   const receipt = await node.withdraw(currency, recipient, weiAmount)
 
-  log(
-    `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(recipient, 'peerId')}, receipt ${styleValue(
-      receipt,
-      'hash'
-    )}.`
-  )
+  log &&
+    log(
+      `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
+        recipient,
+        'peerId'
+      )}, receipt ${styleValue(receipt, 'hash')}.`
+    )
 
   return
 }

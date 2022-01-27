@@ -16,9 +16,9 @@ export const setAlias = ({
     let validPeerId = checkPeerIdInput(peerId)
     state.aliases.set(alias, validPeerId)
 
-    log(`Set alias '${styleValue(alias, 'highlight')}' to '${styleValue(validPeerId.toB58String(), 'peerId')}'.`)
+    log && log(`Set alias '${styleValue(alias, 'highlight')}' to '${styleValue(validPeerId.toB58String(), 'peerId')}'.`)
   } catch (error) {
-    log(styleValue(error.message, 'failure'))
+    log && log(styleValue(error.message, 'failure'))
     return new Error('invalidPeerId')
   }
 }

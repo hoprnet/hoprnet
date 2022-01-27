@@ -3,7 +3,7 @@ import type PeerId from 'peer-id'
 import { OpenChannel } from './openChannel'
 import PrintBalance from './printBalance'
 import Withdraw from './withdraw'
-import { Alias } from './getAlias'
+import { Alias } from './alias'
 import { AbstractCommand, GlobalState } from '../abstractCommand'
 
 export enum CommandE {
