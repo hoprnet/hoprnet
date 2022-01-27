@@ -29,7 +29,7 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.0",
-    "express": "4.17.1",
+    "express": "4.17.2",
     "multiaddr": "^10.0.1",
     "peer-id": "^0.16.0",
     "yargs": "17.3.1"
