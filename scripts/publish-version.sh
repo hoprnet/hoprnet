@@ -75,7 +75,7 @@ done
 log "creating new version ${current_version} + ${version_type}"
 
 # create new version in each package
-yarn workspaces foreach -pv \
+ yarn workspaces foreach -piv --topological-dev \
   --exclude hoprnet --exclude hopr-docs \
   exec -- npm version ${version_type} --preid=next
 declare new_version
