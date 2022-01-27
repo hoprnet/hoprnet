@@ -25,6 +25,7 @@ export type HeartbeatConfig = {
   maxParallelHeartbeats: number
   heartbeatVariance: number
   heartbeatInterval: number
+  heartbeatThreshold: number
 }
 
 export default class Heartbeat {
@@ -47,6 +48,7 @@ export default class Heartbeat {
       heartbeatDialTimeout: config?.heartbeatDialTimeout ?? HEARTBEAT_TIMEOUT,
       heartbeatRunTimeout: config?.heartbeatRunTimeout ?? HEARTBEAT_RUN_TIMEOUT,
       heartbeatInterval: config?.heartbeatInterval ?? HEARTBEAT_INTERVAL,
+      heartbeatThreshold: config?.heartbeatThreshold ?? HEARTBEAT_INTERVAL,
       heartbeatVariance: config?.heartbeatVariance ?? HEARTBEAT_INTERVAL_VARIANCE,
       maxParallelHeartbeats: config?.maxParallelHeartbeats ?? MAX_PARALLEL_HEARTBEATS
     }
@@ -86,6 +88,10 @@ export default class Heartbeat {
       })
     } catch (err) {
       log(`Connection to ${destination.toB58String()} failed: ${err?.message}`)
+      return {
+        destination,
+        lastSeen: -1
+      }
     }
 
     if (pingResponse == null || pingResponse.length != 1 || !u8aEquals(expectedResponse, pingResponse[0])) {
@@ -108,7 +114,7 @@ export default class Heartbeat {
    * Performs a ping request to all nodes who were not seen since the threshold
    */
   protected async checkNodes(): Promise<void> {
-    const thresholdTime = Date.now() - this.config.heartbeatInterval
+    const thresholdTime = Date.now() - this.config.heartbeatThreshold
     log(`Checking nodes since ${thresholdTime} (${new Date(thresholdTime).toLocaleString()})`)
 
     const abort = new AbortController()
@@ -127,6 +133,7 @@ export default class Heartbeat {
       .pingSince(thresholdTime)
       .map<[destination: PeerId, signal: AbortSignal]>((peerToPing: PeerId) => [peerToPing, abort.signal])
 
+    console.log(`pingWork`, pingWork)
     const pingResults = await nAtATime(this._pingNode, pingWork, this.config.maxParallelHeartbeats)
 
     finished = true
@@ -160,8 +167,6 @@ export default class Heartbeat {
       // Prevent nodes from querying each other at the very same time
       () => randomInteger(this.config.heartbeatInterval, this.config.heartbeatInterval + this.config.heartbeatVariance)
     )
-
-    setTimeout(periodicCheck)
   }
 
   public start() {
