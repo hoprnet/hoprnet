@@ -8,7 +8,7 @@ export const GET: Operation = [
   async (req, res, _next) => {
     const { commands } = req.context
 
-    const balances = getBalances(commands.node)
+    const balances = await getBalances(commands.node)
     if (isError(balances)) {
       return res.status(500).send({ status: 'failure' })
     } else {

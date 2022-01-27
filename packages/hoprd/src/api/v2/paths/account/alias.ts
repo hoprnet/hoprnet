@@ -123,24 +123,6 @@ POST.apiDoc = {
       }
     }
   },
-  // parameters: [
-  //   {
-  //     name: 'body',
-  //     in: 'body',
-  //     required: true,
-  //     schema: {
-  //       type: 'object',
-  //       properties: {
-  //         peerId: { type: 'string', description: 'PeerId that we want to set alias to.' },
-  //         alias: { type: 'string', description: 'Alias that we want to attach to peerId.' }
-  //       },
-  //       example: {
-  //         peerId: '0x2C505741584f8591e261e59160D0AED5F74Dc29b',
-  //         alias: 'john'
-  //       }
-  //     }
-  //   }
-  // ],
   responses: {
     '200': {
       description: 'Alias set succesfully',
