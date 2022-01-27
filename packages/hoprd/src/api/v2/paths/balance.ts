@@ -19,7 +19,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description: 'Returns your current HOPR and native balance',
-  tags: ['account'],
+  tags: ['balance'],
   operationId: 'getBalance',
   parameters: [],
   responses: {
@@ -28,15 +28,14 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse',
-            additionalProperties: {
-              properties: {
-                balances: {
-                  type: 'object',
-                  properties: {
-                    native: { type: 'string', example: '1' },
-                    hopr: { type: 'string', example: '10' }
-                  }
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: 'success' },
+              balances: {
+                type: 'object',
+                properties: {
+                  native: { type: 'string', example: '1' },
+                  hopr: { type: 'string', example: '10' }
                 }
               }
             }

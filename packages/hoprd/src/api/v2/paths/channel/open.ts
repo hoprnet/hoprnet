@@ -34,11 +34,10 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse',
-            additionalProperties: {
-              properties: {
-                channelId: { type: 'string', example: '7b379578588920ca78fbf' }
-              }
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: 'success' },
+              channelId: { type: 'string', example: '7b379578588920ca78fbf' }
             }
           }
         }
@@ -60,12 +59,11 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse',
-            additionalProperties: {
-              properties: {
-                tokensRequired: { type: 'string', example: '10' },
-                currentBalance: { type: 'string', example: '9' }
-              }
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: 'success' },
+              tokensRequired: { type: 'string', example: '10' },
+              currentBalance: { type: 'string', example: '9' }
             }
           }
         }

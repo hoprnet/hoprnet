@@ -1,6 +1,6 @@
 import { Operation } from 'express-openapi'
-import { isError } from '../../../commands/v2'
-import { getAlias, setAlias } from '../../../commands/v2/logic/alias'
+import { isError } from '../../../../commands/v2'
+import { getAlias, setAlias } from '../../../../commands/v2/logic/alias'
 
 export const parameters = []
 
@@ -32,7 +32,10 @@ GET.apiDoc = {
       in: 'query',
       description: 'PeerId that we want to fetch aliases for',
       required: true,
-      type: 'string'
+      schema: {
+        type: 'string',
+        example: 'examplePeerId'
+      }
     }
   ],
   responses: {
@@ -41,10 +44,14 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse',
-            additionalProperties: {
-              properties: {
-                aliases: { type: [], example: ['alias1'] }
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: 'success' },
+              aliases: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Aliases for given peerId',
+                example: ['alias1']
               }
             }
           }
@@ -58,7 +65,7 @@ GET.apiDoc = {
           schema: {
             $ref: '#/components/schemas/StatusResponse'
           },
-          example: { status: 'noAliasProvided' }
+          example: { status: 'noPeerIdProvided' }
         }
       }
     },
@@ -88,7 +95,7 @@ export const POST: Operation = [
 
     const aliases = setAlias({ alias, peerId, state: commands.state })
     if (isError(aliases)) {
-      return res.status(404).send({ status: 'invalidPeerId' })
+      return res.status(400).send({ status: 'invalidPeerId' })
     } else {
       return res.status(200).send({ status: 'success', aliases })
     }
@@ -96,34 +103,51 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Get the native and hopr addresses of the account associated with the node',
+  description: 'Alias an address with a more memorable name',
   tags: ['account'],
   operationId: 'setAlias',
-  parameters: [
-    {
-      name: 'body',
-      in: 'body',
-      required: true,
-      schema: {
-        type: 'object',
-        properties: {
-          peerId: { type: 'string', description: 'PeerId that we want to set alias to.' },
-          alias: { type: 'string', description: 'Alias that we want to attach to peerId.' }
-        },
-        example: {
-          peerId: '0x2C505741584f8591e261e59160D0AED5F74Dc29b',
-          alias: 'john'
+  requestBody: {
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            peerId: { type: 'string', description: 'PeerId that we want to set alias to.' },
+            alias: { type: 'string', description: 'Alias that we want to attach to peerId.' }
+          },
+          example: {
+            peerId: '0x2C505741584f8591e261e59160D0AED5F74Dc29b',
+            alias: 'john'
+          }
         }
       }
     }
-  ],
+  },
+  // parameters: [
+  //   {
+  //     name: 'body',
+  //     in: 'body',
+  //     required: true,
+  //     schema: {
+  //       type: 'object',
+  //       properties: {
+  //         peerId: { type: 'string', description: 'PeerId that we want to set alias to.' },
+  //         alias: { type: 'string', description: 'Alias that we want to attach to peerId.' }
+  //       },
+  //       example: {
+  //         peerId: '0x2C505741584f8591e261e59160D0AED5F74Dc29b',
+  //         alias: 'john'
+  //       }
+  //     }
+  //   }
+  // ],
   responses: {
     '200': {
       description: 'Alias set succesfully',
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/Address'
+            $ref: '#/components/schemas/StatusResponse'
           }
         }
       }
@@ -133,10 +157,10 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/Address'
+            $ref: '#/components/schemas/StatusResponse'
           },
           example: {
-            status: 'invalidPeerId'
+            status: 'invalidPeerId | missingBodyfields'
           }
         }
       }
