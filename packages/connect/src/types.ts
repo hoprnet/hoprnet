@@ -59,7 +59,7 @@ export type StreamResult = IteratorResult<StreamType>
 
 export type HoprConnectOptions = {
   publicNodes?: PublicNodesEmitter
-  allowLocalConnections?: boolean,
+  allowLocalConnections?: boolean
   initialNodes?: PeerStoreType[]
   interface?: string
   maxRelayedConnections?: number
