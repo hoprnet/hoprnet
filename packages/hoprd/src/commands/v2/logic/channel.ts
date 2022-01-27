@@ -27,14 +27,28 @@ export const openChannel = async ({
     return new Error('InvalidPeerId')
   }
 
-  const amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
-  const myAvailableTokens = await node.getBalance()
+  let amountToFund: BN
+  let myAvailableTokens: Balance
+  try {
+    amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
+    myAvailableTokens = await node.getBalance()
+  } catch (error) {
+    log && log('Invalid amount to fund')
+    return new Error('invalidAmountToFund')
+  }
+
   if (amountToFund.lten(0)) {
     log && log(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
-    return new Error('InvalidAmountToFund')
+    return new Error('invalidAmountToFund')
   } else if (amountToFund.gt(myAvailableTokens.toBN())) {
     log && log(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
-    return new Error('notEnoughFunds')
+    return new Error(
+      JSON.stringify({
+        status: 'notEnoughFunds',
+        tokensRequired: amountToFund.toString(10),
+        currentBalance: myAvailableTokens.toBN().toString(10)
+      })
+    )
   }
 
   log && log('Opening channel...')
@@ -42,9 +56,9 @@ export const openChannel = async ({
   try {
     const { channelId } = await node.openChannel(counterparty, amountToFund)
     log && log(`${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`)
-    return
+    return channelId.toHex()
   } catch (err) {
     log && log(styleValue(err.message, 'failure'))
-    return new Error('failure')
+    return new Error(err.message.includes('Channel is already opened') ? 'channelAlreadyOpen' : 'failure')
   }
 }
