@@ -18,6 +18,7 @@ import { parseAddress } from './utils'
 import Debug from 'debug'
 import { green } from 'chalk'
 import assert from 'assert'
+import { HoprConnectOptions } from './types'
 
 const log = Debug('hopr-connect:filter')
 
@@ -29,7 +30,7 @@ export class Filter {
 
   protected myPrivateNetworks: Network[]
 
-  constructor(private peerId: PeerId) {
+  constructor(private peerId: PeerId, private opts: HoprConnectOptions) {
     this.myPrivateNetworks = getPrivateAddresses()
   }
 
@@ -141,6 +142,12 @@ export class Filter {
 
     if (address.node != undefined && u8aEquals(address.node, this.peerId.marshalPubKey())) {
       log(`Prevented self-dial. Used addr: ${ma.toString()}`)
+      return false
+    }
+
+    // If localhost connections are explicitly allowed, do not dial it
+    if (isLocalhost(address.address, address.type) && !(this.opts.allowLocalConnections ?? false)) {
+      // Do not pollute logs by rejecting localhost connections attempts
       return false
     }
 
