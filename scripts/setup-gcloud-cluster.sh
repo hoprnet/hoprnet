@@ -103,21 +103,24 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
 fi
 # }}}
 
-# create test specific instance template
-# announce on-chain with routable address
-gcloud_create_or_update_instance_template \
-  "${cluster_id}" \
-  "${docker_image}" \
-  "${environment}" \
-  "${api_token}" \
-  "${password}" \
-  "true"
+if [ "${skip_setup}" != "true" ]; then
 
-# start nodes
-gcloud_create_or_update_managed_instance_group  \
-  "${cluster_id}" \
-  ${cluster_size} \
-  "${cluster_id}"
+  # create test specific instance template
+  # announce on-chain with routable address
+  gcloud_create_instance_template_if_not_exists \
+    "${cluster_id}" \
+    "${docker_image}" \
+    "${environment}" \
+    "${api_token}" \
+    "${password}"
+    "true"
+
+  # start nodes
+  gcloud_create_or_update_managed_instance_group  \
+    "${cluster_id}" \
+    ${cluster_size} \
+    "${cluster_id}"
+fi
 
 # get IPs of newly started VMs which run hoprd
 declare node_ips
