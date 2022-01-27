@@ -1,54 +1,14 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from '../abstractCommand'
 import { styleValue } from '../utils'
-import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
 import { CommandE } from '.'
+import { withdraw } from './logic/withdraw'
 
 export default class Withdraw extends AbstractCommand {
   private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']
 
   constructor(public node: Hopr) {
     super()
-  }
-
-  /**
-   * Will throw if any of the arguments are incorrect.
-   */
-  private async checkArgs(query: string): Promise<{
-    amount: string
-    weiAmount: string
-    currency: 'NATIVE' | 'HOPR'
-    recipient: string
-  }> {
-    const [err, amount, currencyRaw, recipient] = this._assertUsage(query, this.arguments)
-
-    if (err) {
-      throw new Error(err)
-    }
-
-    const currency = currencyRaw.toUpperCase() as 'NATIVE' | 'HOPR'
-    if (!['NATIVE', 'HOPR'].includes(currency)) {
-      throw new Error(`Incorrect currency provided: '${currency}', correct options are: 'native', 'hopr'.`)
-    }
-
-    if (isNaN(Number(amount))) {
-      throw new Error(`Incorrect amount provided: '${amount}'.`)
-    }
-
-    // @TODO: validate recipient address
-
-    const weiAmount =
-      currency === 'NATIVE'
-        ? moveDecimalPoint(amount, NativeBalance.DECIMALS)
-        : moveDecimalPoint(amount, Balance.DECIMALS)
-
-    return {
-      amount,
-      weiAmount,
-      currency,
-      recipient
-    }
   }
 
   public name(): string {
@@ -65,16 +25,13 @@ export default class Withdraw extends AbstractCommand {
    */
   public async execute(log, query: string): Promise<void> {
     try {
-      const { amount, weiAmount, currency, recipient } = await this.checkArgs(query ?? '')
-      const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
+      const [err, rawAmount, rawCurrency, rawRecipient] = this._assertUsage(query, this.arguments)
 
-      const receipt = await this.node.withdraw(currency, recipient, weiAmount)
-      log(
-        `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
-          recipient,
-          'peerId'
-        )}, receipt ${styleValue(receipt, 'hash')}.`
-      )
+      if (err) {
+        throw new Error(err)
+      }
+
+      await withdraw({ rawCurrency, rawRecipient, rawAmount, node: this.node })
     } catch (err) {
       log(styleValue(err.message, 'failure'))
     }
