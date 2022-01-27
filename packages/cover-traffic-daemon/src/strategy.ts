@@ -40,7 +40,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
   async tick(
     balance: BN,
     currentChannels: ChannelEntry[],
-    peers: any,
+    peers: Hopr['networkPeers'],
     _getRandomChannel: () => Promise<ChannelEntry>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     log(`tick, balance ${balance.toString()}`)
@@ -54,7 +54,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
       if (c.status === ChannelStatus.Closed) {
         continue
       }
-      const q = await peers.qualityOf(c.destination)
+      const q = peers.qualityOf(c.destination.toPeerId())
       ctChannels.push({
         destination: c.destination,
         latestQualityOf: q,
@@ -143,7 +143,7 @@ export class CoverTrafficStrategy extends SaneDefaults {
     ) {
       attempts++
       const c = this.data.weightedRandomChoice()
-      const q = await peers.qualityOf(c)
+      const q = peers.qualityOf(c.toPeerId())
       // Ignore the randomly chosen node, if it's the cover traffic node itself, or a non-closed channel exists
       if (
         ctChannels.find((x) => x.destination.eq(c)) ||
