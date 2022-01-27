@@ -3147,7 +3147,7 @@ __metadata:
     secp256k1: 4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
   languageName: unknown
@@ -3187,7 +3187,7 @@ __metadata:
     secp256k1: 4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
   languageName: unknown
@@ -3213,7 +3213,7 @@ __metadata:
     peer-id: ^0.16.0
     proxyquire: ^2.1.3
     rimraf: 3.0.2
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
     yargs: 17.3.1
@@ -3250,7 +3250,7 @@ __metadata:
     ts-generator: 0.1.1
     ts-node: 10.4.0
     typechain: 6.0.5
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
   languageName: unknown
@@ -3296,7 +3296,7 @@ __metadata:
     secp256k1: 4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
   languageName: unknown
@@ -3343,7 +3343,7 @@ __metadata:
     tiny-hashes: 1.0.1
     trace-unhandled: 2.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
     ws: 8.3.0
@@ -16605,12 +16605,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"marked@npm:^3.0.8":
-  version: 3.0.8
-  resolution: "marked@npm:3.0.8"
+"marked@npm:^4.0.10":
+  version: 4.0.10
+  resolution: "marked@npm:4.0.10"
   bin:
-    marked: bin/marked
-  checksum: 3cdeaa126bbeca5b1b8d2f91e9728018dcd63b250233f3607009a4d70bb6bd9df8c769f1bc52ce9856d1316c91c9dacb1d94d80696f76d094146b4fab126a4eb
+    marked: bin/marked.js
+  checksum: 46cd8ef1a7cfcf5e461727c7f3e16dd4244369ef58f60485e75d3f5df9d53a8249b9609e96a336521eaa5c88d9531cbd296509a148718056e9375e69609f4442
   languageName: node
   linkType: hard
 
@@ -22210,14 +22210,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"shiki@npm:^0.9.12":
-  version: 0.9.15
-  resolution: "shiki@npm:0.9.15"
+"shiki@npm:^0.10.0":
+  version: 0.10.0
+  resolution: "shiki@npm:0.10.0"
   dependencies:
     jsonc-parser: ^3.0.0
     vscode-oniguruma: ^1.6.1
     vscode-textmate: 5.2.0
-  checksum: 58d1e3e106320252b67c63dc1269c4b834152e9c675a06a4565ec41db1c93aea2dd94e22640d7ec99334cb47cd41b914642d936577143b689ef2a0db7d938c13
+  checksum: b72630a56c5e4384128a57443fc188ca8f6cf239c16defb6624b2aa500c0c953d41fb53e49f9d583cf093ddc522ff07e1b19fab8f0ae40a03304805c4fd5894b
   languageName: node
   linkType: hard
 
@@ -24212,20 +24212,20 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.22.10":
-  version: 0.22.10
-  resolution: "typedoc@npm:0.22.10"
+"typedoc@npm:0.22.11":
+  version: 0.22.11
+  resolution: "typedoc@npm:0.22.11"
   dependencies:
     glob: ^7.2.0
     lunr: ^2.3.9
-    marked: ^3.0.8
+    marked: ^4.0.10
     minimatch: ^3.0.4
-    shiki: ^0.9.12
+    shiki: ^0.10.0
   peerDependencies:
     typescript: 4.0.x || 4.1.x || 4.2.x || 4.3.x || 4.4.x || 4.5.x
   bin:
     typedoc: bin/typedoc
-  checksum: 404932ae8e62d1507209d50b635d9d5cefead344e7e84e2d21fc84741fb739e011dcffcf335d6d4e2a31fe45910757b27f11678f6ae5b89514d2f291fe41884e
+  checksum: 7d29f4b771d3eadc612d0b35509ee88c153d7310b7adb57faf0740132765613d6ceceb94877148d674cfc8242ca3c2e22e3ae2060768b2d96842bf14659d1b1c
   languageName: node
   linkType: hard
 
