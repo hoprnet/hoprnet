@@ -105,15 +105,13 @@ msg() {
 # $1 command to execute
 # $2 optional: number of retries, defaults to 0
 # $3 optional: seconds between retries, defaults to 1
-# $4 optional: print command before execution, defaults to false
 try_cmd() {
   local cmd="${1}"
   local retries_left=${2:-0}
   local wait_in_sec="${3:-1}"
-  local verbose="${4:-false}"
   local cmd_exit_code result
 
-  if [ "${verbose}" = "true" ]; then
+  if [ "${HOPR_VERBOSE:-false}" = "true" ]; then
     log "Executing command: ${cmd}"
   fi
 
@@ -141,7 +139,7 @@ try_cmd() {
         sleep ${wait_in_sec}
       fi
       log "Retrying command ${retries_left} more time(s)"
-      try_cmd "${cmd}" ${retries_left} ${wait_in_sec} ${verbose}
+      try_cmd "${cmd}" ${retries_left} ${wait_in_sec}
     fi
   fi
 }
@@ -207,7 +205,7 @@ get_native_address(){
 
   # try every 5 seconds for 5 minutes
   local result
-  result=$(try_cmd "${cmd}" 30 5 true)
+  result=$(try_cmd "${cmd}" 30 5)
 
   echo $(echo ${result} | jq -r ".nativeAddress")
 }
@@ -219,7 +217,7 @@ get_hopr_address() {
 
   # try every 5 seconds for 5 minutes
   local result
-  result=$(try_cmd "${cmd}" 30 5 true)
+  result=$(try_cmd "${cmd}" 30 5)
 
   echo $(echo ${result} | jq -r ".hoprAddress")
 }

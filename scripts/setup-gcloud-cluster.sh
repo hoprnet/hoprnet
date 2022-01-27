@@ -46,6 +46,7 @@ usage() {
   msg "HOPRD_PASSWORD\t\t\tused as password for all nodes, defaults to a random value"
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
+  msg "HOPRD_SKIP_SETUP\t\tset to 'true' to perform post setup operations only, that is funding and setting up topology"
   msg
 }
 
@@ -67,6 +68,7 @@ declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
+declare skip_setup="${HOPRD_SKIP_SETUP:-false}"
 
 # Append environment as Docker image version, if not specified
 [[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${environment}"
