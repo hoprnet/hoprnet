@@ -51,7 +51,9 @@ jobs:
 
       - name: '[BUILD] Install dependencies / link / build'
         run: |
+          # Deploying smart contracts requires hardhat to be installed
           yarn
+          # Deploying with hardhat requires built hopr-utils package
           yarn build
 
       - name: '[SMART-CONTRACTS] Deploy for known environments'
@@ -92,6 +94,7 @@ jobs:
           ./scripts/wait-for-npm-package.sh utils
           ./scripts/wait-for-npm-package.sh ethereum
           ./scripts/wait-for-npm-package.sh cover-traffic-daemon
+          ./scripts/wait-for-npm-package.sh connect
 
       - name: '[FINISH] Send notification if anything failed on master or release branches'
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
