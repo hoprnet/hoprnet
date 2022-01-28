@@ -175,6 +175,7 @@ export class AdminServer {
                 }
               }
             })
+            .catch((err) => this.logs.log(err.message))
         }
       })
 
@@ -186,7 +187,7 @@ export class AdminServer {
     })
   }
 
-  registerNode(node: Hopr, cmds: any, cmds2: CommandsV2, settings?: any) {
+  registerNode(node: Hopr, cmds: any, cmds2: any, settings?: any) {
     this.node = node
     this.cmds = cmds
     this.cmds2 = cmds2

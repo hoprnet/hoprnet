@@ -32,11 +32,7 @@ GET.apiDoc = {
             properties: {
               status: { type: 'string', example: 'success' },
               balances: {
-                type: 'object',
-                properties: {
-                  native: { type: 'string', example: '1' },
-                  hopr: { type: 'string', example: '10' }
-                }
+                $ref: '#/components/schemas/Balance'
               }
             }
           }

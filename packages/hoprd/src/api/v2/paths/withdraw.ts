@@ -34,17 +34,7 @@ POST.apiDoc = {
     content: {
       'application/json': {
         schema: {
-          type: 'object',
-          properties: {
-            currency: { type: 'string', description: 'ETH | HOPR currency to withdraw.' },
-            amount: { type: 'string', description: 'Amount to withdraw.' },
-            recipient: { type: 'string', description: 'Blockchain address to withdraw specified currency to.' }
-          },
-          example: {
-            currency: 'hopr',
-            amount: '1',
-            recipient: '0x2C505741584f8591e261e59160D0AED5F74Dc29b'
-          }
+          $ref: '#/components/schemas/WithdrawRequest'
         }
       }
     }
