@@ -146,7 +146,7 @@ export class Filter {
     }
 
     // If localhost connections are explicitly allowed, do not dial it
-    if (isLocalhost(address.address, address.type) && !(this.opts.allowLocalConnections ?? false)) {
+    if (isLocalhost(address.address, address.type) && !!this.opts.allowLocalConnections) {
       // Do not pollute logs by rejecting localhost connections attempts
       return false
     }
