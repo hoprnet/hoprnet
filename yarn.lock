@@ -3327,7 +3327,7 @@ __metadata:
     jazzicon: 1.5.0
     js-cookie: 3.0.1
     key-did-provider-ed25519: 1.1.0
-    key-did-resolver: 1.4.0
+    key-did-resolver: 1.4.4
     mocha: 9.1.4
     next: 12.0.7
     peer-id: 0.16.0
@@ -15316,15 +15316,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"key-did-resolver@npm:1.4.0":
-  version: 1.4.0
-  resolution: "key-did-resolver@npm:1.4.0"
+"key-did-resolver@npm:1.4.4":
+  version: 1.4.4
+  resolution: "key-did-resolver@npm:1.4.4"
   dependencies:
     "@stablelib/ed25519": ^1.0.2
     multibase: ~4.0.2
     uint8arrays: ^2.0.5
     varint: ^6.0.0
-  checksum: a558900deb8e541b03a78027f5f32431b7369819e7cc0af50c519d9c9acd6b00c4436a2622a81c23a0d00bd69632cfbf7f5814b992b7eaee4a8afefd530041bf
+  checksum: 6faac727d7365f8b3842b78b7510694424e68af531a20603c26ef15cca99b310f64d03f757408acc419af39c3f5e8ba4fbac16addebf523d203c18b891a47f0a
   languageName: node
   linkType: hard
 
