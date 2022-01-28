@@ -93,7 +93,6 @@ describe('test addr filtering', function () {
   })
 
   it('refuse localhost connections', function () {
-
     filter.setAddrs(
       [new Multiaddr(`/ip4/1.1.1.1/tcp/123/p2p/${firstPeer.toB58String()}`)],
       [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${firstPeer.toB58String()}`)]
