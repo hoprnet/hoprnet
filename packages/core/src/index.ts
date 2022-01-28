@@ -80,6 +80,7 @@ export type HoprOptions = {
   dbPath?: string
   createDbIfNotExist?: boolean
   forceCreateDB?: boolean
+  allowLocalConnections?: boolean
   password?: string
   connector?: HoprCoreEthereum
   strategy?: ChannelStrategy
