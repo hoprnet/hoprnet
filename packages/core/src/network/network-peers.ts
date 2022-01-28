@@ -1,6 +1,7 @@
 import { randomSubset } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { NETWORK_QUALITY_THRESHOLD } from '../constants'
+import { type HeartbeatPingResult } from './heartbeat'
 
 type Entry = {
   id: PeerId
@@ -20,8 +21,8 @@ const UNKNOWN_Q = 0.2 // Default quality for nodes we don't know about.
 class NetworkPeers {
   private peers: Entry[]
 
-  private find(peer: PeerId): Entry | undefined {
-    return this.peers.find((x) => x.id.toB58String() === peer.toB58String())
+  private findIndex(peer: PeerId): number {
+    return this.peers.findIndex((entry: Entry) => entry.id.equals(peer))
   }
 
   constructor(
@@ -45,39 +46,63 @@ class NetworkPeers {
   // @returns a float between 0 (completely unreliable) and 1 (completely
   // reliable) estimating the quality of service of a peer's network connection
   public qualityOf(peer: PeerId): number {
-    let entry = this.find(peer)
-    if (entry && entry.heartbeatsSent > 0) {
+    let entryIndex = this.findIndex(peer)
+    if (entryIndex >= 0 && this.peers[entryIndex].heartbeatsSent > 0) {
       /*
       return entry.heartbeatsSuccess / entry.heartbeatsSent
       */
-      return entry.lastTen
+      return this.peers[entryIndex].lastTen
     }
     return UNKNOWN_Q
   }
 
   public pingSince(thresholdTime: number): PeerId[] {
-    return this.peers.filter((entry) => this.nextPing(entry) < thresholdTime).map((x) => x.id)
-  }
-
-  public async ping(peer: PeerId, interaction: (peerID: PeerId) => Promise<boolean>): Promise<void> {
-    const entry = this.find(peer)
-    if (!entry) throw new Error('Cannot ping ' + peer.toB58String())
-
-    entry.heartbeatsSent++
-    entry.lastSeen = Date.now()
-    const result = await interaction(entry.id)
-    if (result) {
-      entry.heartbeatsSuccess++
-      entry.backoff = 2 // RESET - to back down: Math.pow(entry.backoff, 1/BACKOFF_EXPONENT)
-      entry.lastTen = Math.min(1, entry.lastTen + 0.1)
-    } else {
-      entry.lastTen = Math.max(0, entry.lastTen - 0.1)
-      entry.backoff = Math.min(MAX_BACKOFF, Math.pow(entry.backoff, BACKOFF_EXPONENT))
-
-      if (entry.lastTen < NETWORK_QUALITY_THRESHOLD) {
-        this.onPeerOffline?.(peer)
+    const toPing: PeerId[] = []
+    for (const entry of this.peers) {
+      if (this.nextPing(entry) < thresholdTime) {
+        toPing.push(entry.id)
       }
     }
+
+    return toPing
+  }
+
+  public updateRecord(pingResult: HeartbeatPingResult): void {
+    const entryIndex = this.findIndex(pingResult.destination)
+
+    if (entryIndex < 0) {
+      return
+    }
+
+    const previousEntry = this.peers[entryIndex]
+
+    let newEntry: Entry
+
+    if (pingResult.lastSeen >= 0) {
+      newEntry = {
+        id: pingResult.destination,
+        heartbeatsSent: previousEntry.heartbeatsSent + 1,
+        lastSeen: Date.now(),
+        heartbeatsSuccess: previousEntry.heartbeatsSuccess + 1,
+        backoff: 2, // RESET - to back down: Math.pow(entry.backoff, 1/BACKOFF_EXPONENT)
+        lastTen: Math.min(1, previousEntry.lastTen + 0.1)
+      }
+    } else {
+      newEntry = {
+        id: pingResult.destination,
+        heartbeatsSent: previousEntry.heartbeatsSent + 1,
+        lastSeen: Date.now(),
+        heartbeatsSuccess: previousEntry.heartbeatsSuccess,
+        backoff: Math.min(MAX_BACKOFF, Math.pow(previousEntry.backoff, BACKOFF_EXPONENT)),
+        lastTen: Math.max(0, previousEntry.lastTen - 0.1)
+      }
+
+      if (newEntry.lastTen < NETWORK_QUALITY_THRESHOLD) {
+        this.onPeerOffline?.(pingResult.destination)
+      }
+    }
+
+    this.peers[entryIndex] = newEntry
   }
 
   // Get a random sample peers.
@@ -90,7 +115,7 @@ class NetworkPeers {
   }
 
   public register(id: PeerId) {
-    if (!this.find(id) && !this.exclude.find((x) => id.equals(x))) {
+    if (!this.has(id) && this.exclude.findIndex((x: PeerId) => id.equals(x)) < 0) {
       this.peers.push({
         id,
         heartbeatsSent: 0,

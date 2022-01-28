@@ -8,6 +8,17 @@ export type TimeoutOpts = {
   signal?: AbortSignal
 }
 
+/**
+ * Cals the worker function with a timeout. Once the timeout is done
+ * abort the call using an abort controller.
+ * If the caller aims to end the call before the tiemout has happened
+ * it can pass an AbortController and end the call prematurely.
+ * @param fn worker function to dial
+ * @param abortMsg value to be returned if aborted
+ * @param timeoutMsg value to be returned on timeout
+ * @param opts options to pass to worker function
+ * @returns
+ */
 export async function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
   fn: (opts: Required<TimeoutOpts>) => Promise<Result>,
   abortMsg: AbortMsg,
