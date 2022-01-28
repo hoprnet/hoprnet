@@ -24,13 +24,15 @@ usage() {
   msg "an initial setup script against these nodes. Once testing has"
   msg "completed the script can be used to cleanup the cluster as well."
   msg
-  msg "Usage: $0 <environment> [<init_script> [<cluster_id> [<docker_image>]]]"
+  msg "Usage: $0 <environment> [<init_script> [<cluster_id> [<docker_image> [<instance_template_name> [<announce_on_chain>]]]]]"
   msg
   msg "where <environment>\t\tthe environment from which the smart contract addresses are derived"
   msg "      <init_script>\t\tpath to a script which is called with all node API endpoints as parameters"
   msg "      <cluster_id>\t\tuses a random value as default"
   msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:<environment>' as default"
   msg "      <cluster_size>\t\tnumber of nodes in the deployed cluster, default is 6."
+  msg "      <instance_template_name>\t\tname of the gcloud instance template to use, default is <cluster_id>"
+  msg "      <announce_on_chain>\t\tset to 'true' so started nodes should not announce themselves, default is ''"
   msg
   msg "Required environment variables"
   msg "------------------------------"
@@ -58,6 +60,8 @@ declare init_script=${2:-}
 declare cluster_id="${3:-${environment}-topology-${RANDOM}-${RANDOM}}"
 declare docker_image=${4:-gcr.io/hoprassociation/hoprd:${environment}}
 declare cluster_size=${5:-6}
+declare instance_template_name=${6:-${cluster_id}}
+declare announce_on_chain=${7:-}
 
 declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
@@ -76,7 +80,7 @@ function cleanup {
   if [ ${EXIT_CODE} -ne 0 ] || [ "${perform_cleanup}" = "true" ] || [ "${perform_cleanup}" = "1" ]; then
     # Cleaning up everything upon failure
     gcloud_delete_managed_instance_group "${cluster_id}"
-    gcloud_delete_instance_template "${cluster_id}"
+    gcloud_delete_instance_template "${instance_template_name}"
   fi
 
   exit $EXIT_CODE
@@ -94,6 +98,8 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
   log "Pre-Start Info"
   log "\tdocker_image: ${docker_image}"
   log "\tcluster_id: ${cluster_id}"
+  log "\tinstance_template_name: ${instance_template_name}"
+  log "\tannounce_on_chain: ${announce_on_chain}"
   log "\tinit_script: ${init_script}"
   log "\tenvironment: ${environment}"
   log "\tapi_token: ${api_token}"
@@ -103,24 +109,21 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
 fi
 # }}}
 
-if [ "${skip_setup}" != "true" ]; then
+# create test specific instance template
+# announce on-chain with routable address
+gcloud_create_instance_template_if_not_exists \
+  "${instance_template_name}" \
+  "${docker_image}" \
+  "${environment}" \
+  "${api_token}" \
+  "${password}" \
+  "${announce_on_chain}"
 
-  # create test specific instance template
-  # announce on-chain with routable address
-  gcloud_create_instance_template_if_not_exists \
-    "${cluster_id}" \
-    "${docker_image}" \
-    "${environment}" \
-    "${api_token}" \
-    "${password}"
-    "true"
-
-  # start nodes
-  gcloud_create_or_update_managed_instance_group  \
-    "${cluster_id}" \
-    ${cluster_size} \
-    "${cluster_id}"
-fi
+# start nodes
+gcloud_create_or_update_managed_instance_group  \
+  "${cluster_id}" \
+  ${cluster_size} \
+  "${instance_template_name}"
 
 # get IPs of newly started VMs which run hoprd
 declare node_ips

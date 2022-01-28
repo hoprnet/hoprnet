@@ -313,7 +313,7 @@ jobs:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
-        
+
       - name: Initialize, install packages and build
         run: |
           # get latest version
