@@ -83,7 +83,7 @@ export type HoprOptions = {
   allowLocalConnections?: boolean
   password?: string
   connector?: HoprCoreEthereum
-  strategy?: ChannelStrategy,
+  strategy?: ChannelStrategy
   hosts?: {
     ip4?: NetOptions
     ip6?: NetOptions
