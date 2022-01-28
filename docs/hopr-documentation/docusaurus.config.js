@@ -78,6 +78,11 @@ const config = {
             position: 'right'
           },
           {
+            href: 'https://discord.gg/dEAWC4G',
+            label: 'Discord',
+            position: 'right'
+          },
+          {
             href: 'https://t.me/hoprnet',
             label: 'Telegram',
             position: 'right'
