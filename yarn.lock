@@ -3095,7 +3095,7 @@ __metadata:
     "@types/yargs": 17.0.8
     abortable-iterator: 3.0.2
     bl: 5.0.0
-    chai: 4.3.4
+    chai: 4.3.6
     chai-spies: 1.0.0
     debug: 4.3.3
     heap-js: 2.1.6
@@ -3133,7 +3133,7 @@ __metadata:
     "@types/mocha": 9.1.0
     async-mutex: 0.3.2
     bn.js: 5.2.0
-    chai: 4.3.4
+    chai: 4.3.6
     chai-as-promised: 7.1.1
     chalk: 4.1.2
     debug: 4.3.3
@@ -3147,7 +3147,7 @@ __metadata:
     secp256k1: 4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
   languageName: unknown
@@ -3167,7 +3167,7 @@ __metadata:
     "@types/mocha": 9.1.0
     abort-controller: 3.0.0
     bn.js: 5.2.0
-    chai: 4.3.4
+    chai: 4.3.6
     chai-as-promised: 7.1.1
     chalk: 4.1.2
     debug: 4.3.3
@@ -3187,7 +3187,7 @@ __metadata:
     secp256k1: 4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
   languageName: unknown
@@ -3205,7 +3205,7 @@ __metadata:
     "@types/yargs": 17.0.8
     bignumber.js: 9.0.2
     bn.js: 5.2.0
-    chai: 4.3.4
+    chai: 4.3.6
     express: 4.17.1
     mocha: 9.1.4
     multiaddr: ^10.0.1
@@ -3213,7 +3213,7 @@ __metadata:
     peer-id: ^0.16.0
     proxyquire: ^2.1.3
     rimraf: 3.0.2
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
     yargs: 17.3.1
@@ -3237,12 +3237,12 @@ __metadata:
     "@typechain/ethers-v5": 8.0.5
     "@typechain/hardhat": 3.0.0
     bn.js: 5.2.0
-    chai: 4.3.4
+    chai: 4.3.6
     dotenv: 10.0.0
     ethereum-waffle: 3.4.0
     ethers: 5.5.2
     hardhat: 2.8.3
-    hardhat-deploy: 0.9.27
+    hardhat-deploy: 0.9.28
     hardhat-gas-reporter: 1.0.7
     multiaddr: 10.0.1
     rimraf: 3.0.2
@@ -3250,7 +3250,7 @@ __metadata:
     ts-generator: 0.1.1
     ts-node: 10.4.0
     typechain: 6.0.5
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
   languageName: unknown
@@ -3268,7 +3268,7 @@ __metadata:
     bl: 5.0.0
     bn.js: 5.2.0
     bs58: 4.0.1
-    chai: 4.3.4
+    chai: 4.3.6
     chalk: 4.1.2
     debug: 4.3.3
     ethers: 5.5.2
@@ -3296,7 +3296,7 @@ __metadata:
     secp256k1: 4.0.2
     sinon: 12.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
   languageName: unknown
@@ -3343,7 +3343,7 @@ __metadata:
     tiny-hashes: 1.0.1
     trace-unhandled: 2.0.1
     ts-node: 10.4.0
-    typedoc: 0.22.10
+    typedoc: 0.22.11
     typedoc-plugin-markdown: 3.11.12
     typescript: 4.5.5
     ws: 8.3.0
@@ -7827,17 +7827,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chai@npm:4.3.4":
-  version: 4.3.4
-  resolution: "chai@npm:4.3.4"
+"chai@npm:4.3.6":
+  version: 4.3.6
+  resolution: "chai@npm:4.3.6"
   dependencies:
     assertion-error: ^1.1.0
     check-error: ^1.0.2
     deep-eql: ^3.0.1
     get-func-name: ^2.0.0
+    loupe: ^2.3.1
     pathval: ^1.1.1
     type-detect: ^4.0.5
-  checksum: 772c522b3bfe3fcf0e0e74edfe584cd886b0e85a73126dec750095300e023d4e1ec6d40e3c35a80d2bd8f33dca46c42767a36f5f50f32dca6fa31c88b5f49ab8
+  checksum: acff93fd537f96d4a4d62dd83810285dffcfccb5089e1bf2a1205b28ec82d93dff551368722893cf85004282df10ee68802737c33c90c5493957ed449ed7ce71
   languageName: node
   linkType: hard
 
@@ -12872,9 +12873,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hardhat-deploy@npm:0.9.27":
-  version: 0.9.27
-  resolution: "hardhat-deploy@npm:0.9.27"
+"hardhat-deploy@npm:0.9.28":
+  version: 0.9.28
+  resolution: "hardhat-deploy@npm:0.9.28"
   dependencies:
     "@ethersproject/abi": ^5.4.0
     "@ethersproject/abstract-signer": ^5.4.1
@@ -12901,7 +12902,7 @@ __metadata:
   peerDependencies:
     "@ethersproject/hardware-wallets": ^5.0.14
     hardhat: ^2.6.8
-  checksum: 9944fa9d11bd94f11852a77cfc76282e90df45659d9e0bfffb78e24c9417151c4bebc8cf31041c5dec1266813139e2b8af8ccf4f5524a0700f8449b5d6a888bc
+  checksum: f415b20b1956e25caddb62b81926f5890ac8a523cf590b3cbaea9be519e5d7a2e6cea2e1a6547771adf1e5298f01e0ce27ad14b0d1a922878e7f97b044120d05
   languageName: node
   linkType: hard
 
@@ -16430,6 +16431,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"loupe@npm:^2.3.1":
+  version: 2.3.1
+  resolution: "loupe@npm:2.3.1"
+  dependencies:
+    get-func-name: ^2.0.0
+  checksum: 11b4c4c9eb271b60d4d85e2ef344135d9043575e105045d1e08f10c0eca4b753df4dcfd9e1c0cbf7e19b25556dee6da16633005c47b9a925e293867c66b79f45
+  languageName: node
+  linkType: hard
+
 "lower-case@npm:^2.0.2":
   version: 2.0.2
   resolution: "lower-case@npm:2.0.2"
@@ -16605,12 +16615,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"marked@npm:^3.0.8":
-  version: 3.0.8
-  resolution: "marked@npm:3.0.8"
+"marked@npm:^4.0.10":
+  version: 4.0.10
+  resolution: "marked@npm:4.0.10"
   bin:
-    marked: bin/marked
-  checksum: 3cdeaa126bbeca5b1b8d2f91e9728018dcd63b250233f3607009a4d70bb6bd9df8c769f1bc52ce9856d1316c91c9dacb1d94d80696f76d094146b4fab126a4eb
+    marked: bin/marked.js
+  checksum: 46cd8ef1a7cfcf5e461727c7f3e16dd4244369ef58f60485e75d3f5df9d53a8249b9609e96a336521eaa5c88d9531cbd296509a148718056e9375e69609f4442
   languageName: node
   linkType: hard
 
@@ -22210,14 +22220,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"shiki@npm:^0.9.12":
-  version: 0.9.15
-  resolution: "shiki@npm:0.9.15"
+"shiki@npm:^0.10.0":
+  version: 0.10.0
+  resolution: "shiki@npm:0.10.0"
   dependencies:
     jsonc-parser: ^3.0.0
     vscode-oniguruma: ^1.6.1
     vscode-textmate: 5.2.0
-  checksum: 58d1e3e106320252b67c63dc1269c4b834152e9c675a06a4565ec41db1c93aea2dd94e22640d7ec99334cb47cd41b914642d936577143b689ef2a0db7d938c13
+  checksum: b72630a56c5e4384128a57443fc188ca8f6cf239c16defb6624b2aa500c0c953d41fb53e49f9d583cf093ddc522ff07e1b19fab8f0ae40a03304805c4fd5894b
   languageName: node
   linkType: hard
 
@@ -24212,20 +24222,20 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.22.10":
-  version: 0.22.10
-  resolution: "typedoc@npm:0.22.10"
+"typedoc@npm:0.22.11":
+  version: 0.22.11
+  resolution: "typedoc@npm:0.22.11"
   dependencies:
     glob: ^7.2.0
     lunr: ^2.3.9
-    marked: ^3.0.8
+    marked: ^4.0.10
     minimatch: ^3.0.4
-    shiki: ^0.9.12
+    shiki: ^0.10.0
   peerDependencies:
     typescript: 4.0.x || 4.1.x || 4.2.x || 4.3.x || 4.4.x || 4.5.x
   bin:
     typedoc: bin/typedoc
-  checksum: 404932ae8e62d1507209d50b635d9d5cefead344e7e84e2d21fc84741fb739e011dcffcf335d6d4e2a31fe45910757b27f11678f6ae5b89514d2f291fe41884e
+  checksum: 7d29f4b771d3eadc612d0b35509ee88c153d7310b7adb57faf0740132765613d6ceceb94877148d674cfc8242ca3c2e22e3ae2060768b2d96842bf14659d1b1c
   languageName: node
   linkType: hard
 
