@@ -163,10 +163,12 @@ describe('unit test heartbeat', async () => {
     const peerA = getPeer(Alice, network)
 
     peerA.peers.register(Charly)
-    // clock.tick(HEARTBEAT_INTERVAL * 2)
-    await peerA.heartbeat.checkNodes()
 
     assert(peerA.peers.qualityOf(Charly).toFixed(1) === '0.2')
+
+    await peerA.heartbeat.checkNodes()
+
+    assert(peerA.peers.qualityOf(Charly).toFixed(1) === '0.1')
 
     peerA.heartbeat.stop()
     network.close()

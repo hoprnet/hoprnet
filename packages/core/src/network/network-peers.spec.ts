@@ -83,7 +83,6 @@ describe('test PeerStore', async function () {
 
     const id = fakePeerId(5)
     networkPeers.register(id)
-    console.log('at start', networkPeers.debugLog())
 
     while (networkPeers.qualityOf(id) <= NETWORK_QUALITY_THRESHOLD) {
       networkPeers.updateRecord({
@@ -104,7 +103,6 @@ describe('test PeerStore', async function () {
       })
     }
 
-    console.log('at end', networkPeers.debugLog())
     assert(peerConsideredOffline, 'peer should be considered offline since quality fell below threshold')
     assert(showBackoff(networkPeers) < MAX_BACKOFF, 'even offline, backoff does not reach max')
   })
