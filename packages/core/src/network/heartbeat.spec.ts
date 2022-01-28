@@ -7,8 +7,6 @@ import type PeerId from 'peer-id'
 import { NETWORK_QUALITY_THRESHOLD } from '../constants'
 
 class TestingHeartbeat extends Heartbeat {
-  public sendMessage: Heartbeat['sendMessage']
-
   public async checkNodes() {
     return await super.checkNodes()
   }
@@ -28,10 +26,23 @@ const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
   heartbeatVariance: 1
 }
 
+/**
+ * Used to mock sending messages using events
+ * @param self peerId of the destination
+ * @param protocol protocol to speak with receiver
+ * @returns an event string that includes destination and protocol
+ */
 function reqEventName(self: PeerId, protocol: string): string {
   return `req:${self.toB58String()}:${protocol}`
 }
 
+/**
+ * Used to mock replying to incoming messages
+ * @param self peerId of the sender
+ * @param dest peerId of the destination
+ * @param protocol protocol to speak with receiver
+ * @returns an event string that includes sender, receiver and the protocol
+ */
 function resEventName(self: PeerId, dest: PeerId, protocol: string): string {
   return `res:${self.toB58String()}:${dest.toB58String()}:${protocol}`
 }
@@ -44,6 +55,7 @@ function createFakeNetwork() {
 
   const subscribedPeers = new Map<string, string>()
 
+  // mocks libp2p.handle(protocol)
   const subscribe = (
     self: PeerId,
     protocol: string,
@@ -58,6 +70,7 @@ function createFakeNetwork() {
     subscribedPeers.set(self.toB58String(), reqEventName(self, protocol))
   }
 
+  // mocks libp2p.dialProtocol
   const sendMessage = async (self: PeerId, dest: PeerId, protocol: string, msg: Uint8Array) => {
     if (network.listenerCount(reqEventName(dest, protocol)) > 0) {
       const recvPromise = once(network, resEventName(dest, self, protocol))
@@ -72,6 +85,7 @@ function createFakeNetwork() {
     return Promise.reject()
   }
 
+  // mocks libp2p.stop
   const unsubscribe = (peer: PeerId) => {
     if (subscribedPeers.has(peer.toB58String())) {
       const protocol = subscribedPeers.get(peer.toB58String())
@@ -158,7 +172,7 @@ describe('unit test heartbeat', async () => {
     network.close()
   })
 
-  it.only('test heartbeat flow', async () => {
+  it('test heartbeat flow', async () => {
     const network = createFakeNetwork()
     const peerA = getPeer(Alice, network)
     const peerB = getPeer(Bob, network)
