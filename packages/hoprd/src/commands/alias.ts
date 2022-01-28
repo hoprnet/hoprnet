@@ -1,7 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, getPaddingLength, styleValue } from './utils'
-import { CommandE } from './v2'
 
 export class Alias extends AbstractCommand {
   private parameters = ['PeerId', 'Name']
@@ -11,7 +10,7 @@ export class Alias extends AbstractCommand {
   }
 
   public name() {
-    return CommandE.ALIAS
+    return 'alias'
   }
 
   public help() {

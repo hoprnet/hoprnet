@@ -24,7 +24,7 @@ const performTestsUsing = (currencyToTest: 'native' | 'hopr') => {
       const res1 = await withdraw(currencyToTest, '0.001', aliceEthWallet)
       assert.equal(res1.status, 200)
       assert.equal(res1.data.status, 'success')
-    }).timeout(60000)
+    }).timeout(2000)
     it('POST - should fail when invalid amount or currency', async () => {
       const res1 = await withdraw(currencyToTest, '0.001abcd', aliceEthWallet)
       assert.equal(res1.status, 400)
@@ -40,7 +40,7 @@ const performTestsUsing = (currencyToTest: 'native' | 'hopr') => {
       const res2 = await withdraw(currencyToTest, '0.001', aliceEthWallet + 'abcd')
       assert.equal(res2.status, 500)
       assert.equal(res2.data.status, 'failure')
-    }).timeout(60000)
+    }).timeout(2000)
   })
 }
 

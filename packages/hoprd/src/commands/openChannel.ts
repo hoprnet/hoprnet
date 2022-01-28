@@ -5,7 +5,6 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import { checkPeerIdInput, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
-import { CommandE } from './v2'
 
 export class OpenChannel extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -13,7 +12,7 @@ export class OpenChannel extends AbstractCommand {
   }
 
   public name() {
-    return CommandE.OPEN_CHANNEL
+    return 'open'
   }
 
   public help() {

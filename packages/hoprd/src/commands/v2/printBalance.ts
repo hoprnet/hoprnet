@@ -1,5 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { CommandE, isError } from '.'
+import { isError } from '.'
 import { AbstractCommand } from '../abstractCommand'
 import { styleValue } from '../utils'
 import { getBalances } from './logic/balance'
@@ -10,7 +10,7 @@ export default class PrintBalance extends AbstractCommand {
   }
 
   public name() {
-    return CommandE.PRINT_BALANCE
+    return 'balance'
   }
 
   public help() {

@@ -3,7 +3,6 @@ import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
 import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
-import { CommandE } from './v2'
 
 export default class Withdraw extends AbstractCommand {
   private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']
@@ -52,7 +51,7 @@ export default class Withdraw extends AbstractCommand {
   }
 
   public name(): string {
-    return CommandE.WITHDRAW
+    return 'withdraw'
   }
 
   public help(): string {

@@ -1,7 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from '../abstractCommand'
 import { styleValue } from '../utils'
-import { CommandE } from '.'
 import { withdraw } from './logic/withdraw'
 
 export default class Withdraw extends AbstractCommand {
@@ -12,7 +11,7 @@ export default class Withdraw extends AbstractCommand {
   }
 
   public name(): string {
-    return CommandE.WITHDRAW
+    return 'withdraw'
   }
 
   public help(): string {

@@ -20,6 +20,7 @@ import { getIdentity } from './identity'
 
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
+import { CommandsV2 } from './commands/v2'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
@@ -251,6 +252,7 @@ async function main() {
   let logs = new LogStream(argv.forwardLogs)
   let adminServer = undefined
   let cmds: Commands
+  let cmds2: CommandsV2
 
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
@@ -353,9 +355,10 @@ async function main() {
       // 3. Start the node.
       await node.start()
       cmds = new Commands(node)
+      cmds2 = new CommandsV2(node)
 
       if (adminServer) {
-        adminServer.registerNode(node, cmds)
+        adminServer.registerNode(node, cmds, cmds2)
       }
 
       logs.logStatus('READY')
@@ -374,9 +377,19 @@ async function main() {
           if (c === 'daemonize') {
             return
           }
-          await cmds.execute((msg) => {
-            logs.log(msg)
-          }, c)
+          logs.log('Trying commands v2')
+          await cmds2
+            .execute((msg) => {
+              logs.log(msg)
+            }, c)
+            .then((res) => {
+              if (res === 'Unknown command!') {
+                logs.log('Trying commands v1')
+                cmds.execute((msg) => {
+                  logs.log(msg)
+                }, c)
+              }
+            })
         }
         // Wait for actions to take place
         await setTimeout(1e3)

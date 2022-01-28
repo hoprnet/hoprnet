@@ -1,5 +1,4 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { CommandE } from '.'
 import { AbstractCommand, GlobalState } from '../abstractCommand'
 import { getPaddingLength, styleValue } from '../utils'
 import { setAlias } from './logic/alias'
@@ -12,7 +11,7 @@ export class Alias extends AbstractCommand {
   }
 
   public name() {
-    return CommandE.ALIAS
+    return 'alias'
   }
 
   public help() {

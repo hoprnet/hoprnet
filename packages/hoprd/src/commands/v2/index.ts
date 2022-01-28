@@ -6,29 +6,6 @@ import Withdraw from './withdraw'
 import { Alias } from './alias'
 import { AbstractCommand, GlobalState } from '../abstractCommand'
 
-export enum CommandE {
-  ADDRESSES = 'addresses',
-  ALIAS = 'alias',
-  CLOSE_CHANNEL = 'close',
-  INFO = 'info',
-  LIST_CONNECTED_PEERS = 'peers',
-  LIST_COMMANDS = 'help',
-  LIST_OPEN_CHANNELS = 'channels',
-  PING = 'ping',
-  PRINT_ADDRESS = 'address',
-  PRINT_BALANCE = 'balance',
-  REDEEM_TICKETS = 'redeemTickets',
-  SIGN = 'sign',
-  STOP_NODE = 'quit',
-  VERSION = 'version',
-  TICKETS = 'tickets',
-  SEND_MESSAGE = 'send',
-  SETTINGS = 'settings',
-  WITHDRAW = 'withdraw',
-  OPEN_CHANNEL = 'open',
-  FUND_CHANNEL = 'fund'
-}
-
 export const isError = (error: any): error is Error => {
   return error instanceof Error
 }
@@ -67,21 +44,22 @@ export class CommandsV2 {
     return this.commandMap.get(command.trim())
   }
 
-  // public async execute(log, message: string): Promise<void> {
-  //   const split: (string | undefined)[] = message.trim().split(/\s+/)
-  //   const command = split[0]
-  //   const query = split.slice(1).join(' ')
+  public async execute(log, message: string): Promise<string | void> {
+    const split: (string | undefined)[] = message.trim().split(/\s+/)
+    const command = split[0]
+    const query = split.slice(1).join(' ')
 
-  //   if (command == null) {
-  //     return undefined
-  //   }
+    if (command == null) {
+      return undefined
+    }
 
-  //   let cmd = this.find(command)
+    let cmd = this.find(command)
 
-  //   if (cmd) {
-  //     return await cmd.execute(log, query || '', this.state)
-  //   }
+    if (cmd) {
+      return await cmd.execute(log, query || '', this.state)
+    }
 
-  //   return log(`${cmd}: Unknown command!`)
-  // }
+    log(`${cmd}: Unknown command!`)
+    return 'Unknown command!'
+  }
 }
