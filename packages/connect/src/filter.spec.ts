@@ -24,7 +24,7 @@ describe('test addr filtering', function () {
   let filter: TestFilter
 
   beforeEach(function () {
-    filter = new TestFilter(firstPeer, {})
+    filter = new TestFilter(firstPeer, {allowLocalConnections: true})
   })
 
   it('should accept valid circuit addresses', function () {
