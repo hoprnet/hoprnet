@@ -238,6 +238,7 @@ describe('entry node functionality', function () {
     const connectPromise = once(newNodeListener, 'connected')
 
     const updatePromise = once(entryNodes, RELAY_CHANGED_EVENT)
+
     entryNodes.onRemoveRelay(relay.id)
 
     await Promise.all([connectPromise, updatePromise])
@@ -284,13 +285,35 @@ describe('entry node functionality', function () {
     assert(availableEntryNodes[0].id.equals(relay.id))
 
     const usedRelays = entryNodes.getUsedRelays()
-    assert(entryNodes.getUsedRelays().length == 1)
+    assert(usedRelays.length == 1)
     assert(
       usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
     )
 
     network.close()
     relayListener.removeAllListeners()
+    entryNodes.stop()
+  })
+
+  it('no available entry nodes', async function () {
+    const network = createFakeNetwork()
+
+    const offlineRelay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
+      {}
+    )
+
+    entryNodes.uncheckedEntryNodes.push(offlineRelay)
+
+    await entryNodes.updatePublicNodes()
+
+    const usedRelays = entryNodes.getUsedRelays()
+    assert(usedRelays.length == 0)
+
+    network.close()
     entryNodes.stop()
   })
 
@@ -309,14 +332,11 @@ describe('entry node functionality', function () {
     await entryNodes.updatePublicNodes()
 
     const availableEntryNodes = entryNodes.getAvailabeEntryNodes()
-    assert(availableEntryNodes.length == 1)
-    assert(availableEntryNodes[0].id.equals(relay.id))
+    assert(availableEntryNodes.length == 0)
 
     const usedRelays = entryNodes.getUsedRelays()
-    assert(usedRelays.length == 1)
-    assert(
-      usedRelays[0].equals(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
-    )
+    assert(usedRelays.length == 0)
+
     entryNodes.stop()
   })
 
@@ -324,6 +344,7 @@ describe('entry node functionality', function () {
     const network = createFakeNetwork()
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
+    const relayListener = network.listen(relay.multiaddrs[0].toString())
 
     const publicNodes = new EventEmitter() as PublicNodesEmitter
     const entryNodes = new TestingEntryNodes(
@@ -348,6 +369,7 @@ describe('entry node functionality', function () {
 
     await entryNodes.updatePublicNodes()
 
+    relayListener.removeAllListeners()
     entryNodes.stop()
     network.close()
   })

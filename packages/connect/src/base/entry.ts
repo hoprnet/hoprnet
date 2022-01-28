@@ -269,30 +269,37 @@ export class EntryNodes extends EventEmitter {
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
-    // Close all unnecessary connections
-    await nAtATime(
-      attemptClose,
-      results
-        .slice(positiveOnes + MAX_RELAYS_PER_NODE)
-        .map<[Connection, (arg: any) => void]>((result) => [result.conn as Connection, error]),
-      ENTRY_NODES_MAX_PARALLEL_DIALS
-    )
+    const previous = new Set<string>(this.usedRelays.map((ma) => relayFromRelayAddress(ma).toB58String()))
 
-    // Take all entry nodes that appeared to be online
-    this.availableEntryNodes = results.slice(positiveOnes).map((result) => result.entry)
+    if (positiveOnes >= 0) {
+      // Close all unnecessary connections
+      await nAtATime(
+        attemptClose,
+        results
+          .slice(positiveOnes + MAX_RELAYS_PER_NODE)
+          .map<[Connection, (arg: any) => void]>((result) => [result.conn as Connection, error]),
+        ENTRY_NODES_MAX_PARALLEL_DIALS
+      )
+
+      // Take all entry nodes that appeared to be online
+      this.availableEntryNodes = results.slice(positiveOnes).map((result) => result.entry)
+
+      this.usedRelays = this.availableEntryNodes
+        // select only those entry nodes with smallest latencies
+        .slice(0, MAX_RELAYS_PER_NODE)
+        .map(
+          (entry: EntryNodeData) =>
+            new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
+        )
+    } else {
+      log(`Could not connect to any entry node. Other nodes may not or no longer be able to connect to this node.`)
+      // Reset to initial state
+      this.usedRelays = []
+      this.availableEntryNodes = []
+    }
 
     // Reset list of unchecked nodes
     this.uncheckedEntryNodes = []
-
-    const previous = new Set<string>(this.usedRelays.map((ma) => relayFromRelayAddress(ma).toB58String()))
-
-    this.usedRelays = this.availableEntryNodes
-      // select only those entry nodes with smallest latencies
-      .slice(0, MAX_RELAYS_PER_NODE)
-      .map(
-        (entry: EntryNodeData) =>
-          new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
-      )
 
     let isDifferent = false
 
