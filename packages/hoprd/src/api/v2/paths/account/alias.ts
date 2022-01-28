@@ -76,7 +76,7 @@ GET.apiDoc = {
           schema: {
             $ref: '#/components/schemas/StatusResponse'
           },
-          example: { status: 'peerIdNotFound' }
+          example: { status: 'aliasNotFound' }
         }
       }
     }
