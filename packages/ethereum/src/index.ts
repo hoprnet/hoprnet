@@ -23,10 +23,6 @@ export const getContractData = (network: string, environmentId: string, contract
   try {
     return require(deploymentsPath)
   } catch {
-    throw Error(
-      `contract data for ${contract} from environment ${environmentId} and network ${network} not found ${
-        deploymentsPath || '@_@'
-      }`
-    )
+    throw Error(`contract data for ${contract} from environment ${environmentId} and network ${network} not found`)
   }
 }

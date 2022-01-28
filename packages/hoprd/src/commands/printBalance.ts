@@ -1,7 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { CommandE } from './v2'
 
 export default class PrintBalance extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -9,7 +8,7 @@ export default class PrintBalance extends AbstractCommand {
   }
 
   public name() {
-    return CommandE.PRINT_BALANCE
+    return 'balance'
   }
 
   public help() {

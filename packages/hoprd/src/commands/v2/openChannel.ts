@@ -1,7 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { styleValue } from '../utils'
 import { AbstractCommand, GlobalState } from '../abstractCommand'
-import { CommandE } from '.'
 import { openChannel } from './logic/channel'
 
 export class OpenChannel extends AbstractCommand {
@@ -10,7 +9,7 @@ export class OpenChannel extends AbstractCommand {
   }
 
   public name() {
-    return CommandE.OPEN_CHANNEL
+    return 'open'
   }
 
   public help() {
