@@ -23,6 +23,7 @@ export const setAlias = ({
   }
 }
 
+// NOTE: no peerId validation
 export const getAlias = ({ state, peerId }: { state: GlobalState; peerId: string }) => {
   const aliases = Array.from(state.aliases.entries())
     .filter(([_, peerIdInMap]) => peerIdInMap.toB58String() === peerId)

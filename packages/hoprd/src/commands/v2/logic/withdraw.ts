@@ -74,7 +74,9 @@ export const withdraw = async ({
 
   const { amount, weiAmount, recipient, currency } = validation
   const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
+  console.log('PREWITHDRAW')
   const receipt = await node.withdraw(currency, recipient, weiAmount)
+  console.log('POSTWITHDRAW')
 
   log &&
     log(

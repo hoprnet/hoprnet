@@ -24,7 +24,7 @@ export const openChannel = async ({
     counterparty = checkPeerIdInput(counterpartyPeerId, state)
   } catch (err) {
     log && log(styleValue(err.message, 'failure'))
-    return new Error('InvalidPeerId')
+    return new Error('invalidPeerId')
   }
 
   let amountToFund: BN

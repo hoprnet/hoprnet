@@ -115,7 +115,7 @@ POST.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'failure' },
+              status: { type: 'string', example: 'notEnoughFunds' },
               tokensRequired: { type: 'string', example: '10' },
               currentBalance: { type: 'string', example: '9' }
             }
