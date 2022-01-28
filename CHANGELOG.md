@@ -4,7 +4,7 @@
 
 ### Changes
 
-none
+- Add CLI parameter `--allowLocalNodeConnections` to explicitly allow connections to localhost ([#3349](https://github.com/hoprnet/hoprnet/pull/3349))
 
 ---
 

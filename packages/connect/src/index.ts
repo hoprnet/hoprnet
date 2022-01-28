@@ -72,7 +72,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
     this._peerId = opts.libp2p.peerId
     this._libp2p = opts.libp2p
 
-    this._addressFilter = new Filter(this._peerId)
+    this._addressFilter = new Filter(this._peerId, this.options)
 
     this.discovery = new Discovery()
 
