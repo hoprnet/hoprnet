@@ -4,6 +4,10 @@
 
 ## Table of contents
 
+### References
+
+- [DialOpts](modules.md#dialopts)
+
 ### Enumerations
 
 - [ChannelStatus](enums/ChannelStatus.md)
@@ -43,7 +47,6 @@
 
 - [AddressSorter](modules.md#addresssorter)
 - [DeferType](modules.md#defertype)
-- [DialOpts](modules.md#dialopts)
 - [DialResponse](modules.md#dialresponse)
 - [Hosts](modules.md#hosts)
 - [LibP2PHandlerArgs](modules.md#libp2phandlerargs)
@@ -150,7 +153,6 @@
 - [lengthPrefixedToU8a](modules.md#lengthprefixedtou8a)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
-- [limitConcurrency](modules.md#limitconcurrency)
 - [loadJson](modules.md#loadjson)
 - [localAddressesFirst](modules.md#localaddressesfirst)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
@@ -200,6 +202,12 @@
 - [validatePoRResponse](modules.md#validateporresponse)
 - [verifySignatureFromPeerId](modules.md#verifysignaturefrompeerid)
 - [wait](modules.md#wait)
+
+## References
+
+### DialOpts
+
+Renames and re-exports [TimeoutOpts](modules.md#timeoutopts)
 
 ## Type aliases
 
@@ -251,29 +259,13 @@ ___
 
 ___
 
-### DialOpts
-
-Ƭ **DialOpts**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `timeout` | `number` |
-
-#### Defined in
-
-[libp2p/index.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L94)
-
-___
-
 ### DialResponse
 
 Ƭ **DialResponse**: { `resp`: `Awaited`<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `query`: `PeerId` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  }
 
 #### Defined in
 
-[libp2p/dialHelper.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L40)
+[libp2p/dialHelper.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L34)
 
 ___
 
@@ -308,7 +300,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
+[libp2p/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L167)
 
 ___
 
@@ -339,7 +331,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L172)
+[libp2p/index.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L168)
 
 ___
 
@@ -467,7 +459,7 @@ ___
 
 ### libp2pSendMessage
 
-Ƭ **libp2pSendMessage**: (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`DialOpts`](modules.md#dialopts)) => `Promise`<`void`\> & (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`DialOpts`](modules.md#dialopts)) => `Promise`<`Uint8Array`[]\>
+Ƭ **libp2pSendMessage**: (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``false``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`void`\> & (`libp2p`: `LibP2P`, `destination`: `PeerId`, `protocol`: `string`, `message`: `Uint8Array`, `includeReply`: ``true``, `opts?`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Uint8Array`[]\>
 
 Asks libp2p to establish a connection to another node and
 send message. If `includeReply` is set, wait for a response
@@ -486,7 +478,7 @@ send message. If `includeReply` is set, wait for a response
 
 #### Defined in
 
-[libp2p/index.ts:109](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L109)
+[libp2p/index.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L105)
 
 ___
 
@@ -509,7 +501,7 @@ and feeds them to the given handler.
 
 #### Defined in
 
-[libp2p/index.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L241)
+[libp2p/index.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L237)
 
 ## Variables
 
@@ -940,6 +932,11 @@ ___
 
 ▸ **abortableTimeout**<`Result`, `AbortMsg`, `TimeoutMsg`\>(`fn`, `abortMsg`, `timeoutMsg`, `opts`): `Promise`<`Result` \| `AbortMsg` \| `TimeoutMsg`\>
 
+Cals the worker function with a timeout. Once the timeout is done
+abort the call using an abort controller.
+If the caller aims to end the call before the tiemout has happened
+it can pass an AbortController and end the call prematurely.
+
 #### Type parameters
 
 | Name |
@@ -950,12 +947,12 @@ ___
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `fn` | (`opts`: `Required`<[`TimeoutOpts`](modules.md#timeoutopts)\>) => `Promise`<`Result`\> |
-| `abortMsg` | `AbortMsg` |
-| `timeoutMsg` | `TimeoutMsg` |
-| `opts` | [`TimeoutOpts`](modules.md#timeoutopts) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `fn` | (`opts`: `Required`<[`TimeoutOpts`](modules.md#timeoutopts)\>) => `Promise`<`Result`\> | worker function to dial |
+| `abortMsg` | `AbortMsg` | value to be returned if aborted |
+| `timeoutMsg` | `TimeoutMsg` | value to be returned on timeout |
+| `opts` | [`TimeoutOpts`](modules.md#timeoutopts) | options to pass to worker function |
 
 #### Returns
 
@@ -963,7 +960,7 @@ ___
 
 #### Defined in
 
-[async/abortableTimeout.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L11)
+[async/abortableTimeout.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L22)
 
 ___
 
@@ -1359,7 +1356,7 @@ Contains a baseline protection against dialing same addresses twice.
 | `libp2p` | `ReducedLibp2p` | a libp2p instance |
 | `destination` | `PeerId` | PeerId of the destination |
 | `protocol` | `string` | - |
-| `opts?` | `DialOpts` |  |
+| `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) |  |
 
 #### Returns
 
@@ -1367,7 +1364,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L279)
+[libp2p/dialHelper.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L273)
 
 ___
 
@@ -2077,7 +2074,7 @@ ___
 | `protocol` | `string` |
 | `message` | `Uint8Array` |
 | `includeReply` | `boolean` |
-| `opts?` | [`DialOpts`](modules.md#dialopts) |
+| `opts?` | [`TimeoutOpts`](modules.md#timeoutopts) |
 
 #### Returns
 
@@ -2085,7 +2082,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L126)
+[libp2p/index.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L122)
 
 ___
 
@@ -2109,36 +2106,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:256](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L256)
-
-___
-
-### limitConcurrency
-
-▸ **limitConcurrency**<`T`\>(`maxConcurrency`, `exitCond`, `createPromise`, `maxIterations?`): `Promise`<`T`[]\>
-
-#### Type parameters
-
-| Name |
-| :------ |
-| `T` |
-
-#### Parameters
-
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `maxConcurrency` | `number` | `undefined` |
-| `exitCond` | () => `boolean` | `undefined` |
-| `createPromise` | () => `Promise`<`T`\> | `undefined` |
-| `maxIterations` | `number` | `1e3` |
-
-#### Returns
-
-`Promise`<`T`[]\>
-
-#### Defined in
-
-[collection/promise-pool.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/promise-pool.ts#L1)
+[libp2p/index.ts:252](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L252)
 
 ___
 
