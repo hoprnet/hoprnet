@@ -97,7 +97,7 @@ describe('nonce-tracker', function () {
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     nonceLock.releaseLock()
-    expect(nonceLock.nextNonce).to.equal(32, `nonce should be 32 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(32, `nonce should be 32 but got ${nonceLock.nextNonce}`)
   })
 
   it('should create nonce 0', async function () {
@@ -114,7 +114,7 @@ describe('nonce-tracker', function () {
     })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-    expect(nonceLock.nextNonce).to.be.equal(2, `nonce should be 2 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.be.equal(2, `nonce should be 2 but got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
   })
 
@@ -128,7 +128,7 @@ describe('nonce-tracker', function () {
     confirmedTxs = genMultiTx({ count: 3 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-    expect(nonceLock.nextNonce).to.equal(3, `nonce should be 3 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(3, `nonce should be 3 but got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
   })
 
@@ -142,7 +142,7 @@ describe('nonce-tracker', function () {
     pendingTxs = genMultiTx({ count: 2 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-    expect(nonceLock.nextNonce).to.equal(2, `nonce should be 2 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(2, `nonce should be 2 but got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
   })
 
@@ -156,7 +156,7 @@ describe('nonce-tracker', function () {
     pendingTxs = genMultiTx({ count: 2 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-    expect(nonceLock.nextNonce).to.equal(5, `nonce should be 5 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(5, `nonce should be 5 but got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
   })
 
@@ -170,7 +170,7 @@ describe('nonce-tracker', function () {
     })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-    expect(nonceLock.nextNonce).to.equal(5, `nonce should be 5 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(5, `nonce should be 5 but got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
   })
 
@@ -186,7 +186,7 @@ describe('nonce-tracker', function () {
     })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-    expect(nonceLock.nextNonce).to.equal(0, `nonce should be 0 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(0, `nonce should be 0 but got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
   })
 
@@ -204,7 +204,7 @@ describe('nonce-tracker', function () {
     })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-    expect(nonceLock.nextNonce).to.equal(50, `nonce should be 50 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(50, `nonce should be 50 but got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
   })
 
@@ -219,7 +219,7 @@ describe('nonce-tracker', function () {
     })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-    expect(nonceLock.nextNonce).to.equal(74, `nonce should be 74 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(74, `nonce should be 74 but got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
   })
 
@@ -243,7 +243,7 @@ describe('nonce-tracker', function () {
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     nonceLock.releaseLock()
-    expect(nonceLock.nextNonce).to.equal(5, `nonce should be 5 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(5, `nonce should be 5 but got ${nonceLock.nextNonce}`)
   })
 
   it('should ignore long-time pending transactions', async function () {
@@ -271,7 +271,7 @@ describe('nonce-tracker', function () {
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     nonceLock.releaseLock()
-    expect(nonceLock.nextNonce).to.equal(0, `nonce should be 0 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(0, `nonce should be 0 but got ${nonceLock.nextNonce}`)
   })
 })
 

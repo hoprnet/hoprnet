@@ -3,20 +3,19 @@
 import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { terminalWidth } from 'yargs'
-
-import { createHoprNode, resolveEnvironment, supportedEnvironments } from '@hoprnet/hopr-core'
+import { createHoprNode, resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 import { ChannelEntry, privKeyToPeerId, PublicKey, debug } from '@hoprnet/hopr-utils'
 
 import { PersistedState } from './state'
 import { CoverTrafficStrategy } from './strategy'
+import setupHealthcheck from './healthcheck'
 
 import type PeerId from 'peer-id'
-import type { HoprOptions, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import type { HoprOptions } from '@hoprnet/hopr-core'
 import type { PeerData, State } from './state'
-import http from 'http'
-import restana from 'restana'
 
 const log = debug('hopr:cover-traffic')
+const verbose = debug('hopr:cover-traffic:verbose')
 
 function stopGracefully(signal: number) {
   console.log(`Process exiting with signal ${signal}`)
@@ -54,13 +53,22 @@ const argv = yargs(process.argv.slice(2))
     string: true,
     default: './ct.json'
   })
+  .option('data', {
+    describe: 'manually specify the database directory to use',
+    default: ''
+  })
+  .option('healthCheck', {
+    boolean: true,
+    describe: 'Run a health check end point on localhost:8080',
+    default: false
+  })
   .option('healthCheckHost', {
     describe: 'Host to listen on for health check',
-    string: true
+    default: 'localhost'
   })
   .option('healthCheckPort', {
     describe: 'Port to listen on for health check',
-    number: true
+    default: 8080
   })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
@@ -74,6 +82,10 @@ async function generateNodeOptions(environment: ResolvedEnvironment): Promise<Ho
     password: ''
   }
 
+  if (argv.data && argv.data !== '') {
+    options.dbPath = argv.data
+  }
+
   return options
 }
 
@@ -84,20 +96,6 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }
 
-  if (argv.healthCheckHost != null) {
-    const service = restana()
-    service.get('/healthcheck/v1/version', (_, res) => res.send(`CT node: ${node.getVersion()}`))
-    const hostname = argv.healthCheckHost
-    const port = argv.healthCheckPort
-    const server = http.createServer(service as any).on('error', (err) => {
-      throw err
-    })
-    server.listen(port, hostname, (err?: Error) => {
-      if (err) throw err
-      log(`Healthcheck server on ${hostname} listening on port ${port}`)
-    })
-  }
-
   const selfPub = PublicKey.fromPeerId(peerId)
   const selfAddr = selfPub.toAddress()
   const data = new PersistedState(update, argv.dbFile)
@@ -106,12 +104,19 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
     data.setChannel(newChannel)
   }
 
+  function logMessageToNode(msg: Uint8Array) {
+    log(`Received message ${msg.toString()}`)
+  }
+
   const peerUpdate = (peer: PeerData) => {
     data.setNode(peer)
   }
 
   log('creating a node')
-  const node = createHoprNode(peerId, options)
+  const node = await createHoprNode(peerId, options)
+
+  node.on('hopr:message', logMessageToNode)
+
   log('setting up indexer')
   node.indexer.on('channel-update', onChannelUpdate)
   node.indexer.on('peer', peerUpdate)
@@ -121,6 +126,11 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
 
   log('waiting for node to be funded')
   await node.waitForFunds()
+
+  if (argv.healthCheck) {
+    setupHealthcheck(node, argv.healthCheckHost, argv.healthCheckPort)
+  }
+
   log('starting node ...')
   await node.start()
   log('node is running')
@@ -134,8 +144,8 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
 
   setInterval(async () => {
     // CT stats
-    console.log('-- CT Stats --')
-    console.log(await node.connectionReport())
+    verbose('-- CT Stats --')
+    verbose(await node.connectionReport())
   }, 5000)
 }
 
@@ -144,25 +154,12 @@ if (require.main === module) {
   process.on('SIGINT', stopGracefully)
   process.on('SIGTERM', stopGracefully)
 
-  process.on('unhandledRejection', (err: Error) => {
-    if (err.message === 'Peer lookup failed') {
-      // @TODO: this is a hack to prevent from crashing with unresolved rejection
-      // due to libp2p bug, see: https://github.com/libp2p/js-libp2p/pull/1025/files
-      return
-    }
-    throw err
-  })
-
   process.on('uncaughtExceptionMonitor', (err, origin) => {
     // Make sure we get a log.
     log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
   })
 
   main((state: State) => {
-    console.log(
-      `CT: State update:` +
-        `${Object.keys(state.nodes).length} nodes, ` +
-        `${Object.keys(state.channels).length} channels`
-    )
+    log(`State update: ${Object.keys(state.nodes).length} nodes, ${Object.keys(state.channels).length} channels`)
   })
 }

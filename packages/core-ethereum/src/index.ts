@@ -1,8 +1,7 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import type { ChainWrapper } from './ethereum'
+import { ChainWrapper, createChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import { debug } from '@hoprnet/hopr-utils'
 import {
   AcknowledgedTicket,
   PublicKey,
@@ -14,14 +13,17 @@ import {
   ChannelEntry,
   ChannelStatus,
   generateChannelId,
-  Hash
+  Hash,
+  debug,
+  DeferType,
+  privKeyToPeerId
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
-import { CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
-import { createChainWrapper } from './ethereum'
-import { PROVIDER_CACHE_TTL } from './constants'
+import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants'
 import { EventEmitter } from 'events'
-import { initializeCommitment, findCommitmentPreImage, bumpCommitment } from './commitment'
+import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
+import { IndexerEvents } from './indexer/types'
+import ChainWrapperSingleton from './chain'
 
 const log = debug('hopr-core-ethereum')
 
@@ -40,10 +42,19 @@ export type RedeemTicketResponse =
       error: Error | string
     }
 
-export default class HoprEthereum extends EventEmitter {
+export type ChainOptions = {
+  provider: string
+  maxConfirmations?: number
+  chainId: number
+  gasPrice?: string
+  network: string
+  environment: string
+}
+
+export default class HoprCoreEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
-  private started: Promise<HoprEthereum> | undefined
+  private started: Promise<HoprCoreEthereum> | undefined
   private redeemingAll: Promise<void> | undefined = undefined
 
   constructor(
@@ -51,41 +62,68 @@ export default class HoprEthereum extends EventEmitter {
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
-    private options?: {
-      provider: string
-      maxConfirmations?: number
-      chainId: number
-      gasPrice?: number
-      network: string
-      environment: string
-    }
+    private options: ChainOptions,
+    protected automaticChainCreation = true
   ) {
     super()
     this.indexer = new Indexer(
       this.publicKey.toAddress(),
       this.db,
-      this.options.maxConfirmations ?? CONFIRMATIONS,
+      this.options?.maxConfirmations ?? CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )
+    // In some cases, we want to make sure the chain within the connector is not triggered
+    // automatically but instead via an event. This is the case for `hoprd`, where we need
+    // to get notified after ther chain was properly created, and we can't get setup the
+    // listeners before the node was actually created.
+    if (automaticChainCreation) {
+      this.createChain()
+    } else {
+      this.once('connector:create', this.createChain)
+    }
   }
 
-  async start(): Promise<HoprEthereum> {
+  private async createChain(): Promise<void> {
+    try {
+      this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
+      // Emit event to make sure connector is aware the chain was created properly.
+      this.emit('connector:created')
+    } catch (err) {
+      const errMsg = 'failed to create provider chain wrapper'
+      log(`error: ${errMsg}`, err)
+      throw Error(errMsg)
+    }
+  }
+
+  async start(): Promise<HoprCoreEthereum> {
     if (this.started) {
       return this.started
     }
 
-    const _start = async (): Promise<HoprEthereum> => {
-      this.chain = await createChainWrapper(this.options, this.privateKey)
-      await this.chain.waitUntilReady()
-      await this.indexer.start(this.chain, this.chain.getGenesisBlock())
+    const _start = async (): Promise<HoprCoreEthereum> => {
+      try {
+        await this.chain.waitUntilReady()
 
-      // Debug log used in e2e integration tests, please don't change
-      log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
-      log(chalk.green('Connector started'))
+        const hoprBalance = await this.chain.getBalance(this.publicKey.toAddress())
+        await this.db.setHoprBalance(hoprBalance)
+        log(`set HOPR balance to ${hoprBalance.toFormattedString()}`)
+
+        await this.indexer.start(this.chain, this.chain.getGenesisBlock())
+
+        // Debug log used in e2e integration tests, please don't change
+        log(`using blockchain address ${this.publicKey.toAddress().toHex()}`)
+        log(chalk.green('Connector started'))
+      } catch (err) {
+        log('error: failed to start the indexer', err)
+      }
       return this
     }
     this.started = _start()
     return this.started
+  }
+
+  public getChain(): ChainWrapper {
+    return this.chain
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -95,21 +133,22 @@ export default class HoprEthereum extends EventEmitter {
    */
   async stop(): Promise<void> {
     log('Stopping connector...')
-    await this.indexer.stop()
+    this.indexer.stop()
   }
 
   async announce(multiaddr: Multiaddr): Promise<string> {
-    // promise of tx hash gets resolved when the tx is mined.
-    const tx = await this.chain.announce(multiaddr)
-    // event emitted by the indexer
-    return this.indexer.resolvePendingTransaction('announce', tx)
+    return this.chain.announce(multiaddr, (tx: string) => this.setTxHandler('announce', tx))
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
-    const tx = await this.chain.withdraw(currency, recipient, amount)
-    // event emitted by the indexer
-    return this.indexer.resolvePendingTransaction(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx)
+    return this.chain.withdraw(currency, recipient, amount, (tx: string) =>
+      this.setTxHandler(currency === 'NATIVE' ? 'withdraw-native' : 'withdraw-hopr', tx)
+    )
+  }
+
+  public setTxHandler(evt: IndexerEvents, tx: string): DeferType<string> {
+    return this.indexer.resolvePendingTransaction(evt, tx)
   }
 
   public getOpenChannelsFrom(p: PublicKey) {
@@ -128,17 +167,17 @@ export default class HoprEthereum extends EventEmitter {
     return this.indexer.getRandomOpenChannel()
   }
 
-  private uncachedGetBalance = () => this.chain.getBalance(this.publicKey.toAddress())
-  private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
   /**
-   * Retrieves HOPR balance, optionally uses the cache.
+   * Retrieves HOPR balance, optionally uses the indexer.
+   * The difference from the two methods is that the latter relys on
+   * the coming events which require 8 blocks to be confirmed.
    * @returns HOPR balance
    */
-  public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return useCache ? this.cachedGetBalance() : this.uncachedGetBalance()
+  public async getBalance(useIndexer: boolean = false): Promise<Balance> {
+    return useIndexer ? this.db.getHoprBalance() : this.chain.getBalance(this.publicKey.toAddress())
   }
 
-  public getPublicKey() {
+  public getPublicKey(): PublicKey {
     return this.publicKey
   }
 
@@ -146,7 +185,9 @@ export default class HoprEthereum extends EventEmitter {
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
-  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.publicKey.toAddress())
+  private uncachedGetNativeBalance = () => {
+    return this.chain.getNativeBalance(this.publicKey.toAddress())
+  }
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
     this.uncachedGetNativeBalance,
     PROVIDER_CACHE_TTL
@@ -171,11 +212,21 @@ export default class HoprEthereum extends EventEmitter {
   public async commitToChannel(c: ChannelEntry): Promise<void> {
     log('committing to channel', c)
     const setCommitment = async (commitment: Hash) => {
-      const tx = await this.chain.setCommitment(c.source.toAddress(), commitment)
-      return this.indexer.resolvePendingTransaction('channel-updated', tx)
+      return this.chain.setCommitment(c.source.toAddress(), commitment, (tx: string) =>
+        this.setTxHandler('channel-updated', tx)
+      )
     }
     const getCommitment = async () => (await this.db.getChannel(c.getId())).commitment
-    initializeCommitment(this.db, c.getId(), getCommitment, setCommitment)
+
+    // Get all channel information required to build the initial commitment
+    const cci = new ChannelCommitmentInfo(
+      this.options.chainId,
+      this.smartContractInfo().hoprChannelsAddress,
+      c.getId(),
+      c.channelEpoch
+    )
+
+    await initializeCommitment(this.db, privKeyToPeerId(this.privateKey), cci, getCommitment, setCommitment)
   }
 
   public async redeemAllTickets(): Promise<void> {
@@ -253,8 +304,9 @@ export default class HoprEthereum extends EventEmitter {
         }
       }
 
-      const receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket)
-      await this.indexer.resolvePendingTransaction('channel-updated', receipt)
+      const receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket, (tx: string) =>
+        this.setTxHandler('channel-updated', tx)
+      )
 
       log('Successfully submitted ticket', ackTicket.response.toHex())
       await this.db.markRedeemeed(ackTicket)
@@ -279,8 +331,7 @@ export default class HoprEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    const tx = await this.chain.initiateChannelClosure(dest.toAddress())
-    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    return this.chain.initiateChannelClosure(dest.toAddress(), (tx: string) => this.setTxHandler('channel-updated', tx))
   }
 
   public async finalizeClosure(dest: PublicKey): Promise<string> {
@@ -288,7 +339,9 @@ export default class HoprEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(dest.toAddress())
+    return await this.chain.finalizeChannelClosure(dest.toAddress(), (tx: string) =>
+      this.setTxHandler('channel-updated', tx)
+    )
   }
 
   public async openChannel(dest: PublicKey, amount: Balance): Promise<Hash> {
@@ -305,8 +358,9 @@ export default class HoprEthereum extends EventEmitter {
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
     }
-    const tx = await this.chain.openChannel(this.publicKey.toAddress(), dest.toAddress(), amount)
-    await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    await this.chain.openChannel(this.publicKey.toAddress(), dest.toAddress(), amount, (tx: string) =>
+      this.setTxHandler('channel-updated', tx)
+    )
     return generateChannelId(this.publicKey.toAddress(), dest.toAddress())
   }
 
@@ -316,14 +370,26 @@ export default class HoprEthereum extends EventEmitter {
     if (totalFund.gt(myBalance)) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    const tx = await this.chain.fundChannel(this.publicKey.toAddress(), dest.toAddress(), myFund, counterpartyFund)
-    return await this.indexer.resolvePendingTransaction('channel-updated', tx)
+    return this.chain.fundChannel(
+      this.publicKey.toAddress(),
+      dest.toAddress(),
+      myFund,
+      counterpartyFund,
+      (tx: string) => this.setTxHandler('channel-updated', tx)
+    )
   }
 }
 
+export { createConnectorMock } from './index.mock'
+export { useFixtures } from './indexer/index.mock'
+export { sampleChainOptions } from './ethereum.mock'
+
 export {
   ChannelEntry,
+  ChannelCommitmentInfo,
   Indexer,
+  ChainWrapperSingleton,
+  ChainWrapper,
   createChainWrapper,
   initializeCommitment,
   findCommitmentPreImage,

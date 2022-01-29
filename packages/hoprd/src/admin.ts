@@ -40,10 +40,6 @@ export class AdminServer {
       return true
     }
 
-    if (req.headers.cookie == undefined) {
-      return false
-    }
-
     // Other clients different to `hoprd` might pass the `apiToken` via a
     // query param since they won't be on the same domain the node is hosted,
     // and thus, unable to set the `apiToken` via cookies. Using `req.url` we
@@ -53,13 +49,18 @@ export class AdminServer {
       try {
         // NB: We use a placeholder domain since req.url only passes query params
         const url = new URL(`https://hoprnet.org${req.url}`)
-        const apiToken = (url.searchParams && url.searchParams.get('apiToken')) || ''
-        if (encodeURI(apiToken) == this.apiToken) {
+        const apiToken = url.searchParams?.get('apiToken') || ''
+        if (decodeURI(apiToken) == this.apiToken) {
+          this.logs.log('ws client connected [ authentication ENABLED ]')
           return true
         }
       } catch (e) {
         this.logs.error('invalid URL queried', e)
       }
+    }
+
+    if (req.headers.cookie == undefined) {
+      return false
     }
 
     let cookies: ReturnType<typeof cookie.parse> | undefined
@@ -69,10 +70,15 @@ export class AdminServer {
       this.logs.error(`failed parsing cookies`, e)
     }
 
-    if (!cookies || cookies['X-Auth-Token'] !== this.apiToken) {
+    if (
+      !cookies ||
+      (decodeURI(cookies['X-Auth-Token'] || '') !== this.apiToken &&
+        decodeURI(cookies['x-auth-token'] || '') !== this.apiToken)
+    ) {
       this.logs.log('ws client failed authentication')
       return false
     }
+
     this.logs.log('ws client connected [ authentication ENABLED ]')
     return true
   }
@@ -196,7 +202,7 @@ export class AdminServer {
     this.logs.logStatus(this.node.status === 'RUNNING' ? 'READY' : 'PENDING')
 
     // Setup some noise
-    connectionReport(this.node, this.logs)
+    startConnectionReports(this.node, this.logs)
     startResourceUsageLogger(debugLog)
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
@@ -214,7 +220,9 @@ export function showDisclaimer(logs: LogStream) {
   }, 60 * 1000)
 }
 
-export async function connectionReport(node: Hopr, logs: LogStream) {
+export async function startConnectionReports(node: Hopr, logs: LogStream) {
   logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
-  setTimeout(() => connectionReport(node, logs), 60_000)
+  setInterval(() => {
+    logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
+  }, 60 * 1000)
 }

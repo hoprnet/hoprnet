@@ -22,8 +22,12 @@ const maxMintAmounts: {
   production: ethers.utils.parseEther('100000000').toString()
 }
 
-const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { ethers, deployments, getNamedAccounts, network } = hre
+const main: DeployFunction = async function ({
+  ethers,
+  deployments,
+  getNamedAccounts,
+  network
+}: HardhatRuntimeEnvironment) {
   const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
   const deploymentType = Object.keys(network.tags).find((tag) => startTimes[tag])
 

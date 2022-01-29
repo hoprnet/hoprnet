@@ -4,7 +4,7 @@ import type { DeferType } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import EventEmitter from 'events'
 
-import type { Stream, StreamResult } from '../types'
+import type { Stream, StreamResult, StreamType } from '../types'
 
 import Debug from 'debug'
 
@@ -17,6 +17,7 @@ const _error = Debug(`${DEBUG_PREFIX}:error`)
 
 import { RelayPrefix, StatusMessages, ConnectionStatusMessages, isValidPrefix } from '../constants'
 import { eagerIterator } from '../utils'
+import assert from 'assert'
 
 export const DEFAULT_PING_TIMEOUT = 300
 
@@ -26,6 +27,7 @@ export const DEFAULT_PING_TIMEOUT = 300
 class RelayContext extends EventEmitter {
   private _streamSourceSwitchPromise: DeferType<Stream['source']>
   private _streamSinkSwitchPromise: DeferType<Stream['sink']>
+  private _sourceIterator: AsyncIterator<StreamType>
 
   private _id: string
 
@@ -50,6 +52,7 @@ class RelayContext extends EventEmitter {
     this._statusMessagePromise = defer<void>()
     this._statusMessages = []
     this._stream = stream
+    this._sourceIterator = (stream.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
 
     this._sourceSwitched = false
 
@@ -180,7 +183,7 @@ class RelayContext extends EventEmitter {
 
       const next = () => {
         result = undefined
-        this._sourcePromise = this._stream.source.next()
+        this._sourcePromise = this._sourceIterator.next()
       }
 
       this.flow(`FLOW: relay_incoming: started loop`)
@@ -204,7 +207,7 @@ class RelayContext extends EventEmitter {
 
         // Wait for payload messages
         if (result == undefined || (result as StreamResult).done != true) {
-          this._sourcePromise = this._sourcePromise ?? this._stream.source.next()
+          this._sourcePromise = this._sourcePromise ?? this._sourceIterator.next()
 
           pushPromise(this._sourcePromise, 'sourcePromise')
         }
@@ -223,7 +226,7 @@ class RelayContext extends EventEmitter {
         // If source switched, get messages from new source
         if (this._sourceSwitched) {
           this._sourceSwitched = false
-          this._stream.source = result as Stream['source']
+          this._sourceIterator = (result as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
 
           this._streamSourceSwitchPromise = defer<Stream['source']>()
 
@@ -332,7 +335,7 @@ class RelayContext extends EventEmitter {
 
     let sourcePromise: Promise<StreamResult> | undefined
 
-    let currentSource: Stream['source'] | undefined
+    let currentSource: AsyncIterator<StreamType> | undefined
 
     async function* drain(this: RelayContext, end: DeferType<void>): Stream['source'] {
       type SinkResult = Stream['source'] | StreamResult | void
@@ -342,7 +345,8 @@ class RelayContext extends EventEmitter {
       const next = () => {
         result = undefined
 
-        sourcePromise = (currentSource as Stream['source']).next()
+        assert(currentSource != undefined)
+        sourcePromise = currentSource.next()
       }
 
       let ended = false
@@ -398,7 +402,7 @@ class RelayContext extends EventEmitter {
 
         if (this._sinkSourceAttached) {
           this._sinkSourceAttached = false
-          currentSource = result as Stream['source']
+          currentSource = (result as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
 
           result = undefined
           this.flow(`FLOW: relay_outgoing: sinkSource attacked, continue`)

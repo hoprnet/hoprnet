@@ -15,7 +15,7 @@ export class Info extends AbstractCommand {
   }
 
   public async execute(log): Promise<void> {
-    const smartContractInfo = await this.node.smartContractInfo()
+    const smartContractInfo = this.node.smartContractInfo()
     const channelClosureMins = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
 
     // @TODO Add connector info etc.

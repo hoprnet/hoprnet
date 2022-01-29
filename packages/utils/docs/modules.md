@@ -89,16 +89,19 @@
 - [PUBLIC\_KEY\_LENGTH](modules.md#public_key_length)
 - [RESERVED\_ADDRS](modules.md#reserved_addrs)
 - [SECP256K1\_CONSTANTS](modules.md#secp256k1_constants)
+- [SECRET\_LENGTH](modules.md#secret_length)
 - [SIGNATURE\_LENGTH](modules.md#signature_length)
 - [SIGNATURE\_RECOVERY\_LENGTH](modules.md#signature_recovery_length)
 - [SUGGESTED\_BALANCE](modules.md#suggested_balance)
 - [SUGGESTED\_NATIVE\_BALANCE](modules.md#suggested_native_balance)
 - [UNCOMPRESSED\_PUBLIC\_KEY\_LENGTH](modules.md#uncompressed_public_key_length)
 - [b58StringRegex](modules.md#b58stringregex)
+- [dbMock](modules.md#dbmock)
 - [durations](modules.md#durations)
 
 ### Functions
 
+- [FIFO](modules.md#fifo)
 - [abortableTimeout](modules.md#abortabletimeout)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [checkNetworks](modules.md#checknetworks)
@@ -107,10 +110,12 @@
 - [createPacket](modules.md#createpacket)
 - [createPoRString](modules.md#createporstring)
 - [createPoRValuesForSender](modules.md#createporvaluesforsender)
+- [createRelayerKey](modules.md#createrelayerkey)
 - [debug](modules.md#debug)
 - [decodePoRBytes](modules.md#decodeporbytes)
 - [defer](modules.md#defer)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
+- [deriveCommitmentSeed](modules.md#derivecommitmentseed)
 - [deserializeKeyPair](modules.md#deserializekeypair)
 - [dial](modules.md#dial)
 - [expandVars](modules.md#expandvars)
@@ -120,6 +125,7 @@
 - [generateKeyShares](modules.md#generatekeyshares)
 - [getB58String](modules.md#getb58string)
 - [getHeaderLength](modules.md#getheaderlength)
+- [getIpv4LocalAddressClass](modules.md#getipv4localaddressclass)
 - [getLocalAddresses](modules.md#getlocaladdresses)
 - [getLocalHosts](modules.md#getlocalhosts)
 - [getNetworkPrefix](modules.md#getnetworkprefix)
@@ -148,6 +154,8 @@
 - [loadJson](modules.md#loadjson)
 - [localAddressesFirst](modules.md#localaddressesfirst)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
+- [multiaddressCompareByClassFunction](modules.md#multiaddresscomparebyclassfunction)
+- [nAtATime](modules.md#natatime)
 - [oneAtATime](modules.md#oneatatime)
 - [parseHosts](modules.md#parsehosts)
 - [parseJSON](modules.md#parsejson)
@@ -163,6 +171,7 @@
 - [randomPermutation](modules.md#randompermutation)
 - [randomSubset](modules.md#randomsubset)
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
+- [retimer](modules.md#retimer)
 - [retryWithBackoff](modules.md#retrywithbackoff)
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeKeyPair](modules.md#serializekeypair)
@@ -214,7 +223,7 @@
 
 #### Defined in
 
-[libp2p/addressSorters.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L63)
+[libp2p/addressSorters.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L98)
 
 ___
 
@@ -254,17 +263,17 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L93)
+[libp2p/index.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L94)
 
 ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: `Awaited`<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `error`: `string` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  }
+Ƭ **DialResponse**: { `resp`: `Awaited`<`ReturnType`<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: [`SUCCESS`](enums/DialStatus.md#success)  } \| { `status`: [`TIMEOUT`](enums/DialStatus.md#timeout)  } \| { `status`: [`ABORTED`](enums/DialStatus.md#aborted)  } \| { `dhtContacted`: `boolean` ; `status`: [`DIAL_ERROR`](enums/DialStatus.md#dial_error)  } \| { `query`: `PeerId` ; `status`: [`DHT_ERROR`](enums/DialStatus.md#dht_error)  }
 
 #### Defined in
 
-[libp2p/dialHelper.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L34)
+[libp2p/dialHelper.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L40)
 
 ___
 
@@ -299,7 +308,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L170)
+[libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
 
 ___
 
@@ -330,7 +339,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
+[libp2p/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L172)
 
 ___
 
@@ -392,7 +401,7 @@ ___
 
 #### Defined in
 
-[db.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L70)
+[db.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L73)
 
 ___
 
@@ -436,7 +445,7 @@ ___
 
 #### Defined in
 
-[db.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L65)
+[db.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L68)
 
 ___
 
@@ -452,7 +461,7 @@ ___
 
 #### Defined in
 
-[db.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L61)
+[db.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L64)
 
 ___
 
@@ -477,13 +486,13 @@ send message. If `includeReply` is set, wait for a response
 
 #### Defined in
 
-[libp2p/index.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L108)
+[libp2p/index.ts:109](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L109)
 
 ___
 
 ### libp2pSubscribe
 
-Ƭ **libp2pSubscribe**: (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
+Ƭ **libp2pSubscribe**: (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void`\> \| `void`\>, `errHandler`: `ErrHandler`, `includeReply`: ``false``) => `void` & (`libp2p`: `LibP2P`, `protocol`: `string`, `handler`: [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`Uint8Array`\>\>, `errHandler`: `ErrHandler`, `includeReply`: ``true``) => `void`
 
 Generates a handler that pulls messages out of a stream
 and feeds them to the given handler.
@@ -500,7 +509,7 @@ and feeds them to the given handler.
 
 #### Defined in
 
-[libp2p/index.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L240)
+[libp2p/index.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L241)
 
 ## Variables
 
@@ -560,7 +569,7 @@ ___
 
 #### Defined in
 
-[constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L15)
+[constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L16)
 
 ___
 
@@ -600,7 +609,7 @@ ___
 
 #### Defined in
 
-[constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L19)
+[constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L20)
 
 ___
 
@@ -634,7 +643,7 @@ ___
 
 #### Defined in
 
-[constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L17)
+[constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L18)
 
 ___
 
@@ -644,7 +653,7 @@ ___
 
 #### Defined in
 
-[constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L22)
+[constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L23)
 
 ___
 
@@ -654,7 +663,7 @@ ___
 
 #### Defined in
 
-[constants.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L11)
+[constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L12)
 
 ___
 
@@ -704,7 +713,7 @@ ___
 
 #### Defined in
 
-[constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L13)
+[constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L14)
 
 ___
 
@@ -800,13 +809,23 @@ Several ECDSA on secp256k1 related constants
 
 ___
 
+### SECRET\_LENGTH
+
+• **SECRET\_LENGTH**: ``32``
+
+#### Defined in
+
+[constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L8)
+
+___
+
 ### SIGNATURE\_LENGTH
 
 • **SIGNATURE\_LENGTH**: ``64``
 
 #### Defined in
 
-[constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L8)
+[constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
 
 ___
 
@@ -816,7 +835,7 @@ ___
 
 #### Defined in
 
-[constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
+[constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L10)
 
 ___
 
@@ -826,7 +845,7 @@ ___
 
 #### Defined in
 
-[constants.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L26)
+[constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L27)
 
 ___
 
@@ -836,7 +855,7 @@ ___
 
 #### Defined in
 
-[constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L23)
+[constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L24)
 
 ___
 
@@ -858,7 +877,17 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L25)
+[libp2p/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L26)
+
+___
+
+### dbMock
+
+• **dbMock**: [`HoprDB`](classes/HoprDB.md) = `db`
+
+#### Defined in
+
+[db.mock.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.mock.ts#L12)
 
 ___
 
@@ -881,6 +910,32 @@ ___
 
 ## Functions
 
+### FIFO
+
+▸ **FIFO**<`T`\>(): `Object`
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Returns
+
+`Object`
+
+| Name | Type |
+| :------ | :------ |
+| `push` | (`data`: `T`) => `number` |
+| `shift` | () => `T` \| `undefined` |
+| `size` | () => `number` |
+
+#### Defined in
+
+[collection/fifo.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L10)
+
+___
+
 ### abortableTimeout
 
 ▸ **abortableTimeout**<`Result`, `AbortMsg`, `TimeoutMsg`\>(`fn`, `abortMsg`, `timeoutMsg`, `opts`): `Promise`<`Result` \| `AbortMsg` \| `TimeoutMsg`\>
@@ -897,7 +952,7 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `fn` | (`opts`: [`TimeoutOpts`](modules.md#timeoutopts)) => `Promise`<`Result`\> |
+| `fn` | (`opts`: `Required`<[`TimeoutOpts`](modules.md#timeoutopts)\>) => `Promise`<`Result`\> |
 | `abortMsg` | `AbortMsg` |
 | `timeoutMsg` | `TimeoutMsg` |
 | `opts` | [`TimeoutOpts`](modules.md#timeoutopts) |
@@ -991,7 +1046,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[libp2p/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L42)
+[libp2p/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L43)
 
 ___
 
@@ -1013,7 +1068,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[libp2p/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L32)
+[libp2p/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L33)
 
 ___
 
@@ -1106,6 +1161,32 @@ the challenge for the first ticket sent to the first relayer
 #### Defined in
 
 [crypto/por/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L21)
+
+___
+
+### createRelayerKey
+
+▸ **createRelayerKey**(`destination`): `Promise`<`CID`\>
+
+Creates a DHT entry to give relays the opportunity to signal
+other nodes in the network that they act as a relay for the given
+node.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `destination` | `PeerId` | peerId of the node for which relay services are provided |
+
+#### Returns
+
+`Promise`<`CID`\>
+
+the DHT entry key
+
+#### Defined in
+
+[libp2p/relayCode.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/relayCode.ts#L13)
 
 ___
 
@@ -1211,6 +1292,29 @@ relayer for transforming and delivering the packet
 
 ___
 
+### deriveCommitmentSeed
+
+▸ **deriveCommitmentSeed**(`privateKey`, `channelInfo`): `Uint8Array`
+
+Derives the initial commitment seed on a newly opened channel.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `privateKey` | `Uint8Array` | Node private key. |
+| `channelInfo` | `Uint8Array` | Additional information identifying the channel. |
+
+#### Returns
+
+`Uint8Array`
+
+#### Defined in
+
+[crypto/commitment/keyDerivation.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/commitment/keyDerivation.ts#L12)
+
+___
+
 ### deserializeKeyPair
 
 ▸ **deserializeKeyPair**(`serialized`, `password`, `useWeakCrypto?`): `Promise`<`DeserializationResponse`\>
@@ -1244,7 +1348,7 @@ ___
 
 ▸ **dial**(`libp2p`, `destination`, `protocol`, `opts?`): `Promise`<[`DialResponse`](modules.md#dialresponse)\>
 
-Combines libp2p methods such as dialProtocol and peerRouting.findPeer
+Performs a dial strategy using libp2p.dialProtocol and libp2p.findPeer
 to establish a connection.
 Contains a baseline protection against dialing same addresses twice.
 
@@ -1252,7 +1356,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `libp2p` | `Libp2p` | a libp2p instance |
+| `libp2p` | `ReducedLibp2p` | a libp2p instance |
 | `destination` | `PeerId` | PeerId of the destination |
 | `protocol` | `string` | - |
 | `opts?` | `DialOpts` |  |
@@ -1263,7 +1367,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/dialHelper.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L169)
+[libp2p/dialHelper.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L279)
 
 ___
 
@@ -1415,7 +1519,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[libp2p/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L69)
+[libp2p/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L70)
 
 ___
 
@@ -1438,6 +1542,26 @@ ___
 #### Defined in
 
 [crypto/packet/index.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L28)
+
+___
+
+### getIpv4LocalAddressClass
+
+▸ **getIpv4LocalAddressClass**(`address`): ``"A"`` \| ``"B"`` \| ``"C"`` \| ``"D"`` \| `undefined`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | `Multiaddr` |
+
+#### Returns
+
+``"A"`` \| ``"B"`` \| ``"C"`` \| ``"D"`` \| `undefined`
+
+#### Defined in
+
+[libp2p/addressSorters.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L34)
 
 ___
 
@@ -1583,7 +1707,7 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[libp2p/index.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L52)
+[libp2p/index.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L53)
 
 ___
 
@@ -1888,7 +2012,7 @@ whether embedded privKey is a secp256k1 key
 
 #### Defined in
 
-[libp2p/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L85)
+[libp2p/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L86)
 
 ___
 
@@ -1961,7 +2085,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L125)
+[libp2p/index.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L126)
 
 ___
 
@@ -1975,7 +2099,7 @@ ___
 | :------ | :------ | :------ |
 | `libp2p` | `Libp2p` | `undefined` |
 | `protocol` | `string` | `undefined` |
-| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`Promise`<`void` \| `Uint8Array`\>\> | `undefined` |
+| `handler` | [`LibP2PHandlerFunction`](modules.md#libp2phandlerfunction)<`void` \| `Promise`<`void` \| `Uint8Array`\>\> | `undefined` |
 | `errHandler` | `ErrHandler` | `undefined` |
 | `includeReply` | `boolean` | `false` |
 
@@ -1985,7 +2109,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:255](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L255)
+[libp2p/index.ts:256](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L256)
 
 ___
 
@@ -2064,7 +2188,7 @@ Take an array of addresses and sorts such that private addresses are first
 
 #### Defined in
 
-[libp2p/addressSorters.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L59)
+[libp2p/addressSorters.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L94)
 
 ___
 
@@ -2089,29 +2213,122 @@ ___
 
 ___
 
+### multiaddressCompareByClassFunction
+
+▸ **multiaddressCompareByClassFunction**(`a`, `b`): `number`
+
+Compare two multiaddresses based on their class: A class first, B class second, ...
+Local addresses take precedence over remote addresses.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `a` | `Multiaddr` |
+| `b` | `Multiaddr` |
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[libp2p/addressSorters.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L54)
+
+___
+
+### nAtATime
+
+▸ **nAtATime**<`ArgType`, `Return`, `Args`\>(`fn`, `args`, `concurrency`): `Promise`<(`Return` \| `Error`)[]\>
+
+Runs the same worker function with multiple arguments but does not run more
+than a given number of workers concurrently.
+
+**`dev`** Iterative implementation of the functionality
+
+**`example`**
+import { setTimeout } from 'timers/promises'
+
+const result = await nAtaTime(setTimeout, [[300, 'one'], [200, 'two'], [100, 'three']], 2)
+// => ['two', 'one', 'three']
+
+#### Type parameters
+
+| Name | Type |
+| :------ | :------ |
+| `ArgType` | `ArgType` |
+| `Return` | `Return` |
+| `Args` | extends `ArgType`[] |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `fn` | (...`args`: `Args`) => `Promise`<`Return`\> | worker function |
+| `args` | `Args`[] | arguments passed to worker function |
+| `concurrency` | `number` | number of parallel jobs |
+
+#### Returns
+
+`Promise`<(`Return` \| `Error`)[]\>
+
+an array containing the results
+
+#### Defined in
+
+[async/parallel.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/parallel.ts#L43)
+
+___
+
 ### oneAtATime
 
-▸ **oneAtATime**(): (`cb`: () => `Promise`<`void`\>) => `Promise`<`void`\>
+▸ **oneAtATime**<`ReturnType`\>(): (`fn`: () => `Promise`<`ReturnType`\>) => `void`
+
+Creates a limiter that takes functions and runs them subsequently
+with no concurrency.
+
+**`example`**
+let limiter = oneAtATime()
+limiter(() => Promise.resolve('1'))
+limiter(() => Promise.resolve('2'))
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `ReturnType` |
 
 #### Returns
 
 `fn`
 
-▸ (`cb`): `Promise`<`void`\>
+a limiter that takes additional functions
+
+▸ (`fn`): `void`
+
+Creates a limiter that takes functions and runs them subsequently
+with no concurrency.
+
+**`example`**
+let limiter = oneAtATime()
+limiter(() => Promise.resolve('1'))
+limiter(() => Promise.resolve('2'))
 
 ##### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `cb` | () => `Promise`<`void`\> |
+| `fn` | () => `Promise`<`ReturnType`\> |
 
 ##### Returns
 
-`Promise`<`void`\>
+`void`
+
+a limiter that takes additional functions
 
 #### Defined in
 
-[async/concurrency.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/concurrency.ts#L8)
+[async/concurrency.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/concurrency.ts#L14)
 
 ___
 
@@ -2167,7 +2384,7 @@ ___
 
 #### Defined in
 
-[db.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L31)
+[db.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L32)
 
 ___
 
@@ -2472,6 +2689,37 @@ ___
 
 ___
 
+### retimer
+
+▸ **retimer**(`fn`, `newTimeout`): () => `void`
+
+Repeatedly apply a function after a timeout
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `fn` | () => `void` | function to apply after every timeout |
+| `newTimeout` | () => `number` | function that returns the new timeout |
+
+#### Returns
+
+`fn`
+
+▸ (): `void`
+
+Repeatedly apply a function after a timeout
+
+##### Returns
+
+`void`
+
+#### Defined in
+
+[process/retimer.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/retimer.ts#L6)
+
+___
+
 ### retryWithBackoff
 
 ▸ **retryWithBackoff**<`T`\>(`fn`, `options?`): `Promise`<`T`\>
@@ -2500,7 +2748,7 @@ A general use backoff that will reject once MAX_DELAY is reached.
 
 #### Defined in
 
-[async/backoff.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L17)
+[async/backoff.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L18)
 
 ___
 
@@ -2895,7 +3143,7 @@ ___
 
 ### u8aEquals
 
-▸ **u8aEquals**(`a`, `b`, ...`arrays`): `boolean`
+▸ **u8aEquals**(...`arrays`): `boolean`
 
 Checks if the contents of the given Uint8Arrays are equal. Returns once at least
 one different entry is found.
@@ -2904,8 +3152,6 @@ one different entry is found.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `a` | `Uint8Array` | first array |
-| `b` | `Uint8Array` | second array |
 | `...arrays` | `Uint8Array`[] | additional arrays |
 
 #### Returns
@@ -3164,4 +3410,4 @@ ___
 
 #### Defined in
 
-[async/backoff.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L6)
+[async/backoff.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L7)

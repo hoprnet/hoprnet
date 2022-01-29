@@ -20,7 +20,7 @@ declare bad_token="bad_token"
 
 usage() {
   msg
-  msg "Usage: $0 <host> <rest_port> <admin_port> <insecure_admin_port>"
+  msg "Usage: $0 <host> <rest_port> <admin_port> <insecure_admin_port> <api_token>"
   msg
 }
 
@@ -28,6 +28,7 @@ declare host="${1}"
 declare rest_port="${2}"
 declare admin_port="${3}"
 declare insecure_admin_port="${4}"
+declare api_token="${5}"
 
 log "Security tests started"
 log "Rest API @ ${host}:${rest_port}"
@@ -45,17 +46,66 @@ wait_for_port "${insecure_admin_port}" "${host}"
 
 declare http_status_code
 
-log "REST API should reject authentication with invalid token"
-http_status_code=$(curl -H "X-Auth-Token: bad-token" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
+log "REST API v1 should reject authentication with invalid token"
+http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${http_status_code} -ne 403 ]; then
   log "⛔️ Expected 403 http status code, got ${http_status_code}"
   exit 1
 fi
 
-log "REST API should reject authentication without token"
+log "REST API v1 should reject authentication without token"
 http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 -X POST --data "fake cmd" "${host}:${rest_port}/api/v1/command")
 if [ ${http_status_code} -ne 403 ]; then
   log "⛔️ Expected 403 http status code, got ${http_status_code}"
+  exit 1
+fi
+
+log "REST API v1 should accept authentication with valid token"
+http_status_code=$(curl -H "X-Auth-Token: ${api_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v1/version")
+if [ ${http_status_code} -ne 200 ]; then
+  log "⛔️ Expected 200 http status code, got ${http_status_code}"
+  exit 1
+fi
+
+log "REST API v2 should reject authentication with invalid token"
+http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
+if [ ${http_status_code} -ne 403 ]; then
+  log "⛔️ Expected 403 http status code, got ${http_status_code}"
+  exit 1
+fi
+
+log "REST API v2 should reject authentication without token"
+http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
+if [ ${http_status_code} -ne 403 ]; then
+  log "⛔️ Expected 403 http status code, got ${http_status_code}"
+  exit 1
+fi
+
+log "REST API v2 should accept authentication with valid token"
+http_status_code=$(curl -H "X-Auth-Token: ${api_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
+if [ ${http_status_code} -ne 200 ]; then
+  log "⛔️ Expected 200 http status code, got ${http_status_code}"
+  exit 1
+fi
+
+log "REST API v2 should reject authentication with invalid basic auth credentials"
+http_status_code=$(curl --basic --user "${bad_token}:" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
+if [ ${http_status_code} -ne 403 ]; then
+  log "⛔️ Expected 403 http status code, got ${http_status_code}"
+  exit 1
+fi
+
+log "REST API v2 should reject authentication without basic auth credentials"
+http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
+if [ ${http_status_code} -ne 403 ]; then
+  log "⛔️ Expected 403 http status code, got ${http_status_code}"
+  exit 1
+fi
+
+log "REST API v2 should accept authentication with valid basic auth credentials"
+http_status_code=$(curl --basic --user "${api_token}:" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${rest_port}/api/v2/node/version")
+if [ ${http_status_code} -ne 200 ]; then
+  log "⛔️ Expected 200 http status code, got ${http_status_code}"
   exit 1
 fi
 
@@ -77,7 +127,7 @@ if [ "${msg_type}" != "auth-failed" ]; then
 fi
 
 log "Admin websocket should reject commands with invalid token"
-ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=bad-token")
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ --header "Cookie:X-Auth-Token=${bad_token}")
 msg_type=$(echo "${ws_response}" | jq .type --raw-output )
 
 if [ "${msg_type}" != "auth-failed" ]; then
@@ -91,7 +141,7 @@ if [ "${msg_type}" != "auth-failed" ]; then
 fi
 
 log "Admin websocket should execute info command with correct token"
-ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=e2e-API-token^^")
+ws_response=$(echo "info" | websocat ws://${host}:${admin_port}/ -0 --header "Cookie:X-Auth-Token=${api_token}")
 if [[ "${ws_response}" != *"ws client connected [ authentication ENABLED ]"* ]]; then
   log "⛔️ Didn't succeed ws authentication"
   log "Expected response should contain: 'ws client connected [ authentication ENABLED ]' "
@@ -119,6 +169,5 @@ if [[ "${ws_response}" != *"ws client connected [ authentication DISABLED ]"* ]]
   log "${ws_response}"
   exit 1
 fi
-
 
 log "Security tests finished successfully"

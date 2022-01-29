@@ -40,7 +40,7 @@ The HOPR Association _tech_ members and [Project Owner](#legend) have agreed on 
 | Trifecta            | Representantives + Project Owner                                                                           |
 | Issue tracker       | The sole issue tracker is [GitHub](https://github.com/hoprnet)                                             |
 
-### Representantives
+### Representatives
 
 Each individual representantive is elected for a period of `3 months`. The periods are overlapped to create a staggered schedule during which new representatives can be guided by their co-representatives who have already served half of their election period. Previous representatives may be re-elected.
 
@@ -53,7 +53,14 @@ Responsibilities:
 _Current:_
 
 - [Tino](https://github.com/tolbrino) until 05/02/2022
-- [Steve](https://github.com/nionis) until 20/12/2021
+- [Robert](https://github.com/robertkiel) until 04/03/2022
+
+#### Electing a new representantive
+
+- every election should begin 5 working days prior to the representantive's replacement
+- voting is done via google form similar to [this](https://docs.google.com/forms/d/1CA_C_NgI9M_drHFqOOVlBVdfuiWsg64xE_wE1V1pgyw)
+- email login is required but emails should not be collected
+- only tech _members_ may vote
 
 ### Trifecta
 
@@ -94,9 +101,9 @@ _Where:_ Google meet
 
 ### End of working day
 
-At the end of every working day, members may write an update on what they have accomplished during the day.
+At the end of every working day, members write an update on what they have accomplished during the day.
 
-_Required:_ `False`
+_Required:_ `True`
 
 _When:_ Every day, at end of work
 
@@ -153,13 +160,31 @@ Newly created issues ([labelled as](#labels): `new issue`) may not all have been
 
 In `Retrospective` we aim to summarize the results of the last spring, in order to help us identify and fix issues in our processes and company culture.
 
-- what went better than expected
-- what went worse than expected
-- lessons learned
+For a `Retrospective` a moderator is chosen:
+
+1. If `Process Facilitator` is present, they are chosen.
+2. Otherwise, any member of `Trifecta` can self-declare themselves as a moderator.
+
+The process is using [EasyRetro](https://easyretro.io/). `Retrospective` follows this schedule:
+
+1. Everybody secretly adds hidden items (max 3) to `What Went Well` column.
+2. The moderator reveals the `What Went Well` column.
+3. Everybody has ~30 secs to speak about each of their items.
+4. Everybody secretly adds hidden items (max 3) to `Problems` column.
+5. The moderator reveals `Problems` column.
+6. Everybody has ~30 secs to speak about each of their items.
+7. Everybody is given 3 votes to vote on the items in the `Problems` category. Voting is hidden.
+8. The moderator stops the voting and the most voted items bubble up.
+9. The moderator takes 3 top items from the `Problems` category and creates an `Action Item` in the third column out of it with the help of the team. Each `Action Item`:
+
+- defines `What` has to be done
+- defines `When` it has to be completed
+- defines `Who` is responsible for completing it
+- must be created as an issue in the repository to be trackable
 
 _Who:_ all tech members within a meeting
 
-_When:_ first day of the sprint
+_When:_ last day of the sprint
 
 ### Epic Prioritization
 
@@ -269,6 +294,7 @@ Since PRs should link to an issue, it's not necessary to label PRs. However, som
 - All PR‘s must pass all status checks/tests before merging.
 - Releases can be merged back to `master`, but not always necessary.
 - When in conflict, chat and engage with the team.
+- When creating a PR, also update the changelog at `CHANGELOG.md` with a one-line high level summary and a reference to the PR or respective issue on Github.
 
 ### Workflow
 

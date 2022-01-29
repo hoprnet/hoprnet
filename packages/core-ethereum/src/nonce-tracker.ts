@@ -166,7 +166,7 @@ export default class NonceTracker {
     const now = new Date().getTime()
 
     // checks if one of the txs is stuck
-    return txs.some((tx) => {
+    return txs.some((tx: Transaction) => {
       return tx.createdAt + this.minPending < now
     })
   }

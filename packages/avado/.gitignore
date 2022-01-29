@@ -1,1 +1,7 @@
-build_*
+# ignore everything in build/ except for the Dockerfile
+!/build
+/build/*
+!/build/Dockerfile
+
+# Avado package builds
+/build_*

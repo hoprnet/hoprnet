@@ -1,25 +1,20 @@
-import dgram from 'dgram'
-import type { Socket, RemoteInfo } from 'dgram'
+import type { RemoteInfo } from 'dgram'
 import {
-  getExternalIp,
   handleStunRequest,
   DEFAULT_PARALLEL_STUN_CALLS,
   PUBLIC_STUN_SERVERS,
-  STUN_TIMEOUT
+  STUN_TIMEOUT,
+  iterateThroughStunServers,
+  performSTUNRequests,
+  getUsableResults,
+  type Request,
+  intepreteResults,
+  getExternalIp
 } from './stun'
-import { nodeToMultiaddr } from '../utils'
 import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
-import { once } from 'events'
-import { defer, ipToU8aAddress, isLocalhost, isPrivateAddress } from '@hoprnet/hopr-utils'
-import type { DeferType } from '@hoprnet/hopr-utils'
-
-type ServerType = {
-  socket: Socket
-  gotContacted: DeferType<number>
-  contactCount: number
-  index: number
-}
+import { defer, type DeferType } from '@hoprnet/hopr-utils'
+import { stopNode, startStunServer, bindToUdpSocket } from './utils.spec'
 
 /**
  * Creates a STUN server that answers with tweaked STUN responses to simulate
@@ -28,253 +23,349 @@ type ServerType = {
  * @param address fake address
  * @returns STUN server answering with falsy responses
  */
-async function getAmbiguousSTUNServer(port: number, address?: string) {
-  const socket = dgram.createSocket('udp4')
-
-  const listeningPromise = once(socket, 'listening')
-  socket.bind()
+async function getAmbiguousSTUNServer(
+  port: number | undefined,
+  address: string | undefined = undefined,
+  state: { msgReceived: DeferType<void>; contactCount?: number } | undefined,
+  reply: boolean = true
+) {
+  const socket = await bindToUdpSocket(undefined)
 
   socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
-    handleStunRequest(socket, msg, rinfo, {
-      ...rinfo,
-      address: address ?? rinfo.address,
-      port
-    })
+    if (reply) {
+      handleStunRequest(socket, msg, rinfo, {
+        ...rinfo,
+        address: address ?? rinfo.address,
+        port: port ?? rinfo.port
+      })
+    }
+    if (state?.contactCount != undefined) {
+      state.contactCount += 1
+    }
+    state?.msgReceived.resolve()
   })
-
-  await listeningPromise
 
   return socket
 }
 
-function closeSTUNServer(socket: Socket) {
-  const closePromise = once(socket, 'close')
-
-  socket.close()
-
-  return closePromise
+type StateType = {
+  msgReceived: DeferType<void>
+  contactCount: number
+}
+function getState(amount: number): StateType[] {
+  return Array.from({ length: amount }, (_) => ({ msgReceived: defer<void>(), contactCount: 0 }))
 }
 
-describe('test STUN', function () {
-  let servers: ServerType[]
-
-  before(async () => {
-    servers = await Promise.all(
-      // 1 STUN server that contacts
-      // DEFAULT_PARALLEL_STUN_CALLS STUN servers and leaves out
-      // 1 available STUN server
-      Array.from({ length: DEFAULT_PARALLEL_STUN_CALLS + 2 }).map(
-        (_: any, index: number) =>
-          new Promise<ServerType>((resolve, reject) => {
-            const socket = dgram.createSocket('udp4')
-
-            const gotContacted = defer<number>()
-            let contactCount = 0
-
-            socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
-              gotContacted.resolve(index)
-              contactCount++
-              handleStunRequest(socket, msg, rinfo)
-            })
-            socket.once('error', reject)
-            socket.once('listening', () => {
-              socket.removeListener('error', reject)
-
-              resolve({
-                socket,
-                gotContacted,
-                contactCount,
-                index
-              })
-            })
-
-            socket.bind()
-          })
-      )
-    )
-  })
-
-  it('should perform a STUN request', async function () {
-    const multiAddrs = servers
-      .slice(1)
-      .map((server: ServerType) => Multiaddr.fromNodeAddress(nodeToMultiaddr(server.socket.address()), 'udp'))
-
-    let result = await getExternalIp(multiAddrs, servers[0].socket)
-
-    if (result == undefined) {
-      // It seems that we're running behind a bidirectional NAT. Test STUN in local mode
-      result = await getExternalIp(multiAddrs, servers[0].socket, true)
-
-      assert(result != undefined, `STUN request must be successful`)
-
-      assert(isLocalhost(ipToU8aAddress(result.address, 'IPv4'), 'IPv4'))
-    } else {
-      // NAT seems to be honest or running on a machine with public IPv4 address
-      const u8aAddress = ipToU8aAddress(result.address, 'IPv4')
-
-      // Check that returned is a public address
-      assert(!isLocalhost(u8aAddress, 'IPv4'), `Returned address must not be localhost`)
-
-      assert(!isPrivateAddress(u8aAddress, 'IPv4'), `Returned address must not be a local address`)
-    }
-
-    /*
-     // DISABLED - with IP4 the address changes from 0.0.0.0 to 127.0.0.1
-     // IPV6 doesn't work at present.
-     //
-      assert((client.address().address === result.address || 
-           client.address().address.concat('1') === result.address), "address should match")
-    */
-  })
-
-  it('should get our external address from a public server if there is no other server given', async function () {
-    const result = await getExternalIp(undefined, servers[0].socket)
-
-    assert(result != undefined, 'server should be able to detect its external address')
-  })
-
-  it('should return a valid external address even if some external STUN servers produce a timeout', async function () {
-    const before = Date.now()
-    const result = await getExternalIp(
-      [
-        ...PUBLIC_STUN_SERVERS.slice(0, Math.max(0, DEFAULT_PARALLEL_STUN_CALLS - 1)),
-        new Multiaddr(`/ip4/127.0.0.1/udp/1`)
-      ],
-      servers[0].socket
-    )
-
-    assert(Date.now() - before >= STUN_TIMEOUT, `should not resolve before timeout ends`)
-    assert(result != undefined, `Timeout should not lead to empty result`)
-  })
-
-  it('should try other STUN servers after DNS failure', async function () {
-    const before = Date.now()
-    const response = await getExternalIp(
-      [new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`)],
-      servers[0].socket
-    )
-
-    assert(response != undefined, `STUN request must be successful`)
-
-    assert(Date.now() - before >= STUN_TIMEOUT, `STUN request must produce at least one timeout`)
-  })
-
-  it('should not try other STUN servers if running locally', async function () {
-    const before = Date.now()
-    const response = await getExternalIp(
-      [new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`)],
-      servers[0].socket,
-      true
-    )
-
-    assert(response == undefined, `STUN request must not be successful`)
-
-    assert(Date.now() - before >= STUN_TIMEOUT, `STUN request must produce at least one timeout`)
-  })
-
-  it('should understand ambiguous results', async function () {
-    const BASE_PUBLIC_ADDRESS = `1.2.3.`
-    const tweakedServers = await Promise.all(
-      Array.from({ length: 2 }, (_, index: number) =>
-        getAmbiguousSTUNServer(index, BASE_PUBLIC_ADDRESS.concat(index.toString()))
+describe('test STUN helper functions', function () {
+  it('iteratively contact STUN servers', async function () {
+    this.timeout(3 * STUN_TIMEOUT + 2e3)
+    const AMOUNT = 2 * DEFAULT_PARALLEL_STUN_CALLS + 1
+    const states = getState(AMOUNT)
+    const servers = await Promise.all(
+      Array.from({ length: AMOUNT }, (_, index: number) =>
+        getAmbiguousSTUNServer(index, undefined, states[index], index < 1)
       )
     )
 
-    const response = await getExternalIp(
-      tweakedServers.map((socket: Socket) => new Multiaddr(`/ip4/127.0.0.1/udp/${socket.address().port}`)),
-      servers[0].socket
-    )
+    const socket = await bindToUdpSocket()
 
-    assert(response == undefined, `Ambiguous results from local STUN servers must detected as bidirectional NAT`)
-
-    await Promise.all(tweakedServers.map(closeSTUNServer))
-  })
-
-  it('should understand ambiguous results when running in local testnet', async function () {
-    const tweakedServers = await Promise.all(
-      Array.from({ length: 2 }, (_, index: number) => getAmbiguousSTUNServer(index))
-    )
-
-    const responseWhenRunningLocally = await getExternalIp(
-      tweakedServers.map((socket: Socket) => new Multiaddr(`/ip4/127.0.0.1/udp/${socket.address().port}`)),
-      servers[0].socket,
+    const responses = await iterateThroughStunServers(
+      servers.map((s) => new Multiaddr(`/ip4/127.0.0.1/udp/${s.address().port}`)),
+      socket,
+      Infinity,
       true
     )
 
-    assert(
-      responseWhenRunningLocally == undefined,
-      `Ambiguous results from local STUN servers should not lead to successful STUN response`
-    )
+    await Promise.all(states.map((state: StateType) => state.msgReceived.promise))
 
-    await Promise.all(tweakedServers.map(closeSTUNServer))
+    assert(
+      responses != undefined && responses.length == 1,
+      `Must contain only one response because the other STUN servers were not responding`
+    )
+    await Promise.all(servers.concat(socket).map(stopNode))
   })
 
-  it('should return local IP address when running in local testnet', async function () {
-    const responseWhenRunningLocally = await getExternalIp(
-      servers.slice(1).map((server: ServerType) => new Multiaddr(`/ip4/127.0.0.1/udp/${server.socket.address().port}`)),
-      servers[0].socket,
+  it('iteratively contact STUN servers and get ambiguous results', async function () {
+    this.timeout(3 * STUN_TIMEOUT + 2e3)
+    const AMOUNT = 2
+    const states = getState(AMOUNT)
+    const servers = await Promise.all(
+      Array.from({ length: AMOUNT }, (_, index: number) =>
+        getAmbiguousSTUNServer(index, undefined, states[index], true)
+      )
+    )
+
+    const socket = await bindToUdpSocket()
+
+    const responses = await iterateThroughStunServers(
+      servers.map((s) => new Multiaddr(`/ip4/127.0.0.1/udp/${s.address().port}`)),
+      socket,
+      Infinity,
       true
     )
 
-    assert(responseWhenRunningLocally != undefined, 'STUN request must be successful')
-
+    assert(responses != undefined && responses.length == 2, `Must return two responses`)
     assert(
-      responseWhenRunningLocally.address === '127.0.0.1',
-      `When running all nodes on localhost, response must be localhost`
+      responses[0].response != undefined && responses[1].response != undefined,
+      `Both request must lead to a response`
     )
+    assert(responses[0].response.port != responses[1].response.port, `Responses must be different`)
+
+    await Promise.all(states.map((state: StateType) => state.msgReceived.promise))
+
+    await Promise.all(servers.concat(socket).map(stopNode))
   })
 
-  it('should not fail on DNS failures', async function () {
-    const stunResult = await getExternalIp(
-      [
-        new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`),
-        ...PUBLIC_STUN_SERVERS.slice(DEFAULT_PARALLEL_STUN_CALLS - 1)
-      ],
-      servers[0].socket
+  it('iteratively contact STUN servers with limit', async function () {
+    this.timeout(3 * STUN_TIMEOUT + 2e3)
+    const AMOUNT = DEFAULT_PARALLEL_STUN_CALLS * 2 + 1
+    const states = getState(AMOUNT)
+    const servers = await Promise.all(
+      Array.from({ length: AMOUNT }, (_, index: number) =>
+        getAmbiguousSTUNServer(undefined, undefined, states[index], index < 1)
+      )
     )
 
-    assert(stunResult != undefined, `STUN request should work even if there are DNS failures`)
-  })
+    const socket = await bindToUdpSocket()
 
-  it('should contact only a few STUN servers', async function () {
-    const multiaddrs = servers
-      .slice(1)
-      .map((server: ServerType) => Multiaddr.fromNodeAddress(nodeToMultiaddr(server.socket.address()), 'udp'))
+    const LIMIT = 5
 
-    assert(multiaddrs.length == DEFAULT_PARALLEL_STUN_CALLS + 1)
-
-    const stunResult = await getExternalIp(multiaddrs, servers[0].socket)
-
-    assert(stunResult != undefined, `STUN requests must lead to a result`)
-
-    let contactedPromises = servers.slice(1).map((server) => server.gotContacted.promise)
-    const contactedIndices: number[] = []
-
-    for (let i = 0; i < DEFAULT_PARALLEL_STUN_CALLS; i++) {
-      const next = await Promise.race(contactedPromises)
-
-      contactedIndices.push(next)
-      contactedPromises = servers
-        .slice(1)
-        .filter((server: ServerType) => !contactedIndices.includes(server.index))
-        .map((server: ServerType) => server.gotContacted.promise)
-    }
-
-    assert(
-      servers.some((server: ServerType) => !contactedIndices.includes(server.index) && server.contactCount == 0),
-      `At least one server should not have been contacted`
+    await iterateThroughStunServers(
+      servers.map((s) => new Multiaddr(`/ip4/127.0.0.1/udp/${s.address().port}`)),
+      socket,
+      LIMIT
     )
-  })
 
-  after(async () => {
+    const indices = states.reduce((acc: number[], state: StateType, index: number) => {
+      if (state.contactCount == 0) {
+        acc.push(index)
+      }
+      return acc
+    }, [])
+
+    assert(indices.length >= AMOUNT - LIMIT)
+
     await Promise.all(
-      servers.map((server) => {
-        // Make sure that there are no hanging promises
-        server.gotContacted.resolve()
-
-        server.socket.close()
-        return once(server.socket, 'close')
+      states.map((state: StateType, i: number) => {
+        if (indices.includes(i)) {
+          return Promise.resolve()
+        } else {
+          return state.msgReceived.promise
+        }
       })
     )
+
+    await Promise.all(servers.concat(socket).map(stopNode))
+  })
+
+  it('dns failures', async function () {
+    const socket = await bindToUdpSocket()
+
+    let responses: Request[] | undefined
+    await assert.doesNotReject(async () => {
+      responses = await performSTUNRequests([new Multiaddr(`/dns4/totallyinvalidurl.hoprnet.org/udp/12345`)], socket)
+    }, `dns error must not cause an exception`)
+
+    assert(responses != undefined && responses.length == 0, `Failed STUN request must not return any response`)
+    await stopNode(socket)
+  })
+
+  it('result filter', function () {
+    const ip6address = {
+      family: 'IPv6',
+      address: '::1',
+      port: 0
+    }
+
+    assert(
+      getUsableResults([{ response: ip6address }] as Request[], true).length == 0,
+      `Must not accept IPv6 addresses in local-mode`
+    )
+    assert(
+      getUsableResults([{ response: ip6address }] as Request[], false).length == 0,
+      `Must not accept IPv6 addresses in normal-mode`
+    )
+
+    const localhostAddress = {
+      family: 'IPv4',
+      address: '127.0.0.1',
+      port: 0
+    }
+
+    assert(
+      getUsableResults([{ response: localhostAddress }] as Request[], true).length == 1,
+      `Must accept localhost addresses in local-mode`
+    )
+    assert(
+      getUsableResults([{ response: localhostAddress }] as Request[], false).length == 0,
+      `Must not accept localhost addresses in normal-mode`
+    )
+
+    const localAddress = {
+      family: 'IPv4',
+      address: '192.168.0.23',
+      port: 0
+    }
+
+    assert(
+      getUsableResults([{ response: localAddress }] as Request[], true).length == 1,
+      `Must accept local addresses in local-mode`
+    )
+    assert(
+      getUsableResults([{ response: localAddress }] as Request[], false).length == 0,
+      `Must not accept local addresses in normal-mode`
+    )
+
+    const publicAddress = {
+      family: 'IPv4',
+      address: '1.2.3.4',
+      port: 0
+    }
+
+    assert(
+      getUsableResults([{ response: publicAddress }] as Request[], true).length == 0,
+      `Must not accept public addresses in local-mode`
+    )
+    assert(
+      getUsableResults([{ response: publicAddress }] as Request[], false).length == 1,
+      `Must accept public addresses in normal-mode`
+    )
+
+    assert(getUsableResults([] as Request[]).length == 0, `Must not accept empty responses`)
+  })
+
+  it('check ambiguity detection', function () {
+    const ambiguousResults: Pick<Request, 'response'>[] = [
+      {
+        response: {
+          family: 'IPv4',
+          address: '1.2.3.4',
+          port: 0
+        }
+      },
+      {
+        response: {
+          family: 'IPv4',
+          address: '1.2.3.4',
+          port: 1
+        }
+      }
+    ]
+
+    assert(intepreteResults(ambiguousResults as Required<Request>[]).ambiguous == true)
+
+    const nonAmbiguousResults: Pick<Request, 'response'>[] = [
+      {
+        response: {
+          family: 'IPv4',
+          address: '1.2.3.4',
+          port: 0
+        }
+      },
+      {
+        response: {
+          family: 'IPv4',
+          address: '1.2.3.4',
+          port: 0
+        }
+      }
+    ]
+
+    assert(intepreteResults(nonAmbiguousResults as Required<Request>[]).ambiguous == false)
+  })
+})
+
+describe('test getExternalIp', function () {
+  it('return an address in local-mode if no STUN servers are given', async function () {
+    const socket = await bindToUdpSocket()
+
+    const result = await getExternalIp(undefined, socket, true)
+
+    assert(result != undefined, `local-mode should lead to a valid external IP`)
+
+    await stopNode(socket)
+  })
+
+  it(`return an address in local-mode`, async function () {
+    const AMOUNT = 3
+    const servers = await Promise.all(Array.from({ length: AMOUNT }, () => startStunServer(undefined, undefined)))
+
+    const socket = await bindToUdpSocket()
+
+    const result = await getExternalIp(
+      servers.map((s) => new Multiaddr(`/ip4/127.0.0.1/udp/${s.address().port}`)),
+      socket,
+      true
+    )
+
+    assert(result != undefined, `local-mode should lead to a valid external IP`)
+
+    await Promise.all(servers.concat(socket).map(stopNode))
+  })
+
+  it(`return no address in local-mode if results are ambiguous`, async function () {
+    const AMOUNT = 3
+    const servers = await Promise.all(
+      Array.from({ length: AMOUNT }, (_, index: number) => getAmbiguousSTUNServer(index, undefined, undefined))
+    )
+
+    const socket = await bindToUdpSocket()
+
+    const result = await getExternalIp(
+      servers.map((s) => new Multiaddr(`/ip4/127.0.0.1/udp/${s.address().port}`)),
+      socket,
+      true
+    )
+
+    assert(result == undefined, `ambiguos results in local-mode should not lead to an address`)
+
+    await Promise.all(servers.concat(socket).map(stopNode))
+  })
+
+  it(`return no address in local-mode if only one STUN server answers`, async function () {
+    const AMOUNT = 3
+    const servers = await Promise.all(
+      Array.from({ length: AMOUNT }, (_, index: number) =>
+        getAmbiguousSTUNServer(index, undefined, undefined, index < 1)
+      )
+    )
+
+    const socket = await bindToUdpSocket()
+
+    const result = await getExternalIp(
+      servers.map((s) => new Multiaddr(`/ip4/127.0.0.1/udp/${s.address().port}`)),
+      socket,
+      true
+    )
+
+    assert(result == undefined, `ambiguos results in local-mode should not lead to an address`)
+
+    await Promise.all(servers.concat(socket).map(stopNode))
+  })
+
+  it(`get the external IP`, async function () {
+    this.timeout((DEFAULT_PARALLEL_STUN_CALLS / DEFAULT_PARALLEL_STUN_CALLS) * STUN_TIMEOUT + 2e3)
+    const socket = await bindToUdpSocket()
+
+    const results = await iterateThroughStunServers(PUBLIC_STUN_SERVERS, socket)
+
+    if (results.length == 0) {
+      console.log(`Node cannot reach more than one external STUN servers. Has the node access to the internet?`)
+      // Cannot proceed without access to internet
+      return
+    }
+
+    const interpreted = intepreteResults(results)
+
+    if (interpreted.ambiguous) {
+      console.log(`Node seems to run behind a bidirectional NAT. External IP address is ambigous`)
+      return
+    }
+
+    const externalIP = await getExternalIp(undefined, socket)
+
+    assert(externalIP != undefined, `Must return an external address if not running behind a bidirectional NAT`)
+
+    await stopNode(socket)
   })
 })

@@ -213,7 +213,7 @@ describe('relay switch context - falsy streams', function () {
       })()
     )
 
-    const sourcePromise = relayToNode.source.next()
+    const sourcePromise = (relayToNode.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next()
 
     await assert.rejects(sinkPromise, Error(errorInSource))
 
@@ -271,6 +271,9 @@ describe('relay switch context - falsy streams', function () {
       sink: relayToNode.sink
     })
 
-    await assert.rejects(ctx.source.next(), Error(falsySourceError))
+    await assert.rejects(
+      (ctx.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next(),
+      Error(falsySourceError)
+    )
   })
 })

@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() && runner.os == 'Linux' }}
         with:
-          name: hopr-e2e-source-node-logs
+          name: hopr-linux-e2e-source-node-logs
           path: |
             /tmp/hopr-source-node-*.log
             /tmp/hopr-source-hardhat-rpc.log
@@ -61,7 +61,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() && runner.os == 'macOS' }}
         with:
-          name: hopr-e2e-source-node-logs
+          name: hopr-macOS-e2e-source-node-logs
           path: |
             /var/tmp/hopr-source-node-*.log
             /var/tmp/hopr-source-hardhat-rpc.log

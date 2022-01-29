@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - heartbeat: every connection uses its own timer now
 - `randomInteger` function is now cryptographically safe
 - ECDSA signatures now use a more compact representation (64 instead 65 bytes)
+- Initial commitment seed is derived using node key and channel information
 
 ### Fixed
 

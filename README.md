@@ -70,19 +70,19 @@ npm install @hoprnet/hoprd@1.73
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-goerli` tag represents the `master` branch, while the `tuttlingen` tag
+The `master-goerli` tag represents the `master` branch, while the `athens` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:tuttlingen
+docker pull gcr.io/hoprassociation/hoprd:athens
 ```
 
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:tuttlingen'
+alias hoprd='docker run --pull always -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:athens'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -124,33 +124,32 @@ $ hoprd --help
 Options:
   --help                        Show help  [boolean]
   --version                     Show version number  [boolean]
-  --network                     Which network to run the HOPR node on  [choices: "ETHEREUM"] [default: "ETHEREUM"]
-  --host                        The network host to run the HOPR node on.  [default: "0.0.0.0:9091"]
+  --environment                 Environment id which the node shall run on  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens"] [default: ""]
+  --host                        The network host to run the HOPR node on.  [string] [default: "0.0.0.0:9091"]
   --announce                    Announce public IP to the network  [boolean] [default: false]
   --admin                       Run an admin interface on localhost:3000, requires --apiToken  [boolean] [default: false]
-  --rest                        Run a rest interface on localhost:3001, requires --apiToken  [boolean] [default: false]
-  --restHost                    Updates the host for the rest server  [default: "localhost"]
-  --restPort                    Updates the port for the rest server  [default: 3001]
+  --rest                        Expose the Rest API on localhost:3001, requires --apiToken  [boolean] [default: false]
+  --restHost                    Set host IP to which the Rest API server will bind  [string] [default: "localhost"]
+  --restPort                    Set host port to which the Rest API server will bind  [number] [default: 3001]
   --healthCheck                 Run a health check end point on localhost:8080  [boolean] [default: false]
-  --healthCheckHost             Updates the host for the healthcheck server  [default: "localhost"]
-  --healthCheckPort             Updates the port for the healthcheck server  [default: 8080]
+  --healthCheckHost             Updates the host for the healthcheck server  [string] [default: "localhost"]
+  --healthCheckPort             Updates the port for the healthcheck server  [number] [default: 8080]
   --forwardLogs                 Forwards all your node logs to a public available sink  [boolean] [default: false]
-  --forwardLogsProvider         A provider url for the logging sink node to use  [default: "https://ceramic-clay.3boxlabs.com"]
-  --password                    A password to encrypt your keys  [default: ""]
-  --apiToken                    (experimental) A REST API token and admin panel password for user authentication  [string]
-  --identity                    The path to the identity file  [default: "/home/tbr/.hopr-identity"]
-  --run                         Run a single hopr command, same syntax as in hopr-admin  [default: ""]
+  --forwardLogsProvider         A provider url for the logging sink node to use  [string] [default: "https://ceramic-clay.3boxlabs.com"]
+  --password                    A password to encrypt your keys  [string] [default: ""]
+  --apiToken                    A REST API token and admin panel password for user authentication  [string]
+  --privateKey                  A private key to be used for your HOPR node  [string]
+  --identity                    The path to the identity file  [string] [default: "$HOME/.hopr-identity"]
+  --run                         Run a single hopr command, same syntax as in hopr-admin  [string] [default: ""]
   --dryRun                      List all the options used to run the HOPR node, but quit instead of starting  [boolean] [default: false]
-  --data                        manually specify the database directory to use  [default: ""]
+  --data                        manually specify the database directory to use  [string] [default: ""]
   --init                        initialize a database if it doesn't already exist  [boolean] [default: false]
-  --privateKey                  A private key to be used for your node wallet, to quickly boot your node [string] [default: undefined]
-  --adminHost                   Host to listen to for admin console  [default: "localhost"]
-  --adminPort                   Port to listen to for admin console  [default: 3000]
-  --environment                 Environment id to run in [string] [default: defined by release]
+  --adminHost                   Host to listen to for admin console  [string] [default: "localhost"]
+  --adminPort                   Port to listen to for admin console  [string] [default: 3000]
   --testAnnounceLocalAddresses  For testing local testnets. Announce local addresses.  [boolean] [default: false]
   --testPreferLocalAddresses    For testing local testnets. Prefer local peers to remote.  [boolean] [default: false]
   --testUseWeakCrypto           weaker crypto for faster node startup  [boolean] [default: false]
-  --testNoAuthentication        (experimental) disable remote authentication
+  --testNoAuthentication        no remote authentication for easier testing  [boolean] [default: false]
 ```
 
 As you might have noticed running the node without any command-line argument might not work depending on the installation method used. Here are examples to run a node with some safe configurations set.
@@ -209,13 +208,14 @@ At the moment we DO NOT HAVE backward compatibility between releases.
 We attempt to provide instructions on how to migrate your tokens between releases.
 
 1. Set your automatic channel strategy to `MANUAL`.
-2. Close all open payment channels.
-3. Once all payment channels have closed, withdraw your funds to an external
+2. Redeem all unredeemed tickets.
+3. Close all open payment channels.
+4. Once all payment channels have closed, withdraw your funds to an external
    wallet.
-4. Run `info` and take note of the **network name**.
-5. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` and `.db` folders.
-6. Launch new `HOPRd` instance using latest release, this will create new `.hopr-identity` and `.db` folders, observe the account address.
-7. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
+5. Run `info` and take note of the **network name**.
+6. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` folder.
+7. Launch new `HOPRd` instance using latest release, observe the account address.
+8. Only tranfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
 
 ## Develop
 
@@ -227,7 +227,7 @@ yarn build    # Builds contracts, clients, etc
 HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:network
 
 # workaround for a temp issue with local hardhat-network
-cp -R packages/ethereum/deployments/hardhat-localhost/localhost packages/ethereum/deployments/hardhat-localhost/hardhat
+cp -R packages/ethereum/deployments/hardhat-localhost/localhost/* packages/ethereum/deployments/hardhat-localhost/hardhat
 
 # running normal node alice (separate terminal)
 DEBUG="hopr*" yarn run:hoprd:alice --environment hardhat-localhost
@@ -365,6 +365,8 @@ FUNDING_PRIV_KEY=mysecretaccountprivkey \
 The given account private key is used to fund the test nodes to be able to
 perform throughout the tests. Thus the account must have enough funds available.
 
+The test instantiated by this script will also include nodes behind NAT.
+
 Read the full help information of the script in case of questions:
 
 ```sh
@@ -404,9 +406,9 @@ To launch nodes using the `xDai` network one would execute (with the
 placeholders replaced accordingly):
 
 ```sh
-HOPRD_PROVIDER="<URL_TO_AN_XDAI_ENDPOINT>" \
-HOPRD_TOKEN_CONTRACT="<ADDRESS_OF_TOKEN_CONTRACT_ON_XDAI>" \
-  ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+HOPRD_API_TOKEN="<ADMIN_AUTH_HTTP_TOKEN>" \
+HOPRD_PASSWORD="<IDENTITY_FILE_PASSWORD>" \
+  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
 ```
 
 A previously started cluster can be destroyed, which includes all running nodes,
@@ -414,8 +416,18 @@ by using the same script but setting the cleanup switch:
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh my-custom-cluster-without-name
+  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
 ```
+
+The default Docker image in `scripts/setup-gcloud-cluster.sh` deploys GCloud public nodes. If you wish to deploy GCloud nodes
+that are behind NAT, you need to specify a NAT-variant of the `hoprd` image (note the `-nat` suffix in the image name):
+
+```sh
+HOPRD_PERFORM_CLEANUP=true \
+  ./scripts/setup-gcloud-cluster.sh environment "" my-nat-cluster gcr.io/hoprassociation/hoprd-nat
+```
+
+Note that if the Docker image version is not specified, the script will use the `environment` as version.
 
 ### Using Google Cloud Platform and a Default Topology
 
@@ -425,7 +437,7 @@ script to the creation script:
 ```sh
 ./scripts/setup-gcloud-cluster.sh \
   my-custom-cluster-without-name \
-  gcr.io/hoprassociation/hoprd:tuttlingen \
+  gcr.io/hoprassociation/hoprd:athens \
   `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
 

@@ -20,7 +20,7 @@
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
-      "channels_contract_address": "0x0C151f1E58ffa265a0d9D1C1207b22Ca5e1ee979",
+      "channels_contract_address": "0xA3052110A3DcCBbc5B58a076A4BB84574Fc47265",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "tags": ["development"]
     },
@@ -28,7 +28,7 @@
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xC3Ff0A2C4F404D6a9B31a7ABc2a41E616bd4F34C",
-      "channels_contract_address": "0x0Df426849D532fa06BC843dcaBf14CD60c89e78f",
+      "channels_contract_address": "0x5daae235eEAeA72D9116702A615c2Be89D00D91b",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "tags": ["development"]
     },
@@ -37,6 +37,27 @@
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
       "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
+      "tags": ["production"]
+    },
+    "prague": {
+      "network_id": "xdai",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+      "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
+      "tags": ["production"]
+    },
+    "budapest": {
+      "network_id": "xdai",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+      "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
+      "tags": ["production"]
+    },
+    "athens": {
+      "network_id": "xdai",
+      "channel_contract_deploy_block": 0,
+      "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+      "channels_contract_address": "0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A",
       "tags": ["production"]
     }
   },

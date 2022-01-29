@@ -1,13 +1,11 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import type { UnsignedTransaction, BigNumber, providers } from 'ethers'
-import type { HoprToken } from '../src/types'
+import type { HoprToken } from '@hoprnet/hopr-ethereum'
 
 import { utils, constants } from 'ethers'
 import { deserializeKeyPair, PublicKey, hasB58String } from '@hoprnet/hopr-utils'
-import { getContractData } from '../src'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
-import { ethers } from 'hardhat'
 
 /**
  * Takes an array of transactions, signs them and
@@ -105,7 +103,7 @@ async function createTransaction(
   return txs
 }
 
-type CLIOPts = {
+export type FaucetCLIOPts = {
   address?: string
   password: string
   useLocalIdentities: boolean
@@ -118,21 +116,27 @@ type CLIOPts = {
  * Faucets HOPR and ETH tokens to a local account with HOPR
  */
 async function main(
-  opts: CLIOPts,
-  { network, environment }: HardhatRuntimeEnvironment,
+  opts: FaucetCLIOPts,
+  { network, ethers, deployments, environment }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
-) {
+): Promise<void> {
+  if (environment == undefined) {
+    console.error(`HOPR_ENVIRONMENT_ID is not set. Run with "HOPR_ENVIRONMENT_ID=<environment> ..."`)
+    process.exit(1)
+  }
+
   if (!network.tags.development) {
-    throw Error('Faucet is only valid in a development network')
+    console.error('Faucet is only valid in a development network')
+    process.exit(1)
   }
 
   let hoprTokenAddress: string
   try {
-    const contract = getContractData(network.name, environment, 'HoprToken')
+    const contract = await deployments.get('HoprToken')
     hoprTokenAddress = contract.address
   } catch (error) {
-    console.error('You need to ensure the network deployed the contracts')
-    throw error
+    console.error('HoprToken contract has not been deployed. Deploy the contract and run again.')
+    process.exit(1)
   }
 
   const identities: string[] = []
@@ -156,10 +160,11 @@ async function main(
   }
 
   if (identities.length == 0) {
-    throw Error(`Could not get any usable addresses.`)
+    console.error(`Could not get any usable addresses.`)
+    process.exit(1)
   }
 
-  const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(hoprTokenAddress) as HoprToken
+  const hoprToken = (await ethers.getContractFactory('HoprToken')).attach(hoprTokenAddress)
 
   const txs: UnsignedTransaction[] = []
   for (const identity of identities) {

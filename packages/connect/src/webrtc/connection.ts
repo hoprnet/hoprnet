@@ -1,18 +1,17 @@
-import type { MultiaddrConnection } from 'libp2p-interfaces/src/transport/types'
-import type ConnectionManager from 'libp2p/src/connection-manager'
-
+import type { MultiaddrConnection } from 'libp2p-interfaces/transport'
 import type { Instance as SimplePeer } from 'simple-peer'
 import type PeerId from 'peer-id'
-import { durations, u8aToHex, defer } from '@hoprnet/hopr-utils'
-import type { DeferType } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
 
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import type { RelayConnection } from '../relay/connection'
+import type Libp2p from 'libp2p'
 import { randomBytes } from 'crypto'
 import { toU8aStream, encodeWithLengthPrefix, decodeWithLengthPrefix, eagerIterator } from '../utils'
 import abortable from 'abortable-iterator'
-import type { Stream, StreamResult, DialOptions } from '../types'
+import type { Stream, StreamResult, StreamType, HoprConnectDialOptions } from '../types'
+import assert from 'assert'
 
 const DEBUG_PREFIX = `hopr-connect`
 
@@ -40,7 +39,7 @@ function getAbortableSource(source: Stream['source'], signal?: AbortSignal) {
  * Encapsulate state management and upgrade from relayed connection to
  * WebRTC connection
  */
-class WebRTCConnection implements MultiaddrConnection {
+class WebRTCConnection implements MultiaddrConnection<StreamType> {
   private _switchPromise: DeferType<void>
   private _sinkSourceAttached: boolean
   private _sinkSourceAttachedPromise: DeferType<Stream['source']>
@@ -52,7 +51,6 @@ class WebRTCConnection implements MultiaddrConnection {
   private _sinkMigrated: boolean
 
   public destroyed: boolean
-
   public remoteAddr: MultiaddrConnection['remoteAddr']
   public localAddr: MultiaddrConnection['localAddr']
 
@@ -68,10 +66,10 @@ class WebRTCConnection implements MultiaddrConnection {
 
   constructor(
     private counterparty: PeerId,
-    private connectionManager: ConnectionManager,
+    private connectionManager: Pick<Libp2p['connectionManager'], 'connections'>,
     private relayConn: RelayConnection,
     private channel: SimplePeer,
-    private options?: DialOptions & { __noWebRTCUpgrade?: boolean }
+    private options?: HoprConnectDialOptions & { __noWebRTCUpgrade?: boolean }
   ) {
     this.conn = relayConn
 
@@ -85,8 +83,8 @@ class WebRTCConnection implements MultiaddrConnection {
     this._sourceMigrated = false
     this._sinkMigrated = false
 
-    this.remoteAddr = relayConn.remoteAddr
-    this.localAddr = relayConn.localAddr
+    this.localAddr = this.conn.localAddr
+    this.remoteAddr = this.conn.remoteAddr
 
     this.timeline = {
       open: Date.now()
@@ -217,7 +215,7 @@ class WebRTCConnection implements MultiaddrConnection {
   private async sinkFunction(): Promise<void> {
     type SinkType = Stream['source'] | StreamResult | void
 
-    let source: Stream['source'] | undefined
+    let source: AsyncIterator<StreamType> | undefined
     let sourcePromise: Promise<StreamResult> | void
 
     let sourceAttached = false
@@ -240,7 +238,8 @@ class WebRTCConnection implements MultiaddrConnection {
               let result: SinkType
 
               const next = () => {
-                sourcePromise = (source as Stream['source']).next()
+                assert(source != undefined)
+                sourcePromise = source.next()
                 result = undefined
               }
 
@@ -273,7 +272,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
                 // Source already attached, wait for incoming messages
                 if (sourceAttached) {
-                  sourcePromise ??= (source as Stream['source']).next()
+                  assert(source != undefined)
+                  sourcePromise ??= source.next()
                   pushPromise(sourcePromise, 'source')
                 }
 
@@ -287,7 +287,7 @@ class WebRTCConnection implements MultiaddrConnection {
                 // Source got attached
                 if (!sourceAttached && this._sinkSourceAttached) {
                   sourceAttached = true
-                  source = result as Stream['source']
+                  source = (result as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
                   this.flow(`FLOW: webrtc sink: source attached, continue`)
                   continue
                 }
@@ -355,14 +355,15 @@ class WebRTCConnection implements MultiaddrConnection {
             if (!sourceAttached) {
               result = await this._sinkSourceAttachedPromise.promise
             } else {
-              sourcePromise ??= (source as Stream['source']).next()
+              assert(source != undefined)
+              sourcePromise ??= source.next()
               result = await sourcePromise
             }
 
             // Handle attached source
             if (!sourceAttached && this._sinkSourceAttached) {
               sourceAttached = true
-              source = result as Stream['source']
+              source = (result as AsyncIterable<StreamType>)[Symbol.asyncIterator]()
               continue
             }
 
@@ -373,7 +374,8 @@ class WebRTCConnection implements MultiaddrConnection {
               break
             }
 
-            sourcePromise = (source as Stream['source']).next()
+            assert(source != undefined)
+            sourcePromise = source.next()
 
             this.log(`sinking ${received.value.slice().length} bytes into webrtc[${(this.channel as any)._id}]`)
 

@@ -141,4 +141,28 @@ describe(`database tests`, function () {
     assert.equal(await db.getRejectedTicketsCount(), 1)
     assert((await db.getRejectedTicketsValue()).toBN().eq(amount))
   })
+
+  it('should store environment', async function () {
+    await db.setEnvironmentId('test-env')
+    assert.equal(await db.getEnvironmentId(), 'test-env')
+  })
+
+  it('should verify environment', async function () {
+    await db.setEnvironmentId('test-env')
+    assert((await db.verifyEnvironmentId('wrong-id')) === false, `must fail for wrong id`)
+    assert((await db.verifyEnvironmentId('test-env')) === true, `must not fail for correct id`)
+  })
+
+  it('should store hopr balance', async function () {
+    assert((await db.getHoprBalance()).toBN().isZero())
+
+    await db.setHoprBalance(new Balance(new BN(10)))
+    assert.equal((await db.getHoprBalance()).toString(), '10')
+
+    await db.addHoprBalance(new Balance(new BN(1)))
+    assert.equal((await db.getHoprBalance()).toString(), '11')
+
+    await db.subHoprBalance(new Balance(new BN(2)))
+    assert.equal((await db.getHoprBalance()).toString(), '9')
+  })
 })

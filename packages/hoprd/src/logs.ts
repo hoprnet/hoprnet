@@ -102,12 +102,17 @@ export class LogStream {
   }
 
   logFullLine(...args: string[]) {
-    const msg = { type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString() }
+    const msg = { type: 'log', msg: args.join(' '), ts: new Date().toISOString() }
     this._log(msg)
   }
 
   logConnectedPeers(peers: string[]) {
     const msg = { type: 'connected', msg: peers.join(','), ts: new Date().toISOString() }
+    this._log(msg)
+  }
+
+  logMessage(...args: string[]) {
+    const msg = { type: 'message', msg: args.join(' '), ts: new Date().toISOString() }
     this._log(msg)
   }
 

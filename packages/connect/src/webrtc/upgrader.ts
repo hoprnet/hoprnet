@@ -2,9 +2,10 @@ import SimplePeer from 'simple-peer'
 import debug from 'debug'
 
 import type { Multiaddr } from 'multiaddr'
-import type { PublicNodesEmitter, PeerStoreType } from '../types'
+import type { PeerStoreType, HoprConnectOptions } from '../types'
 import { CODE_IP4, CODE_TCP, CODE_UDP } from '../constants'
 import type PeerId from 'peer-id'
+import { AbortError } from 'abortable-iterator'
 
 const wrtc = require('wrtc')
 
@@ -38,14 +39,37 @@ class WebRTCUpgrader {
   public rtcConfig?: RTCConfiguration
   private publicNodes: PeerStoreType[]
 
-  constructor(publicNodes?: PublicNodesEmitter, initialNodes?: PeerStoreType[]) {
+  private _onNewPublicNode: WebRTCUpgrader['onNewPublicNode'] | undefined
+  private _onOfflineNode: WebRTCUpgrader['onOfflineNode'] | undefined
+
+  constructor(private options: HoprConnectOptions) {
     this.publicNodes = []
+  }
 
-    initialNodes?.forEach(this.onNewPublicNode.bind(this))
+  /**
+   * Attach event listeners
+   */
+  public start() {
+    this._onNewPublicNode = this.onNewPublicNode.bind(this)
+    this._onOfflineNode = this.onOfflineNode.bind(this)
 
-    publicNodes?.on('addPublicNode', this.onNewPublicNode.bind(this))
+    this.options.initialNodes?.forEach(this._onNewPublicNode)
 
-    publicNodes?.on('removePublicNode', this.onOfflineNode.bind(this))
+    if (this.options.publicNodes != undefined) {
+      this.options.publicNodes.on('addPublicNode', this._onNewPublicNode)
+      this.options.publicNodes.on('removePublicNode', this._onOfflineNode)
+    }
+  }
+
+  public stop() {
+    if (
+      this.options.publicNodes != undefined &&
+      this._onNewPublicNode != undefined &&
+      this._onOfflineNode != undefined
+    ) {
+      this.options.publicNodes.removeListener('addPublicNode', this._onNewPublicNode)
+      this.options.publicNodes.removeListener('removePublicNode', this._onOfflineNode)
+    }
   }
 
   private publicNodesToRTCServers(): RTCIceServer[] {
@@ -155,17 +179,15 @@ class WebRTCUpgrader {
       wrtc,
       initiator,
       trickle: true,
-      // @ts-ignore
       allowHalfTrickle: true,
       config: this.rtcConfig
     })
 
     const onAbort = () => {
-      channel.destroy()
-      verbose('abort')
+      done(new AbortError())
     }
 
-    const done = async (err?: Error) => {
+    const done = (err?: Error) => {
       channel.removeListener('connect', done)
       channel.removeListener('error', done)
 

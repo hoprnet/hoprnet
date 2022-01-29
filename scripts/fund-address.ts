@@ -4,29 +4,47 @@
 import yargs from 'yargs/yargs'
 import BN from 'bn.js'
 import { createChainWrapper } from '@hoprnet/hopr-core-ethereum'
-import { expandVars, moveDecimalPoint, Address, Balance, NativeBalance } from '@hoprnet/hopr-utils'
-import { utils } from 'ethers'
+import {
+  expandVars,
+  moveDecimalPoint,
+  Address,
+  Balance,
+  NativeBalance,
+  DeferType,
+  stringToU8a
+} from '@hoprnet/hopr-utils'
+import { resolveEnvironment } from '@hoprnet/hopr-core'
 
 const { PRIVATE_KEY } = process.env
-const PROTOCOL_CONFIG = require('../packages/core/protocol-config.json')
 
-function parseGasPrice(gasPrice: string) {
-  const parsedGasPrice = gasPrice.split(' ')
-  if (parsedGasPrice.length > 1) {
-    return Number(utils.parseUnits(parsedGasPrice[0], parsedGasPrice[1]))
+type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
+
+// naive mock of indexer waiting for confirmation
+function createTxHandler(tx: string): DeferType<string> {
+  const state = {
+    promise: Promise.resolve(),
+    reject: () => {
+      console.log(`tx ${tx} got rejected`)
+      state.promise = Promise.reject()
+    }
   }
-  return Number(parsedGasPrice[0])
+
+  // Don't need to implement `resolve` method
+  // because it is intended to be called by the
+  // indexer - which we don't use in this script, so
+  // we must only ensure that we reject once there is an error
+  return state as unknown as DeferType<string>
 }
 
-async function getNativeBalance(chain, address: string) {
+async function getNativeBalance(chain: ChainWrapper, address: string) {
   return await chain.getNativeBalance(Address.fromString(address))
 }
 
-async function getERC20Balance(chain, address: string) {
+async function getERC20Balance(chain: ChainWrapper, address: string) {
   return await chain.getBalance(Address.fromString(address))
 }
 
-async function fundERC20(chain, sender: string, receiver: string, targetBalanceStr: string) {
+async function fundERC20(chain: ChainWrapper, sender: string, receiver: string, targetBalanceStr: string) {
   const senderBalance = await getNativeBalance(chain, sender)
   const balance = await getERC20Balance(chain, receiver)
   const targetBalanceNr = moveDecimalPoint(targetBalanceStr, Balance.DECIMALS)
@@ -53,10 +71,10 @@ async function fundERC20(chain, sender: string, receiver: string, targetBalanceS
   console.log(
     `transfer ${diff.toFormattedString()} from ${sender} to ${receiver} to top up ${balance.toFormattedString()}`
   )
-  await chain.withdraw('HOPR', receiver, diff.toString())
+  await chain.withdraw('HOPR', receiver, diff.toString(), createTxHandler)
 }
 
-async function fundNative(chain, sender: string, receiver: string, targetBalanceStr: string) {
+async function fundNative(chain: ChainWrapper, sender: string, receiver: string, targetBalanceStr: string) {
   const senderBalance = await getNativeBalance(chain, sender)
   const balance = await getNativeBalance(chain, receiver)
   const targetBalanceNr = moveDecimalPoint(targetBalanceStr, Balance.DECIMALS)
@@ -83,7 +101,7 @@ async function fundNative(chain, sender: string, receiver: string, targetBalance
   console.log(
     `transfer ${diff.toFormattedString()} from ${sender} to ${receiver} to top up ${balance.toFormattedString()}`
   )
-  await chain.withdraw('HOPR', receiver, diff.toString())
+  await chain.withdraw('NATIVE', receiver, diff.toString(), createTxHandler)
 }
 
 async function main() {
@@ -94,24 +112,26 @@ async function main() {
       type: 'string'
     })
     .option('address', {
-      describe: 'ETH address',
+      describe: 'ETH address of the recipient',
       demandOption: true,
       type: 'string'
     })
-    .option('erc20', {
-      describe: 'whether to fund ERC20 token instead of native',
-      demandOption: false,
-      type: 'boolean',
-      default: false
-    })
-    .option('target', {
+    .option('targetERC20', {
       describe: 'the target balance up to which the account shall be funded',
-      demandOption: true,
+      type: 'string'
+    })
+    .option('targetNative', {
+      describe: 'the target balance up to which the account shall be funded',
       type: 'string'
     })
     .parseSync()
 
-  const environment = PROTOCOL_CONFIG.environments[argv.environment]
+  if (!argv.targetERC20 && !argv.targetNative) {
+    console.error(`Running fund script without a fund option.`)
+    process.exit(1)
+  }
+
+  const environment = resolveEnvironment(argv.environment)
   if (!environment) {
     console.error(`Cannot find environment ${environment}`)
     process.exit(1)
@@ -123,31 +143,35 @@ async function main() {
   }
 
   // instantiate chain object based on given environment and private key
-  const network = PROTOCOL_CONFIG.networks[environment.network_id]
   const chainOptions = {
-    chainId: network.chain_id,
-    environment: argv.environment,
-    gasPrice: parseGasPrice(network.gas_price),
-    network: environment.network_id,
-    provider: expandVars(network.default_provider, process.env)
+    chainId: environment.network.chain_id,
+    environment: environment.id,
+    gasPrice: environment.network.gas_price,
+    network: environment.network.id,
+    provider: expandVars(environment.network.default_provider, process.env)
   }
-  const privKey = utils.arrayify(PRIVATE_KEY)
-  const chain = await createChainWrapper(chainOptions, privKey)
+
+  const privKey = stringToU8a(PRIVATE_KEY)
+
+  // Wait as long as it takes to mine the transaction, i.e. timeout=0
+  const chain = await createChainWrapper(chainOptions, privKey, true, 0)
   const sender = chain.getPublicKey().toAddress().toString()
 
   // maybe fund ERC20
-  if (argv.erc20) {
-    await fundERC20(chain, sender, argv.address, argv.target)
-    return
+  if (argv.targetERC20) {
+    await fundERC20(chain, sender, argv.address, argv.targetERC20)
   }
-  // by default we fund native token
-  await fundNative(chain, sender, argv.address, argv.target)
+
+  if (argv.targetNative) {
+    await fundNative(chain, sender, argv.address, argv.targetNative)
+  }
 }
 
 main()
-  .then((_result) => {
+  .then(() => {
     console.log('Funding process succeeded')
   })
   .catch((err) => {
-    console.log(`Error during script execution: ${err}`)
+    console.error(`Error during script execution: ${err}`)
+    process.exit(1)
   })

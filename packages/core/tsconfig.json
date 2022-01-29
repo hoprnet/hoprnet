@@ -4,10 +4,11 @@
     "noImplicitReturns": true,
     "noImplicitThis": true,
     "strictBindCallApply": true,
-    "outDir": "lib",
-    "rootDir": "src"
+    "outDir": "./lib",
+    "rootDir": "./src"
   },
   "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",

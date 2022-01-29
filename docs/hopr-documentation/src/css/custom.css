@@ -1,0 +1,152 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #0000b4;
+  --ifm-color-primary-dark: rgb(33, 175, 144);
+  --ifm-color-primary-darker: rgb(31, 165, 136);
+  --ifm-color-primary-darkest: rgb(26, 136, 112);
+  --ifm-color-primary-light: rgb(70, 203, 174);
+  --ifm-color-primary-lighter: rgb(102, 212, 189);
+  --ifm-color-primary-lightest: rgb(146, 224, 208);
+  --ifm-code-font-size: 95%;
+  --ifm-heading-margin-bottom: 0px;
+  --ifm-paragraph-margin-bottom: 0px;
+  /* --ifm-font-family-base: 'Source Code Pro', monospace;*/
+  --ifm-font-family-base: 'Lato';
+  --ifm-footer-background-color: #0000b4;
+  --ifm-footer-color: #fff;
+  --ifm-heading-color: #414141;
+  --ifm-alert-border-radius: 0px;
+  --ifm-h1-font-size: 2rem !important;
+  --ifm-h2-font-size: 1.5rem !important;
+  --ifm-color-emphasis-300: #f2f2f2;
+}
+
+body {
+  /*font-family: 'Source Code Pro', monospace;*/
+  font-family: 'Lato';
+}
+.footer {
+  background: linear-gradient(#000050, #0000b4) !important;
+}
+a {
+  color: #414141;
+  text-decoration: none;
+}
+a:hover {
+  color: #414141;
+  text-decoration: none;
+}
+.tabs-container p {
+  margin-bottom: 1em;
+}
+.markdown h1:first-child {
+  font-size: 2rem !important;
+}
+h2 {
+  font-size: 1.5rem !important;
+}
+.highlightPanel h3 {
+  font-size: 23px;
+}
+.highlightPanel p {
+  font-size: 20px;
+  padding: 20px 0px;
+}
+.tabs-container ul {
+  margin-top: 1rem !important;
+}
+.mainContainer {
+  padding: 40px 0px 0px 0px;
+}
+
+.highlightPanel .icon {
+  margin-right: 0.8rem;
+}
+.highlightPanel .icon img {
+  max-width: 30px;
+}
+.highlightPanel .mb-2 {
+  margin: 0px !important;
+}
+.markdown a,
+.markdown ul li a {
+  color: var(--ifm-color-primary);
+}
+.markdown a:hover {
+  color: var(--ifm-color-primary);
+  text-decoration: underline;
+  -webkit-text-decoration-color: var(--ifm-color-primary); /* Safari */
+  text-decoration-color: var(--ifm-color-primary);
+}
+.markdown > h3 {
+  font-size: 1.2rem !important;
+}
+.markdown > h3 > a {
+  font-weight: 600;
+}
+.tabs__item {
+  border: 0px;
+  border-radius: var(--ifm-global-radius);
+  font-weight: 400;
+  margin-right: 10px;
+}
+
+.tabs__item--active {
+  background: var(--ifm-hover-overlay);
+}
+
+.pagination-nav__item {
+  text-align: center;
+}
+.pagination-nav__link:hover {
+  border-color: var(--ifm-color-emphasis-300);
+  background-color: var(--ifm-menu-color-background-active);
+}
+/** Front page **/
+
+.highlightPanel:hover h3,
+.highlightPanel:active p,
+.highlightPanel:hover p {
+  color: var(--ifm-color-primary);
+}
+
+.docusaurus-highlight-code-line {
+  background-color: rgba(0, 0, 0, 0.1);
+  display: block;
+  margin: 0 calc(-1 * var(--ifm-pre-padding));
+  padding: 0 var(--ifm-pre-padding);
+}
+
+html[data-theme='dark'] .docusaurus-highlight-code-line {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+.highlightPanel {
+  height: 100%;
+  background-color: #fff;
+  padding: 24px 28px 14px;
+  /**padding: 1.5rem 1.8rem 1.7rem;**/
+  border: none;
+  border-radius: 0.65rem;
+  /**border: 1px solid rgba(0, 0, 219, 1);**/
+  --ifm-box-shadow-color: rgb(0, 0, 0, 0.2);
+  box-shadow: 2px 2px 21px -5px var(--ifm-box-shadow-color);
+  transition-property: all;
+  transition-duration: 0.2s;
+}
+.highlightPanel img {
+  width: 100%;
+}
+.highlightPanel img.svg_icon {
+  max-width: 45px;
+}
+.highlightPanel:active,
+.highlightPanel:hover {
+  /** transform: translateY(4px);**/
+  --ifm-box-shadow-color: rgb(0, 0, 0, 0.3);
+}
