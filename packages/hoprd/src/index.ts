@@ -381,7 +381,7 @@ async function main() {
             return
           }
 
-          cmds.execute((msg) => {
+          await cmds.execute((msg) => {
             logs.log(msg)
           }, c)
         }

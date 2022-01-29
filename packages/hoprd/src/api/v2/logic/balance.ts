@@ -1,6 +1,11 @@
 import Hopr from '@hoprnet/hopr-core'
 
-export const getBalances = async (node: Hopr) => {
+export interface Balances {
+  native: string
+  hopr: string
+}
+
+export const getBalances = async (node: Hopr): Promise<Balances | Error> => {
   try {
     const hoprBalance = (await node.getBalance()).toFormattedString()
     const nativeBalance = (await node.getNativeBalance()).toFormattedString()

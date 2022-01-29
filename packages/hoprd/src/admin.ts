@@ -169,13 +169,11 @@ export class AdminServer {
     })
   }
 
-  registerNode(node: Hopr, cmds: any, cmds2: any, settings?: any) {
+  registerNode(node: Hopr, cmds: any, settings?: any) {
     this.node = node
     this.cmds = cmds
-    this.cmds2 = cmds2
     if (settings) {
       this.cmds.setState(settings)
-      this.cmds2.setState(settings)
     }
 
     this.node.on('hopr:channel:opened', (channel) => {
