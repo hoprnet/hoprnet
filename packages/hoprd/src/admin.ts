@@ -19,6 +19,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import cookie from 'cookie'
+import { CommandsV2 } from './commands/v2'
 
 let debugLog = debug('hoprd:admin')
 
@@ -31,6 +32,7 @@ export class AdminServer {
   private node: Hopr | undefined
   private wsServer: ws.Server
   private cmds: Commands
+  private cmds2: CommandsV2
 
   constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) {}
 
@@ -169,11 +171,13 @@ export class AdminServer {
     })
   }
 
-  registerNode(node: Hopr, cmds: any, settings?: any) {
+  registerNode(node: Hopr, cmds: any, cmds2: any, settings?: any) {
     this.node = node
     this.cmds = cmds
+    this.cmds2 = cmds2
     if (settings) {
       this.cmds.setState(settings)
+      this.cmds2.setState(settings)
     }
 
     this.node.on('hopr:channel:opened', (channel) => {
@@ -208,7 +212,15 @@ export class AdminServer {
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
 
-    this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
+    this.logs.log('Trying commands v2')
+    this.cmds2
+      .execute(() => {}, `alias ${node.getId().toB58String()} me`)
+      .then((res) => {
+        if (res === 'Unknown command!') {
+          this.logs.log('Trying commands v1')
+          this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
+        }
+      })
   }
 }
 
