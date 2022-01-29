@@ -98,9 +98,20 @@ components:
           type: string
           description: Blockchain address to withdraw specified currency to.
       example:
-        currency: hopr,
+        currency: hopr
         amount: '1'
         recipient: '0x2C505741584f8591e261e59160D0AED5F74Dc29b'
+    Setting:
+      type: object
+      properties:
+        settingName: 
+          type: 'string'
+          description: 'Setting name.'
+        value: 
+          description: 'Depends on the setting.'
+      example:
+        settingName: "includeRecipient"
+        value: true
   securitySchemes:
     keyScheme:
       type: apiKey

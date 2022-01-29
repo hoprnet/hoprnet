@@ -1,7 +1,7 @@
-import { GlobalState } from '../../../commands/abstractCommand'
 import { checkPeerIdInput } from '../../../commands/utils'
+import { APIv2State } from '../../v2'
 
-export const setAlias = ({ peerId, alias, state }: { peerId: string; alias: string; state: GlobalState }) => {
+export const setAlias = ({ peerId, alias, state }: { peerId: string; alias: string; state: APIv2State }) => {
   try {
     let validPeerId = checkPeerIdInput(peerId)
     state.aliases.set(alias, validPeerId)
@@ -10,7 +10,7 @@ export const setAlias = ({ peerId, alias, state }: { peerId: string; alias: stri
   }
 }
 
-export const getAlias = ({ state, peerId }: { state: GlobalState; peerId: string }) => {
+export const getAlias = ({ state, peerId }: { state: APIv2State; peerId: string }) => {
   try {
     checkPeerIdInput(peerId)
   } catch (error) {

@@ -2,8 +2,8 @@ import Hopr from '@hoprnet/hopr-core'
 import { Balance, moveDecimalPoint } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
-import { GlobalState } from '../../../commands/abstractCommand'
 import { checkPeerIdInput } from '../../../commands/utils'
+import { APIv2State } from '../../v2'
 
 export const openChannel = async ({
   counterpartyPeerId,
@@ -13,12 +13,12 @@ export const openChannel = async ({
 }: {
   counterpartyPeerId: string
   amountToFundStr: string
-  state: GlobalState
+  state: APIv2State
   node: Hopr
 }) => {
   let counterparty: PeerId
   try {
-    counterparty = checkPeerIdInput(counterpartyPeerId, state)
+    counterparty = checkPeerIdInput(counterpartyPeerId, state as any)
   } catch (err) {
     return new Error('invalidPeerId')
   }

@@ -11,15 +11,19 @@ import type { Application, Request } from 'express'
 import type Hopr from '@hoprnet/hopr-core'
 
 import type { LogStream } from './../logs'
+import { APIv2Settings } from './v2/logic/settings'
 
 export interface APIv2State {
   aliases: Map<string, PeerId>
-  includeRecipient: boolean
+  settings: APIv2Settings
 }
 
 const state: APIv2State = {
   aliases: new Map<string, PeerId>(),
-  includeRecipient: false
+  settings: {
+    includeRecipient: false,
+    strategy: "passive"
+  }
 }
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
@@ -114,7 +118,7 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
 // In order to pass custom objects along with each request we build a context
 // which is attached during request processing.
 export class Context {
-  constructor(public node: Hopr, public logs: LogStream, public state: APIv2State) {}
+  constructor(public node: Hopr, public logs: LogStream, public state: APIv2State) { }
 }
 
 declare global {
