@@ -21,14 +21,14 @@ The Invisible Internet Project (\textit{I2P}) is an implementation of onion rout
 
 \begin{itemize}
 
-  \item \textbf{Packet switched instead of circuit switched}
-        Tor allocates connection to long-lived circuits; this allocation does not change until either the connection or the circuit closes. In contrast, routers in I2P maintain multiple tunnels per destination. This significantly increases scalability and failure resistance since packets are used in parallel.
+      \item \textbf{Packet switched instead of circuit switched}
+            Tor allocates connection to long-lived circuits; this allocation does not change until either the connection or the circuit closes. In contrast, routers in I2P maintain multiple tunnels per destination. This significantly increases scalability and failure resistance since packets are used in parallel.
 
-  \item \textbf{Unidirectional tunnels}
-        Employing unidirectional rather than bidirectional tunnels makes deanonymization harder, because tunnel participants see half as much data and need two sets of peers to be profiled.
+      \item \textbf{Unidirectional tunnels}
+            Employing unidirectional rather than bidirectional tunnels makes deanonymization harder, because tunnel participants see half as much data and need two sets of peers to be profiled.
 
-  \item \textbf{Peer profiles instead of directory authorities}
-        I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
+      \item \textbf{Peer profiles instead of directory authorities}
+            I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
 \end{itemize}
 
 Despite these improvements, I2P is vulnerable to eclipse attacks since no I2P router has a full view of the global network (similar to other peer-to-peer networks). Like Tor, I2P only provides protection against local adversaries, making it vulnerable to timing, intersection, and traffic analysis attacks. I2P has also been shown to be vulnerable to Sybil and predecessor attacks, in spite of various countermeasures implemented to thwart these.
@@ -56,15 +56,92 @@ The Raiden network \cite{raiden} is a layer-2 payment solution for the Ethereum 
 We present in the following a comparison table (from the Loopix paper) between different anonymous communication systems.
 
 \begin{figure}[H]
-  \centering
-  \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/state-of-the-art.png}
-  \caption{Comparison between anonymous communication systems}
-  \label{fig:Comparison between anonymous communication systems}
+      \centering
+      \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/state-of-the-art.png}
+      \caption{Comparison between anonymous communication systems}
+      \label{fig:Comparison between anonymous communication systems}
 \end{figure}
 \end{comment}
 
-\subsubsection{P2P Networks}
+\subsubsection{Decentralized Networks}
 \label{sec:intro:stateoftheart:p2pnetworks}
+
+Many, if not most, services in the internet implement the client-server principle in which the client requests resources from the server which acts as a single source of truth. This principle does not only establish a clear hierarchy between both parties, allowing the server to fully control the state that is observable by the client, but also introduces single points of failure in the network [add Facebook outage].
+
+TODO: add decentralization picture
+
+\paragraph{P2P Networking}
+
+When applying the client-server principle, clients usually do not connect directly. Instead, they establish a direct connection to the server and the server forwards the data to other clients. In this setting, it is the responsability of the server to reachable for the client and the responsibility of the client to find a way to connect to the server.
+
+As Peer-to-Peer (P2P) networks aim to forego the usage of a central server, each node needs to fulfill both roles and thus needs to remain reachable by other nodes and determine a means of communication to other nodes. As of now, this is usually done using version four of the Internet Protocol (IPv4). It is expected to switch to version six of the Internet Protocol (IPv6) due the scarcity of IPv4 addresses but the transformation process has not yet reached a point where the majority of nodes can connect to each other using IPv6.
+
+Due to the aforementioned scarcity of IPv4 addresses, it is a common principle to led many machines share the same IPv4 address by using a Network Address Translation (NAT) mechanism that maps local addresses to one or more public IP addresses by rewriting the source port of outgoing packets and the destination port of incoming packets. In general, this mapping is not static. Thus, nodes need add to add on demand an entry to the address mapping in order to receive messages from outside their local network. This makes it complicated for nodes in a local network to be reachable by other nodes.
+
+Figure \ref{fig:successful-nat-traversal} shows two nodes, \textit{A} and \textit{B} that are connected to the internet through a router that applies a NAT mechanism. As both routers transparently rewrite the source port, node \textit{A} needs to know to which external port node \textit{B} is mapped by their router in order to deliver data. To establish a duplex connection, node \textit{B} needs to know \textit{A}'s external port.
+
+\begin{figure}[H]
+      \centering
+      \begin{tikzpicture}
+            \def\nodeWidth{0.6}
+            \def\nodeHeight{0.6}
+            \def\routerWidth{0.6}
+            \def\routerHeight{1.8}
+            \def\routerOffset{4.2}
+
+            % Subnet A
+            \draw (0,0) rectangle (\nodeWidth,\nodeHeight) node[midway] {A};
+
+            % Interaction with router A
+            \draw[->] (\nodeWidth,0.75*\nodeHeight) -- (\routerOffset,0.75*\nodeHeight) node[midway,above] {\smaller{\shortstack{src: 192.168.0.2:9091\\dest: 1.2.3.4:50043}}};
+
+            \draw[->] (\routerOffset,0.25*\nodeHeight) -- (\nodeWidth,0.25*\nodeHeight) node[midway,below] {\smaller{\shortstack{src: 5.6.7.8:50043\\dest: 192.168.0.2:9091}}};
+
+            % Router to router interaction
+            \begin{scope}[shift={(0,-0.6)}]
+                  \draw[->,decorate,decoration={snake,pre length=1mm,post length=1mm}] (\routerOffset+\routerWidth,0.75*\routerHeight) -- (2*\routerOffset,0.75*\routerHeight) node[midway,above=2pt] {\smaller{\shortstack{src: 5.6.7.8:61072\\dest: 1.2.3.4:50043}}};
+                  \draw[->,decorate,decoration={snake,pre length=1mm,post length=1mm}] (2*\routerOffset,0.25*\routerHeight) -- (\routerOffset+\routerWidth,0.25*\routerHeight) node[midway,below=2pt] {\smaller{\shortstack{src: 1.2.3.4:50043\\dest: 5.6.7.8:61072}}};
+
+                  \path (\routerOffset+\routerWidth,0.5*\routerHeight) -- (2*\routerOffset,0.5*\routerHeight) node[midway] {\small{The internet}};
+            \end{scope}
+
+            % Subnet B
+            \begin{scope}[shift={(3*\routerOffset,0)}]
+                  \draw (0,0) rectangle (\nodeWidth,\nodeHeight) node[midway] {B};
+                  % Interaction with router B
+                  \draw[->] (-\routerOffset+\routerWidth,0.75*\nodeHeight) -- (0,0.75*\nodeHeight) node[midway,above] {\smaller{\shortstack{src: 5.6.7.8:61072\\dest: 192.168.1.2:9091}}};
+
+                  \draw[->] (0,0.25*\nodeHeight) -- (-\routerOffset+\routerWidth,0.25*\nodeHeight) node[midway,below] {\smaller{\shortstack{src: 192.168.1.2:9091\\dest: 5.6.7.8:61072}}};
+            \end{scope}
+
+            \foreach \offset\name\address in{1/A/5.6.7.8,2/B/1.2.3.4} {
+                        \begin{scope}[shift={(\offset*\routerOffset,-0.6)}]
+                              \def\a{0.6}
+                              \def\b{1.8}
+                              \def\diff{1.2}
+
+                              \def\lw{0.2}
+
+                              \foreach \x [count=\i] in{0,0.3,0.6,...,\a}{
+                                          \draw [line width=\lw mm](\x,0)--(0,\x) (\x,\b)--(\a,\b-\a+\x);
+                                    }
+                              \foreach \x [count=\i] in{0,0.3,0.6,...,\diff}{
+                                          \draw [line width=\lw mm](0,\a+\x)--(\a,\x);
+                                    }
+                              \draw (0,0) rectangle  node[below=25pt] {\smaller{\shortstack{router\\\address}}} (\routerWidth,\routerHeight);
+                        \end{scope}
+
+                  }
+      \end{tikzpicture}
+      \label{fig:successful-nat-traversal}
+      \caption{Network address translation done by most routers.}
+\end{figure}
+
+As of this, it is key for traversing NATs to find out (1) if and if yes, (2) to which external port their connection is mapped and (3) if the mapping is done individually for each destination address and if in this case, (4) the NAT follows any observable pattern. Depending on which NAT mechanism the router implements, nodes can either establish a direct connection or fallback to a relayed connection using the TURN protocol.
+
+If possible, establishing a direct connection is done in general using ICE protocol together with one or more STUN servers and a signalling server that acts as a rendezvous point and allows nodes to exchange connection information.
+
+\paragraph{Distributed Hash Tables}
 
 % DHT 
 
