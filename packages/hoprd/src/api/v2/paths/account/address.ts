@@ -4,8 +4,9 @@ export const parameters = []
 
 export const GET: Operation = [
   (req, res, _next) => {
-    const nativeAddress = req.context.node.getEthereumAddress().toHex()
-    const hoprAddress = req.context.node.getId().toB58String()
+    const { node } = req.context
+    const nativeAddress = node.getEthereumAddress().toHex()
+    const hoprAddress = node.getId().toB58String()
 
     res.status(200).json({ nativeAddress, hoprAddress })
   }

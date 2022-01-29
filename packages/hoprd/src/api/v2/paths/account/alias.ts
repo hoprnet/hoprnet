@@ -1,21 +1,21 @@
 import { Operation } from 'express-openapi'
-import { isError } from '../../../../commands/v2'
-import { getAlias, setAlias } from '../../../../commands/v2/logic/alias'
+import { isError } from '../../logic'
+import { getAlias, setAlias } from '../../logic/alias'
 
 export const parameters = []
 
 export const GET: Operation = [
   async (req, res, _next) => {
-    const { commands } = req.context
+    const { state } = req.context
     const { peerId } = req.query
 
     if (!peerId) {
       return res.status(400).send({ status: 'noPeerIdProvided' })
     }
 
-    const aliases = getAlias({ peerId: peerId as string, state: commands.state })
+    const aliases = getAlias({ peerId: peerId as string, state })
     if (isError(aliases)) {
-      return res.status(404).send({ status: 'aliasNotFound' })
+      return res.status(aliases.message === 'invalidPeerId' ? 400 : 404).send({ status: aliases.message })
     } else {
       return res.status(200).send({ status: 'success', aliases })
     }
@@ -65,7 +65,7 @@ GET.apiDoc = {
           schema: {
             $ref: '#/components/schemas/StatusResponse'
           },
-          example: { status: 'noPeerIdProvided' }
+          example: { status: 'noPeerIdProvided | invalidPeerId' }
         }
       }
     },
@@ -85,7 +85,7 @@ GET.apiDoc = {
 
 export const POST: Operation = [
   async (req, res, _next) => {
-    const { commands } = req.context
+    const { state } = req.context
     const { peerId, alias } = req.body
 
     // NOTE: probably express can or already is handling it automatically
@@ -93,7 +93,7 @@ export const POST: Operation = [
       return res.status(400).send({ status: 'missingBodyfields' })
     }
 
-    const aliases = setAlias({ alias, peerId, state: commands.state })
+    const aliases = setAlias({ alias, peerId, state: state })
     if (isError(aliases)) {
       return res.status(400).send({ status: 'invalidPeerId' })
     } else {

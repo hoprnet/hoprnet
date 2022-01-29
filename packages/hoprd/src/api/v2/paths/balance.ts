@@ -1,14 +1,14 @@
 import { Operation } from 'express-openapi'
-import { isError } from '../../../commands/v2'
-import { getBalances } from '../../../commands/v2/logic/balance'
+import { isError } from '../logic'
+import { getBalances } from '../logic/balance'
 
 export const parameters = []
 
 export const GET: Operation = [
   async (req, res, _next) => {
-    const { commands } = req.context
+    const { node } = req.context
 
-    const balances = await getBalances(commands.node)
+    const balances = await getBalances(node)
     if (isError(balances)) {
       return res.status(500).send({ status: 'failure' })
     } else {

@@ -1,7 +1,6 @@
 import Hopr from '@hoprnet/hopr-core'
 import { Balance, moveDecimalPoint, NativeBalance } from '@hoprnet/hopr-utils'
-import { isError } from '..'
-import { styleValue } from '../../utils'
+import { isError } from '.'
 
 type WithdrawArgs = {
   amount: string
@@ -13,25 +12,18 @@ type WithdrawArgs = {
 const validateWithdrawArgs = async ({
   amount,
   currency,
-  recipient,
-  log
+  recipient
 }: {
   amount: string
   currency: string
   recipient: string
-  log?: (string) => void
 }): Promise<WithdrawArgs | Error> => {
   const validCurrency = currency.toUpperCase() as 'NATIVE' | 'HOPR'
   if (!['NATIVE', 'HOPR'].includes(validCurrency)) {
-    log &&
-      log(
-        styleValue(`Incorrect currency provided: '${validCurrency}', correct options are: 'native', 'hopr'.`, 'failure')
-      )
     return new Error('incorrectCurrency')
   }
 
   if (isNaN(Number(amount))) {
-    log && log(styleValue(`Incorrect amount provided: '${amount}'.`, 'failure'))
     return new Error('incorrectAmount')
   }
 
@@ -54,14 +46,12 @@ export const withdraw = async ({
   rawCurrency,
   rawRecipient,
   rawAmount,
-  node,
-  log
+  node
 }: {
   rawCurrency: string
   rawRecipient: string
   rawAmount: string
   node: Hopr
-  log?: (string) => void
 }) => {
   const validation = await validateWithdrawArgs({
     amount: rawAmount,
@@ -72,19 +62,8 @@ export const withdraw = async ({
     return validation
   }
 
-  const { amount, weiAmount, recipient, currency } = validation
-  const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
-  console.log('PREWITHDRAW')
+  const { weiAmount, recipient, currency } = validation
   const receipt = await node.withdraw(currency, recipient, weiAmount)
-  console.log('POSTWITHDRAW')
 
-  log &&
-    log(
-      `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
-        recipient,
-        'peerId'
-      )}, receipt ${styleValue(receipt, 'hash')}.`
-    )
-
-  return
+  return receipt
 }

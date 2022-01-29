@@ -55,6 +55,11 @@ describe('alias', () => {
     assert.equal(status, 400)
     assert.deepEqual(data, { status: 'noPeerIdProvided' })
   })
+  it('GET - should fail on invalid peerId', async () => {
+    const { status, data } = await getAlias(invalidPeerId)
+    assert.equal(status, 400)
+    assert.deepEqual(data, { status: 'invalidPeerId' })
+  })
   it('GET - should fail when no alias found', async () => {
     const { status, data } = await getAlias(alicePeerId)
     assert.equal(status, 404)

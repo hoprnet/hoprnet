@@ -1,24 +1,24 @@
 import { Operation } from 'express-openapi'
-import { isError } from '../../../commands/v2'
-import { withdraw } from '../../../commands/v2/logic/withdraw'
+import { isError } from '../logic'
+import { withdraw } from '../logic/withdraw'
 
 export const POST: Operation = [
   async (req, res, _next) => {
     try {
-      const { commands } = req.context
+      const { node } = req.context
       const { currency, amount, recipient } = req.body
 
-      const err = await withdraw({
+      const receipt = await withdraw({
         rawCurrency: currency,
         rawRecipient: recipient,
         rawAmount: amount,
-        node: commands.node
+        node: node
       })
 
-      if (isError(err)) {
-        return res.status(400).send({ status: err.message })
+      if (isError(receipt)) {
+        return res.status(400).send({ status: receipt.message })
       } else {
-        return res.status(200).send({ status: 'success' })
+        return res.status(200).send({ status: 'success', receipt })
       }
     } catch (error) {
       return res.status(500).send({ status: 'failure' })
@@ -45,7 +45,11 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: 'success' },
+              receipt: { type: 'string', example: '0xc0d8dcb4c83543adfd77b44390d2b61bc28ebe6585a6b1a30550987af9798448' }
+            }
           }
         }
       }

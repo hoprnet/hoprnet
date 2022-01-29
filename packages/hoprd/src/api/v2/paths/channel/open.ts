@@ -1,12 +1,12 @@
 import { Operation } from 'express-openapi'
-import { isError } from '../../../../commands/v2'
-import { openChannel } from '../../../../commands/v2/logic/channel'
+import { isError } from '../../logic'
+import { openChannel } from '../../logic/channel'
 
 export const parameters = []
 
 export const POST: Operation = [
   async (req, res, _next) => {
-    const { commands } = req.context
+    const { node, state } = req.context
     const { peerId, amount } = req.body
 
     // NOTE: probably express can or already is handling it automatically
@@ -17,8 +17,8 @@ export const POST: Operation = [
     const channelId = await openChannel({
       amountToFundStr: amount,
       counterpartyPeerId: peerId,
-      node: commands.node,
-      state: commands.state
+      node: node,
+      state: state
     })
     if (isError(channelId)) {
       let errorStatus
