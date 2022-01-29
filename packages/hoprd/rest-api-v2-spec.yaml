@@ -112,6 +112,29 @@ components:
       example:
         settingName: "includeRecipient"
         value: true
+    Info:
+      type: object
+      properties:
+        amouncedAddress:
+          type: array
+          items: 
+            type: string
+        listeningAddress:
+          type: array
+          items: 
+            type: string
+        network:
+          type: string
+          example: "hardhat"
+        hoprToken:
+          type: string
+          example: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+        hoprChannels:
+          type: string
+          example: "0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63"
+        channelClosurePeriod:
+          type: number
+          example: 1
   securitySchemes:
     keyScheme:
       type: apiKey
