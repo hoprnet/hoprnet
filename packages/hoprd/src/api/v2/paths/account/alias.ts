@@ -34,7 +34,7 @@ GET.apiDoc = {
       required: true,
       schema: {
         type: 'string',
-        example: 'examplePeerId'
+        example: '16Uiu2HAmRFjDov6sbcZeppbnNFFTdx5hFoBzr8csBgevtKUex8y9'
       }
     }
   ],
