@@ -48,8 +48,8 @@ import {
   PassiveStrategy,
   PromiscuousStrategy,
   SaneDefaults,
-  ChannelsToOpen,
-  ChannelsToClose
+  type ChannelsToOpen,
+  type ChannelsToClose
 } from './channel-strategy'
 
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
@@ -80,6 +80,7 @@ export type HoprOptions = {
   dbPath?: string
   createDbIfNotExist?: boolean
   forceCreateDB?: boolean
+  allowLocalConnections?: boolean
   password?: string
   connector?: HoprCoreEthereum
   strategy?: ChannelStrategy
@@ -1048,6 +1049,6 @@ export * from './constants'
 export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
-export { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from './environment'
+export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment'
 export { createLibp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'

@@ -150,6 +150,7 @@ function setup_node() {
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
+    --allowLocalNodeConnections \
     ${additional_args} \
     > "${log}" 2>&1 &
 }

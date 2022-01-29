@@ -23,6 +23,7 @@ import faucet, { type FaucetCLIOPts } from './tasks/faucet'
 import getAccounts from './tasks/getAccounts'
 
 import { expandVars } from '@hoprnet/hopr-utils'
+import type { ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 // rest
 import { task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
@@ -44,7 +45,7 @@ extendEnvironment((hre: HardhatRuntimeEnvironment) => {
 //
 // https://hardhat.org/hardhat-network/reference/#config
 // https://github.com/wighawag/hardhat-deploy/blob/master/README.md
-function networkToHardhatNetwork(name: String, input: any): NetworkUserConfig {
+function networkToHardhatNetwork(name: String, input: ResolvedEnvironment['network']): NetworkUserConfig {
   let cfg: NetworkUserConfig = {
     chainId: input.chain_id,
     gasMultiplier: input.gas_multiplier,
@@ -91,7 +92,7 @@ function networkToHardhatNetwork(name: String, input: any): NetworkUserConfig {
 
 const networks: NetworksUserConfig = {}
 
-for (const [networkId, network] of Object.entries(PROTOCOL_CONFIG.networks)) {
+for (const [networkId, network] of Object.entries<ResolvedEnvironment['network']>(PROTOCOL_CONFIG.networks)) {
   if (
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID] &&
     PROTOCOL_CONFIG.environments[HOPR_ENVIRONMENT_ID].network_id === networkId
@@ -225,7 +226,7 @@ subtask('flat:get-flattened-sources', 'Returns all contracts and their dependenc
     flattened = flattened.replace(
       /pragma experimental ABIEncoderV2;\n/gm,
       (
-        (i) => (m) =>
+        (i) => (m: string) =>
           !i++ ? m : ''
       )(0)
     )

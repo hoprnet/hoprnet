@@ -10,13 +10,15 @@ import {
   checkNetworks,
   isLinkLocaleAddress,
   u8aAddrToString,
-  getPrivateAddresses
+  getPrivateAddresses,
+  isLocalhost
 } from '@hoprnet/hopr-utils'
 import { parseAddress } from './utils'
 
 import Debug from 'debug'
 import { green } from 'chalk'
 import assert from 'assert'
+import { HoprConnectOptions } from './types'
 
 const log = Debug('hopr-connect:filter')
 
@@ -28,7 +30,7 @@ export class Filter {
 
   protected myPrivateNetworks: Network[]
 
-  constructor(private peerId: PeerId) {
+  constructor(private peerId: PeerId, private opts: HoprConnectOptions) {
     this.myPrivateNetworks = getPrivateAddresses()
   }
 
@@ -71,6 +73,7 @@ export class Filter {
           if (!this.listeningFamilies.includes(parsed.address.type)) {
             this.listeningFamilies.push(parsed.address.type)
           }
+          break
         case 'p2p':
           continue
       }
@@ -118,15 +121,16 @@ export class Filter {
       return false
     }
 
+    // Resolve p2p addresses first
     if (parsed.address.type === 'p2p') {
-      const address = parsed.address
+      const p2pAddress = parsed.address
 
-      if (u8aEquals(address.node, this.peerId.marshalPubKey())) {
+      if (u8aEquals(p2pAddress.node, this.peerId.marshalPubKey())) {
         log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
         return false
       }
 
-      if (u8aEquals(address.relayer, this.peerId.marshalPubKey())) {
+      if (u8aEquals(p2pAddress.relayer, this.peerId.marshalPubKey())) {
         log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
         return false
       }
@@ -141,6 +145,12 @@ export class Filter {
       return false
     }
 
+    // If localhost connections are explicitly allowed, do not dial it
+    if (isLocalhost(address.address, address.type) && !(this.opts.allowLocalConnections ?? false)) {
+      // Do not pollute logs by rejecting localhost connections attempts
+      return false
+    }
+
     assert(this.announcedAddrs != undefined && this.listeningFamilies != undefined)
 
     if (!this.listeningFamilies.includes(address.type)) {
@@ -151,6 +161,21 @@ export class Filter {
 
     if (INVALID_PORTS.includes(address.port)) {
       log(`Tried to dial invalid port ${address.port}`)
+      return false
+    }
+
+    // Allow to dial localhost only if the port is different from all of those we're listening on
+    if (
+      isLocalhost(address.address, address.type) &&
+      this.announcedAddrs.some(
+        (announced: ValidAddress) =>
+          announced.type !== 'p2p' &&
+          isLocalhost(announced.address, announced.type) &&
+          announced.type === address.type &&
+          announced.port == address.port
+      )
+    ) {
+      // Do not log anything to prevent too much log pollution
       return false
     }
 

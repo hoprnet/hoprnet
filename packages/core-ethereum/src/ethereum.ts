@@ -31,7 +31,7 @@ export type SendTransactionReturn = {
 }
 
 export async function createChainWrapper(
-  networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
+  networkInfo: { provider: string; chainId: number; gasPrice?: string; network: string; environment: string },
   privateKey: Uint8Array,
   checkDuplicate: Boolean = true,
   timeout = TX_CONFIRMATION_WAIT
@@ -75,6 +75,14 @@ export async function createChainWrapper(
     durations.minutes(15)
   )
 
+  let gasPrice: number | BigNumber
+  if (networkInfo.gasPrice) {
+    const [gasPriceValue, gasPriceUnit] = networkInfo.gasPrice.split(' ')
+    gasPrice = ethers.utils.parseUnits(gasPriceValue, gasPriceUnit)
+  } else {
+    gasPrice = await provider.getGasPrice()
+  }
+
   /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
    * to the response until reaching block confirmation.
@@ -91,7 +99,6 @@ export async function createChainWrapper(
     ...rest: Parameters<T['functions'][keyof T['functions']]>
   ): Promise<SendTransactionReturn> {
     const gasLimit = 400e3
-    const gasPrice = networkInfo.gasPrice ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
@@ -220,7 +227,8 @@ export async function createChainWrapper(
         const transaction = await wallet.sendTransaction({
           to: recipient,
           value: BigNumber.from(amount),
-          nonce: BigNumber.from(nonceLock.nextNonce)
+          nonce: BigNumber.from(nonceLock.nextNonce),
+          gasPrice
         })
         nonceLock.releaseLock()
         return transaction.hash

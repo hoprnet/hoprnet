@@ -21,19 +21,19 @@ type ChainWrapper = Awaited<ReturnType<typeof createChainWrapper>>
 
 // naive mock of indexer waiting for confirmation
 function createTxHandler(tx: string): DeferType<string> {
-  const deferred = {} as DeferType<string>
-  deferred.promise = new Promise((resolve, reject) => {
-    deferred.reject = () => {
-      console.log(`tx ${tx} is rejected`)
-      reject(tx)
+  const state = {
+    promise: Promise.resolve(),
+    reject: () => {
+      console.log(`tx ${tx} got rejected`)
+      state.promise = Promise.reject()
     }
-    deferred.resolve = () => {
-      console.log(`tx ${tx} is resolved`)
-      resolve(tx)
-    }
-  })
+  }
 
-  return deferred
+  // Don't need to implement `resolve` method
+  // because it is intended to be called by the
+  // indexer - which we don't use in this script, so
+  // we must only ensure that we reject once there is an error
+  return state as unknown as DeferType<string>
 }
 
 async function getNativeBalance(chain: ChainWrapper, address: string) {
@@ -116,18 +116,20 @@ async function main() {
       demandOption: true,
       type: 'string'
     })
-    .option('erc20', {
-      describe: 'if set, fund erc20 token instead of native topken',
-      demandOption: false,
-      type: 'boolean',
-      default: false
-    })
-    .option('target', {
+    .option('targetERC20', {
       describe: 'the target balance up to which the account shall be funded',
-      demandOption: true,
+      type: 'string'
+    })
+    .option('targetNative', {
+      describe: 'the target balance up to which the account shall be funded',
       type: 'string'
     })
     .parseSync()
+
+  if (!argv.targetERC20 && !argv.targetNative) {
+    console.error(`Running fund script without a fund option.`)
+    process.exit(1)
+  }
 
   const environment = resolveEnvironment(argv.environment)
   if (!environment) {
@@ -144,7 +146,7 @@ async function main() {
   const chainOptions = {
     chainId: environment.network.chain_id,
     environment: environment.id,
-    gasPrice: environment.network.gasPrice,
+    gasPrice: environment.network.gas_price,
     network: environment.network.id,
     provider: expandVars(environment.network.default_provider, process.env)
   }
@@ -156,12 +158,13 @@ async function main() {
   const sender = chain.getPublicKey().toAddress().toString()
 
   // maybe fund ERC20
-  if (argv.erc20) {
-    await fundERC20(chain, sender, argv.address, argv.target)
-    return
+  if (argv.targetERC20) {
+    await fundERC20(chain, sender, argv.address, argv.targetERC20)
   }
-  // by default we fund native token
-  await fundNative(chain, sender, argv.address, argv.target)
+
+  if (argv.targetNative) {
+    await fundNative(chain, sender, argv.address, argv.targetNative)
+  }
 }
 
 main()
