@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { _createTestState } from '.'
-import { openChannel } from './channel'
+import { listOpenChannels, openChannel } from './channel'
 import sinon from 'sinon'
 
 const peerId = '16Uiu2HAmRFjDov6sbcZeppbnNFFTdx5hFoBzr8csBgevtKUex8y9'
@@ -67,3 +67,13 @@ describe('openChannel', () => {
     assert.equal(channelId.message, 'notEnoughFunds')
   })
 })
+
+// describe('listOpenChannels', () => {
+//   it('should work', () => {
+//     // NOTE: how does one go about mocking it?
+//     listOpenChannels({ node })
+//   })
+//   it('should fail', () => {
+//     listOpenChannels({ node })
+//   })
+// })

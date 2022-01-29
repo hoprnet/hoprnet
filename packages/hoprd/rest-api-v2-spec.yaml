@@ -104,37 +104,51 @@ components:
     Setting:
       type: object
       properties:
-        settingName: 
+        settingName:
           type: 'string'
           description: 'Setting name.'
-        value: 
+        value:
           description: 'Depends on the setting.'
       example:
-        settingName: "includeRecipient"
+        settingName: 'includeRecipient'
         value: true
     Info:
       type: object
       properties:
         amouncedAddress:
           type: array
-          items: 
+          items:
             type: string
         listeningAddress:
           type: array
-          items: 
+          items:
             type: string
         network:
           type: string
-          example: "hardhat"
+          example: 'hardhat'
         hoprToken:
           type: string
-          example: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+          example: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
         hoprChannels:
           type: string
-          example: "0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63"
+          example: '0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63'
         channelClosurePeriod:
           type: number
           example: 1
+    Channel:
+      type: object
+      properties:
+        type:
+          type: string
+        channelId:
+          type: string
+        peerId:
+          type: string
+        status:
+          type: string
+        balance:
+          type: string
+
   securitySchemes:
     keyScheme:
       type: apiKey
