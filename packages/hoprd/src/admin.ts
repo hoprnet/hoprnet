@@ -19,7 +19,6 @@ import {
 } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import cookie from 'cookie'
-import { CommandsV2 } from './commands/v2'
 
 let debugLog = debug('hoprd:admin')
 
@@ -32,7 +31,6 @@ export class AdminServer {
   private node: Hopr | undefined
   private wsServer: ws.Server
   private cmds: Commands
-  private cmds2: CommandsV2
 
   constructor(private logs: LogStream, private host: string, private port: number, private apiToken?: string) {}
 
@@ -212,15 +210,7 @@ export class AdminServer {
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
 
-    this.logs.log('Trying commands v2')
-    this.cmds2
-      .execute(() => {}, `alias ${node.getId().toB58String()} me`)
-      .then((res) => {
-        if (res === 'Unknown command!') {
-          this.logs.log('Trying commands v1')
-          this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
-        }
-      })
+    this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
   }
 }
 
