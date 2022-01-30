@@ -16,7 +16,12 @@ describe('setAlias', function () {
   })
 
   it('should throw error on invalid peerId', () => {
-    assert.throws(() => setAlias(mocks, alias1, invalidPeerId), STATUS_CODES.INVALID_PEERID)
+    assert.throws(
+      () => setAlias(mocks, alias1, invalidPeerId),
+      (err: Error) => {
+        return err.message.includes(STATUS_CODES.INVALID_PEERID)
+      }
+    )
   })
 })
 
@@ -27,7 +32,7 @@ describe('removeAlias', function () {
     setAlias(mocks, alias1, peerId)
     removeAlias(mocks, alias1)
     assert.equal(mocks.getState().aliases.size, 0)
-    assert.equal(mocks.getState().aliases.get('alias1').toB58String(), undefined)
+    assert.equal(mocks.getState().aliases.get('alias1'), undefined)
   })
 })
 
@@ -37,10 +42,15 @@ describe('getAlias', () => {
 
   it('should successfuly get alias', () => {
     const alias = getAlias(mocks.getState(), alias1)
-    assert.equal(alias, alias1)
+    assert.equal(alias, peerId)
   })
 
   it('should throw error on invalid peerId', () => {
-    assert.throws(() => getAlias(mocks.getState(), 'alias2'), STATUS_CODES.PEERID_NOT_FOUND)
+    assert.throws(
+      () => getAlias(mocks.getState(), 'alias2'),
+      (err: Error) => {
+        return err.message.includes(STATUS_CODES.PEERID_NOT_FOUND)
+      }
+    )
   })
 })

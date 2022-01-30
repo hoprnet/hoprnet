@@ -42,7 +42,7 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Close a channel.',
+  description: 'Close a channel',
   tags: ['channel'],
   operationId: 'postChannelClose',
   requestBody: {
@@ -68,7 +68,6 @@ POST.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'success' },
               closureStatus: {
                 $ref: '#/components/schemas/ChannelClosureStatus'
               }
@@ -85,7 +84,7 @@ POST.apiDoc = {
             $ref: '#/components/schemas/StatusResponse'
           },
           example: {
-            status: 'invalidPeerId | missingPeerId'
+            status: STATUS_CODES.INVALID_PEERID
           }
         }
       }

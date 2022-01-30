@@ -20,14 +20,14 @@ POST.apiDoc = {
   operationId: 'channelRedeemTickets',
   responses: {
     '200': {
-      description: 'Tickets redeemed succesfully.',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/StatusResponse'
-          }
-        }
-      }
+      description: 'Tickets redeemed succesfully.'
+      // content: {
+      //   'application/json': {
+      //     schema: {
+      //       $ref: '#/components/schemas/StatusResponse'
+      //     }
+      //   }
+      // }
     }
   }
 }

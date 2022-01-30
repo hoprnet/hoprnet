@@ -13,7 +13,6 @@ GET.apiDoc = {
   description: 'Get release version of the running node',
   tags: ['node'],
   operationId: 'nodeGetVersion',
-  parameters: [],
   responses: {
     '200': {
       description: 'Returns the release version of the running node',

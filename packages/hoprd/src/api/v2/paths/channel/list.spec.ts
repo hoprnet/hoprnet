@@ -7,7 +7,7 @@ import { ChannelEntry } from '@hoprnet/hopr-utils'
 const SELF = PeerId.createFromB58String('16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12')
 
 let node = sinon.fake() as any
-node.getId = sinon.fake.returns(Promise.resolve(SELF))
+node.getId = sinon.fake.returns(SELF)
 
 describe('listChannels', function () {
   it('should get channels list', async function () {

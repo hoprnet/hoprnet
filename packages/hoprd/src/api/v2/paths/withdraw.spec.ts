@@ -24,27 +24,40 @@ describe('withdraw', () => {
   })
 
   it('should reject on invalid arguments', async () => {
-    assert.rejects(() => {
-      return withdraw(node, 'invalidCurrency' as unknown as 'NATIVE', alice, '1')
-    }, STATUS_CODES.INVALID_CURRENCY)
-    assert.rejects(() => {
-      return withdraw(node, 'HOPR', '0x00', '1')
-    }, STATUS_CODES.INVALID_ADDRESS)
-    assert.rejects(() => {
-      return withdraw(node, 'NATIVE', alice, 'abc')
-    }, STATUS_CODES.INVALID_AMOUNT)
+    assert.rejects(
+      () => {
+        return withdraw(node, 'invalidCurrency' as unknown as 'NATIVE', alice, '1')
+      },
+      (err: Error) => {
+        return err.message.includes(STATUS_CODES.INVALID_CURRENCY)
+      }
+    )
+    assert.rejects(
+      () => {
+        return withdraw(node, 'HOPR', '0x00', '1')
+      },
+      (err: Error) => {
+        return err.message.includes(STATUS_CODES.INVALID_ADDRESS)
+      }
+    )
+    assert.rejects(
+      () => {
+        return withdraw(node, 'NATIVE', alice, 'abc')
+      },
+      (err: Error) => {
+        return err.message.includes(STATUS_CODES.INVALID_AMOUNT)
+      }
+    )
   })
 
   it('should return error when withdrawing more than balance or address incorrect', async () => {
-    assert.rejects(() => {
-      return withdraw(node, 'NATIVE', alice, '100')
-    }, STATUS_CODES.NOT_ENOUGH_BALANCE)
-  })
-
-  it('should return error when node call fails', async () => {
-    node.withdraw = sinon.fake.throws('')
-    assert.rejects(() => {
-      return withdraw(node, 'NATIVE', alice, '100')
-    }, STATUS_CODES.UNKNOWN_FAILURE)
+    assert.rejects(
+      () => {
+        return withdraw(node, 'NATIVE', alice, '100')
+      },
+      (err: Error) => {
+        return err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)
+      }
+    )
   })
 })

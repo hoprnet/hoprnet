@@ -21,17 +21,27 @@ describe('closeChannel', () => {
     const expectedStatus = { channelStatus: 3, receipt: 'receipt' }
     node.closeChannel = sinon.fake.returns({ status: expectedStatus.channelStatus, receipt: expectedStatus.receipt })
 
-    assert.rejects(() => {
-      return closeChannel(node, invalidPeerId)
-    }, STATUS_CODES.INVALID_PEERID)
+    assert.rejects(
+      () => {
+        return closeChannel(node, invalidPeerId)
+      },
+      (err: Error) => {
+        return err.message.includes(STATUS_CODES.INVALID_PEERID)
+      }
+    )
   })
 
   it('should fail when node call fails', async () => {
-    const expectedStatus = { channelStatus: 3, receipt: 'receipt' }
     node.closeChannel = sinon.fake.throws('unknown error')
 
-    assert.rejects(() => {
-      return closeChannel(node, peerId)
-    }, STATUS_CODES.UNKNOWN_FAILURE)
+    assert.rejects(
+      () => {
+        return closeChannel(node, peerId)
+      },
+      // we only care if it throws
+      (_err: Error) => {
+        return true
+      }
+    )
   })
 })

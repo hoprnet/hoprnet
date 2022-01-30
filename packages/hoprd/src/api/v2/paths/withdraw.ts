@@ -92,18 +92,9 @@ POST.apiDoc = {
           schema: {
             $ref: '#/components/schemas/StatusResponse'
           },
-          example: { status: 'incorrectCurrency | incorrectAmount' }
-        }
-      }
-    },
-    '500': {
-      description: 'Withdraw failed',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/StatusResponse'
-          },
-          example: { status: 'failure' }
+          example: {
+            status: `${STATUS_CODES.INVALID_CURRENCY} | ${STATUS_CODES.INVALID_AMOUNT} | ${STATUS_CODES.INVALID_ADDRESS}`
+          }
         }
       }
     }

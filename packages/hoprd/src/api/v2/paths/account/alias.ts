@@ -93,25 +93,11 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              status: {
-                $ref: '#/components/schemas/StatusResponse'
-              },
               peerId: {
                 $ref: '#/components/schemas/PeerId'
               }
             }
           }
-        }
-      }
-    },
-    '400': {
-      description: 'Invalid input',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/StatusResponse'
-          },
-          example: { status: 'noPeerIdProvided | invalidPeerId' }
         }
       }
     },
@@ -122,7 +108,7 @@ GET.apiDoc = {
           schema: {
             $ref: '#/components/schemas/StatusResponse'
           },
-          example: { status: 'aliasNotFound' }
+          example: { status: STATUS_CODES.PEERID_NOT_FOUND }
         }
       }
     }
@@ -170,14 +156,14 @@ POST.apiDoc = {
   },
   responses: {
     '200': {
-      description: 'Alias set succesfully',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/StatusResponse'
-          }
-        }
-      }
+      description: 'Alias set succesfully'
+      // content: {
+      //   'application/json': {
+      //     schema: {
+      //       $ref: '#/components/schemas/StatusResponse'
+      //     }
+      //   }
+      // }
     },
     '400': {
       description: 'Invalid peerId',
@@ -187,7 +173,7 @@ POST.apiDoc = {
             $ref: '#/components/schemas/StatusResponse'
           },
           example: {
-            status: 'invalidPeerId | missingBodyfields'
+            status: STATUS_CODES.INVALID_PEERID
           }
         }
       }
@@ -230,14 +216,14 @@ DELETE.apiDoc = {
   },
   responses: {
     '200': {
-      description: 'Alias removed succesfully',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/StatusResponse'
-          }
-        }
-      }
+      description: 'Alias removed succesfully'
+      // content: {
+      //   'application/json': {
+      //     schema: {
+      //       $ref: '#/components/schemas/StatusResponse'
+      //     }
+      //   }
+      // }
     }
   }
 }

@@ -14,12 +14,24 @@ describe('ping', () => {
     const res = await ping({ node, peerId })
     assert.equal(res.latency, 10)
   })
+
   it('should return error on invalid peerId', async () => {
     node.ping = sinon.fake.returns({ latency: 10 })
-    assert.throws(() => ping({ node, peerId: invalidPeerId }), STATUS_CODES.INVALID_PEERID)
+    assert.rejects(
+      () => ping({ node, peerId: invalidPeerId }),
+      (err: Error) => {
+        return err.message.includes(STATUS_CODES.INVALID_PEERID)
+      }
+    )
   })
+
   it('should return propper error on ping fail', async () => {
     node.ping = sinon.fake.throws('')
-    assert.throws(() => ping({ node, peerId }))
+    assert.rejects(
+      () => ping({ node, peerId }),
+      () => {
+        return true
+      }
+    )
   })
 })

@@ -2,8 +2,7 @@ import { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { encodeMessage } from '../../../commands/utils'
-
-export const parameters = []
+import { STATUS_CODES } from '../'
 
 export const POST: Operation = [
   async (req, res, _next) => {
@@ -20,7 +19,7 @@ export const POST: Operation = [
       await req.context.node.sendMessage(message, recipient, path)
       res.status(204).send()
     } catch (err) {
-      res.status(422).json({ error: err.message })
+      res.status(422).json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
@@ -29,7 +28,6 @@ POST.apiDoc = {
   description: 'Send a message to another peer using a given path.',
   tags: ['messages'],
   operationId: 'messagesSend',
-  parameters: [],
   requestBody: {
     content: {
       'application/json': {

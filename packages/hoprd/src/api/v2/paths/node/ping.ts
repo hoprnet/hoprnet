@@ -44,7 +44,7 @@ export const GET: Operation = [
       return res.status(200).send({ status: 'success', ...pingRes })
     } catch (error) {
       return res
-        .status(error.message === STATUS_CODES.INVALID_PEERID ? 400 : 500)
+        .status(error.message.includes(STATUS_CODES.INVALID_PEERID) ? 400 : 500)
         .send({ status: STATUS_CODES[error.message] || STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
   }
@@ -74,7 +74,6 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'success' },
               latency: {
                 type: 'number',
                 example: 10
@@ -91,7 +90,7 @@ GET.apiDoc = {
           schema: {
             $ref: '#/components/schemas/StatusResponse'
           },
-          example: { status: 'invalidPeerId' }
+          example: { status: STATUS_CODES.INVALID_PEERID }
         }
       }
     }

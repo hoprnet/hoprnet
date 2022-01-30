@@ -22,7 +22,7 @@ export const openChannel = async (node: Hopr, counterpartyStr: string, amountStr
     throw Error(STATUS_CODES.NOT_ENOUGH_BALANCE)
   }
 
-  // @TODO: handle errors from open channel
+  // @TODO: handle errors from open channel, inconsistent return value
   try {
     const { channelId } = await node.openChannel(counterparty, amount)
     return channelId.toHex()
@@ -49,6 +49,8 @@ export const POST: Operation = [
         return res.status(400).send({ STATUS: INVALID_ARG, error: err.message })
       } else if (err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
         return res.status(304).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
+      } else if (err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)) {
+        return res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
       } else {
         return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
       }
@@ -89,7 +91,6 @@ POST.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'success' },
               channelId: { type: 'string', example: '7b379578588920ca78fbf' }
             }
           }
@@ -103,7 +104,7 @@ POST.apiDoc = {
           schema: {
             $ref: '#/components/schemas/StatusResponse'
           },
-          example: { status: 'invalidPeerId | invalidAmountToFund' }
+          example: { status: `${STATUS_CODES.INVALID_AMOUNT} | ${STATUS_CODES.INVALID_ADDRESS}` }
         }
       }
     },
@@ -114,7 +115,7 @@ POST.apiDoc = {
           schema: {
             $ref: '#/components/schemas/StatusResponse'
           },
-          example: { status: 'channelAlreadyOpen' }
+          example: { status: STATUS_CODES.CHANNEL_ALREADY_OPEN }
         }
       }
     },
@@ -125,7 +126,7 @@ POST.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'notEnoughFunds' },
+              status: { type: 'string', example: STATUS_CODES.NOT_ENOUGH_BALANCE },
               tokensRequired: { type: 'string', example: '10' },
               currentBalance: { type: 'string', example: '9' }
             }

@@ -39,23 +39,11 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'success' },
               balances: {
                 $ref: '#/components/schemas/Balance'
               }
             }
           }
-        }
-      }
-    },
-    '500': {
-      description: 'Failed to get balance.',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/StatusResponse'
-          },
-          example: { status: 'failure' }
         }
       }
     }

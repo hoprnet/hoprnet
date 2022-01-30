@@ -128,7 +128,6 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'success' },
               settings: {
                 type: 'array',
                 items: {
@@ -148,7 +147,7 @@ GET.apiDoc = {
           schema: {
             $ref: '#/components/schemas/StatusResponse'
           },
-          example: { status: 'invalidSettingName' }
+          example: { status: STATUS_CODES.INVALID_SETTING }
         }
       }
     }
@@ -164,8 +163,9 @@ export const POST: Operation = [
       setSetting({ node, stateOps, value, settingName })
       return res.status(200).send({ status: STATUS_CODES.SUCCESS })
     } catch (error) {
+      const invalidDataErrors = [STATUS_CODES.INVALID_SETTING_VALUE, STATUS_CODES.INVALID_SETTING]
       return res
-        .status(error.message === STATUS_CODES.INVALID_SETTING_VALUE ? 400 : 500)
+        .status(invalidDataErrors.includes(error.message) ? 400 : 500)
         .send({ status: STATUS_CODES[error.message] || STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
   }
@@ -186,14 +186,14 @@ POST.apiDoc = {
   },
   responses: {
     '200': {
-      description: 'Setting set succesfully',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/StatusResponse'
-          }
-        }
-      }
+      description: 'Setting set succesfully'
+      // content: {
+      //   'application/json': {
+      //     schema: {
+      //       $ref: '#/components/schemas/StatusResponse'
+      //     }
+      //   }
+      // }
     },
     '400': {
       description: 'Invalid input',
@@ -203,7 +203,7 @@ POST.apiDoc = {
             $ref: '#/components/schemas/StatusResponse'
           },
           example: {
-            status: 'invalidSettingName | invalidValue'
+            status: `${STATUS_CODES.INVALID_SETTING} | ${STATUS_CODES.INVALID_SETTING_VALUE}`
           }
         }
       }

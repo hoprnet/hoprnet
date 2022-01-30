@@ -68,7 +68,6 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'success' },
               channels: {
                 type: 'object',
                 properties: {
@@ -78,17 +77,6 @@ GET.apiDoc = {
               }
             }
           }
-        }
-      }
-    },
-    '500': {
-      description: 'No alias found for the peerId',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/StatusResponse'
-          },
-          example: { status: 'failure' }
         }
       }
     }
