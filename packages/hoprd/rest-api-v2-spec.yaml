@@ -83,15 +83,15 @@ components:
         - status
       example:
         status: success
-    Balance:
+    Balances:
       type: object
       properties:
-        bn:
+        native:
           type: string
-          example: 0de0b6b3a7640000
-        symbol:
+          example: '1998149726987048088'
+        hopr:
           type: string
-          example: xDAI
+          example: '19999999999999999998'
     WithdrawRequest:
       type: object
       properties:

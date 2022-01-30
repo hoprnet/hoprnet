@@ -16,9 +16,10 @@ export const GET: Operation = [
     const { node } = req.context
 
     try {
-      const balances = await getBalances(node)
+      const { native, hopr } = await getBalances(node)
       return res.status(200).send({
-        balances
+        native: native.toBN().toString(),
+        hopr: hopr.toBN().toString()
       })
     } catch (err) {
       return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -38,13 +39,7 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              balances: {
-                type: 'object',
-                properties: {
-                  native: { $ref: '#/components/schemas/Balance' },
-                  hopr: { $ref: '#/components/schemas/Balance' }
-                }
-              }
+              balances: { $ref: '#/components/schemas/Balances' }
             }
           }
         }
