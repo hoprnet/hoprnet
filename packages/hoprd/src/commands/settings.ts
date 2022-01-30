@@ -3,7 +3,6 @@ import type { State, StateOps } from '../types'
 import { getPaddingLength, styleValue } from './utils'
 import { AbstractCommand } from './abstractCommand'
 import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
-import { setSetting } from '../api/v2/paths/node/settings'
 
 function booleanSetter(name: string) {
   return function setter(query: string, state: State): string {
@@ -101,17 +100,9 @@ export default class Settings extends AbstractCommand {
       return s === setting
     })
     if (typeof matchesASetting !== 'undefined') {
-      try {
-        setSetting({
-          node: this.node,
-          settingName: setting as keyof State['settings'],
-          stateOps: { getState, setState },
-          value: setting === 'includeRecipient' ? !!option : option
-        })
-        return log(this.settings[matchesASetting][1](option, state))
-      } catch (error) {
-        return log(styleValue(`Error setting “${styleValue(setting)}”`, 'failure'))
-      }
+      state.settings[setting] = setting === 'includeRecipient' ? !!option : option
+      setState(state)
+      return log(this.settings[matchesASetting][1](option, state))
     }
 
     return log(styleValue(`Setting “${styleValue(setting)}” does not exist.`, 'failure'))

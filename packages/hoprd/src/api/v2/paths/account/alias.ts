@@ -142,7 +142,7 @@ POST.apiDoc = {
             alias: { type: 'string', description: 'Alias that we want to attach to peerId.' }
           },
           example: {
-            peerId: '0x2C505741584f8591e261e59160D0AED5F74Dc29b',
+            peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12',
             alias: 'Alice'
           }
         }

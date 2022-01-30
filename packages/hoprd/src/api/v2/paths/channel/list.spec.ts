@@ -11,8 +11,11 @@ node.getId = sinon.fake.returns(SELF)
 
 describe('listChannels', function () {
   it('should get channels list', async function () {
-    node.getChannelsFrom = sinon.fake.returns(Promise.resolve([ChannelEntry.createMock()]))
-    node.getChannelsTo = sinon.fake.returns(Promise.resolve([ChannelEntry.createMock()]))
+    const testChannel = ChannelEntry.createMock()
+    //@ts-ignore
+    testChannel.status = 2
+    node.getChannelsFrom = sinon.fake.returns(Promise.resolve([testChannel]))
+    node.getChannelsTo = sinon.fake.returns(Promise.resolve([testChannel]))
     const { incoming, outgoing } = await listChannels(node)
 
     assert.equal(incoming.length, 1)
