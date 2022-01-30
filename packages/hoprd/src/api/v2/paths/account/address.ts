@@ -16,8 +16,6 @@ export const getAddresses = (
   }
 }
 
-export const parameters = []
-
 export const GET: Operation = [
   (req, res, _next) => {
     const { node } = req.context
@@ -31,13 +29,13 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Get the native and hopr addresses of the account associated with the node',
+  description: 'Get the native and hopr addresses of the account associated with the node.',
   tags: ['account'],
   operationId: 'accountGetAddress',
   parameters: [],
   responses: {
     '200': {
-      description: 'Returns the native and hopr addresses of the account associated with the node',
+      description: 'Returns the native and hopr addresses of the account associated with the node.',
       content: {
         'application/json': {
           schema: {

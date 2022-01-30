@@ -1,41 +1,46 @@
-import { _createTestState } from '../../'
+import { _createTestMocks, STATUS_CODES } from '../../'
 import assert from 'assert'
-import { getAlias, setAlias } from './alias'
+import { setAlias, removeAlias, getAlias } from './alias'
 
 const peerId = '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
 const invalidPeerId = 'definetly not a valid peerId'
 const alias1 = 'alias1'
 
-describe('setAlias', () => {
-  it('should set alias successfuly', () => {
-    const state = _createTestState()
-    setAlias({ alias: alias1, peerId, state })
-    assert.equal(state.aliases.size, 1)
-    assert.equal(state.aliases.get('alias1').toB58String(), peerId)
+describe('setAlias', function () {
+  const mocks = _createTestMocks()
+
+  it('should set alias successfuly', function () {
+    setAlias(mocks, alias1, peerId)
+    assert.equal(mocks.getState().aliases.size, 1)
+    assert.equal(mocks.getState().aliases.get('alias1').toB58String(), peerId)
   })
 
   it('should throw error on invalid peerId', () => {
-    const state = _createTestState()
-    assert.throws(() => setAlias({ alias: alias1, peerId: invalidPeerId, state }), /invalidPeerId/)
+    assert.throws(() => setAlias(mocks, alias1, invalidPeerId), STATUS_CODES.INVALID_PEERID)
+  })
+})
+
+describe('removeAlias', function () {
+  const mocks = _createTestMocks()
+
+  it('should remove alias successfuly', function () {
+    setAlias(mocks, alias1, peerId)
+    removeAlias(mocks, alias1)
+    assert.equal(mocks.getState().aliases.size, 0)
+    assert.equal(mocks.getState().aliases.get('alias1').toB58String(), undefined)
   })
 })
 
 describe('getAlias', () => {
-  it('should successfuly get aliases', () => {
-    const state = _createTestState()
-    setAlias({ alias: alias1, peerId, state })
-    const aliases = getAlias({ peerId, state }) as string[]
-    assert.equal(aliases.length, 1)
-    assert.equal(aliases[0], alias1)
+  const mocks = _createTestMocks()
+  setAlias(mocks, alias1, peerId)
+
+  it('should successfuly get alias', () => {
+    const alias = getAlias(mocks.getState(), alias1)
+    assert.equal(alias, alias1)
   })
 
   it('should throw error on invalid peerId', () => {
-    const state = _createTestState()
-    assert.throws(() => getAlias({ peerId, state }), 'invalidPeerId')
-  })
-
-  it('should throw error when no alias found', () => {
-    const state = _createTestState()
-    assert.throws(() => getAlias({ peerId: invalidPeerId, state }), 'aliasNotFound')
+    assert.throws(() => getAlias(mocks.getState(), 'alias2'), STATUS_CODES.PEERID_NOT_FOUND)
   })
 })

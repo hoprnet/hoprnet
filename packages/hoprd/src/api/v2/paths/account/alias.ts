@@ -1,89 +1,103 @@
-import type { State } from '../../../../types'
+import type { Operation } from 'express-openapi'
+import type { State, StateOps } from '../../../../types'
 import PeerId from 'peer-id'
-import { Operation } from 'express-openapi'
+import { STATUS_CODES } from '../../'
 
-export const setAlias = ({ peerId, alias, state }: { peerId: string; alias: string; state: State }): State => {
+/**
+ * Sets an alias and assigns the PeerId to it.
+ * Updates HOPRd's state.
+ * @returns new state
+ */
+export const setAlias = (stateOps: StateOps, alias: string, peerId: string): State => {
   try {
+    const state = stateOps.getState()
     state.aliases.set(alias, PeerId.createFromB58String(peerId))
+    stateOps.setState(state)
     return state
-  } catch (error) {
-    throw Error('invalidPeerId')
+  } catch {
+    throw Error(STATUS_CODES.INVALID_PEERID)
   }
 }
 
-export const getAlias = ({ state, peerId }: { state: State; peerId: string }): string[] => {
-  // @TODO: perhaps unnecessary
-  try {
-    PeerId.createFromB58String(peerId)
-  } catch (error) {
-    throw Error('invalidPeerId')
-  }
-
-  const aliases = Array.from(state.aliases.entries())
-    .filter(([_, peerIdInMap]) => peerIdInMap.toB58String() === peerId)
-    .map(([alias, _]) => alias)
-
-  if (aliases.length === 0) {
-    throw Error('aliasNotFound')
-  }
-
-  return aliases
+/**
+ * Removes alias and it's assigned PeerId.
+ * Updates HOPRd's state.
+ * @returns new state
+ */
+export const removeAlias = (stateOps: StateOps, alias: string): State => {
+  const state = stateOps.getState()
+  state.aliases.delete(alias)
+  stateOps.setState(state)
+  return state
 }
 
-export const parameters = []
+/**
+ * @returns The PeerId associated with the alias.
+ */
+export const getAlias = (state: Readonly<State>, alias: string): string => {
+  const peerId = state.aliases.get(alias)
+  if (!peerId) throw Error(STATUS_CODES.PEERID_NOT_FOUND)
+  return peerId.toB58String()
+}
+
+// @TODO: add get all aliases
+/**
+ * @returns All PeerIds keyed by their aliases.
+ */
+// export const getAliases = (state: Readonly<State>): { [alias: string]: string[] } => {
+//   return Array.from(state.aliases).reduce((result, [alias, peerId]) => {
+//     result[alias] = peerId.toB58String()
+//     return result
+//   }, {})
+// }
 
 export const GET: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
-    const { peerId } = req.query
-
-    if (!peerId) {
-      return res.status(400).send({ status: 'noPeerIdProvided' })
-    }
+    const { alias } = req.query
 
     try {
-      const aliases = getAlias({ peerId: peerId as string, state: stateOps.getState() })
-      return res.status(200).send({ status: 'success', aliases })
+      const peerId = getAlias(stateOps.getState(), alias as string)
+      return res.status(200).send({ status: 'success', peerId })
     } catch (err) {
-      if (err.message.includes('invalidPeerId')) {
-        return res.status(400).send({ error: err.message })
+      if (err.message.includes(STATUS_CODES.PEERID_NOT_FOUND)) {
+        return res.status(404).send({ status: STATUS_CODES.PEERID_NOT_FOUND, error: err.message })
       } else {
-        return res.status(404).send({ error: err.message })
+        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
       }
     }
   }
 ]
 
 GET.apiDoc = {
-  description: 'Get the alias/es assigned to a given address',
+  description: 'Get the PeerId of an alias.',
   tags: ['account'],
-  operationId: 'getAlias',
+  operationId: 'accountGetPeerId',
   parameters: [
     {
-      name: 'peerId',
+      name: 'alias',
       in: 'query',
-      description: 'PeerId that we want to fetch aliases for',
+      description: 'Alias we want to fetch PeerId for.',
       required: true,
       schema: {
         type: 'string',
-        example: '16Uiu2HAmRFjDov6sbcZeppbnNFFTdx5hFoBzr8csBgevtKUex8y9'
+        example: 'Alice'
       }
     }
   ],
   responses: {
     '200': {
-      description: 'Alias/es fetched succesfully',
+      description: 'PeerId found.',
       content: {
         'application/json': {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'success' },
-              aliases: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Aliases for given peerId',
-                example: ['alias1']
+              status: {
+                $ref: '#/components/schemas/StatusResponse'
+              },
+              peerId: {
+                $ref: '#/components/schemas/PeerId'
               }
             }
           }
@@ -120,16 +134,15 @@ export const POST: Operation = [
     const { stateOps } = req.context
     const { peerId, alias } = req.body
 
-    // @TODO: probably express can or already is handling it automatically
-    if (!peerId || !alias) {
-      return res.status(400).send({ status: 'missingBodyfields' })
-    }
-
     try {
-      const aliases = setAlias({ alias, peerId, state: stateOps.getState() })
-      return res.status(200).send({ status: 'success', aliases })
+      setAlias(stateOps, alias, peerId)
+      return res.status(200).send({ status: STATUS_CODES.SUCCESS })
     } catch (err) {
-      return res.status(400).send({ status: 'invalidPeerId' })
+      if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
+        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID, error: err.message })
+      } else {
+        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      }
     }
   }
 ]
@@ -175,6 +188,53 @@ POST.apiDoc = {
           },
           example: {
             status: 'invalidPeerId | missingBodyfields'
+          }
+        }
+      }
+    }
+  }
+}
+
+export const DELETE: Operation = [
+  async (req, res, _next) => {
+    const { stateOps } = req.context
+    const { alias } = req.body
+
+    try {
+      removeAlias(stateOps, alias)
+      return res.status(200).send({ status: STATUS_CODES.SUCCESS })
+    } catch (err) {
+      return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+    }
+  }
+]
+
+DELETE.apiDoc = {
+  description: 'Unassign an alias from a PeerId',
+  tags: ['account'],
+  operationId: 'removeAlias',
+  requestBody: {
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            alias: { type: 'string', description: 'Alias that we want to remove.' }
+          },
+          example: {
+            alias: 'Alice'
+          }
+        }
+      }
+    }
+  },
+  responses: {
+    '200': {
+      description: 'Alias removed succesfully',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/StatusResponse'
           }
         }
       }

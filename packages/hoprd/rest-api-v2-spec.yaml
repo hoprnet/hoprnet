@@ -43,6 +43,16 @@ components:
       example:
         nativeAddress: '0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a'
         hoprAddress: '16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar'
+    PeerId:
+      type: string
+      properties:
+        peerId:
+          type: string
+          description: A PeerId
+      required:
+        - peerId
+      example:
+        peerId: '16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar'
     Version:
       type: object
       properties:
@@ -148,15 +158,6 @@ components:
           type: string
         balance:
           type: string
-    ChannelClosureStatus:
-      type: object
-      properties:
-        channelStatus:
-          type: string
-        receipt:
-          type: string
-        closureWaitTime:
-          type: number
 
   securitySchemes:
     keyScheme:
