@@ -1,72 +1,58 @@
 import type { Operation } from 'express-openapi'
-import { Balance, moveDecimalPoint, NativeBalance, Address } from '@hoprnet/hopr-utils'
+import type Hopr from '@hoprnet/hopr-core'
+import { Address } from '@hoprnet/hopr-utils'
+import BN from 'bn.js'
+import { STATUS_CODES } from '../'
 
-type WithdrawArgs = {
-  amount: string
-  weiAmount: string
-  currency: 'NATIVE' | 'HOPR'
-  recipient: string
-}
-
-const validateWithdrawArgs = async ({
-  amount,
-  currency,
-  recipient
-}: {
-  amount: string
-  currency: string
-  recipient: string
-}): Promise<WithdrawArgs> => {
-  const validCurrency = currency.toUpperCase() as 'NATIVE' | 'HOPR'
-  if (!['NATIVE', 'HOPR'].includes(validCurrency)) {
-    throw Error('incorrectCurrency')
+export const withdraw = async (node: Hopr, rawCurrency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => {
+  const currency = rawCurrency.toUpperCase() as 'NATIVE' | 'HOPR'
+  if (!['NATIVE', 'HOPR'].includes(currency)) {
+    throw Error(STATUS_CODES.INVALID_CURRENCY)
   }
 
   if (isNaN(Number(amount))) {
-    throw Error('incorrectAmount')
+    throw Error(STATUS_CODES.INVALID_AMOUNT)
   }
 
-  // @TODO: done by express?
   try {
     Address.fromString(recipient)
   } catch (_err) {
-    throw Error('incorrectRecipient')
+    throw Error(STATUS_CODES.INVALID_ADDRESS)
   }
 
-  const weiAmount =
-    validCurrency === 'NATIVE'
-      ? moveDecimalPoint(amount, NativeBalance.DECIMALS)
-      : moveDecimalPoint(amount, Balance.DECIMALS)
-
-  return {
-    amount,
-    weiAmount,
-    currency: validCurrency,
-    recipient
+  const balance = currency === 'NATIVE' ? await node.getNativeBalance() : await node.getBalance()
+  if (balance.toBN().lt(new BN(amount))) {
+    throw Error(STATUS_CODES.NOT_ENOUGH_BALANCE)
   }
+
+  const txHash = await node.withdraw(currency, recipient, amount)
+  return txHash
 }
 
 export const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { currency, amount, recipient } = req.body
-    let validated: WithdrawArgs
 
     try {
-      validated = await validateWithdrawArgs({
-        amount,
-        currency,
-        recipient
-      })
+      const txHash = await withdraw(node, currency, recipient, amount)
+      return res.status(200).send({ status: STATUS_CODES.SUCCESS, receipt: txHash })
     } catch (err) {
-      return res.status(400).send({ error: err.message })
-    }
-
-    try {
-      const txHash = await node.withdraw(validated.currency, validated.recipient, validated.amount)
-      return res.status(200).send({ status: 'success', receipt: txHash })
-    } catch (err) {
-      return res.status(500).send({ error: err.message })
+      const INVALID_ARG = [
+        STATUS_CODES.INVALID_CURRENCY,
+        STATUS_CODES.INVALID_AMOUNT,
+        STATUS_CODES.INVALID_ADDRESS
+      ].find(err.message)
+      if (INVALID_ARG) {
+        return res.status(400).send({ STATUS: INVALID_ARG, error: err.message })
+      } else {
+        return res.status(500).send({
+          STATUS: err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)
+            ? STATUS_CODES.NOT_ENOUGH_BALANCE
+            : STATUS_CODES.UNKNOWN_FAILURE,
+          error: err.message
+        })
+      }
     }
   }
 ]

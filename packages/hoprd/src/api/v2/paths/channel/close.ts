@@ -1,28 +1,21 @@
-import Hopr from '@hoprnet/hopr-core'
-import { ChannelStatus } from '@hoprnet/hopr-utils'
-import { Operation } from 'express-openapi'
+import type Hopr from '@hoprnet/hopr-core'
+import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
+import { STATUS_CODES } from '../../'
 
-export const closeChannel = async ({ peerId, node }: { peerId: string; node: Hopr }) => {
-  let validPeerId: PeerId
+export const closeChannel = async (node: Hopr, peerIdStr: string) => {
+  let peerId: PeerId
   try {
-    validPeerId = PeerId.createFromB58String(peerId)
+    peerId = PeerId.createFromB58String(peerIdStr)
   } catch (err) {
-    throw Error('invalidPeerId')
+    throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
-  try {
-    const { status, receipt } = await node.closeChannel(validPeerId)
-    const smartContractInfo = node.smartContractInfo()
-    const channelClosureMins = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
+  const { status: channelStatus, receipt } = await node.closeChannel(peerId)
 
-    return {
-      channelStatus: status,
-      receipt,
-      closureWaitTime: status !== ChannelStatus.PendingToClose ? channelClosureMins : undefined
-    }
-  } catch (err) {
-    throw Error('failure' + err.message)
+  return {
+    channelStatus,
+    receipt
   }
 }
 
@@ -36,18 +29,22 @@ export const POST: Operation = [
     }
 
     try {
-      const closureStatus = await closeChannel({ peerId, node })
-      return res.status(200).send({ status: 'success', closureStatus })
+      const { receipt, channelStatus } = await closeChannel(node, peerId)
+      return res.status(200).send({ status: STATUS_CODES.SUCCESS, receipt, channelStatus })
     } catch (err) {
-      return res.status(err.message === 'invalidPeerId' ? 400 : 500).send({ status: err.message })
+      if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
+        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID, error: err.message })
+      } else {
+        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      }
     }
   }
 ]
 
 POST.apiDoc = {
-  description: 'Close an open channel',
+  description: 'Close a channel.',
   tags: ['channel'],
-  operationId: 'closeChannel',
+  operationId: 'postChannelClose',
   requestBody: {
     content: {
       'application/json': {
@@ -57,7 +54,7 @@ POST.apiDoc = {
             peerId: { type: 'string', description: 'PeerId attached to the channel that we want to close.' }
           },
           example: {
-            peerId: '0x2C505741584f8591e261e59160D0AED5F74Dc29b'
+            peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
           }
         }
       }

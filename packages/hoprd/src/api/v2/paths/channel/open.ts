@@ -1,92 +1,57 @@
-import { Operation } from 'express-openapi'
+import type { Operation } from 'express-openapi'
+import type Hopr from '@hoprnet/hopr-core'
+import BN from 'bn.js'
+import PeerId from 'peer-id'
+import { STATUS_CODES } from '../../'
 
-export const openChannel = async ({
-  counterpartyPeerId,
-  amountToFundStr,
-  state,
-  node
-}: {
-  counterpartyPeerId: string
-  amountToFundStr: string
-  state: State
-  node: Hopr
-}) => {
+export const openChannel = async (node: Hopr, counterpartyStr: string, amountStr: string) => {
   let counterparty: PeerId
   try {
-    counterparty = PeerId.createFromB58String(counterpartyPeerId)
+    counterparty = PeerId.createFromB58String(counterpartyStr)
   } catch (err) {
-    return new Error('invalidPeerId')
+    throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
-  let amountToFund: BN
-  let myAvailableTokens: Balance
+  if (isNaN(Number(amountStr))) {
+    throw Error(STATUS_CODES.INVALID_AMOUNT)
+  }
+
+  const amount = new BN(amountStr)
+  const balance = await node.getBalance()
+  if (amount.lten(0) || balance.toBN().lt(amount)) {
+    throw Error(STATUS_CODES.NOT_ENOUGH_BALANCE)
+  }
+
+  // @TODO: handle errors from open channel
   try {
-    amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
-    myAvailableTokens = await node.getBalance()
-  } catch (error) {
-    return new Error('invalidAmountToFund')
-  }
-
-  if (amountToFund.lten(0)) {
-    return new Error('invalidAmountToFund')
-  } else if (amountToFund.gt(myAvailableTokens.toBN())) {
-    return new Error(
-      JSON.stringify({
-        status: 'notEnoughFunds',
-        tokensRequired: amountToFund.toString(10),
-        currentBalance: myAvailableTokens.toBN().toString(10)
-      })
-    )
-  }
-
-  try {
-    const { channelId } = await node.openChannel(counterparty, amountToFund)
+    const { channelId } = await node.openChannel(counterparty, amount)
     return channelId.toHex()
   } catch (err) {
-    return new Error(err.message.includes('Channel is already opened') ? 'channelAlreadyOpen' : 'failure')
+    if (err.message.includes('Channel is already opened')) {
+      throw Error(STATUS_CODES.CHANNEL_ALREADY_OPEN)
+    } else {
+      throw Error(err.message)
+    }
   }
 }
 
-export const parameters = []
-
 export const POST: Operation = [
   async (req, res, _next) => {
-    const { node, stateOps } = req.context
+    const { node } = req.context
     const { peerId, amount } = req.body
 
-    // NOTE: probably express can or already is handling it automatically
-    if (!peerId || !amount) {
-      return res.status(400).send({ status: 'missingBodyfields' })
-    }
-
-    const channelId = await openChannel({
-      amountToFundStr: amount,
-      counterpartyPeerId: peerId,
-      node: node,
-      state: stateOps.getState()
-    })
-    if (isError(channelId)) {
-      let errorStatus
-
-      switch (channelId.message) {
-        case 'invalidAmountToFund':
-        case 'invalidPeerId':
-          errorStatus = 400
-          break
-        case 'channelAlreadyOpen':
-          errorStatus = 403
-          break
-        default:
-          errorStatus = 500
+    try {
+      const channelId = await openChannel(node, peerId, amount)
+      return res.status(200).send({ status: STATUS_CODES.SUCCESS, channelId })
+    } catch (err) {
+      const INVALID_ARG = [STATUS_CODES.INVALID_AMOUNT, STATUS_CODES.INVALID_ADDRESS].find(err.message)
+      if (INVALID_ARG) {
+        return res.status(400).send({ STATUS: INVALID_ARG, error: err.message })
+      } else if (err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
+        return res.status(304).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
+      } else {
+        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
       }
-
-      return res
-        .status(errorStatus)
-        .send(
-          channelId.message.includes('notEnoughFunds') ? JSON.parse(channelId.message) : { status: channelId.message }
-        )
-    } else {
-      return res.status(200).send({ status: 'success', channelId })
     }
   }
 ]

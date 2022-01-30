@@ -1,4 +1,7 @@
-import { Operation } from 'express-openapi'
+import type { Operation } from 'express-openapi'
+import type Hopr from '@hoprnet/hopr-core'
+import { ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
+import { STATUS_CODES } from '../../'
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'
@@ -16,58 +19,50 @@ const channelStatusToString = (status: ChannelStatus): string => {
   return 'Unknown'
 }
 
-export const listOpenChannels = async ({ node }: { node: Hopr }) => {
-  try {
-    const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
-    const selfAddress = selfPubKey.toAddress()
+export const listChannels = async (node: Hopr) => {
+  const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
+  const selfAddress = selfPubKey.toAddress()
 
-    const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress))
-      .filter((channel) => channel.status !== ChannelStatus.Closed)
-      .map(({ /*getId,*/ destination, status, balance }) => ({
-        type: 'incoming',
-        channelId: 'getId().toHex()', // <<<--- NOTE: issue here, source is undefined
-        peerId: destination.toPeerId().toB58String(),
-        status: channelStatusToString(status),
-        balance: balance.toFormattedString()
-      }))
+  const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress)).map((channel) => ({
+    type: 'incoming',
+    channelId: channel.getId().toHex(),
+    peerId: channel.destination.toPeerId().toB58String(),
+    status: channelStatusToString(channel.status),
+    balance: channel.balance.toBN().toString()
+  }))
 
-    const channelsTo: ChannelInfo[] = (await node.getChannelsTo(selfAddress))
-      .filter((channel) => channel.status !== ChannelStatus.Closed)
-      .map(({ /*getId,*/ source, status, balance }) => ({
-        type: 'outgoing',
-        channelId: 'getId().toHex()', // <<<--- NOTE: issue here, source is undefined
-        peerId: source.toPeerId().toB58String(),
-        status: channelStatusToString(status),
-        balance: balance.toFormattedString()
-      }))
+  const channelsTo: ChannelInfo[] = (await node.getChannelsTo(selfAddress)).map((channel) => ({
+    type: 'outgoing',
+    channelId: channel.getId().toHex(),
+    peerId: channel.source.toPeerId().toB58String(),
+    status: channelStatusToString(channel.status),
+    balance: channel.balance.toBN().toString()
+  }))
 
-    return { incoming: channelsFrom, outgoing: channelsTo }
-  } catch (err) {
-    return new Error(err.message)
-  }
+  return { incoming: channelsFrom, outgoing: channelsTo }
 }
 
 export const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
-    const channels = await listOpenChannels({ node })
-    if (isError(channels)) {
-      return res.status(500).send({ status: channels.message })
-    } else {
-      return res.status(200).send({ status: 'success', channels })
+    try {
+      const channels = await listChannels(node)
+      return res.status(200).send({ status: STATUS_CODES.SUCCESS, channels })
+    } catch (err) {
+      return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
 
 GET.apiDoc = {
-  description: 'Lists your currently open channels',
+  description: 'Lists your channels.',
   tags: ['channel'],
-  operationId: 'listOpenChannels',
+  operationId: 'channelList',
   parameters: [],
   responses: {
     '200': {
-      description: 'Channels fetched succesfully',
+      description: 'Channels fetched succesfully.',
       content: {
         'application/json': {
           schema: {
