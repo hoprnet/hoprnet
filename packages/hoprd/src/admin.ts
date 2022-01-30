@@ -173,7 +173,7 @@ export class AdminServer {
     this.node = node
     this.cmds = cmds
     if (settings) {
-      this.cmds.setState(settings)
+      this.cmds.stateOps.setState(settings)
     }
 
     this.node.on('hopr:channel:opened', (channel) => {

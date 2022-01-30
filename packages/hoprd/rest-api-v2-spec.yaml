@@ -93,10 +93,10 @@ components:
           description: ETH | HOPR currency to withdraw
         amount:
           type: string
-          description: Amount to withdraw
+          description: Amount to withdraw in the currency's smallest unit
         recipient:
           type: string
-          description: Blockchain address to withdraw specified currency to.
+          description: Blockchain address to withdraw specified currency to
       example:
         currency: hopr
         amount: '1'

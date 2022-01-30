@@ -1,12 +1,57 @@
 import { Operation } from 'express-openapi'
-import { isError } from '../../logic'
-import { openChannel } from '../../logic/channel'
+
+export const openChannel = async ({
+  counterpartyPeerId,
+  amountToFundStr,
+  state,
+  node
+}: {
+  counterpartyPeerId: string
+  amountToFundStr: string
+  state: State
+  node: Hopr
+}) => {
+  let counterparty: PeerId
+  try {
+    counterparty = PeerId.createFromB58String(counterpartyPeerId)
+  } catch (err) {
+    return new Error('invalidPeerId')
+  }
+
+  let amountToFund: BN
+  let myAvailableTokens: Balance
+  try {
+    amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
+    myAvailableTokens = await node.getBalance()
+  } catch (error) {
+    return new Error('invalidAmountToFund')
+  }
+
+  if (amountToFund.lten(0)) {
+    return new Error('invalidAmountToFund')
+  } else if (amountToFund.gt(myAvailableTokens.toBN())) {
+    return new Error(
+      JSON.stringify({
+        status: 'notEnoughFunds',
+        tokensRequired: amountToFund.toString(10),
+        currentBalance: myAvailableTokens.toBN().toString(10)
+      })
+    )
+  }
+
+  try {
+    const { channelId } = await node.openChannel(counterparty, amountToFund)
+    return channelId.toHex()
+  } catch (err) {
+    return new Error(err.message.includes('Channel is already opened') ? 'channelAlreadyOpen' : 'failure')
+  }
+}
 
 export const parameters = []
 
 export const POST: Operation = [
   async (req, res, _next) => {
-    const { node, state } = req.context
+    const { node, stateOps } = req.context
     const { peerId, amount } = req.body
 
     // NOTE: probably express can or already is handling it automatically
@@ -18,7 +63,7 @@ export const POST: Operation = [
       amountToFundStr: amount,
       counterpartyPeerId: peerId,
       node: node,
-      state: state
+      state: stateOps.getState()
     })
     if (isError(channelId)) {
       let errorStatus

@@ -11,6 +11,7 @@ import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
+import type { State } from './types'
 import setupAPI from './api'
 import setupHealthcheck from './healthcheck'
 import { AdminServer } from './admin'
@@ -257,6 +258,22 @@ async function main() {
   let logs = new LogStream(argv.forwardLogs)
   let adminServer = undefined
   let cmds: Commands
+  // As the daemon aims to maintain for the time being
+  // both APIv1 and APIv2 (hopr-admin / myne-chat), we need
+  // to ensure that daemon's state can be used by both APIs.
+  let state: State = {
+    aliases: new Map(),
+    settings: {
+      includeRecipient: false,
+      strategy: 'passive'
+    }
+  }
+  function setState(newState: State): void {
+    state = newState
+  }
+  function getState(): State {
+    return state
+  }
 
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
@@ -338,7 +355,7 @@ async function main() {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
       if (argv.rest) {
-        setupAPI(node, logs, argv)
+        setupAPI(node, logs, { getState, setState }, argv)
       }
 
       if (argv.healthCheck) {
@@ -358,7 +375,7 @@ async function main() {
 
       // 3. Start the node.
       await node.start()
-      cmds = new Commands(node)
+      cmds = new Commands(node, { setState, getState })
 
       if (adminServer) {
         adminServer.registerNode(node, cmds)

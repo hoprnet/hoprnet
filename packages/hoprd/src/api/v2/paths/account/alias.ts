@@ -1,23 +1,55 @@
+import type { State } from '../../../../types'
+import PeerId from 'peer-id'
 import { Operation } from 'express-openapi'
-import { isError } from '../../logic'
-import { getAlias, setAlias } from '../../logic/alias'
+
+export const setAlias = ({ peerId, alias, state }: { peerId: string; alias: string; state: State }): State => {
+  try {
+    state.aliases.set(alias, PeerId.createFromB58String(peerId))
+    return state
+  } catch (error) {
+    throw Error('invalidPeerId')
+  }
+}
+
+export const getAlias = ({ state, peerId }: { state: State; peerId: string }): string[] => {
+  // @TODO: perhaps unnecessary
+  try {
+    PeerId.createFromB58String(peerId)
+  } catch (error) {
+    throw Error('invalidPeerId')
+  }
+
+  const aliases = Array.from(state.aliases.entries())
+    .filter(([_, peerIdInMap]) => peerIdInMap.toB58String() === peerId)
+    .map(([alias, _]) => alias)
+
+  if (aliases.length === 0) {
+    throw Error('aliasNotFound')
+  }
+
+  return aliases
+}
 
 export const parameters = []
 
 export const GET: Operation = [
   async (req, res, _next) => {
-    const { state } = req.context
+    const { stateOps } = req.context
     const { peerId } = req.query
 
     if (!peerId) {
       return res.status(400).send({ status: 'noPeerIdProvided' })
     }
 
-    const aliases = getAlias({ peerId: peerId as string, state })
-    if (isError(aliases)) {
-      return res.status(aliases.message === 'invalidPeerId' ? 400 : 404).send({ status: aliases.message })
-    } else {
+    try {
+      const aliases = getAlias({ peerId: peerId as string, state: stateOps.getState() })
       return res.status(200).send({ status: 'success', aliases })
+    } catch (err) {
+      if (err.message.includes('invalidPeerId')) {
+        return res.status(400).send({ error: err.message })
+      } else {
+        return res.status(404).send({ error: err.message })
+      }
     }
   }
 ]
@@ -85,19 +117,19 @@ GET.apiDoc = {
 
 export const POST: Operation = [
   async (req, res, _next) => {
-    const { state } = req.context
+    const { stateOps } = req.context
     const { peerId, alias } = req.body
 
-    // NOTE: probably express can or already is handling it automatically
+    // @TODO: probably express can or already is handling it automatically
     if (!peerId || !alias) {
       return res.status(400).send({ status: 'missingBodyfields' })
     }
 
-    const aliases = setAlias({ alias, peerId, state: state })
-    if (isError(aliases)) {
-      return res.status(400).send({ status: 'invalidPeerId' })
-    } else {
+    try {
+      const aliases = setAlias({ alias, peerId, state: stateOps.getState() })
       return res.status(200).send({ status: 'success', aliases })
+    } catch (err) {
+      return res.status(400).send({ status: 'invalidPeerId' })
     }
   }
 ]

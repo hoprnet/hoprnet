@@ -6,30 +6,24 @@ import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import PeerId from 'peer-id'
+import { Address } from '@hoprnet/hopr-utils'
 
 import type { Application, Request } from 'express'
 import type Hopr from '@hoprnet/hopr-core'
-
 import type { LogStream } from './../logs'
-import { APIv2Settings } from './v2/logic/settings'
-
-export interface APIv2State {
-  aliases: Map<string, PeerId>
-  settings: APIv2Settings
-}
-
-const state: APIv2State = {
-  aliases: new Map<string, PeerId>(),
-  settings: {
-    includeRecipient: false,
-    strategy: "passive"
-  }
-}
+import type { StateOps } from '../types'
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
-export default function setupApiV2(service: Application, urlPath: string, node: Hopr, logs: LogStream, options: any) {
+export default function setupApiV2(
+  service: Application,
+  urlPath: string,
+  node: Hopr,
+  logs: LogStream,
+  stateOps: StateOps,
+  options: any
+) {
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
 
@@ -39,7 +33,7 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
   // assign internal objects to each requests so they can be accessed within
   // handlers
   service.use(urlPath, (req, _res, next) => {
-    req.context = new Context(node, logs, state)
+    req.context = new Context(node, logs, stateOps)
     next()
   })
   // because express-openapi uses relative paths we need to figure out where
@@ -64,6 +58,13 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
         try {
           // this call will throw if the input is no peer id
           return !!PeerId.createFromB58String(input)
+        } catch (_err) {
+          return false
+        }
+      },
+      address: (input) => {
+        try {
+          return !!Address.fromString(input)
         } catch (_err) {
           return false
         }
@@ -118,7 +119,7 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
 // In order to pass custom objects along with each request we build a context
 // which is attached during request processing.
 export class Context {
-  constructor(public node: Hopr, public logs: LogStream, public state: APIv2State) { }
+  constructor(public node: Hopr, public logs: LogStream, public stateOps: StateOps) {}
 }
 
 declare global {

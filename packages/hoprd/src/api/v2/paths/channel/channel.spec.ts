@@ -1,6 +1,6 @@
 import assert from 'assert'
-import { _createTestState } from '.'
-import { listOpenChannels, openChannel } from './channel'
+import { _createTestState } from '../../../v2'
+import { listOpenChannels, openChannel } from '../../logic/channel'
 import sinon from 'sinon'
 
 const peerId = '16Uiu2HAmRFjDov6sbcZeppbnNFFTdx5hFoBzr8csBgevtKUex8y9'
@@ -68,12 +68,12 @@ describe('openChannel', () => {
   })
 })
 
-// describe('listOpenChannels', () => {
-//   it('should work', () => {
-//     // NOTE: how does one go about mocking it?
-//     listOpenChannels({ node })
-//   })
-//   it('should fail', () => {
-//     listOpenChannels({ node })
-//   })
-// })
+describe('listOpenChannels', () => {
+  it('should work', () => {
+    // NOTE: how does one go about mocking it?
+    listOpenChannels({ node })
+  })
+  it('should fail', () => {
+    listOpenChannels({ node })
+  })
+})

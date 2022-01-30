@@ -1,27 +1,72 @@
-import { Operation } from 'express-openapi'
-import { isError } from '../logic'
-import { withdraw } from '../logic/withdraw'
+import type { Operation } from 'express-openapi'
+import { Balance, moveDecimalPoint, NativeBalance, Address } from '@hoprnet/hopr-utils'
+
+type WithdrawArgs = {
+  amount: string
+  weiAmount: string
+  currency: 'NATIVE' | 'HOPR'
+  recipient: string
+}
+
+const validateWithdrawArgs = async ({
+  amount,
+  currency,
+  recipient
+}: {
+  amount: string
+  currency: string
+  recipient: string
+}): Promise<WithdrawArgs> => {
+  const validCurrency = currency.toUpperCase() as 'NATIVE' | 'HOPR'
+  if (!['NATIVE', 'HOPR'].includes(validCurrency)) {
+    throw Error('incorrectCurrency')
+  }
+
+  if (isNaN(Number(amount))) {
+    throw Error('incorrectAmount')
+  }
+
+  // @TODO: done by express?
+  try {
+    Address.fromString(recipient)
+  } catch (_err) {
+    throw Error('incorrectRecipient')
+  }
+
+  const weiAmount =
+    validCurrency === 'NATIVE'
+      ? moveDecimalPoint(amount, NativeBalance.DECIMALS)
+      : moveDecimalPoint(amount, Balance.DECIMALS)
+
+  return {
+    amount,
+    weiAmount,
+    currency: validCurrency,
+    recipient
+  }
+}
 
 export const POST: Operation = [
   async (req, res, _next) => {
+    const { node } = req.context
+    const { currency, amount, recipient } = req.body
+    let validated: WithdrawArgs
+
     try {
-      const { node } = req.context
-      const { currency, amount, recipient } = req.body
-
-      const receipt = await withdraw({
-        rawCurrency: currency,
-        rawRecipient: recipient,
-        rawAmount: amount,
-        node: node
+      validated = await validateWithdrawArgs({
+        amount,
+        currency,
+        recipient
       })
+    } catch (err) {
+      return res.status(400).send({ error: err.message })
+    }
 
-      if (isError(receipt)) {
-        return res.status(400).send({ status: receipt.message })
-      } else {
-        return res.status(200).send({ status: 'success', receipt })
-      }
-    } catch (error) {
-      return res.status(500).send({ status: 'failure' })
+    try {
+      const txHash = await node.withdraw(validated.currency, validated.recipient, validated.amount)
+      return res.status(200).send({ status: 'success', receipt: txHash })
+    } catch (err) {
+      return res.status(500).send({ error: err.message })
     }
   }
 ]

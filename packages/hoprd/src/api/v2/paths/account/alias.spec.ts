@@ -1,4 +1,4 @@
-import { _createTestState } from '.'
+import { _createTestState } from '../../'
 import assert from 'assert'
 import { getAlias, setAlias } from './alias'
 
@@ -11,12 +11,12 @@ describe('setAlias', () => {
     const state = _createTestState()
     setAlias({ alias: alias1, peerId, state })
     assert.equal(state.aliases.size, 1)
-    assert.equal(state.aliases[0], alias1)
+    assert.equal(state.aliases.get('alias1').toB58String(), peerId)
   })
-  it('should return error on invalid peerId', () => {
+
+  it('should throw error on invalid peerId', () => {
     const state = _createTestState()
-    const err = setAlias({ alias: alias1, peerId, state })
-    assert.equal(err.message, 'invalidPeerId')
+    assert.throws(() => setAlias({ alias: alias1, peerId: invalidPeerId, state }), /invalidPeerId/)
   })
 })
 
@@ -28,14 +28,14 @@ describe('getAlias', () => {
     assert.equal(aliases.length, 1)
     assert.equal(aliases[0], alias1)
   })
-  it('should return error on invalid peerId', () => {
+
+  it('should throw error on invalid peerId', () => {
     const state = _createTestState()
-    const err = getAlias({ peerId, state }) as Error
-    assert.equal(err.message, 'invalidPeerId')
+    assert.throws(() => getAlias({ peerId, state }), 'invalidPeerId')
   })
-  it('should return error when no alias found', () => {
+
+  it('should throw error when no alias found', () => {
     const state = _createTestState()
-    const err = getAlias({ peerId: invalidPeerId, state }) as Error
-    assert.equal(err.message, 'aliasNotFound')
+    assert.throws(() => getAlias({ peerId: invalidPeerId, state }), 'aliasNotFound')
   })
 })

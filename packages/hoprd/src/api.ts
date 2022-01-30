@@ -4,16 +4,22 @@ import http from 'http'
 import type Hopr from '@hoprnet/hopr-core'
 
 import type { LogStream } from './logs'
+import type { StateOps } from './types'
 import setupApiV1 from './api/v1'
 import setupApiV2 from './api/v2'
 
-export default function setupAPI(node: Hopr, logs: LogStream, options: { restPort: number; restHost: string }) {
+export default function setupAPI(
+  node: Hopr,
+  logs: LogStream,
+  stateOps: StateOps,
+  options: { restPort: number; restHost: string }
+) {
   const hostname = options.restHost
   const port = options.restPort
   const service = express()
 
-  setupApiV1(service, '/api/v1', node, logs, options)
-  setupApiV2(service, '/api/v2', node, logs, options)
+  setupApiV1(service, '/api/v1', node, logs, stateOps, options)
+  setupApiV2(service, '/api/v2', node, logs, stateOps, options)
 
   http
     .createServer(service)

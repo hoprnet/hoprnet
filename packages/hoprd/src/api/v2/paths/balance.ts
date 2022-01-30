@@ -1,6 +1,14 @@
+import type Hopr from '@hoprnet/hopr-core'
 import { Operation } from 'express-openapi'
-import { isError } from '../logic'
-import { getBalances } from '../logic/balance'
+
+export const getBalances = async (node: Hopr) => {
+  const [nativeBalance, hoprBalance] = await Promise.all([await node.getNativeBalance(), await node.getBalance()])
+
+  return {
+    native: nativeBalance,
+    hopr: hoprBalance
+  }
+}
 
 export const parameters = []
 
@@ -8,11 +16,14 @@ export const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
-    const balances = await getBalances(node)
-    if (isError(balances)) {
-      return res.status(500).send({ status: 'failure' })
-    } else {
-      return res.status(200).send({ status: 'success', balances })
+    try {
+      const balances = await getBalances(node)
+      return res.status(200).send({
+        status: 'success',
+        balances
+      })
+    } catch (err) {
+      return res.status(500).send({ error: err.message })
     }
   }
 ]

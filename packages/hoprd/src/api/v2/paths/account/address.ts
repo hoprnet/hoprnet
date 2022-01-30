@@ -1,14 +1,32 @@
-import { Operation } from 'express-openapi'
+import type { Operation } from 'express-openapi'
+import type Hopr from '@hoprnet/hopr-core'
+
+export const getAddresses = (
+  node: Hopr
+): {
+  native: string
+  hopr: string
+} => {
+  const native = node.getEthereumAddress().toHex()
+  const hopr = node.getId().toB58String()
+
+  return {
+    native,
+    hopr
+  }
+}
 
 export const parameters = []
 
 export const GET: Operation = [
   (req, res, _next) => {
     const { node } = req.context
-    const nativeAddress = node.getEthereumAddress().toHex()
-    const hoprAddress = node.getId().toB58String()
+    const addresses = getAddresses(node)
 
-    res.status(200).json({ nativeAddress, hoprAddress })
+    res.status(200).json({
+      nativeBalance: addresses.native,
+      hoprBalance: addresses.hopr
+    })
   }
 ]
 

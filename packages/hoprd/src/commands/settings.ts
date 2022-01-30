@@ -1,10 +1,11 @@
-import { getPaddingLength, styleValue } from './utils'
-import { AbstractCommand, GlobalState } from './abstractCommand'
 import type Hopr from '@hoprnet/hopr-core'
+import type { State, StateOps } from '../types'
+import { getPaddingLength, styleValue } from './utils'
+import { AbstractCommand } from './abstractCommand'
 import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
 
 function booleanSetter(name: string) {
-  return function setter(query: string, state: GlobalState): string {
+  return function setter(query: string, state: State): string {
     if (!query.match(/true|false/i)) {
       return styleValue(`Invalid option.`, 'failure')
     }
@@ -56,9 +57,9 @@ export default class Settings extends AbstractCommand {
     return Object.keys(this.settings)
   }
 
-  private listSettings(state: GlobalState): string {
+  private listSettings(state: State): string {
     const entries = this.settingsKeys.map((setting) => {
-      return [setting, this.getState(setting, state)]
+      return [setting, this.getSingleState(setting, state)]
     })
 
     const results: string[] = []
@@ -70,15 +71,17 @@ export default class Settings extends AbstractCommand {
     return results.join('\n')
   }
 
-  private getState(setting: string, state: GlobalState): string {
+  private getSingleState(setting: string, state: State): string {
     if (this.settings[setting] && this.settings[setting][2]) {
       // Use getter
       return this.settings[setting][2]()
     }
-    return state[setting]
+    return state.settings[setting]
   }
 
-  public async execute(log, query: string, state: GlobalState): Promise<void> {
+  public async execute(log, query: string, { getState }: StateOps): Promise<void> {
+    const state = getState()
+
     if (!query) {
       log(this.listSettings(state))
       return
@@ -88,7 +91,7 @@ export default class Settings extends AbstractCommand {
     const option = optionArray.join(' ')
 
     if (!option) {
-      log(setting + ': ' + this.getState(setting, state))
+      log(setting + ': ' + this.getSingleState(setting, state))
       return
     }
 

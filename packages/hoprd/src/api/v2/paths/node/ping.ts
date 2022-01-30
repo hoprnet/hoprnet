@@ -1,19 +1,46 @@
 import { Operation } from 'express-openapi'
-import { isError } from '../../logic'
-import { ping } from '../../logic/ping'
+import { isError } from '../..'
+
+export const ping = async ({ node, state, peerId }: { node: Hopr; state: State; peerId: string }) => {
+  let validPeerId: PeerId
+  try {
+    validPeerId = checkPeerIdInput(peerId, state)
+  } catch (err) {
+    return new Error('invalidPeerId')
+  }
+
+  let pingResult: Awaited<ReturnType<Hopr['ping']>>
+  let error: any
+
+  try {
+    pingResult = await node.ping(validPeerId)
+  } catch (err) {
+    error = err
+  }
+
+  if (pingResult.latency >= 0) {
+    return { latency: pingResult.latency }
+  }
+
+  if (error && error.message) {
+    return new Error('failure')
+  }
+  return new Error('timeout')
+}
 
 export const parameters = []
 
 export const GET: Operation = [
   async (req, res, _next) => {
-    const { state, node } = req.context
+    const { stateOps, node } = req.context
     const { peerId } = req.query
 
+    // @TODO: done by express?
     if (!peerId) {
       return res.status(400).send({ status: 'noPeerIdProvided' })
     }
 
-    const pingRes = await ping({ peerId: peerId as string, state, node })
+    const pingRes = await ping({ peerId: peerId as string, stateOps, node })
     if (isError(pingRes)) {
       return res.status(pingRes.message === 'invalidPeerId' ? 400 : 500).send({ status: pingRes.message })
     } else {
@@ -66,6 +93,6 @@ GET.apiDoc = {
           example: { status: 'invalidPeerId' }
         }
       }
-    },
+    }
   }
 }
