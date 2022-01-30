@@ -148,6 +148,15 @@ components:
           type: string
         balance:
           type: string
+    ChannelClosureStatus:
+      type: object
+      properties:
+        channelStatus:
+          type: string
+        receipt:
+          type: string
+        closureWaitTime:
+          type: number
 
   securitySchemes:
     keyScheme:

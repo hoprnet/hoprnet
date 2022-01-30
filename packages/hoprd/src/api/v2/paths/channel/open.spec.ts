@@ -1,7 +1,7 @@
 import assert from 'assert'
-import { _createTestState } from '../../../v2'
-import { listOpenChannels, openChannel } from '../../logic/channel'
 import sinon from 'sinon'
+import { _createTestState } from '../../../v2/'
+import { openChannel } from './open'
 
 const peerId = '16Uiu2HAmRFjDov6sbcZeppbnNFFTdx5hFoBzr8csBgevtKUex8y9'
 const invalidPeerId = 'definetly not a valid peerId'
@@ -65,15 +65,5 @@ describe('openChannel', () => {
       state
     })) as Error
     assert.equal(channelId.message, 'notEnoughFunds')
-  })
-})
-
-describe('listOpenChannels', () => {
-  it('should work', () => {
-    // NOTE: how does one go about mocking it?
-    listOpenChannels({ node })
-  })
-  it('should fail', () => {
-    listOpenChannels({ node })
   })
 })
