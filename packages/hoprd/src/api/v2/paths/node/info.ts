@@ -25,7 +25,7 @@ export const GET: Operation = [
 
     try {
       const info = await getInfo({ node })
-      return res.status(200).send({ status: STATUS_CODES.SUCCESS, info })
+      return res.status(200).send({ info })
     } catch (error) {
       return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
@@ -33,12 +33,12 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Information about the HOPR Node, including any options it started with',
+  description: 'Information about the HOPR Node, including any options it started with.',
   tags: ['node'],
   operationId: 'getInfo',
   responses: {
     '200': {
-      description: 'Info fetched successfuly',
+      description: 'Info fetched successfuly.',
       content: {
         'application/json': {
           schema: {

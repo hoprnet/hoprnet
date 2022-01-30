@@ -36,16 +36,20 @@ export const GET: Operation = [
     const { peerId } = req.query
 
     if (!peerId) {
-      return res.status(400).send({ status: 'noPeerIdProvided' })
+      return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
     }
 
     try {
       const pingRes = await ping({ peerId: peerId as string, node })
-      return res.status(200).send({ status: 'success', ...pingRes })
+      return res.status(200).send(pingRes)
     } catch (error) {
-      return res
-        .status(error.message.includes(STATUS_CODES.INVALID_PEERID) ? 400 : 500)
-        .send({ status: STATUS_CODES[error.message] || STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      if (STATUS_CODES[error.message]) {
+        return res
+          .status(error.message.includes(STATUS_CODES.INVALID_PEERID) ? 400 : 500)
+          .send({ status: STATUS_CODES[error.message] })
+      } else {
+        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      }
     }
   }
 ]
@@ -91,6 +95,17 @@ GET.apiDoc = {
             $ref: '#/components/schemas/StatusResponse'
           },
           example: { status: STATUS_CODES.INVALID_PEERID }
+        }
+      }
+    },
+    '500': {
+      description: 'Timout',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/StatusResponse'
+          },
+          example: { status: STATUS_CODES.TIMEOUT }
         }
       }
     }

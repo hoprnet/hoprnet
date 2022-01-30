@@ -10,12 +10,12 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Get release version of the running node',
+  description: 'Get release version of the running node.',
   tags: ['node'],
   operationId: 'nodeGetVersion',
   responses: {
     '200': {
-      description: 'Returns the release version of the running node',
+      description: 'Returns the release version of the running node.',
       content: {
         'application/json': {
           schema: {

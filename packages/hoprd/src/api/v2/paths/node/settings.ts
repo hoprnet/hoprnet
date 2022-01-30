@@ -94,26 +94,26 @@ export const GET: Operation = [
         state: stateOps.getState(),
         settingName: settingName as keyof State['settings']
       })
-      return res
-        .status(200)
-        .send({ status: STATUS_CODES.SUCCESS, settings: Array.isArray(setting) ? setting : [setting] })
+      return res.status(200).send({ settings: Array.isArray(setting) ? setting : [setting] })
     } catch (error) {
-      return res
-        .status(error.message === STATUS_CODES.INVALID_SETTING ? 400 : 500)
-        .send({ status: STATUS_CODES[error.message] || STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      if (error.message.includes(STATUS_CODES.INVALID_SETTING)) {
+        return res.status(400).send({ status: STATUS_CODES.INVALID_SETTING })
+      } else {
+        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      }
     }
   }
 ]
 
 GET.apiDoc = {
-  description: 'Get setting value',
+  description: 'Get setting value.',
   tags: ['node'],
   operationId: 'getSetting',
   parameters: [
     {
       name: 'settingName',
       in: 'query',
-      description: 'Setting name that we want to fetch value for',
+      description: 'Setting name that we want to fetch value for.',
       schema: {
         type: 'string',
         example: 'includeRecipient'
@@ -122,7 +122,7 @@ GET.apiDoc = {
   ],
   responses: {
     '200': {
-      description: 'Alias/es fetched succesfully',
+      description: 'Alias/es fetched succesfully.',
       content: {
         'application/json': {
           schema: {
@@ -141,7 +141,7 @@ GET.apiDoc = {
       }
     },
     '400': {
-      description: 'Invalid input',
+      description: 'Invalid input.',
       content: {
         'application/json': {
           schema: {
@@ -161,12 +161,16 @@ export const POST: Operation = [
 
     try {
       setSetting({ node, stateOps, value, settingName })
-      return res.status(200).send({ status: STATUS_CODES.SUCCESS })
+      return res.status(200).send()
     } catch (error) {
-      const invalidDataErrors = [STATUS_CODES.INVALID_SETTING_VALUE, STATUS_CODES.INVALID_SETTING]
-      return res
-        .status(invalidDataErrors.includes(error.message) ? 400 : 500)
-        .send({ status: STATUS_CODES[error.message] || STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      const INVALID_ARG = [STATUS_CODES.INVALID_SETTING_VALUE, STATUS_CODES.INVALID_SETTING].find((arg) =>
+        error.message.includes(arg)
+      )
+      if (INVALID_ARG) {
+        return res.status(400).send({ STATUS: INVALID_ARG })
+      } else {
+        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      }
     }
   }
 ]
@@ -187,13 +191,6 @@ POST.apiDoc = {
   responses: {
     '200': {
       description: 'Setting set succesfully'
-      // content: {
-      //   'application/json': {
-      //     schema: {
-      //       $ref: '#/components/schemas/StatusResponse'
-      //     }
-      //   }
-      // }
     },
     '400': {
       description: 'Invalid input',

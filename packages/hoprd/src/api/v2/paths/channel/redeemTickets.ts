@@ -7,7 +7,7 @@ export const POST: Operation = [
 
     try {
       await node.redeemAllTickets()
-      return res.status(200).send({ status: STATUS_CODES.SUCCESS })
+      return res.status(200).send()
     } catch (err) {
       return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
@@ -21,13 +21,6 @@ POST.apiDoc = {
   responses: {
     '200': {
       description: 'Tickets redeemed succesfully.'
-      // content: {
-      //   'application/json': {
-      //     schema: {
-      //       $ref: '#/components/schemas/StatusResponse'
-      //     }
-      //   }
-      // }
     }
   }
 }

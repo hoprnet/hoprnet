@@ -22,8 +22,8 @@ export const GET: Operation = [
     const addresses = getAddresses(node)
 
     res.status(200).json({
-      nativeBalance: addresses.native,
-      hoprBalance: addresses.hopr
+      nativeAddress: addresses.native,
+      hoprAddress: addresses.hopr
     })
   }
 ]
@@ -32,7 +32,6 @@ GET.apiDoc = {
   description: 'Get the native and hopr addresses of the account associated with the node.',
   tags: ['account'],
   operationId: 'accountGetAddress',
-  parameters: [],
   responses: {
     '200': {
       description: 'Returns the native and hopr addresses of the account associated with the node.',

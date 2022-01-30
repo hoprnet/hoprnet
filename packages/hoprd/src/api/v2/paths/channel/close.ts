@@ -25,15 +25,15 @@ export const POST: Operation = [
     const { peerId } = req.body
 
     if (!peerId) {
-      return res.status(400).send({ status: 'missingPeerId' })
+      return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
     }
 
     try {
       const { receipt, channelStatus } = await closeChannel(node, peerId)
-      return res.status(200).send({ status: STATUS_CODES.SUCCESS, receipt, channelStatus })
+      return res.status(200).send({ receipt, channelStatus })
     } catch (err) {
       if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
-        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID, error: err.message })
+        return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
       } else {
         return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
       }
@@ -42,7 +42,7 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Close a channel',
+  description: 'Close a channel.',
   tags: ['channel'],
   operationId: 'postChannelClose',
   requestBody: {
@@ -62,22 +62,25 @@ POST.apiDoc = {
   },
   responses: {
     '200': {
-      description: 'Channel closed succesfully',
+      description: 'Channel closed succesfully.',
       content: {
         'application/json': {
           schema: {
             type: 'object',
             properties: {
-              closureStatus: {
-                $ref: '#/components/schemas/ChannelClosureStatus'
-              }
+              receipt: {
+                type: 'string',
+                description: 'Receipt of the closing transaction',
+                example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e'
+              },
+              channelStatus: { type: 'number', description: 'Current status of the channel', example: 2 }
             }
           }
         }
       }
     },
     '400': {
-      description: 'Invalid peerId',
+      description: 'Invalid peerId.',
       content: {
         'application/json': {
           schema: {

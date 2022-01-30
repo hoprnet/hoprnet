@@ -18,7 +18,6 @@ export const GET: Operation = [
     try {
       const balances = await getBalances(node)
       return res.status(200).send({
-        status: STATUS_CODES.SUCCESS,
         balances
       })
     } catch (err) {
@@ -28,19 +27,23 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Returns your current HOPR and native balance',
+  description: 'Returns your current HOPR and native balance.',
   tags: ['balance'],
   operationId: 'getBalance',
   responses: {
     '200': {
-      description: 'Balance fetched successfuly',
+      description: 'Balance fetched successfuly.',
       content: {
         'application/json': {
           schema: {
             type: 'object',
             properties: {
               balances: {
-                $ref: '#/components/schemas/Balance'
+                type: 'object',
+                properties: {
+                  native: { $ref: '#/components/schemas/Balance' },
+                  hopr: { $ref: '#/components/schemas/Balance' }
+                }
               }
             }
           }

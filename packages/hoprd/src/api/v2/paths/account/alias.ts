@@ -58,10 +58,10 @@ export const GET: Operation = [
 
     try {
       const peerId = getAlias(stateOps.getState(), alias as string)
-      return res.status(200).send({ status: 'success', peerId })
+      return res.status(200).send({ peerId })
     } catch (err) {
       if (err.message.includes(STATUS_CODES.PEERID_NOT_FOUND)) {
-        return res.status(404).send({ status: STATUS_CODES.PEERID_NOT_FOUND, error: err.message })
+        return res.status(404).send({ status: STATUS_CODES.PEERID_NOT_FOUND })
       } else {
         return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
       }
@@ -91,18 +91,13 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            properties: {
-              peerId: {
-                $ref: '#/components/schemas/PeerId'
-              }
-            }
+            $ref: '#/components/schemas/PeerId'
           }
         }
       }
     },
     '404': {
-      description: 'No alias found for the peerId',
+      description: 'No alias found for the peerId.',
       content: {
         'application/json': {
           schema: {
@@ -122,7 +117,7 @@ export const POST: Operation = [
 
     try {
       setAlias(stateOps, alias, peerId)
-      return res.status(200).send({ status: STATUS_CODES.SUCCESS })
+      return res.status(200).send()
     } catch (err) {
       if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
         return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID, error: err.message })
@@ -148,7 +143,7 @@ POST.apiDoc = {
           },
           example: {
             peerId: '0x2C505741584f8591e261e59160D0AED5F74Dc29b',
-            alias: 'john'
+            alias: 'Alice'
           }
         }
       }
@@ -157,13 +152,6 @@ POST.apiDoc = {
   responses: {
     '200': {
       description: 'Alias set succesfully'
-      // content: {
-      //   'application/json': {
-      //     schema: {
-      //       $ref: '#/components/schemas/StatusResponse'
-      //     }
-      //   }
-      // }
     },
     '400': {
       description: 'Invalid peerId',
@@ -188,7 +176,7 @@ export const DELETE: Operation = [
 
     try {
       removeAlias(stateOps, alias)
-      return res.status(200).send({ status: STATUS_CODES.SUCCESS })
+      return res.status(200).send()
     } catch (err) {
       return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
@@ -217,13 +205,6 @@ DELETE.apiDoc = {
   responses: {
     '200': {
       description: 'Alias removed succesfully'
-      // content: {
-      //   'application/json': {
-      //     schema: {
-      //       $ref: '#/components/schemas/StatusResponse'
-      //     }
-      //   }
-      // }
     }
   }
 }

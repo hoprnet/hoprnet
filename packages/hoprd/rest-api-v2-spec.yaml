@@ -86,15 +86,12 @@ components:
     Balance:
       type: object
       properties:
-        native:
+        bn:
           type: string
-          description: Amount of ETH
-        hopr:
+          example: 0de0b6b3a7640000
+        symbol:
           type: string
-          description: Amount of HOPR
-      example:
-        native: '1'
-        hopr: '10'
+          example: xDAI
     WithdrawRequest:
       type: object
       properties:
@@ -152,12 +149,16 @@ components:
           type: string
         channelId:
           type: string
+          example: incoming
         peerId:
           type: string
+          example: '0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5'
         status:
           type: string
+          example: Open
         balance:
           type: string
+          example: '1'
 
   securitySchemes:
     keyScheme:

@@ -42,11 +42,13 @@ export const POST: Operation = [
 
     try {
       const channelId = await openChannel(node, peerId, amount)
-      return res.status(200).send({ status: STATUS_CODES.SUCCESS, channelId })
+      return res.status(200).send({ channelId })
     } catch (err) {
-      const INVALID_ARG = [STATUS_CODES.INVALID_AMOUNT, STATUS_CODES.INVALID_ADDRESS].find(err.message)
+      const INVALID_ARG = [STATUS_CODES.INVALID_AMOUNT, STATUS_CODES.INVALID_PEERID].find((arg) =>
+        err.message.includes(arg)
+      )
       if (INVALID_ARG) {
-        return res.status(400).send({ STATUS: INVALID_ARG, error: err.message })
+        return res.status(400).send({ status: INVALID_ARG })
       } else if (err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
         return res.status(304).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
       } else if (err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)) {
@@ -59,7 +61,7 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Opens a payment channel between you and the counter party provided',
+  description: 'Opens a payment channel between you and the counter party provided.',
   tags: ['channel'],
   operationId: 'openChannel',
   requestBody: {
@@ -70,14 +72,13 @@ POST.apiDoc = {
           properties: {
             peerId: {
               type: 'string',
-              description:
-                'peerId that we want to transact with using this channel, in other words a receiver of funds.'
+              description: 'PeerId that we want to transact with using this channel.'
             },
             amount: { type: 'string', description: 'Amount of tokens to fund the channel.' }
           },
           example: {
             peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12',
-            amount: '0.001'
+            amount: '1000000'
           }
         }
       }
@@ -85,20 +86,23 @@ POST.apiDoc = {
   },
   responses: {
     '200': {
-      description: 'Channel succesfuly opened',
+      description: 'Channel succesfully opened.',
       content: {
         'application/json': {
           schema: {
             type: 'object',
             properties: {
-              channelId: { type: 'string', example: '7b379578588920ca78fbf' }
+              channelId: {
+                type: 'string',
+                example: '0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5'
+              }
             }
           }
         }
       }
     },
     '400': {
-      description: 'Problem with inputs',
+      description: 'Problem with inputs.',
       content: {
         'application/json': {
           schema: {
@@ -108,8 +112,8 @@ POST.apiDoc = {
         }
       }
     },
-    '403': {
-      description: 'Channel already open',
+    '304': {
+      description: 'Channel already open.',
       content: {
         'application/json': {
           schema: {
@@ -119,18 +123,14 @@ POST.apiDoc = {
         }
       }
     },
-    '500': {
-      description: 'Insufficient balance to open channel',
+    '403': {
+      description: 'Insufficient balance to open channel.',
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            properties: {
-              status: { type: 'string', example: STATUS_CODES.NOT_ENOUGH_BALANCE },
-              tokensRequired: { type: 'string', example: '10' },
-              currentBalance: { type: 'string', example: '9' }
-            }
-          }
+            $ref: '#/components/schemas/StatusResponse'
+          },
+          example: { status: STATUS_CODES.NOT_ENOUGH_BALANCE }
         }
       }
     }

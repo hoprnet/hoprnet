@@ -23,21 +23,25 @@ export const listChannels = async (node: Hopr) => {
   const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
   const selfAddress = selfPubKey.toAddress()
 
-  const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress)).map((channel) => ({
-    type: 'incoming',
-    channelId: channel.getId().toHex(),
-    peerId: channel.destination.toPeerId().toB58String(),
-    status: channelStatusToString(channel.status),
-    balance: channel.balance.toBN().toString()
-  }))
+  const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress))
+    .filter((channel) => channel.status !== ChannelStatus.Closed)
+    .map((channel) => ({
+      type: 'incoming',
+      channelId: channel.getId().toHex(),
+      peerId: channel.destination.toPeerId().toB58String(),
+      status: channelStatusToString(channel.status),
+      balance: channel.balance.toBN().toString()
+    }))
 
-  const channelsTo: ChannelInfo[] = (await node.getChannelsTo(selfAddress)).map((channel) => ({
-    type: 'outgoing',
-    channelId: channel.getId().toHex(),
-    peerId: channel.source.toPeerId().toB58String(),
-    status: channelStatusToString(channel.status),
-    balance: channel.balance.toBN().toString()
-  }))
+  const channelsTo: ChannelInfo[] = (await node.getChannelsTo(selfAddress))
+    .filter((channel) => channel.status !== ChannelStatus.Closed)
+    .map((channel) => ({
+      type: 'outgoing',
+      channelId: channel.getId().toHex(),
+      peerId: channel.source.toPeerId().toB58String(),
+      status: channelStatusToString(channel.status),
+      balance: channel.balance.toBN().toString()
+    }))
 
   return { incoming: channelsFrom, outgoing: channelsTo }
 }
@@ -48,7 +52,7 @@ export const GET: Operation = [
 
     try {
       const channels = await listChannels(node)
-      return res.status(200).send({ status: STATUS_CODES.SUCCESS, channels })
+      return res.status(200).send({ channels })
     } catch (err) {
       return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
@@ -59,7 +63,6 @@ GET.apiDoc = {
   description: 'Lists your channels.',
   tags: ['channel'],
   operationId: 'channelList',
-  parameters: [],
   responses: {
     '200': {
       description: 'Channels fetched succesfully.',

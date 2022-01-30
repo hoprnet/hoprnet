@@ -36,13 +36,13 @@ export const POST: Operation = [
 
     try {
       const txHash = await withdraw(node, currency, recipient, amount)
-      return res.status(200).send({ status: STATUS_CODES.SUCCESS, receipt: txHash })
+      return res.status(200).send({ receipt: txHash })
     } catch (err) {
       const INVALID_ARG = [
         STATUS_CODES.INVALID_CURRENCY,
         STATUS_CODES.INVALID_AMOUNT,
         STATUS_CODES.INVALID_ADDRESS
-      ].find(err.message)
+      ].find((arg) => err.message.includes(arg))
       if (INVALID_ARG) {
         return res.status(400).send({ STATUS: INVALID_ARG, error: err.message })
       } else {
@@ -58,7 +58,7 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Withdraw native or hopr to a specified recipient',
+  description: 'Withdraw native or hopr to a specified recipient.',
   tags: ['balance'],
   operationId: 'withdraw',
   requestBody: {
@@ -72,21 +72,20 @@ POST.apiDoc = {
   },
   responses: {
     '200': {
-      description: 'Withdraw successful',
+      description: 'Withdraw successful.',
       content: {
         'application/json': {
           schema: {
             type: 'object',
             properties: {
-              status: { type: 'string', example: 'success' },
-              receipt: { type: 'string', example: '0xc0d8dcb4c83543adfd77b44390d2b61bc28ebe6585a6b1a30550987af9798448' }
+              receipt: { type: 'string', example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e' }
             }
           }
         }
       }
     },
     '400': {
-      description: 'Incorrect data in request body',
+      description: 'Incorrect data in request body.',
       content: {
         'application/json': {
           schema: {
@@ -94,6 +93,19 @@ POST.apiDoc = {
           },
           example: {
             status: `${STATUS_CODES.INVALID_CURRENCY} | ${STATUS_CODES.INVALID_AMOUNT} | ${STATUS_CODES.INVALID_ADDRESS}`
+          }
+        }
+      }
+    },
+    '500': {
+      description: 'Withdraw amount exeeds current balance.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/StatusResponse'
+          },
+          example: {
+            status: `${STATUS_CODES.NOT_ENOUGH_BALANCE}`
           }
         }
       }
