@@ -1,14 +1,12 @@
 import type Hopr from '@hoprnet/hopr-core'
+import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import type { State } from '../../../../types'
+import { STATUS_CODES } from '../../'
+import type { State, StateOps } from '../../../../types'
 
 export interface Setting {
   name: string
   value: any
-}
-
-export const getSettings = (state: State) => {
-  return state.settings
 }
 
 export const getSetting = ({
@@ -25,7 +23,7 @@ export const getSetting = ({
       const setting = state.settings[name]
 
       if (typeof setting === 'undefined') {
-        throw Error('invalidSetting')
+        throw Error(STATUS_CODES.INVALID_SETTING)
       }
 
       if (name === 'strategy') {
@@ -37,28 +35,32 @@ export const getSetting = ({
   }
 
   if (!settingName) {
+    const settingsNames: (keyof State['settings'])[] = ['includeRecipient', 'strategy']
+    return settingsNames.map(getSettingByName)
   }
+
   return getSettingByName(settingName)
 }
 
 export const setSetting = ({
   node,
   settingName,
-  state,
+  stateOps,
   value
 }: {
   settingName: keyof State['settings']
   value: any
   node: Hopr
-  state: State
+  stateOps: StateOps
 }) => {
+  const state = stateOps.getState()
   if (typeof state.settings[settingName] === 'undefined') {
-    throw Error('invalidSettingName')
+    throw Error(STATUS_CODES.INVALID_SETTING)
   }
 
   switch (settingName) {
     case 'includeRecipient':
-      if (typeof value !== 'boolean') throw Error('invalidValue')
+      if (typeof value !== 'boolean') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[settingName] = value
       break
     case 'strategy':
@@ -72,11 +74,13 @@ export const setSetting = ({
           strategy = new PromiscuousStrategy()
           break
       }
-      if (!strategy) throw Error('invalidValue')
+      if (!strategy) throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       node.setChannelStrategy(strategy)
       state.settings[settingName] = value
       break
   }
+
+  stateOps.setState(state)
 }
 
 export const GET: Operation = [
@@ -84,15 +88,19 @@ export const GET: Operation = [
     const { stateOps, node } = req.context
     const { settingName } = req.query
 
-    const setting = getSetting({
-      node,
-      state: stateOps.getState(),
-      settingName: settingName as keyof State['settings']
-    })
-    if (isError(setting)) {
-      return res.status(400).send({ status: setting.message })
-    } else {
-      return res.status(200).send({ status: 'success', settings: Array.isArray(setting) ? setting : [setting] })
+    try {
+      const setting = getSetting({
+        node,
+        state: stateOps.getState(),
+        settingName: settingName as keyof State['settings']
+      })
+      return res
+        .status(200)
+        .send({ status: STATUS_CODES.SUCCESS, settings: Array.isArray(setting) ? setting : [setting] })
+    } catch (error) {
+      return res
+        .status(error.message === STATUS_CODES.INVALID_SETTING ? 400 : 500)
+        .send({ status: STATUS_CODES[error.message] || STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
   }
 ]
@@ -106,7 +114,6 @@ GET.apiDoc = {
       name: 'settingName',
       in: 'query',
       description: 'Setting name that we want to fetch value for',
-      required: true,
       schema: {
         type: 'string',
         example: 'includeRecipient'
@@ -126,9 +133,6 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   $ref: '#/components/schemas/Setting'
-                  // type: "object", properties: {
-                  //     name: { type: "string", example: "includeRecipient" }, value: {}
-                  // }
                 },
                 description: 'Setting/s fetched'
               }
@@ -156,11 +160,13 @@ export const POST: Operation = [
     const { stateOps, node } = req.context
     const { settingName, value } = req.body
 
-    const err = setSetting({ node, state: stateOps.getState(), value, settingName })
-    if (isError(err)) {
-      return res.status(400).send({ status: err.message })
-    } else {
-      return res.status(200).send({ status: 'success' })
+    try {
+      setSetting({ node, stateOps, value, settingName })
+      return res.status(200).send({ status: STATUS_CODES.SUCCESS })
+    } catch (error) {
+      return res
+        .status(error.message === STATUS_CODES.INVALID_SETTING_VALUE ? 400 : 500)
+        .send({ status: STATUS_CODES[error.message] || STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
   }
 ]
@@ -174,15 +180,6 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           $ref: '#/components/schemas/Setting'
-          // type: 'object',
-          // properties: {
-          //     settingName: { type: 'string', description: 'PeerId that we want to set alias to.' },
-          //     value: { description: 'Alias that we want to attach to peerId.' }
-          // },
-          // example: {
-          //     settingName: "includeRecipient",
-          //     value: true
-          // }
         }
       }
     }

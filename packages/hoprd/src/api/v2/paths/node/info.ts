@@ -1,6 +1,6 @@
+import Hopr from '@hoprnet/hopr-core'
 import { Operation } from 'express-openapi'
-import { isError } from '../..'
-import { getInfo } from '../../logic/info'
+import { STATUS_CODES } from '../../'
 
 export const getInfo = async ({ node }: { node: Hopr }) => {
   try {
@@ -15,7 +15,7 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
       channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
     }
   } catch (error) {
-    return new Error('failure')
+    throw new Error(STATUS_CODES.UNKNOWN_FAILURE + error.message)
   }
 }
 
@@ -23,11 +23,11 @@ export const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
 
-    const info = await getInfo({ node })
-    if (isError(info)) {
-      return res.status(500).send({ status: info.message })
-    } else {
-      return res.status(200).send({ status: 'success', info })
+    try {
+      const info = await getInfo({ node })
+      return res.status(200).send({ status: STATUS_CODES.SUCCESS, info })
+    } catch (error) {
+      return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
   }
 ]

@@ -1,12 +1,14 @@
+import Hopr from '@hoprnet/hopr-core'
 import { Operation } from 'express-openapi'
-import { isError } from '../..'
+import PeerId from 'peer-id'
+import { STATUS_CODES } from '../../'
 
-export const ping = async ({ node, state, peerId }: { node: Hopr; state: State; peerId: string }) => {
+export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => {
   let validPeerId: PeerId
   try {
-    validPeerId = checkPeerIdInput(peerId, state)
+    validPeerId = PeerId.createFromB58String(peerId)
   } catch (err) {
-    return new Error('invalidPeerId')
+    throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
   let pingResult: Awaited<ReturnType<Hopr['ping']>>
@@ -23,28 +25,27 @@ export const ping = async ({ node, state, peerId }: { node: Hopr; state: State; 
   }
 
   if (error && error.message) {
-    return new Error('failure')
+    throw error
   }
-  return new Error('timeout')
+  throw Error(STATUS_CODES.TIMEOUT)
 }
-
-export const parameters = []
 
 export const GET: Operation = [
   async (req, res, _next) => {
-    const { stateOps, node } = req.context
+    const { node } = req.context
     const { peerId } = req.query
 
-    // @TODO: done by express?
     if (!peerId) {
       return res.status(400).send({ status: 'noPeerIdProvided' })
     }
 
-    const pingRes = await ping({ peerId: peerId as string, stateOps, node })
-    if (isError(pingRes)) {
-      return res.status(pingRes.message === 'invalidPeerId' ? 400 : 500).send({ status: pingRes.message })
-    } else {
+    try {
+      const pingRes = await ping({ peerId: peerId as string, node })
       return res.status(200).send({ status: 'success', ...pingRes })
+    } catch (error) {
+      return res
+        .status(error.message === STATUS_CODES.INVALID_PEERID ? 400 : 500)
+        .send({ status: STATUS_CODES[error.message] || STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
   }
 ]

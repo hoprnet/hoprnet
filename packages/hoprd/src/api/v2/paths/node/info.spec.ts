@@ -1,6 +1,6 @@
-import { getInfo } from '../../logic/info'
 import sinon from 'sinon'
 import assert from 'assert'
+import { getInfo } from './info'
 
 let node = sinon.fake() as any
 
@@ -23,5 +23,11 @@ describe('getInfo', () => {
       hoprChannels: 'c',
       channelClosurePeriod: 1
     })
+  })
+  it('should throw when node call fails', async () => {
+    node.smartContractInfo = sinon.fake.throws('')
+    node.getAnnouncedAddresses = sinon.fake.throws('')
+    node.getListeningAddresses = sinon.fake.throws('')
+    assert.throws(() => getInfo({ node }))
   })
 })
