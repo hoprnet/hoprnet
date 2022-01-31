@@ -289,7 +289,13 @@ class Hopr extends EventEmitter {
 
     this.connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
 
-    await this.announce(this.options.announce)
+    try {
+      await this.announce(this.options.announce)
+    } catch (err) {
+      console.error(`Could not announce self on-chain`)
+      console.error(`Observed error:`, err)
+      process.exit(1)
+    }
 
     this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
 
