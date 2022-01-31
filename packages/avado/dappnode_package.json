@@ -1,6 +1,6 @@
 {
   "name": "hopr.avado.dnp.dappnode.eth",
-  "version": "1.86.9",
+  "version": "1.86.10",
   "description": "HOPR is an open incentivized mixnet which enables privacy-preserving point-to-point data exchange. HOPR is similar to Tor but actually private, decentralized and economically sustainable.",
   "avatar": "/ipfs/QmX8oTreTovBjr3QmV4UT5nfNbjYxJJJy3dswYVgcYattE",
   "type": "service",
@@ -20,9 +20,9 @@
       "9091:9091/udp"
     ],
     "restart": "always",
-    "path": "hopr.avado.dnp.dappnode.eth_1.86.9.tar.xz",
-    "hash": "/ipfs/QmVhsBLECLrx7mnoBapmXoKSyssHvB6JTncnLvzgiEse1W",
-    "size": 78421416
+    "path": "hopr.avado.dnp.dappnode.eth_1.86.10.tar.xz",
+    "hash": "/ipfs/QmZdSu4JfykE99Pc9cynxkbJ26RQLvPSy2MZiJWTBvzeVd",
+    "size": 79001272
   },
   "author": "HOPR",
   "license": "GPL-3.0",
@@ -32,5 +32,5 @@
     "Admin interface": "http://hopr.my.ava.do:3000",
     "Rest API V2": "http://hopr.my.ava.do:3001/api/v2/_swagger/"
   },
-  "builddate": "2022-01-28T15:50:34.000Z"
+  "builddate": "2022-01-31T08:22:36.780Z"
 }
