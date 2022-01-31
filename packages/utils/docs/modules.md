@@ -164,6 +164,7 @@
 - [pendingAcknowledgement](modules.md#pendingacknowledgement)
 - [pickVersion](modules.md#pickversion)
 - [preVerify](modules.md#preverify)
+- [prefixLength](modules.md#prefixlength)
 - [privKeyToPeerId](modules.md#privkeytopeerid)
 - [pubKeyToPeerId](modules.md#pubkeytopeerid)
 - [randomBigInteger](modules.md#randombiginteger)
@@ -187,6 +188,7 @@
 - [toU8a](modules.md#tou8a)
 - [u8aAdd](modules.md#u8aadd)
 - [u8aAddrToString](modules.md#u8aaddrtostring)
+- [u8aAddressToCIDR](modules.md#u8aaddresstocidr)
 - [u8aAllocate](modules.md#u8aallocate)
 - [u8aCompare](modules.md#u8acompare)
 - [u8aConcat](modules.md#u8aconcat)
@@ -1021,7 +1023,7 @@ true if address is at least one of the given networks
 
 #### Defined in
 
-[network/addrs.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L72)
+[network/addrs.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L70)
 
 ___
 
@@ -1578,7 +1580,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:228](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L228)
+[network/addrs.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L258)
 
 ___
 
@@ -1598,7 +1600,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L239)
+[network/addrs.ts:269](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L269)
 
 ___
 
@@ -1620,7 +1622,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:153](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L153)
+[network/addrs.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L183)
 
 ___
 
@@ -1662,7 +1664,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:225](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L225)
+[network/addrs.ts:255](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L255)
 
 ___
 
@@ -1682,7 +1684,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L232)
+[network/addrs.ts:262](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L262)
 
 ___
 
@@ -1727,7 +1729,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L166)
+[network/addrs.ts:196](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L196)
 
 ___
 
@@ -1752,7 +1754,7 @@ Byte representation of the given ip address
 
 #### Defined in
 
-[network/addrs.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L94)
+[network/addrs.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L92)
 
 ___
 
@@ -1775,7 +1777,7 @@ Checks if given address is any address
 
 #### Defined in
 
-[network/addrs.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L13)
+[network/addrs.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L11)
 
 ___
 
@@ -1886,7 +1888,7 @@ true if is link-locale address
 
 #### Defined in
 
-[network/addrs.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L50)
+[network/addrs.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L48)
 
 ___
 
@@ -1911,7 +1913,7 @@ true if localhost
 
 #### Defined in
 
-[network/addrs.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L30)
+[network/addrs.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L28)
 
 ___
 
@@ -1960,7 +1962,7 @@ true if private address
 
 #### Defined in
 
-[network/addrs.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L40)
+[network/addrs.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L38)
 
 ___
 
@@ -1985,7 +1987,7 @@ true if address is a reserved address
 
 #### Defined in
 
-[network/addrs.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L60)
+[network/addrs.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L58)
 
 ___
 
@@ -2407,6 +2409,30 @@ to create it and the challenge for the next relayer.
 #### Defined in
 
 [crypto/por/index.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L83)
+
+___
+
+### prefixLength
+
+▸ **prefixLength**(`prefix`): `number`
+
+Returns the prefix length of a network prefix
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `prefix` | `Uint8Array` | network prefix, e.g. `new Uint8Array([255,255,255,0])` |
+
+#### Returns
+
+`number`
+
+the prefix length, e.g. 24
+
+#### Defined in
+
+[network/addrs.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L131)
 
 ___
 
@@ -2949,7 +2975,7 @@ ___
 
 #### Defined in
 
-[network/addrs.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L199)
+[network/addrs.ts:229](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L229)
 
 ___
 
@@ -3026,7 +3052,34 @@ Converts ip address from byte representation to string
 
 #### Defined in
 
-[network/addrs.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L134)
+[network/addrs.ts:164](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L164)
+
+___
+
+### u8aAddressToCIDR
+
+▸ **u8aAddressToCIDR**(`prefix`, `subnet`, `family`): `string`
+
+Takes a network prefix, a subnet and a IP address family and
+returns a CIDR string
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `prefix` | `Uint8Array` | network prefix, e.g. `new Uint8Array([10,0,0,0]) |
+| `subnet` | `Uint8Array` | subnet, e.g. `new Uint8Array([255,255,255,0]) |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` | IP address family, `IPv4` or `IPv6` |
+
+#### Returns
+
+`string`
+
+a CIDR string, such as `192.168.1.0/24`
+
+#### Defined in
+
+[network/addrs.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L154)
 
 ___
 
