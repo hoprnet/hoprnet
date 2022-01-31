@@ -58,4 +58,4 @@ export function resolveEnvironment(environment_id: string): ResolvedEnvironment 
   throw new Error(`environment '${environment_id}' is not supported, supported environments: ${supportedEnvsString}`)
 }
 
-export const DEFAULT_ENVIRONMENT = 'hardhat-localhost';
+export const DEFAULT_ENVIRONMENT = 'hardhat-localhost'

@@ -264,7 +264,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => { },
+      () => {},
       protocolAck
     )
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
