@@ -149,6 +149,11 @@ const argv = yargs(process.argv.slice(2))
     describe: 'Port to listen to for admin console',
     default: 3000
   })
+  .option('allowLocalNodeConnections', {
+    boolean: true,
+    describe: 'Allow connections to other nodes running on localhost.',
+    default: false
+  })
   .option('testAnnounceLocalAddresses', {
     boolean: true,
     describe: 'For testing local testnets. Announce local addresses.',
@@ -213,6 +218,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     announce: argv.announce,
     hosts: parseHosts(),
     environment,
+    allowLocalConnections: argv.allowLocalNodeConnections,
     testing: {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses,
