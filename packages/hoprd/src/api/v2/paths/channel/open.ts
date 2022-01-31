@@ -133,6 +133,21 @@ POST.apiDoc = {
           example: { status: STATUS_CODES.NOT_ENOUGH_BALANCE }
         }
       }
+    },
+    '500': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
+        }
+      }
     }
   }
 }

@@ -19,12 +19,12 @@ const channelStatusToString = (status: ChannelStatus): string => {
   return 'Unknown'
 }
 
-export const listChannels = async (node: Hopr) => {
+export const listChannels = async (node: Hopr, includingClosed: boolean) => {
   const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
   const selfAddress = selfPubKey.toAddress()
 
   const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress))
-    .filter((channel) => channel.status !== ChannelStatus.Closed)
+    .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
     .map((channel) => ({
       type: 'incoming',
       channelId: channel.getId().toHex(),
@@ -34,7 +34,7 @@ export const listChannels = async (node: Hopr) => {
     }))
 
   const channelsTo: ChannelInfo[] = (await node.getChannelsTo(selfAddress))
-    .filter((channel) => channel.status !== ChannelStatus.Closed)
+    .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
     .map((channel) => ({
       type: 'outgoing',
       channelId: channel.getId().toHex(),
@@ -49,9 +49,10 @@ export const listChannels = async (node: Hopr) => {
 export const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
+    const { includingClosed } = req.query
 
     try {
-      const channels = await listChannels(node)
+      const channels = await listChannels(node, !!includingClosed)
       return res.status(200).send({ channels })
     } catch (err) {
       return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -63,6 +64,18 @@ GET.apiDoc = {
   description: 'Lists your channels.',
   tags: ['channel'],
   operationId: 'channelList',
+  parameters: [
+    {
+      in: 'query',
+      name: 'includingClosed',
+      description:
+        'When includingClosed is passed the response will include closed channels which are ommited by default.',
+      schema: {
+        type: 'string',
+        example: 'true'
+      }
+    }
+  ],
   responses: {
     '200': {
       description: 'Channels fetched succesfully.',
@@ -80,6 +93,21 @@ GET.apiDoc = {
               }
             }
           }
+        }
+      }
+    },
+    '500': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
         }
       }
     }

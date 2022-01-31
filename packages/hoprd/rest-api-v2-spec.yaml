@@ -14,7 +14,7 @@ info:
     url: 'https://github.com/hoprnet/hoprnet/blob/master/LICENSE'
 tags:
   - name: nodeinfo
-    description: Information about the specific node instance
+    description: Information about the specific node instance.
 
 # paths are defined at compile-time by the OpenAPI middleware
 paths: {}
@@ -24,7 +24,7 @@ security:
   - passwordScheme: ['write']
 
 externalDocs:
-  description: Find out more about HOPR and HOPRd
+  description: Find out more about HOPR and HOPRd.
   url: 'http://docs.hoprnet.org'
 components:
   schemas:
@@ -33,10 +33,10 @@ components:
       properties:
         nativeAddress:
           type: string
-          description: Blockchain-native account address
+          description: Blockchain-native account address.
         hoprAddress:
           type: string
-          description: HOPR account address, also called PeerId
+          description: HOPR account address, also called PeerId.
       required:
         - nativeAddress
         - hoprAddress
@@ -48,7 +48,7 @@ components:
       properties:
         peerId:
           type: string
-          description: A PeerId
+          description: A PeerId.
       required:
         - peerId
       example:
@@ -58,7 +58,7 @@ components:
       properties:
         version:
           type: string
-          description: Node version
+          description: Node version.
       required:
         - version
       example:
@@ -68,7 +68,7 @@ components:
       properties:
         signature:
           type: string
-          description: Signature from requested message
+          description: Signature from requested message.
       required:
         - signature
       example:
@@ -78,7 +78,7 @@ components:
       properties:
         status:
           type: string
-          description: Status declaring success/failure of the request
+          description: Status declaring success/failure of the request.
       required:
         - status
       example:
@@ -97,13 +97,13 @@ components:
       properties:
         currency:
           type: string
-          description: ETH | HOPR currency to withdraw
+          description: ETH | HOPR currency to withdraw.
         amount:
           type: string
-          description: Amount to withdraw in the currency's smallest unit
+          description: Amount to withdraw in the currency's smallest unit.
         recipient:
           type: string
-          description: Blockchain address to withdraw specified currency to
+          description: Blockchain address to withdraw specified currency to.
       example:
         currency: hopr
         amount: '1'
@@ -112,12 +112,12 @@ components:
       type: object
       properties:
         settingName:
-          type: 'string'
-          description: 'Setting name.'
+          type: string
+          description: Setting name.
         value:
-          description: 'Depends on the setting.'
+          description: Depends on the setting.
       example:
-        settingName: 'includeRecipient'
+        settingName: includeRecipient
         value: true
     Info:
       type: object
@@ -165,8 +165,8 @@ components:
       type: apiKey
       name: x-auth-token
       in: header
-      description: 'A valid API token which had been configured at node startup.'
+      description: A valid API token which had been configured at node startup.
     passwordScheme:
       type: http
       scheme: basic
-      description: 'A valid API token is used as the user which had been configured at node startup. No password is required.'
+      description: A valid API token is used as the user which had been configured at node startup. No password is required.

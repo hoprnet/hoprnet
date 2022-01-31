@@ -1,5 +1,6 @@
 import { Operation } from 'express-openapi'
 import { u8aToHex } from '@hoprnet/hopr-utils'
+import { STATUS_CODES } from '../../'
 
 export const parameters = []
 
@@ -9,7 +10,7 @@ export const POST: Operation = [
       const signature = await req.context.node.signMessage(new TextEncoder().encode(req.body.message))
       res.status(200).send({ signature: u8aToHex(signature) })
     } catch (err) {
-      res.status(422).json({ error: err.message })
+      res.status(422).json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
@@ -43,6 +44,21 @@ POST.apiDoc = {
           schema: {
             $ref: '#/components/schemas/Signature'
           }
+        }
+      }
+    },
+    '422': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
         }
       }
     }

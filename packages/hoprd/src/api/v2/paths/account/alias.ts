@@ -40,17 +40,6 @@ export const getAlias = (state: Readonly<State>, alias: string): string => {
   return peerId.toB58String()
 }
 
-// @TODO: add get all aliases
-/**
- * @returns All PeerIds keyed by their aliases.
- */
-// export const getAliases = (state: Readonly<State>): { [alias: string]: string[] } => {
-//   return Array.from(state.aliases).reduce((result, [alias, peerId]) => {
-//     result[alias] = peerId.toB58String()
-//     return result
-//   }, {})
-// }
-
 export const GET: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
@@ -104,6 +93,21 @@ GET.apiDoc = {
             $ref: '#/components/schemas/StatusResponse'
           },
           example: { status: STATUS_CODES.PEERID_NOT_FOUND }
+        }
+      }
+    },
+    '500': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
         }
       }
     }
@@ -165,6 +169,21 @@ POST.apiDoc = {
           }
         }
       }
+    },
+    '500': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
+        }
+      }
     }
   }
 }
@@ -205,6 +224,21 @@ DELETE.apiDoc = {
   responses: {
     '200': {
       description: 'Alias removed succesfully'
+    },
+    '500': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
+        }
+      }
     }
   }
 }

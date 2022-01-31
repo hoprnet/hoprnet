@@ -150,6 +150,21 @@ GET.apiDoc = {
           example: { status: STATUS_CODES.INVALID_SETTING }
         }
       }
+    },
+    '500': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
+        }
+      }
     }
   }
 }
@@ -202,6 +217,21 @@ POST.apiDoc = {
           example: {
             status: `${STATUS_CODES.INVALID_SETTING} | ${STATUS_CODES.INVALID_SETTING_VALUE}`
           }
+        }
+      }
+    },
+    '500': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
         }
       }
     }
