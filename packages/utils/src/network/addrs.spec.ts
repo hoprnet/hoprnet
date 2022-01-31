@@ -9,11 +9,14 @@ import {
   getLocalHosts,
   isLinkLocaleAddress,
   isLocalhost,
-  getPublicAddresses
+  getPublicAddresses,
+  prefixLength,
+  u8aAddressToCIDR
 } from './addrs'
 import type { Network } from './constants'
-import { u8aEquals } from '..'
+import { u8aEquals, u8aToHex } from '..'
 import assert from 'assert'
+import { type NetworkInterfaceInfo } from 'os'
 
 describe('test utils', function () {
   it('should convert ip addresses', function () {
@@ -146,5 +149,47 @@ describe('test utils', function () {
           !isLinkLocaleAddress(network.networkPrefix, network.family)
       )
     )
+  })
+
+  it('test prefix length', function () {
+    const testVectors: [prefix: Uint8Array, length: number][] = [
+      [new Uint8Array([255, 255, 255, 255]), 32],
+      [new Uint8Array([255, 255, 255, 254]), 31],
+      [new Uint8Array([128, 0, 0, 0]), 1],
+      [new Uint8Array([0, 0, 0, 0]), 0]
+    ]
+
+    for (const testVector of testVectors) {
+      assert(
+        prefixLength(testVector[0]) == testVector[1],
+        `${u8aToHex(testVector[0])} must have prefix length ${testVector[1]} but got ${prefixLength(testVector[0])}`
+      )
+    }
+  })
+
+  it('check CIDR output', function () {
+    const testVectors: [
+      prefix: Uint8Array,
+      subnet: Uint8Array,
+      family: NetworkInterfaceInfo['family'],
+      cidrString: string
+    ][] = [
+      [new Uint8Array([10, 0, 0, 0]), new Uint8Array([255, 255, 255, 255]), 'IPv4', '10.0.0.0/32'],
+      [
+        Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+        Uint8Array.from([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]),
+        'IPv6',
+        '0000:0000:0000:0000:0000:0000:0000:0001/128'
+      ]
+    ]
+
+    for (const testVector of testVectors) {
+      assert(
+        u8aAddressToCIDR(testVector[0], testVector[1], testVector[2]) == testVector[3],
+        `prefix ${u8aToHex(testVector[0])}, subnet ${u8aToHex(testVector[1])}, family ${testVector[2]} must yield ${
+          testVector[3]
+        } bot got ${u8aAddressToCIDR(testVector[0], testVector[1], testVector[2])}`
+      )
+    }
   })
 })

@@ -1,9 +1,7 @@
 import { stringToU8a, u8aToHex } from '..'
-import type { Network } from './constants'
-import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS } from './constants'
+import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOOPBACK_ADDRS, RESERVED_ADDRS, type Network } from './constants'
 
-import type { NetworkInterfaceInfo } from 'os'
-import { networkInterfaces } from 'os'
+import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
 
 /**
  * Checks if given address is any address
@@ -123,6 +121,47 @@ export function ipToU8aAddress(address: string, family: NetworkInterfaceInfo['fa
     default:
       throw Error(`Invalid address family`)
   }
+}
+
+/**
+ * Returns the prefix length of a network prefix
+ * @param prefix network prefix, e.g. `new Uint8Array([255,255,255,0])`
+ * @returns the prefix length, e.g. 24
+ */
+export function prefixLength(prefix: Uint8Array) {
+  const masks: number[] = [128, 192, 224, 240, 248, 252, 254, 255]
+
+  let prefixLength = 0
+  let done = false
+
+  for (let i = 0; i < prefix.length; i++) {
+    for (let bit = 0; bit < 8; bit++) {
+      if ((prefix[i] & masks[bit]) == masks[bit]) {
+        prefixLength++
+      } else {
+        done = true
+        break
+      }
+    }
+
+    if (done) {
+      break
+    }
+  }
+
+  return prefixLength
+}
+
+/**
+ * Takes a network prefix, a subnet and a IP address family and
+ * returns a CIDR string
+ * @param prefix network prefix, e.g. `new Uint8Array([10,0,0,0])
+ * @param subnet subnet, e.g. `new Uint8Array([255,255,255,0])
+ * @param family IP address family, `IPv4` or `IPv6`
+ * @returns a CIDR string, such as `192.168.1.0/24`
+ */
+export function u8aAddressToCIDR(prefix: Uint8Array, subnet: Uint8Array, family: NetworkInterfaceInfo['family']) {
+  return `${u8aAddrToString(prefix, family)}/${prefixLength(subnet)}`
 }
 
 /**
