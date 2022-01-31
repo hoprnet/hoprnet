@@ -9,7 +9,7 @@ import { setTimeout } from 'timers/promises'
 
 import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
-import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment, DEFAULT_ENVIRONMENT } from '@hoprnet/hopr-core'
 
 import setupAPI from './api'
 import setupHealthcheck from './healthcheck'
@@ -22,20 +22,6 @@ import type { HoprOptions } from '@hoprnet/hopr-core'
 import { setLogger } from 'trace-unhandled'
 
 const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
-
-export type DefaultEnvironment = {
-  id?: string
-}
-
-function defaultEnvironment(): string {
-  try {
-    const config = require('../default-environment.json') as DefaultEnvironment
-    return config?.id || ''
-  } catch (error) {
-    // its ok if the file isn't there or cannot be read
-    return ''
-  }
-}
 
 function addUnhandledPromiseRejectionHandler() {
   require('trace-unhandled/register')
@@ -57,7 +43,7 @@ export async function main() {
       string: true,
       describe: 'Environment id which the node shall run on',
       choices: supportedEnvironments().map((env) => env.id),
-      default: defaultEnvironment()
+      default: DEFAULT_ENVIRONMENT
     })
     .option('host', {
       string: true,
@@ -395,6 +381,7 @@ export async function main() {
     logs.log(`Ready to request on-chain connector to connect to provider.`)
     node.subscribeOnConnector('connector:created', () => node.emit('hopr:connector:created'))
     node.emitOnConnector('connector:create')
+    return node
   } catch (e) {
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)

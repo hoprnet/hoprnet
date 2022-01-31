@@ -1049,6 +1049,6 @@ export * from './constants'
 export { createHoprNode } from './main'
 export { PassiveStrategy, PromiscuousStrategy, SaneDefaults, findPath }
 export type { ChannelsToOpen, ChannelsToClose }
-export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment'
+export { resolveEnvironment, supportedEnvironments, DEFAULT_ENVIRONMENT, type ResolvedEnvironment } from './environment'
 export { createLibp2pMock } from './libp2p.mock'
 export { sampleOptions } from './index.mock'
