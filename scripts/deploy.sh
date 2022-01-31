@@ -80,7 +80,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
           "" \
           "${cluster_name}" \
           "${docker_image_full}" \
-          "2"
+          "2" \
           "${cluster_template_name}"
       else
         # announce on-chain with routable address
@@ -89,7 +89,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
           "" \
           "${cluster_name}" \
           "${docker_image_full}" \
-          "3"
+          "3" \
           "${cluster_template_name}" \
           "true"
       fi
