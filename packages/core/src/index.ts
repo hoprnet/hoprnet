@@ -74,7 +74,6 @@ type PeerStoreAddress = {
   multiaddrs: Multiaddr[]
 }
 
-<<<<<<< HEAD
 export type HoprOptions = {
   environment: ResolvedEnvironment
   announce?: boolean
@@ -111,29 +110,6 @@ export type HoprOptions = {
     // default: false
     noUPNP?: boolean
   }
-=======
-export class HoprOptions {
-  constructor(
-    public environment: ResolvedEnvironment,
-    public announce?: boolean,
-    public dbPath?: string,
-    public createDbIfNotExist?: boolean,
-    public forceCreateDB?: boolean,
-    public password?: string,
-    public connector?: HoprCoreEthereum,
-    public strategy?: ChannelStrategy,
-    public hosts?: {
-      ip4?: NetOptions
-      ip6?: NetOptions
-    },
-    // You almost certainly want this to be false, this is so we can test with
-    // local testnets, and announce 127.0.0.1 addresses.
-    public announceLocalAddresses?: boolean,
-    // when true, addresses will be sorted local first
-    // when false, addresses will be sorted public first
-    public preferLocalAddresses?: boolean
-  ) {}
->>>>>>> 45bd10b0b1c605582d9e5c6e18beb113ce592fee
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -288,7 +264,7 @@ class Hopr extends EventEmitter {
       },
       (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
       // TODO: automatically reinitialize commitments
-      () => {},
+      () => { },
       protocolAck
     )
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
