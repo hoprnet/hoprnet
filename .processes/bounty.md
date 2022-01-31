@@ -65,7 +65,11 @@ After a bounty is [reviewed](#creating-a-bounty), two dates need to be set:
 
 The deadline set for the bounty hunter should be the `pickup deadline`, this way, it allows the tech team to fully avoid working on the task in the case it's completed or assist the bounty hunter on completing it. Either way, bounty hunter must be showing good progress throughout the time they are accepted to work on it.
 
-<!-- ## Rewards -->
+<!-- ## Rewards
+
+Depending on the prize's currency, there might be fluctuations in the price relative to the dollar amount.
+Depending on the quality of work, bounty creator might  -->
+
 <!-- good hunters -->
 
 ## The Bounty Program
