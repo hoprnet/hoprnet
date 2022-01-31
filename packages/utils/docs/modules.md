@@ -410,7 +410,7 @@ ___
 
 #### Defined in
 
-[async/abortableTimeout.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L6)
+[async/abortableTimeout.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L5)
 
 ___
 
@@ -960,7 +960,7 @@ it can pass an AbortController and end the call prematurely.
 
 #### Defined in
 
-[async/abortableTimeout.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L22)
+[async/abortableTimeout.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L21)
 
 ___
 
