@@ -129,7 +129,7 @@ export function ipToU8aAddress(address: string, family: NetworkInterfaceInfo['fa
  * @returns the prefix length, e.g. 24
  */
 export function prefixLength(prefix: Uint8Array) {
-  const masks: number[] = [0, 128, 192, 224, 240, 248, 252, 254, 255]
+  const masks: number[] = [128, 192, 224, 240, 248, 252, 254, 255]
 
   let prefixLength = 0
 
@@ -137,7 +137,7 @@ export function prefixLength(prefix: Uint8Array) {
     let bit = 0
     for (; (prefix[i] & masks[bit]) == masks[bit]; bit++) {}
 
-    prefixLength += bit - 1
+    prefixLength += bit
   }
 
   return prefixLength
