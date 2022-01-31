@@ -1,6 +1,5 @@
 import Multiaddr from 'multiaddr'
 
-// @ts-ignore
 const { name, version } = require('../package.json')
 
 // Use name without organisation prefix
@@ -22,10 +21,12 @@ export const CLOSE_TIMEOUT = 6000 // ms
 export const RELAY_CIRCUIT_TIMEOUT = 6000 // ms
 export const RELAY_CONTACT_TIMEOUT = 3000 // ms
 
-// Either set on ALL nodes to true or NONE
-// @dev mixed operation is neither tested nor implemented
-export const USE_WEBRTC = true
 export const WEBRTC_TIMEOUT = 2400 // ms
+
+// Keys in the DHT have a TTL of 24 hours, hence
+// relay keys need to be reset on daily base.
+// Interval to renew the DHT entry
+export const DEFAULT_DHT_ENTRY_RENEWAL = 8 * 60 * 60 * 1000 // 8 hours
 
 // Use default UTF-8 text encoding
 const encoder = new TextEncoder()
@@ -63,5 +64,37 @@ export function isValidPrefix(prefix: RelayPrefix): boolean {
   }
 }
 
-export const RELAY = `/${NAME}/relay/${version}`
-export const DELIVERY = `/${NAME}/delivery/${version}`
+export const MAX_RELAYS_PER_NODE = 5
+
+/**
+ * @param environment [optional] isolate from nodes running in other environments
+ * @returns the relay request protocol string
+ */
+export function CAN_RELAY_PROTCOL(environment?: string): string {
+  if (environment) {
+    return `/${NAME}/${environment}/can-relay/${version}`
+  }
+  return `/${NAME}/can-relay/${version}`
+}
+
+/**
+ * @param environment [optional] isolate from nodes running in other environments
+ * @returns the relay request protocol string
+ */
+export function RELAY_PROTCOL(environment?: string): string {
+  if (environment) {
+    return `/${NAME}/${environment}/relay/${version}`
+  }
+  return `/${NAME}/relay/${version}`
+}
+
+/**
+ * @param environment [optional] isolate from nodes running in other environments
+ * @returns the relay delivery protocol string
+ */
+export function DELIVERY_PROTOCOL(environment?: string): string {
+  if (environment) {
+    return `/${NAME}/${environment}/delivery/${version}`
+  }
+  return `/${NAME}/delivery/${version}`
+}

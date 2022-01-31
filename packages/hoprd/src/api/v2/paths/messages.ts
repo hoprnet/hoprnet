@@ -8,8 +8,13 @@ export const parameters = []
 export const POST: Operation = [
   async (req, res, _next) => {
     const message = encodeMessage(req.body.body)
-    const path: PublicKey[] = req.body.path.map((peer) => PublicKey.fromPeerId(PeerId.createFromB58String(peer)))
     const recipient: PeerId = PeerId.createFromB58String(req.body.recipient)
+
+    // only set path if given, otherwise a path will be chosen by hopr core
+    let path: PublicKey[]
+    if (req.body.path != undefined) {
+      path = req.body.path.map((peer) => PublicKey.fromPeerId(PeerId.createFromB58String(peer)))
+    }
 
     try {
       await req.context.node.sendMessage(message, recipient, path)
@@ -41,9 +46,9 @@ POST.apiDoc = {
               format: 'peerId'
             },
             path: {
-              description: 'The path is ordered list of peer ids through which the message should be sent. ',
+              description:
+                'The path is ordered list of peer ids through which the message should be sent. If no path is provided, a path which covers the nodes minimum required hops will be determined automatically.',
               type: 'array',
-              default: [],
               items: {
                 description: 'A valid HOPR peer id',
                 type: 'string',

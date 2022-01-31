@@ -9,6 +9,7 @@ describe('Identity', function () {
   const WRONG_DUMMY_PASSWORD = 'hopr-unit-test-wrong-password'
   const INVALID_PRIVATE_KEY = 'invalid_hex_string'
   const INVALID_SECP256K1_PRIVATE_KEY = 'cd09f9'
+  const INVALID_TOO_SHORT_PRIVATE_KEY = '0xcd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e03'
   const DUMMY_PRIVATE_KEY = 'cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317'
   const DUMMY_PREFIXED_PRIVATE_KEY = '0xcd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317'
 
@@ -51,6 +52,22 @@ describe('Identity', function () {
         }
       )
     })
+
+    it('fails to load a private key that is too short', async () => {
+      await assert.rejects(
+        async () => {
+          await getIdentity({
+            ...mockIdentityOptions,
+            privateKey: INVALID_TOO_SHORT_PRIVATE_KEY
+          })
+        },
+        {
+          name: 'Error',
+          message: IdentityErrors.INVALID_PRIVATE_KEY_GIVEN
+        }
+      )
+    })
+
     it('fails to load a non-secp256k1 hex encoded value as private key', async () => {
       await assert.rejects(
         async () => {
@@ -61,7 +78,7 @@ describe('Identity', function () {
         },
         {
           name: 'Error',
-          message: IdentityErrors.INVALID_SECPK256K1_PRIVATE_KEY_GIVEN
+          message: IdentityErrors.INVALID_PRIVATE_KEY_GIVEN
         }
       )
     })

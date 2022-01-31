@@ -193,7 +193,7 @@ function find_tmp_dir() {
   fi
 
   if [[ -d "${tmp}" && -h "${tmp}" ]]; then
-    msg "Neither /tmp or /var/tmp can be used for writing logs"; 
+    msg "Neither /tmp or /var/tmp can be used for writing logs";
     exit 1;
   fi
 

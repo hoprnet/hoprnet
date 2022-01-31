@@ -3,8 +3,8 @@ import { Operation } from 'express-openapi'
 export const parameters = []
 
 export const GET: Operation = [
-  async (req, res, _next) => {
-    const nativeAddress = (await req.context.node.getEthereumAddress()).toHex()
+  (req, res, _next) => {
+    const nativeAddress = req.context.node.getEthereumAddress().toHex()
     const hoprAddress = req.context.node.getId().toB58String()
 
     res.status(200).json({ nativeAddress, hoprAddress })

@@ -1,8 +1,11 @@
-node_modules
-lib
-db
+/node_modules
+/lib
+/db
 
 # Exclude built npm packages
-*.tgz
-cache/
-.testid
+/*.tgz
+/cache
+/.testid
+
+# used only in release and should not be tracked
+/default-environment.json

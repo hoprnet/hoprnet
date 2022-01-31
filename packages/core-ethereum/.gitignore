@@ -1,18 +1,12 @@
 # Exclude node.js stuff
-node_modules
-
-# Exclude yarn stuff
-yarn-error.log
-
-# Exclude OSX stuff
-**/.DS_Store
+/node_modules
 
 # Typescript builds
-lib
+/lib
 
 # Exclude any built npm packages
-*.tgz
+/*.tgz
 
 # coverage
-.nyc_output
-coverage
+/.nyc_output
+/coverage

@@ -70,7 +70,11 @@ export class AdminServer {
       this.logs.error(`failed parsing cookies`, e)
     }
 
-    if (!cookies || (cookies['X-Auth-Token'] !== this.apiToken && cookies['x-auth-token'] !== this.apiToken)) {
+    if (
+      !cookies ||
+      (decodeURI(cookies['X-Auth-Token'] || '') !== this.apiToken &&
+        decodeURI(cookies['x-auth-token'] || '') !== this.apiToken)
+    ) {
       this.logs.log('ws client failed authentication')
       return false
     }
@@ -198,7 +202,7 @@ export class AdminServer {
     this.logs.logStatus(this.node.status === 'RUNNING' ? 'READY' : 'PENDING')
 
     // Setup some noise
-    connectionReport(this.node, this.logs)
+    startConnectionReports(this.node, this.logs)
     startResourceUsageLogger(debugLog)
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
@@ -216,7 +220,9 @@ export function showDisclaimer(logs: LogStream) {
   }, 60 * 1000)
 }
 
-export async function connectionReport(node: Hopr, logs: LogStream) {
+export async function startConnectionReports(node: Hopr, logs: LogStream) {
   logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
-  setTimeout(() => connectionReport(node, logs), 60_000)
+  setInterval(() => {
+    logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
+  }, 60 * 1000)
 }

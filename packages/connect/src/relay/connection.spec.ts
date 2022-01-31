@@ -8,6 +8,7 @@ import Pair from 'it-pair'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants'
 import handshake from 'it-handshake'
 import { StreamType } from '../types'
+import { createPeerId } from '../base/utils.spec'
 
 describe('test status message sorting', function () {
   it('sort status messages', function () {
@@ -25,11 +26,9 @@ describe('test status message sorting', function () {
 })
 
 describe('relay connection', function () {
-  let Alice: PeerId, Relay: PeerId, Bob: PeerId
-
-  before(async function () {
-    ;[Alice, Relay, Bob] = await Promise.all(Array.from({ length: 3 }, (_) => PeerId.create({ keyType: 'secp256k1' })))
-  })
+  const Alice: PeerId = createPeerId()
+  const Relay: PeerId = createPeerId()
+  const Bob: PeerId = createPeerId()
 
   it('ping message', async function () {
     const AliceRelay = Pair<StreamType>()
@@ -457,11 +456,9 @@ describe('relay connection', function () {
 })
 
 describe('relay connection - stream error propagation', function () {
-  let Alice: PeerId, Relay: PeerId, Bob: PeerId
-
-  before(async function () {
-    ;[Alice, Relay, Bob] = await Promise.all(Array.from({ length: 3 }, (_) => PeerId.create({ keyType: 'secp256k1' })))
-  })
+  const Alice: PeerId = createPeerId()
+  const Relay: PeerId = createPeerId()
+  const Bob: PeerId = createPeerId()
 
   it('falsy sources in sinks', async function () {
     const AliceRelay = Pair<StreamType>()

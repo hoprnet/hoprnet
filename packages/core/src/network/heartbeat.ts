@@ -1,7 +1,6 @@
 import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
-import type { LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
-import { randomInteger, limitConcurrency, u8aEquals, debug } from '@hoprnet/hopr-utils'
+import { randomInteger, limitConcurrency, u8aEquals, debug, retimer } from '@hoprnet/hopr-utils'
 import {
   HEARTBEAT_INTERVAL,
   HEARTBEAT_TIMEOUT,
@@ -18,7 +17,7 @@ const error = debug('hopr-core:heartbeat:error')
 const PING_HASH_ALGORITHM = 'blake2s256'
 
 export default class Heartbeat {
-  private timeout: NodeJS.Timeout
+  private stopHeartbeatInterval: (() => void) | undefined
   private protocolHeartbeat: string
 
   constructor(
@@ -32,14 +31,9 @@ export default class Heartbeat {
       error(`Error while processing heartbeat request`, err)
     }
 
-    this.protocolHeartbeat = `hopr/${environmentId}/heartbeat`
+    this.protocolHeartbeat = `/hopr/${environmentId}/heartbeat`
 
-    subscribe(
-      this.protocolHeartbeat,
-      this.handleHeartbeatRequest.bind(this) as LibP2PHandlerFunction<Promise<Uint8Array>>,
-      true,
-      errHandler
-    )
+    subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, errHandler)
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
@@ -88,24 +82,31 @@ export default class Heartbeat {
     log(this.networkPeers.debugLog())
   }
 
-  private tick() {
-    this.timeout = setTimeout(async () => {
+  private startHeartbeatInterval() {
+    const periodicCheck = async function (this: Heartbeat) {
       try {
         await this.checkNodes()
       } catch (e) {
         log('FATAL ERROR IN HEARTBEAT', e)
       }
-      this.tick()
-    }, randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE))
+    }.bind(this)
+
+    this.stopHeartbeatInterval = retimer(
+      periodicCheck,
+      // Prevent nodes from querying each other at the very same time
+      () => randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE)
+    )
+
+    setTimeout(periodicCheck)
   }
 
   public start() {
-    this.tick()
+    this.startHeartbeatInterval()
     log(`Heartbeat started`)
   }
 
   public stop() {
-    clearTimeout(this.timeout)
+    this.stopHeartbeatInterval?.()
     log(`Heartbeat stopped`)
   }
 

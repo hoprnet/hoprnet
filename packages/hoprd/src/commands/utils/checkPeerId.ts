@@ -9,7 +9,7 @@ import PeerId from 'peer-id'
  * @param peerIdString query that contains the peerId
  * @returns a 'PeerId' instance
  */
-export async function checkPeerIdInput(peerIdString: string, state?: GlobalState): Promise<PeerId> {
+export function checkPeerIdInput(peerIdString: string, state?: GlobalState): PeerId {
   try {
     if (typeof state !== 'undefined' && state.aliases && state.aliases.has(peerIdString)) {
       return state.aliases.get(peerIdString)!

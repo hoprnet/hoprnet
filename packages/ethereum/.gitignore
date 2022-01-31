@@ -1,8 +1,5 @@
 # Exclude node.js module directory
-node_modules/
-
-# Exclude yarn stuff
-yarn-error.log
+/node_modules
 
 # Coverage directory used by tools like istanbul
 coverage*
@@ -18,20 +15,20 @@ allFiredEvents
 scTopics
 
 # Exclude secrets
-.env
+/.env
 
 # Exclude built npm packages
-*.tgz
+/*.tgz
 
 # Hardhat
-hardhat/artifacts
-hardhat/cache
-deployments/**/solcInputs
-deployments/hardhat-localhost
-deployments/hardhat-localhost2
+/hardhat/artifacts
+/hardhat/cache
+/deployments/**/solcInputs
+/deployments/hardhat-localhost
+/deployments/hardhat-localhost2
 
 # typechain
-src/types
+/src/types
 
 # Typescript builds
-lib
+/lib

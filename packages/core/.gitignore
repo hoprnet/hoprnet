@@ -1,11 +1,8 @@
-# Exclude OSX stuff
-**/.DS_Store
-
 # Exclude node stuff
-node_modules
+/node_modules
 
 # Exclude built files
-lib
+/lib
 
 # Exclude vim swap files
 *.swp
@@ -15,8 +12,8 @@ lib
 log.txt
 
 # Exclude built npm packages
-*.tgz
+/*.tgz
 
 # Exclude coverage
-.nyc_output
-coverage
+/.nyc_output
+/coverage

@@ -34,22 +34,6 @@ GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDIS
 # let keys expire after 1 hour
 alias gssh="gcloud compute ssh --force-key-file-overwrite --ssh-key-expire-after=1h --ssh-flag='-t' $ZONE"
 
-# NB: This is useless for getting an IP of a VM
-# Get or create an IP address
-# $1=VM name
-gcloud_get_address() {
-  local vm_name="${1}"
-
-  local ip=$(gcloud compute addresses describe ${vm_name} $gcloud_region 2>&1)
-  # Google does not return an appropriate exit code :(
-  if [ "$(echo "$ip" | grep 'ERROR')" ]; then
-    log "No address, creating"
-    gcloud compute addresses create ${vm_name} $gcloud_region
-    ip=$(gcloud compute addresses describe ${vm_name} $gcloud_region 2>&1)
-  fi
-  echo $ip | awk '{ print $2 }'
-}
-
 # $1=ip
 # $2=optional: healthcheck port, defaults to 8080
 wait_until_node_is_ready() {
@@ -160,10 +144,24 @@ gcloud_cleanup_docker_images() {
 # $3 - optional: environment id
 # $4 - optional: api token
 # $5 - optional: password
-# $6 - optional: private key
-# $7 - optional: no args
+# $6 - optional: announce
+# $7 - optional: private key
+# $8 - optional: no args
+gcloud_create_instance_template_if_not_exists() {
+  gcloud_create_or_update_instance_template "${1}" "${2}" "${3:-}" "${4:-}" "${5:-}" "${6:-}" "${7:-}" "${8:-}" "true"
+}
+
+# $1 - template name
+# $2 - container image
+# $3 - optional: environment id
+# $4 - optional: api token
+# $5 - optional: password
+# $6 - optional: announce
+# $7 - optional: private key
+# $8 - optional: no args
+# $9 - optional: skip_update if exists already
 gcloud_create_or_update_instance_template() {
-  local args name mount_path image rpc api_token password host_path no_args private_key
+  local args name mount_path image rpc api_token password host_path no_args private_key announce skip_update_if_exists
   local extra_args=""
 
   name="${1}"
@@ -174,12 +172,17 @@ gcloud_create_or_update_instance_template() {
   api_token="${4:-}"
   password="${5:-}"
 
+  # if set, let the node announce with a routable address on-chain
+  announce="${6:-}"
+
   # this parameter is mostly used on by CT nodes, although hoprd nodes also
   # support it
-  private_key="${6:-}"
+  private_key="${7:-}"
 
   # if set no additional arguments are used to start the container
-  no_args="${7:-}"
+  no_args="${8:-}"
+
+  skip_update_if_exists="${9:-false}"
 
   args=""
   # the environment is optional, since each docker image has a default environment set
@@ -196,7 +199,11 @@ gcloud_create_or_update_instance_template() {
   fi
 
   if [ -n "${private_key}" ]; then
-    extra_args="${extra_args} --container-arg=--privateKey --container-arg=\"${private_key}\""
+    extra_args="${extra_args} --container-arg=\"--privateKey\" --container-arg=\"${private_key}\""
+  fi
+
+  if [ -n "${announce}" ]; then
+    extra_args="${extra_args} --container-arg=\"--announce\""
   fi
 
   mount_path="/app/db"
@@ -205,6 +212,12 @@ gcloud_create_or_update_instance_template() {
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet >/dev/null; then
     log "instance template ${name} already present"
+
+    if [ "${skip_update_if_exists}" = "true" ]; then
+      # short-circuit, stop operation
+      return
+    fi
+
     gcloud_delete_instance_template "${name}"
   fi
 
@@ -221,9 +234,10 @@ gcloud_create_or_update_instance_template() {
       --image-family=cos-stable \
       --image-project=cos-cloud \
       --container-image="${image}" \
-      --container-env=^,@^DEBUG=hopr\*,-hopr-connect\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
-      --container-restart-policy=always \
+      --container-mount-host-path=mount-path=/var/run/docker.sock,host-path=/var/run/docker.sock \
+      --container-restart-policy=on-failure \
       ${args} \
       ${extra_args}
   else
@@ -239,10 +253,10 @@ gcloud_create_or_update_instance_template() {
       --container-image="${image}" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-mount-host-path=mount-path="${mount_path}",host-path="${host_path}" \
-      --container-restart-policy=always \
+      --container-mount-host-path=mount-path=/var/run/docker.sock,host-path=/var/run/docker.sock \
+      --container-restart-policy=on-failure \
       --container-arg="--admin" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
-      --container-arg="--announce" \
       --container-arg="--healthCheck" \
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--identity" --container-arg="${mount_path}/.hopr-identity" \
@@ -291,11 +305,31 @@ gcloud_create_or_update_managed_instance_group() {
   gcloud compute instance-groups managed wait-until "${name}" \
     --stable \
     ${gcloud_region}
+
+  log "reserve all external addresses of the instance group ${name} instances"
+  for instance_uri in $(gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --uri); do
+    local instance_name=$(gcloud compute instances describe ${instance_uri} --format 'csv[no-heading](name)')
+    local instance_ip=$(gcloud compute instances describe ${instance_uri} \
+      --flatten 'networkInterfaces[].accessConfigs[]' \
+      --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)')
+
+    gcloud_reserve_static_ip_address "${instance_name}" "${instance_ip}"
+  done
 }
 
 # $1=group name
 gcloud_delete_managed_instance_group() {
   local name="${1}"
+
+  log "un-reserve all external addresses of the instance group ${name} instances"
+  for instance_uri in $(gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --uri); do
+    local instance_name=$(gcloud compute instances describe ${instance_uri} --format 'csv[no-heading](name)')
+    local isntance_ip=$(gcloud compute instances describe ${instance_uri} \
+      --flatten 'networkInterfaces[].accessConfigs[]' \
+      --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)')
+
+    gcloud_delete_static_ip_address "${instance_name}"
+  done
 
   log "deleting managed instance group ${name}"
   gcloud compute instance-groups managed delete "${name}" \
@@ -312,4 +346,33 @@ gcloud_get_managed_instance_group_instances_ips() {
     xargs -P `nproc` -I '{}' gcloud compute instances describe '{}' \
       --flatten 'networkInterfaces[].accessConfigs[]' \
       --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
+}
+
+gcloud_get_unused_static_ip_addresses() {
+  local json
+
+  json=$(gcloud compute addresses list --filter='status != IN_USE' --format=json ${gcloud_region})
+
+  echo "${json}"
+}
+
+# $1=address name
+gcloud_delete_static_ip_address() {
+  local address="${1}"
+
+  gcloud compute addresses delete "${address}" --quiet ${gcloud_region}
+}
+
+# $1=address name
+# $2=ip
+gcloud_reserve_static_ip_address() {
+  local address="${1}"
+  local ip="${2}"
+
+  if gcloud compute addresses describe "${address}" ${gcloud_region}; then
+    # already reserved, no-op
+    :
+  else
+    gcloud compute addresses create "${address}" --addresses="${ip}" ${gcloud_region}
+  fi
 }

@@ -23,9 +23,6 @@ import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './consta
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment'
 import { IndexerEvents } from './indexer/types'
-import { connectorMock } from './index.mock'
-import { useFixtures } from './indexer/index.mock'
-import { sampleChainOptions } from './ethereum.mock'
 import ChainWrapperSingleton from './chain'
 
 const log = debug('hopr-core-ethereum')
@@ -49,7 +46,7 @@ export type ChainOptions = {
   provider: string
   maxConfirmations?: number
   chainId: number
-  gasPrice?: number
+  gasPrice?: string
   network: string
   environment: string
 }
@@ -87,9 +84,15 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   private async createChain(): Promise<void> {
-    this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
-    // Emit event to make sure connector is aware the chain was created properly.
-    this.emit('connector:created')
+    try {
+      this.chain = await ChainWrapperSingleton.create(this.options, this.privateKey)
+      // Emit event to make sure connector is aware the chain was created properly.
+      this.emit('connector:created')
+    } catch (err) {
+      const errMsg = 'failed to create provider chain wrapper'
+      log(`error: ${errMsg}`, err)
+      throw Error(errMsg)
+    }
   }
 
   async start(): Promise<HoprCoreEthereum> {
@@ -100,6 +103,11 @@ export default class HoprCoreEthereum extends EventEmitter {
     const _start = async (): Promise<HoprCoreEthereum> => {
       try {
         await this.chain.waitUntilReady()
+
+        const hoprBalance = await this.chain.getBalance(this.publicKey.toAddress())
+        await this.db.setHoprBalance(hoprBalance)
+        log(`set HOPR balance to ${hoprBalance.toFormattedString()}`)
+
         await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
         // Debug log used in e2e integration tests, please don't change
@@ -159,17 +167,17 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.indexer.getRandomOpenChannel()
   }
 
-  private uncachedGetBalance = () => this.chain.getBalance(this.publicKey.toAddress())
-  private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
   /**
-   * Retrieves HOPR balance, optionally uses the cache.
+   * Retrieves HOPR balance, optionally uses the indexer.
+   * The difference from the two methods is that the latter relys on
+   * the coming events which require 8 blocks to be confirmed.
    * @returns HOPR balance
    */
-  public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return useCache ? this.cachedGetBalance() : this.uncachedGetBalance()
+  public async getBalance(useIndexer: boolean = false): Promise<Balance> {
+    return useIndexer ? this.db.getHoprBalance() : this.chain.getBalance(this.publicKey.toAddress())
   }
 
-  public getPublicKey() {
+  public getPublicKey(): PublicKey {
     return this.publicKey
   }
 
@@ -178,7 +186,6 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns ETH balance
    */
   private uncachedGetNativeBalance = () => {
-    log('Chain [inside cached hopr-ethereum]', this.chain)
     return this.chain.getNativeBalance(this.publicKey.toAddress())
   }
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
@@ -373,19 +380,20 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 }
 
+export { createConnectorMock } from './index.mock'
+export { useFixtures } from './indexer/index.mock'
+export { sampleChainOptions } from './ethereum.mock'
+
 export {
   ChannelEntry,
   ChannelCommitmentInfo,
   Indexer,
   ChainWrapperSingleton,
   ChainWrapper,
-  connectorMock,
   createChainWrapper,
   initializeCommitment,
   findCommitmentPreImage,
   bumpCommitment,
   INDEXER_BLOCK_RANGE,
-  CONFIRMATIONS,
-  useFixtures,
-  sampleChainOptions
+  CONFIRMATIONS
 }

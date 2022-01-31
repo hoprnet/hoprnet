@@ -31,18 +31,19 @@ export type SendTransactionReturn = {
 }
 
 export async function createChainWrapper(
-  networkInfo: { provider: string; chainId: number; gasPrice?: number; network: string; environment: string },
+  networkInfo: { provider: string; chainId: number; gasPrice?: string; network: string; environment: string },
   privateKey: Uint8Array,
-  checkDuplicate: Boolean = true
+  checkDuplicate: Boolean = true,
+  timeout = TX_CONFIRMATION_WAIT
 ) {
   const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
-  log('Provider obtained from options', provider)
+  log('Provider obtained from options', provider.network)
   const wallet = new Wallet(privateKey).connect(provider)
   const publicKey = PublicKey.fromPrivKey(privateKey)
   const address = publicKey.toAddress()
-  const providerChainId = await provider.getNetwork().then((res) => res.chainId)
+  const providerChainId = (await provider.getNetwork()).chainId
 
   // ensure chain id matches our expectation
   if (networkInfo.chainId !== providerChainId) {
@@ -74,6 +75,14 @@ export async function createChainWrapper(
     durations.minutes(15)
   )
 
+  let gasPrice: number | BigNumber
+  if (networkInfo.gasPrice) {
+    const [gasPriceValue, gasPriceUnit] = networkInfo.gasPrice.split(' ')
+    gasPrice = ethers.utils.parseUnits(gasPriceValue, gasPriceUnit)
+  } else {
+    gasPrice = await provider.getGasPrice()
+  }
+
   /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
    * to the response until reaching block confirmation.
@@ -90,7 +99,6 @@ export async function createChainWrapper(
     ...rest: Parameters<T['functions'][keyof T['functions']]>
   ): Promise<SendTransactionReturn> {
     const gasLimit = 400e3
-    const gasPrice = networkInfo.gasPrice ?? (await provider.getGasPrice())
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
@@ -114,7 +122,8 @@ export async function createChainWrapper(
     }
     log('essentialTxPayload %o', essentialTxPayload)
 
-    let deferredListener
+    let initiatedHash: string
+    let deferredListener: DeferType<string>
     try {
       if (checkDuplicate) {
         const [isDuplicate, hash] = transactions.existInMinedOrPendingWithHigherFee(essentialTxPayload, gasPrice)
@@ -135,7 +144,7 @@ export async function createChainWrapper(
       // 3. sign transaction
       const signedTx = await wallet.signTransaction(populatedTx)
       // compute tx hash and save to initiated tx list in tx manager
-      const initiatedHash = utils.keccak256(signedTx)
+      initiatedHash = utils.keccak256(signedTx)
       transactions.addToQueuing(initiatedHash, { nonce, gasPrice }, essentialTxPayload)
       // with let indexer to listen to the tx
       deferredListener = handleTxListener(initiatedHash)
@@ -143,8 +152,8 @@ export async function createChainWrapper(
       transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
-      deferredListener.reject()
-      transactions.remove(transaction.hash)
+      deferredListener && deferredListener.reject()
+      transactions.remove(initiatedHash)
       nonceLock.releaseLock()
       throw error
     }
@@ -155,7 +164,7 @@ export async function createChainWrapper(
 
     try {
       // wait for the tx to be mined
-      await provider.waitForTransaction(transaction.hash, 1, TX_CONFIRMATION_WAIT)
+      await provider.waitForTransaction(transaction.hash, 1, timeout)
     } catch (error) {
       log(error)
       // remove listener but not throwing error message
@@ -218,7 +227,8 @@ export async function createChainWrapper(
         const transaction = await wallet.sendTransaction({
           to: recipient,
           value: BigNumber.from(amount),
-          nonce: BigNumber.from(nonceLock.nextNonce)
+          nonce: BigNumber.from(nonceLock.nextNonce),
+          gasPrice
         })
         nonceLock.releaseLock()
         return transaction.hash

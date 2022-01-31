@@ -1,18 +1,18 @@
 # Exclude node.js stuff
-node_modules
-
-# Exclude OSX files
-**/.DS_Store
+/node_modules
 
 # Exclude built Typescript files
-lib
+/lib
 
 # Exclude built npm packages
-*.tgz
+/*.tgz
 
 # CT database
-ct.json
+/ct.json
 
 # coverage
-.nyc_output
-coverage
+/.nyc_output
+/coverage
+
+# used only in release and should not be tracked
+/default-environment.json

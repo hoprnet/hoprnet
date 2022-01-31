@@ -4,11 +4,10 @@ import { SOCKET_CLOSE_TIMEOUT, TCPConnection } from './tcp'
 import { once } from 'events'
 import { Multiaddr } from 'multiaddr'
 import { u8aEquals, defer } from '@hoprnet/hopr-utils'
-import PeerId from 'peer-id'
 import assert from 'assert'
 import type { EventEmitter } from 'events'
 
-import { waitUntilListening, stopNode } from './utils.spec'
+import { waitUntilListening, stopNode, createPeerId } from './utils.spec'
 
 describe('test TCP connection', function () {
   it('should test TCPConnection against Node.js APIs', async function () {
@@ -17,7 +16,7 @@ describe('test TCP connection', function () {
     const testMessage = new TextEncoder().encode('test')
     const testMessageReply = new TextEncoder().encode('reply')
 
-    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const peerId = createPeerId()
 
     const server = createServer((socket: Socket) => {
       socket.on('data', (data: Uint8Array) => {
@@ -77,7 +76,7 @@ describe('test TCP connection', function () {
 
     await waitUntilListening(server, undefined)
 
-    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const peerId = createPeerId()
     const conn = await TCPConnection.create(
       new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
       peerId
@@ -115,7 +114,7 @@ describe('test TCP connection', function () {
 
   it('tcp socket timeout and error cases', async function () {
     const INVALID_PORT = 54221
-    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const peerId = createPeerId()
 
     await assert.rejects(
       async () => {

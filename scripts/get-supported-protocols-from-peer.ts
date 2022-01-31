@@ -93,7 +93,7 @@ async function main() {
   })
 
   // As used by other HOPR nodes
-  upgrader.cryptos.set(NOISE.protocol, NOISE)
+  upgrader.cryptos.set(NOISE.protocol, NOISE as any)
   upgrader.muxers.set(MPLEX.multicodec, MPLEX)
 
   // Use minimal configuration for hopr-connect

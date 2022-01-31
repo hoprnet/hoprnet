@@ -54,6 +54,7 @@ const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
 const ENVIRONMENT_KEY = encoder.encode('environment_id')
+const HOPR_BALANCE_KEY = encoder.encode('hopr-balance')
 
 enum PendingAcknowledgementPrefix {
   Relayer = 0,
@@ -105,6 +106,10 @@ export class HoprDB {
       }
     }
     this.db = levelup(leveldown(dbPath))
+
+    // Fully initialize database
+    await this.db.open()
+
     log('namespacing db by pubkey: ', this.id.toAddress().toHex())
     if (setEnvironment) {
       if (!environmentId) {
@@ -112,6 +117,14 @@ export class HoprDB {
       }
       log(`setting environment id ${environmentId} to db`)
       await this.setEnvironmentId(environmentId)
+    } else {
+      const hasEnvironmentKey = await this.verifyEnvironmentId(environmentId)
+
+      if (!hasEnvironmentKey) {
+        const storedId = await this.getEnvironmentId()
+
+        throw new Error(`invalid db environment id: ${storedId} (expected: ${environmentId})`)
+      }
     }
   }
 
@@ -555,13 +568,32 @@ export class HoprDB {
   }
 
   public async getEnvironmentId(): Promise<string> {
-    return decoder.decode(await this.get(ENVIRONMENT_KEY))
+    return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
   }
 
-  public async verifyEnvironmentId(expectedId: string): Promise<void> {
+  public async verifyEnvironmentId(expectedId: string): Promise<boolean> {
     const storedId = await this.getEnvironmentId()
-    if (storedId !== expectedId) {
-      throw new Error(`invalid db environment id: ${storedId} (expected: ${expectedId})`)
+
+    if (storedId == undefined) {
+      return false
     }
+
+    return storedId === expectedId
+  }
+
+  public async getHoprBalance(): Promise<Balance> {
+    return this.getCoercedOrDefault(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO())
+  }
+
+  public async setHoprBalance(value: Balance): Promise<void> {
+    return this.put(HOPR_BALANCE_KEY, value.serialize())
+  }
+
+  public async addHoprBalance(value: Balance): Promise<void> {
+    return this.addBalance(HOPR_BALANCE_KEY, value)
+  }
+
+  public async subHoprBalance(value: Balance): Promise<void> {
+    return this.subBalance(HOPR_BALANCE_KEY, value)
   }
 }

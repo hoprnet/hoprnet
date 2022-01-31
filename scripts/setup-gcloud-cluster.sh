@@ -24,12 +24,15 @@ usage() {
   msg "an initial setup script against these nodes. Once testing has"
   msg "completed the script can be used to cleanup the cluster as well."
   msg
-  msg "Usage: $0 <environment> [<init_script> [<cluster_id> [<docker_image>]]]"
+  msg "Usage: $0 <environment> [<init_script> [<cluster_id> [<docker_image> [<cluster_size> [<instance_template_name> [<announce_on_chain>]]]]]"
   msg
   msg "where <environment>\t\tthe environment from which the smart contract addresses are derived"
   msg "      <init_script>\t\tpath to a script which is called with all node API endpoints as parameters"
   msg "      <cluster_id>\t\tuses a random value as default"
   msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:<environment>' as default"
+  msg "      <cluster_size>\t\tnumber of nodes in the deployed cluster, default is 6."
+  msg "      <instance_template_name>\t\tname of the gcloud instance template to use, default is <cluster_id>"
+  msg "      <announce_on_chain>\t\tset to 'true' so started nodes should not announce themselves, default is ''"
   msg
   msg "Required environment variables"
   msg "------------------------------"
@@ -56,11 +59,17 @@ declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
 declare cluster_id="${3:-${environment}-topology-${RANDOM}-${RANDOM}}"
 declare docker_image=${4:-gcr.io/hoprassociation/hoprd:${environment}}
+declare cluster_size=${5:-6}
+declare instance_template_name=${6:-${cluster_id}}
+declare announce_on_chain=${7:-}
 
-declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}%${RANDOM}%${RANDOM}Token}"
+declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
 declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
+
+# Append environment as Docker image version, if not specified
+[[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${environment}"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -71,7 +80,7 @@ function cleanup {
   if [ ${EXIT_CODE} -ne 0 ] || [ "${perform_cleanup}" = "true" ] || [ "${perform_cleanup}" = "1" ]; then
     # Cleaning up everything upon failure
     gcloud_delete_managed_instance_group "${cluster_id}"
-    gcloud_delete_instance_template "${cluster_id}"
+    gcloud_delete_instance_template "${instance_template_name}"
   fi
 
   exit $EXIT_CODE
@@ -89,6 +98,8 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
   log "Pre-Start Info"
   log "\tdocker_image: ${docker_image}"
   log "\tcluster_id: ${cluster_id}"
+  log "\tinstance_template_name: ${instance_template_name}"
+  log "\tannounce_on_chain: ${announce_on_chain}"
   log "\tinit_script: ${init_script}"
   log "\tenvironment: ${environment}"
   log "\tapi_token: ${api_token}"
@@ -99,18 +110,20 @@ fi
 # }}}
 
 # create test specific instance template
-gcloud_create_or_update_instance_template \
-  "${cluster_id}" \
+# announce on-chain with routable address
+gcloud_create_instance_template_if_not_exists \
+  "${instance_template_name}" \
   "${docker_image}" \
   "${environment}" \
   "${api_token}" \
-  "${password}"
+  "${password}" \
+  "${announce_on_chain}"
 
 # start nodes
 gcloud_create_or_update_managed_instance_group  \
   "${cluster_id}" \
-  6 \
-  "${cluster_id}"
+  ${cluster_size} \
+  "${instance_template_name}"
 
 # get IPs of newly started VMs which run hoprd
 declare node_ips
@@ -121,13 +134,16 @@ declare node_ips_arr=( ${node_ips} )
 declare eth_address
 for ip in ${node_ips}; do
   wait_until_node_is_ready "${ip}"
-  eth_address=$(get_native_address "${ip}:3001")
+  eth_address=$(get_native_address "${api_token}@${ip}:3001")
   fund_if_empty "${eth_address}" "${environment}"
 done
 
-for ip in ${node_ips}; do
-  wait_for_port "9091" "${ip}"
-done
+# We cannot poll for NAT nodes, because they do not expose 9091 to the outside world
+if [[ "${docker_image}" != *-nat:* ]]; then
+  for ip in ${node_ips}; do
+    wait_for_port "9091" "${ip}"
+  done
+fi
 # }}}
 
 # --- Call init script--- {{{

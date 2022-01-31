@@ -1,2 +1,3 @@
 # ignore generated folders
-_*/
+build/
+.docusaurus/
