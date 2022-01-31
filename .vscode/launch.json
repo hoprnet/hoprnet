@@ -79,7 +79,21 @@
       "program": "${workspaceFolder}/node_modules/.bin/mocha",
       "args": ["--reporter=tap", "--full-trace", "--exit"],
       "cwd": "${workspaceFolder}/packages/hoprd",
-      "outFiles": ["${workspaceFolder}/**/*.js"]
+      "outFiles": ["${workspaceFolder}/packages/hoprd/lib/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Test HOPRd (instance)",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/node_modules/.bin/mocha",
+      "args": ["--reporter=tap", "--full-trace", "--exit", "--grep=HOPRd"],
+      "env": {
+        "DEBUG": "hopr*"
+      },
+      "cwd": "${workspaceFolder}/packages/hoprd",
+      "console": "integratedTerminal",
+      "outFiles": ["${workspaceFolder}/packages/hoprd/**/*.{ts,js}"]
     },
     {
       "type": "node",

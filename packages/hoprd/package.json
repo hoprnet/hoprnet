@@ -5,8 +5,8 @@
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
-  "main": "lib/index.js",
-  "bin": "lib/index.js",
+  "main": "lib/main.js",
+  "bin": "lib/main.js",
   "files": [
     "lib",
     "hopr-admin/.next/**",
