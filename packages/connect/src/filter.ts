@@ -11,7 +11,8 @@ import {
   isLinkLocaleAddress,
   u8aAddrToString,
   getPrivateAddresses,
-  isLocalhost
+  isLocalhost,
+  u8aAddressToCIDR
 } from '@hoprnet/hopr-utils'
 import { parseAddress } from './utils'
 
@@ -212,7 +213,7 @@ export class Filter {
           `Prevented dialing private address ${u8aAddrToString(address.address, address.type)}:${
             address.port
           } because not in our network(s): ${this.myPrivateNetworks
-            .map((network) => `${u8aAddrToString(network.networkPrefix, network.family)}`)
+            .map((network) => `${u8aAddressToCIDR(network.networkPrefix, network.subnet, network.family)}`)
             .join(', ')}`
         )
         return false
