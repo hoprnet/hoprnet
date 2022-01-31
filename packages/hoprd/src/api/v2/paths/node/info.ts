@@ -2,6 +2,9 @@ import Hopr from '@hoprnet/hopr-core'
 import { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../'
 
+/**
+ * @returns Information about the HOPR Node, including any options it started with.
+ */
 export const getInfo = async ({ node }: { node: Hopr }) => {
   try {
     const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs } = node.smartContractInfo()

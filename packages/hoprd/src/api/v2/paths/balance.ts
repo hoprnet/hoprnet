@@ -2,6 +2,9 @@ import type Hopr from '@hoprnet/hopr-core'
 import { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../'
 
+/**
+ * @returns Current HOPR and native balance.
+ */
 export const getBalances = async (node: Hopr) => {
   const [nativeBalance, hoprBalance] = await Promise.all([await node.getNativeBalance(), await node.getBalance()])
 

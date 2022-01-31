@@ -24,13 +24,4 @@ describe('getInfo', () => {
       channelClosurePeriod: 1
     })
   })
-  // it('should throw when node call fails', async () => {
-  //   node.getInfo = sinon.fake.throws(STATUS_CODES.UNKNOWN_FAILURE)
-  //   assert.throws(
-  //     () => getInfo({ node }),
-  //     (err: Error) => {
-  //       return err.message.includes(STATUS_CODES.UNKNOWN_FAILURE)
-  //     }
-  //   )
-  // })
 })

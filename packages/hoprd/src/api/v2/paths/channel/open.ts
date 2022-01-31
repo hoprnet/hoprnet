@@ -4,6 +4,10 @@ import BN from 'bn.js'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../'
 
+/**
+ * Opens channel between two parties.
+ * @returns The PeerId associated with the alias.
+ */
 export const openChannel = async (node: Hopr, counterpartyStr: string, amountStr: string) => {
   let counterparty: PeerId
   try {

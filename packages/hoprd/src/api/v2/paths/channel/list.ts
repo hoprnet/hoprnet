@@ -19,6 +19,9 @@ const channelStatusToString = (status: ChannelStatus): string => {
   return 'Unknown'
 }
 
+/**
+ * @returns List of incoming and outgoing channels associated with the node.
+ */
 export const listChannels = async (node: Hopr, includingClosed: boolean) => {
   const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
   const selfAddress = selfPubKey.toAddress()

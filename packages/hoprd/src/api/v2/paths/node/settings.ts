@@ -9,6 +9,10 @@ export interface Setting {
   value: any
 }
 
+/**
+ * Reads node setting/s from HOPRd state.
+ * @returns Setting value or all settings values.
+ */
 export const getSetting = ({
   node,
   state,
@@ -42,6 +46,11 @@ export const getSetting = ({
   return getSettingByName(settingName)
 }
 
+/**
+ * Sets node setting/s in HOPRd state.
+ * Updates HOPRd's state.
+ * @returns Setting value or all settings values.
+ */
 export const setSetting = ({
   node,
   settingName,

@@ -1,8 +1,6 @@
 import { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../'
 
-export const parameters = []
-
 export const GET: Operation = [
   (req, res, _next) => {
     try {

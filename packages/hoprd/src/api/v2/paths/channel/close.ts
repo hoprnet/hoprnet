@@ -3,6 +3,10 @@ import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../'
 
+/**
+ * Closes a channel with provided peerId.
+ * @returns Channel status and receipt.
+ */
 export const closeChannel = async (node: Hopr, peerIdStr: string) => {
   let peerId: PeerId
   try {

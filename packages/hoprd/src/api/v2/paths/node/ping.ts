@@ -3,6 +3,10 @@ import { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../'
 
+/**
+ * Pings another node to check its availability.
+ * @returns Latency if ping was successfull.
+ */
 export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => {
   let validPeerId: PeerId
   try {
@@ -55,14 +59,14 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Pings another node to check its availability',
+  description: 'Pings another node to check its availability.',
   tags: ['node'],
   operationId: 'ping',
   parameters: [
     {
       name: 'peerId',
       in: 'query',
-      description: 'PeerId that we want to ping',
+      description: 'PeerId that we want to ping.',
       required: true,
       schema: {
         type: 'string',
@@ -72,7 +76,7 @@ GET.apiDoc = {
   ],
   responses: {
     '200': {
-      description: 'Ping successful',
+      description: 'Ping successful.',
       content: {
         'application/json': {
           schema: {
@@ -88,7 +92,7 @@ GET.apiDoc = {
       }
     },
     '400': {
-      description: 'Invalid peerId',
+      description: 'Invalid peerId.',
       content: {
         'application/json': {
           schema: {
@@ -99,7 +103,7 @@ GET.apiDoc = {
       }
     },
     '500': {
-      description: 'Timout',
+      description: 'Timout.',
       content: {
         'application/json': {
           schema: {

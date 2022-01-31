@@ -2,6 +2,9 @@ import type { Operation } from 'express-openapi'
 import type Hopr from '@hoprnet/hopr-core'
 import { STATUS_CODES } from '../../'
 
+/**
+ * @returns Native and hopr addresses of the account associated with the node.
+ */
 export const getAddresses = (
   node: Hopr
 ): {

@@ -4,6 +4,10 @@ import { Address } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../'
 
+/**
+ * Withdraws specified amount of specified currency from the node.
+ * @returns Transaction hash if transaction got successfully submited.
+ */
 export const withdraw = async (node: Hopr, rawCurrency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => {
   const currency = rawCurrency.toUpperCase() as 'NATIVE' | 'HOPR'
   if (!['NATIVE', 'HOPR'].includes(currency)) {
