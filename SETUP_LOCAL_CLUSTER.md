@@ -25,17 +25,16 @@ cd hoprnet-master
 ```
 
 2. **Install the dependencies of the project and build it**: Make sure you have `nodejs@16` (we suggest installing it via [nvm](https://github.com/nvm-sh/nvm), ie `nvm install lts/gallium`), and `yarn` (included in `nodejs@16` by running `corepack enable`).
-   to install the required packages and project modules. Soon afterward, build the project to use it in the next step.
+   to install and build the required packages and project modules. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
 ```
-yarn
-yarn build
+yarn && yarn build
 ```
 
 3. **Run the one-line setup script**: Proceed to run the following script. If you are planning to run [MyneChat](http://app.myne.chat/)
    alongside, then make sure to pass the `-m` flag with your MyneChat instance URL. Please wait while this script creates
    the local blockchain network and deploys the project contracts. In average, the process can take between 2-6 minutes,
-   depending on your computer capacity.
+   depending on your computer capacity. **Important**, make sure to have both `curl` and `jq` installed in your computer before running the script, as both are used.
 
 ```
 ./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
