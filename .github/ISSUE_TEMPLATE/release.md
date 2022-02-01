@@ -3,7 +3,7 @@ name: Release Template
 about: Create an issue to track scope and progress of a release
 title: 'Release: [RELEASE NAME]'
 labels: 'release'
-assignees: 'HOPR Tech Representatives'
+assignees: 'hoprnet/hopr-tech-representatives'
 ---
 
 # Timing
