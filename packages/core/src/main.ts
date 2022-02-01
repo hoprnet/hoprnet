@@ -59,7 +59,8 @@ export async function createLibp2pInstance(
             initialNodes,
             publicNodes,
             environment: options.environment.id,
-            allowLocalConnections: options.allowLocalConnections
+            allowLocalConnections: options.allowLocalConnections,
+            allowPrivateConnections: options.allowPrivateConnections
           },
           testing: {
             // Treat local and private addresses as public addresses
