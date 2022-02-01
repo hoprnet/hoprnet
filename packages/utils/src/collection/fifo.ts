@@ -29,6 +29,30 @@ export function FIFO<T>() {
     return result
   }
 
+  function peek(): T | undefined {
+    return head?.data
+  }
+
+  function replace(find: (item: T) => boolean, modify: (oldItem: T) => T): boolean {
+    let current: Entry<T> | undefined = head
+
+    let found = false
+    while (current != undefined) {
+      if (find(current.data)) {
+        current.data = modify(current.data)
+        found = true
+      }
+
+      if (found) {
+        break
+      } else {
+        current = current.next
+      }
+    }
+
+    return found
+  }
+
   function push(data: T): number {
     if (length == 0) {
       head = {
@@ -47,5 +71,18 @@ export function FIFO<T>() {
     return ++length
   }
 
-  return { push, shift, size }
+  function toArray() {
+    const result: T[] = []
+
+    let current = head
+
+    while (current != undefined) {
+      result.push(current.data)
+      current = current.next
+    }
+
+    return result
+  }
+
+  return { peek, push, replace, shift, size, toArray }
 }
