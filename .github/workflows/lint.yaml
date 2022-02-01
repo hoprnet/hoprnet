@@ -33,4 +33,4 @@ jobs:
       - name: Commit and push changes
         run: ./scripts/commit-and-push-all-changes.sh
         env:
-          HOPR_GIT_MSG: "chore(build): apply linter changes"
+          HOPR_GIT_MSG: 'chore(build): apply linter changes'

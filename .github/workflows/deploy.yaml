@@ -69,7 +69,7 @@ jobs:
           yarn lint:fix
           ./scripts/commit-and-push-all-changes.sh
         env:
-          HOPR_GIT_MSG: "chore(release): update smart contract deployments"
+          HOPR_GIT_MSG: 'chore(release): update smart contract deployments'
 
       - name: '[NPM] Publish prerelease version (On pushes to master and debug-deploy/*)'
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') }}
@@ -278,7 +278,7 @@ jobs:
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
         env:
-          HOPR_GIT_MSG: "chore(release): publish Avado ${{ steps.set-version.outputs.vsn }}"
+          HOPR_GIT_MSG: 'chore(release): publish Avado ${{ steps.set-version.outputs.vsn }}'
           HOPR_GITHUB_REF: ${{ github.ref }}
         run: ./scripts/commit-and-push-all-changes.sh
 
