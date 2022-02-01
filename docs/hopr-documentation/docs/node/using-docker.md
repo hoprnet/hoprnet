@@ -51,7 +51,7 @@ The `wildhorn-v2` tag represents the latest community release version.
 You can pull the Docker image like so:
 
 ```bash
-docker pull gcr.io/hoprassociation/hoprd:athens
+docker pull gcr.io/hoprassociation/hoprd:wildhorn-v2
 ```
 
 Then start a container:
