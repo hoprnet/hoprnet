@@ -46,7 +46,7 @@ Depending of your distribution, please follow the official guidelines for how to
 
 All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd).
 Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
-The `wildhorn-v2` tag represents the latest community release version.
+The `athens` tag represents the latest community release version.
 
 You can pull the Docker image like so:
 
