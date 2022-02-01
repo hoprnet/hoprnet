@@ -55,7 +55,7 @@ MacOS M1 users will need to follow an extra set of instructions from [NVM](https
 ```bash
 $ mkdir athens
 $ cd athens
-$ npm install @hoprnet/hoprd@1.86.6
+$ npm install @hoprnet/hoprd@1.86.17
 ```
 
 ## Running HOPRd
