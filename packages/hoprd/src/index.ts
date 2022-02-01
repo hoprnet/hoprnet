@@ -154,6 +154,11 @@ const argv = yargs(process.argv.slice(2))
     describe: 'Allow connections to other nodes running on localhost.',
     default: false
   })
+  .option('allowPrivateNodeConnections', {
+    boolean: true,
+    describe: 'Allow connections to other nodes running on private addresses.',
+    default: false
+  })
   .option('testAnnounceLocalAddresses', {
     boolean: true,
     describe: 'For testing local testnets. Announce local addresses.',
