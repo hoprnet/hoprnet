@@ -68,7 +68,7 @@
       "live": false,
       "gas_price": "1 gwei",
       "gas_multiplier": 1.1,
-      "default_provider": "ws://127.0.0.1:8545/",
+      "default_provider": "http://127.0.0.1:8545/",
       "native_token_name": "ETH",
       "hopr_token_name": "wxHOPR"
     },
