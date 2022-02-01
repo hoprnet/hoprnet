@@ -25,8 +25,8 @@ describe('test addr filtering', function () {
   let filter_no_local: TestFilter
 
   beforeEach(function () {
-    filter = new TestFilter(firstPeer, { allowLocalConnections: true })
-    filter_no_local = new TestFilter(firstPeer, { allowLocalConnections: false })
+    filter = new TestFilter(firstPeer, { allowLocalConnections: true, allowPrivateConnections: true })
+    filter_no_local = new TestFilter(firstPeer, { allowLocalConnections: false, allowPrivateConnections: false })
   })
 
   it('should accept valid circuit addresses', function () {
@@ -92,7 +92,7 @@ describe('test addr filtering', function () {
     )
   })
 
-  it('refuse localhost connections', function () {
+  it('refuse localhost and private connections', function () {
     filter.setAddrs(
       [new Multiaddr(`/ip4/1.1.1.1/tcp/123/p2p/${firstPeer.toB58String()}`)],
       [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${firstPeer.toB58String()}`)]
@@ -114,6 +114,16 @@ describe('test addr filtering', function () {
     assert(
       filter.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/456/p2p/${secondPeer.toB58String()}`)) == true,
       'Allow dialing localhost'
+    )
+
+    assert(
+      filter_no_local.filter(new Multiaddr(`/ip4/172.17.0.1/tcp/456/p2p/${secondPeer.toB58String()}`)) == false,
+      'Refuse dialing private address'
+    )
+
+    assert(
+      filter.filter(new Multiaddr(`/ip4/172.17.0.1/tcp/456/p2p/${secondPeer.toB58String()}`)) == true,
+      'Allow dialing private address'
     )
   })
 
