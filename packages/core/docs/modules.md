@@ -25,7 +25,6 @@
 
 - [ACKNOWLEDGEMENT\_TIMEOUT](modules.md#acknowledgement_timeout)
 - [CHECK\_TIMEOUT](modules.md#check_timeout)
-- [DEFAULT\_ENVIRONMENT](modules.md#default_environment)
 - [DEFAULT\_STUN\_PORT](modules.md#default_stun_port)
 - [FULL\_VERSION](modules.md#full_version)
 - [HEARTBEAT\_INTERVAL](modules.md#heartbeat_interval)
@@ -173,16 +172,6 @@ ___
 #### Defined in
 
 [packages/core/src/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L28)
-
-___
-
-### DEFAULT\_ENVIRONMENT
-
-• **DEFAULT\_ENVIRONMENT**: ``"hardhat-localhost"``
-
-#### Defined in
-
-[packages/core/src/environment.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L61)
 
 ___
 

@@ -4,20 +4,22 @@
 
 ## Table of contents
 
-### Functions
+### Type aliases
 
-- [main](modules.md#main)
+- [DefaultEnvironment](modules.md#defaultenvironment)
 
-## Functions
+## Type aliases
 
-### main
+### DefaultEnvironment
 
-▸ **main**(): `Promise`<`Hopr`\>
+Ƭ **DefaultEnvironment**: `Object`
 
-#### Returns
+#### Type declaration
 
-`Promise`<`Hopr`\>
+| Name | Type |
+| :------ | :------ |
+| `id?` | `string` |
 
 #### Defined in
 
-[index.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L34)
+[index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L26)
