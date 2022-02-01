@@ -338,7 +338,7 @@ result=$(run_command "${api5}" "close ${addr1}" "Initiated channel closure" 600)
 log "-- ${result}"
 
 # close channels
-echo "Waiting 1 minure for cool-off period"
+echo "Waiting 1 minute for cool-off period"
 sleep 60
 
 log "Node 1 close channel to Node 2"
