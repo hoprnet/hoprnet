@@ -283,7 +283,7 @@ class Indexer extends EventEmitter {
       this.latestBlock = blockNumber
     }
 
-    let lastSnapshot
+    let lastSnapshot: Snapshot
     try {
       lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
@@ -538,12 +538,20 @@ class Indexer extends EventEmitter {
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    return (await this.db.getAccounts((account: AccountEntry) => account.containsRouting())).map(
-      (account: AccountEntry) => ({
-        id: account.getPublicKey().toPeerId(),
+    const accounts = await this.db.getAccounts((account: AccountEntry) => account.containsRouting())
+
+    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = Array.from({ length: accounts.length })
+
+    log(`Known public nodes:`)
+    for (const [index, account] of accounts.entries()) {
+      result[index] = {
+        id: account.getPeerId(),
         multiaddrs: [account.multiAddr]
-      })
-    )
+      }
+      log(`\t${account.getPeerId().toB58String()} ${account.multiAddr.toString()}`)
+    }
+
+    return result
   }
 
   /**

@@ -61,7 +61,7 @@ export async function createChainWrapper(
     wallet
   ) as HoprChannels
 
-  const genesisBlock = (await provider.getTransaction(hoprChannelsDeployment.transactionHash)).blockNumber
+  const genesisBlock = parseInt(hoprChannelsDeployment.blockNumber)
   const channelClosureSecs = await channels.secsClosure()
 
   const transactions = new TransactionManager()
