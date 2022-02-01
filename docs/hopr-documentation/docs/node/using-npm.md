@@ -53,9 +53,9 @@ MacOS M1 users will need to follow an extra set of instructions from [NVM](https
 ## Installing HOPRd using NPM
 
 ```bash
-$ mkdir athens
-$ cd athens
-$ npm install @hoprnet/hoprd@1.86
+$ mkdir hopr-wildhorn-v2
+$ cd hopr-wildhorn-v2
+$ npm install @hoprnet/hoprd@wildhorn-v2
 ```
 
 ## Running HOPRd
@@ -63,7 +63,7 @@ $ npm install @hoprnet/hoprd@1.86
 ### run hoprd
 
 ```bash
-DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-athens --data ./hoprd-db-athens --password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --rest --restHost "0.0.0.0" --restPort 3001 --apiToken='<YOUR_SECRET_TOKEN>'
+DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --apiToken='<YOUR_SECRET_TOKEN>'
 ```
 
 :::danger Important
