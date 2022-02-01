@@ -528,7 +528,7 @@ peer's open channels
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:571](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L571)
+[packages/core-ethereum/src/indexer/index.ts:579](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L579)
 
 ___
 
@@ -581,7 +581,7 @@ an open channel
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:554](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L554)
+[packages/core-ethereum/src/indexer/index.ts:562](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L562)
 
 ___
 
@@ -1288,7 +1288,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:577](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L577)
+[packages/core-ethereum/src/indexer/index.ts:585](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L585)
 
 ___
 
