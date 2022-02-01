@@ -19,7 +19,8 @@ import {
   DeferType,
   retryWithBackoff,
   Ticket,
-  Balance
+  Balance,
+  ordered
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
@@ -96,9 +97,25 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
-    this.unsubscribeBlock = this.chain.subscribeBlock(async (block: number) => {
-      await this.onNewBlock(block) // exceptions are handled
+    const orderedBlocks = ordered<number>()
+
+    ;(async function (this: Indexer) {
+      for await (const block of orderedBlocks.iterator()) {
+        await this.onNewBlock(block.value) // exceptions are handled
+      }
+    }.call(this))
+
+    const unsubscribeBlock = this.chain.subscribeBlock(async (block: number) => {
+      orderedBlocks.push({
+        index: block,
+        value: block
+      })
     })
+
+    this.unsubscribeBlock = () => {
+      unsubscribeBlock()
+      orderedBlocks.end()
+    }
 
     this.unsubscribeErrors = this.chain.subscribeError(async (error: any) => {
       await this.onProviderError(error) // exceptions are handled
