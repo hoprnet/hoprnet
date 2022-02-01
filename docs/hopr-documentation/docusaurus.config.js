@@ -12,7 +12,7 @@ if (DOCS_ALGOLIA_APP_ID && DOCS_ALGOLIA_API_KEY) {
   extraThemeConfig.algolia = {
     appId: DOCS_ALGOLIA_APP_ID,
     apiKey: DOCS_ALGOLIA_API_KEY,
-    indexName: 'docs_hoprnet_org',
+    indexName: 'docs-hoprnet',
     contextualSearch: true
   }
 }
