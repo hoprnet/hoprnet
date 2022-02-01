@@ -1,13 +1,11 @@
 import assert from 'assert'
 import sinon from 'sinon'
-import PeerId from 'peer-id'
 import { listChannels } from './list'
 import { ChannelEntry } from '@hoprnet/hopr-utils'
-
-const SELF = PeerId.createFromB58String('16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12')
+import { testPeerIdInstance } from '../../fixtures'
 
 let node = sinon.fake() as any
-node.getId = sinon.fake.returns(SELF)
+node.getId = sinon.fake.returns(testPeerIdInstance)
 
 describe('listChannels', function () {
   const testChannel = ChannelEntry.createMock()

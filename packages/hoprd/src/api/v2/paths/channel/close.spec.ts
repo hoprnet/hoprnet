@@ -2,9 +2,7 @@ import assert from 'assert'
 import sinon from 'sinon'
 import { closeChannel } from './close'
 import { STATUS_CODES } from '../../'
-
-const peerId = '16Uiu2HAmRFjDov6sbcZeppbnNFFTdx5hFoBzr8csBgevtKUex8y9'
-const invalidPeerId = 'definetly not a valid peerId'
+import { invalidTestPeerId, testPeerId } from '../../fixtures'
 
 let node = sinon.fake() as any
 
@@ -13,7 +11,7 @@ describe('closeChannel', () => {
     const expectedStatus = { channelStatus: 2, receipt: 'receipt' }
     node.closeChannel = sinon.fake.returns({ status: expectedStatus.channelStatus, receipt: expectedStatus.receipt })
 
-    const closureStatus = await closeChannel(node, peerId)
+    const closureStatus = await closeChannel(node, testPeerId)
     assert.deepEqual(closureStatus, expectedStatus)
   })
 
@@ -23,7 +21,7 @@ describe('closeChannel', () => {
 
     assert.rejects(
       () => {
-        return closeChannel(node, invalidPeerId)
+        return closeChannel(node, invalidTestPeerId)
       },
       (err: Error) => {
         return err.message.includes(STATUS_CODES.INVALID_PEERID)
@@ -36,7 +34,7 @@ describe('closeChannel', () => {
 
     assert.rejects(
       () => {
-        return closeChannel(node, peerId)
+        return closeChannel(node, testPeerId)
       },
       // we only care if it throws
       (_err: Error) => {

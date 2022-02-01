@@ -2,23 +2,21 @@ import sinon from 'sinon'
 import assert from 'assert'
 import { ping } from './ping'
 import { STATUS_CODES } from '../../'
-
-const peerId = '16Uiu2HAmRFjDov6sbcZeppbnNFFTdx5hFoBzr8csBgevtKUex8y9'
-const invalidPeerId = 'definetly not a valid peerId'
+import { invalidTestPeerId, testPeerId } from '../../fixtures'
 
 let node = sinon.fake() as any
 
 describe('ping', () => {
   it('should ping successfuly', async () => {
     node.ping = sinon.fake.returns({ latency: 10 })
-    const res = await ping({ node, peerId })
+    const res = await ping({ node, peerId: testPeerId })
     assert.equal(res.latency, 10)
   })
 
   it('should return error on invalid peerId', async () => {
     node.ping = sinon.fake.returns({ latency: 10 })
     assert.rejects(
-      () => ping({ node, peerId: invalidPeerId }),
+      () => ping({ node, peerId: invalidTestPeerId }),
       (err: Error) => {
         return err.message.includes(STATUS_CODES.INVALID_PEERID)
       }
@@ -28,7 +26,7 @@ describe('ping', () => {
   it('should return propper error on ping fail', async () => {
     node.ping = sinon.fake.throws('')
     assert.rejects(
-      () => ping({ node, peerId }),
+      () => ping({ node, peerId: testPeerId }),
       () => {
         return true
       }
