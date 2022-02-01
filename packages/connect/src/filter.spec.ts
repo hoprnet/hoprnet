@@ -106,6 +106,32 @@ describe('test addr filtering', function () {
     assert(filter.addrsSet)
     assert(filter_no_local.addrsSet)
 
+    filter._setLocalAddressesForTesting([
+      toNetworkPrefix({
+        address: '10.0.0.1',
+        netmask: '255.0.0.0',
+        family: 'IPv4'
+      } as any),
+      toNetworkPrefix({
+        address: '192.168.1.0',
+        netmask: '255.255.255.0',
+        family: 'IPv4'
+      } as any)
+    ])
+
+    filter_no_local._setLocalAddressesForTesting([
+      toNetworkPrefix({
+        address: '10.0.0.1',
+        netmask: '255.0.0.0',
+        family: 'IPv4'
+      } as any),
+      toNetworkPrefix({
+        address: '192.168.1.0',
+        netmask: '255.255.255.0',
+        family: 'IPv4'
+      } as any)
+    ])
+
     assert(
       filter_no_local.filter(new Multiaddr(`/ip4/127.0.0.1/tcp/456/p2p/${secondPeer.toB58String()}`)) == false,
       'Refuse dialing localhost'
@@ -117,12 +143,12 @@ describe('test addr filtering', function () {
     )
 
     assert(
-      filter_no_local.filter(new Multiaddr(`/ip4/172.17.0.1/tcp/456/p2p/${secondPeer.toB58String()}`)) == false,
+      filter_no_local.filter(new Multiaddr(`/ip4/10.0.0.1/tcp/456/p2p/${secondPeer.toB58String()}`)) == false,
       'Refuse dialing private address'
     )
 
     assert(
-      filter.filter(new Multiaddr(`/ip4/172.17.0.1/tcp/456/p2p/${secondPeer.toB58String()}`)) == true,
+      filter.filter(new Multiaddr(`/ip4/10.0.0.1/tcp/456/p2p/${secondPeer.toB58String()}`)) == true,
       'Allow dialing private address'
     )
   })
