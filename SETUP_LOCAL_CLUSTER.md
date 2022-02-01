@@ -13,7 +13,8 @@ ecosystem toolset is running a local HOPR network, either in your workstation or
 
 # Tooling
 
-As of time of writing, the best way to setup a local HOPR network is by following these steps[^3]:
+As of time of writing, the best way to setup a local HOPR network is by following these steps[^3]. Please bear in mind that these steps
+had been tested only on `macOS` and `Linux` devices, for Windows please use our cloud setup instead.
 
 1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet)[^4]
    and unzip it in your local folder (roughly `~30 Mbs` at the time of writing). For the next tasks, we will assume you are within that folder.
@@ -34,7 +35,9 @@ yarn && yarn build
 3. **Run the one-line setup script**: Proceed to run the following script. If you are planning to run [MyneChat](http://app.myne.chat/)
    alongside, then make sure to pass the `-m` flag with your MyneChat instance URL. Please wait while this script creates
    the local blockchain network and deploys the project contracts. In average, the process can take between 2-6 minutes,
-   depending on your computer capacity. **Important**, make sure to have both `curl` and `jq` installed in your computer before running the script, as both are used.
+   depending on your computer capacity. **Important**, make sure to have both `curl` and `jq` installed in your computer
+   before running the script, as both are used. Please be aware you also need a version of `bash` of `5.x` or superior,
+   which in most macOS devices require an upgrade, the easiest being via `brew bash`.
 
 ```
 ./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
