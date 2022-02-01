@@ -15,7 +15,7 @@ ecosystem toolset is running a local HOPR network, either in your workstation or
 
 As of time of writing, the best way to setup a local HOPR network is by following these steps[^3]:
 
-1. **Download the latest version of the repository**: Download a local version of our [GitHub repository](https://github.com/hoprnet/hoprnet)[^4]
+1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet)[^4]
    and unzip it in your local folder. For the next tasks, we will assume you are within that folder.
 
 ```
