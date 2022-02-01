@@ -32,8 +32,8 @@ Do you agree to our Privacy Policy? [y/n]:y
 Terrific!
 Warning! Running this script repeatedly will cause you to have a new node address each time.
 Would you like to run this script? [y/n]:y
-What release are you installing? Example: athens (The latest community release version you will find on the docs page)
-athens
+What release are you installing? Example: wildhorn-v2 (The latest community release version you will find on the docs page)
+wildhorn-v2
 ```
 
 You might need to restart your terminal for your computer to be able to find `hoprd` after the script completes installation.
@@ -47,7 +47,7 @@ $ sudo apt install -y curl
 $ curl https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setup-hoprd.sh --output setup-hoprd.sh
 $ chmod +x setup-hoprd.sh
 $ ./setup-hoprd.sh
-$ cd athens
+$ cd wildhorn-v2
 ```
 
 ### macOS
@@ -65,7 +65,7 @@ $ brew install curl
 $ curl https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setup-hoprd-macos.sh --output setup-hoprd.sh
 $ chmod +x setup-hoprd.sh
 $ ./setup-hoprd.sh
-$ cd athens
+$ cd wildhorn-v2
 ```
 
 ### One-liner
@@ -83,7 +83,7 @@ bash -c "$(curl -s https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setu
 ### run hoprd
 
 ```bash
-DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-athens --data ./hoprd-db-athens --password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --rest --restHost "0.0.0.0" --restPort 3001 --apiToken='<YOUR_SECRET_TOKEN>'
+DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --apiToken='<YOUR_SECRET_TOKEN>'
 ```
 
 :::danger Important
