@@ -9,6 +9,7 @@ import PeerId from 'peer-id'
 import { Address } from '@hoprnet/hopr-utils'
 
 import type { Application, Request } from 'express'
+import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import type { LogStream } from './../logs'
 import type { StateOps } from '../types'
@@ -16,7 +17,7 @@ import type { StateOps } from '../types'
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
-export default function setupApiV2(
+export function setupRestApi(
   service: Application,
   urlPath: string,
   node: Hopr,
@@ -114,6 +115,50 @@ export default function setupApiV2(
   service.use(urlPath, ((err, _req, res, _next) => {
     res.status(err.status).json(err)
   }) as express.ErrorRequestHandler)
+}
+
+export function setupWsApi(server: WebSocketServer, logs: LogStream, options: { apiToken?: string }) {
+  server.on('connection', (socket, req) => {
+    if (!authenticateConnection(logs, req, options.apiToken)) {
+      socket.send(
+        JSON.stringify({
+          type: 'auth-failed',
+          msg: 'authentication failed',
+          ts: new Date().toISOString()
+        })
+      )
+      socket.close()
+      return
+    }
+  })
+}
+
+const authenticateConnection = (
+  logs: LogStream,
+  req: { url?: string; headers: Record<any, any> },
+  apiToken?: string
+): boolean => {
+  if (!apiToken) {
+    logs.log('ws client connected [ authentication DISABLED ]')
+    return true
+  }
+
+  if (req.url) {
+    try {
+      // NB: We use a placeholder domain since req.url only passes query params
+      const url = new URL(`https://hoprnet.org${req.url}`)
+      const apiToken = url.searchParams?.get('apiToken') || ''
+      if (decodeURI(apiToken) == apiToken) {
+        logs.log('ws client connected [ authentication ENABLED ]')
+        return true
+      }
+    } catch (e) {
+      logs.error('invalid URL queried', e)
+    }
+  }
+
+  logs.log('ws client failed authentication')
+  return false
 }
 
 // In order to pass custom objects along with each request we build a context
