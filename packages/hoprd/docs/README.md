@@ -29,7 +29,7 @@ Options:
   --network                     Which network to run the HOPR node on  [choices: "ETHEREUM"] [default: "ETHEREUM"]
   --host                        The network host to run the HOPR node on.  [default: "0.0.0.0:9091"]
   --announce                    Announce public IP to the network  [boolean] [default: false]
-  --admin                       Run an admin interface on localhost:3000, requires --apiToken and --ws  [boolean] [default: false]
+  --admin                       Run an admin interface on localhost:3000, requires --apiToken  [boolean] [default: false]
   --adminHost                   Host to listen to for admin console  [default: "localhost"]
   --adminPort                   Port to listen to for admin console  [default: 3000]
   --rest                        Run a rest interface on localhost:3001, requires --apiToken  [boolean] [default: false]

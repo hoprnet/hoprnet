@@ -57,7 +57,7 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('admin', {
     boolean: true,
-    describe: 'Run an admin interface on localhost:3000, requires --apiToken and --ws',
+    describe: 'Run an admin interface on localhost:3000, requires --apiToken',
     default: false
   })
   .option('rest', {
