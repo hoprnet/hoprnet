@@ -12,6 +12,7 @@ assignees: ''
 <!--
   Provide a clear and concise description of what this epic achieves.
 -->
+
 ### Description
 
 Tasks required to be completed for moving to a new chain.
@@ -19,6 +20,7 @@ Tasks required to be completed for moving to a new chain.
 <!--
   Provide a list of issues, it's okay if the issues are not yet turned into github issues but they are just text.
 -->
+
 ### Relevant issues
 
 - [ ] Ensure that the `gasPrice` set in hopr is high enough to resist the volatility of `gasPrice` of the chain.
@@ -30,6 +32,7 @@ Tasks required to be completed for moving to a new chain.
 <!--
   How can a team member know this epic was completed.
 -->
+
 ### Definition of DONE
 
 All tasks are completed and tested under a [HOPR team testing](../../.processes/release.md#testing-phases) session.
