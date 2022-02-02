@@ -16,7 +16,7 @@ describe('getInfo', () => {
     node.getListeningAddresses = sinon.fake.returns([3, 4])
     const info = await getInfo({ node })
     assert.deepEqual(info, {
-      amouncedAddress: ['1', '2'],
+      announcedAddress: ['1', '2'],
       listeningAddress: ['3', '4'],
       network: 'a',
       hoprToken: 'b',

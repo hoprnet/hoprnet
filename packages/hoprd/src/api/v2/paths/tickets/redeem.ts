@@ -15,7 +15,8 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Redeems your tickets.',
+  description:
+    'Redeems all tickets from all the channels and exchanges them for Hopr tokens. Every ticket have a chance to be winning one, rewarding you with Hopr tokens.',
   tags: ['Tickets'],
   operationId: 'channelRedeemTickets',
   responses: {

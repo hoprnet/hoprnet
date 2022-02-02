@@ -66,7 +66,8 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Lists your channels.',
+  description:
+    'Lists all active channels between this node and other nodes on the Hopr network. By default response will contain all incomming and outgoing channels that are either open, waiting to be opened, or waiting to be closed. If you also want to receive past channels that were closed, you can pass `includingClosed` in the request url query.',
   tags: ['Channels'],
   operationId: 'channelList',
   parameters: [
@@ -92,8 +93,18 @@ GET.apiDoc = {
               channels: {
                 type: 'object',
                 properties: {
-                  incoming: { type: 'array', items: { $ref: '#/components/schemas/Channel' } },
-                  outgoing: { type: 'array', items: { $ref: '#/components/schemas/Channel' } }
+                  incoming: {
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/Channel' },
+                    description:
+                      'Incomming channels are the ones that were opened by a different node and this node acts as relay.'
+                  },
+                  outgoing: {
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/Channel' },
+                    description:
+                      'Outgoing channels are the ones that were opened by this node and is using other node as relay.'
+                  }
                 }
               }
             }
@@ -180,7 +191,8 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Opens a payment channel between you and the counter party provided.',
+  description:
+    'Opens a payment channel between this node and the counter party provided. This channel can be used to send messages between two nodes using other nodes on the network to relay the messages. Each message will deduce its cost from the funded amount to pay other nodes for relaying your messages. Opening a channel can take a little bit of time, because it requires some block confirmations on the blockchain.',
   tags: ['Channels'],
   operationId: 'openChannel',
   requestBody: {
@@ -213,7 +225,8 @@ POST.apiDoc = {
             properties: {
               channelId: {
                 type: 'string',
-                example: '0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5'
+                example: '0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5',
+                description: 'Channel ID that can be used in other calls, not to confuse with transaction hash.'
               }
             }
           }
@@ -221,7 +234,7 @@ POST.apiDoc = {
       }
     },
     '304': {
-      description: 'Channel already open.',
+      description: 'Channel already open. Cannot open more than one channel between two nodes.',
       content: {
         'application/json': {
           schema: {
@@ -243,7 +256,7 @@ POST.apiDoc = {
       }
     },
     '403': {
-      description: 'Insufficient balance to open channel.',
+      description: 'Insufficient balance to open channel. Amount passed in request body exeeds current balance.',
       content: {
         'application/json': {
           schema: {

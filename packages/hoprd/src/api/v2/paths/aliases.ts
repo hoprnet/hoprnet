@@ -43,7 +43,7 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Get All aliases and thier corresponding PeerId.',
+  description: 'Get all aliases you set previously and thier corresponding peer IDs.',
   tags: ['Aliases'],
   operationId: 'getAliases',
   responses: {
@@ -98,7 +98,8 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Alias an address with a more memorable name',
+  description:
+    'Instead of using HOPR address, we can assign HOPR address to a specific name called alias. Give an address a more memorable alias and use it instead of Hopr address. Aliases are kept locally and are not saved or shared on the network.',
   tags: ['Aliases'],
   operationId: 'setAlias',
   requestBody: {
@@ -123,7 +124,7 @@ POST.apiDoc = {
       description: 'Alias set succesfully'
     },
     '400': {
-      description: 'Invalid peerId',
+      description: 'Invalid peerId. The format or length of the peerId is incorrect.',
       content: {
         'application/json': {
           schema: {

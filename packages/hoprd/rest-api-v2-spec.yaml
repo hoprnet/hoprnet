@@ -30,10 +30,10 @@ components:
       properties:
         nativeAddress:
           type: string
-          description: Blockchain-native account address.
+          description: Blockchain-native account address. Can be funded from external wallets (starts with **0x...**). It **can't be used** internally to send / receive messages, open / close payment channels.
         hoprAddress:
           type: string
-          description: HOPR account address, also called PeerId.
+          description: HOPR account address, also called PeerId. Can be funded only from the other node, it can't be fund'ed from the external wallets (starts with **0x...**). You can send / receive messages, open / close payment channels.
       required:
         - nativeAddress
         - hoprAddress
@@ -86,11 +86,11 @@ components:
         native:
           type: string
           example: '1998149726987048088'
-          description: Amount of ETH in the smallest unit.
+          description: Amount of ETH in the smallest unit. Used only for gas fees on the blockchain the current release is running on. For example, when you will open or close the payment channel, it will use gas fees to execute this action.
         hopr:
           type: string
           example: '19999999999999999998'
-          description: Amount of HOPR token in the smallest unit.
+          description: Amount of HOPR token in the smallest unit. Used for opening payment channels.
     WithdrawRequest:
       type: object
       properties:
@@ -121,43 +121,55 @@ components:
     Info:
       type: object
       properties:
-        amouncedAddress:
+        announcedAddress:
           type: array
           items:
             type: string
+            description: Public IP address that the node announced on network when it was launched. Node anouncing means notifying all the other nodes on the network about its presence and readiness to be connected to via websocket.
         listeningAddress:
           type: array
           items:
             type: string
+            description: Other nodes IP address that this node is listening to for websocket events.
         network:
           type: string
           example: 'hardhat'
+          description: Name of the Hopr network this node connects to.
         hoprToken:
           type: string
           example: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+          description: Contract address of the Hopr token on the ethereum network.
         hoprChannels:
           type: string
           example: '0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63'
+          description: Contract address of the HoprChannels smart contract on ethereum network. This smart contract is used to open payment channels between nodes on blockchain.
         channelClosurePeriod:
           type: number
           example: 1
+          description: Time (in minutes) that this node needs in order to clean up before closing the channel. When requesting to close the channel each node needs some time to make sure that channel can be closed securely and cleanly. After this channelClosurePeriod passes the second request for closing channel will close the channel.
     Channel:
       type: object
       properties:
         type:
           type: string
+          example: incoming
+          description: Channel can be either incomming or outgoing. Incomming means that other node can send messages using this node as relay. Outgoing means that this node can use other node to send message as realy.
         channelId:
           type: string
-          example: incoming
+          example: 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7
+          description: Channel ID that can be used in other calls, not to confuse with transaction hash.
         peerId:
           type: string
           example: '0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5'
+          description: PeerId of the other node in the channel.
         status:
           type: string
           example: Open
+          description: 'Status of the channel can be: WaitingForCommitment, Open, PendingToClose, or Closed.'
         balance:
           type: string
           example: '1'
+          description: Amount of Hopr tokens left in the channel that can be used to pay for sending messages.
 
   securitySchemes:
     keyScheme:

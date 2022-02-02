@@ -17,7 +17,8 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Redeems your tickets for this channel.',
+  description:
+    'Redeems your tickets for this channel. Redeeming will change your tickets into Hopr tokens if they are winning ones. You can check how much tickets given channel has by calling /channels/{peerid}/tickets endpoint. Do this before channel is closed as neglected tickets are no longer valid for redeeming.',
   tags: ['Channels'],
   operationId: 'channelRedeemTickets',
   responses: {

@@ -1,7 +1,7 @@
 import sinon from 'sinon'
 import assert from 'assert'
 import { STATUS_CODES, _createTestMocks } from '../../'
-import { getSetting, setSetting, Setting } from './settings'
+import { getSetting, setSetting, Setting } from './{setting}'
 
 let node = sinon.fake() as any
 node.getChannelStrategy = sinon.fake.returns('passive')

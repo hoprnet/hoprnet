@@ -10,7 +10,7 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
     const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs } = node.smartContractInfo()
 
     return {
-      amouncedAddress: (await node.getAnnouncedAddresses()).map((ma) => ma.toString()),
+      announcedAddress: (await node.getAnnouncedAddresses()).map((ma) => ma.toString()),
       listeningAddress: node.getListeningAddresses().map((ma) => ma.toString()),
       network: network,
       hoprToken: hoprTokenAddress,
@@ -36,12 +36,13 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Information about the HOPR Node, including any options it started with.',
+  description:
+    'Information about the HOPR Node, including any options it started with. See the schema of the response to get more information on each field',
   tags: ['Node'],
   operationId: 'getInfo',
   responses: {
     '200': {
-      description: 'Info fetched successfuly.',
+      description: 'Node information fetched successfuly.',
       content: {
         'application/json': {
           schema: {

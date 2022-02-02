@@ -42,7 +42,7 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Get the PeerId (Hopr address) that had this alias assigned to it.',
+  description: 'Get the PeerId (Hopr address) that have this alias assigned to it.',
   tags: ['Aliases'],
   operationId: 'getAlias',
   parameters: [

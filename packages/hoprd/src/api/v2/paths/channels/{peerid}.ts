@@ -47,7 +47,8 @@ export const DELETE: Operation = [
 ]
 
 DELETE.apiDoc = {
-  description: 'Close a channel.',
+  description: `Close a opened channel between this node and other node. Once you’ve initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.
+  Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.`,
   tags: ['Channels'],
   operationId: 'postChannelClose',
   parameters: [
@@ -129,7 +130,7 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Returns channel by peerId.',
+  description: 'Returns information about the channel between this node and provided peerId.',
   tags: ['Channels'],
   operationId: 'channelList',
   parameters: [

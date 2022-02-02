@@ -115,8 +115,8 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Get setting value.',
-  tags: ['Node'],
+  description: `Get this node's specified setting value.`,
+  tags: ['Settings'],
   operationId: 'getSetting',
   parameters: [
     {
@@ -131,7 +131,7 @@ GET.apiDoc = {
   ],
   responses: {
     '200': {
-      description: 'Alias/es fetched succesfully.',
+      description: 'Setting fetched succesfully.',
       content: {
         'application/json': {
           schema: {
@@ -150,7 +150,7 @@ GET.apiDoc = {
       }
     },
     '400': {
-      description: 'Invalid input.',
+      description: 'Invalid input. Setting with that name does not exist.',
       content: {
         'application/json': {
           schema: {
@@ -200,8 +200,8 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Change setting value',
-  tags: ['Node'],
+  description: `Change this node's setting value.`,
+  tags: ['Settings'],
   operationId: 'setSetting',
   requestBody: {
     content: {
@@ -217,7 +217,7 @@ POST.apiDoc = {
       description: 'Setting set succesfully'
     },
     '400': {
-      description: 'Invalid input',
+      description: `Invalid input. Either setting with that name doesn't exist or the value is incorrect.`,
       content: {
         'application/json': {
           schema: {

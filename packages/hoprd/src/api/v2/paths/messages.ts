@@ -25,7 +25,8 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Send a message to another peer using a given path.',
+  description:
+    'Send a message to another peer using a given path (list of node addresses that should relay our message through network).',
   tags: ['Messages'],
   operationId: 'messagesSend',
   requestBody: {

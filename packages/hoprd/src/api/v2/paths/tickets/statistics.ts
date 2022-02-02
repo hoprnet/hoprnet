@@ -8,14 +8,14 @@ export const getTicketsStatistics = async (node: Hopr) => {
   return {
     pending: stats.pending,
     unredeemed: stats.unredeemed,
-    unredeemedValue: stats.unredeemedValue.toFormattedString(),
+    unredeemedValue: stats.unredeemedValue.toBN().toString(),
     redeemed: stats.redeemed,
-    redeemedValue: stats.redeemedValue.toFormattedString(),
+    redeemedValue: stats.redeemedValue.toBN().toString(),
     losingTickets: stats.losing,
     winProportion: stats.winProportion,
     neglected: stats.neglected,
     rejected: stats.rejected,
-    rejectedValue: stats.rejectedValue.toFormattedString()
+    rejectedValue: stats.rejectedValue.toBN().toString()
   }
 }
 
@@ -33,27 +33,50 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Get statistics regarding your tickets.',
+  description:
+    'Get statistics regarding all your tickets. Node gets a ticket everytime it relays data packet in channel.',
   tags: ['Tickets'],
   operationId: 'getTickets',
   responses: {
     '200': {
-      description: 'Tickets statistics fetched successfully.',
+      description:
+        'Tickets statistics fetched successfully. Check schema for description of every field in the statistics.',
       content: {
         'application/json': {
           schema: {
             type: 'object',
             properties: {
-              pending: { type: 'number' },
-              unredeemed: { type: 'number' },
-              unredeemedValue: { type: 'string', example: '0 txHOPR' },
-              redeemed: { type: 'number' },
-              redeemedValue: { type: 'string', example: '0 txHOPR' },
-              losingTickets: { type: 'number' },
-              winProportion: { type: 'number' },
-              neglected: { type: 'number' },
-              rejected: { type: 'number' },
-              rejectedValue: { type: 'string', example: '0 txHOPR' }
+              pending: {
+                type: 'number',
+                description: `Number of tickets that other node in the channel earned and didn't redeem yet.`
+              },
+              unredeemed: {
+                type: 'number',
+                description: 'Number of tickets that wait to be redeemed as for Hopr tokens.'
+              },
+              unredeemedValue: { type: 'string', description: 'Total value of all unredeemed tickets in Hopr tokens.' },
+              redeemed: { type: 'number', description: 'Number of tickets already redeemed on this node.' },
+              redeemedValue: { type: 'string', description: 'Total value of all redeemed tickets in Hopr tokens.' },
+              losingTickets: {
+                type: 'number',
+                description: `Number of tickets that didn't win any Hopr tokens. To better understand how tickets work read about probabilistic payments (https://docs.hoprnet.org/core/probabilistic-payments)`
+              },
+              winProportion: {
+                type: 'number',
+                description:
+                  'Proportion of number of winning tickets vs loosing tickets, 1 means 100% of tickets won and 0 means that all tickets were losing ones.'
+              },
+              neglected: {
+                type: 'number',
+                description:
+                  'Number of tickets that were not redeemed in time before channel was closed. Those cannot be redeemed anymore.'
+              },
+              rejected: {
+                type: 'number',
+                description:
+                  'Number of tickets that were rejected by the network by not passing validation. In other words tickets that look suspicious and are not eligible for redeeming.'
+              },
+              rejectedValue: { type: 'string', description: 'Total value of rejected tickets in Hopr tokens' }
             }
           }
         }

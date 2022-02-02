@@ -66,7 +66,7 @@ GET.apiDoc = {
     {
       name: 'peerId',
       in: 'query',
-      description: 'PeerId that we want to ping.',
+      description: 'PeerId associated to the other node that we want to ping.',
       required: true,
       schema: {
         type: 'string',
@@ -84,7 +84,8 @@ GET.apiDoc = {
             properties: {
               latency: {
                 type: 'number',
-                example: 10
+                example: 10,
+                description: 'Number of miliseconds it took to get the response from the pinged node.'
               }
             }
           }
@@ -103,7 +104,7 @@ GET.apiDoc = {
       }
     },
     '422': {
-      description: 'Timout.',
+      description: `Timout, node with specified PeerId didn't respond in time.`,
       content: {
         'application/json': {
           schema: {

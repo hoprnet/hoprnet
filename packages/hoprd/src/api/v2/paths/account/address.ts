@@ -38,7 +38,8 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Get the native and hopr addresses of the account associated with the node.',
+  description:
+    'Get the native and hopr addresses of the account associated with the node. Hopr address is also called PeerId and can be used by other node owner to open payment channel with this node.',
   tags: ['Account'],
   operationId: 'accountGetAddress',
   responses: {
