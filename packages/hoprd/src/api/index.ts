@@ -21,10 +21,14 @@ export default function setupAPI(
     ws: boolean
     wsPort: number
     wsHost: string
+    admin: boolean
+    adminPort: number
+    adminHost: string
     apiToken?: string
   },
-  adminServer?: AdminServer // required by hopr-admin, legacy V1 behaviour
+  adminServer?: AdminServer // api V1: required by hopr-admin
 ) {
+  // creates server for rest API v1 and rest API v2
   if (options.rest) {
     const service = express()
 
@@ -45,9 +49,9 @@ export default function setupAPI(
       })
   }
 
+  // creates WS server for API v1 and API v2
   if (options.ws) {
-    const useAdminServer = !!adminServer?.server
-    const server = useAdminServer ? adminServer.server : http.createServer()
+    const server = http.createServer()
     const wsV1 = new ws.Server({ noServer: true, path: '/' })
     const wsV2 = new ws.Server({ noServer: true, path: '/api/v2/messages/websocket' })
 
@@ -70,20 +74,30 @@ export default function setupAPI(
       }
     })
 
-    if (useAdminServer) {
-      logs.log(`WS API server on ${options.wsHost} listening on port ${options.wsPort}`)
-    } else {
-      server
-        .listen(options.wsPort, options.wsHost, () => {
-          logs.log(`WS API server on ${options.wsHost} listening on port ${options.wsPort}`)
-        })
-        .on('error', (err: any) => {
-          logs.log(`Failed to start WS API server: ${err}`)
+    server
+      .listen(options.wsPort, options.wsHost, () => {
+        logs.log(`WS API server on ${options.wsHost} listening on port ${options.wsPort}`)
+      })
+      .on('error', (err: any) => {
+        logs.log(`Failed to start WS API server: ${err}`)
 
-          // bail out, fail hard because we cannot proceed with the overall
-          // startup
-          throw err
-        })
-    }
+        // bail out, fail hard because we cannot proceed with the overall
+        // startup
+        throw err
+      })
+  }
+
+  // deprecated: creates WS server for hopr-admin
+  if (options.admin && adminServer?.server) {
+    const wsV1 = new ws.Server({ noServer: true, path: '/' })
+    apiV1.setupWsApi(wsV1, logs, options, adminServer)
+
+    adminServer.server.on('upgrade', (request, socket, head) => {
+      wsV1.handleUpgrade(request, socket, head, function done(ws) {
+        wsV1.emit('connection', ws, request)
+      })
+    })
+
+    logs.log(`deprecated WS admin API server on ${options.adminHost} listening on port ${options.adminPort}`)
   }
 }

@@ -312,18 +312,9 @@ async function main() {
     logs.startLoggingQueue()
   }
 
-  // Deprecated: enable `--ws` when `--admin` is used.
-  const useAdminServerForWs = argv.admin && !argv.ws
-  if (useAdminServerForWs) {
-    logs.warn("WS API enabled by --admin using admin's host and port")
-    argv.ws = true
-    argv.wsHost = argv.adminHost
-    argv.wsPort = argv.adminPort
-  }
-
-  if (!argv.testNoAuthentication && (argv.rest || argv.ws)) {
+  if (!argv.testNoAuthentication && (argv.rest || argv.ws || argv.admin)) {
     if (argv.apiToken == null) {
-      throw Error(`Must provide --apiToken when --rest or --ws is specified`)
+      throw Error(`Must provide --apiToken when --rest, --ws or --admin is specified`)
     }
     const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
     for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
@@ -376,21 +367,16 @@ async function main() {
     node.on('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
-      if (argv.rest || argv.ws) {
+      if (argv.rest || argv.ws || argv.admin) {
         setupAPI(
           node,
           logs,
           { getState, setState },
           {
-            rest: argv.rest,
-            restPort: argv.restPort,
-            restHost: argv.restHost,
-            ws: argv.ws,
-            wsPort: argv.wsPort,
-            wsHost: argv.wsHost,
+            ...argv,
             apiToken
           },
-          useAdminServerForWs ? adminServer : undefined // legacy requirement
+          adminServer // api V1: required by hopr-admin
         )
       }
 
