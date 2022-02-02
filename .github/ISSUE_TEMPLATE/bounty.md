@@ -23,6 +23,7 @@ assignees: ''
 
 Find out more about HOPR at the following links:
 
-- [hoprnet](https://hoprnet.org)
+- [HOPR Website](https://hoprnet.org)
 - [hoprnet monorepo](https://github.com/hoprnet/hoprnet)
 - [hoprnet docs](http://docs.hoprnet.org)
+- [discord](https://discord.com/invite/dEAWC4G)
