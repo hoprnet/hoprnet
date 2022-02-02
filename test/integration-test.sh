@@ -99,7 +99,7 @@ send_message(){
 # $3 = OPTIONAL: positive assertion message
 # $4 = OPTIONAL: maximum wait time in seconds during which we busy try
 # afterwards we fail, defaults to 0
-# $4 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds 
+# $4 = OPTIONAL: step time between retries in seconds, defaults to 25 seconds
 # (8 blocks with 1-3 s/block in ganache)
 # $5 = OPTIONAL: end time for busy wait in nanoseconds since epoch, has higher
 # priority than wait time, defaults to 0
@@ -299,42 +299,59 @@ for i in `seq 1 10`; do
   send_message "${api1}" "${addr5}" "hello, world" "" 600
 done
 
-# redeem tickets
-log "Node 2 should redeem all tickets"
-result=$(run_command "${api2}" "redeemTickets" "Redeemed all tickets" 600)
-log "--${result}"
+# redeem tickets in parallel
+redeem_tickets() {
+  local node_id="${1}"
+  local node_api="${2}"
 
-log "Node 3 should redeem all tickets"
-result=$(run_command "${api3}" "redeemTickets" "Redeemed all tickets" 600)
-log "--${result}"
+  log "Node ${node_id} ticket information (before redemption)"
+  result=$(run_command "${node_api}" "tickets" "" 600)
+  log "--${result}"
 
-log "Node 4 should redeem all tickets"
-result=$(run_command "${api4}" "redeemTickets" "Redeemed all tickets" 600)
-log "--${result}"
+  log "Node ${node_id} should redeem all tickets"
+  result=$(run_command "${node_api}" "redeemTickets" "Redeemed all tickets" 600 600)
+  log "--${result}"
 
-log "Node 5 should redeem all tickets"
-result=$(run_command "${api5}" "redeemTickets" "Redeemed all tickets" 600)
-log "--${result}"
+  log "Node ${node_id} ticket information (after redemption)"
+  result=$(run_command "${node_api}" "tickets" "" 600)
+  log "--${result}"
+
+  log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
+  result=$(run_command "${node_api}" "redeemTickets" "Redeemed all tickets" 600 600)
+  log "--${result}"
+
+  log "Node ${node_id} ticket information (after second redemption)"
+  result=$(run_command "${node_api}" "tickets" "" 600)
+  log "--${result}"
+}
+
+redeem_tickets "2" "${api2}" &
+redeem_tickets "3" "${api2}" &
+redeem_tickets "4" "${api2}" &
+redeem_tickets "5" "${api2}" &
+
+log "Waiting for nodes to finish ticket redemption (long running)"
+wait
 
 # initiate channel closures
 log "Node 1 close channel to Node 2"
-result=$(run_command "${api1}" "close ${addr2}" "Initiated channel closure" 600)
+result=$(run_command "${api1}" "close ${addr2}" "Closing channel..." 600)
 log "-- ${result}"
 
 log "Node 2 close channel to Node 3"
-result=$(run_command "${api2}" "close ${addr3}" "Initiated channel closure" 600)
+result=$(run_command "${api2}" "close ${addr3}" "Closing channel..." 600)
 log "-- ${result}"
 
 log "Node 3 close channel to Node 4"
-result=$(run_command "${api3}" "close ${addr4}" "Initiated channel closure" 600)
+result=$(run_command "${api3}" "close ${addr4}" "Closing channel..." 600)
 log "-- ${result}"
 
 log "Node 4 close channel to Node 5"
-result=$(run_command "${api4}" "close ${addr5}" "Initiated channel closure" 600)
+result=$(run_command "${api4}" "close ${addr5}" "Closing channel..." 600)
 log "-- ${result}"
 
 log "Node 5 close channel to Node 1"
-result=$(run_command "${api5}" "close ${addr1}" "Initiated channel closure" 600)
+result=$(run_command "${api5}" "close ${addr1}" "Closing channel..." 600)
 log "-- ${result}"
 
 # close channels

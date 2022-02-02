@@ -155,7 +155,9 @@ export class Ticket {
   }
 
   verify(pubKey: PublicKey): boolean {
-    return pubKey.eq(this.recoverSigner())
+    const signer = this.recoverSigner()
+    console.log(`ticket verify pubkey ${pubKey} against signer ${signer}, ${this}`)
+    return pubKey.eq(signer)
   }
 
   getLuck(preImage: Hash, challengeResponse: Response): UINT256 {

@@ -136,7 +136,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     this.indexer.stop()
   }
 
-  async announce(multiaddr: Multiaddr): Promise<string> {
+  announce(multiaddr: Multiaddr): Promise<string> {
     return this.chain.announce(multiaddr, (tx: string) => this.setTxHandler('announce', tx))
   }
 
@@ -231,16 +231,25 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public async redeemAllTickets(): Promise<void> {
     if (this.redeemingAll) {
+      log('skipping redeemAllTickets because another operation is still in progress')
       return this.redeemingAll
     }
-    const _redeemAll = async () => {
-      for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
-        await this.redeemTicketsInChannel(ce)
-      }
-      this.redeemingAll = undefined
-    }
-    this.redeemingAll = _redeemAll()
+    this.redeemingAll = this.redeemAllTicketsInternalLoop()
     return this.redeemingAll
+  }
+
+  private async redeemAllTicketsInternalLoop(): Promise<void> {
+      try {
+      for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
+          await this.redeemTicketsInChannel(ce)
+        }
+      }
+        catch (err) {
+          log(`error during redeeming all tickets`, err)
+        }
+
+        // whenever we finish this loop we clear the reference
+      this.redeemingAll = undefined
   }
 
   public async redeemTicketsInChannel(channel: ChannelEntry) {
@@ -252,22 +261,25 @@ export default class HoprCoreEthereum extends EventEmitter {
     // sequentially.
     const tickets = await this.db.getAcknowledgedTickets({ channel })
     log(`redeeming ${tickets.length} tickets from ${channel.source.toB58String()}`)
-    try {
-      for (const ticket of tickets) {
-        log('redeeming ticket', ticket)
-        const result = await this.redeemTicket(channel.source, ticket)
-        if (result.status !== 'SUCCESS') {
-          log('Error redeeming ticket', result)
-          // We need to abort as tickets require ordered redemption.
-          return
-        }
-        log('ticket was redeemed')
-      }
-    } catch (e) {
-      // We are going to swallow the error here, as more than one consumer may
-      // be inspecting this same promise.
-      log('Error when redeeming tickets, aborting', e)
+    const indices: string[] = []
+    for (const ticket of tickets) {
+      indices.push(ticket.ticket.index.toHex())
     }
+    log('tickets to be redeemed with indices', indices)
+
+    for (const ticket of tickets) {
+      log(`redeeming ticket in channel from ${channel.source} to ${channel.destination}`, ticket, ticket.ticket.toString())
+      const result = await this.redeemTicket(channel.source, ticket)
+
+      if (result.status !== 'SUCCESS') {
+        log('Error redeeming ticket', result)
+        // We need to abort as tickets require ordered redemption.
+        if (result.status === 'ERROR') throw result.error
+        return
+      }
+      log('ticket was redeemed')
+    }
+
     log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
   }
 

@@ -353,17 +353,16 @@ class Hopr extends EventEmitter {
    * - it will emit that the node is out of funds
    * @param error error thrown by an ethereum transaction
    */
-  private isOutOfFunds(error: any): void {
+  private maybeEmitFundsEmptyEvent(error: any): void {
     const isOutOfFunds = isErrorOutOfFunds(error)
     if (!isOutOfFunds) return
 
     const address = this.getEthereumAddress().toHex()
+    log('unfunded node', address)
 
     if (isOutOfFunds === 'NATIVE') {
-      log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
     } else if (isOutOfFunds === 'HOPR') {
-      log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
     }
   }
@@ -784,14 +783,17 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      log(`announcing ${announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'} routing`)
-
-      await this.connector.announce(addrToAnnounce)
-      log(`announced address ${addrToAnnounce}`)
+      log(
+        `announcing address ${addrToAnnounce} ${
+          announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
+        } routing`
+      )
+      const announceTxHash = await this.connector.announce(addrToAnnounce)
+      log(`announcing address ${addrToAnnounce} done in tx ${announceTxHash}`)
     } catch (err) {
-      log('announce failed')
-      this.isOutOfFunds(err)
-      throw new Error(`Failed to announce: ${err}`)
+      log(`announcing address ${addrToAnnounce} failed`)
+      this.maybeEmitFundsEmptyEvent(err)
+      throw new Error(`Failed to announce address ${addrToAnnounce}: ${err}`)
     }
   }
 
@@ -860,7 +862,7 @@ class Hopr extends EventEmitter {
     try {
       return this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
     } catch (err) {
-      await this.isOutOfFunds(err)
+      this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to openChannel: ${err}`)
     }
   }
@@ -891,7 +893,7 @@ class Hopr extends EventEmitter {
     try {
       await this.connector.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
     } catch (err) {
-      await this.isOutOfFunds(err)
+      this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to fundChannel: ${err}`)
     }
   }
@@ -928,7 +930,7 @@ class Hopr extends EventEmitter {
       }
     } catch (err) {
       log('failed to close channel', err)
-      await this.isOutOfFunds(err)
+      this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to closeChannel: ${err}`)
     }
 
@@ -1018,7 +1020,7 @@ class Hopr extends EventEmitter {
     try {
       result = await this.connector.withdraw(currency, recipient, amount)
     } catch (err) {
-      await this.isOutOfFunds(err)
+      this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to withdraw: ${err}`)
     }
 
