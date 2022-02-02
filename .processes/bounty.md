@@ -75,6 +75,10 @@ Depending on the prize's currency, there might be fluctuations in the price rela
 - Price decrease: Bounty creator may choose to tip the bounty hunter with the difference, but not necessary.
 - Price increase: Bounty creator is not allowed to change the prize, bounty hunter should receive set amount.
 
+## Awarding the prize
+
+Before the bounty is awarded, one of the [tech representatives](./development#tech-representantives) has to approve the PR which was created to resolve the bounty.
+
 ## The Bounty Program
 
 The bounty program is a new initiative at HOPR created to kick-start and build a strong tech community.
