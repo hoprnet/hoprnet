@@ -317,7 +317,7 @@ redeem_tickets() {
   log "--${result}"
 
   log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
-  result=$(run_command "${node_api}" "redeemTickets" "Redeemed all tickets" 600 600)
+  result=$(run_command "${node_api}" "redeemTickets" "" 60 60)
   log "--${result}"
 
   log "Node ${node_id} ticket information (after second redemption)"
