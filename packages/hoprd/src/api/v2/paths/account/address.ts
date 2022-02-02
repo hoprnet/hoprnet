@@ -32,18 +32,18 @@ export const GET: Operation = [
         hoprAddress: addresses.hopr
       })
     } catch (error) {
-      res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
   }
 ]
 
 GET.apiDoc = {
   description: 'Get the native and hopr addresses of the account associated with the node.',
-  tags: ['account'],
+  tags: ['Account'],
   operationId: 'accountGetAddress',
   responses: {
     '200': {
-      description: 'Returns the native and hopr addresses of the account associated with the node.',
+      description: 'Addresses fetched successfully.',
       content: {
         'application/json': {
           schema: {
@@ -52,7 +52,7 @@ GET.apiDoc = {
         }
       }
     },
-    '500': {
+    '422': {
       description: 'Unknown failure.',
       content: {
         'application/json': {

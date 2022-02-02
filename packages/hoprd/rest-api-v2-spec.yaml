@@ -12,9 +12,6 @@ info:
   license:
     name: GPL-3.0
     url: 'https://github.com/hoprnet/hoprnet/blob/master/LICENSE'
-tags:
-  - name: nodeinfo
-    description: Information about the specific node instance.
 
 # paths are defined at compile-time by the OpenAPI middleware
 paths: {}
@@ -48,7 +45,7 @@ components:
       properties:
         peerId:
           type: string
-          description: A PeerId.
+          description: A PeerId which is a name for HOPR account address.
       required:
         - peerId
       example:
@@ -89,15 +86,17 @@ components:
         native:
           type: string
           example: '1998149726987048088'
+          description: Amount of ETH in the smallest unit.
         hopr:
           type: string
           example: '19999999999999999998'
+          description: Amount of HOPR token in the smallest unit.
     WithdrawRequest:
       type: object
       properties:
         currency:
           type: string
-          description: ETH | HOPR currency to withdraw.
+          description: NATIVE | HOPR currency to withdraw.
         amount:
           type: string
           description: Amount to withdraw in the currency's smallest unit.

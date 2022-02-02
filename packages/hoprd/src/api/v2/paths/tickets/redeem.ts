@@ -1,31 +1,26 @@
 import { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../'
 
-export const GET: Operation = [
-  (req, res, _next) => {
+export const POST: Operation = [
+  async (req, res, _next) => {
+    const { node } = req.context
+
     try {
-      const version = req.context.node.getVersion()
-      res.status(200).json({ version })
-    } catch (error) {
-      res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+      await node.redeemAllTickets()
+      return res.status(200).send()
+    } catch (err) {
+      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
 
-GET.apiDoc = {
-  description: 'Get release version of the running node.',
-  tags: ['Node'],
-  operationId: 'nodeGetVersion',
+POST.apiDoc = {
+  description: 'Redeems your tickets.',
+  tags: ['Tickets'],
+  operationId: 'channelRedeemTickets',
   responses: {
     '200': {
-      description: 'Returns the release version of the running node.',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/Version'
-          }
-        }
-      }
+      description: 'Tickets redeemed succesfully.'
     },
     '422': {
       description: 'Unknown failure.',

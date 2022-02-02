@@ -941,6 +941,13 @@ class Hopr extends EventEmitter {
     await this.connector.redeemAllTickets()
   }
 
+  public async redeemTicketsInChannel(peerId: PeerId) {
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
+    const channel = await this.db.getChannelX(selfPubKey, counterpartyPubKey)
+    await this.connector.redeemTicketsInChannel(channel)
+  }
+
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
     return await this.db.getChannelsFrom(addr)
   }

@@ -2,6 +2,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../'
+import { listChannels } from '../channels'
 
 /**
  * Closes a channel with provided peerId.
@@ -23,7 +24,7 @@ export const closeChannel = async (node: Hopr, peerIdStr: string) => {
   }
 }
 
-export const POST: Operation = [
+export const DELETE: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { peerId } = req.body
@@ -39,31 +40,28 @@ export const POST: Operation = [
       if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
         return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
       } else {
-        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
       }
     }
   }
 ]
 
-POST.apiDoc = {
+DELETE.apiDoc = {
   description: 'Close a channel.',
-  tags: ['channel'],
+  tags: ['Channels'],
   operationId: 'postChannelClose',
-  requestBody: {
-    content: {
-      'application/json': {
-        schema: {
-          type: 'object',
-          properties: {
-            peerId: { type: 'string', description: 'PeerId attached to the channel that we want to close.' }
-          },
-          example: {
-            peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
-          }
-        }
+  parameters: [
+    {
+      in: 'path',
+      name: 'peerid',
+      required: true,
+      schema: {
+        type: 'string',
+        description: 'PeerId attached to the channel that we want to close.',
+        example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
       }
     }
-  },
+  ],
   responses: {
     '200': {
       description: 'Channel closed succesfully.',
@@ -96,7 +94,67 @@ POST.apiDoc = {
         }
       }
     },
-    '500': {
+    '422': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
+        }
+      }
+    }
+  }
+}
+
+export const GET: Operation = [
+  async (req, res, _next) => {
+    const { node } = req.context
+    const { peerid } = req.params
+
+    try {
+      const channels = await listChannels(node, true)
+      const incoming = channels.incoming.filter((channel) => channel.peerId === peerid)
+      const outgoing = channels.outgoing.filter((channel) => channel.peerId === peerid)
+      return res.status(200).send(incoming[0] || outgoing[0])
+    } catch (err) {
+      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+    }
+  }
+]
+
+GET.apiDoc = {
+  description: 'Returns channel by peerId.',
+  tags: ['Channels'],
+  operationId: 'channelList',
+  parameters: [
+    {
+      in: 'path',
+      name: 'peerid',
+      description: 'Counterparty peerId assigned to the channel you want to fetch.',
+      schema: {
+        type: 'string',
+        example: 'true'
+      }
+    }
+  ],
+  responses: {
+    '200': {
+      description: 'Channel fetched succesfully.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/Channel'
+          }
+        }
+      }
+    },
+    '422': {
       description: 'Unknown failure.',
       content: {
         'application/json': {

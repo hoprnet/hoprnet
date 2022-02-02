@@ -49,10 +49,10 @@ export const GET: Operation = [
     } catch (error) {
       if (STATUS_CODES[error.message]) {
         return res
-          .status(error.message.includes(STATUS_CODES.INVALID_PEERID) ? 400 : 500)
+          .status(error.message.includes(STATUS_CODES.INVALID_PEERID) ? 400 : 422)
           .send({ status: STATUS_CODES[error.message] })
       } else {
-        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
       }
     }
   }
@@ -60,7 +60,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description: 'Pings another node to check its availability.',
-  tags: ['node'],
+  tags: ['Node'],
   operationId: 'ping',
   parameters: [
     {
@@ -102,7 +102,7 @@ GET.apiDoc = {
         }
       }
     },
-    '500': {
+    '422': {
       description: 'Timout.',
       content: {
         'application/json': {

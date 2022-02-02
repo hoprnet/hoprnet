@@ -108,7 +108,7 @@ export const GET: Operation = [
       if (error.message.includes(STATUS_CODES.INVALID_SETTING)) {
         return res.status(400).send({ status: STATUS_CODES.INVALID_SETTING })
       } else {
-        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
       }
     }
   }
@@ -116,7 +116,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description: 'Get setting value.',
-  tags: ['node'],
+  tags: ['Node'],
   operationId: 'getSetting',
   parameters: [
     {
@@ -160,7 +160,7 @@ GET.apiDoc = {
         }
       }
     },
-    '500': {
+    '422': {
       description: 'Unknown failure.',
       content: {
         'application/json': {
@@ -193,7 +193,7 @@ export const POST: Operation = [
       if (INVALID_ARG) {
         return res.status(400).send({ STATUS: INVALID_ARG })
       } else {
-        return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
+        return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
       }
     }
   }
@@ -201,7 +201,7 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description: 'Change setting value',
-  tags: ['node'],
+  tags: ['Node'],
   operationId: 'setSetting',
   requestBody: {
     content: {
@@ -229,7 +229,7 @@ POST.apiDoc = {
         }
       }
     },
-    '500': {
+    '422': {
       description: 'Unknown failure.',
       content: {
         'application/json': {

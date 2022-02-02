@@ -2,7 +2,7 @@ import Hopr from '@hoprnet/hopr-core'
 import { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../'
 
-export const getTickets = async (node: Hopr) => {
+export const getTicketsStatistics = async (node: Hopr) => {
   const stats = await node.getTicketStatistics()
 
   return {
@@ -24,17 +24,17 @@ export const GET: Operation = [
     const { node } = req.context
 
     try {
-      const tickets = await getTickets(node)
+      const tickets = await getTicketsStatistics(node)
       return res.status(200).send(tickets)
     } catch (err) {
-      return res.status(500).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
+      return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
 
 GET.apiDoc = {
   description: 'Get statistics regarding your tickets.',
-  tags: ['channel'],
+  tags: ['Tickets'],
   operationId: 'getTickets',
   responses: {
     '200': {
@@ -59,7 +59,7 @@ GET.apiDoc = {
         }
       }
     },
-    '500': {
+    '422': {
       description: 'Unknown failure.',
       content: {
         'application/json': {

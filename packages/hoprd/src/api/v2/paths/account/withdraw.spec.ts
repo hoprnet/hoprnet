@@ -2,9 +2,9 @@ import assert from 'assert'
 import BN from 'bn.js'
 import sinon from 'sinon'
 import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
-import { STATUS_CODES } from '../'
+import { STATUS_CODES } from '../../'
 import { withdraw } from './withdraw'
-import { testEthAddress } from '../fixtures'
+import { testEthAddress } from '../../fixtures'
 
 let node = sinon.fake() as any
 node.withdraw = sinon.fake.returns('receipt')

@@ -2,7 +2,7 @@ import type { Operation } from 'express-openapi'
 import type Hopr from '@hoprnet/hopr-core'
 import { Address } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../'
+import { STATUS_CODES } from '../../'
 
 /**
  * Withdraws specified amount of specified currency from the node.
@@ -50,7 +50,7 @@ export const POST: Operation = [
       if (INVALID_ARG) {
         return res.status(400).send({ STATUS: INVALID_ARG, error: err.message })
       } else {
-        return res.status(500).send({
+        return res.status(422).send({
           STATUS: err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)
             ? STATUS_CODES.NOT_ENOUGH_BALANCE
             : STATUS_CODES.UNKNOWN_FAILURE,
@@ -62,8 +62,9 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: 'Withdraw native or hopr to a specified recipient.',
-  tags: ['balance'],
+  description:
+    'Withdraw funds from this node account to your ethereum wallet address. You can choose whitch currency you want to withdraw, native or hopr.',
+  tags: ['Account'],
   operationId: 'withdraw',
   requestBody: {
     content: {
@@ -76,20 +77,26 @@ POST.apiDoc = {
   },
   responses: {
     '200': {
-      description: 'Withdraw successful.',
+      description:
+        'Withdraw successful. Receipt from this response can be used to check details of the transaction on ethereum network.',
       content: {
         'application/json': {
           schema: {
             type: 'object',
             properties: {
-              receipt: { type: 'string', example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e' }
+              receipt: {
+                type: 'string',
+                example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e',
+                description:
+                  'Withdraw txn hash that can be used to check details of the transaction on ethereum network.'
+              }
             }
           }
         }
       }
     },
     '400': {
-      description: 'Incorrect data in request body.',
+      description: `Incorrect data in request body. Make sure to provide valid currency ('NATIVE' | 'HOPR'), amount, and ethereum address.`,
       content: {
         'application/json': {
           schema: {
@@ -101,8 +108,9 @@ POST.apiDoc = {
         }
       }
     },
-    '500': {
-      description: 'Withdraw amount exeeds current balance.',
+    '422': {
+      description:
+        'Withdraw amount exeeds current balance. You can check current balance using /account/balance endpoint.',
       content: {
         'application/json': {
           schema: {

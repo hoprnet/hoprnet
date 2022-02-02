@@ -243,7 +243,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.redeemingAll
   }
 
-  private async redeemTicketsInChannel(channel: ChannelEntry) {
+  public async redeemTicketsInChannel(channel: ChannelEntry) {
     if (!channel.destination.eq(this.getPublicKey())) {
       throw new Error('Cannot redeem ticket in channel that isnt to us')
     }

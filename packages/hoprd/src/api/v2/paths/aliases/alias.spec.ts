@@ -1,26 +1,8 @@
 import { _createTestMocks, STATUS_CODES } from '../../'
 import assert from 'assert'
-import { setAlias, removeAlias, getAlias } from './alias'
-import { invalidTestPeerId, testPeerId, testAlias } from '../../fixtures'
-
-describe('setAlias', function () {
-  const mocks = _createTestMocks()
-
-  it('should set alias successfuly', function () {
-    setAlias(mocks, testAlias, testPeerId)
-    assert.equal(mocks.getState().aliases.size, 1)
-    assert.equal(mocks.getState().aliases.get('alias').toB58String(), testPeerId)
-  })
-
-  it('should throw error on invalid peerId', () => {
-    assert.throws(
-      () => setAlias(mocks, testAlias, invalidTestPeerId),
-      (err: Error) => {
-        return err.message.includes(STATUS_CODES.INVALID_PEERID)
-      }
-    )
-  })
-})
+import { removeAlias, getAlias } from './{alias}'
+import { testPeerId, testAlias } from '../../fixtures'
+import { setAlias } from '../aliases'
 
 describe('removeAlias', function () {
   const mocks = _createTestMocks()

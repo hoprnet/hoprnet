@@ -26,7 +26,7 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description: 'Send a message to another peer using a given path.',
-  tags: ['messages'],
+  tags: ['Messages'],
   operationId: 'messagesSend',
   requestBody: {
     content: {

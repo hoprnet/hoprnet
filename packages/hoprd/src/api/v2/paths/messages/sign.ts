@@ -16,7 +16,7 @@ export const POST: Operation = [
 POST.apiDoc = {
   description:
     'Signs a message given using the node’s private key. Prefixes messsage with “HOPR Signed Message: ” before signing.',
-  tags: ['message'],
+  tags: ['Messages'],
   operationId: 'messageGetSignature',
   requestBody: {
     content: {

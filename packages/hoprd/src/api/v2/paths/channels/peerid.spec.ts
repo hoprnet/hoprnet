@@ -1,8 +1,8 @@
 import assert from 'assert'
 import sinon from 'sinon'
-import { closeChannel } from './close'
 import { STATUS_CODES } from '../../'
 import { invalidTestPeerId, testPeerId } from '../../fixtures'
+import { closeChannel } from './{peerid}'
 
 let node = sinon.fake() as any
 
