@@ -150,3 +150,7 @@ html[data-theme='dark'] .docusaurus-highlight-code-line {
   /** transform: translateY(4px);**/
   --ifm-box-shadow-color: rgb(0, 0, 0, 0.3);
 }
+
+summary {
+  list-style-type: none;
+}
