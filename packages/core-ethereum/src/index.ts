@@ -239,17 +239,16 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
-      try {
+    try {
       for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
-          await this.redeemTicketsInChannel(ce)
-        }
+        await this.redeemTicketsInChannel(ce)
       }
-        catch (err) {
-          log(`error during redeeming all tickets`, err)
-        }
+    } catch (err) {
+      log(`error during redeeming all tickets`, err)
+    }
 
-        // whenever we finish this loop we clear the reference
-      this.redeemingAll = undefined
+    // whenever we finish this loop we clear the reference
+    this.redeemingAll = undefined
   }
 
   public async redeemTicketsInChannel(channel: ChannelEntry) {
@@ -268,7 +267,11 @@ export default class HoprCoreEthereum extends EventEmitter {
     log('tickets to be redeemed with indices', indices)
 
     for (const ticket of tickets) {
-      log(`redeeming ticket in channel from ${channel.source} to ${channel.destination}`, ticket, ticket.ticket.toString())
+      log(
+        `redeeming ticket in channel from ${channel.source} to ${channel.destination}`,
+        ticket,
+        ticket.ticket.toString()
+      )
       const result = await this.redeemTicket(channel.source, ticket)
 
       if (result.status !== 'SUCCESS') {

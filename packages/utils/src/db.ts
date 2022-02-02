@@ -329,8 +329,8 @@ export class HoprDB {
       if (
         filter?.channel &&
         (!a.signer.eq(filter.channel.source) ||
-         !filter.channel.destination.eq(this.id) ||
-         !a.ticket.channelEpoch.eq(filter.channel.channelEpoch))
+          !filter.channel.destination.eq(this.id) ||
+          !a.ticket.channelEpoch.eq(filter.channel.channelEpoch))
       ) {
         return false
       }
