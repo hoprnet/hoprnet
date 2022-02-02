@@ -8,7 +8,7 @@ export const GET: Operation = [
     const { peerid } = req.params
 
     try {
-      // TODO: implement logic for getting ticktes for specific channel
+      // TODO: implement logic for getting ticktes info for specific channel
       const tickets = await new Promise((resolve) => resolve(peerid))
       return res.status(200).send(tickets)
     } catch (err) {
