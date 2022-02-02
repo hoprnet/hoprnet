@@ -75,6 +75,21 @@ const argv = yargs(process.argv.slice(2))
     describe: 'Set host port to which the Rest API server will bind',
     default: 3001
   })
+  .option('ws', {
+    boolean: true,
+    describe: 'Expose the WS API on localhost:3002, requires --apiToken',
+    default: false
+  })
+  .option('wsHost', {
+    string: true,
+    describe: 'Set host IP to which the WS API server will bind',
+    default: 'localhost'
+  })
+  .option('wsPort', {
+    number: true,
+    describe: 'Set host port to which the WS API server will bind',
+    default: 3002
+  })
   .option('healthCheck', {
     boolean: true,
     describe: 'Run a health check end point on localhost:8080',
@@ -256,7 +271,7 @@ async function main() {
 
   let node: Hopr
   let logs = new LogStream(argv.forwardLogs)
-  let adminServer = undefined
+  let adminServer: AdminServer = undefined
   let cmds: Commands
   // As the daemon aims to maintain for the time being
   // both APIv1 and APIv2 (hopr-admin / myne-chat), we need
@@ -297,9 +312,9 @@ async function main() {
     logs.startLoggingQueue()
   }
 
-  if (!argv.testNoAuthentication && (argv.rest || argv.admin)) {
+  if (!argv.testNoAuthentication && (argv.rest || argv.ws || argv.admin)) {
     if (argv.apiToken == null) {
-      throw Error(`Must provide --apiToken when --admin or --rest is specified`)
+      throw Error(`Must provide --apiToken when --rest, --ws or --admin is specified`)
     }
     const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
     for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
@@ -312,14 +327,12 @@ async function main() {
     }
   }
 
+  const apiToken = argv.testNoAuthentication ? null : argv.apiToken
+
+  // We need to setup the admin server before the HOPR node
+  // as if the HOPR node fails, we need to put an error message up.
   if (argv.admin) {
-    // We need to setup the admin server before the HOPR node
-    // as if the HOPR node fails, we need to put an error message up.
-    let apiToken = argv.apiToken
-    if (argv.testNoAuthentication) {
-      apiToken = null
-    }
-    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort, apiToken)
+    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
     await adminServer.setup()
   }
 
@@ -354,8 +367,17 @@ async function main() {
     node.on('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
-      if (argv.rest) {
-        setupAPI(node, logs, { getState, setState }, argv)
+      if (argv.rest || argv.ws || argv.admin) {
+        setupAPI(
+          node,
+          logs,
+          { getState, setState },
+          {
+            ...argv,
+            apiToken
+          },
+          adminServer // api V1: required by hopr-admin
+        )
       }
 
       if (argv.healthCheck) {
