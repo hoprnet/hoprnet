@@ -1,19 +1,19 @@
 # Introduction
 
-For both HOPR app and core protocol developers, being able to spin a fully interconnected HOPR network is critical.
-Without doing so, app developers will only be able to fake interactions with a HOPR node by mocking their API[^1], and
-core protocol developers will not be able to replicate critical functionality over messaging such as ticket redemption
+The best way to learn and develop the HOPR protocol is by interacting with a HOPR node connected inside the HOPR network. A series of HOPR nodes interconnected (i.e. reachable and with channels opened against each other) is called a HOPR cluster.
+Without a HOPR cluster, app developers can only fake interactions with a HOPR node by mocking their API[^1], and
+core protocol developers can't replicate critical functionality over messaging such as ticket redemption
 and packet relaying.
 
-Although the HOPR Association provides a series of [nodes](https://status.hoprnet.org/) anyone could talk in production[^2],
+Although the HOPR Association provides a [production HOPR cluster](https://status.hoprnet.org/) anyone could talk to in production[^2],
 this setup is not ideal for development as doing so would incur on costs for executing basic operations. Staging networks
 such as görli are too slow to provide meaningful feedback, so the ideal setup for properly interacting with the HOPR
-ecosystem toolset is running a local HOPR network, either in your workstation or via a local environment like
+ecosystem toolset is running a local HOPR cluster, either in your workstation or via a cloud environment like
 [Gitpod](https://gitpod.io). This way contributors are not constrained by internet connection or blockchain RPC providers.
 
 # Tooling
 
-As of time of writing, the best way to setup a local HOPR network is by following these steps[^3]. Please bear in mind that these steps
+As of the time of writing, the best way to set up a local HOPR cluster is by following these steps[^3]. Please bear in mind that these steps
 had been tested only on `macOS` and `Linux` devices, for Windows please use our cloud setup instead.
 
 1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet)[^4]
@@ -51,7 +51,7 @@ the basic commands. Afterwards, it might also make sense to check the API v2 Swa
     The demo application [MyneChat](https://github.com/hoprnet/myne-chat) uses a
     [mock server](https://github.com/hoprnet/myne-chat/blob/cf6501b2ffa24502834f567ab575630e302e3d34/mocks/index.js#L47-L79)
     to simplify it’s development workflow. Nevertheless, to fully experience the extend of its features, it relies on a
-    HOPR network, either a local or a public one.
+    HOPR cluster, either a local or a public one.
 
 [^2]:
     Production is to be understood as a "live" network where [HOPR](https://coinmarketcap.com/currencies/hopr/) tokens can
