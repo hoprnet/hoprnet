@@ -43,7 +43,7 @@ wait_until_node_is_ready() {
 
   # try every 10 seconds for 5 minutes
   log "waiting for VM with IP $1 to have HOPR node up and running"
-  try_cmd "${cmd}" 30 10 true
+  try_cmd "${cmd}" 30 10
 }
 
 # Get external IP for running node or die
@@ -54,7 +54,7 @@ gcloud_get_ip() {
 }
 
 # $1=VM name
-gcloud_find_vm_with_name() {  
+gcloud_find_vm_with_name() {
   local vm_name="${1}"
   gcloud compute instances list | grep "${vm_name}" | grep 'RUNNING'
 }
