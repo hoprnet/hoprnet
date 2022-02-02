@@ -313,7 +313,8 @@ async function main() {
   }
 
   // Deprecated: enable `--ws` when `--admin` is used.
-  if (argv.admin && !argv.ws) {
+  const useAdminServerForWs = argv.admin && !argv.ws
+  if (useAdminServerForWs) {
     logs.warn("WS API enabled by --admin using admin's host and port")
     argv.ws = true
     argv.wsHost = argv.adminHost
@@ -389,7 +390,7 @@ async function main() {
             wsHost: argv.wsHost,
             apiToken
           },
-          adminServer // legacy requirement
+          useAdminServerForWs ? adminServer : undefined // legacy requirement
         )
       }
 
