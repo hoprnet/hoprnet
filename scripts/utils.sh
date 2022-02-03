@@ -203,7 +203,7 @@ function find_tmp_dir() {
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_native_address(){
   local endpoint=${1:-localhost:3001}
-  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/address"
+  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
 
   # try every 5 seconds for 5 minutes
   local result
@@ -215,7 +215,7 @@ get_native_address(){
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_hopr_address() {
   local endpoint=${1:-localhost:3001}
-  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/address"
+  local cmd="curl --silent --max-time 5 ${endpoint}/api/v2/account/addresses"
 
   # try every 5 seconds for 5 minutes
   local result

@@ -117,21 +117,20 @@ components:
           $ref: '#/components/schemas/Signature'
     Settings:
       type: object
-      description: "Various settings that affects how this node is interacting with the network."
+      description: 'Various settings that affects how this node is interacting with the network.'
       properties:
-        includeRecipient: {
-          type: 'boolean',
-          description:
-            'Prepends your address to all messages so that receiver of the message can know that you sent that message.',
+        includeRecipient:
+          type: 'boolean'
+          description: 'Prepends your address to all messages so that receiver of the message can know that you sent that message.'
           example: true
-        },
-        strategy: {
-          type: 'string',
-          enum: ['passive', 'promiscuous'],
-          example: 'passive',
-          description:
-            'By default, hoprd runs in **passive** mode, this means that your node will not attempt to open or close any channels automatically. When you set your strategy to **promiscuous** mode, your node will attempt to open channels to a _randomly_ selected group of nodes which you have a healthy connection to. At the same time, your node will also attempt to close channels that are running low on balance or are unhealthy.'
-        }
+        strategy:
+          type: 'string'
+          enum:
+            - 'passive'
+            - 'promiscuous'
+          example: 'passive'
+          description: 'By default, hoprd runs in **passive** mode, this means that your node will not attempt to open or close any channels automatically. When you set your strategy to **promiscuous** mode, your node will attempt to open channels to a _randomly_ selected group of nodes which you have a healthy connection to. At the same time, your node will also attempt to close channels that are running low on balance or are unhealthy.'
+
   securitySchemes:
     keyScheme:
       type: apiKey
