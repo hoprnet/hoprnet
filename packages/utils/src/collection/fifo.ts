@@ -3,11 +3,20 @@ type Entry<T> = {
   next: Entry<T> | undefined
 }
 
+export interface FIFO<T> {
+  last(): T
+  size(): number
+  shift(): T | undefined
+  peek(): T | undefined
+  replace(find: (item: T) => boolean, modify: (oldItem: T) => T): boolean
+  push(item: T): number
+  toArray(): T[]
+}
 /**
  *
  * @returns
  */
-export function FIFO<T>() {
+export function FIFO<T>(): FIFO<T> {
   let head: Entry<T> | undefined
   let tail: Entry<T> | undefined
   let length = 0
@@ -26,11 +35,19 @@ export function FIFO<T>() {
 
     length--
 
+    if (length == 0) {
+      tail = undefined
+    }
+
     return result
   }
 
   function peek(): T | undefined {
     return head?.data
+  }
+
+  function last(): T | undefined {
+    return tail?.data
   }
 
   function replace(find: (item: T) => boolean, modify: (oldItem: T) => T): boolean {
@@ -84,5 +101,5 @@ export function FIFO<T>() {
     return result
   }
 
-  return { peek, push, replace, shift, size, toArray }
+  return { last, peek, push, replace, shift, size, toArray }
 }

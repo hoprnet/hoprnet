@@ -48,6 +48,26 @@ describe('test fifo', function () {
     assert(queue.peek() == 2)
   })
 
+  it('correct tail', function () {
+    const queue = FIFO<number>()
+
+    queue.push(1)
+
+    assert(queue.last() == 1)
+
+    queue.push(2)
+
+    assert(queue.last() == 2)
+
+    queue.shift()
+
+    assert(queue.last() == 2)
+
+    queue.shift()
+
+    assert(queue.last() == undefined)
+  })
+
   it('replace items', function () {
     const queue = FIFO<number>()
 
