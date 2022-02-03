@@ -2,7 +2,7 @@ import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
 import sinon from 'sinon'
-import { getBalances } from './balance'
+import { getBalances } from './balances'
 
 let node = sinon.fake() as any
 

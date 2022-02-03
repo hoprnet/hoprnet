@@ -1,8 +1,8 @@
 import { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { PublicKey } from '@hoprnet/hopr-utils'
-import { encodeMessage } from '../../../commands/utils'
-import { STATUS_CODES } from '../'
+import { encodeMessage } from '../../../../commands/utils'
+import { STATUS_CODES } from '../../'
 
 export const POST: Operation = [
   async (req, res, _next) => {
@@ -28,7 +28,7 @@ POST.apiDoc = {
   description:
     'Send a message to another peer using a given path (list of node addresses that should relay our message through network).',
   tags: ['Messages'],
-  operationId: 'messagesSend',
+  operationId: 'messagesSendMessage',
   requestBody: {
     content: {
       'application/json': {

@@ -1,7 +1,7 @@
 import { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
-import { STATUS_CODES } from '../'
-import { State, StateOps } from '../../../types'
+import { STATUS_CODES } from '../../'
+import { State, StateOps } from '../../../../types'
 
 /**
  * Sets an alias and assigns the PeerId to it.
@@ -45,7 +45,7 @@ export const GET: Operation = [
 GET.apiDoc = {
   description: 'Get all aliases you set previously and thier corresponding peer IDs.',
   tags: ['Aliases'],
-  operationId: 'getAliases',
+  operationId: 'aliasesGetAliases',
   responses: {
     '200': {
       description: 'Returns List of Aliases and corresponding peerIds.',
@@ -54,8 +54,12 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              Alice: { type: 'string', example: '16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar' },
-              randomAlias: { type: 'string', example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12' }
+              alice: {
+                $ref: '#/components/schemas/HoprAddress'
+              },
+              bob: {
+                $ref: '#/components/schemas/HoprAddress'
+              }
             }
           }
         }
@@ -101,7 +105,7 @@ POST.apiDoc = {
   description:
     'Instead of using HOPR address, we can assign HOPR address to a specific name called alias. Give an address a more memorable alias and use it instead of Hopr address. Aliases are kept locally and are not saved or shared on the network.',
   tags: ['Aliases'],
-  operationId: 'setAlias',
+  operationId: 'aliasesSetAlias',
   requestBody: {
     content: {
       'application/json': {
@@ -128,7 +132,7 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: {
             status: STATUS_CODES.INVALID_PEERID

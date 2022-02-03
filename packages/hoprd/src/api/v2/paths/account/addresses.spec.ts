@@ -2,7 +2,7 @@ import assert from 'assert'
 import sinon from 'sinon'
 import PeerId from 'peer-id'
 import { Address } from '@hoprnet/hopr-utils'
-import { getAddresses } from './address'
+import { getAddresses } from './addresses'
 
 let node = sinon.fake() as any
 

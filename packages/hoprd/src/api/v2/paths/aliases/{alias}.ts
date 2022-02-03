@@ -44,7 +44,7 @@ export const GET: Operation = [
 GET.apiDoc = {
   description: 'Get the PeerId (Hopr address) that have this alias assigned to it.',
   tags: ['Aliases'],
-  operationId: 'getAlias',
+  operationId: 'aliasesGetAlias',
   parameters: [
     {
       name: 'alias',
@@ -59,11 +59,11 @@ GET.apiDoc = {
   ],
   responses: {
     '200': {
-      description: `PeerId was found for the provided alias.`,
+      description: `HOPR address was found for the provided alias.`,
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/PeerId'
+            $ref: '#/components/schemas/HoprAddress'
           }
         }
       }
@@ -73,7 +73,7 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: { status: STATUS_CODES.PEERID_NOT_FOUND }
         }
@@ -115,7 +115,7 @@ DELETE.apiDoc = {
   description:
     'Unassign an alias from a PeerId. You can always assign back alias to that PeerId using /aliases endpoint.',
   tags: ['Aliases'],
-  operationId: 'removeAlias',
+  operationId: 'aliasesRemoveAlias',
   requestBody: {
     content: {
       'application/json': {

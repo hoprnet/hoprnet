@@ -39,7 +39,7 @@ GET.apiDoc = {
   description:
     'Information about the HOPR Node, including any options it started with. See the schema of the response to get more information on each field',
   tags: ['Node'],
-  operationId: 'getInfo',
+  operationId: 'nodeGetInfo',
   responses: {
     '200': {
       description: 'Node information fetched successfuly.',
@@ -48,8 +48,42 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              info: {
-                $ref: '#/components/schemas/Info'
+              announcedAddress: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  description:
+                    'description: Public IP address that the node announced on network when it was launched. Node anouncing means notifying all the other nodes on the network about its presence and readiness to be connected to via websocket.'
+                }
+              },
+              listeningAddress: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  description: 'Other nodes IP address that this node is listening to for websocket events.'
+                }
+              },
+              network: {
+                type: 'string',
+                example: 'hardhat',
+                description: 'Name of the Hopr network this node connects to.'
+              },
+              hoprToken: {
+                type: 'string',
+                example: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
+                description: 'Contract address of the Hopr token on the ethereum network.'
+              },
+              hoprChannels: {
+                type: 'string',
+                example: '0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63',
+                description:
+                  'Contract address of the HoprChannels smart contract on ethereum network. This smart contract is used to open payment channels between nodes on blockchain.'
+              },
+              channelClosurePeriod: {
+                type: 'number',
+                example: 1,
+                description:
+                  'Time (in minutes) that this node needs in order to clean up before closing the channel. When requesting to close the channel each node needs some time to make sure that channel can be closed securely and cleanly. After this channelClosurePeriod passes the second request for closing channel will close the channel.'
               }
             }
           }

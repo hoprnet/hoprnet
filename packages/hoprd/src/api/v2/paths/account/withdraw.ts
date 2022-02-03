@@ -8,9 +8,8 @@ import { STATUS_CODES } from '../../'
  * Withdraws specified amount of specified currency from the node.
  * @returns Transaction hash if transaction got successfully submited.
  */
-export const withdraw = async (node: Hopr, rawCurrency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => {
-  const currency = rawCurrency.toUpperCase() as 'NATIVE' | 'HOPR'
-  if (!['NATIVE', 'HOPR'].includes(currency)) {
+export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipient: string, amount: string) => {
+  if (!['native', 'hopr'].includes(currency)) {
     throw Error(STATUS_CODES.INVALID_CURRENCY)
   }
 
@@ -24,12 +23,13 @@ export const withdraw = async (node: Hopr, rawCurrency: 'NATIVE' | 'HOPR', recip
     throw Error(STATUS_CODES.INVALID_ADDRESS)
   }
 
-  const balance = currency === 'NATIVE' ? await node.getNativeBalance() : await node.getBalance()
+  const balance = currency === 'native' ? await node.getNativeBalance() : await node.getBalance()
   if (balance.toBN().lt(new BN(amount))) {
     throw Error(STATUS_CODES.NOT_ENOUGH_BALANCE)
   }
 
-  const txHash = await node.withdraw(currency, recipient, amount)
+  const currencyUpperCase = currency.toUpperCase() as 'NATIVE' | 'HOPR'
+  const txHash = await node.withdraw(currencyUpperCase, recipient, amount)
   return txHash
 }
 
@@ -63,14 +63,29 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description:
-    'Withdraw funds from this node account to your ethereum wallet address. You can choose whitch currency you want to withdraw, native or hopr.',
+    'Withdraw funds from this node to your ethereum wallet address. You can choose whitch currency you want to withdraw, native or hopr.',
   tags: ['Account'],
-  operationId: 'withdraw',
+  operationId: 'accountWithdraw',
   requestBody: {
     content: {
       'application/json': {
         schema: {
-          $ref: '#/components/schemas/WithdrawRequest'
+          type: 'object',
+          properties: {
+            currency: {
+              type: 'string',
+              // $ref: '#/components/schemas/Currency',
+              example: 'native | hopr'
+            },
+            amount: {
+              type: 'string',
+              description: "Amount to withdraw in the currency's smallest unit.",
+              example: '1337'
+            },
+            recipient: {
+              $ref: '#/components/schemas/HoprAddress'
+            }
+          }
         }
       }
     }
@@ -100,7 +115,7 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: {
             status: `${STATUS_CODES.INVALID_CURRENCY} | ${STATUS_CODES.INVALID_AMOUNT} | ${STATUS_CODES.INVALID_ADDRESS}`
@@ -114,7 +129,7 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: {
             status: `${STATUS_CODES.NOT_ENOUGH_BALANCE}`

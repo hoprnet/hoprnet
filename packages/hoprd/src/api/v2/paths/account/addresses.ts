@@ -3,7 +3,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import { STATUS_CODES } from '../../'
 
 /**
- * @returns Native and hopr addresses of the account associated with the node.
+ * @returns Native and HOPR addresses of the account associated with the node.
  */
 export const getAddresses = (
   node: Hopr
@@ -39,16 +39,24 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description:
-    'Get the native and hopr addresses of the account associated with the node. Hopr address is also called PeerId and can be used by other node owner to open payment channel with this node.',
+    "Get node's HOPR and native addresses. HOPR address is also called PeerId and can be used by other node owner to interact with this node.",
   tags: ['Account'],
-  operationId: 'accountGetAddress',
+  operationId: 'accountGetAddresses',
   responses: {
     '200': {
       description: 'Addresses fetched successfully.',
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/Address'
+            type: 'object',
+            properties: {
+              nativeAddress: {
+                $ref: '#/components/schemas/NativeAddress'
+              },
+              hoprAddress: {
+                $ref: '#/components/schemas/HoprAddress'
+              }
+            }
           }
         }
       }

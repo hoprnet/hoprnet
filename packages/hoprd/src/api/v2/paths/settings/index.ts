@@ -1,17 +1,18 @@
 import type { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../'
-import { getSetting } from './settings/{setting}'
+import type { State } from '../../../../types'
+import { STATUS_CODES } from '../../'
+
+export const getSettings = (state: State) => {
+  return state.settings
+}
 
 export const GET: Operation = [
   async (req, res, _next) => {
-    const { stateOps, node } = req.context
+    const { stateOps } = req.context
 
     try {
-      const settings = getSetting({
-        node,
-        state: stateOps.getState()
-      })
-      return res.status(200).send({ settings })
+      const settings = getSettings(stateOps.getState())
+      return res.status(200).send(settings)
     } catch (error) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
@@ -21,7 +22,7 @@ export const GET: Operation = [
 GET.apiDoc = {
   description: `Get all of this node's settings values.`,
   tags: ['Settings'],
-  operationId: 'getSetting',
+  operationId: 'settingsGetSettings',
   responses: {
     '200': {
       description: 'Settings fetched succesfully.',
@@ -30,14 +31,18 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              settings: {
-                type: 'array',
-                items: {
-                  $ref: '#/components/schemas/Setting'
-                },
-                description: 'Setting/s fetched'
+              includeRecipient: {
+                type: 'boolean',
+                description: 'Prepends your address to all messages.',
+                example: true
+              },
+              strategy: {
+                type: 'string',
+                enum: ['passive', 'promiscuous'],
+                example: 'passive'
               }
-            }
+            },
+            description: "The node's settings."
           }
         }
       }

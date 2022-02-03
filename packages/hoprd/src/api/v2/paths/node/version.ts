@@ -5,7 +5,7 @@ export const GET: Operation = [
   (req, res, _next) => {
     try {
       const version = req.context.node.getVersion()
-      res.status(200).json({ version })
+      res.status(200).json(version)
     } catch (error) {
       res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
@@ -22,7 +22,9 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/Version'
+            type: 'string',
+            description: 'Node version.',
+            example: '1.83.5'
           }
         }
       }

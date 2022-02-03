@@ -20,7 +20,7 @@ export const GET: Operation = [
 GET.apiDoc = {
   description: 'Get tickets earned by relaying data packets by your node for the particular channel.',
   tags: ['Channels'],
-  operationId: 'getTickets',
+  operationId: 'channelsGetTickets',
   responses: {
     '200': {
       description: 'Tickets fetched successfully.',

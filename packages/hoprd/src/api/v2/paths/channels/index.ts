@@ -3,7 +3,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import { ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../'
+import { STATUS_CODES } from '../../'
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'
@@ -24,7 +24,7 @@ const channelStatusToString = (status: ChannelStatus): string => {
 /**
  * @returns List of incoming and outgoing channels associated with the node.
  */
-export const listChannels = async (node: Hopr, includingClosed: boolean) => {
+export const getChannels = async (node: Hopr, includingClosed: boolean) => {
   const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
   const selfAddress = selfPubKey.toAddress()
 
@@ -57,7 +57,7 @@ export const GET: Operation = [
     const { includingClosed } = req.query
 
     try {
-      const channels = await listChannels(node, !!includingClosed)
+      const channels = await getChannels(node, !!includingClosed)
       return res.status(200).send({ channels })
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -69,7 +69,7 @@ GET.apiDoc = {
   description:
     'Lists all active channels between this node and other nodes on the Hopr network. By default response will contain all incomming and outgoing channels that are either open, waiting to be opened, or waiting to be closed. If you also want to receive past channels that were closed, you can pass `includingClosed` in the request url query.',
   tags: ['Channels'],
-  operationId: 'channelList',
+  operationId: 'channelsGetChannels',
   parameters: [
     {
       in: 'query',
@@ -194,7 +194,7 @@ POST.apiDoc = {
   description:
     'Opens a payment channel between this node and the counter party provided. This channel can be used to send messages between two nodes using other nodes on the network to relay the messages. Each message will deduce its cost from the funded amount to pay other nodes for relaying your messages. Opening a channel can take a little bit of time, because it requires some block confirmations on the blockchain.',
   tags: ['Channels'],
-  operationId: 'openChannel',
+  operationId: 'channelsOpenChannel',
   requestBody: {
     content: {
       'application/json': {
@@ -238,7 +238,7 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: { status: STATUS_CODES.CHANNEL_ALREADY_OPEN }
         }
@@ -249,7 +249,7 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: { status: `${STATUS_CODES.INVALID_AMOUNT} | ${STATUS_CODES.INVALID_ADDRESS}` }
         }
@@ -260,7 +260,7 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: { status: STATUS_CODES.NOT_ENOUGH_BALANCE }
         }

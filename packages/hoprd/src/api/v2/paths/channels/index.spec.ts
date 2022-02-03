@@ -1,26 +1,26 @@
 import assert from 'assert'
 import sinon from 'sinon'
-import { listChannels, openChannel } from './channels'
+import { getChannels, openChannel } from '.'
 import { Balance, ChannelEntry, NativeBalance } from '@hoprnet/hopr-utils'
-import { invalidTestPeerId, testChannelId, testPeerId, testPeerIdInstance } from '../fixtures'
+import { invalidTestPeerId, testChannelId, testPeerId, testPeerIdInstance } from '../../fixtures'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../'
+import { STATUS_CODES } from '../../'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(testPeerIdInstance)
 
-describe('listChannels', function () {
+describe('getChannels', function () {
   const testChannel = ChannelEntry.createMock()
   node.getChannelsFrom = sinon.fake.returns(Promise.resolve([testChannel]))
   node.getChannelsTo = sinon.fake.returns(Promise.resolve([testChannel]))
 
   it('should get channels list including closed', async function () {
-    const { incoming, outgoing } = await listChannels(node, true)
+    const { incoming, outgoing } = await getChannels(node, true)
     assert.equal(incoming.length, 1)
     assert.equal(outgoing.length, 1)
   })
   it('should get channels list excluding closed', async function () {
-    const { incoming, outgoing } = await listChannels(node, false)
+    const { incoming, outgoing } = await getChannels(node, false)
 
     assert.equal(incoming.length, 0)
     assert.equal(outgoing.length, 0)

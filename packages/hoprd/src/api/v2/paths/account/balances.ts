@@ -21,8 +21,8 @@ export const GET: Operation = [
     try {
       const { native, hopr } = await getBalances(node)
       return res.status(200).send({
-        native: native.toBN().toString(),
-        hopr: hopr.toBN().toString()
+        nativeBalance: native.toBN().toString(),
+        hoprBalance: hopr.toBN().toString()
       })
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -32,9 +32,9 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description:
-    "Check this node's current HOPR and native balances. Hopr tokens from this balance is used to fund payment channels between this node and other nodes on the network. ETH from Native token balance is used to pay for the gas fees on ethereum network.",
+    "Get node's HOPR and native balances. HOPR tokens from this balance is used to fund payment channels between this node and other nodes on the network. NATIVE balance is used to pay for the gas fees for the blockchain network.",
   tags: ['Account'],
-  operationId: 'getBalance',
+  operationId: 'accountGetBalances',
   responses: {
     '200': {
       description: 'Balances fetched successfuly.',
@@ -43,7 +43,12 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              balances: { $ref: '#/components/schemas/Balances' }
+              nativeBalance: {
+                $ref: '#/components/schemas/NativeBalance'
+              },
+              hoprBalance: {
+                $ref: '#/components/schemas/HoprBalance'
+              }
             }
           }
         }

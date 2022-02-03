@@ -17,7 +17,7 @@ POST.apiDoc = {
   description:
     'Signs a message given using the node’s private key. Prefixes messsage with “HOPR Signed Message: ” before signing.',
   tags: ['Messages'],
-  operationId: 'messageGetSignature',
+  operationId: 'messagesSign',
   requestBody: {
     content: {
       'application/json': {

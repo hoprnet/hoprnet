@@ -36,7 +36,7 @@ GET.apiDoc = {
   description:
     'Get statistics regarding all your tickets. Node gets a ticket everytime it relays data packet in channel.',
   tags: ['Tickets'],
-  operationId: 'getTickets',
+  operationId: 'ticketsGetStatistics',
   responses: {
     '200': {
       description:

@@ -25,128 +25,45 @@ externalDocs:
   url: 'http://docs.hoprnet.org'
 components:
   schemas:
-    Address:
+    RequestStatus:
       type: object
       properties:
-        nativeAddress:
+        status:
           type: string
-          description: Blockchain-native account address. Can be funded from external wallets (starts with **0x...**). It **can't be used** internally to send / receive messages, open / close payment channels.
-        hoprAddress:
-          type: string
-          description: HOPR account address, also called PeerId. Can be funded only from the other node, it can't be fund'ed from the external wallets (starts with **0x...**). You can send / receive messages, open / close payment channels.
-      required:
-        - nativeAddress
-        - hoprAddress
+          description: Status declaring success/failure of the request.
       example:
-        nativeAddress: '0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a'
-        hoprAddress: '16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar'
-    PeerId:
-      type: string
-      properties:
-        peerId:
-          type: string
-          description: A PeerId which is a name for HOPR account address.
-      required:
-        - peerId
-      example:
-        peerId: '16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar'
-    Version:
-      type: object
-      properties:
-        version:
-          type: string
-          description: Node version.
-      required:
-        - version
-      example:
-        version: '1.83.5'
+        status: success
     Signature:
       type: object
       properties:
         signature:
           type: string
           description: Signature from requested message.
-      required:
-        - signature
       example:
         signature: '0x304402201065a95fd22fc3e48266c3b270ace032489b0177e07d33c59e0d13dccc89108402205f41fb911bcfe485a8e58162ebce90382dc96ccafff378e5c8960e07efcf9e92'
-    StatusResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          description: Status declaring success/failure of the request.
-      required:
-        - status
-      example:
-        status: success
-    Balances:
-      type: object
-      properties:
-        native:
-          type: string
-          example: '1998149726987048088'
-          description: Amount of ETH in the smallest unit. Used only for gas fees on the blockchain the current release is running on. For example, when you will open or close the payment channel, it will use gas fees to execute this action.
-        hopr:
-          type: string
-          example: '19999999999999999998'
-          description: Amount of HOPR token in the smallest unit. Used for opening payment channels.
-    WithdrawRequest:
-      type: object
-      properties:
-        currency:
-          type: string
-          description: NATIVE | HOPR currency to withdraw.
-        amount:
-          type: string
-          description: Amount to withdraw in the currency's smallest unit.
-        recipient:
-          type: string
-          description: Blockchain address to withdraw specified currency to.
-      example:
-        currency: hopr
-        amount: '1'
-        recipient: '0x2C505741584f8591e261e59160D0AED5F74Dc29b'
-    Setting:
-      type: object
-      properties:
-        settingName:
-          type: string
-          description: Setting name.
-        value:
-          description: Depends on the setting.
-      example:
-        settingName: includeRecipient
-        value: true
-    Info:
-      type: object
-      properties:
-        announcedAddress:
-          type: array
-          items:
-            type: string
-            description: Public IP address that the node announced on network when it was launched. Node anouncing means notifying all the other nodes on the network about its presence and readiness to be connected to via websocket.
-        listeningAddress:
-          type: array
-          items:
-            type: string
-            description: Other nodes IP address that this node is listening to for websocket events.
-        network:
-          type: string
-          example: 'hardhat'
-          description: Name of the Hopr network this node connects to.
-        hoprToken:
-          type: string
-          example: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
-          description: Contract address of the Hopr token on the ethereum network.
-        hoprChannels:
-          type: string
-          example: '0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63'
-          description: Contract address of the HoprChannels smart contract on ethereum network. This smart contract is used to open payment channels between nodes on blockchain.
-        channelClosurePeriod:
-          type: number
-          example: 1
-          description: Time (in minutes) that this node needs in order to clean up before closing the channel. When requesting to close the channel each node needs some time to make sure that channel can be closed securely and cleanly. After this channelClosurePeriod passes the second request for closing channel will close the channel.
+    Currency:
+      type: string
+      enum:
+        - native
+        - hopr
+      description: Supported currencies, NATIVE used for the blockchain or HOPR used to fund channels.
+      example: 'native'
+    NativeAddress:
+      type: string
+      description: Blockchain-native account address. Can be funded from external wallets (starts with **0x...**). It **can't be used** internally to send / receive messages, open / close payment channels.
+      example: '0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a'
+    HoprAddress:
+      type: string
+      description: HOPR account address, also called a PeerId. Used to send / receive messages, open / close payment channels.
+      example: '16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar'
+    NativeBalance:
+      type: string
+      example: '1000000000000000000'
+      description: Amount of NATIVE (ETH) balance in the smallest unit. Used only for gas fees on the blockchain the current release is running on. For example, when you will open or close the payment channel, it will use gas fees to execute this action.
+    HoprBalance:
+      type: string
+      example: '10000000000000000000'
+      description: Amount of HOPR tokens in the smallest unit. Used for funding payment channels.
     Channel:
       type: object
       properties:

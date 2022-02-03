@@ -1,10 +1,10 @@
-import { STATUS_CODES, _createTestMocks } from '../'
+import { STATUS_CODES } from '../../'
 import assert from 'assert'
-import { getAliases, setAlias } from './aliases'
-import { invalidTestPeerId, testAlias, testPeerId } from '../fixtures'
+import { getAliases, setAlias } from '.'
+import { createTestMocks, invalidTestPeerId, testAlias, testPeerId } from '../../fixtures'
 
 describe('getAliases', () => {
-  const mocks = _createTestMocks()
+  const mocks = createTestMocks()
   setAlias(mocks, testAlias, testPeerId)
 
   it('should successfuly get aliases', () => {
@@ -14,7 +14,7 @@ describe('getAliases', () => {
 })
 
 describe('setAlias', function () {
-  const mocks = _createTestMocks()
+  const mocks = createTestMocks()
 
   it('should set alias successfuly', function () {
     setAlias(mocks, testAlias, testPeerId)

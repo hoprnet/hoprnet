@@ -10,7 +10,7 @@ GET.apiDoc = {
   description:
     'This is a websocket endpoint to connect to via websocket client to receive realtime stream of messages sent to this node from other nodes on the network.',
   tags: ['Messages'],
-  operationId: 'websocket',
+  operationId: 'messagesWebsocket',
   responses: {
     '200': {
       description: '',

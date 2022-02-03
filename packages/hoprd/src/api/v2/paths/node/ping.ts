@@ -61,7 +61,7 @@ export const GET: Operation = [
 GET.apiDoc = {
   description: 'Pings another node to check its availability.',
   tags: ['Node'],
-  operationId: 'ping',
+  operationId: 'nodePing',
   parameters: [
     {
       name: 'peerId',
@@ -97,7 +97,7 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: { status: STATUS_CODES.INVALID_PEERID }
         }
@@ -108,7 +108,7 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: { status: STATUS_CODES.TIMEOUT }
         }

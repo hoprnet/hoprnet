@@ -2,7 +2,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../'
-import { listChannels } from '../channels'
+import { getChannels } from '.'
 
 /**
  * Closes a channel with provided peerId.
@@ -50,7 +50,7 @@ DELETE.apiDoc = {
   description: `Close a opened channel between this node and other node. Once you’ve initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.
   Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.`,
   tags: ['Channels'],
-  operationId: 'postChannelClose',
+  operationId: 'channelsCloseChannel',
   parameters: [
     {
       in: 'path',
@@ -87,7 +87,7 @@ DELETE.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/StatusResponse'
+            $ref: '#/components/schemas/RequestStatus'
           },
           example: {
             status: STATUS_CODES.INVALID_PEERID
@@ -119,7 +119,7 @@ export const GET: Operation = [
     const { peerid } = req.params
 
     try {
-      const channels = await listChannels(node, true)
+      const channels = await getChannels(node, true)
       const incoming = channels.incoming.filter((channel) => channel.peerId === peerid)
       const outgoing = channels.outgoing.filter((channel) => channel.peerId === peerid)
       return res.status(200).send(incoming[0] || outgoing[0])
@@ -132,7 +132,7 @@ export const GET: Operation = [
 GET.apiDoc = {
   description: 'Returns information about the channel between this node and provided peerId.',
   tags: ['Channels'],
-  operationId: 'channelList',
+  operationId: 'channelsGetChannel',
   parameters: [
     {
       in: 'path',
