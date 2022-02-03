@@ -26,6 +26,7 @@
 
 ### Methods
 
+- [closureTimePassed](ChannelEntry.md#closuretimepassed)
 - [getId](ChannelEntry.md#getid)
 - [serialize](ChannelEntry.md#serialize)
 - [toString](ChannelEntry.md#tostring)
@@ -163,6 +164,20 @@ packages/utils/lib/types/channelEntry.d.ts:21
 
 ## Methods
 
+### closureTimePassed
+
+▸ **closureTimePassed**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:27
+
+___
+
 ### getId
 
 ▸ **getId**(): `Hash`
@@ -215,7 +230,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:27
+packages/utils/lib/types/channelEntry.d.ts:28
 
 ___
 

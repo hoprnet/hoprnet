@@ -24,7 +24,7 @@ usage() {
   msg "an initial setup script against these nodes. Once testing has"
   msg "completed the script can be used to cleanup the cluster as well."
   msg
-  msg "Usage: $0 <environment> [<init_script> [<cluster_id> [<docker_image> [<instance_template_name> [<announce_on_chain>]]]]]"
+  msg "Usage: $0 <environment> [<init_script> [<cluster_id> [<docker_image> [<cluster_size> [<instance_template_name> [<announce_on_chain>]]]]]"
   msg
   msg "where <environment>\t\tthe environment from which the smart contract addresses are derived"
   msg "      <init_script>\t\tpath to a script which is called with all node API endpoints as parameters"

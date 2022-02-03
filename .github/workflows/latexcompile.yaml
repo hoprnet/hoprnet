@@ -32,5 +32,4 @@ jobs:
       - name: Commit & Push changes
         run: ./scripts/commit-and-push-all-changes.sh
         env:
-          HOPR_GIT_MSG: "chore(build): update yellowpaper"
-
+          HOPR_GIT_MSG: 'chore(build): update yellowpaper'

@@ -17,7 +17,7 @@ yarn workspace @hoprnet/hopr-ethereum run hardhat flat contracts/HoprChannels.so
 ```
 Contract Name: HoprChannels.sol
 Include nightly builds: No
-Compiler: v0.8.3+commit.8d00100c (as of time of writing, this might change, this also depends on the contract you are verifying)
+Compiler: v0.8.9+commit.e5eed63a (as of time of writing, this might change, this also depends on the contract you are verifying)
 EVM Version: default
 Optimization: yes
 Optimization runs: 200 (as of time of writing, might change)

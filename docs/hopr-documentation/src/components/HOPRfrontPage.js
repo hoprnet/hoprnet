@@ -10,7 +10,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl'
 const FeatureList = [
   {
     title: 'About HOPR',
-    Svg: <img class="svg_icon" src={'/img/front_icons/hopr-getting-started.svg'} />,
+    Svg: <img class="svg_icon" src={'/img/front_icons/hopr-about.svg'} />,
     description: <>Brief explanation what is HOPR.</>,
     docName: 'about-hopr'
   },

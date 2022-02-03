@@ -51,13 +51,13 @@ The `wildhorn-v2` tag represents the latest community release version.
 You can pull the Docker image like so:
 
 ```bash
-docker pull gcr.io/hoprassociation/hoprd:athens
+docker pull gcr.io/hoprassociation/hoprd:wildhorn-v2
 ```
 
 Then start a container:
 
 ```bash
-docker run --pull always -ti -v $HOME/.hoprd-db-athens:/app/db -p 9091:9091 -p 3100:3100 -p 3101:3101 gcr.io/hoprassociation/hoprd:athens --admin --password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --rest --restHost "0.0.0.0" --restPort 3101 --identity /app/db/.hopr-id-athens --apiToken='<YOUR_SECRET_TOKEN>' --adminHost "0.0.0.0" --adminPort 3100 --host "0.0.0.0:9191"
+docker run --pull always -ti -v $HOME/.hoprd-db-wildhorn-v2:/app/db -p 9091:9091 -p 3000:3000 -p 8080:8080 hopr/hoprd:wildhorn-v2 --password='h0pR-w1ldhorn-v2' --init --announce --identity /app/db/.hopr-id-wildhorn-v2 --apiToken='<YOUR_SECRET_TOKEN>'
 ```
 
 Also all ports are mapped to your local host, assuming you stick to the default port numbers.
