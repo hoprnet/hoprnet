@@ -28,7 +28,7 @@ export const GET: Operation = [
 
     try {
       const info = await getInfo({ node })
-      return res.status(200).send({ info })
+      return res.status(200).send(info)
     } catch (error) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
     }
@@ -54,14 +54,21 @@ GET.apiDoc = {
                   type: 'string',
                   description:
                     'description: Public IP address that the node announced on network when it was launched. Node anouncing means notifying all the other nodes on the network about its presence and readiness to be connected to via websocket.'
-                }
+                },
+                example: [
+                  '/ip4/128.0.215.32/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
+                  '/p2p/16Uiu2HAmLpqczAGfgmJchVgVk233rmB2T3DSn2gPG6JMa5brEHZ1/p2p-circuit/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
+                  '/ip4/127.0.0.1/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
+                  '/ip4/192.168.178.56/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit'
+                ]
               },
               listeningAddress: {
                 type: 'array',
                 items: {
                   type: 'string',
                   description: 'Other nodes IP address that this node is listening to for websocket events.'
-                }
+                },
+                example: ['/ip4/0.0.0.0/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit']
               },
               network: {
                 type: 'string',

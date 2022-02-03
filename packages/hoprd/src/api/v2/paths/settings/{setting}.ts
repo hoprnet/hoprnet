@@ -43,12 +43,10 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
 export const POST: Operation = [
   async (req, res, _next) => {
     const { stateOps, node } = req.context
-    const settings = req.body
+    const { key, value } = req.body
 
     try {
-      for (const { key, value } of settings) {
-        setSetting(node, stateOps, key, value)
-      }
+      setSetting(node, stateOps, key, value)
       return res.status(200).send()
     } catch (error) {
       const INVALID_ARG = [STATUS_CODES.INVALID_SETTING_VALUE, STATUS_CODES.INVALID_SETTING].find((arg) =>
@@ -72,6 +70,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          // TODO: improve docs here
           properties: {
             key: {
               type: 'string'

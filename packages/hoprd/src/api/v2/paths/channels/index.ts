@@ -58,7 +58,7 @@ export const GET: Operation = [
 
     try {
       const channels = await getChannels(node, !!includingClosed)
-      return res.status(200).send({ channels })
+      return res.status(200).send(channels)
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
@@ -90,22 +90,17 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              channels: {
-                type: 'object',
-                properties: {
-                  incoming: {
-                    type: 'array',
-                    items: { $ref: '#/components/schemas/Channel' },
-                    description:
-                      'Incomming channels are the ones that were opened by a different node and this node acts as relay.'
-                  },
-                  outgoing: {
-                    type: 'array',
-                    items: { $ref: '#/components/schemas/Channel' },
-                    description:
-                      'Outgoing channels are the ones that were opened by this node and is using other node as relay.'
-                  }
-                }
+              incoming: {
+                type: 'array',
+                items: { $ref: '#/components/schemas/Channel' },
+                description:
+                  'Incomming channels are the ones that were opened by a different node and this node acts as relay.'
+              },
+              outgoing: {
+                type: 'array',
+                items: { $ref: '#/components/schemas/Channel' },
+                description:
+                  'Outgoing channels are the ones that were opened by this node and is using other node as relay.'
               }
             }
           }
@@ -190,6 +185,7 @@ export const POST: Operation = [
   }
 ]
 
+// TODO: return tx hash
 POST.apiDoc = {
   description:
     'Opens a payment channel between this node and the counter party provided. This channel can be used to send messages between two nodes using other nodes on the network to relay the messages. Each message will deduce its cost from the funded amount to pay other nodes for relaying your messages. Opening a channel can take a little bit of time, because it requires some block confirmations on the blockchain.',
