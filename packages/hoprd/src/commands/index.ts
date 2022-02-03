@@ -91,8 +91,7 @@ export class Commands {
     if (cmd) {
       try {
         return await cmd.execute(log, query || '', this.state)
-      }
-      catch (err) {
+      } catch (err) {
         return log(`${cmd} execution failed with error: ${err.message}`)
       }
     }
