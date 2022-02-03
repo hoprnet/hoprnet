@@ -480,7 +480,6 @@ export async function createChainWrapper(
       channels.removeAllListeners()
       token.removeAllListeners()
     },
-    getLogs: (filter: providers.Filter) => provider.getLogs(filter),
     getChannels: () => channels,
     getToken: () => token,
     getPrivateKey: () => utils.arrayify(wallet.privateKey),

@@ -22,8 +22,6 @@ describe('test indexer', function () {
     await indexer.start(chain, 0)
 
     // Make sure that it assigns event listeners
-    assert(hoprChannels.listeners('*').length > 0)
-    assert(hoprToken.listeners('*').length > 0)
     assert(hoprChannels.listeners('error').length > 0)
     assert(hoprToken.listeners('error').length > 0)
     assert(provider.listeners('error').length > 0)
@@ -32,8 +30,6 @@ describe('test indexer', function () {
     indexer.stop()
 
     // Make sure that it does the cleanup properly
-    assert(hoprChannels.listeners('*').length == 0)
-    assert(hoprToken.listeners('*').length == 0)
     assert(hoprChannels.listeners('error').length == 0)
     assert(hoprToken.listeners('error').length == 0)
     assert(provider.listeners('error').length == 0)
@@ -54,8 +50,6 @@ describe('test indexer', function () {
     indexer.stop()
 
     // Make sure that it does the cleanup properly
-    assert(hoprChannels.listeners('*').length == 0)
-    assert(hoprToken.listeners('*').length == 0)
     assert(hoprChannels.listeners('error').length == 0)
     assert(hoprToken.listeners('error').length == 0)
     assert(provider.listeners('error').length == 0)
@@ -65,9 +59,12 @@ describe('test indexer', function () {
   it('should process 1 past event', async function () {
     const { indexer, OPENED_CHANNEL, chain, db } = await useFixtures({
       latestBlockNumber: 2,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
     await indexer.start(chain, 0)
+
+    // await new Promise((resolve) => setTimeout(resolve, 50))
+    // provider.emit('block', 11)
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
@@ -191,7 +188,7 @@ describe('test indexer', function () {
   it('should contract error by restarting', async function () {
     const { indexer, hoprChannels, chain } = await useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
     await indexer.start(chain, 0)

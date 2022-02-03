@@ -99,11 +99,17 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
         } as any
       } as Event<'ChannelUpdated'>
       handleEvent(newEvent)
-      this.emit('*', newEvent)
+      pastEvents.push(newEvent)
     }
 
     async queryFilter() {
       return pastEvents
+    }
+
+    interface = {
+      getEventTopic: () => `eae81df29528b1d65938ed313945e8181978784c7a98a41bc4c4c2c7749b7710`,
+      // Events are already correctly formatted
+      parseLog: (arg: any) => arg
     }
   }
 
@@ -118,7 +124,9 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
   }
 }
-const createHoprTokenMock = () => {
+const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
+  const pastEvents = ops.pastEvents ?? []
+
   class FakeToken extends EventEmitter {
     async transfer() {
       let newEvent = {
@@ -133,7 +141,17 @@ const createHoprTokenMock = () => {
           balance: BigNumber.from('1')
         } as any
       } as TokenEvent<'Transfer'>
-      this.emit('*', newEvent)
+      pastEvents.push(newEvent)
+    }
+
+    async queryFilter() {
+      return pastEvents
+    }
+
+    interface = {
+      getEventTopic: () => `eae81df29528b1d65938ed313945e8181978784c7a98a41bc4c4c2c7749b7710`,
+      // Events are already correctly formatted
+      parseLog: (arg: any) => arg
     }
   }
 
@@ -142,7 +160,7 @@ const createHoprTokenMock = () => {
   return {
     hoprToken,
     newEvent(event: Event<any>) {
-      hoprToken.emit('*', event)
+      pastEvents.push(event)
     }
   }
 }
@@ -214,6 +232,7 @@ const createChainMock = (
     updateConfirmedTransaction: (_hash: string) => {},
     getNativeBalance: () => new NativeBalance(SUGGESTED_NATIVE_BALANCE),
     getChannels: () => hoprChannels,
+    getToken: () => hoprToken,
     getWallet: () => account ?? fixtures.ACCOUNT_A,
     getAccount: () => {
       chainLogger('getAccount method was called')

@@ -200,8 +200,26 @@ class Indexer extends EventEmitter {
           toBlock
         )
         .then((events: TypedEvent<any, any>[]) => {
+          return events.map((event: TypedEvent<any, any>) => {
+            return Object.assign(event, this.chain.getChannels().interface.parseLog(event))
+          })
+        }),
+      this.chain
+        .getToken()
+        .queryFilter(
+          {
+            topics: [
+              // Token transfer *towards* us
+              [this.chain.getToken().interface.getEventTopic('Transfer')],
+              [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+            ]
+          },
+          fromBlock,
+          toBlock
+        )
+        .then((events: TypedEvent<any, any>[]) => {
           return events.map((event: TypedEvent<any, any>) =>
-            Object.assign(event, this.chain.getChannels().interface.parseLog(event))
+            Object.assign(event, this.chain.getToken().interface.parseLog(event))
           )
         }),
       this.chain
@@ -209,9 +227,10 @@ class Indexer extends EventEmitter {
         .queryFilter(
           {
             topics: [
+              // Token transfer *from* us towards someone else
               [this.chain.getToken().interface.getEventTopic('Transfer')],
-              [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()])), null],
-              [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()])), null]
+              null,
+              [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
             ]
           },
           fromBlock,
@@ -224,7 +243,18 @@ class Indexer extends EventEmitter {
         })
     ])
 
-    return events.flat(1).sort(snapshotComparator)
+    return (
+      events
+        .flat(1)
+        .sort(snapshotComparator)
+        // @TODO fix type clash
+        .map((event) => {
+          if (event.event == undefined) {
+            return Object.assign(event, { event: event.name })
+          }
+          return event
+        })
+    )
   }
 
   /**
@@ -405,6 +435,7 @@ class Indexer extends EventEmitter {
     }
 
     for (; offset < events.length; offset++) {
+      console.log(`add event`, events[offset])
       this.unconfirmedEvents.push(events[offset])
     }
     this.updateLastSnapshot(events[events.length - 1])
@@ -437,7 +468,7 @@ class Indexer extends EventEmitter {
       log(
         'Processing event %s blockNumber=%s maxConfirmations=%s',
         // @TODO: fix type clash
-        (event as any).name,
+        event.event,
         blockNumber,
         this.maxConfirmations
       )
@@ -460,7 +491,7 @@ class Indexer extends EventEmitter {
       }
 
       // @TODO: fix type clash
-      const eventName = (event as any).name as EventNames | TokenEventNames
+      const eventName = event.event as EventNames | TokenEventNames
 
       // update transaction manager
       this.chain.updateConfirmedTransaction(event.transactionHash)
@@ -544,12 +575,13 @@ class Indexer extends EventEmitter {
       multiaddrs: [account.multiAddr]
     })
     await this.db.updateAccount(account)
+    console.log(await this.db.getAccount(account.address))
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
     this.indexEvent('channel-updated', [event.transactionHash])
     log('channel-updated for hash %s', event.transactionHash)
-    const channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
+    const channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
     log(`Smart contract event`)
     log(channel.toString())
 
