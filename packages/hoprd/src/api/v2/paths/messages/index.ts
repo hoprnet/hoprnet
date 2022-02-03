@@ -37,12 +37,14 @@ POST.apiDoc = {
           properties: {
             body: {
               description: 'The message body which should be sent.',
-              type: 'string'
+              type: 'string',
+              example: 'Hello'
             },
             recipient: {
               description: 'The recipient HOPR peer id, to which the message is sent.',
               type: 'string',
-              format: 'peerId'
+              format: 'peerId',
+              example: '16Uiu2HAm2SF8EdwwUaaSoYTiZSddnG4hLVF7dizh32QFTNWMic2b'
             },
             path: {
               description:
@@ -53,7 +55,8 @@ POST.apiDoc = {
                 type: 'string',
                 format: 'peerId',
                 minItems: 1,
-                maxItems: 3
+                maxItems: 3,
+                example: '16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n'
               }
             }
           },
