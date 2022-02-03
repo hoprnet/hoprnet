@@ -1,5 +1,5 @@
 import EventEmitter from 'events'
-import { providers as Providers, Wallet, BigNumber } from 'ethers'
+import { providers as Providers, Wallet, BigNumber, utils } from 'ethers'
 import type { HoprChannels, HoprToken, TypedEvent } from '@hoprnet/hopr-ethereum'
 import {
   Address,
@@ -107,7 +107,8 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
 
     interface = {
-      getEventTopic: () => `eae81df29528b1d65938ed313945e8181978784c7a98a41bc4c4c2c7749b7710`,
+      // Dummy event topic but different for every event
+      getEventTopic: (arg: string) => utils.keccak256(utils.toUtf8Bytes(arg)),
       // Events are already correctly formatted
       parseLog: (arg: any) => arg
     }
@@ -149,7 +150,8 @@ const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
 
     interface = {
-      getEventTopic: () => `eae81df29528b1d65938ed313945e8181978784c7a98a41bc4c4c2c7749b7710`,
+      // Dummy event topic but different for every event
+      getEventTopic: (arg: string) => utils.keccak256(utils.toUtf8Bytes(arg)),
       // Events are already correctly formatted
       parseLog: (arg: any) => arg
     }
