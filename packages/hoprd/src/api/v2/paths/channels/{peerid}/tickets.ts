@@ -27,6 +27,19 @@ GET.apiDoc = {
   description: 'Get tickets earned by relaying data packets by your node for the particular channel.',
   tags: ['Channels'],
   operationId: 'channelsGetTickets',
+  parameters: [
+    {
+      in: 'path',
+      name: 'peerid',
+      example: '16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
+      required: true,
+      schema: {
+        type: 'string',
+        description: 'PeerId attached to the channel.',
+        example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
+      }
+    }
+  ],
   responses: {
     '200': {
       description: 'Tickets fetched successfully.',

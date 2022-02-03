@@ -77,7 +77,8 @@ POST.apiDoc = {
               type: 'string'
             },
             value: {}
-          }
+          },
+          example: { key: 'includeRecipient', value: true }
         }
       }
     }
