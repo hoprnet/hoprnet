@@ -136,7 +136,7 @@ export class ChannelEntry {
    */
   public closureTimePassed(): boolean {
     const now = new BN(new Date().getTime())
-    return this.closureTime && now.gt(this.closureTime.toBN())
+    return !!this.closureTime && now.gt(this.closureTime.toBN())
   }
 
   public static createMock(): ChannelEntry {
