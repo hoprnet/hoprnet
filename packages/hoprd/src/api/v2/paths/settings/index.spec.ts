@@ -10,8 +10,7 @@ describe('getSetting', () => {
   it('should return all settings', () => {
     const stateOps = createTestMocks()
     const state = stateOps.getState()
-    const allSettings = Array.from(Object.entries(state.settings)).map(([key, value]) => ({ key, value }))
     const settings = getSettings(state)
-    assert.deepEqual(settings, allSettings)
+    assert.deepEqual(settings, state.settings)
   })
 })
