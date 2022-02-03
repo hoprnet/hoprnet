@@ -53,7 +53,7 @@ Responsibilities:
 
 _Current:_
 
-- [Tino](https://github.com/tolbrino) until 05/02/2022
+- [Tino](https://github.com/tolbrino) until 06/05/2022
 - [Robert](https://github.com/robertkiel) until 04/03/2022
 
 #### Electing a new representantive
