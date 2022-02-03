@@ -303,26 +303,37 @@ done
 redeem_tickets() {
   local node_id="${1}"
   local node_api="${2}"
+  local rejected redeemed prev_redeemed
 
-  log "Node ${node_id} ticket information (before redemption)"
   result=$(run_command "${node_api}" "tickets" "" 600)
-  log "--${result}"
+  log "Node ${node_id} ticket information (before redemption) -- ${result}"
+  rejected=$(echo "${result}" | grep "Rejected:" | awk '{ print $3; }' | tr -d '\n')
+  redeemed=$(echo "${result}" | grep "Redeemed:" | awk '{ print $3; }' | tr -d '\n')
+  [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
+  last_redeemed="${redeemed}"
 
   log "Node ${node_id} should redeem all tickets"
   result=$(run_command "${node_api}" "redeemTickets" "Redeemed all tickets" 600 600)
   log "--${result}"
 
-  log "Node ${node_id} ticket information (after redemption)"
   result=$(run_command "${node_api}" "tickets" "" 600)
-  log "--${result}"
+  log "Node ${node_id} ticket information (after redemption) -- ${result}"
+  rejected=$(echo "${result}" | grep "Rejected:" | awk '{ print $3; }' | tr -d '\n')
+  redeemed=$(echo "${result}" | grep "Redeemed:" | awk '{ print $3; }' | tr -d '\n')
+  [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
+  [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
+  last_redeemed="${redeemed}"
 
   log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
   result=$(run_command "${node_api}" "redeemTickets" "" 60 60)
   log "--${result}"
 
-  log "Node ${node_id} ticket information (after second redemption)"
   result=$(run_command "${node_api}" "tickets" "" 600)
-  log "--${result}"
+  log "Node ${node_id} ticket information (after second redemption) -- ${result}"
+  rejected=$(echo "${result}" | grep "Rejected:" | awk '{ print $3; }' | tr -d '\n')
+  redeemed=$(echo "${result}" | grep "Redeemed:" | awk '{ print $3; }' | tr -d '\n')
+  [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
+  [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
 }
 
 redeem_tickets "2" "${api2}" &
