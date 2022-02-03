@@ -18,6 +18,7 @@ Phase 4 Testing: tbd
 - [ ] create branch
 - [ ] merge back initial release branch to master 
 - [ ] create tracking PR to keep track of diff between release branch and `master`
+- [ ] verify HoprChannels contract, see VERIFICATION_GUIDE.md
 - [ ] CD: launch base cluster (including NAT nodes)
 - [ ] launch topology cluster
 - [ ] launch ct cluster
