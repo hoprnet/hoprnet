@@ -32,7 +32,7 @@ export apiToken="^^LOCAL-testing-123^^"
 
 ### 2. Test REST API connectivity
 
-Given your node's `apiToken` and your `HOPR_NODE_1_HTTP_URL` from the last section, try to send a REST command to query it’s address with the following `curl`
+Given your node's `apiToken` and your `HOPR_NODE_1_HTTP_URL` from the last section (likely `localhost:3001`), try to send a REST command to query its address with the following `curl`
 command. If you don’t have `jq` installed, just remove it at the end of the command.
 
 ```
@@ -62,7 +62,8 @@ In case you have made a mistake, like forgotten to use `-n` in your `echo` or ha
 
 Unlike our REST API endpoint, to see interactions against our HOPR node WebSocket server, we need to use a client to both send and listen
 connections in our HOPR node. Our suggested client is [websocat](https://github.com/vi/websocat), which you can install by running our
-`./scripts/install-websocat.sh` [script](https://raw.githubusercontent.com/hoprnet/hoprnet/master/scripts/install-websocat.sh) from our monorepo.
+`./install-websocat.sh` [script](https://raw.githubusercontent.com/hoprnet/hoprnet/master/scripts/install-websocat.sh) from our monorepo.
+To install, make sure to run it from the `scripts` folder, as it will install it in the parent folder under a `.bin` folder, and will not export it to your `$PATH`.
 
 :::warning @TODO
 Migrate `install-websocat.sh` script to allow one-line setup via bash pipeing
