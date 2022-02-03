@@ -348,10 +348,11 @@ class Indexer extends EventEmitter {
 
   /**
    * Called whenever a new block found.
-   * This will update {this.latestBlock},
+   * This will update `this.latestBlock`,
    * and processes events which are within
    * confirmed blocks.
-   * @param blockNumber
+   * @param blockNumber latest on-chain block number
+   * @param fetchEvents [optional] if true, query provider for events in block
    */
   private async onNewBlock(blockNumber: number, fetchEvents = false): Promise<void> {
     // NOTE: This function is also used in event handlers
@@ -394,17 +395,9 @@ class Indexer extends EventEmitter {
     await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot)
   }
 
-  private updateLastSnapshot(event: TypedEvent<any, any>): void {
-    this.lastSnapshot = {
-      blockNumber: event.blockNumber,
-      logIndex: event.logIndex,
-      transactionIndex: event.transactionIndex
-    }
-  }
-
   /**
    * Adds new events to the queue of unprocessed events
-   * @param events
+   * @param events new unprocessed events
    */
   private onNewEvents(events: Event<any>[] | TokenEvent<any>[]): void {
     if (events.length == 0) {
@@ -438,13 +431,19 @@ class Indexer extends EventEmitter {
       console.log(`add event`, events[offset])
       this.unconfirmedEvents.push(events[offset])
     }
-    this.updateLastSnapshot(events[events.length - 1])
+
+    this.lastSnapshot = {
+      blockNumber: events[events.length].blockNumber,
+      logIndex: events[events.length].logIndex,
+      transactionIndex: events[events.length].transactionIndex
+    }
   }
 
   /**
-   *
-   * @param blockNumber
-   * @param lastDatabaseSnapshot
+   * Process all stored but not yet processed events up to latest
+   * confirmed block (latestBlock - confirmationTime)
+   * @param blockNumber latest on-chain block number
+   * @param lastDatabaseSnapshot latest snapshot in database
    */
   async processUnconfirmedEvents(blockNumber: number, lastDatabaseSnapshot: Snapshot | undefined) {
     log(

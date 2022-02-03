@@ -63,9 +63,6 @@ describe('test indexer', function () {
     })
     await indexer.start(chain, 0)
 
-    // await new Promise((resolve) => setTimeout(resolve, 50))
-    // provider.emit('block', 11)
-
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
