@@ -175,7 +175,7 @@ class Hopr extends EventEmitter {
     this.environment = options.environment
     log(`using environment: ${this.environment.id}`)
     this.indexer = this.connector.indexer // TODO temporary
-    this.pubKey = new PublicKey(id.pubKey.marshal())
+    this.pubKey = PublicKey.fromPeerId(id)
   }
 
   /**
@@ -840,7 +840,7 @@ class Hopr extends EventEmitter {
   ): Promise<{
     channelId: Hash
   }> {
-    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
+    const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myAvailableTokens = await this.connector.getBalance(true)
 
     // validate 'amountToFund'
@@ -872,7 +872,7 @@ class Hopr extends EventEmitter {
    * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
    */
   public async fundChannel(counterparty: PeerId, myFund: BN, counterpartyFund: BN): Promise<void> {
-    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
+    const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myBalance = await this.connector.getBalance(false)
     const totalFund = myFund.add(counterpartyFund)
 
@@ -896,7 +896,7 @@ class Hopr extends EventEmitter {
   }
 
   public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: ChannelStatus }> {
-    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
+    const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const channel = await this.db.getChannelX(this.pubKey, counterpartyPubKey)
 
     // TODO: should we wait for confirmation?
