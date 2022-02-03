@@ -13,6 +13,7 @@ import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import type { LogStream } from './../logs'
 import type { StateOps } from '../types'
+import { authenticateWsConnection } from './utils'
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
@@ -119,7 +120,7 @@ export function setupRestApi(
 
 export function setupWsApi(server: WebSocketServer, logs: LogStream, options: { apiToken?: string }) {
   server.on('connection', (socket, req) => {
-    if (!authenticateConnection(logs, req, options.apiToken)) {
+    if (!authenticateWsConnection(logs, req, options.apiToken)) {
       socket.send(
         JSON.stringify({
           type: 'auth-failed',
@@ -131,34 +132,6 @@ export function setupWsApi(server: WebSocketServer, logs: LogStream, options: { 
       return
     }
   })
-}
-
-const authenticateConnection = (
-  logs: LogStream,
-  req: { url?: string; headers: Record<any, any> },
-  apiToken?: string
-): boolean => {
-  if (!apiToken) {
-    logs.log('ws client connected [ authentication DISABLED ]')
-    return true
-  }
-
-  if (req.url) {
-    try {
-      // NB: We use a placeholder domain since req.url only passes query params
-      const url = new URL(`https://hoprnet.org${req.url}`)
-      const apiToken = url.searchParams?.get('apiToken') || ''
-      if (decodeURI(apiToken) == apiToken) {
-        logs.log('ws client connected [ authentication ENABLED ]')
-        return true
-      }
-    } catch (e) {
-      logs.error('invalid URL queried', e)
-    }
-  }
-
-  logs.log('ws client failed authentication')
-  return false
 }
 
 // In order to pass custom objects along with each request we build a context

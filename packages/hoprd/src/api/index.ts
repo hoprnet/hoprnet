@@ -89,14 +89,8 @@ export default function setupAPI(
 
   // deprecated: creates WS server for hopr-admin
   if (options.admin && adminServer?.server) {
-    const wsV1 = new ws.Server({ noServer: true, path: '/' })
+    const wsV1 = new ws.Server({ server: adminServer.server })
     apiV1.setupWsApi(wsV1, logs, options, adminServer)
-
-    adminServer.server.on('upgrade', (request, socket, head) => {
-      wsV1.handleUpgrade(request, socket, head, function done(ws) {
-        wsV1.emit('connection', ws, request)
-      })
-    })
 
     logs.log(`deprecated WS admin API server on ${options.adminHost} listening on port ${options.adminPort}`)
   }
