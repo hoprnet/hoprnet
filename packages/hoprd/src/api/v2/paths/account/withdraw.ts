@@ -29,7 +29,7 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
   }
 
   const currencyUpperCase = currency.toUpperCase() as 'NATIVE' | 'HOPR'
-  // TODO: withdraw hopr broken
+  // TODO: withdraw hopr broken, its working but only resolves after transaction have been mined.
   const txHash = await node.withdraw(currencyUpperCase, recipient, amount)
   return txHash
 }
@@ -73,11 +73,8 @@ POST.apiDoc = {
         schema: {
           type: 'object',
           properties: {
-            // TODO: improve docs
             currency: {
-              type: 'string',
-              // $ref: '#/components/schemas/Currency',
-              example: 'native | hopr'
+              $ref: '#/components/schemas/Currency'
             },
             amount: {
               type: 'string',

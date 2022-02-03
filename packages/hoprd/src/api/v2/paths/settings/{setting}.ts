@@ -62,7 +62,7 @@ export const POST: Operation = [
 ]
 
 POST.apiDoc = {
-  description: `Change this node's setting value.`,
+  description: `Change this node's setting value. Check Settings schema to learn more about each setting and the type of value it expects.`,
   tags: ['Settings'],
   operationId: 'settingsSetSetting',
   requestBody: {

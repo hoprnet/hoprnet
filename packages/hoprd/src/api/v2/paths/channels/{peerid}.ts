@@ -27,14 +27,14 @@ export const closeChannel = async (node: Hopr, peerIdStr: string) => {
 export const DELETE: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
-    const { peerId } = req.body
+    const { peerid } = req.params
 
-    if (!peerId) {
+    if (!peerid) {
       return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
     }
 
     try {
-      const { receipt, channelStatus } = await closeChannel(node, peerId)
+      const { receipt, channelStatus } = await closeChannel(node, peerid)
       return res.status(200).send({ receipt, channelStatus })
     } catch (err) {
       if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {

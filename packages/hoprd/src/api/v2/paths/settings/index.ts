@@ -29,20 +29,7 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            properties: {
-              includeRecipient: {
-                type: 'boolean',
-                description: 'Prepends your address to all messages.',
-                example: true
-              },
-              strategy: {
-                type: 'string',
-                enum: ['passive', 'promiscuous'],
-                example: 'passive'
-              }
-            },
-            description: "The node's settings."
+            $ref: '#/components/schemas/Settings'
           }
         }
       }

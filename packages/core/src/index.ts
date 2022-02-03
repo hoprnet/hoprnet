@@ -59,6 +59,7 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 import { Packet } from './messages'
 import type { ResolvedEnvironment } from './environment'
 import { createLibp2pInstance } from './main'
+import { Receipt } from '@hoprnet/hopr-core-ethereum/src/ethereum'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -825,6 +826,7 @@ class Hopr extends EventEmitter {
     amountToFund: BN
   ): Promise<{
     channelId: Hash
+    receipt: Receipt
   }> {
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
@@ -842,9 +844,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      return {
-        channelId: await this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
-      }
+      return this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
     } catch (err) {
       await this.isOutOfFunds(err)
       throw new Error(`Failed to openChannel: ${err}`)

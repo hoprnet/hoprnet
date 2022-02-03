@@ -1,6 +1,6 @@
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
-import { ChainWrapper, createChainWrapper } from './ethereum'
+import { ChainWrapper, createChainWrapper, Receipt } from './ethereum'
 import chalk from 'chalk'
 import {
   AcknowledgedTicket,
@@ -344,7 +344,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public async openChannel(dest: PublicKey, amount: Balance): Promise<Hash> {
+  public async openChannel(dest: PublicKey, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
@@ -358,10 +358,10 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
     }
-    await this.chain.openChannel(this.publicKey.toAddress(), dest.toAddress(), amount, (tx: string) =>
+    const receipt = await this.chain.openChannel(this.publicKey.toAddress(), dest.toAddress(), amount, (tx: string) =>
       this.setTxHandler('channel-updated', tx)
     )
-    return generateChannelId(this.publicKey.toAddress(), dest.toAddress())
+    return { channelId: generateChannelId(this.publicKey.toAddress(), dest.toAddress()), receipt }
   }
 
   public async fundChannel(dest: PublicKey, myFund: Balance, counterpartyFund: Balance) {

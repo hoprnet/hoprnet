@@ -31,14 +31,18 @@ node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
 node.getBalance = sinon.fake.returns(new Balance(new BN(1)))
 node.openChannel = sinon.fake.returns(
   Promise.resolve({
-    channelId: testChannelId
+    channelId: testChannelId,
+    receipt: 'testReceipt'
   })
 )
 
 describe('openChannel', () => {
   it('should open channel', async () => {
-    const channelId = await openChannel(node, testPeerId, '1')
-    assert.equal(channelId, channelId)
+    const channel = await openChannel(node, testPeerId, '1')
+    assert.deepEqual(channel, {
+      channelId: testChannelId.toHex(),
+      receipt: 'testReceipt'
+    })
   })
 
   it('should fail on invalid peerId or amountToFund', async () => {

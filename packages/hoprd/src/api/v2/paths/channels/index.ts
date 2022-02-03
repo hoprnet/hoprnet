@@ -149,8 +149,8 @@ export const openChannel = async (node: Hopr, counterpartyStr: string, amountStr
 
   // @TODO: handle errors from open channel, inconsistent return value
   try {
-    const { channelId } = await node.openChannel(counterparty, amount)
-    return channelId.toHex()
+    const { channelId, receipt } = await node.openChannel(counterparty, amount)
+    return { channelId: channelId.toHex(), receipt }
   } catch (err) {
     if (err.message.includes('Channel is already opened')) {
       throw Error(STATUS_CODES.CHANNEL_ALREADY_OPEN)
@@ -166,8 +166,8 @@ export const POST: Operation = [
     const { peerId, amount } = req.body
 
     try {
-      const channelId = await openChannel(node, peerId, amount)
-      return res.status(200).send({ channelId })
+      const { channelId, receipt } = await openChannel(node, peerId, amount)
+      return res.status(200).send({ channelId, receipt })
     } catch (err) {
       const INVALID_ARG = [STATUS_CODES.INVALID_AMOUNT, STATUS_CODES.INVALID_PEERID].find((arg) =>
         err.message.includes(arg)
@@ -201,7 +201,11 @@ POST.apiDoc = {
               type: 'string',
               description: 'PeerId that we want to transact with using this channel.'
             },
-            amount: { type: 'string', description: 'Amount of tokens to fund the channel.' }
+            amount: {
+              type: 'string',
+              description:
+                'Amount of HOPR tokens to fund the channel. It will be used to pay for sending messages through channel'
+            }
           },
           example: {
             peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12',
@@ -223,6 +227,12 @@ POST.apiDoc = {
                 type: 'string',
                 example: '0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5',
                 description: 'Channel ID that can be used in other calls, not to confuse with transaction hash.'
+              },
+              receipt: {
+                type: 'string',
+                example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e',
+                description:
+                  'Receipt for open channel transaction. Can be used to check status of the smart contract call on blockchain.'
               }
             }
           }
