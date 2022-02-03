@@ -34,9 +34,10 @@ export const GET: Operation = [
   }
 ]
 
+// TODO: tickets missing param
 GET.apiDoc = {
   description: 'Get tickets earned by relaying data packets by your node for the particular channel.',
-  tags: ['Channels'],
+  tags: ['Tickets'],
   operationId: 'ticketsGetTickets',
   responses: {
     '200': {

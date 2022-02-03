@@ -139,8 +139,7 @@ GET.apiDoc = {
       name: 'peerid',
       description: 'Counterparty peerId assigned to the channel you want to fetch.',
       schema: {
-        type: 'string',
-        example: 'true'
+        $ref: '#/components/schemas/HoprAddress'
       }
     }
   ],

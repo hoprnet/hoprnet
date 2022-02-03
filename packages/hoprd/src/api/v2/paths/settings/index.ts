@@ -20,7 +20,7 @@ export const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: `Get all of this node's settings values.`,
+  description: `Get all of the node's settings.`,
   tags: ['Settings'],
   operationId: 'settingsGetSettings',
   responses: {
