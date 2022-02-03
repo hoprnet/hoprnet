@@ -1,21 +1,32 @@
 import type Hopr from '@hoprnet/hopr-core'
-import type { Operation } from 'express-openapi'
-import PeerId from 'peer-id'
-import { STATUS_CODES } from '../../../'
-import { formatTicket } from '../../tickets'
+import type { Ticket } from '@hoprnet/hopr-utils'
+import { Operation } from 'express-openapi'
+import { STATUS_CODES } from '../../'
 
-export const getTickets = async (node: Hopr, peerId: string) => {
-  const tickets = await node.getTickets(PeerId.createFromB58String(peerId))
+export const formatTicket = (ticket: Ticket) => {
+  return {
+    counterparty: ticket.counterparty.toHex(),
+    challenge: ticket.challenge.toHex(),
+    epoch: ticket.epoch.toBN().toString(),
+    index: ticket.index.toBN().toString(),
+    amount: ticket.amount.toBN().toString(),
+    winProb: ticket.winProb.toBN().toString(),
+    channelEpoch: ticket.channelEpoch.toBN().toString(),
+    signature: ticket.signature.toHex()
+  }
+}
+
+export const getAllTickets = async (node: Hopr) => {
+  const tickets = await node.getAllTickets()
   return tickets.map(formatTicket)
 }
 
 export const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
-    const { peerid } = req.params
 
     try {
-      const tickets = await getTickets(node, peerid)
+      const tickets = await getAllTickets(node)
       return res.status(200).send(tickets)
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -26,7 +37,7 @@ export const GET: Operation = [
 GET.apiDoc = {
   description: 'Get tickets earned by relaying data packets by your node for the particular channel.',
   tags: ['Channels'],
-  operationId: 'channelsGetTickets',
+  operationId: 'ticketsGetTickets',
   responses: {
     '200': {
       description: 'Tickets fetched successfully.',

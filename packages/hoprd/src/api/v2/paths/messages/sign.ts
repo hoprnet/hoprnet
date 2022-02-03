@@ -40,7 +40,12 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/Signature'
+            type: 'object',
+            properties: {
+              signature: {
+                $ref: '#/components/schemas/Signature'
+              }
+            }
           }
         }
       }

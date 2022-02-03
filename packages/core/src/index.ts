@@ -36,6 +36,7 @@ import {
   type DialOpts,
   type Hash,
   type HalfKeyChallenge,
+  type Ticket,
   multiaddressCompareByClassFunction,
   createRelayerKey
 } from '@hoprnet/hopr-utils'
@@ -914,6 +915,21 @@ class Hopr extends EventEmitter {
 
     log(`closed channel, ${channel.getId()}`)
     return { receipt: txHash, status: channel.status }
+  }
+
+  public async getAllTickets(): Promise<Ticket[]> {
+    return this.db.getAcknowledgedTickets().then((list) => list.map((t) => t.ticket))
+  }
+
+  public async getTickets(peerId: PeerId): Promise<Ticket[]> {
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
+    const channel = await this.db.getChannelX(selfPubKey, counterpartyPubKey)
+    return this.db
+      .getAcknowledgedTickets({
+        channel
+      })
+      .then((list) => list.map((t) => t.ticket))
   }
 
   public async getTicketStatistics() {

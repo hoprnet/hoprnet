@@ -39,8 +39,7 @@ components:
         signature:
           type: string
           description: Signature from requested message.
-      example:
-        signature: '0x304402201065a95fd22fc3e48266c3b270ace032489b0177e07d33c59e0d13dccc89108402205f41fb911bcfe485a8e58162ebce90382dc96ccafff378e5c8960e07efcf9e92'
+      example: '0x304402201065a95fd22fc3e48266c3b270ace032489b0177e07d33c59e0d13dccc89108402205f41fb911bcfe485a8e58162ebce90382dc96ccafff378e5c8960e07efcf9e92'
     Currency:
       type: string
       enum:
@@ -69,24 +68,53 @@ components:
       properties:
         type:
           type: string
-          example: incoming
+          enum:
+            - incoming
+            - outgoing
           description: Channel can be either incomming or outgoing. Incomming means that other node can send messages using this node as relay. Outgoing means that this node can use other node to send message as realy.
+          example: incoming
         channelId:
           type: string
-          example: 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7
           description: Channel ID that can be used in other calls, not to confuse with transaction hash.
-        peerId:
-          type: string
           example: '0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5'
-          description: PeerId of the other node in the channel.
+        peerId:
+          $ref: '#/components/schemas/HoprAddress'
         status:
           type: string
-          example: Open
+          enum:
+            - WaitingForCommitment
+            - Open
+            - PendingToClose
+            - Closed
           description: 'Status of the channel can be: WaitingForCommitment, Open, PendingToClose, or Closed.'
+          example: Open
         balance:
+          $ref: '#/components/schemas/HoprBalance'
+    Ticket:
+      type: object
+      properties:
+        counterparty:
+          $ref: '#/components/schemas/HoprAddress'
+        challenge:
           type: string
-          example: '1'
-          description: Amount of Hopr tokens left in the channel that can be used to pay for sending messages.
+          description: The ticket's challenge which needs to be solved before being able to claim the embedded incentive.
+        epoch:
+          type: string
+          description: Ticket redemption relies on providing the value opening to a series of commitments that have previously been stored on-chain by the ticket recipient.
+        index:
+          type: string
+          description: Each ticket is labeled by an ongoing serial number named ticket index i and its current value is stored in the smart contract.
+        amount:
+          type: string
+          description: The ticket's value in HOPR.
+        winProb:
+          type: string
+          description: The ticket's winning probability normalized with the common base of Ethereum which is 2^256-1.
+        channelEpoch:
+          type: string
+          description: Payment channels might run through multiple open and close sequences, this epoch tracks the sequence.
+        signature:
+          $ref: '#/components/schemas/Signature'
 
   securitySchemes:
     keyScheme:
