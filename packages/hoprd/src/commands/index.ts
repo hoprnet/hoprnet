@@ -89,7 +89,11 @@ export class Commands {
     let cmd = this.find(command)
 
     if (cmd) {
-      return await cmd.execute(log, query || '', this.state)
+      try {
+        return await cmd.execute(log, query || '', this.state)
+      } catch (err) {
+        return log(`${cmd} execution failed with error: ${err.message}`)
+      }
     }
 
     return log(`${cmd}: Unknown command!`)
