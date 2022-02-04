@@ -10,18 +10,8 @@ set -Eeuo pipefail
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-declare HOPR_LOG_ID="get-npm-package-info"
+
 source "${mydir}/utils.sh"
-
-usage() {
-  msg
-  msg "Usage: $0"
-  msg
-  msg "\t<pkg> must be one of packages under packages/, defaults to 'hoprd'"
-  msg "\t<pkg_version> must be a valid semver version which shall be checked, defaults to the latest tag"
-  msg
-}
-
 
 log "get default environment id"
 declare branch=$(git rev-parse --abbrev-ref HEAD)
