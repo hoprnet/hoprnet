@@ -47,7 +47,7 @@ export const POST: Operation = [
 
     try {
       setSetting(node, stateOps, key, value)
-      return res.status(200).send()
+      return res.status(204).send()
     } catch (error) {
       const INVALID_ARG = [STATUS_CODES.INVALID_SETTING_VALUE, STATUS_CODES.INVALID_SETTING].find((arg) =>
         error.message.includes(arg)
