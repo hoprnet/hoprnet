@@ -216,7 +216,7 @@ POST.apiDoc = {
     }
   },
   responses: {
-    '200': {
+    '201': {
       description: 'Channel succesfully opened.',
       content: {
         'application/json': {
