@@ -67,7 +67,7 @@ sed -e "s/\"version\":[ ]\"[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"/\"version\": 
   > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
 
 
-# Overwrite default environmnet in Dockerfile with currently used one
+# Overwrite default environmnet in Dockerfile with the one currently used
 sed -e "s/master-goerli/${environment_id}/" ./build/Dockerfile > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile 
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
