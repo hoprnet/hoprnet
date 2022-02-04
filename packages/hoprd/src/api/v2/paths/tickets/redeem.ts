@@ -20,7 +20,7 @@ POST.apiDoc = {
   tags: ['Tickets'],
   operationId: 'ticketsRedeemTickets',
   responses: {
-    '200': {
+    '204': {
       description: 'Tickets redeemed succesfully.'
     },
     '422': {
