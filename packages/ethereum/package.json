@@ -58,6 +58,9 @@
     "typedoc-plugin-markdown": "3.11.12",
     "typescript": "4.5.5"
   },
+  "resolutions": {
+    "eth-sig-util": "3.0.1"
+  },
   "engines": {
     "node": "16"
   },
