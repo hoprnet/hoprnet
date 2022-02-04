@@ -132,7 +132,7 @@ DELETE.apiDoc = {
     }
   },
   responses: {
-    '200': {
+    '204': {
       description: 'Alias removed succesfully.'
     },
     '422': {
