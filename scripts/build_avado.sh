@@ -77,3 +77,6 @@ npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${AVADO_SDK_COMM
 sudo avadosdk build --provider http://80.208.229.228:5001
 
 # http://go.ava.do/install/<IPFS HASH>
+
+# Undo changes to Avado Dockerfile
+sed -i "s/${environment_id}/master-goerli" ./build/Dockerfile
