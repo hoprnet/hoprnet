@@ -167,7 +167,7 @@ export const POST: Operation = [
 
     try {
       const { channelId, receipt } = await openChannel(node, peerId, amount)
-      return res.status(200).send({ channelId, receipt })
+      return res.status(201).send({ channelId, receipt })
     } catch (err) {
       const INVALID_ARG = [STATUS_CODES.INVALID_AMOUNT, STATUS_CODES.INVALID_PEERID].find((arg) =>
         err.message.includes(arg)
