@@ -49,10 +49,11 @@ Responsibilities:
 - to be the bridge between tech team and Project Owner
 - daily check for community created tasks in [hopr-devrel](https://github.com/hoprnet/hopr-devrel)
 - daily check for new [unreleased tokens](../UNRELEASED_TOKENS.md) emails send to `tech@hoprnet.org`
+- review tech related bounties ([read more](./bounty.md))
 
 _Current:_
 
-- [Tino](https://github.com/tolbrino) until 05/02/2022
+- [Tino](https://github.com/tolbrino) until 06/05/2022
 - [Robert](https://github.com/robertkiel) until 04/03/2022
 
 #### Electing a new representantive
@@ -266,6 +267,7 @@ All HOPR repositories must support at most these issue templates, more templates
 - [Bug Template](./.github/ISSUE_TEMPLATE/bug.md)
 - [Feature Template](./.github/ISSUE_TEMPLATE/feature.md)
 - [Custom Template](./.github/ISSUE_TEMPLATE/custom.md)
+- [Bounty Template](./.github/ISSUE_TEMPLATE/bounty.md) ([learn more](./bounty.md))
 
 - A _tech_ member, or an external contributor creates an issue using one of our templates, these templates may add some labels by default.
 - All new issues created by external contributors will contain a `new issue` label.

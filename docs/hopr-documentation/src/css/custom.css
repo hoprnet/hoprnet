@@ -74,6 +74,12 @@ h2 {
 .highlightPanel .mb-2 {
   margin: 0px !important;
 }
+.prism-code > code {
+  white-space: pre-wrap;
+}
+.admonition-content > p {
+  margin-bottom: 0.5rem;
+}
 .markdown a,
 .markdown ul li a {
   color: var(--ifm-color-primary);

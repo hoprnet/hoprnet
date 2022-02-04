@@ -51,4 +51,4 @@ jobs:
           ) && !env.ACT
         run: ./scripts/commit-and-push-all-changes.sh
         env:
-          HOPR_GIT_MSG: "Re-generate API docs for packages"
+          HOPR_GIT_MSG: 'Re-generate API docs for packages'
