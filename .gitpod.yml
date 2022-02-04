@@ -1,5 +1,5 @@
 tasks:
-    ## HOPR net repositories
+  ## HOPR net repositories
   - name: (HOPRd) Installing hoprnet which contains the required scripts
 
     # TODO: Change to the latest release (e.g. lisbon)
@@ -36,7 +36,7 @@ tasks:
 
   - name: WS
 
-    command: | 
+    command: |
       echo '📡 Node WS Connection'
       echo -e "\n"
       .bin/websocat "$(echo "$HOPR_NODE_1_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
