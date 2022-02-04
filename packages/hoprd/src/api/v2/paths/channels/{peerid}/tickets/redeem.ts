@@ -22,7 +22,7 @@ POST.apiDoc = {
   tags: ['Channels'],
   operationId: 'channelsRedeemTickets',
   responses: {
-    '200': {
+    '204': {
       description: 'Tickets redeemed succesfully.'
     },
     '422': {
