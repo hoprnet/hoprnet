@@ -1,8 +1,58 @@
-image:
-  file: .gitpod.Dockerfile
-
 tasks:
-  - init: yarn && yarn build
+    ## HOPR net repositories
+  - name: (HOPRd) Installing hoprnet which contains the required scripts
+
+    # TODO: Change to the latest release (e.g. lisbon)
+    command: |
+      echo '🟡 📦 Setting up hoprnet repository'
+      wget -O hopr.zip https://github.com/hoprnet/hoprnet/archive/refs/heads/release/athens.zip && unzip hopr.zip
+      cd hopr
+      echo '🟡 📦 Installing hoprnet repository dependencies'
+      ./scripts/install-websocat.sh
+      yarn
+      echo '🟡 📦 Building latest version of hoprnet monorepo'
+      yarn build
+      echo '🟡 Running HOPR nodes and topology'
+      ./scripts/setup-local-cluster.sh -t "MyT0ken123^" -m "$(gp url 8080)" -i scripts/topologies/full_interconnected_cluster.sh
+      echo '🚦 Waiting on all nodes...'
+      gp await-port 13301
+      echo '✔️ Node 1 is up at $(gp url 13301) '
+      gp await-port 13302
+      echo '✔️ Node 2 is up at $(gp url 13302) '
+      gp await-port 13303
+      echo '✔️ Node 3 is up at $(gp url 13303) '
+      gp await-port 13304
+      echo '✔️ Node 4 is up at $(gp url 13304) '
+      gp await-port 13305
+      echo '✔️ Node 5 is up at $(gp url 13305) '
+      echo '🎉 All nodes are up! 🎉'
+      export apiToken=MyT0ken123^ HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501)
+
+    openMode: split-right
+
+  - name: REST API
+
+    command: |
+      echo '📡 Node REST API'
+      echo -e "\n"
+      echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/address | jq
+
+  - name: WS
+
+    command: | 
+      echo '📡 Node WS Connection'
+      echo -e "\n"
+      .bin/websocat "$(echo "$HOPR_NODE_1_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
+
+    openMode: tab-after
 
 ports:
-  - port: 3000-9095
+  - name: HOPRd REST API
+    port: 13301-13305
+    visibility: public
+  - name: HOPR protocol
+    port: 19091-19095
+    visibility: public
+  - name: HOPRd Admin
+    port: 19501-19505
+    visibility: public
