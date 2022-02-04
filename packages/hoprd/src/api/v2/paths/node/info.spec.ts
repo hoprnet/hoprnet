@@ -6,6 +6,7 @@ let node = sinon.fake() as any
 
 describe('getInfo', () => {
   it('should get info', async () => {
+    node.environment = { id: 'hardhat-localhost' }
     node.smartContractInfo = sinon.fake.returns({
       network: 'a',
       hoprTokenAddress: 'b',
@@ -16,6 +17,7 @@ describe('getInfo', () => {
     node.getListeningAddresses = sinon.fake.returns([3, 4])
     const info = await getInfo({ node })
     assert.deepEqual(info, {
+      environment: 'hardhat-localhost',
       announcedAddress: ['1', '2'],
       listeningAddress: ['3', '4'],
       network: 'a',

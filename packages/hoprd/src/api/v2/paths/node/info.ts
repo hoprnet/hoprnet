@@ -10,6 +10,7 @@ export const getInfo = async ({ node }: { node: Hopr }) => {
     const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs } = node.smartContractInfo()
 
     return {
+      environment: node.environment.id,
       announcedAddress: (await node.getAnnouncedAddresses()).map((ma) => ma.toString()),
       listeningAddress: node.getListeningAddresses().map((ma) => ma.toString()),
       network: network,
@@ -48,6 +49,11 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
+              environment: {
+                type: 'string',
+                example: 'hardhat-localhost',
+                description: 'Name of the enviroment the node is running on.'
+              },
               announcedAddress: {
                 type: 'array',
                 items: {

@@ -34,10 +34,10 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
   throw Error(STATUS_CODES.TIMEOUT)
 }
 
-export const GET: Operation = [
+export const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
-    const { peerId } = req.query
+    const { peerId } = req.body
 
     if (!peerId) {
       return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
@@ -58,22 +58,29 @@ export const GET: Operation = [
   }
 ]
 
-GET.apiDoc = {
+POST.apiDoc = {
   description: 'Pings another node to check its availability.',
   tags: ['Node'],
   operationId: 'nodePing',
-  parameters: [
-    {
-      name: 'peerId',
-      in: 'query',
-      description: 'PeerId associated to the other node that we want to ping.',
-      required: true,
-      schema: {
-        type: 'string',
-        example: '16Uiu2HAmRFjDov6sbcZeppbnNFFTdx5hFoBzr8csBgevtKUex8y9'
+  requestBody: {
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          required: ['peerId'],
+          properties: {
+            peerId: {
+              type: 'string',
+              description: 'PeerId associated to the other node that we want to ping.'
+            }
+          },
+          example: {
+            peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
+          }
+        }
       }
     }
-  ],
+  },
   responses: {
     '200': {
       description: 'Ping successful.',

@@ -118,11 +118,22 @@ export const GET: Operation = [
     const { node } = req.context
     const { peerid } = req.params
 
+    let peerIdStr: string
+    try {
+      peerIdStr = PeerId.createFromB58String(peerid).toB58String()
+    } catch (err) {
+      return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
+    }
+
     try {
       const channels = await getChannels(node, true)
-      const incoming = channels.incoming.filter((channel) => channel.peerId === peerid)
-      const outgoing = channels.outgoing.filter((channel) => channel.peerId === peerid)
-      return res.status(200).send(incoming[0] || outgoing[0])
+      const incoming = channels.incoming.filter((channel) => channel.peerId === peerIdStr)
+      const outgoing = channels.outgoing.filter((channel) => channel.peerId === peerIdStr)
+      const channel = incoming[0] || outgoing[0]
+      if (!channel) {
+        return res.status(404).send({ status: STATUS_CODES.CHANNEL_NOT_FOUND })
+      }
+      return res.status(200).send(channel)
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
@@ -150,6 +161,32 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             $ref: '#/components/schemas/Channel'
+          }
+        }
+      }
+    },
+    '400': {
+      description: 'Invalid peerId.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/RequestStatus'
+          },
+          example: {
+            status: STATUS_CODES.INVALID_PEERID
+          }
+        }
+      }
+    },
+    '404': {
+      description: 'Channel with that peerId was not found. You can list all channels using /channels/ endpoint.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/RequestStatus'
+          },
+          example: {
+            status: STATUS_CODES.CHANNEL_NOT_FOUND
           }
         }
       }

@@ -26,7 +26,7 @@ export const getAlias = (state: Readonly<State>, alias: string): string => {
 export const GET: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
-    const { alias } = req.query
+    const { alias } = req.params
 
     try {
       const peerId = getAlias(stateOps.getState(), alias as string)
@@ -100,7 +100,7 @@ GET.apiDoc = {
 export const DELETE: Operation = [
   async (req, res, _next) => {
     const { stateOps } = req.context
-    const { alias } = req.body
+    const { alias } = req.params
 
     try {
       removeAlias(stateOps, alias)
@@ -116,21 +116,18 @@ DELETE.apiDoc = {
     'Unassign an alias from a PeerId. You can always assign back alias to that PeerId using /aliases endpoint.',
   tags: ['Aliases'],
   operationId: 'aliasesRemoveAlias',
-  requestBody: {
-    content: {
-      'application/json': {
-        schema: {
-          type: 'object',
-          properties: {
-            alias: { type: 'string', description: 'Alias that we want to remove.' }
-          },
-          example: {
-            alias: 'Alice'
-          }
-        }
+  parameters: [
+    {
+      name: 'alias',
+      in: 'path',
+      description: 'Alias that we want to remove.',
+      required: true,
+      schema: {
+        type: 'string',
+        example: 'Alice'
       }
     }
-  },
+  ],
   responses: {
     '204': {
       description: 'Alias removed succesfully.'

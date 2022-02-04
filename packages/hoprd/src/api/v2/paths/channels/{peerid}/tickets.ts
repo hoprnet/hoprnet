@@ -16,6 +16,9 @@ export const GET: Operation = [
 
     try {
       const tickets = await getTickets(node, peerid)
+      if (tickets.length <= 0) {
+        return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })
+      }
       return res.status(200).send(tickets)
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -50,6 +53,20 @@ GET.apiDoc = {
             items: {
               $ref: '#/components/schemas/Ticket'
             }
+          }
+        }
+      }
+    },
+    '404': {
+      description:
+        'Tickets were not found for that channel. That means that no messages were sent inside this channel yet.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/RequestStatus'
+          },
+          example: {
+            status: STATUS_CODES.TICKETS_NOT_FOUND
           }
         }
       }

@@ -9,7 +9,8 @@ import { STATUS_CODES } from '../../'
  * @returns Transaction hash if transaction got successfully submited.
  */
 export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipient: string, amount: string) => {
-  if (!['native', 'hopr'].includes(currency)) {
+  const currencyUpperCase = currency.toUpperCase() as 'NATIVE' | 'HOPR'
+  if (!['NATIVE', 'HOPR'].includes(currencyUpperCase)) {
     throw Error(STATUS_CODES.INVALID_CURRENCY)
   }
 
@@ -23,12 +24,11 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
     throw Error(STATUS_CODES.INVALID_ADDRESS)
   }
 
-  const balance = currency === 'native' ? await node.getNativeBalance() : await node.getBalance()
+  const balance = currencyUpperCase === 'NATIVE' ? await node.getNativeBalance() : await node.getBalance()
   if (balance.toBN().lt(new BN(amount))) {
     throw Error(STATUS_CODES.NOT_ENOUGH_BALANCE)
   }
 
-  const currencyUpperCase = currency.toUpperCase() as 'NATIVE' | 'HOPR'
   // TODO: withdraw hopr broken, its working but only resolves after transaction have been mined.
   const txHash = await node.withdraw(currencyUpperCase, recipient, amount)
   return txHash
@@ -64,7 +64,7 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description:
-    'Withdraw funds from this node to your ethereum wallet address. You can choose whitch currency you want to withdraw, native or hopr.',
+    'Withdraw funds from this node to your ethereum wallet address. You can choose whitch currency you want to withdraw, NATIVE or HOPR.',
   tags: ['Account'],
   operationId: 'accountWithdraw',
   requestBody: {

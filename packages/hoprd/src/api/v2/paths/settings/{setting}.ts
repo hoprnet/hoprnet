@@ -40,7 +40,7 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
   stateOps.setState(state)
 }
 
-export const POST: Operation = [
+export const PUT: Operation = [
   async (req, res, _next) => {
     const { stateOps, node } = req.context
     const { key, value } = req.body
@@ -61,7 +61,7 @@ export const POST: Operation = [
   }
 ]
 
-POST.apiDoc = {
+PUT.apiDoc = {
   description: `Change this node's setting value. Check Settings schema to learn more about each setting and the type of value it expects.`,
   tags: ['Settings'],
   operationId: 'settingsSetSetting',
@@ -70,7 +70,6 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          // TODO: improve docs here
           properties: {
             key: {
               type: 'string'

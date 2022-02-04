@@ -8,7 +8,12 @@ export const POST: Operation = [
     const { peerid } = req.params
 
     try {
-      await node.redeemTicketsInChannel(PeerId.createFromB58String(peerid))
+      const validPeerId = PeerId.createFromB58String(peerid)
+      const tickets = await node.getTickets(validPeerId)
+      if (tickets.length <= 0) {
+        return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })
+      }
+      await node.redeemTicketsInChannel(validPeerId)
       return res.status(204).send()
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -24,6 +29,20 @@ POST.apiDoc = {
   responses: {
     '204': {
       description: 'Tickets redeemed succesfully.'
+    },
+    '404': {
+      description:
+        'Tickets were not found for that channel. That means that no messages were sent inside this channel yet.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/RequestStatus'
+          },
+          example: {
+            status: STATUS_CODES.TICKETS_NOT_FOUND
+          }
+        }
+      }
     },
     '422': {
       description: 'Unknown failure.',

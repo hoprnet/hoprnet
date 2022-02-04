@@ -175,7 +175,7 @@ export const POST: Operation = [
       if (INVALID_ARG) {
         return res.status(400).send({ status: INVALID_ARG })
       } else if (err.message.includes(STATUS_CODES.CHANNEL_ALREADY_OPEN)) {
-        return res.status(304).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
+        return res.status(403).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
       } else if (err.message.includes(STATUS_CODES.NOT_ENOUGH_BALANCE)) {
         return res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
       } else {
@@ -239,17 +239,6 @@ POST.apiDoc = {
         }
       }
     },
-    '304': {
-      description: 'Channel already open. Cannot open more than one channel between two nodes.',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/RequestStatus'
-          },
-          example: { status: STATUS_CODES.CHANNEL_ALREADY_OPEN }
-        }
-      }
-    },
     '400': {
       description: 'Problem with inputs.',
       content: {
@@ -262,13 +251,41 @@ POST.apiDoc = {
       }
     },
     '403': {
-      description: 'Insufficient balance to open channel. Amount passed in request body exeeds current balance.',
+      description:
+        'Failed to open the channel either because of insufficient HOPR balance or because channel between this nodes already exists. Check response examples for more info.',
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schemas/RequestStatus'
+            oneOf: [
+              {
+                type: 'object',
+                properties: {
+                  status: {
+                    type: 'string',
+                    example: STATUS_CODES.NOT_ENOUGH_BALANCE,
+                    description:
+                      'Insufficient balance to open channel. Amount passed in request body exeeds current balance.'
+                  }
+                }
+              },
+              {
+                type: 'object',
+                properties: {
+                  status: {
+                    type: 'string',
+                    example: STATUS_CODES.CHANNEL_ALREADY_OPEN,
+                    description: 'Channel already open. Cannot open more than one channel between two nodes.'
+                  }
+                }
+              }
+            ]
           },
-          example: { status: STATUS_CODES.NOT_ENOUGH_BALANCE }
+          examples: {
+            NOT_ENOUGH_BALANCE: { value: { status: STATUS_CODES.NOT_ENOUGH_BALANCE } },
+            CHANNEL_ALREADY_OPEN: {
+              value: { status: STATUS_CODES.CHANNEL_ALREADY_OPEN }
+            }
+          }
         }
       }
     },
