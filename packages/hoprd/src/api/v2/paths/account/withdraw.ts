@@ -72,6 +72,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['currency', 'amount', 'recipient'],
           properties: {
             currency: {
               $ref: '#/components/schemas/Currency'

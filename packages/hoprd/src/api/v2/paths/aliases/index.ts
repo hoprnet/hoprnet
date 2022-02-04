@@ -111,6 +111,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['peerId', 'alias'],
           properties: {
             peerId: { type: 'string', description: 'PeerId that we want to set alias to.' },
             alias: { type: 'string', description: 'Alias that we want to attach to peerId.' }

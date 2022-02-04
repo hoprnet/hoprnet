@@ -70,6 +70,7 @@ PUT.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['key', 'value'],
           properties: {
             key: {
               type: 'string'

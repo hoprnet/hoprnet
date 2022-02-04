@@ -23,13 +23,13 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['message'],
           properties: {
             message: {
               description: 'The message to be signed.',
               type: 'string'
             }
-          },
-          required: ['message']
+          }
         }
       }
     }

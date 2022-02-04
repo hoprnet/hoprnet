@@ -196,6 +196,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['peerId', 'amount'],
           properties: {
             peerId: {
               type: 'string',

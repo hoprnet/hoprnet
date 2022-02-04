@@ -38,7 +38,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description:
-    'Information about the HOPR Node, including any options it started with. See the schema of the response to get more information on each field',
+    'Information about the HOPR Node, including any options it started with. See the schema of the response to get more information on each field.',
   tags: ['Node'],
   operationId: 'nodeGetInfo',
   responses: {

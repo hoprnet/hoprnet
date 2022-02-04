@@ -34,6 +34,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['body', 'recipient'],
           properties: {
             body: {
               description: 'The message body which should be sent.',
@@ -59,8 +60,7 @@ POST.apiDoc = {
                 example: '16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n'
               }
             }
-          },
-          required: ['body', 'recipient']
+          }
         }
       }
     }
