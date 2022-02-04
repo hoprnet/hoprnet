@@ -124,7 +124,7 @@ POST.apiDoc = {
     }
   },
   responses: {
-    '200': {
+    '201': {
       description: 'Alias set succesfully'
     },
     '400': {
