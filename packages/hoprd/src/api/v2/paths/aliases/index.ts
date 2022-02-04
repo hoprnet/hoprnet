@@ -90,7 +90,7 @@ export const POST: Operation = [
 
     try {
       setAlias(stateOps, alias, peerId)
-      return res.status(200).send()
+      return res.status(201).send()
     } catch (err) {
       if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
         return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID, error: err.message })
