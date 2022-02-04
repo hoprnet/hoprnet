@@ -41,8 +41,8 @@ const FeatureList = [
   {
     title: 'For Developers',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-development.svg'} />,
-    description: <>Coming Soon.</>,
-    docName: '#'
+    description: <>Learn how to build apps on top of the HOPR network.</>,
+    docName: 'developers/intro'
   },
   /*{
     title: 'Ecosystem',

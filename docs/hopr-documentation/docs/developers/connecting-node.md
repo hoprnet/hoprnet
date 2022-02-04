@@ -7,7 +7,7 @@ Once you have your HOPR cluster up and running, you are ready to connect to a si
 The following guide will show you how to connect to a running HOPR node, and verify some basic functionality using both the REST and WebSocket
 endpoints.
 
-## Requirements before getting started
+## Requirements
 
 ### 1. Get the node security credentials
 
@@ -34,8 +34,9 @@ export apiToken="^^LOCAL-testing-123^^"
 
 ### 2. Export your HOPR node REST/WebSocket endpoints
 
-If you followed the ["Running a local HOPR Cluster"](#) section, these will be already exported in your current terminal. Otherwise, you can run
-the following commands to ensure at least your first node's endpoints are exported.
+If you followed the ["Running a local HOPR Cluster"](/developers/starting-local-cluster) section, these will be already exported in your current terminal. Otherwise, you can run the following commands to ensure at least your first node's endpoints are exported.
+
+As an alternative, you an also run a single HOPR node following our [monorepo](https://github.com/hoprnet/hoprnet#develop) instructions.
 
 <details>
   <summary>Export REST and WebSocket endpoints (from local HOPR cluster)</summary>
@@ -149,7 +150,7 @@ If your node is running properly, you should see an image similar to this one:
 
 **Testing the REST API with `curl`**
 
-Given your node's `apiToken` and your `HOPR_NODE_1_HTTP_URL` from the ["Running a local HOPR Cluster"](#) section (likely `127.0.0.1:3001` or `127.0.0.1:13301`), try to send a REST command to query its address with the following `curl`
+Given your node's `apiToken` and your `HOPR_NODE_1_HTTP_URL` from the ["Running a local HOPR Cluster"](/developers/starting-local-cluster) section (likely `127.0.0.1:3001` or `127.0.0.1:13301`), try to send a REST command to query its address with the following `curl`
 command. If you don’t have `jq` installed, just remove it at the end of the command.
 
 ```
@@ -214,12 +215,20 @@ need to know your `apiToken`.
 
 - [Piesocket WebSocket Tester](https://www.piesocket.com/websocket-tester): This is a great tool to debug both listening and sending to
   messages from/to your HOPR node. Make sure you paste your `HOPR_NODE_1_WS_URL` and append your `apiToken` as a query parameter. Also,
-  you need to change the `http` protocol to `ws`. For instance, here's how this would look like in a `Gitpod.io` instance. After it's
-  connected, you can type `balance` to see your node response.
+  you need to change the `http` protocol to `ws`. For instance, here's how this would look like
+  in a `Gitpod.io` instance. After it's connected, you can type `balance` to see your node response.
 
 ```
-wss://19501-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/?apiToken=^^LOCAL-testing-123^^
+ws://127.0.0.1:19501/?apiToken=^^LOCAL-testing-123^^
 ```
+
+If you are using a Gitpod public URL, you can simply use the output of `gp url` for that particular port (`19501`) and paste it in the website.
+
+```
+gp url 19501
+```
+
+The output should look something like this `wss://19501-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/?apiToken=^^LOCAL-testing-123^^`.
 
 **REST client**
 
@@ -229,15 +238,14 @@ wss://19501-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/?apiToken=^^LOCAL-tes
 
 :::info Tip
 For `apiToken` `^^LOCAL-testing-123^^` the `base64` encoded value is `Xl5MT0NBTC10ZXN0aW5nLTEyM15e`, so to use [ReqBin](https://reqbin.com/)
-with a Gitpod exposed URL, you can do the following. For a different `apiToken` value, you can use the `btoa` function of your browser
-Developer Tools to figure it out.
+with a Gitpod exposed URL (e.g. `https://13302-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/api/v2/account/address`), you can use `gp url`.
+For a different `apiToken` value, you can use the `btoa` function of your browser Developer Tools to figure it out.
 
 <br/>
 
-**URL**
-
+**Gitpod command (paste output in the URL section of `reqbin`)**
 ```
-https://13302-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/api/v2/account/address
+gp url 13302
 ```
 
 **Custom Header**

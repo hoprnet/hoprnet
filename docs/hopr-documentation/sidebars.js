@@ -65,7 +65,8 @@ const sidebars = {
     {
       type: 'category',
       label: 'Developers',
-      items: ['developers/connecting-node', 'developers/tutorial-hello-world']
+      link: {type: 'doc', id: 'developers/intro'},
+      items: ['developers/starting-local-cluster', 'developers/connecting-node', 'developers/tutorial-hello-world']
     },
     /*{
         type: 'doc',
