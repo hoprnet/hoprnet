@@ -1,7 +1,6 @@
 tasks:
   ## HOPR net repositories
   - name: (HOPRd) Installing hoprnet which contains the required scripts
-
     # TODO: Change to the latest release (e.g. lisbon)
     command: |
       echo '🟡 📦 Installing hoprnet repository dependencies'
@@ -28,18 +27,20 @@ tasks:
     openMode: split-right
 
   - name: REST API
-
     command: |
+      gp await-port 13301
+      
       echo '📡 Node REST API'
       echo -e "\n"
       echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/address | jq
 
   - name: WS
-
     command: |
+      gp await-port 13301
+      
       echo '📡 Node WS Connection'
       echo -e "\n"
-      .bin/websocat "$(echo "$HOPR_NODE_1_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
+      ./.bin/websocat "$(echo "$HOPR_NODE_1_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
 
     openMode: tab-after
 
