@@ -83,7 +83,7 @@ POST.apiDoc = {
     }
   },
   responses: {
-    '200': {
+    '204': {
       description: 'Setting set succesfully'
     },
     '400': {
