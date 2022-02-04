@@ -15,15 +15,23 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] version"
+  msg "Usage: $0 [-h|--help] version [environment]"
   msg
   msg "Sets the version of the AVADO build and builds the image. Version must be semver"
+  msg "Optional: set default environment"
   msg
 }
 
 if [ -z "${1:-}" ]; then
   msg "Missing version"
   usage
+  exit 1
+fi
+
+declare environment_id="${2:-"$(${mydir}/get-default-environment.sh)"}"
+
+if [ -z ${environment_id} ]; then
+  msg "Could not determine default environment"
   exit 1
 fi
 
@@ -48,6 +56,18 @@ sed -i "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0
 
 # Write dappnode version
 sed -i "s/\"version\":[ ]\"[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"/\"version\": \"${AVADO_VERSION}\"/" ./dappnode_package.json
+
+
+declare default_development_environment="master-goerli"
+
+if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]; then
+  # Fail if default environment is no longer `master-goerli`
+  msg "Avado Dockerfile differs. Could not find \"${default_development_environment}\" environment in it"
+  exit 1
+fi
+
+sed -i "s/master-goerli/${environment_id}/" ./build/Dockerfile
+
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
 declare AVADO_SDK_COMMIT="de9f16d"
