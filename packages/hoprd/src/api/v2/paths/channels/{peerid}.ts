@@ -2,7 +2,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { STATUS_CODES } from '../../'
-import { getChannels } from '.'
+import { channelStatusToString, getChannels } from '.'
 
 /**
  * Closes a channel with provided peerId.
@@ -35,7 +35,7 @@ export const DELETE: Operation = [
 
     try {
       const { receipt, channelStatus } = await closeChannel(node, peerid)
-      return res.status(200).send({ receipt, channelStatus })
+      return res.status(200).send({ receipt, channelStatus: channelStatusToString(channelStatus) })
     } catch (err) {
       if (err.message.includes(STATUS_CODES.INVALID_PEERID)) {
         return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })

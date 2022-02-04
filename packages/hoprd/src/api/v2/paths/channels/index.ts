@@ -13,7 +13,7 @@ export interface ChannelInfo {
   balance: string
 }
 
-const channelStatusToString = (status: ChannelStatus): string => {
+export const channelStatusToString = (status: ChannelStatus): string => {
   if (status === 0) return 'Closed'
   else if (status === 1) return 'WaitingForCommitment'
   else if (status === 2) return 'Open'
