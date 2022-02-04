@@ -187,7 +187,7 @@ Congratulations! You have sent your first message using the HOPR protocol!
 
 You can not send an unlimited amount of messages[^2]. Each message requires `ticket`s, headers with signatures for claiming
 balance updates in a `HOPR` token balanced Payment Channel. For every relayer you use (default `2`) you need to "attach"
-`HOPR` tokens (`0.01` per relay), which are used to pay for relayer's work, and are settledin a global single entry
+`HOPR` tokens (`0.01` per relay), which are used to pay for relayer's work, and are settled in a global single entry
 `HoprChannels` Ethereum contract. 
 
 The previous message worked because a cluster has been configured by default to open a few channels and locked enough `HOPR`
