@@ -135,7 +135,8 @@ export class ChannelEntry {
    * @returns true if the time window passed, false if not
    */
   public closureTimePassed(): boolean {
-    const now = new BN(new Date().getTime())
+    const nowInSeconds = Math.round(new Date().getTime() / 1000)
+    const now = new BN(nowInSeconds)
     return !!this.closureTime && now.gt(this.closureTime.toBN())
   }
 
