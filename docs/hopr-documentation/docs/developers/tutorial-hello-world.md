@@ -88,16 +88,19 @@ terminal.
 Using `websocat` or any other WebSocket client, connect to your `node 2` until you are able to receive and send messages to it.
 
 **Connecting to `node 2` via `websocat`**
+
 ```
 .bin/websocat "$(echo "$HOPR_NODE_2_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
 ```
 
 **Connecting to `node 2` via [Piesocket WebSocket Tester](https://www.piesocket.com/websocket-tester)**
+
 ```
 ws://127.0.0.1:19502/?apiToken=^^LOCAL-testing-123^^
 ```
 
 You can verify that you are connected by typing the command `address` and seeing an output similar to this:
+
 ```
 {"type":"log","msg":"admin > address\n","ts":"2022-02-02T19:17:48.431Z"}
 {"type":"log","msg":"HOPR Address:  16Uiu2HAmKhrwGWcvaZ3ic5dgy7oFawmnELJGBrySSsNo4bzGBxHW\nETH Address:   0x4cD95E1deF16D5913255Fe0af208EdDe2e04d720","ts":"2022-02-02T19:17:48.435Z"}
@@ -108,21 +111,27 @@ You can verify that you are connected by typing the command `address` and seeing
 Using `curl` or any other HTTP client, verify you can reach your `node 1`'s API
 
 **Obtaining the `node 1` address using `curl`**
+
 ```
 echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/address | jq
 ```
+
 **Obtaining the `node 1` address using [reqbin](https://reqbin.com/)**
 
 _URL_
+
 ```
 http://127.0.0.1:13301/api/v2/account/address
 ```
+
 _Custom Header (default `apiToken` `base64`-encoded)_
+
 ```
 Basic Xl5MT0NBTC10ZXN0aW5nLTEyM15e
 ```
 
 If you sent a successful request, the response will look something like this:
+
 ```
 {
   "nativeAddress": "0x3a54dDE3ee5ACfd43C902cbecC8ED0CBA10Ff326",
@@ -188,7 +197,7 @@ Congratulations! You have sent your first message using the HOPR protocol!
 You can not send an unlimited amount of messages[^2]. Each message requires `ticket`s, headers with signatures for claiming
 balance updates in a `HOPR` token balanced Payment Channel. For every relayer you use (default `2`) you need to "attach"
 `HOPR` tokens (`0.01` per relay), which are used to pay for relayer's work, and are settled in a global single entry
-`HoprChannels` Ethereum contract. 
+`HoprChannels` Ethereum contract.
 
 The previous message worked because a cluster has been configured by default to open a few channels and locked enough `HOPR`
 tokens to send messages to at least `2` relayers. When a path used to relay has depleted (empty) or closed `channels`,
@@ -204,14 +213,12 @@ Likewise, you can see your balance via the following command.
 balance
 ```
 
-
 ## HOPR Admin UI and REST API
 
 We ran all these commands via our WebSocket API, but you can also see them via our Web UI interface called `hopr-admin`.
 In a browser, you can simply paste your `HOPR_NODE_1_WS_URL`. You should be able to see an image like the following one:
 
 ![HOPR Admin Image](/img/developer/hopr_admin_ui.png)
-
 
 ## Walkthrough
 
@@ -222,14 +229,15 @@ of the local HOPR cluster.
   <iframe src="https://player.vimeo.com/video/672847960?h=bc02050298" width="640" height="564" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
 </figure>
 
-[^1]: As defined in ["Running a local HOPR Cluster"](#), a HOPR cluster is a set of HOPR nodes that are connected (i.e 
-reachable) between each other and have openned funded channels between each other. This is also known as a [Complete
-Graph](https://en.wikipedia.org/wiki/Complete_graph), and although it is not required for successfully sending a message
-(i.e. you only need `1` path to a recipient when sending a message), it makes testing and developing HOPR apps easier.
+[^1]:
+    As defined in ["Running a local HOPR Cluster"](#), a HOPR cluster is a set of HOPR nodes that are connected (i.e
+    reachable) between each other and have openned funded channels between each other. This is also known as a [Complete
+    Graph](https://en.wikipedia.org/wiki/Complete_graph), and although it is not required for successfully sending a message
+    (i.e. you only need `1` path to a recipient when sending a message), it makes testing and developing HOPR apps easier.
 
-[^2]: When a HOPR node uses the `/api/v2/messages` REST API endpoint to send a message, it will use a random path of at
-least `2` nodes as relayers. These messages cost `$HOPR` tokens, because it pays each relayer accordingly to forward the
-packet. However, you can also send what it is known as `0-hop` messages, which bears no cost, but provides no privacy, as
-the message is sent directly to the recipient. The REST API endpoint does not expose this, but you can send a `0-hop`
-message via the HOPR admin UI or WebSocket client by typing `send ,$peerId message`.
-
+[^2]:
+    When a HOPR node uses the `/api/v2/messages` REST API endpoint to send a message, it will use a random path of at
+    least `2` nodes as relayers. These messages cost `$HOPR` tokens, because it pays each relayer accordingly to forward the
+    packet. However, you can also send what it is known as `0-hop` messages, which bears no cost, but provides no privacy, as
+    the message is sent directly to the recipient. The REST API endpoint does not expose this, but you can send a `0-hop`
+    message via the HOPR admin UI or WebSocket client by typing `send ,$peerId message`.
