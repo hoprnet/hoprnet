@@ -17,7 +17,7 @@ Before getting started, we suggest you get familiar with the following concepts:
 
 ### 2. HOPR Cluster & exported variables
 
-Make sure you have a HOPR cluster available for you to connect. Also, make sure to have the equivalent of at least `2`
+Make sure you have a HOPR cluster[^1] available for you to connect. Also, make sure to have the equivalent of at least `2`
 nodes endpoints (both HTTP and WS). Here are the default values for each of these endpoints.
 
 <details>
@@ -185,7 +185,7 @@ Congratulations! You have sent your first message using the HOPR protocol!
 
 ### 3. Extra: Channels and tickets
 
-You can not send an unlimited amount of messages. Each message requires `ticket`s, headers with signatures for claiming
+You can not send an unlimited amount of messages[^2]. Each message requires `ticket`s, headers with signatures for claiming
 balance updates in a `HOPR` token balanced Payment Channel. For every relayer you use (default `2`) you need to "attach"
 `HOPR` tokens (`0.01` per relay), which are used to pay for relayer's work, and are settledin a global single entry
 `HoprChannels` Ethereum contract. 
@@ -221,4 +221,15 @@ of the local HOPR cluster.
 <figure class="video-container" style={{"marginTop": "-100px"}}>
   <iframe src="https://player.vimeo.com/video/672847960?h=bc02050298" width="640" height="564" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
 </figure>
+
+[^1]: As defined in ["Running a local HOPR Cluster"](#), a HOPR cluster is a set of HOPR nodes that are connected (i.e 
+reachable) between each other and have openned funded channels between each other. This is also known as a [Complete
+Graph](https://en.wikipedia.org/wiki/Complete_graph), and although it is not required for successfully sending a message
+(i.e. you only need `1` path to a recipient when sending a message), it makes testing and developing HOPR apps easier.
+
+[^2]: When a HOPR node uses the `/api/v2/messages` REST API endpoint to send a message, it will use a random path of at
+least `2` nodes as relayers. These messages cost `$HOPR` tokens, because it pays each relayer accordingly to forward the
+packet. However, you can also send what it is known as `0-hop` messages, which bears no cost, but provides no privacy, as
+the message is sent directly to the recipient. The REST API endpoint does not expose this, but you can send a `0-hop`
+message via the HOPR admin UI or WebSocket client by typing `send ,$peerId message`.
 

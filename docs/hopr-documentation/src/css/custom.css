@@ -160,3 +160,10 @@ html[data-theme='dark'] .docusaurus-highlight-code-line {
 summary {
   list-style-type: none;
 }
+
+.footnotes {
+  font-size: 0.9em;
+}
+.footnotes li {
+  margin-bottom: 20px;
+}
