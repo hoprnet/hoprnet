@@ -8,8 +8,7 @@ export const GET: Operation = [
 
 // TODO: document
 GET.apiDoc = {
-  description:
-    'For developer convenience, we will be documenting the websocket endpoint here, however, the websocket endpoint lives on a different port, depending on the configuration of your node the port might be different.',
+  description: 'For developer convenience, we will be documenting the websocket endpoint here.',
   tags: ['Messages'],
   operationId: 'messagesWebsocket',
   responses: {

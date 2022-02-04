@@ -60,35 +60,34 @@ const argv = yargs(process.argv.slice(2))
     describe: 'Run an admin interface on localhost:3000, requires --apiToken',
     default: false
   })
-  .option('rest', {
-    boolean: true,
-    describe: 'Expose the Rest API on localhost:3001, requires --apiToken',
-    default: false
-  })
-  .option('restHost', {
+  .option('adminHost', {
     string: true,
-    describe: 'Set host IP to which the Rest API server will bind',
+    describe: 'Host to listen to for admin console',
     default: 'localhost'
   })
-  .option('restPort', {
-    number: true,
-    describe: 'Set host port to which the Rest API server will bind',
-    default: 3001
-  })
-  .option('ws', {
-    boolean: true,
-    describe: 'Expose the WS API on localhost:3002, requires --apiToken',
-    default: false
-  })
-  .option('wsHost', {
+  .option('adminPort', {
     string: true,
-    describe: 'Set host IP to which the WS API server will bind',
-    default: 'localhost'
+    describe: 'Port to listen to for admin console',
+    default: 3000
   })
-  .option('wsPort', {
+  .option('api', {
+    boolean: true,
+    describe:
+      'Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated.',
+    default: false,
+    alias: 'rest'
+  })
+  .option('apiHost', {
+    string: true,
+    describe: 'Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated.',
+    default: 'localhost',
+    alias: 'restHost'
+  })
+  .option('apiPort', {
     number: true,
-    describe: 'Set host port to which the WS API server will bind',
-    default: 3002
+    describe: 'Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated.',
+    default: 3001,
+    alias: 'restPort'
   })
   .option('healthCheck', {
     boolean: true,
@@ -154,16 +153,6 @@ const argv = yargs(process.argv.slice(2))
     boolean: true,
     describe: "initialize a database if it doesn't already exist",
     default: false
-  })
-  .option('adminHost', {
-    string: true,
-    describe: 'Host to listen to for admin console',
-    default: 'localhost'
-  })
-  .option('adminPort', {
-    string: true,
-    describe: 'Port to listen to for admin console',
-    default: 3000
   })
   .option('allowLocalNodeConnections', {
     boolean: true,
@@ -317,9 +306,9 @@ async function main() {
     logs.startLoggingQueue()
   }
 
-  if (!argv.testNoAuthentication && (argv.rest || argv.ws || argv.admin)) {
+  if (!argv.testNoAuthentication && (argv.api || argv.admin)) {
     if (argv.apiToken == null) {
-      throw Error(`Must provide --apiToken when --rest, --ws or --admin is specified`)
+      throw Error(`Must provide --apiToken when --api, --rest or --admin is specified`)
     }
     const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
     for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
@@ -372,7 +361,11 @@ async function main() {
     node.on('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
-      if (argv.rest || argv.ws || argv.admin) {
+      if (argv.api || argv.admin) {
+        /*
+          When `--api` is used, we turn on Rest API v1, v2 and WS API v2.
+          When `--admin` is used, we turn on WS API v1 only.
+        */
         setupAPI(
           node,
           logs,

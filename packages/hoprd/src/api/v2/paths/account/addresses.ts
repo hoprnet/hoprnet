@@ -53,12 +53,24 @@ GET.apiDoc = {
             type: 'object',
             properties: {
               nativeAddress: {
-                $ref: '#/components/schemas/NativeAddress',
-                deprecated: true
+                allOf: [
+                  {
+                    $ref: '#/components/schemas/NativeAddress'
+                  },
+                  {
+                    deprecated: true
+                  }
+                ]
               },
               hoprAddress: {
-                $ref: '#/components/schemas/HoprAddress',
-                deprecated: true
+                allOf: [
+                  {
+                    $ref: '#/components/schemas/HoprAddress'
+                  },
+                  {
+                    deprecated: true
+                  }
+                ]
               },
               native: {
                 $ref: '#/components/schemas/NativeAddress'
