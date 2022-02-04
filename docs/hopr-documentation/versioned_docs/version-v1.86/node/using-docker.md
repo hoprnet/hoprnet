@@ -55,6 +55,7 @@ Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
 The `athens` tag represents the latest community release version.
 
 Open your console based on your OS:
+
 - Terminal (Mac OS / Linux OS)
 
 You can pull the Docker image like so:

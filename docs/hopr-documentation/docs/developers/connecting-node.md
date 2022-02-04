@@ -23,6 +23,7 @@ so make sure to change it when running your own node in a public network.
 ```
 ^^LOCAL-testing-123^^
 ```
+
 :::
 
 Make sure to export your `apiToken` to be used in the incoming commands, and every time you open a new terminal.
@@ -116,6 +117,7 @@ cd scripts
 </pre>
 
 <b>Install script</b>
+
 <pre>
 ./install-websocat.sh
 </pre>
@@ -176,7 +178,7 @@ In case you have made a mistake, like forgotten to use `-n` in your `echo` or ha
 ### 2. Test WebSocket connectivity
 
 Unlike our REST API endpoint, to see interactions against our HOPR node WebSocket server, we need to use a WebSocket client that will remain
-open to listen to all messages sent to our HOPR node. 
+open to listen to all messages sent to our HOPR node.
 
 **Connecting to our HOPR node WebSocket server**
 
@@ -211,9 +213,9 @@ need to know your `apiToken`.
 **WebSocket clients**
 
 - [Piesocket WebSocket Tester](https://www.piesocket.com/websocket-tester): This is a great tool to debug both listening and sending to
-messages from/to your HOPR node. Make sure you paste your `HOPR_NODE_1_WS_URL` and append your `apiToken` as a query parameter. Also,
-you need to change the `http` protocol to `ws`. For instance, here's how this would look like in a `Gitpod.io` instance. After it's
-connected, you can type `balance` to see your node response.
+  messages from/to your HOPR node. Make sure you paste your `HOPR_NODE_1_WS_URL` and append your `apiToken` as a query parameter. Also,
+  you need to change the `http` protocol to `ws`. For instance, here's how this would look like in a `Gitpod.io` instance. After it's
+  connected, you can type `balance` to see your node response.
 
 ```
 wss://19501-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/?apiToken=^^LOCAL-testing-123^^
@@ -222,8 +224,8 @@ wss://19501-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/?apiToken=^^LOCAL-tes
 **REST client**
 
 - [ReqBin](https://reqbin.com/): Using their `Custom` Header option, you can send the proper `Authorization` request so you can test your
-HOPR node endpoint. For testing, we suggest using `HOPR_NODE_1_HTTP_URL` and the `api/v2/account/address` endpoint. Make sure sure to use
-the `base64` encoded version of your `apiToken` and adding the prefix `Basic `.
+  HOPR node endpoint. For testing, we suggest using `HOPR_NODE_1_HTTP_URL` and the `api/v2/account/address` endpoint. Make sure sure to use
+  the `base64` encoded version of your `apiToken` and adding the prefix `Basic `.
 
 :::info Tip
 For `apiToken` `^^LOCAL-testing-123^^` the `base64` encoded value is `Xl5MT0NBTC10ZXN0aW5nLTEyM15e`, so to use [ReqBin](https://reqbin.com/)
@@ -233,16 +235,20 @@ Developer Tools to figure it out.
 <br/>
 
 **URL**
+
 ```
 https://13302-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/api/v2/account/address
 ```
 
 **Custom Header**
+
 ```
 Basic Xl5MT0NBTC10ZXN0aW5nLTEyM15e
 ```
+
 :::
 
-[^1]: Although you can successfully interact with a HOPR node only using a WebSocket client, it is recommended to always use the REST API
-for sending commands to the HOPR node, as the API is optimized for applications, whereas the WebSocket commands are mostly used within the
-`hopr-admin` UI, an operator-targeted tooling used to verify the functionality of the node.
+[^1]:
+    Although you can successfully interact with a HOPR node only using a WebSocket client, it is recommended to always use the REST API
+    for sending commands to the HOPR node, as the API is optimized for applications, whereas the WebSocket commands are mostly used within the
+    `hopr-admin` UI, an operator-targeted tooling used to verify the functionality of the node.
