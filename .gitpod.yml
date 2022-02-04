@@ -4,9 +4,6 @@ tasks:
 
     # TODO: Change to the latest release (e.g. lisbon)
     command: |
-      echo '🟡 📦 Setting up hoprnet repository'
-      wget -O hopr.zip https://github.com/hoprnet/hoprnet/archive/refs/heads/release/athens.zip && unzip hopr.zip
-      cd hopr
       echo '🟡 📦 Installing hoprnet repository dependencies'
       ./scripts/install-websocat.sh
       yarn
