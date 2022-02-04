@@ -30,7 +30,17 @@ describe('test fifo', function () {
     const queue = FIFO<number>()
 
     assert(queue.shift() == undefined)
+    assert(queue.last() == undefined)
 
+    assert(queue.size() == 0)
+
+    // Should not do anyting
+    assert(
+      queue.replace(
+        (item: number) => item == 3,
+        () => 5
+      ) == false
+    )
     assert(queue.size() == 0)
   })
 
