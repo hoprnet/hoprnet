@@ -50,10 +50,13 @@ export default function setupAPI(
   }
 
   // creates WS server for API v1 and API v2
+  // we should probably disable legacy WS V1 here
+  // and assume that people using `--ws` will always
+  // want V2, it's added here to be consistent with API V1 and V2
   if (options.ws) {
     const server = http.createServer()
     const wsV1 = new ws.Server({ noServer: true, path: '/' })
-    const wsV2 = new ws.Server({ noServer: true, path: '/api/v2/messages/websocket' })
+    const wsV2 = new ws.Server({ noServer: true, path: '/v2' })
 
     apiV1.setupWsApi(wsV1, logs, options, adminServer)
     apiV2.setupWsApi(wsV2, logs, options)
@@ -65,7 +68,7 @@ export default function setupAPI(
         wsV1.handleUpgrade(request, socket, head, function done(ws) {
           wsV1.emit('connection', ws, request)
         })
-      } else if (pathname === '/api/v2/messages/websocket') {
+      } else if (pathname === '/v2') {
         wsV2.handleUpgrade(request, socket, head, function done(ws) {
           wsV2.emit('connection', ws, request)
         })
