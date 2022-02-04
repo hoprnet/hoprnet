@@ -4,6 +4,10 @@
 
 ### Changes
 
+- Expanded API v2 with routes covering most of the cli commands logic ([#3367](https://github.com/hoprnet/hoprnet/pull/3367))
+- New API v2 endpoints allowing fetching and redeeming tickets from specific channels ([#3367](https://github.com/hoprnet/hoprnet/pull/3367))
+- New websocket endpoint `/messages/websocket` and addition of `--ws`, `--wsHost`, and `--wsPort` flags to `hoprd` ([#3367](https://github.com/hoprnet/hoprnet/pull/3367))
+
 ---
 
 <a name="1.86"></a>
