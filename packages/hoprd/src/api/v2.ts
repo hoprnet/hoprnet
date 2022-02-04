@@ -6,7 +6,7 @@ import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import PeerId from 'peer-id'
-import { Address } from '@hoprnet/hopr-utils'
+import { debug, Address } from '@hoprnet/hopr-utils'
 
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
@@ -14,6 +14,8 @@ import type Hopr from '@hoprnet/hopr-core'
 import type { LogStream } from './../logs'
 import type { StateOps } from '../types'
 import { authenticateWsConnection } from './utils'
+
+const debugLog = debug('hoprd:api:v2')
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
@@ -118,7 +120,7 @@ export function setupRestApi(
   }) as express.ErrorRequestHandler)
 }
 
-export function setupWsApi(server: WebSocketServer, logs: LogStream, options: { apiToken?: string }) {
+export function setupWsApi(server: WebSocketServer, node: Hopr, logs: LogStream, options: { apiToken?: string }) {
   server.on('connection', (socket, req) => {
     if (!authenticateWsConnection(logs, req, options.apiToken)) {
       socket.send(
@@ -131,6 +133,23 @@ export function setupWsApi(server: WebSocketServer, logs: LogStream, options: { 
       socket.close()
       return
     }
+
+    // used by E2E tests to test security
+    socket.on('message', (message: string) => {
+      debugLog('Received message', message)
+      if (message === '_test') {
+        socket.emit('OK')
+      }
+    })
+
+    socket.on('error', (err: string) => {
+      debugLog('Error', err)
+      logs.log('Websocket error', err.toString())
+    })
+
+    node.on('hopr:message', (msg: Uint8Array) => {
+      socket.emit(msg.toString())
+    })
   })
 }
 

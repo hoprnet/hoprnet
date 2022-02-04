@@ -112,7 +112,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${npm_install_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 14301 14302 14303 14304 14305 14306 14307 19091 19092 19093 19094 19095 19096 19097 20000; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -126,24 +126,23 @@ if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
-# $1 = rest port
+# $1 = api port
 # $2 = node port
 # $3 = admin port
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
-# $7 = OPTIONAL: additions args to hoprd
+# $7 = OPTIONAL: additional args to hoprd
 function setup_node() {
-  local rest_port=${1}
-  local ws_port=${2}
-  local node_port=${3}
-  local admin_port=${4}
-  local dir=${5}
-  local log=${6}
-  local id=${7}
-  local additional_args=${8:-""}
+  local api_port=${1}
+  local node_port=${2}
+  local admin_port=${3}
+  local dir=${4}
+  local log=${5}
+  local id=${6}
+  local additional_args=${7:-""}
 
-  log "Run node ${id} on rest port ${rest_port} and ws port ${ws_port} -> ${log}"
+  log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [ -n "${additional_args}" ]; then
     log "Additional args: \"${additional_args}\""
@@ -162,10 +161,8 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="${password}" \
-    --rest \
-    --restPort "${rest_port}" \
-    --ws \
-    --wsPort "${ws_port}" \
+    --api \
+    --apiPort "${api_port}" \
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
@@ -277,13 +274,6 @@ ensure_port_is_free 13304
 ensure_port_is_free 13305
 ensure_port_is_free 13306
 ensure_port_is_free 13307
-ensure_port_is_free 14301
-ensure_port_is_free 14302
-ensure_port_is_free 14303
-ensure_port_is_free 14304
-ensure_port_is_free 14305
-ensure_port_is_free 14306
-ensure_port_is_free 14307
 ensure_port_is_free 19091
 ensure_port_is_free 19092
 ensure_port_is_free 19093
@@ -329,12 +319,12 @@ log "Hardhat node started (127.0.0.1:8545)"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 14301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
-setup_node 13302 14302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce --testNoAuthentication"
-setup_node 13303 14303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "--announce"
-setup_node 13304 14304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections"
-setup_node 13305 14305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections"
-setup_node 13306 14306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
+setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
+setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce --testNoAuthentication"
+setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "--announce"
+setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections"
+setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections"
+setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
 # should not be able to talk to the rest
 setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
 # }}}
@@ -373,7 +363,7 @@ wait_for_port 19097 "127.0.0.1" "${node7_log}"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 14301 14302 19501 19502 "${api_token}"
+  127.0.0.1 13301 13302 19501 19502 "${api_token}"
 #}}}
 
 # --- Run test --- {{{
