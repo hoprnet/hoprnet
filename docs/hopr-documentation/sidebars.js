@@ -62,9 +62,14 @@ const sidebars = {
       label: 'Staking',
       items: ['staking/how-to-get-hopr', 'staking/how-to-stake', 'staking/convert-hopr']
     },
+    {
+      type: 'category',
+      label: 'Developers',
+      items: ['developers/connecting-node', 'developers/tutorial-hello-world']
+    },
     /*{
         type: 'doc',
-	id: 'staking',
+  id: 'staking',
         label: 'Staking',
     },*/
     {
