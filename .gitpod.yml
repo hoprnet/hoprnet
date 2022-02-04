@@ -1,13 +1,14 @@
 tasks:
   ## HOPR net repositories
   - name: (HOPRd) Installing hoprnet which contains the required scripts
-    # TODO: Change to the latest release (e.g. lisbon)
-    command: |
-      echo '🟡 📦 Installing hoprnet repository dependencies'
+    init: |
+      echo '🦄 📦 Installing hoprnet repository dependencies'
       ./scripts/install-websocat.sh
       yarn
-      echo '🟡 📦 Building latest version of hoprnet monorepo'
+      echo '🦄 📦 Building latest version of hoprnet monorepo'
       yarn build
+
+    command: |
       echo '🟡 Running HOPR nodes and topology'
       ./scripts/setup-local-cluster.sh -t "MyT0ken123^" -m "$(gp url 8080)" -i scripts/topologies/full_interconnected_cluster.sh
       echo '🚦 Waiting on all nodes...'
@@ -22,27 +23,28 @@ tasks:
       gp await-port 13305
       echo '✔️ Node 5 is up at $(gp url 13305) '
       echo '🎉 All nodes are up! 🎉'
-      export apiToken=MyT0ken123^ HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501)
 
-    openMode: split-right
+    openMode: tab-after
 
   - name: REST API
     command: |
       gp await-port 13301
-      
+      export apiToken=MyT0ken123^ HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501)
       echo '📡 Node REST API'
       echo -e "\n"
       echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/address | jq
 
+    openMode: tab-after
+
   - name: WS
     command: |
       gp await-port 13301
-      
+      export apiToken=MyT0ken123^ HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501)
       echo '📡 Node WS Connection'
       echo -e "\n"
       ./.bin/websocat "$(echo "$HOPR_NODE_1_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
 
-    openMode: tab-after
+    openMode: split-right
 
 ports:
   - name: HOPRd REST API
