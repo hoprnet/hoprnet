@@ -50,12 +50,6 @@ fi
 
 cd "${mydir}/../packages/avado"
 
-# Write AVADO docker build version
-sed -i "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/" ./docker-compose.yml
-
-# Write dappnode version
-sed -i "s/\"version\":[ ]\"[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"/\"version\": \"${AVADO_VERSION}\"/" ./dappnode_package.json
-
 declare default_development_environment="master-goerli"
 
 if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]; then
@@ -64,8 +58,17 @@ if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]
   exit 1
 fi
 
+# Write AVADO docker build version
+sed -e "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/image: 'hopr.avado.dnp.dappnode.eth:${AVADO_VERSION}/" ./docker-compose.yml \
+  > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
+
+# Write dappnode version
+sed -e "s/\"version\":[ ]\"[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"/\"version\": \"${AVADO_VERSION}\"/" ./dappnode_package.json \
+  > ./dappnode_package.json.tmp && mv ./dappnode_package.json.tmp ./dappnode_package.json
+
+
 # Overwrite default environmnet in Dockerfile with currently used one
-sed -i "s/master-goerli/${environment_id}/" ./build/Dockerfile
+sed -e "s/master-goerli/${environment_id}/" ./build/Dockerfile > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile 
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
 declare AVADO_SDK_COMMIT="de9f16d"
@@ -79,4 +82,4 @@ sudo avadosdk build --provider http://80.208.229.228:5001
 # http://go.ava.do/install/<IPFS HASH>
 
 # Undo changes to Avado Dockerfile
-sed -i "s/${environment_id}/master-goerli" ./build/Dockerfile
+sed -e "s/${environment_id}/master-goerli/" ./build/Dockerfile > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile 
