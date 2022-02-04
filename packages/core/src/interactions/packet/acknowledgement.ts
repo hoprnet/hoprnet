@@ -74,7 +74,15 @@ async function handleAcknowledgement(
   }
   const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
   const ticket = unacknowledged.ticket
-  const opening = await findCommitmentPreImage(db, channelId)
+  let opening
+  try {
+    opening = await findCommitmentPreImage(db, channelId)
+  } catch (err) {
+    log(`Channel ${channelId.toHex()} is out of commitments`)
+    onOutOfCommitments(channelId)
+    // TODO: How should we handle this ticket?
+    return
+  }
 
   if (!ticket.isWinningTicket(opening, response, ticket.winProb)) {
     log(`Got a ticket that is not a win. Dropping ticket.`)
@@ -93,12 +101,8 @@ async function handleAcknowledgement(
     log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
   }
 
-  try {
-    await bumpCommitment(db, channelId)
-  } catch (err) {
-    log(`Channel ${channelId.toHex()} is out of commitments`)
-    onOutOfCommitments(channelId)
-  }
+  // store commitment in db
+  await bumpCommitment(db, channelId, opening)
 
   onWinningTicket(ack)
 }

@@ -258,15 +258,12 @@ export default class HoprCoreEthereum extends EventEmitter {
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
-    const tickets = await this.db.getAcknowledgedTickets({ channel })
-    log(`redeeming ${tickets.length} tickets from ${channel.source.toB58String()}`)
-    const indices: string[] = []
-    for (const ticket of tickets) {
-      indices.push(ticket.ticket.index.toHex())
-    }
-    log('tickets to be redeemed with indices', indices)
-
-    for (const ticket of tickets) {
+    // We redeem step-wise, reading only the next ticket from the db, to
+    // reduce the chance for race-conditions with db write operations on
+    // those tickets.
+    let tickets = await this.db.getAcknowledgedTickets({ channel })
+    while (tickets.length > 0) {
+      const ticket = tickets[0]
       log(
         `redeeming ticket in channel from ${channel.source} to ${channel.destination}`,
         ticket,
@@ -281,6 +278,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         return
       }
       log('ticket was redeemed')
+
+      tickets = await this.db.getAcknowledgedTickets({ channel })
     }
 
     log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
