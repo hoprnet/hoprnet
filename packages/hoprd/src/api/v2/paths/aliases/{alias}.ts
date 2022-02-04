@@ -104,7 +104,7 @@ export const DELETE: Operation = [
 
     try {
       removeAlias(stateOps, alias)
-      return res.status(200).send()
+      return res.status(204).send()
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
