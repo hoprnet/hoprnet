@@ -29,7 +29,9 @@ export const GET: Operation = [
 
       res.status(200).json({
         nativeAddress: addresses.native,
-        hoprAddress: addresses.hopr
+        native: addresses.native,
+        hoprAddress: addresses.hopr,
+        hopr: addresses.hopr
       })
     } catch (error) {
       res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: error.message })
@@ -51,9 +53,17 @@ GET.apiDoc = {
             type: 'object',
             properties: {
               nativeAddress: {
-                $ref: '#/components/schemas/NativeAddress'
+                $ref: '#/components/schemas/NativeAddress',
+                deprecated: true
               },
               hoprAddress: {
+                $ref: '#/components/schemas/HoprAddress',
+                deprecated: true
+              },
+              native: {
+                $ref: '#/components/schemas/NativeAddress'
+              },
+              hopr: {
                 $ref: '#/components/schemas/HoprAddress'
               }
             }

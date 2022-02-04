@@ -21,8 +21,8 @@ export const GET: Operation = [
     try {
       const { native, hopr } = await getBalances(node)
       return res.status(200).send({
-        nativeBalance: native.toBN().toString(),
-        hoprBalance: hopr.toBN().toString()
+        native: native.toBN().toString(),
+        hopr: hopr.toBN().toString()
       })
     } catch (err) {
       return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
@@ -43,10 +43,10 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              nativeBalance: {
+              native: {
                 $ref: '#/components/schemas/NativeBalance'
               },
-              hoprBalance: {
+              hopr: {
                 $ref: '#/components/schemas/HoprBalance'
               }
             }
