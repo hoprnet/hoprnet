@@ -156,3 +156,14 @@ html[data-theme='dark'] .docusaurus-highlight-code-line {
   /** transform: translateY(4px);**/
   --ifm-box-shadow-color: rgb(0, 0, 0, 0.3);
 }
+
+summary {
+  list-style-type: none;
+}
+
+.footnotes {
+  font-size: 0.9em;
+}
+.footnotes li {
+  margin-bottom: 20px;
+}
