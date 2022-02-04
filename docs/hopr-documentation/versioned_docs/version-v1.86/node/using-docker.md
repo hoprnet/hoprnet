@@ -56,7 +56,6 @@ The `athens` tag represents the latest community release version.
 
 Open your console based on your OS:
 - Terminal (Mac OS / Linux OS)
-- Command Prompt (Windows OS)
 
 You can pull the Docker image like so:
 
