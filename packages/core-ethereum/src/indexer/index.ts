@@ -433,9 +433,9 @@ class Indexer extends EventEmitter {
     }
 
     this.lastSnapshot = {
-      blockNumber: events[events.length].blockNumber,
-      logIndex: events[events.length].logIndex,
-      transactionIndex: events[events.length].transactionIndex
+      blockNumber: events[events.length - 1].blockNumber,
+      logIndex: events[events.length - 1].logIndex,
+      transactionIndex: events[events.length - 1].transactionIndex
     }
   }
 
