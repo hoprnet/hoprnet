@@ -78,7 +78,7 @@ GET.apiDoc = {
         'When includingClosed is passed the response will include closed channels which are ommited by default.',
       schema: {
         type: 'string',
-        example: 'true'
+        example: 'false'
       }
     }
   ],
