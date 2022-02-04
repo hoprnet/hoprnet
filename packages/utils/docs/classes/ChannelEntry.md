@@ -194,7 +194,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L142)
+[types/channelEntry.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L143)
 
 ___
 
