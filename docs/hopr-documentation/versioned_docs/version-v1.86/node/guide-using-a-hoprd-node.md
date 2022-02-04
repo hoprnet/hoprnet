@@ -35,7 +35,9 @@ Brief look at the admin UI:
 
 :::info
 
-Note: All the addresses mentioned bellow are just for example. These addresses may no longer be working in the time you will be trying a new hoprd release.
+Mentioned HOPR addresses and ETH addresses are **examples**.
+
+Search HOPR addresses on your HOPR node by using command: `peers` and search for **current nodes**. Use two of the **current nodes** instead of the examples.
 
 :::
 
@@ -215,7 +217,7 @@ Between comma sign (**,**) and HOPR addresses can't be any space.
 :::
 
 ```
-send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV,16Uiu2HAkuiKZnPRoeV8qjXNJaazo2D6G89UG4bLoyUmza1hM6psb This is a feature message for me!
+send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV,me This is a feature message for me!
 ```
 
 Output will look similar to this:
@@ -358,7 +360,9 @@ Note: Between comma sign (**,**) and HOPR addresses can't be any space.
 :::
 
 ```
-send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV,16Uiu2HAm35DuQk2Cvp9aLpRTD43ZubLqtbAwf242w2YmAe8FskLs,16Uiu2HAkuiKZnPRoeV8qjXNJaazo2D6G89UG4bLoyUmza1hM6psb This is a feature message for me, but this time I used Bob and Alice nodes to relay data packets!
+send 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV,
+16Uiu2HAm35DuQk2Cvp9aLpRTD43ZubLqtbAwf242w2YmAe8FskLs,
+me This is a feature message for me, but this time I used Bob and Alice nodes to relay data packets!
 ```
 
 Output will look similar to this:
