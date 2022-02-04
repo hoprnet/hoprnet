@@ -40,7 +40,6 @@ if [[ "${1}" == "-h" ]] || [[ "${1}" == "--help" ]]; then
   exit 0
 fi
 
-
 declare AVADO_VERSION="${1}"
 
 if ! [[ $AVADO_VERSION =~ [0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}$ ]]; then
@@ -57,7 +56,6 @@ sed -i "s/image:[ ]'hopr\.avado\.dnp\.dappnode\.eth:[0-9]\{1,\}\.[0-9]\{1,\}\.[0
 # Write dappnode version
 sed -i "s/\"version\":[ ]\"[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"/\"version\": \"${AVADO_VERSION}\"/" ./dappnode_package.json
 
-
 declare default_development_environment="master-goerli"
 
 if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]; then
@@ -66,8 +64,8 @@ if [[ -z $(grep -E "${default_development_environment}" "./build/Dockerfile") ]]
   exit 1
 fi
 
+# Overwrite default environmnet in Dockerfile with currently used one
 sed -i "s/master-goerli/${environment_id}/" ./build/Dockerfile
-
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
 declare AVADO_SDK_COMMIT="de9f16d"
