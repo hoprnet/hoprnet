@@ -1,11 +1,11 @@
 \subsection{Ticket Issuance}
 \label{sec:tickets:issuance}
 
-Before a node is able to issue tickets for another node, it needs to lock funds on-chain to cover for the current as well as future tickets. Locking funds is considered equal to staking tokens in the HOPR network as it allows the node to create mixnet packets and act as relayer. By locking tokens in the smart contract, the node creates a unidirectional payment channel towards the recipient and is thus able to convince the recipient that it is eligible to issue tickets.
+Before a node can issue tickets to another node, it needs to lock funds on-chain to cover the cost of current and future tickets. Locking funds is considered equivalent to staking tokens in the HOPR network as it allows the node to create mixnet packets and act as relayer. By locking tokens in the smart contract, the node creates a unidirectional payment channel towards the recipient and is thus able to prove its eligibility to issue tickets to the recipient.
 
-As ticket issuance happens without any interaction to the blockchain, it is the duty of the node who receives the ticket to check whether there were any tokens locked on-chain and to keep track about previously issued tickets. If there is no record on-chain about any locked funds or if the sum of the received tickets exceed the amount of tokens that were locked on-chain, the recipient should refuse the ticket.
+As ticket issuance happens without any interaction with the blockchain, it is the duty of the receiving node to validate whether sufficient tokens are locked on-chain and to keep track of previously issued tickets. If there is no on-chain record of any locked funds or if the sum of the received tickets exceeds the amount of tokens locked on-chain, the recipient should refuse the ticket.\footnote{TODO: Explain the consequences of ignoring this.}
 
-Tickets are sent together with a mixnet packet and include the incentive for processing and forwarding the packet to the next downstream node. To meet the \lcnameref{sec:intro:securitygoals}, neither issuance nor redemption must be linkable to the creation or processing of mixnet packets. Therefore, each ticket is given a winning probability, which means that not every issued ticket leads to a claimable incentive and, moreover, those tickets who turn out to be a winner cover the missed incentives of losing tickets. It turned out that is not only beneficial in terms of privacy but also helps to keep transaction costs resulting from on-chain interactions minimal.
+Tickets are sent together with a mixnet packet and include the incentive for processing and forwarding the packet to the next downstream node. To meet the \lcnameref{sec:intro:securitygoals},\footnote{TODO: Further specify how and which security goals are met here.} neither issuance nor redemption must be linkable to the creation or processing of mixnet packets. Therefore, each ticket is given a winning probability. This means that all tickets produce a claimable incentive and winning tickets mitigate the lack of incentives for losing tickets.\footnote{TODO: Expand on this concept to show expected break-even times and variance of different winning probabilities.} By reducing on-chain interactions, this approach not only provides privacy, it also significantly reduces transaction costs.
 
 When issuing a ticket, the issuer picks a winning probability $winProb > 0$ and starts creating the data structure $ticketData$ by setting the intended value $value$ through
 
@@ -44,7 +44,7 @@ Note that the ticket issuer should not choose $winProb$ too low as the recipient
 \paragraph{Recipient}
 \label{sec:tickets:issuance:recipient}
 
-The Ethereum address of the recipient, derived from the recipient's public key. This nails down the ticket to one specific payment channel, the one from ticket issuer to ticket recipient. Note that Ethereum addresses are computed as
+The Ethereum address of the recipient, derived from the recipient's public key. This confines the ticket to one specific payment channel, the one from ticket issuer to ticket recipient. Note that Ethereum addresses are computed as
 
 $$ ethAddr: pubKey \in \{ 0,1 \}^{64} \mapsto \mathsf{keccak256}( pubKey).\mathsf{slice}(12,32)$$
 
@@ -53,12 +53,12 @@ $$ ethAddr: pubKey \in \{ 0,1 \}^{64} \mapsto \mathsf{keccak256}( pubKey).\maths
 \paragraph{Challenge}
 \label{sec:tickets:issuance:challenge}
 
-Tickets are issued locked, hence the embedded incentive is not yet claimable by the ticket recipient but their validity can be verified. Locked means that the ticket states a challenge which needs to be solved before being able to claim the embedded incentive. This mechanism servers as a building block for \lcnameref{sec:incentives:proofofrelay}.
+Tickets are issued locked, hence the embedded incentive is not yet claimable by the ticket recipient, although the ticket's validity can be verified. Locked means that the ticket states a challenge which needs to be solved before being able to claim the embedded incentive. This mechanism servers as a building block for \lcnameref{sec:incentives:proofofrelay}.
 
 \paragraph{Ticket epoch}
 \label{sec:tickets:issuance:ticketepoch}
 
-Ticket redemptions relies on providing the value $opening$ to a series of commitments that have previously been stored on-chain by the ticket recipient. To make sure that the party who wants to redeem tickets, is always able to compute the opening to a commitment, there is the opportunity to renew the on-chain commitment. As this allows the ticket recipient to change the entropy that is used to determine whether a ticket is a winner, the smart contract stores a counter that increases on every renewal and the ticket issuer signs the current value. This makes sure, that each commitment renewal invalidates all previously issued but not yet redeemed tickets.
+Ticket redemption relies on providing the value $opening$\footnote{TODO: Properly introduce this value} to a series of commitments that have previously been stored on-chain by the ticket recipient. To ensure that the recipient is always able to compute the opening to a commitment, there is the opportunity to renew the on-chain commitment. As this allows the recipient to change the entropy used to determine whether a ticket is a winner (see Section \ref{sec:incentives:commitment}, the smart contract stores a counter that increases on every renewal and the ticket issuer signs the current value. This ensures that each commitment renewal invalidates all issued but unredeemed tickets.
 
 \paragraph{Ticket value}
 \label{sec:tickets:issuance:ticketvalue}
@@ -75,12 +75,12 @@ $$ ticketData.invWinProb := winProb * (2^{256} -1)$$
 \paragraph{Ticket index}
 \label{sec:tickets:issuance:ticketindex}
 
-Each ticket is labeled by an ongoing serial number named ticket index $i$ and its current value is stored in the smart contract. Whenever a ticket gets redeemed, the stored value is updated to the value given by the redeemed ticket and thus invalidates all tickets with index $i' \le i$. This is necessary to have each ticket being valid exactly once. Since ticket issuance does not change the value stored in the smart contract and tickets and tickets with unchanged ticket index are worthless, it is the duty of the ticket recipient to make sure that ticket index keeps increasing.
+Each ticket is labeled by an incrementing serial number named the ticket index, $i$, whose current value is stored in the smart contract. Whenever a ticket is redeemed, the stored value is updated to the value given by the redeemed ticket. This invalidates all tickets with index $i' \le i$. This is necessary to ensure each ticket is valid exactly once. Since ticket issuance does not change the value stored in the smart contract and tickets with unchanged ticket index are worthless, it is the duty of the ticket recipient to ensure that the ticket index correctly increments, and to refuse tickets with an incorrect index.
 
 \paragraph{Channel epoch}
 \label{sec:tickets:issuance:channelepoch}
 
-Payment channels might run throug multiple \textit{open} and \textit{close} sequences, see section \ref{sec:incentives:channels} for more information. To make sure that tickets from previous channel incarnations lose their value once the channel is reopened, tickets include the current channel epoch counter and the smart contract considers the ticket invalid if the signed channel epoch does not match the stored channel epoch.
+Payment channels can run through multiple \textit{open} and \textit{close} sequences (see Section \ref{sec:incentives:channels} for more information). To ensure that tickets from previous channel incarnations lose their value once the channel is reopened, tickets include the current channel epoch counter and the smart contract considers the ticket invalid if the signed channel epoch does not match the stored channel epoch.
 
 \paragraph{Signature}
 \label{sec:tickets:issuance:signature}
