@@ -12,11 +12,13 @@ export const authenticateWsConnection = (
   req: { url?: string; headers: Record<any, any> },
   apiToken?: string
 ): boolean => {
+  // authentication is disabled
   if (!apiToken) {
     logs.log('ws client connected [ authentication DISABLED ]')
     return true
   }
 
+  // Authenticate by URL parameter
   // Other clients different to `hopr-admin` might pass the `apiToken` via a
   // query param since they won't be on the same domain the node is hosted,
   // and thus, unable to set the `apiToken` via cookies. Using `req.url` we
@@ -36,25 +38,24 @@ export const authenticateWsConnection = (
     }
   }
 
-  if (req.headers.cookie == undefined) {
-    return false
+  // Authenticate by cookie
+  if (req.headers.cookie) {
+    let cookies: ReturnType<typeof cookie.parse> | undefined
+    try {
+      cookies = cookie.parse(req.headers.cookie)
+    } catch (e) {
+      logs.error(`failed parsing cookies`, e)
+    }
+
+    if (
+      cookies &&
+      (decodeURI(cookies['X-Auth-Token'] || '') === apiToken || decodeURI(cookies['x-auth-token'] || '') === apiToken)
+    ) {
+      logs.log('ws client connected [ authentication ENABLED ]')
+      return true
+    }
   }
 
-  let cookies: ReturnType<typeof cookie.parse> | undefined
-  try {
-    cookies = cookie.parse(req.headers.cookie)
-  } catch (e) {
-    logs.error(`failed parsing cookies`, e)
-  }
-
-  if (
-    !cookies ||
-    (decodeURI(cookies['X-Auth-Token'] || '') !== apiToken && decodeURI(cookies['x-auth-token'] || '') !== apiToken)
-  ) {
-    logs.log('ws client failed authentication')
-    return false
-  }
-
-  logs.log('ws client connected [ authentication ENABLED ]')
-  return true
+  logs.log('ws client failed authentication')
+  return false
 }

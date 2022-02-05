@@ -137,9 +137,6 @@ export function setupWsApi(server: WebSocketServer, node: Hopr, logs: LogStream,
     // used by E2E tests to test security
     socket.on('message', (message: string) => {
       debugLog('Received message', message)
-      if (message === '_test') {
-        socket.emit('OK')
-      }
     })
 
     socket.on('error', (err: string) => {
@@ -150,6 +147,7 @@ export function setupWsApi(server: WebSocketServer, node: Hopr, logs: LogStream,
     node.on('hopr:message', (msg: Uint8Array) => {
       socket.emit(msg.toString())
     })
+    logs.subscribe(socket)
   })
 }
 
