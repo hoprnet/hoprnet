@@ -1,9 +1,8 @@
 import { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
 import { PublicKey } from '@hoprnet/hopr-utils'
-import { encodeMessage } from '../../../commands/utils'
-
-export const parameters = []
+import { encodeMessage } from '../../../../commands/utils'
+import { STATUS_CODES } from '../../'
 
 export const POST: Operation = [
   async (req, res, _next) => {
@@ -20,30 +19,33 @@ export const POST: Operation = [
       await req.context.node.sendMessage(message, recipient, path)
       res.status(204).send()
     } catch (err) {
-      res.status(422).json({ error: err.message })
+      res.status(422).json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err.message })
     }
   }
 ]
 
 POST.apiDoc = {
-  description: 'Send a message to another peer using a given path.',
-  tags: ['messages'],
-  operationId: 'messagesSend',
-  parameters: [],
+  description:
+    'Send a message to another peer using a given path (list of node addresses that should relay our message through network).',
+  tags: ['Messages'],
+  operationId: 'messagesSendMessage',
   requestBody: {
     content: {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['body', 'recipient'],
           properties: {
             body: {
               description: 'The message body which should be sent.',
-              type: 'string'
+              type: 'string',
+              example: 'Hello'
             },
             recipient: {
               description: 'The recipient HOPR peer id, to which the message is sent.',
               type: 'string',
-              format: 'peerId'
+              format: 'peerId',
+              example: '16Uiu2HAm2SF8EdwwUaaSoYTiZSddnG4hLVF7dizh32QFTNWMic2b'
             },
             path: {
               description:
@@ -54,11 +56,11 @@ POST.apiDoc = {
                 type: 'string',
                 format: 'peerId',
                 minItems: 1,
-                maxItems: 3
+                maxItems: 3,
+                example: '16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n'
               }
             }
-          },
-          required: ['body', 'recipient']
+          }
         }
       }
     }
@@ -66,6 +68,21 @@ POST.apiDoc = {
   responses: {
     '204': {
       description: 'The message was sent successfully. NOTE: This does not imply successful delivery.'
+    },
+    '422': {
+      description: 'Unknown failure.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', example: STATUS_CODES.UNKNOWN_FAILURE },
+              error: { type: 'string', example: 'Full error message.' }
+            }
+          },
+          example: { status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Full error message.' }
+        }
+      }
     }
   }
 }
