@@ -4,6 +4,34 @@ type Item<T> = {
   index: number
   value?: T
 }
+
+/**
+ * Creates a queue that consumes items asynchronously and potentially
+ * unorders but outputs them ordered using an asynchronous iterator.
+ * Each element consists of a value and an index upon which
+ * elements are ordered.
+ * @example
+ * import { ordered, wait } from '@hoprnet/hopr-utils'
+ *
+ * const order = ordered<number>()
+ *
+ * (async function () {
+ *   order.push({ index: 0, value: 'first' })
+ *   wait(50)
+ *   order.push({ index: 2, value: 'second' })
+ *   wait(50)
+ *   order.push({ index: 1, value: 'third' })
+ *   wait(50)
+ *   order.end()
+ * })()
+ *
+ * const result: string[] = []
+ * for await (const item of order.iterator()) {
+ *   result.push(item.value)
+ * }
+ * // result == ['first', 'third', 'second']
+ * @returns an ordered stream
+ */
 export function ordered<T>() {
   const queue = FIFO<Item<T>>()
 

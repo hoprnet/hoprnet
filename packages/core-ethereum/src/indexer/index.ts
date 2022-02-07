@@ -100,6 +100,8 @@ class Indexer extends EventEmitter {
 
     const orderedBlocks = ordered<number>()
 
+    // Starts the asynchronous stream of indexer events
+    // and feeds them to the event listener
     ;(async function (this: Indexer) {
       for await (const block of orderedBlocks.iterator()) {
         await this.onNewBlock(block.value, true) // exceptions are handled
@@ -397,6 +399,7 @@ class Indexer extends EventEmitter {
 
   /**
    * Adds new events to the queue of unprocessed events
+   * @dev ignores events that have been processed before.
    * @param events new unprocessed events
    */
   private onNewEvents(events: Event<any>[] | TokenEvent<any>[]): void {
@@ -406,6 +409,11 @@ class Indexer extends EventEmitter {
     }
 
     let offset = 0
+
+    // lastSnapshot ~= watermark of previously process events
+    //
+    // lastSnapshot == undefined means there is no watermark, hence
+    // all events can be considered new
     if (this.lastSnapshot != undefined) {
       let currentSnapshot: IndexerSnapshot = {
         blockNumber: events[offset].blockNumber,
@@ -413,6 +421,8 @@ class Indexer extends EventEmitter {
         transactionIndex: events[offset].transactionIndex
       }
 
+      // As long events are older than the current watermark,
+      // increase the offset to ignore them
       while (snapshotComparator(this.lastSnapshot, currentSnapshot) >= 0) {
         offset++
         if (offset < events.length) {
@@ -427,8 +437,11 @@ class Indexer extends EventEmitter {
       }
     }
 
+    // Once the offset is known upon which we have
+    // received new events, add them to `unconfirmedEvents` to
+    // be processed once the next+confirmationTime block
+    // has been mined
     for (; offset < events.length; offset++) {
-      console.log(`add event`, events[offset])
       this.unconfirmedEvents.push(events[offset])
     }
 
