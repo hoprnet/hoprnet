@@ -36,6 +36,7 @@ import {
   type DialOpts,
   type Hash,
   type HalfKeyChallenge,
+  type Ticket,
   multiaddressCompareByClassFunction,
   createRelayerKey
 } from '@hoprnet/hopr-utils'
@@ -58,6 +59,7 @@ import { PacketForwardInteraction } from './interactions/packet/forward'
 import { Packet } from './messages'
 import type { ResolvedEnvironment } from './environment'
 import { createLibp2pInstance } from './main'
+import { Receipt } from '@hoprnet/hopr-core-ethereum/src/ethereum'
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -839,6 +841,7 @@ class Hopr extends EventEmitter {
     amountToFund: BN
   ): Promise<{
     channelId: Hash
+    receipt: Receipt
   }> {
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myAvailableTokens = await this.connector.getBalance(true)
@@ -855,9 +858,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      return {
-        channelId: await this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
-      }
+      return this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
     } catch (err) {
       await this.isOutOfFunds(err)
       throw new Error(`Failed to openChannel: ${err}`)
@@ -935,6 +936,21 @@ class Hopr extends EventEmitter {
     return { receipt: txHash, status: channel.status }
   }
 
+  public async getAllTickets(): Promise<Ticket[]> {
+    return this.db.getAcknowledgedTickets().then((list) => list.map((t) => t.ticket))
+  }
+
+  public async getTickets(peerId: PeerId): Promise<Ticket[]> {
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
+    const channel = await this.db.getChannelX(selfPubKey, counterpartyPubKey)
+    return this.db
+      .getAcknowledgedTickets({
+        channel
+      })
+      .then((list) => list.map((t) => t.ticket))
+  }
+
   public async getTicketStatistics() {
     const ack = await this.db.getAcknowledgedTickets()
     const pending = await this.db.getPendingTicketCount()
@@ -958,6 +974,13 @@ class Hopr extends EventEmitter {
 
   public async redeemAllTickets() {
     await this.connector.redeemAllTickets()
+  }
+
+  public async redeemTicketsInChannel(peerId: PeerId) {
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(peerId.pubKey.marshal())
+    const channel = await this.db.getChannelX(selfPubKey, counterpartyPubKey)
+    await this.connector.redeemTicketsInChannel(channel)
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {

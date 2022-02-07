@@ -6,16 +6,28 @@ import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import PeerId from 'peer-id'
+import { debug, Address } from '@hoprnet/hopr-utils'
 
 import type { Application, Request } from 'express'
+import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
-
 import type { LogStream } from './../logs'
+import type { StateOps } from '../types'
+import { authenticateWsConnection } from './utils'
+
+const debugLog = debug('hoprd:api:v2')
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
-export default function setupApiV2(service: Application, urlPath: string, node: Hopr, logs: LogStream, options: any) {
+export function setupRestApi(
+  service: Application,
+  urlPath: string,
+  node: Hopr,
+  logs: LogStream,
+  stateOps: StateOps,
+  options: any
+) {
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
 
@@ -25,7 +37,7 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
   // assign internal objects to each requests so they can be accessed within
   // handlers
   service.use(urlPath, (req, _res, next) => {
-    req.context = new Context(node, logs)
+    req.context = new Context(node, logs, stateOps)
     next()
   })
   // because express-openapi uses relative paths we need to figure out where
@@ -50,6 +62,13 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
         try {
           // this call will throw if the input is no peer id
           return !!PeerId.createFromB58String(input)
+        } catch (_err) {
+          return false
+        }
+      },
+      address: (input) => {
+        try {
+          return !!Address.fromString(input)
         } catch (_err) {
           return false
         }
@@ -101,10 +120,41 @@ export default function setupApiV2(service: Application, urlPath: string, node: 
   }) as express.ErrorRequestHandler)
 }
 
+export function setupWsApi(server: WebSocketServer, node: Hopr, logs: LogStream, options: { apiToken?: string }) {
+  server.on('connection', (socket, req) => {
+    if (!authenticateWsConnection(logs, req, options.apiToken)) {
+      socket.send(
+        JSON.stringify({
+          type: 'auth-failed',
+          msg: 'authentication failed',
+          ts: new Date().toISOString()
+        })
+      )
+      socket.close()
+      return
+    }
+
+    // used by E2E tests to test security
+    socket.on('message', (message: string) => {
+      debugLog('Received message', message)
+    })
+
+    socket.on('error', (err: string) => {
+      debugLog('Error', err)
+      logs.log('Websocket error', err.toString())
+    })
+
+    node.on('hopr:message', (msg: Uint8Array) => {
+      socket.emit(msg.toString())
+    })
+    logs.subscribe(socket)
+  })
+}
+
 // In order to pass custom objects along with each request we build a context
 // which is attached during request processing.
 export class Context {
-  constructor(public node: Hopr, public logs: LogStream) {}
+  constructor(public node: Hopr, public logs: LogStream, public stateOps: StateOps) {}
 }
 
 declare global {

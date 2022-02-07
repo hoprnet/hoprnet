@@ -112,7 +112,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${npm_install_dir}"
 
   log "Cleaning up processes"
-  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097; do
+  for port in 8545 13301 13302 13303 13304 13305 13306 13307 19091 19092 19093 19094 19095 19096 19097 20000; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -126,15 +126,15 @@ if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
-# $1 = rest port
+# $1 = api port
 # $2 = node port
 # $3 = admin port
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
-# $7 = OPTIONAL: additions args to hoprd
+# $7 = OPTIONAL: additional args to hoprd
 function setup_node() {
-  local rest_port=${1}
+  local api_port=${1}
   local node_port=${2}
   local admin_port=${3}
   local dir=${4}
@@ -142,7 +142,7 @@ function setup_node() {
   local id=${6}
   local additional_args=${7:-""}
 
-  log "Run node ${id} on rest port ${rest_port}"
+  log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [ -n "${additional_args}" ]; then
     log "Additional args: \"${additional_args}\""
@@ -161,8 +161,8 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="${password}" \
-    --rest \
-    --restPort "${rest_port}" \
+    --api \
+    --apiPort "${api_port}" \
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
@@ -363,7 +363,7 @@ wait_for_port 19097 "127.0.0.1" "${node7_log}"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 19501 19502 "${api_token}"
+  127.0.0.1 13301 13302 19501 19502 "${api_token}"
 #}}}
 
 # --- Run test --- {{{
