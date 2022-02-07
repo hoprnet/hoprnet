@@ -227,6 +227,10 @@ log "Node 1 open channel to Node 2"
 result=$(run_command "${api1}" "open ${addr2} 1" "Successfully opened channel" 600)
 log "-- ${result}"
 
+log "Node 1 open channel to Node 5 (used for channel close test later)"
+result=$(run_command "${api1}" "open ${addr5} 1" "Successfully opened channel" 600)
+log "-- ${result}"
+
 log "Node 2 open channel to Node 3"
 result=$(run_command "${api2}" "open ${addr3} 1" "Successfully opened channel" 600)
 log "-- ${result}"
@@ -352,47 +356,39 @@ redeem_tickets "5" "${api2}" &
 log "Waiting for nodes to finish ticket redemption (long running)"
 wait
 
-# initiate channel closures
+# initiate channel closures, but don't wait because this will trigger ticket
+# redemption as well
 log "Node 1 close channel to Node 2"
-result=$(run_command "${api1}" "close ${addr2}" "" 600)
+result=$(run_command "${api1}" "close ${addr2}" "" 20 20)
 log "-- ${result}"
 
 log "Node 2 close channel to Node 3"
-result=$(run_command "${api2}" "close ${addr3}" "" 600)
+result=$(run_command "${api2}" "close ${addr3}" "" 20 20)
 log "-- ${result}"
 
 log "Node 3 close channel to Node 4"
-result=$(run_command "${api3}" "close ${addr4}" "" 600)
+result=$(run_command "${api3}" "close ${addr4}" "" 20 20)
 log "-- ${result}"
 
 log "Node 4 close channel to Node 5"
-result=$(run_command "${api4}" "close ${addr5}" "" 600)
+result=$(run_command "${api4}" "close ${addr5}" "" 20 20)
 log "-- ${result}"
 
 log "Node 5 close channel to Node 1"
-result=$(run_command "${api5}" "close ${addr1}" "" 600)
+result=$(run_command "${api5}" "close ${addr1}" "" 20 20)
+log "-- ${result}"
+
+# initiate channel closures for channels without tickets so we can check
+# completeness
+
+log "Node 1 close channel to Node 5"
+result=$(run_command "${api1}" "close ${addr5}" "" 600)
 log "-- ${result}"
 
 # close channels
 log "Waiting 1 minure for cool-off period"
 sleep 60
 
-log "Node 1 close channel to Node 2"
-result=$(run_command "${api1}" "close ${addr2}" "Channel is already closed" 600)
-log "--${result}"
-
-log "Node 2 close channel to Node 3"
-result=$(run_command "${api2}" "close ${addr3}" "Channel is already closed" 600)
-log "--${result}"
-
-log "Node 3 close channel to Node 4"
-result=$(run_command "${api3}" "close ${addr4}" "Channel is already closed" 600)
-log "--${result}"
-
-log "Node 4 close channel to Node 5"
-result=$(run_command "${api4}" "close ${addr5}" "Channel is already closed" 600)
-log "--${result}"
-
-log "Node 5 close channel to Node 1"
-result=$(run_command "${api5}" "close ${addr1}" "Channel is already closed" 600)
+log "Node 1 close channel to Node 5"
+result=$(run_command "${api1}" "close ${addr5}" "Channel is already closed" 600)
 log "--${result}"
