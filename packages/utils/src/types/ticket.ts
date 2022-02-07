@@ -156,7 +156,6 @@ export class Ticket {
 
   verify(pubKey: PublicKey): boolean {
     const signer = this.recoverSigner()
-    console.log(`ticket verify pubkey ${pubKey} against signer ${signer}, ${this}`)
     return pubKey.eq(signer)
   }
 
