@@ -1,6 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
-import type PeerId from 'peer-id'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import type { StateOps } from '../types'
+import { AbstractCommand } from './abstractCommand'
 import FundChannel from './fundChannel'
 import CloseChannel from './closeChannel'
 import ListCommands from './listCommands'
@@ -25,14 +25,8 @@ import Addresses from './addresses'
 export class Commands {
   readonly commands: AbstractCommand[]
   private commandMap: Map<string, AbstractCommand>
-  private state: GlobalState
 
-  constructor(public node: Hopr) {
-    this.state = {
-      aliases: new Map<string, PeerId>(),
-      includeRecipient: false
-    }
-
+  constructor(public node: Hopr, public stateOps: StateOps) {
     this.commands = [
       new Addresses(node),
       new Alias(node),
@@ -65,10 +59,6 @@ export class Commands {
     }
   }
 
-  public setState(settings: any) {
-    this.state = settings
-  }
-
   public allCommands(): string[] {
     return Array.from(this.commandMap.keys())
   }
@@ -90,7 +80,7 @@ export class Commands {
 
     if (cmd) {
       try {
-        return await cmd.execute(log, query || '', this.state)
+        return await cmd.execute(log, query || '', this.stateOps)
       } catch (err) {
         return log(`${cmd} execution failed with error: ${err.message}`)
       }

@@ -917,7 +917,7 @@ ___
 
 ### openChannel
 
-▸ **openChannel**(`dest`, `amount`): `Promise`<`Hash`\>
+▸ **openChannel**(`dest`, `amount`): `Promise`<{ `channelId`: `Hash` ; `receipt`: `string`  }\>
 
 #### Parameters
 
@@ -928,7 +928,7 @@ ___
 
 #### Returns
 
-`Promise`<`Hash`\>
+`Promise`<{ `channelId`: `Hash` ; `receipt`: `string`  }\>
 
 #### Defined in
 
@@ -1104,7 +1104,7 @@ ___
 
 ### redeemTicketsInChannel
 
-▸ `Private` **redeemTicketsInChannel**(`channel`): `Promise`<`void`\>
+▸ **redeemTicketsInChannel**(`channel`): `Promise`<`void`\>
 
 #### Parameters
 

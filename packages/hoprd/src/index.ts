@@ -11,6 +11,7 @@ import Hopr, { createHoprNode } from '@hoprnet/hopr-core'
 import { NativeBalance, SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-utils'
 import { resolveEnvironment, supportedEnvironments, ResolvedEnvironment } from '@hoprnet/hopr-core'
 
+import type { State } from './types'
 import setupAPI from './api'
 import setupHealthcheck from './healthcheck'
 import { AdminServer } from './admin'
@@ -59,20 +60,34 @@ const argv = yargs(process.argv.slice(2))
     describe: 'Run an admin interface on localhost:3000, requires --apiToken',
     default: false
   })
-  .option('rest', {
-    boolean: true,
-    describe: 'Expose the Rest API on localhost:3001, requires --apiToken',
-    default: false
-  })
-  .option('restHost', {
+  .option('adminHost', {
     string: true,
-    describe: 'Set host IP to which the Rest API server will bind',
+    describe: 'Host to listen to for admin console',
     default: 'localhost'
   })
-  .option('restPort', {
+  .option('adminPort', {
+    string: true,
+    describe: 'Port to listen to for admin console',
+    default: 3000
+  })
+  .option('api', {
+    boolean: true,
+    describe:
+      'Expose the Rest (V1, V2) and Websocket (V2) API on localhost:3001, requires --apiToken. "--rest" is deprecated.',
+    default: false,
+    alias: 'rest'
+  })
+  .option('apiHost', {
+    string: true,
+    describe: 'Set host IP to which the Rest and Websocket API server will bind. "--restHost" is deprecated.',
+    default: 'localhost',
+    alias: 'restHost'
+  })
+  .option('apiPort', {
     number: true,
-    describe: 'Set host port to which the Rest API server will bind',
-    default: 3001
+    describe: 'Set host port to which the Rest and Websocket API server will bind. "--restPort" is deprecated.',
+    default: 3001,
+    alias: 'restPort'
   })
   .option('healthCheck', {
     boolean: true,
@@ -138,16 +153,6 @@ const argv = yargs(process.argv.slice(2))
     boolean: true,
     describe: "initialize a database if it doesn't already exist",
     default: false
-  })
-  .option('adminHost', {
-    string: true,
-    describe: 'Host to listen to for admin console',
-    default: 'localhost'
-  })
-  .option('adminPort', {
-    string: true,
-    describe: 'Port to listen to for admin console',
-    default: 3000
   })
   .option('allowLocalNodeConnections', {
     boolean: true,
@@ -260,8 +265,24 @@ async function main() {
 
   let node: Hopr
   let logs = new LogStream(argv.forwardLogs)
-  let adminServer = undefined
+  let adminServer: AdminServer = undefined
   let cmds: Commands
+  // As the daemon aims to maintain for the time being
+  // both APIv1 and APIv2 (hopr-admin / myne-chat), we need
+  // to ensure that daemon's state can be used by both APIs.
+  let state: State = {
+    aliases: new Map(),
+    settings: {
+      includeRecipient: false,
+      strategy: 'passive'
+    }
+  }
+  function setState(newState: State): void {
+    state = newState
+  }
+  function getState(): State {
+    return state
+  }
 
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
@@ -285,9 +306,9 @@ async function main() {
     logs.startLoggingQueue()
   }
 
-  if (!argv.testNoAuthentication && (argv.rest || argv.admin)) {
+  if (!argv.testNoAuthentication && (argv.api || argv.admin)) {
     if (argv.apiToken == null) {
-      throw Error(`Must provide --apiToken when --admin or --rest is specified`)
+      throw Error(`Must provide --apiToken when --api, --rest or --admin is specified`)
     }
     const { contains: hasSymbolTypes, length }: { contains: string[]; length: number } = passwordStrength(argv.apiToken)
     for (const requiredSymbolType of ['uppercase', 'lowercase', 'symbol', 'number']) {
@@ -300,14 +321,12 @@ async function main() {
     }
   }
 
+  const apiToken = argv.testNoAuthentication ? null : argv.apiToken
+
+  // We need to setup the admin server before the HOPR node
+  // as if the HOPR node fails, we need to put an error message up.
   if (argv.admin) {
-    // We need to setup the admin server before the HOPR node
-    // as if the HOPR node fails, we need to put an error message up.
-    let apiToken = argv.apiToken
-    if (argv.testNoAuthentication) {
-      apiToken = null
-    }
-    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort, apiToken)
+    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
     await adminServer.setup()
   }
 
@@ -342,8 +361,21 @@ async function main() {
     node.on('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
-      if (argv.rest) {
-        setupAPI(node, logs, argv)
+      if (argv.api || argv.admin) {
+        /*
+          When `--api` is used, we turn on Rest API v1, v2 and WS API v2.
+          When `--admin` is used, we turn on WS API v1 only.
+        */
+        setupAPI(
+          node,
+          logs,
+          { getState, setState },
+          {
+            ...argv,
+            apiToken
+          },
+          adminServer // api V1: required by hopr-admin
+        )
       }
 
       if (argv.healthCheck) {
@@ -363,7 +395,7 @@ async function main() {
 
       // 3. Start the node.
       await node.start()
-      cmds = new Commands(node)
+      cmds = new Commands(node, { setState, getState })
 
       if (adminServer) {
         adminServer.registerNode(node, cmds)
@@ -385,6 +417,7 @@ async function main() {
           if (c === 'daemonize') {
             return
           }
+
           await cmds.execute((msg) => {
             logs.log(msg)
           }, c)

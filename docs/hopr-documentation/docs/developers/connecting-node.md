@@ -251,4 +251,5 @@ Basic Xl5MT0NBTC10ZXN0aW5nLTEyM15e
 [^1]:
     Although you can successfully interact with a HOPR node only using a WebSocket client, it is recommended to always use the REST API
     for sending commands to the HOPR node, as the API is optimized for applications, whereas the WebSocket commands are mostly used within the
-    `hopr-admin` UI, an operator-targeted tooling used to verify the functionality of the node.
+    `hopr-admin` UI, an operator-targeted tooling used to verify the functionality of the node. In other words, only use the WebSocket server
+    whenever you need to process information sent to a node, and use the REST API when you need to write actions to a node.
