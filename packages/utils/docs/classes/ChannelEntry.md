@@ -26,6 +26,7 @@
 
 ### Methods
 
+- [closureTimePassed](ChannelEntry.md#closuretimepassed)
 - [getId](ChannelEntry.md#getid)
 - [serialize](ChannelEntry.md#serialize)
 - [toString](ChannelEntry.md#tostring)
@@ -127,6 +128,20 @@ ___
 
 ## Methods
 
+### closureTimePassed
+
+▸ **closureTimePassed**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[types/channelEntry.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L137)
+
+___
+
 ### getId
 
 ▸ **getId**(): [`Hash`](Hash.md)
@@ -179,7 +194,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L132)
+[types/channelEntry.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L143)
 
 ___
 

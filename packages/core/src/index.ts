@@ -146,6 +146,8 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
+  private pubKey: PublicKey
+
   public environment: ResolvedEnvironment
 
   public indexer: Indexer
@@ -173,6 +175,7 @@ class Hopr extends EventEmitter {
     this.environment = options.environment
     log(`using environment: ${this.environment.id}`)
     this.indexer = this.connector.indexer // TODO temporary
+    this.pubKey = PublicKey.fromPeerId(id)
   }
 
   /**
@@ -445,41 +448,52 @@ class Hopr extends EventEmitter {
     } catch (e) {
       throw new Error('failed to getBalance, aborting tick')
     }
-    const [nextChannels, closeChannels] = await this.strategy.tick(
-      balance.toBN(),
-      currentChannels,
-      this.networkPeers,
-      this.connector.getRandomOpenChannel.bind(this.connector)
-    )
-    verbose(`strategy wants to close ${closeChannels.length} channels`)
+    const [nextChannelDestinations, closeChannelDestinations]: [ChannelsToOpen[], ChannelsToClose[]] =
+      await this.strategy.tick(
+        balance.toBN(),
+        currentChannels,
+        this.networkPeers,
+        this.connector.getRandomOpenChannel.bind(this.connector)
+      )
 
-    for (let channel of currentChannels) {
-      if (channel.status == ChannelStatus.PendingToClose) {
+    const closeChannelDestinationsCount = closeChannelDestinations.length
+    verbose(`strategy wants to close ${closeChannelDestinationsCount} channels`)
+
+    for (const channel of currentChannels) {
+      if (channel.status == ChannelStatus.PendingToClose && !closeChannelDestinations.includes(channel.destination)) {
         // attempt to finalize closure
-        closeChannels.push(channel.destination)
+        closeChannelDestinations.push(channel.destination)
       }
     }
 
-    for (let toClose of closeChannels) {
-      verbose(`closing ${toClose}`)
+    verbose(
+      `strategy wants to finalize closure of ${
+        closeChannelDestinations.length - closeChannelDestinationsCount
+      } channels`
+    )
+
+    for (const destination of closeChannelDestinations) {
+      verbose(`closing ${destination}`)
       try {
-        await this.closeChannel(toClose.toPeerId())
-        verbose(`closed channel to ${toClose.toString()}`)
-        this.emit('hopr:channel:closed', toClose.toPeerId())
+        await this.closeChannel(destination.toPeerId())
+        verbose(`closed channel to ${destination.toString()}`)
+        this.emit('hopr:channel:closed', destination.toPeerId())
       } catch (e) {
-        log('error when trying to close strategy channels', e)
+        log(`error when strategy trying to close channel to ${destination.toString()}`, e)
       }
     }
-    verbose(`strategy wants to open`, nextChannels.length, 'new channels')
-    for (let channelToOpen of nextChannels) {
-      this.networkPeers.register(channelToOpen[0].toPeerId())
+
+    verbose(`strategy wants to open ${nextChannelDestinations.length} new channels`)
+
+    for (const channel of nextChannelDestinations) {
+      this.networkPeers.register(channel[0].toPeerId())
       try {
         // Opening channels can fail if we can't establish a connection.
-        const hash = await this.openChannel(channelToOpen[0].toPeerId(), channelToOpen[1])
-        verbose('- opened', channelToOpen, hash)
-        this.emit('hopr:channel:opened', channelToOpen)
+        const hash = await this.openChannel(channel[0].toPeerId(), channel[1])
+        verbose('- opened', channel, hash)
+        this.emit('hopr:channel:opened', channel)
       } catch (e) {
-        log('error when trying to open strategy channels', e)
+        log(`error when strategy trying to open channel to ${channel[0].toString()}`, e)
       }
     }
   }
@@ -832,8 +846,7 @@ class Hopr extends EventEmitter {
   ): Promise<{
     channelId: Hash
   }> {
-    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
-    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
+    const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myAvailableTokens = await this.connector.getBalance(true)
 
     // validate 'amountToFund'
@@ -843,7 +856,7 @@ class Hopr extends EventEmitter {
       throw Error(
         `You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens
           .toBN()
-          .toString(10)} at address ${selfPubKey.toAddress().toHex()}`
+          .toString(10)} at address ${this.pubKey.toAddress().toHex()}`
       )
     }
 
@@ -865,8 +878,7 @@ class Hopr extends EventEmitter {
    * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
    */
   public async fundChannel(counterparty: PeerId, myFund: BN, counterpartyFund: BN): Promise<void> {
-    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
-    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
+    const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myBalance = await this.connector.getBalance(false)
     const totalFund = myFund.add(counterpartyFund)
 
@@ -877,7 +889,7 @@ class Hopr extends EventEmitter {
       throw Error(
         `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance
           .toBN()
-          .toString(10)} at address ${selfPubKey.toAddress().toHex()}`
+          .toString(10)} at address ${this.pubKey.toAddress().toHex()}`
       )
     }
 
@@ -890,9 +902,8 @@ class Hopr extends EventEmitter {
   }
 
   public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: ChannelStatus }> {
-    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
-    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const channel = await this.db.getChannelX(selfPubKey, counterpartyPubKey)
+    const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
+    const channel = await this.db.getChannelX(this.pubKey, counterpartyPubKey)
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
@@ -910,8 +921,15 @@ class Hopr extends EventEmitter {
         log('initiating closure')
         txHash = await this.connector.initializeClosure(counterpartyPubKey)
       } else {
-        log('finalizing closure')
-        txHash = await this.connector.finalizeClosure(counterpartyPubKey)
+        // verify that we passed the closure waiting period to prevent failing
+        // on-chain transactions
+
+        if (channel.closureTimePassed()) {
+          log('finalizing closure')
+          txHash = await this.connector.finalizeClosure(counterpartyPubKey)
+        } else {
+          log('ignoring finalizing closure because closure window is still active', channel.getId())
+        }
       }
     } catch (err) {
       log('failed to close channel', err)

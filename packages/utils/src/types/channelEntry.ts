@@ -129,6 +129,17 @@ export class ChannelEntry {
     return generateChannelId(this.source.toAddress(), this.destination.toAddress())
   }
 
+  /*
+   * Calculates whether the channel has passed its required closure time
+   * window.
+   * @returns true if the time window passed, false if not
+   */
+  public closureTimePassed(): boolean {
+    const nowInSeconds = Math.round(new Date().getTime() / 1000)
+    const now = new BN(nowInSeconds)
+    return !!this.closureTime && now.gt(this.closureTime.toBN())
+  }
+
   public static createMock(): ChannelEntry {
     const pub = PublicKey.createMock()
     return new ChannelEntry(

@@ -59,18 +59,7 @@ fi
 
 log "get default environment id"
 
-declare environment_id
-for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
-  if [[ "${branch}" =~ ${git_ref} ]]; then
-    environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | .key")
-    # if no default is set we take the first entry
-    if [ -z "${environment_id}" ]; then
-      environment_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .key" | sed q)
-    fi
-    break
-  fi
-done
-: ${environment_id:?"Could not read value for default environment id"}
+declare environment_id="$(${mydir}/get-default-environment.sh)"
 
 log "creating new version ${current_version} + ${version_type}"
 

@@ -150,9 +150,8 @@ particular branch to deploy on every change.
 4. (on `release/${RELEASE_NAME}`) Before pushing the branch to Github, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
 
    1. Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
-   2. Change use of `master-goerli` in `packages/avado/Dockerfile` to the new release name. Changes should be committed locally.
-   3. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
-   4. Copy contract deployment files from the old release. This can be done doing
+   2. Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
+   3. Copy contract deployment files from the old release. This can be done doing
 
    ```
    mkdir -p packages/ethereum/deployments/${RELEASE_NAME}/xdai
