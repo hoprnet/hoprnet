@@ -10,29 +10,26 @@ tasks:
 
     command: |
       echo '🟡 Running HOPR nodes and topology'
-      ./scripts/setup-local-cluster.sh -t "MyT0ken123^" -m "$(gp url 8080)" -i scripts/topologies/full_interconnected_cluster.sh
+      ./scripts/setup-local-cluster.sh -t "^^LOCAL-testing-123^^" -m "$(gp url 8080)" -i scripts/topologies/full_interconnected_cluster.sh
 
     openMode: tab-after
 
-  - name: REST API
+  - name: Node 1
     command: |
       gp await-port 13301
-      export apiToken=MyT0ken123^ 
+      export apiToken="^^LOCAL-testing-123^^"
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501)
       export HOPR_NODE_2_HTTP_URL=$(gp url 13302) HOPR_NODE_2_WS_URL=$(gp url 19502)
       export HOPR_NODE_3_HTTP_URL=$(gp url 13303) HOPR_NODE_3_WS_URL=$(gp url 19503)
       export HOPR_NODE_4_HTTP_URL=$(gp url 13304) HOPR_NODE_4_WS_URL=$(gp url 19504)
       export HOPR_NODE_5_HTTP_URL=$(gp url 13305) HOPR_NODE_5_WS_URL=$(gp url 19505)
-      echo '📡 Node REST API'
-      echo -e "\n"
-      echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/address | jq
 
     openMode: tab-after
 
-  - name: WS
+  - name: Node 2 WS
     command: |
       gp await-port 13302
-      export apiToken=MyT0ken123^
+      export apiToken="^^LOCAL-testing-123^^"
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501)
       export HOPR_NODE_2_HTTP_URL=$(gp url 13302) HOPR_NODE_2_WS_URL=$(gp url 19502)
       export HOPR_NODE_3_HTTP_URL=$(gp url 13303) HOPR_NODE_3_WS_URL=$(gp url 19503)
