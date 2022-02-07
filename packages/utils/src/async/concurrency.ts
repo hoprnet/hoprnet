@@ -17,7 +17,10 @@ export function oneAtATime<ReturnType>(): (fn: () => Promise<ReturnType>) => voi
 
   function push(fn: () => Promise<ReturnType>): void {
     queue.push(fn)
+    maybeStart()
+  }
 
+  function maybeStart(): void {
     if (queue.size() == 1 && !isRunning) {
       start()
     }

@@ -305,6 +305,7 @@ redeem_tickets() {
   local node_api="${2}"
   local rejected redeemed prev_redeemed
 
+  # First get the inital ticket statistics for reference
   result=$(run_command "${node_api}" "tickets" "" 600)
   log "Node ${node_id} ticket information (before redemption) -- ${result}"
   rejected=$(echo "${result}" | grep "Rejected:" | awk '{ print $3; }' | tr -d '\n')
@@ -312,10 +313,14 @@ redeem_tickets() {
   [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
   last_redeemed="${redeemed}"
 
+  # Trigger a redemption run, but cap it at 1 minute. We only want to measure
+  # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets"
-  result=$(run_command "${node_api}" "redeemTickets" "Redeemed all tickets" 600 600)
+  result=$(run_command "${node_api}" "redeemTickets" "" 60 60)
   log "--${result}"
 
+  # Get ticket statistics again and compare with previous state. Ensure we
+  # redeemed tickets.
   result=$(run_command "${node_api}" "tickets" "" 600)
   log "Node ${node_id} ticket information (after redemption) -- ${result}"
   rejected=$(echo "${result}" | grep "Rejected:" | awk '{ print $3; }' | tr -d '\n')
@@ -324,10 +329,13 @@ redeem_tickets() {
   [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
   last_redeemed="${redeemed}"
 
+  # Trigger another redemption run, but cap it at 1 minute. We only want to measure
+  # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
   result=$(run_command "${node_api}" "redeemTickets" "" 60 60)
   log "--${result}"
 
+  # Get final ticket statistics
   result=$(run_command "${node_api}" "tickets" "" 600)
   log "Node ${node_id} ticket information (after second redemption) -- ${result}"
   rejected=$(echo "${result}" | grep "Rejected:" | awk '{ print $3; }' | tr -d '\n')
