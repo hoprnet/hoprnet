@@ -11,18 +11,6 @@ tasks:
     command: |
       echo '🟡 Running HOPR nodes and topology'
       ./scripts/setup-local-cluster.sh -t "MyT0ken123^" -m "$(gp url 8080)" -i scripts/topologies/full_interconnected_cluster.sh
-      echo '🚦 Waiting on all nodes...'
-      gp await-port 13301
-      echo '✔️ Node 1 is up at $(gp url 13301) '
-      gp await-port 13302
-      echo '✔️ Node 2 is up at $(gp url 13302) '
-      gp await-port 13303
-      echo '✔️ Node 3 is up at $(gp url 13303) '
-      gp await-port 13304
-      echo '✔️ Node 4 is up at $(gp url 13304) '
-      gp await-port 13305
-      echo '✔️ Node 5 is up at $(gp url 13305) '
-      echo '🎉 All nodes are up! 🎉'
 
     openMode: tab-after
 
