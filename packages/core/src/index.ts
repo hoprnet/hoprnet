@@ -911,18 +911,17 @@ class Hopr extends EventEmitter {
       await this.strategy.onChannelWillClose(channel, this.connector)
     }
 
-    log('closing channel', channel.getId())
     let txHash: string
     try {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
-        log('initiating closure')
+        log('initiating closure of channel', channel.getId())
         txHash = await this.connector.initializeClosure(counterpartyPubKey)
       } else {
         // verify that we passed the closure waiting period to prevent failing
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          log('finalizing closure')
+          log('finalizing closure of channel', channel.getId())
           txHash = await this.connector.finalizeClosure(counterpartyPubKey)
         } else {
           log('ignoring finalizing closure because closure window is still active', channel.getId())
@@ -934,7 +933,6 @@ class Hopr extends EventEmitter {
       throw new Error(`Failed to closeChannel: ${err}`)
     }
 
-    log(`closed channel, ${channel.getId()}`)
     return { receipt: txHash, status: channel.status }
   }
 

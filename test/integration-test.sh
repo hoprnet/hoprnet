@@ -354,27 +354,27 @@ wait
 
 # initiate channel closures
 log "Node 1 close channel to Node 2"
-result=$(run_command "${api1}" "close ${addr2}" "Initiated channel closure" 600)
+result=$(run_command "${api1}" "close ${addr2}" "" 600)
 log "-- ${result}"
 
 log "Node 2 close channel to Node 3"
-result=$(run_command "${api2}" "close ${addr3}" "Initiated channel closure" 600)
+result=$(run_command "${api2}" "close ${addr3}" "" 600)
 log "-- ${result}"
 
 log "Node 3 close channel to Node 4"
-result=$(run_command "${api3}" "close ${addr4}" "Initiated channel closure" 600)
+result=$(run_command "${api3}" "close ${addr4}" "" 600)
 log "-- ${result}"
 
 log "Node 4 close channel to Node 5"
-result=$(run_command "${api4}" "close ${addr5}" "Initiated channel closure" 600)
+result=$(run_command "${api4}" "close ${addr5}" "" 600)
 log "-- ${result}"
 
 log "Node 5 close channel to Node 1"
-result=$(run_command "${api5}" "close ${addr1}" "Initiated channel closure" 600)
+result=$(run_command "${api5}" "close ${addr1}" "" 600)
 log "-- ${result}"
 
 # close channels
-echo "Waiting 1 minure for cool-off period"
+log "Waiting 1 minure for cool-off period"
 sleep 60
 
 log "Node 1 close channel to Node 2"
