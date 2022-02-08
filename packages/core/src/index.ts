@@ -947,7 +947,7 @@ class Hopr extends EventEmitter {
               .getId()
               .toHex()} because closure window is still active. Need to wait ${channel
               .getRemainingClosureTime()
-              .toString(10)}`
+              .toString(10)} seconds.`
           )
         }
       }
