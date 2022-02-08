@@ -1,10 +1,5 @@
-import type PeerId from 'peer-id'
+import type { StateOps } from '../types'
 import { styleValue } from './utils'
-
-export type GlobalState = {
-  aliases: Map<string, PeerId>
-  includeRecipient: boolean
-}
 
 // REPL Command
 export abstract class AbstractCommand {
@@ -17,7 +12,7 @@ export abstract class AbstractCommand {
   abstract help(): string
 
   // Run the command with optional argument
-  abstract execute(log: (string) => void, query: string, state: GlobalState): Promise<void>
+  abstract execute(log: (string) => void, query: string, stateOps: StateOps): Promise<void>
 
   protected usage(parameters: string[]): string {
     return `usage: ${parameters.map((x) => `<${x}>`).join(' ')}`

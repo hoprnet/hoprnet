@@ -36,8 +36,8 @@ export async function findCommitmentPreImage(db: HoprDB, channelId: Hash): Promi
   return new Hash(Uint8Array.from(result.preImage))
 }
 
-export async function bumpCommitment(db: HoprDB, channelId: Hash) {
-  await db.setCurrentCommitment(channelId, await findCommitmentPreImage(db, channelId))
+export async function bumpCommitment(db: HoprDB, channelId: Hash, newCommitment: Hash) {
+  await db.setCurrentCommitment(channelId, newCommitment)
 }
 
 type GetCommitment = () => Promise<Hash>

@@ -198,6 +198,14 @@ export async function createChainWrapper(
     }
   }
 
+  /*
+   * Sends announce transaction on-chain synchronously.
+   * Throws when an error during transaction sending is encountered.
+   *
+   * @param the address to be announced
+   * @param callback transaction handler
+   * @returns a Promise that resolve to the hash of the on-chain transaction
+   */
   async function announce(multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> {
     try {
       const confirmation = await sendTransaction(

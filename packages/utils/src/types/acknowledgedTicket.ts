@@ -23,7 +23,9 @@ export class AcknowledgedTicket {
   }
 
   public verify(ticketIssuer: PublicKey): boolean {
-    return validatePoRResponse(this.ticket.challenge, this.response) && this.ticket.verify(ticketIssuer)
+    const check1 = validatePoRResponse(this.ticket.challenge, this.response)
+    const check2 = this.ticket.verify(ticketIssuer)
+    return check1 && check2
   }
 
   static deserialize(arr: Uint8Array) {

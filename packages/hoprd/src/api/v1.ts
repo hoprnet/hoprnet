@@ -2,12 +2,23 @@ import express from 'express'
 import bodyParser from 'body-parser'
 
 import type { Application } from 'express'
+import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
+import type { AdminServer } from '../admin'
 
 import type { LogStream } from './../logs'
+import type { StateOps } from '../types'
 import { Commands } from './../commands'
+import { authenticateWsConnection } from './utils'
 
-export default function setupApiV1(service: Application, urlPath: string, node: Hopr, logs: LogStream, options: any) {
+export function setupRestApi(
+  service: Application,
+  urlPath: string,
+  node: Hopr,
+  logs: LogStream,
+  stateOps: StateOps,
+  options: any
+) {
   const router = express.Router()
 
   router.use(bodyParser.text({ type: '*/*' }))
@@ -16,7 +27,7 @@ export default function setupApiV1(service: Application, urlPath: string, node: 
   router.get('/address/eth', (_, res) => res.send(node.getEthereumAddress().toHex()))
   router.get('/address/hopr', (_, res) => res.send(node.getId().toB58String()))
 
-  const cmds = new Commands(node)
+  const cmds = new Commands(node, stateOps)
   router.post('/command', async (req, res) => {
     await node.waitForRunning()
     logs.log('Node is running')
@@ -43,4 +54,26 @@ export default function setupApiV1(service: Application, urlPath: string, node: 
   })
 
   service.use(urlPath, router)
+}
+
+export function setupWsApi(
+  server: WebSocketServer,
+  logs: LogStream,
+  options: { apiToken?: string },
+  adminServer?: AdminServer
+) {
+  server.on('connection', (socket, req) => {
+    if (!authenticateWsConnection(logs, req, options.apiToken)) {
+      socket.send(
+        JSON.stringify({
+          type: 'auth-failed',
+          msg: 'authentication failed',
+          ts: new Date().toISOString()
+        })
+      )
+      socket.close()
+      return
+    }
+    if (adminServer) adminServer.onConnection(socket)
+  })
 }

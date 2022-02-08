@@ -3,7 +3,8 @@ import type PeerId from 'peer-id'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import type { StateOps } from '../types'
+import { AbstractCommand } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
 
 export default class FundChannel extends AbstractCommand {
@@ -19,7 +20,7 @@ export default class FundChannel extends AbstractCommand {
     return '(deprecated) Fund a channel, if channel is closed it will open it'
   }
 
-  async execute(log, query: string, state: GlobalState): Promise<void> {
+  async execute(log, query: string, { getState }: StateOps): Promise<void> {
     if (query == null) {
       return log(
         styleValue(
@@ -41,7 +42,7 @@ export default class FundChannel extends AbstractCommand {
     let counterpartyFund: BN
 
     try {
-      peerId = checkPeerIdInput(peerIdInput, state)
+      peerId = checkPeerIdInput(peerIdInput, getState())
       if (isNaN(Number(myFundInput))) throw Error('Argument <myFund> is not a number')
       myFund = new BN(moveDecimalPoint(myFundInput, Balance.DECIMALS))
       if (isNaN(Number(counterpartyFundInput))) throw Error('Argument <counterpartyFund> is not a number')
