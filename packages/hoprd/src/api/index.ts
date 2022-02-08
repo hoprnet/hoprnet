@@ -30,8 +30,8 @@ export default function setupAPI(
     const server = http.createServer(service)
 
     apiV1.setupRestApi(service, '/api/v1', node, logs, stateOps, options)
-    apiV2.setupRestApi(service, '/api/v2', node, logs, stateOps, options)
-    apiV2.setupWsApi(new ws.Server({ server, path: '/api/v2/messages/websocket' }), node, logs, options)
+    apiV2.setupRestApi(service, '/api/v2', node, stateOps, options)
+    apiV2.setupWsApi(server, new ws.Server({ noServer: true, path: '/api/v2/messages/websocket' }), node, options)
 
     server
       .listen(options.apiPort, options.apiHost, () => {

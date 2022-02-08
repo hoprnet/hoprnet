@@ -118,69 +118,62 @@ testWebsocketSecurity() {
   local path="${2}"
   local port="${3}"
   local insecure_port="${4}"
+  local unauth_error="${5}"
   local ws_response
-  local msg_type
 
   log "${name} should reject data without token"
-  ws_response=$(echo "_test" | websocat ws://${host}:${port}${path})
-  msg_type=$(echo "${ws_response}" | jq .type --raw-output )
-
-  if [ "${msg_type}" != "auth-failed" ]; then
+  ws_response=$(echo "_test" | websocat ws://${host}:${port}${path} 2>&1)
+  echo "response: ${ws_response}"
+  if [ "${ws_response}" == *"${unauth_error}"* ]; then
     log "⛔️ Didn't fail ws authentication"
-    log "Expected response: '{ type: 'auth-failed' } "
+    log "Expected response: '${unauth_error}' "
     log "Actual response:"
     log "${ws_response}"
-    log "Msg type:"
-    log ${msg_type}
     exit 1
   fi
 
   log "${name} should reject data with invalid token"
-  ws_response=$(echo "_test" | websocat ws://${host}:${port}${path} --header "Cookie:X-Auth-Token=${bad_token}")
-  msg_type=$(echo "${ws_response}" | jq .type --raw-output )
-
-  if [ "${msg_type}" != "auth-failed" ]; then
+  ws_response=$(echo "_test" | websocat ws://${host}:${port}${path} --header "Cookie:X-Auth-Token=${bad_token}" 2>&1)
+  if [ "${ws_response}" == *"${unauth_error}"* ]; then
     log "⛔️ Didn't fail ws authentication"
-    log "Expected response: '{ type: 'auth-failed' } "
+    log "Expected response: '${unauth_error}' "
     log "Actual response:"
     log "${ws_response}"
-    log "Msg type:"
-    log ${msg_type}
     exit 1
   fi
 
   log "${name} should execute _test data with correct token"
-  ws_response=$(echo "_test" | websocat ws://${host}:${port}${path} -0 --header "Cookie:X-Auth-Token=${api_token}")
-  if [[ "${ws_response}" != *"ws client connected [ authentication ENABLED ]"* ]]; then
+  ws_response=$(echo "_test" | websocat ws://${host}:${port}${path} -0 --header "Cookie:X-Auth-Token=${api_token}" 2>&1)
+  if [[ "${ws_response}" == *"${unauth_error}"* ]]; then
     log "⛔️ Didn't succeed ws authentication"
-    log "Expected response should contain: 'ws client connected [ authentication ENABLED ]' "
+    log "Expected response should not contain: '${unauth_error}' "
     log "Actual response:"
     log "${ws_response}"
     exit 1
   fi
 
   log "No-auth ${name} should auth with no token"
-  ws_response=$(echo "_test" | websocat ws://${host}:${insecure_port}${path} -0)
-  if [[ "${ws_response}" != *"ws client connected [ authentication DISABLED ]"* ]]; then
+  ws_response=$(echo "_test" | websocat ws://${host}:${insecure_port}${path} -0 2>&1)
+  if [[ "${ws_response}" == *"${unauth_error}"* ]]; then
     log "⛔️ Didn't succeed ws authentication"
-    log "Expected response should contain: 'ws client connected [ authentication DISABLED ]' "
+    log "Expected response should not contain: '${unauth_error}' "
     log "Actual response:"
     log "${ws_response}"
     exit 1
   fi
 
   log "No-auth ${name} should auth with bad token"
-  ws_response=$(echo "_test" | websocat ws://${host}:${insecure_port}${path} -0 --header "Cookie:${bad_token}")
-  if [[ "${ws_response}" != *"ws client connected [ authentication DISABLED ]"* ]]; then
+  ws_response=$(echo "_test" | websocat ws://${host}:${insecure_port}${path} -0 --header "Cookie:${bad_token}" 2>&1)
+  if [[ "${ws_response}" == *"${unauth_error}"* ]]; then
     log "⛔️ Didn't succeed ws authentication"
-    log "Expected response should contain: 'ws client connected [ authentication DISABLED ]' "
+    log "Expected response should not contain: '${unauth_error}' "
     log "Actual response:"
     log "${ws_response}"
     exit 1
   fi
 }
 
-testWebsocketSecurity "Admin websocket" "/" $admin_port $insecure_admin_port
-testWebsocketSecurity "websocket V2" "/api/v2/messages/websocket" $api_port $insecure_api_port
+testWebsocketSecurity "Admin websocket" "/" $admin_port $insecure_admin_port "auth-failed"
+testWebsocketSecurity "websocket V2" "/api/v2/messages/websocket" $api_port $insecure_api_port "401 Unauthorized"
 
 log "Security tests finished successfully"

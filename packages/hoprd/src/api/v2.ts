@@ -8,10 +8,10 @@ import { initialize } from 'express-openapi'
 import PeerId from 'peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
 
+import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
-import type { LogStream } from './../logs'
 import type { StateOps } from '../types'
 import { authenticateWsConnection } from './utils'
 
@@ -20,14 +20,7 @@ const debugLog = debug('hoprd:api:v2')
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
-export function setupRestApi(
-  service: Application,
-  urlPath: string,
-  node: Hopr,
-  logs: LogStream,
-  stateOps: StateOps,
-  options: any
-) {
+export function setupRestApi(service: Application, urlPath: string, node: Hopr, stateOps: StateOps, options: any) {
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
 
@@ -37,7 +30,7 @@ export function setupRestApi(
   // assign internal objects to each requests so they can be accessed within
   // handlers
   service.use(urlPath, (req, _res, next) => {
-    req.context = new Context(node, logs, stateOps)
+    req.context = new Context(node, stateOps)
     next()
   })
   // because express-openapi uses relative paths we need to figure out where
@@ -120,41 +113,38 @@ export function setupRestApi(
   }) as express.ErrorRequestHandler)
 }
 
-export function setupWsApi(server: WebSocketServer, node: Hopr, logs: LogStream, options: { apiToken?: string }) {
-  server.on('connection', (socket, req) => {
-    if (!authenticateWsConnection(logs, req, options.apiToken)) {
-      socket.send(
-        JSON.stringify({
-          type: 'auth-failed',
-          msg: 'authentication failed',
-          ts: new Date().toISOString()
-        })
-      )
-      socket.close()
+export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, options: { apiToken?: string }) {
+  server.on('upgrade', function upgrade(req, socket, head) {
+    const needsAuth = !!options.apiToken
+    if (needsAuth && !authenticateWsConnection(req, options.apiToken)) {
+      debug('ws client failed authentication')
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+      socket.destroy()
       return
     }
+    if (!needsAuth) debug('ws client connected [ authentication DISABLED ]')
+    else debug('ws client connected [ authentication ENABLED ]')
 
-    // used by E2E tests to test security
-    socket.on('message', (message: string) => {
-      debugLog('Received message', message)
+    wss.handleUpgrade(req, socket, head, function done(wsSocket) {
+      wss.emit('connection', wsSocket, req)
     })
+  })
 
+  wss.on('connection', (socket) => {
     socket.on('error', (err: string) => {
-      debugLog('Error', err)
-      logs.log('Websocket error', err.toString())
+      debugLog('Websocket error', err.toString())
     })
 
     node.on('hopr:message', (msg: Uint8Array) => {
       socket.emit(msg.toString())
     })
-    logs.subscribe(socket)
   })
 }
 
 // In order to pass custom objects along with each request we build a context
 // which is attached during request processing.
 export class Context {
-  constructor(public node: Hopr, public logs: LogStream, public stateOps: StateOps) {}
+  constructor(public node: Hopr, public stateOps: StateOps) {}
 }
 
 declare global {

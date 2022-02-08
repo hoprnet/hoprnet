@@ -1,5 +1,7 @@
-import type { LogStream } from './../logs'
 import cookie from 'cookie'
+import { debug } from '@hoprnet/hopr-utils'
+
+const debugLog = debug('hoprd:api:utils')
 
 /**
  * Authenticates a websocket connection.
@@ -8,54 +10,46 @@ import cookie from 'cookie'
  * @returns true if connection is authenticated
  */
 export const authenticateWsConnection = (
-  logs: LogStream,
   req: { url?: string; headers: Record<any, any> },
-  apiToken?: string
+  apiToken: string
 ): boolean => {
-  // authentication is disabled
-  if (!apiToken) {
-    logs.log('ws client connected [ authentication DISABLED ]')
-    return true
-  }
+  // throw if apiToken is empty
+  if (apiToken === '') throw Error('Cannot authenticate empty apiToken')
 
-  // Authenticate by URL parameter
-  // Other clients different to `hopr-admin` might pass the `apiToken` via a
-  // query param since they won't be on the same domain the node is hosted,
-  // and thus, unable to set the `apiToken` via cookies. Using `req.url` we
-  // can detect these cases and provide the ability for any client that
-  // knows the `apiToken` to reach your HOPR node.
+  // attempt to authenticate via URL parameter
   if (req.url) {
     try {
       // NB: We use a placeholder domain since req.url only passes query params
       const url = new URL(`https://hoprnet.org${req.url}`)
       const paramApiToken = url.searchParams?.get('apiToken') || ''
       if (decodeURI(paramApiToken) == apiToken) {
-        logs.log('ws client connected [ authentication ENABLED ]')
+        debugLog('ws client connected [ authentication SUCCESS via URL parameter ]')
         return true
       }
     } catch (e) {
-      logs.error('invalid URL queried', e)
+      debugLog('invalid URL queried', e)
     }
   }
 
-  // Authenticate by cookie
+  // attempt to authenticate via cookie
   if (req.headers.cookie) {
     let cookies: ReturnType<typeof cookie.parse> | undefined
     try {
       cookies = cookie.parse(req.headers.cookie)
+      console.log('cookies', cookies)
     } catch (e) {
-      logs.error(`failed parsing cookies`, e)
+      debugLog(`failed parsing cookies`, e)
     }
 
     if (
       cookies &&
       (decodeURI(cookies['X-Auth-Token'] || '') === apiToken || decodeURI(cookies['x-auth-token'] || '') === apiToken)
     ) {
-      logs.log('ws client connected [ authentication ENABLED ]')
+      debugLog('ws client connected [ authentication SUCCESS via cookie ]')
       return true
     }
   }
 
-  logs.log('ws client failed authentication')
+  debugLog('ws client failed authentication')
   return false
 }
