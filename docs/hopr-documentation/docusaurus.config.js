@@ -17,6 +17,20 @@ if (DOCS_ALGOLIA_APP_ID && DOCS_ALGOLIA_API_KEY) {
   }
 }
 
+const redocusaurus = [
+  'redocusaurus',
+  {
+    debug: Boolean(process.env.DEBUG || process.env.CI),
+    specs: [
+      {
+        id: 'rest-api',
+        specUrl: 'https://raw.githubusercontent.com/hoprnet/hoprnet/master/packages/hoprd/rest-api-v2-spec.yaml',
+        routePath: '/developers/rest-api/',
+      },
+    ],
+  },
+];
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'HOPR',
@@ -36,6 +50,7 @@ const config = {
     'https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css'
   ],
   presets: [
+    redocusaurus,
     [
       '@docusaurus/preset-classic',
       /** @type {import('@docusaurus/preset-classic').Options} */
