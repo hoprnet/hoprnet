@@ -16,9 +16,10 @@ tasks:
     openMode: tab-after
 
   - name: Command window
+    before: |
+      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && sleep 10s
     command: |
       export apiToken="^^LOCAL-testing-123^^"
-      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && sleep 10s
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
       export HOPR_NODE_1_ADDR=$(curl -X 'GET' "$HOPR_NODE_1_HTTP_URL/api/v2/account/addresses" -H 'accept: application/json' -H "x-auth-token: $apiToken" 2>/dev/null | jq -r '.hopr')
       export HOPR_NODE_2_HTTP_URL=$(gp url 13302) HOPR_NODE_2_WS_URL=$(gp url 19502)
@@ -33,9 +34,10 @@ tasks:
     openMode: tab-after
 
   - name: Node 1 WS
+    before: |
+      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && sleep 10s
     command: |
       export apiToken="^^LOCAL-testing-123^^"
-      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && sleep 10s
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
       export HOPR_NODE_1_ADDR=$(curl -X 'GET' "$HOPR_NODE_1_HTTP_URL/api/v2/account/addresses" -H 'accept: application/json' -H "x-auth-token: $apiToken" 2>/dev/null | jq -r '.hopr')
       export HOPR_NODE_2_HTTP_URL=$(gp url 13302) HOPR_NODE_2_WS_URL=$(gp url 19502)
@@ -54,9 +56,10 @@ tasks:
     openMode: tab-after
 
   - name: Node 2 WS
+    before: |
+      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && sleep 10s
     command: |
       export apiToken="^^LOCAL-testing-123^^"
-      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && sleep 10s
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
       export HOPR_NODE_1_ADDR=$(curl -X 'GET' "$HOPR_NODE_1_HTTP_URL/api/v2/account/addresses" -H 'accept: application/json' -H "x-auth-token: $apiToken" 2>/dev/null | jq -r '.hopr')
       export HOPR_NODE_2_HTTP_URL=$(gp url 13302) HOPR_NODE_2_WS_URL=$(gp url 19502)
