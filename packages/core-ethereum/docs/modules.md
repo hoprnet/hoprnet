@@ -108,7 +108,7 @@ ___
 
 ### bumpCommitment
 
-▸ **bumpCommitment**(`db`, `channelId`): `Promise`<`void`\>
+▸ **bumpCommitment**(`db`, `channelId`, `newCommitment`): `Promise`<`void`\>
 
 #### Parameters
 
@@ -116,6 +116,7 @@ ___
 | :------ | :------ |
 | `db` | `HoprDB` |
 | `channelId` | `Hash` |
+| `newCommitment` | `Hash` |
 
 #### Returns
 
