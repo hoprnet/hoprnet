@@ -26,8 +26,7 @@ To see an example of how to run this as an isolated application, you can also ch
 
 Our React application starts as with any, just loading the application within an entry point.
 
-```js
-// index.js (usually your React application entrypoint)
+```jsx {3,6} title="index.jsx (usually your React application entrypoint)"
 import { render } from "react-dom";
 
 import BoomerangChat from "./BoomerangChat";
@@ -39,8 +38,7 @@ render(<BoomerangChat />, rootElement);
 We can see how we are loading our app in line `3` and rendering it on line `6`.
 `BoomerangChat.jsx` renders the actual component we are looking to build as a HOPR App, so let's take a look at `BoomerangChat.jsx`:
 
-```js
-// BoomerangChat.jsx
+```jsx {6-8,25} title="BoomerangChat.jsx"
 import React, { useEffect, useState } from "react";
 import WebSocketHandler from "./WebSocketHandler";
 
@@ -71,14 +69,13 @@ export default function BoomerangChat() {
 }
 ```
 
-We can see that from line `7` to `9`, we see a series of values called `httpEndpoint`, `wsEndpoint`, and `securityToken`,
+We can see that from line `6` to `8`, we see a series of values called `httpEndpoint`, `wsEndpoint`, and `securityToken`,
 which are needed in most HOPR Applications. Without these values, configurable by the user, a HOPR app can
 not communicate with a HOPR node, and thus, without a HOPR cluster.
 
-We also see in line `22` a component called `WebSocketHandler`. Here is its code:
+We also see in line `25` a component called `WebSocketHandler`. Here is its code:
 
-```js
-//WebSocketHandler.jsx
+```jsx title="WebSocketHandler.jsx"
 import React, { useEffect, useState } from "react";
 import useWebsocket from "../hooks/useWebSockets ";
 
@@ -118,8 +115,7 @@ useful information about it in the app, such as address and balance.
 
 In our previous example, inside `BoomerangChat.jsx` we had a `useEffect` call, which has something like this:
 
-```js
-// inside BoomerangChat.jsx
+```jsx {4-5} title="BoomerangChat.jsx"
 useEffect(() => {
   const loadAddress = async () => {
     const headers = getHeaders();
@@ -135,10 +131,10 @@ useEffect(() => {
 ```
 
 In line `4` we are talking to the node's REST API using the native `fetch` call, to obtain its HOPR Address, since
-we’ll be using that later when we want to send a message. It's important to include the `Headers` (see line `6`)
+we’ll be using that later when we want to send a message. It's important to include the `Headers` (see next line)
 which authenticate the client against the call to avoid unauthorized calls. Here's the `getHeaders` method for reference:
 
-```js
+```js title="getHeaders method"
 const getHeaders = (isPost = false) => {
   const headers = new Headers();
   if (isPost) {
@@ -155,8 +151,7 @@ const getHeaders = (isPost = false) => {
 The final part of the demo revolves around the actual request to send the message. We can see the code from the same
 file here:
 
-```js
-// inside BoomerangChat.jsx
+```jsx {7} title="BoomerangChat.jsx"
 const sendMessage = async () => {
     if (!address) return;
     await fetch(`${httpEndpoint}/api/v2/messages`, {
@@ -171,7 +166,7 @@ const sendMessage = async () => {
 ```
 
 We can see that the message is being sent via the REST API endpoint, including also headers (which are now different)
-since we are doing a `POST` request. The important part is on line `8`, where we state the `recipient` of the message
+since we are doing a `POST` request. The important part is on line `7`, where we state the `recipient` of the message
 is `address`, value which we set up in the initial `useEffect` request. This is how we are signaling to the API to send
 a message to that particular address, which happens to be ourselves. To the HOPR Network the destination of the message
 is irrelevant.
@@ -192,8 +187,7 @@ Here's all the code for all components and hooks used.
 
 Used as a WebSocket interface to react and connect to our HOPR node accordingly.
 
-```js
-// useWebSocket.js
+```js title="useWebSocket.js"
 /*
   A react hook.
   Keeps websocket connection alive, reconnects on disconnections or endpoint change.
@@ -294,7 +288,7 @@ export default useWebsocket;
 
 Used to a React component to load our HOPR node using the `useWebSocket` hook.
 
-```js
+```jsx title="WebSocketHandler.jsx"
 import React, { useEffect, useState } from "react";
 import useWebsocket from "../hooks/useWebSockets ";
 
@@ -335,7 +329,7 @@ export default WebSocketHandler;
 
 Actual HOPR application able to send and read a message to the same node it’s connected usign its HTTP/WS endpoints.
 
-```js
+```jsx title="BoomerangChat.jsx"
 import React, { useEffect, useState } from "react";
 import WebSocketHandler from "./WebSocketHandler";
 
