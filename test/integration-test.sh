@@ -405,4 +405,4 @@ log "Waiting 70 seconds for cool-off period"
 sleep 70
 
 # verify channel has been closed
-close_channel 1 5 "${api1}" "${addr5}" "true"
+close_channel 1 5 "${api1}" "${addr5}"
