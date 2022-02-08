@@ -98,7 +98,7 @@ tasks:
       echo -e "\n"
       sleep 5s
         ./.bin/websocat "$(echo "$HOPR_NODE_2_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
-      
+
     openMode: split-right
 
 ports:
