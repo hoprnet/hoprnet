@@ -17,7 +17,7 @@ tasks:
 
   - name: Command window
     before: |
-      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && sleep 10s
+      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && gp await-port 13305 && sleep 15s
     command: |
       export apiToken="^^LOCAL-testing-123^^"
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
@@ -40,7 +40,7 @@ tasks:
 
   - name: Node 1 WS
     before: |
-      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && sleep 10s
+      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && gp await-port 13305 && sleep 15s
     command: |
       export apiToken="^^LOCAL-testing-123^^"
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
@@ -62,7 +62,7 @@ tasks:
 
   - name: Node 2 WS
     before: |
-      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && sleep 10s
+      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && gp await-port 13305 && sleep 15s
     command: |
       export apiToken="^^LOCAL-testing-123^^"
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
