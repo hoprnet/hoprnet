@@ -363,7 +363,7 @@ for i in `seq 1 10`; do
   run_command "${api3}" "send ${addr4},${addr5} 'hello, world'" "Message sent" 600
 
   log "Node 5 send 1 hop message to node 2 via node 1"
-  run_command "${api5}" "send ${addr1},${addr2} 'hello, world'" "Could not send message" 600
+  run_command "${api5}" "send ${addr1},${addr2} 'hello, world'" "Message sent" 600
 done
 
 # for the last send tests we use Rest API v2 instead of the older command-based Rest API v1

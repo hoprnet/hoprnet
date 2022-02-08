@@ -296,6 +296,9 @@ class Hopr extends EventEmitter {
 
     this.connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
 
+    // subscribe so we can process channel close events
+    this.connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
+
     await this.announce(this.options.announce)
 
     this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
@@ -341,10 +344,21 @@ class Hopr extends EventEmitter {
     }
   }
 
-  private async onChannelWaitingForCommitment(c: ChannelEntry) {
+  private async onChannelWaitingForCommitment(c: ChannelEntry): Promise<void> {
     if (this.strategy.shouldCommitToChannel(c)) {
       log(`Found channel ${c.getId().toHex()} to us with unset commitment. Setting commitment`)
       retryWithBackoff(() => this.connector.commitToChannel(c))
+    }
+  }
+
+  /*
+   * Callback function used to react to on-chain channel update events.
+   * Specifically we trigger the strategy on channel close handler.
+   * @param channel object
+   */
+  private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
+    if (channel.status === ChannelStatus.PendingToClose) {
+      await this.strategy.onChannelWillClose(channel, this.connector)
     }
   }
 

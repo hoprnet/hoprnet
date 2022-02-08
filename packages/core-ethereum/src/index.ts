@@ -51,11 +51,18 @@ export type ChainOptions = {
   environment: string
 }
 
+type ticketRedemtionInChannelOperations = {
+  // maps channel id to ongoing operation
+  [id: string]: Promise<void>
+}
+
 export default class HoprCoreEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
   private started: Promise<HoprCoreEthereum> | undefined
   private redeemingAll: Promise<void> | undefined = undefined
+  // Used to store ongoing operations to prevent duplicate redemption attempts
+  private ticketRedemtionInChannelOperations: ticketRedemtionInChannelOperations = {}
 
   constructor(
     //private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
@@ -251,9 +258,31 @@ export default class HoprCoreEthereum extends EventEmitter {
     this.redeemingAll = undefined
   }
 
+  public async redeemTicketsInChannelByCounterparty(counterparty: PublicKey) {
+    const channel = await this.db.getChannelFrom(counterparty)
+    return this.redeemTicketsInChannel(channel)
+  }
+
   public async redeemTicketsInChannel(channel: ChannelEntry) {
+    const channelId = channel.getId().toHex()
+    const currentOperation = this.ticketRedemtionInChannelOperations[channelId]
+
+    // verify that no operation is running, or return the active operation
+    if (currentOperation) {
+      return currentOperation
+    }
+
+    // start new operation and store it
+    this.ticketRedemtionInChannelOperations[channelId] = this.redeemTicketsInChannelLoop(channel)
+    return this.ticketRedemtionInChannelOperations[channelId]
+  }
+
+  private async redeemTicketsInChannelLoop(channel: ChannelEntry): Promise<void> {
+    const channelId = channel.getId().toHex()
     if (!channel.destination.eq(this.getPublicKey())) {
-      throw new Error('Cannot redeem ticket in channel that isnt to us')
+      // delete operation before returning
+      delete this.ticketRedemtionInChannelOperations[channelId]
+      throw new Error('Cannot redeem ticket in channel that is not to us')
     }
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
@@ -274,6 +303,8 @@ export default class HoprCoreEthereum extends EventEmitter {
       if (result.status !== 'SUCCESS') {
         log('Error redeeming ticket', result)
         // We need to abort as tickets require ordered redemption.
+        // delete operation before returning
+        delete this.ticketRedemtionInChannelOperations[channelId]
         if (result.status === 'ERROR') throw result.error
         return
       }
@@ -283,6 +314,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
 
     log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
+    // delete operation before returning
+    delete this.ticketRedemtionInChannelOperations[channelId]
   }
 
   // Private as out of order redemption will break things - redeem all at once.
