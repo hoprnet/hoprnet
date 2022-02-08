@@ -80,7 +80,7 @@ ___
 
 #### Defined in
 
-[types/acknowledgedTicket.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L39)
+[types/acknowledgedTicket.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L41)
 
 ## Methods
 
@@ -134,4 +134,4 @@ ___
 
 #### Defined in
 
-[types/acknowledgedTicket.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L29)
+[types/acknowledgedTicket.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L31)
