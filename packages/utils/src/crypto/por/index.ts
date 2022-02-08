@@ -131,7 +131,8 @@ export function validatePoRHalfKeys(ethereumChallenge: EthereumChallenge, ownKey
 
 // @TODO add description
 export function validatePoRResponse(ethereumChallenge: EthereumChallenge, response: Response): boolean {
-  return response.toChallenge().toEthereumChallenge().eq(ethereumChallenge)
+  const challenge = response.toChallenge().toEthereumChallenge()
+  return challenge.eq(ethereumChallenge)
 }
 
 // @TODO add description

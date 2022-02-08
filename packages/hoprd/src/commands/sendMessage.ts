@@ -1,9 +1,10 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
+import type { StateOps, State } from '../types'
 import { INTERMEDIATE_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import { PublicKey } from '@hoprnet/hopr-utils'
 import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
 
 export class SendMessage extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -24,12 +25,12 @@ export class SendMessage extends AbstractCommand {
   }
 
   protected async sendMessage(
-    state: GlobalState,
+    state: State,
     recipient: PeerId,
     rawMessage: string,
     path?: PublicKey[]
   ): Promise<string> {
-    const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
+    const message = state.settings.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
     try {
       await this.node.sendMessage(encodeMessage(message), recipient, path)
@@ -39,7 +40,8 @@ export class SendMessage extends AbstractCommand {
     }
   }
 
-  public async execute(log: (str: string) => void, query: string, state: GlobalState): Promise<void> {
+  public async execute(log: (str: string) => void, query: string, { getState }: StateOps): Promise<void> {
+    const state = getState()
     let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
     if (err) {
       log(styleValue(err, 'failure'))

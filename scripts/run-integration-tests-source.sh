@@ -115,7 +115,7 @@ if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
-# $1 = rest port
+# $1 = api port
 # $2 = node port
 # $3 = admin port
 # $4 = node data directory
@@ -123,7 +123,7 @@ fi
 # $6 = node id file
 # $7 = OPTIONAL: additional args to hoprd
 function setup_node() {
-  local rest_port=${1}
+  local api_port=${1}
   local node_port=${2}
   local admin_port=${3}
   local dir=${4}
@@ -131,7 +131,7 @@ function setup_node() {
   local id=${6}
   local additional_args=${7:-""}
 
-  log "Run node ${id} on rest port ${rest_port} -> ${log}"
+  log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
     additional_args="--environment hardhat-localhost ${additional_args}"
@@ -152,8 +152,8 @@ function setup_node() {
     --identity="${id}" \
     --init \
     --password="${password}" \
-    --rest \
-    --restPort "${rest_port}" \
+    --api \
+    --apiPort "${api_port}" \
     --testAnnounceLocalAddresses \
     --testPreferLocalAddresses \
     --testUseWeakCrypto \
@@ -287,7 +287,8 @@ setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "--anno
 setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections"
 setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections"
 setup_node 13306 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --run \"info;balance\""
-setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2" # should not be able to talk to the rest
+# should not be able to talk to the rest
+setup_node 13307 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce --environment hardhat-localhost2"
 setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}" 
 # }}}
 
@@ -333,7 +334,7 @@ log "All nodes came up online"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 19501 19502 "${api_token}"
+  127.0.0.1 13301 13302 19501 19502 "${api_token}"
 # }}}
 
 # --- Run protocol test --- {{{
@@ -343,7 +344,7 @@ HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
-grep -E "HOPR Balance: +10 txHOPR" "${node6_log}"
+grep -E "HOPR Balance: +20 txHOPR" "${node6_log}"
 grep -E "ETH Balance: +1 xDAI" "${node6_log}"
 grep -E "Running on: hardhat" "${node6_log}"
 # }}}

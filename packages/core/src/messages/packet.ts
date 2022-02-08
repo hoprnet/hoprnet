@@ -425,6 +425,7 @@ export class Packet {
           })
       )
     } catch (e) {
+      log(`mark ticket as rejected`, this.ticket)
       await db.markRejected(this.ticket)
       throw e
     }

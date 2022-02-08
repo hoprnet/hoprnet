@@ -155,7 +155,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:161](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L161)
+[types/ticket.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L162)
 
 ___
 
@@ -169,7 +169,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L185)
+[types/ticket.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L186)
 
 ___
 
@@ -197,7 +197,7 @@ a ticket before we submit it to the blockchain.
 
 #### Defined in
 
-[types/ticket.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L180)
+[types/ticket.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L181)
 
 ___
 
