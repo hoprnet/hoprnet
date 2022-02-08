@@ -26,7 +26,7 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description:
-    'Send a message to another peer using a given path (list of node addresses that should relay our message through network).',
+    'Send a message to another peer using a given path (list of node addresses that should relay our message through network). If no path is given, HOPR will attempt to find a path.',
   tags: ['Messages'],
   operationId: 'messagesSendMessage',
   requestBody: {
