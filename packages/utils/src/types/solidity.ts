@@ -23,6 +23,10 @@ class UINT256 {
     return this.toBN().eq(b.toBN())
   }
 
+  public cmp(b: UINT256): number {
+    return this.toBN().cmp(b.toBN())
+  }
+
   static fromString(str: string): UINT256 {
     return new UINT256(new BN(str))
   }
