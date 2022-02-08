@@ -12,8 +12,8 @@ HOPR network by learning how to send and read messages from one node to another.
 
 Before getting started, we suggest you get familiar with the following concepts:
 
-- ["Running a local HOPR Cluster"](#)
-- ["Interacting with a HOPR node"](#)
+- ["Running a local HOPR Cluster"](/developers/starting-local-cluster)
+- ["Interacting with a HOPR node"](/developers/connecting-node)
 
 ### 2. HOPR Cluster & exported variables
 
@@ -225,12 +225,12 @@ In a browser, you can simply paste your `HOPR_NODE_1_WS_URL`. You should be able
 In case you need some help to complete this tutorial, you can watch our 15-minute walkthrough which includes also the setup
 of the local HOPR cluster.
 
-<figure class="video-container" style={{"marginTop": "-100px"}}>
+<figure class="video-container" style={{"marginTop": "-100px", "marginBottom": "-100px"}}>
   <iframe src="https://player.vimeo.com/video/672847960?h=bc02050298" width="640" height="564" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
 </figure>
 
 [^1]:
-    As defined in ["Running a local HOPR Cluster"](#), a HOPR cluster is a set of HOPR nodes that are connected (i.e
+    As defined in ["Running a local HOPR Cluster"](/developers/starting-local-cluster), a HOPR cluster is a set of HOPR nodes that are connected (i.e
     reachable) between each other and have openned funded channels between each other. This is also known as a [Complete
     Graph](https://en.wikipedia.org/wiki/Complete_graph), and although it is not required for successfully sending a message
     (i.e. you only need `1` path to a recipient when sending a message), it makes testing and developing HOPR apps easier.
