@@ -56,7 +56,7 @@ tasks:
       echo '📡 Node 1 WS Connection'
       echo -e "\n"
       sleep 5s
-      ./.bin/websocat "$(echo "$HOPR_NODE_2_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
+      ./.bin/websocat "$(echo "$HOPR_NODE_1_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
 
     openMode: tab-after
 
