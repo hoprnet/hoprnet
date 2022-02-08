@@ -21,12 +21,12 @@ export default function BoomerangChat() {
   useEffect(() => {
     const loadAddress = async () => {
       const headers = getHeaders()
-      const account = await fetch(`${httpEndpoint}/api/v2/account/address`, {
+      const account = await fetch(`${httpEndpoint}/api/v2/account/addresses`, {
         headers
       })
         .then((res) => res.json())
         .catch((err) => console.error(err))
-      setAddress(account?.hoprAddress)
+      setAddress(account?.hopr)
     }
     loadAddress()
   }, [securityToken, httpEndpoint])

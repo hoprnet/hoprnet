@@ -238,7 +238,7 @@ The output should look something like this `wss://19501-hoprnet-mynechat-7x6h2gh
 
 :::info Tip
 For `apiToken` `^^LOCAL-testing-123^^` the `base64` encoded value is `Xl5MT0NBTC10ZXN0aW5nLTEyM15e`, so to use [ReqBin](https://reqbin.com/)
-with a Gitpod exposed URL (e.g. `https://13302-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/api/v2/account/address`), you can use `gp url`.
+with a Gitpod exposed URL (e.g. `https://13302-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/api/v2/account/addresses`), you can use `gp url`.
 For a different `apiToken` value, you can use the `btoa` function of your browser Developer Tools to figure it out.
 
 <br/>
