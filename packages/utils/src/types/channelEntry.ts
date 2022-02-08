@@ -30,6 +30,21 @@ function numberToChannelStatus(i: number): ChannelStatus {
   }
 }
 
+function channelStatusToString(status: ChannelStatus): string {
+  switch (status) {
+    case ChannelStatus.Closed:
+      return 'Closed'
+    case ChannelStatus.WaitingForCommitment:
+      return 'WaitingForCommitment'
+    case ChannelStatus.Open:
+      return 'Open'
+    case ChannelStatus.PendingToClose:
+      return 'PendingToClose'
+    default:
+      throw Error(`Status ${status} does not exist`)
+  }
+}
+
 function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
   return numberToChannelStatus(u8aToNumber(arr) as number)
 }
@@ -119,7 +134,7 @@ export class ChannelEntry {
       `  commitment:   ${this.commitment.toHex()}\n` +
       `  ticketEpoch:  ${this.ticketEpoch.toBN().toString(10)}\n` +
       `  ticketIndex:  ${this.ticketIndex.toBN().toString(10)}\n` +
-      `  status:       ${chalk.green(this.status)}\n` +
+      `  status:       ${chalk.green(channelStatusToString(this.status))}\n` +
       `  channelEpoch: ${this.channelEpoch.toBN().toString(10)}\n` +
       `  closureTime:  ${this.closureTime.toBN().toString(10)}\n`
     )
@@ -148,7 +163,7 @@ export class ChannelEntry {
       return new BN(-1)
     }
 
-    return now.sub(this.closureTime.toBN()).isNeg() ? new BN(0) : now.sub(this.closureTime.toBN())
+    return now.gt(this.closureTime.toBN()) ? new BN(0) : this.closureTime.toBN().sub(now)
   }
 
   public static createMock(): ChannelEntry {
