@@ -388,11 +388,11 @@ wait
 
 # initiate channel closures, but don't wait because this will trigger ticket
 # redemption as well
-close_channel 1 2 "${api1}" "${addr2}" &
-close_channel 2 3 "${api2}" "${addr3}" &
-close_channel 3 4 "${api3}" "${addr4}" &
-close_channel 4 5 "${api4}" "${addr5}" &
-close_channel 5 1 "${api5}" "${addr1}" &
+close_channel 1 2 "${api1}" "${addr2}" "true" &
+close_channel 2 3 "${api2}" "${addr3}" "true" &
+close_channel 3 4 "${api3}" "${addr4}" "true" &
+close_channel 4 5 "${api4}" "${addr5}" "true" &
+close_channel 5 1 "${api5}" "${addr1}" "true" &
 
 # initiate channel closures for channels without tickets so we can check
 # completeness
@@ -401,8 +401,9 @@ close_channel 1 5 "${api1}" "${addr5}" &
 log "Waiting for nodes to finish handling close channels calls"
 wait
 
-log "Waiting 70 seconds for cool-off period"
-sleep 70
+# Also add confirmation time
+log "Waiting 80 seconds for cool-off period"
+sleep 80
 
 # verify channel has been closed
 close_channel 1 5 "${api1}" "${addr5}"

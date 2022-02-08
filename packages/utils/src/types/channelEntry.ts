@@ -140,6 +140,17 @@ export class ChannelEntry {
     return !!this.closureTime && now.gt(this.closureTime.toBN())
   }
 
+  public getRemainingClosureTime(): BN {
+    const nowInSeconds = Math.round(new Date().getTime() / 1000)
+    const now = new BN(nowInSeconds)
+
+    if (this.closureTime == undefined) {
+      return new BN(-1)
+    }
+
+    return now.sub(this.closureTime.toBN()).isNeg() ? new BN(0) : now.sub(this.closureTime.toBN())
+  }
+
   public static createMock(): ChannelEntry {
     const pub = PublicKey.createMock()
     return new ChannelEntry(
