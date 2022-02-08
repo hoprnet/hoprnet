@@ -1,6 +1,6 @@
 tasks:
   ## HOPR net repositories
-  - name: (HOPRd) Installing hoprnet which contains the required scripts
+  - name: Environment setup
     init: |
       echo '🦄 📦 Installing hoprnet repository dependencies'
       ./scripts/install-websocat.sh
@@ -60,8 +60,7 @@ tasks:
       sleep 5s
       ./.bin/websocat "$(echo "$HOPR_NODE_2_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
 
-    #openMode: tab-after
-    openMode: split-bottom
+    openMode: tab-after
 
   - name: Node 2 WS
     command: |
