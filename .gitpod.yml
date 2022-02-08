@@ -35,10 +35,11 @@ tasks:
       export HOPR_NODE_5_HTTP_URL=$(gp url 13305) HOPR_NODE_5_WS_URL=$(gp url 19505)
       export HOPR_NODE_5_ADDR=$(curl -X 'GET' "$HOPR_NODE_5_HTTP_URL/api/v2/account/addresses" -H 'accept: application/json' -H "x-auth-token: $apiToken" 2>/dev/null | jq -r '.hopr')
 
-    openMode: tab-after
+    openMode: split-right
 
   - name: Node 1 WS
     command: |
+      export apiToken="^^LOCAL-testing-123^^"
       gp await-port 13301
       gp await-port 13302
       gp await-port 13303
@@ -64,6 +65,7 @@ tasks:
 
   - name: Node 2 WS
     command: |
+      export apiToken="^^LOCAL-testing-123^^"
       gp await-port 13301
       gp await-port 13302
       gp await-port 13303
