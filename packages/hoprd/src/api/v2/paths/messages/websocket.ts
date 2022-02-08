@@ -2,26 +2,22 @@ import { Operation } from 'express-openapi'
 
 export const GET: Operation = [
   async (_, res, _next) => {
-    return res.status(200).send('')
+    return res.status(101).end()
   }
 ]
 
-// TODO: document
+// This endpoint only exists to document the websocket behaviour.
 GET.apiDoc = {
-  description: 'For developer convenience, we will be documenting the websocket endpoint here.',
+  description:
+    'This is a websocket endpoint which streams incoming messages. Authentication (if enabled) is done via either passing an `apiToken` parameter in the url or cookie `X-Auth-Token`. Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v2/messages/websocket/?apiToken=myApiToken`',
   tags: ['Messages'],
   operationId: 'messagesWebsocket',
   responses: {
-    '200': {
-      description: '',
-      content: {
-        'application/json': {
-          schema: {
-            type: 'string',
-            example: ''
-          }
-        }
-      }
+    '101': {
+      description: 'Switcing protocols'
+    },
+    '401': {
+      description: 'Unauthorized'
     }
   }
 }

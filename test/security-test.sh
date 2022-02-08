@@ -121,6 +121,9 @@ testWebsocketSecurity() {
   local unauth_error="${5}"
   local ws_response
 
+  # we are expecting some pipes to fail here
+  set +Eeo pipefail
+
   log "${name} should reject data without token"
   ws_response=$(echo "_test" | websocat ws://${host}:${port}${path} 2>&1)
   echo "response: ${ws_response}"
@@ -171,6 +174,9 @@ testWebsocketSecurity() {
     log "${ws_response}"
     exit 1
   fi
+
+  # continue failing on pipe errors
+  set -Eeo pipefail
 }
 
 testWebsocketSecurity "Admin websocket" "/" $admin_port $insecure_admin_port "auth-failed"
