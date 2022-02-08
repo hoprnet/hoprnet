@@ -296,6 +296,9 @@ class Hopr extends EventEmitter {
 
     this.connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
 
+    // subscribe so we can process channel close events
+    this.connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
+
     await this.announce(this.options.announce)
 
     this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
@@ -341,10 +344,21 @@ class Hopr extends EventEmitter {
     }
   }
 
-  private async onChannelWaitingForCommitment(c: ChannelEntry) {
+  private async onChannelWaitingForCommitment(c: ChannelEntry): Promise<void> {
     if (this.strategy.shouldCommitToChannel(c)) {
       log(`Found channel ${c.getId().toHex()} to us with unset commitment. Setting commitment`)
       retryWithBackoff(() => this.connector.commitToChannel(c))
+    }
+  }
+
+  /*
+   * Callback function used to react to on-chain channel update events.
+   * Specifically we trigger the strategy on channel close handler.
+   * @param channel object
+   */
+  private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
+    if (channel.status === ChannelStatus.PendingToClose) {
+      await this.strategy.onChannelWillClose(channel, this.connector)
     }
   }
 
@@ -353,17 +367,16 @@ class Hopr extends EventEmitter {
    * - it will emit that the node is out of funds
    * @param error error thrown by an ethereum transaction
    */
-  private isOutOfFunds(error: any): void {
+  private maybeEmitFundsEmptyEvent(error: any): void {
     const isOutOfFunds = isErrorOutOfFunds(error)
     if (!isOutOfFunds) return
 
     const address = this.getEthereumAddress().toHex()
+    log('unfunded node', address)
 
     if (isOutOfFunds === 'NATIVE') {
-      log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
     } else if (isOutOfFunds === 'HOPR') {
-      log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
     }
   }
@@ -784,14 +797,17 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      log(`announcing ${announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'} routing`)
-
-      await this.connector.announce(addrToAnnounce)
-      log(`announced address ${addrToAnnounce}`)
+      log(
+        `announcing address ${addrToAnnounce} ${
+          announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
+        } routing`
+      )
+      const announceTxHash = await this.connector.announce(addrToAnnounce)
+      log(`announcing address ${addrToAnnounce} done in tx ${announceTxHash}`)
     } catch (err) {
-      log('announce failed')
-      this.isOutOfFunds(err)
-      throw new Error(`Failed to announce: ${err}`)
+      log(`announcing address ${addrToAnnounce} failed`)
+      this.maybeEmitFundsEmptyEvent(err)
+      throw new Error(`Failed to announce address ${addrToAnnounce}: ${err}`)
     }
   }
 
@@ -860,7 +876,7 @@ class Hopr extends EventEmitter {
     try {
       return this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
     } catch (err) {
-      await this.isOutOfFunds(err)
+      this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to openChannel: ${err}`)
     }
   }
@@ -891,7 +907,7 @@ class Hopr extends EventEmitter {
     try {
       await this.connector.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
     } catch (err) {
-      await this.isOutOfFunds(err)
+      this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to fundChannel: ${err}`)
     }
   }
@@ -909,18 +925,17 @@ class Hopr extends EventEmitter {
       await this.strategy.onChannelWillClose(channel, this.connector)
     }
 
-    log('closing channel', channel.getId())
     let txHash: string
     try {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
-        log('initiating closure')
+        log('initiating closure of channel', channel.getId())
         txHash = await this.connector.initializeClosure(counterpartyPubKey)
       } else {
         // verify that we passed the closure waiting period to prevent failing
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          log('finalizing closure')
+          log('finalizing closure of channel', channel.getId())
           txHash = await this.connector.finalizeClosure(counterpartyPubKey)
         } else {
           log('ignoring finalizing closure because closure window is still active', channel.getId())
@@ -928,11 +943,10 @@ class Hopr extends EventEmitter {
       }
     } catch (err) {
       log('failed to close channel', err)
-      await this.isOutOfFunds(err)
+      this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to closeChannel: ${err}`)
     }
 
-    log(`closed channel, ${channel.getId()}`)
     return { receipt: txHash, status: channel.status }
   }
 
@@ -1018,7 +1032,7 @@ class Hopr extends EventEmitter {
     try {
       result = await this.connector.withdraw(currency, recipient, amount)
     } catch (err) {
-      await this.isOutOfFunds(err)
+      this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to withdraw: ${err}`)
     }
 

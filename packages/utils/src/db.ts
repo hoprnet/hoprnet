@@ -185,7 +185,8 @@ export class HoprDB {
   private async getAll<T>(
     prefix: Uint8Array,
     deserialize: (u: Uint8Array) => T,
-    filter: (o: T) => boolean
+    filter?: (o: T) => boolean,
+    sorter?: (e1: T, e2: T) => number
   ): Promise<T[]> {
     const res: T[] = []
     const prefixKeyed = this.keyOf(prefix)
@@ -198,11 +199,22 @@ export class HoprDB {
             return
           }
           const obj = deserialize(Uint8Array.from(value))
-          if (filter(obj)) {
+          // filter if a filter function was given
+          if (filter) {
+            if (filter(obj)) {
+              res.push(obj)
+            }
+          } else {
             res.push(obj)
           }
         })
-        .on('end', () => resolve(res))
+        .on('end', () => {
+          // sort if a sorter function was given
+          if (sorter) {
+            res.sort(sorter)
+          }
+          resolve(res)
+        })
     })
   }
 
@@ -300,7 +312,7 @@ export class HoprDB {
   }
 
   /**
-   * Get acknowledged tickets
+   * Get acknowledged tickets sorted by ticket index in ascending order.
    * @param filter optionally filter by signer
    * @returns an array of all acknowledged tickets
    */
@@ -316,15 +328,24 @@ export class HoprDB {
 
       if (
         filter?.channel &&
-        !a.signer.eq(filter.channel.source) &&
-        !a.ticket.channelEpoch.eq(filter.channel.channelEpoch)
+        (!a.signer.eq(filter.channel.source) ||
+          !filter.channel.destination.eq(this.id) ||
+          !a.ticket.channelEpoch.eq(filter.channel.channelEpoch))
       ) {
         return false
       }
+
       return true
     }
+    // sort in ascending order by ticket index: 1,2,3,4,...
+    const sortFunc = (t1: AcknowledgedTicket, t2: AcknowledgedTicket): number => t1.ticket.index.cmp(t2.ticket.index)
 
-    return this.getAll<AcknowledgedTicket>(ACKNOWLEDGED_TICKETS_PREFIX, AcknowledgedTicket.deserialize, filterFunc)
+    return this.getAll<AcknowledgedTicket>(
+      ACKNOWLEDGED_TICKETS_PREFIX,
+      AcknowledgedTicket.deserialize,
+      filterFunc,
+      sortFunc
+    )
   }
 
   public async deleteAcknowledgedTicketsFromChannel(channel: ChannelEntry): Promise<void> {
@@ -452,7 +473,6 @@ export class HoprDB {
   }
 
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
-    filter = filter || (() => true)
     return this.getAll<ChannelEntry>(CHANNEL_PREFIX, ChannelEntry.deserialize, filter)
   }
 
@@ -470,7 +490,6 @@ export class HoprDB {
   }
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
-    filter = filter || (() => true)
     return this.getAll<AccountEntry>(ACCOUNT_PREFIX, AccountEntry.deserialize, filter)
   }
 
