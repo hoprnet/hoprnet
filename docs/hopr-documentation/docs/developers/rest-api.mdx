@@ -1,0 +1,16 @@
+---
+id: rest-api
+title: HOPR REST API
+hide_title: true
+hide_table_of_contents: true
+---
+
+import IframeLoader from './components/IframeLoader'
+
+<IframeLoader
+  url={"/developers/placeholder-rest-api"}
+  loadingMessage="Loading REST API..."
+  callback={() => {
+    document.querySelector('iframe').contentWindow.document.querySelector("nav").style.display = 'none';
+  }}
+/>

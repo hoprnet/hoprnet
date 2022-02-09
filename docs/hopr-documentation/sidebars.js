@@ -70,7 +70,8 @@ const sidebars = {
         'developers/starting-local-cluster',
         'developers/connecting-node',
         'developers/tutorial-hello-world',
-        'developers/demo-boomerang-chat'
+        'developers/demo-boomerang-chat',
+        'developers/rest-api'
       ]
     },
     /*{

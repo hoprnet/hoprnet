@@ -23,11 +23,22 @@ const redocusaurus = [
     debug: Boolean(process.env.DEBUG || process.env.CI),
     specs: [
       {
-        id: 'rest-api',
+        id: 'placerholder-rest-api',
         spec: 'rest-api-v2-full-spec.yaml',
-        routePath: '/developers/rest-api/'
+        routePath: '/developers/placeholder-rest-api/'
       }
-    ]
+    ],
+    theme: {
+      /**
+       * Highlight color for docs
+       */
+      primaryColor: '#0000b4',
+      /**
+       * Options to pass to redoc
+       * @see https://github.com/redocly/redoc#redoc-options-object
+       */
+      redocOptions: {},
+    },
   }
 ]
 
