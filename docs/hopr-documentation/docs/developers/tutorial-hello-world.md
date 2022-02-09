@@ -89,19 +89,19 @@ Using `websocat` or any other WebSocket client, connect to your `node 2` until y
 
 **Connecting to `node 2` via `websocat`**
 
-```
+```bash
 .bin/websocat "$(echo "$HOPR_NODE_2_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
 ```
 
 **Connecting to `node 2` via [Piesocket WebSocket Tester](https://www.piesocket.com/websocket-tester)**
 
-```
+```bash
 ws://127.0.0.1:19502/?apiToken=^^LOCAL-testing-123^^
 ```
 
 You can verify that you are connected by typing the command `address` and seeing an output similar to this:
 
-```
+```json
 {"type":"log","msg":"admin > address\n","ts":"2022-02-02T19:17:48.431Z"}
 {"type":"log","msg":"HOPR Address:  16Uiu2HAmKhrwGWcvaZ3ic5dgy7oFawmnELJGBrySSsNo4bzGBxHW\nETH Address:   0x4cD95E1deF16D5913255Fe0af208EdDe2e04d720","ts":"2022-02-02T19:17:48.435Z"}
 ```
@@ -112,7 +112,7 @@ Using `curl` or any other HTTP client, verify you can reach your `node 1`'s API
 
 **Obtaining the `node 1` address using `curl`**
 
-```
+```bash
 echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/address | jq
 ```
 
@@ -120,19 +120,19 @@ echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $H
 
 _URL_
 
-```
+```bash
 http://127.0.0.1:13301/api/v2/account/address
 ```
 
 _Custom Header (default `apiToken` `base64`-encoded)_
 
-```
+```bash
 Basic Xl5MT0NBTC10ZXN0aW5nLTEyM15e
 ```
 
 If you sent a successful request, the response will look something like this:
 
-```
+```json
 {
   "nativeAddress": "0x3a54dDE3ee5ACfd43C902cbecC8ED0CBA10Ff326",
   "hoprAddress": "16Uiu2HAmE9b3TSHeF25uJS1Ecf2Js3TutnaSnipdV9otEpxbRN8Q"
@@ -155,13 +155,13 @@ WebSocket client connection.
 
 Using `node 2`, type in your terminal with `websocat` running or WebSocket client interface the following command:
 
-```
+```bash
 address
 ```
 
 You should see a response like the following:
 
-```
+```json
 {"type":"log","msg":"admin > address\n","ts":"2022-02-02T19:17:48.431Z"}
 {"type":"log","msg":"HOPR Address:  16Uiu2HAmKhrwGWcvaZ3ic5dgy7oFawmnELJGBrySSsNo4bzGBxHW\nETH Address:   0x4cD95E1deF16D5913255Fe0af208EdDe2e04d720","ts":"2022-02-02T19:17:48.435Z"}
 ```
@@ -174,7 +174,7 @@ information to send a message from `node 1`. Make sure to keep your WebSocket cl
 To send a message from `node 1` to `node 2`, we need to use `node 1`'s REST API, particularly the `/messages` endpoint. Using `curl`
 or any other HTTP client, send the following request:
 
-```
+```bash
 echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" \
 -H 'Content-Type: application/json' \
 -d '{"body":"Hello world","recipient":"16Uiu2HAmKhrwGWcvaZ3ic5dgy7oFawmnELJGBrySSsNo4bzGBxHW"}' \
@@ -183,7 +183,7 @@ $HOPR_NODE_1_HTTP_URL/api/v2/messages
 
 In the terminal of `node 2`, you will see something similar to this:
 
-```
+```json
 {"type":"log","msg":"#### NODE RECEIVED MESSAGE [2022-02-03T21:48:13.845Z] ####","ts":"2022-02-03T21:48:13.845Z"}
 {"type":"log","msg":"Message: Hello world","ts":"2022-02-03T21:48:13.846Z"}
 {"type":"log","msg":"Latency: 668ms","ts":"2022-02-03T21:48:13.846Z"}
@@ -203,13 +203,13 @@ The previous message worked because a cluster has been configured by default to 
 tokens to send messages to at least `2` relayers. When a path used to relay has depleted (empty) or closed `channels`,
 your message will no longer be forwarded. You can always see your open `channels` and ther balance with the following command.
 
-```
+```bash
 channels
 ```
 
 Likewise, you can see your balance via the following command.
 
-```
+```bash
 balance
 ```
 
