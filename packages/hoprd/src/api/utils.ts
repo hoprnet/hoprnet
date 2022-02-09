@@ -61,5 +61,5 @@ export const authenticateWsConnection = (
  * @example `/api/v2/messages/websocket/?apiToken=^^LOCAL-testing-123^^` becomes `/api/v2/messages/websocket`
  */
 export const removeQueryParams = (path: string): string => {
-  return path.replace(/(\?.*)|(\/\?.*)|(#.*)/g, '')
+  return path.replace(/(\?.*)|(\/\?.*)|(#.*)|(\/$)/g, '')
 }

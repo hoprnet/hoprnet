@@ -56,13 +56,21 @@ describe('Test authenticateWsConnection', function () {
 
 describe('Test removeQueryParams', function () {
   it('should strip away parameters', function () {
-    assert(removeQueryParams('/api/v2/messages/websocket?apiToken=^^LOCAL-testing-123^^'), '/api/v2/messages/websocket')
+    assert.equal(
+      removeQueryParams('/api/v2/messages/websocket?apiToken=^^LOCAL-testing-123^^'),
+      '/api/v2/messages/websocket'
+    )
   })
 
   it('should strip away parameters and tailing slash', function () {
-    assert(
+    assert.equal(
       removeQueryParams('/api/v2/messages/websocket/?apiToken=^^LOCAL-testing-123^^'),
       '/api/v2/messages/websocket'
     )
+  })
+
+  it('should strip away single slash', function () {
+    assert.equal(removeQueryParams('/?apiToken=^^LOCAL-testing-123^^'), '')
+    assert.equal(removeQueryParams('/'), '')
   })
 })
