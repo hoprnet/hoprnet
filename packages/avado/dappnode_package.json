@@ -28,9 +28,16 @@
   "license": "GPL-3.0",
   "dependencies": {},
   "links": {
+    "OnboardingWizard": "http://hopr.my.ava.do:3000/",
     "homepage": "https://hoprnet.org",
     "Admin interface": "http://hopr.my.ava.do:3000",
     "Rest API V2": "http://hopr.my.ava.do:3001/api/v2/_swagger/"
+  },
+  "ui": {
+    "OnboardingWizard": {
+      "url": "http://hopr.my.ava.do",
+      "external": true
+    }
   },
   "builddate": "2022-02-08T16:44:07.566Z"
 }

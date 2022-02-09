@@ -71,7 +71,7 @@ sed -e "s/\"version\":[ ]\"[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"/\"version\": 
 sed -e "s/master-goerli/${environment_id}/" ./build/Dockerfile > ./build/Dockerfile.tmp && mv ./build/Dockerfile.tmp ./build/Dockerfile 
 
 # AVADO SDK does not do proper releases, therefore using GitHub + git commit hashes
-declare AVADO_SDK_COMMIT="de9f16d"
+declare AVADO_SDK_COMMIT="7b035be"
 
 # Must be installed globally due to bad directory calls
 npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#${AVADO_SDK_COMMIT}
