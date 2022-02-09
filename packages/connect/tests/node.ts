@@ -260,6 +260,16 @@ function parseCLIOptions() {
       type: 'boolean',
       default: false
     })
+    .option('allowLocalNodeConnections', {
+      boolean: true,
+      describe: 'Allow connections to other nodes running on localhost.',
+      default: false
+    })
+    .option('allowPrivateNodeConnections', {
+      boolean: true,
+      describe: 'Allow connections to other nodes running on private addresses.',
+      default: false
+    })
     .option('command', {
       describe: 'example: --command.name dial --command.targetIdentityName charly',
       type: 'string'
@@ -313,16 +323,17 @@ async function main() {
       config: {
         initialNodes: bootstrapAddress ? [bootstrapAddress] : undefined,
         maxRelayedConnections: parsedOpts.maxRelayedConnections,
-        relayFreeTimeout: parsedOpts.relayFreeTimeout
+        relayFreeTimeout: parsedOpts.relayFreeTimeout,
+        allowLocalConnections: parsedOpts.allowLocalNodeConnections,
+        allowPrivateConnections: parsedOpts.allowPrivateNodeConnections
       },
       testing: {
         __noDirectConnections: parsedOpts.noDirectConnections,
         __noWebRTCUpgrade: parsedOpts.noWebRTCUpgrade,
         __noUPNP: parsedOpts.noUPNP,
-        __preferLocalAddresses: parsedOpts.preferLocalAddresses,
-        __runningLocally: false
+        __preferLocalAddresses: parsedOpts.preferLocalAddresses
       }
-    }
+    } as HoprConnectConfig
   )
 
   await executeCommands({ node, cmds: parsedOpts.script, pipeFileStream })

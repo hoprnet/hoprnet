@@ -56,7 +56,9 @@ start_node tests/node \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --preferLocalAddresses true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # run bob (client)
 # should be able to receive 'test' from alice through charly
@@ -79,7 +81,9 @@ start_node tests/node "${bob_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --preferLocalAddresses true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # run charly
 # should able to serve as a bootstrap
@@ -92,7 +96,9 @@ start_node tests/node "${charly_log}" \
   --noWebRTCUpgrade false \
   --maxRelayedConnections 1 \
   --preferLocalAddresses true \
-  --relayFreeTimeout 2000 # to simulate relay being busy
+  --relayFreeTimeout 2000 \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # run dave (client)
 # should try connecting to bob through relay charly and get RELAY_FULL error
@@ -119,7 +125,9 @@ start_node tests/node "${dave_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --preferLocalAddresses true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # run ed (client)
 # should try connecting to bob through relay charly after alice finishes talking to bob and succeed
@@ -146,7 +154,9 @@ start_node tests/node "${ed_log}" \
   --bootstrapIdentityName 'charly' \
   --noDirectConnections true \
   --noWebRTCUpgrade false \
-  --preferLocalAddresses true
+  --preferLocalAddresses true \
+  --allowLocalNodeConnections true \
+  --allowPrivateNodeConnections true
 
 # wait till nodes finish communicating
 wait_for_regex "${alice_log}" "all tasks executed"
