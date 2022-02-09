@@ -98,10 +98,6 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
-    const hoprBalance = await this.chain.getBalance(this.address)
-    await this.db.setHoprBalance(hoprBalance)
-    log(`set own HOPR balance to ${hoprBalance.toFormattedString()}`)
-
     const orderedBlocks = ordered<number>()
 
     // Starts the asynchronous stream of indexer events
