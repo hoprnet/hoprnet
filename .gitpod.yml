@@ -12,7 +12,7 @@ tasks:
 
     command: |
       echo '🟡 Running HOPR nodes and topology'
-      ./scripts/setup-local-cluster.sh -t "^^LOCAL-testing-123^^" -m "$(gp url 8080)" -i scripts/topologies/full_interconnected_cluster.sh
+      ./scripts/setup-local-cluster.sh -t "^^LOCAL-testing-123^^" -i scripts/topologies/full_interconnected_cluster.sh
 
     openMode: tab-after
 
