@@ -3276,7 +3276,7 @@ __metadata:
     leveldown: 6.1.0
     levelup: 5.1.1
     libp2p: 0.35.8
-    libp2p-crypto: 0.21.0
+    libp2p-crypto: 0.21.2
     libp2p-kad-dht: 0.27.6
     libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
@@ -3541,6 +3541,13 @@ __metadata:
   version: 1.4.0
   resolution: "@noble/ed25519@npm:1.4.0"
   checksum: 4711ac56a69dd4d8380a8ab3261b71b33052a4b7bf97627832286d17a7f6296b41eaff783dbfd8ae219bcbb1f707cef54e8287515b0f42a54522c592b0352f67
+  languageName: node
+  linkType: hard
+
+"@noble/ed25519@npm:^1.5.1":
+  version: 1.5.3
+  resolution: "@noble/ed25519@npm:1.5.3"
+  checksum: 4aedb37f6cac90f9a4ec19b2356bab5b9d42abe6a4f53dd5cf93c29c7e4acc038e78573b0078fc9ccb9bd520a3428265f4d04508036127adbd88f855094e755b
   languageName: node
   linkType: hard
 
@@ -15762,7 +15769,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-crypto@npm:0.21.0, libp2p-crypto@npm:^0.21.0":
+"libp2p-crypto@npm:0.21.2":
+  version: 0.21.2
+  resolution: "libp2p-crypto@npm:0.21.2"
+  dependencies:
+    "@noble/ed25519": ^1.5.1
+    "@noble/secp256k1": ^1.3.0
+    err-code: ^3.0.1
+    iso-random-stream: ^2.0.0
+    multiformats: ^9.4.5
+    node-forge: ^1.2.1
+    protobufjs: ^6.11.2
+    uint8arrays: ^3.0.0
+  checksum: e03f8398db3a2913374b6a4b13560aec0c8e2d244c80fa0b2f119600789c445b235be01987580262a91d63e590f0f1a185728ea4b8697e5d4dfc9ec6da5266d6
+  languageName: node
+  linkType: hard
+
+"libp2p-crypto@npm:^0.21.0":
   version: 0.21.0
   resolution: "libp2p-crypto@npm:0.21.0"
   dependencies:
@@ -17782,7 +17805,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"node-forge@npm:^1.2.0":
+"node-forge@npm:^1.2.0, node-forge@npm:^1.2.1":
   version: 1.2.1
   resolution: "node-forge@npm:1.2.1"
   checksum: af4f88c3f69362359f35f6a9e231b35c96d906eeb6e976fb92742afe7fcdd76439dc22b41ce3755389d171f6320756ec7505bdfa7b252466c091b8c519a22674
