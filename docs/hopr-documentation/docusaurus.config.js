@@ -17,6 +17,31 @@ if (DOCS_ALGOLIA_APP_ID && DOCS_ALGOLIA_API_KEY) {
   }
 }
 
+const redocusaurus = [
+  'redocusaurus',
+  {
+    debug: Boolean(process.env.DEBUG || process.env.CI),
+    specs: [
+      {
+        id: 'placerholder-rest-api',
+        spec: 'rest-api-v2-full-spec.yaml',
+        routePath: '/developers/placeholder-rest-api/'
+      }
+    ],
+    theme: {
+      /**
+       * Highlight color for docs
+       */
+      primaryColor: '#0000b4',
+      /**
+       * Options to pass to redoc
+       * @see https://github.com/redocly/redoc#redoc-options-object
+       */
+      redocOptions: {}
+    }
+  }
+]
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'HOPR',
@@ -36,6 +61,7 @@ const config = {
     'https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css'
   ],
   presets: [
+    redocusaurus,
     [
       '@docusaurus/preset-classic',
       /** @type {import('@docusaurus/preset-classic').Options} */
