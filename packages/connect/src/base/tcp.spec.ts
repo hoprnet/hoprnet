@@ -156,11 +156,14 @@ describe('test TCP connection', function () {
       }
     )
 
-    await conn.sink(
-      (async function* () {
-        abort.abort()
-        yield testMessage
-      })()
+    await assert.doesNotReject(
+      async () =>
+        await conn.sink(
+          (async function* () {
+            abort.abort()
+            yield testMessage
+          })()
+        )
     )
 
     // Produces an error if abort error is not caught properly
