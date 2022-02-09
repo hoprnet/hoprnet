@@ -9,10 +9,15 @@ export default function RPSGame() {
   const [selectedNode, setSelectedNode] = useState();
   const [wsEndpoint, setWsEndpoint] = useState('ws://localhost:3000')
   const [httpEndpoint, setHTTPEndpoint] = useState('http://localhost:3001')
+  const [messages, setMessages] = useState([])
   const [address, setAddress] = useState('')
   const [isReferee, setIsReferee] = useState()
   const [referee, setReferee] = useState('')
   const [notification, setNotification] = useState('')
+
+  const SCISSORS_MOVE = 'scissors'
+  const ROCK_MOVE = 'rock'
+  const PAPER_MOVE = 'paper'
 
   useEffect(() => {
     const loadAddress = async () => {
@@ -27,18 +32,57 @@ export default function RPSGame() {
     loadAddress()
   }, [securityToken, httpEndpoint])
 
-  const sendMove = async (move) => {
+  const sendMessage = async (recipient, body) => {
     if (!address) return
     await fetch(`${httpEndpoint}/api/v2/messages`, {
       method: 'POST',
       headers: getHeaders(securityToken, true),
       body: JSON.stringify({
-        recipient: referee,
-        body: `${address}-${move}`
+        recipient,
+        body
       })
     }).catch((err) => console.error(err))
+  }
+
+  const sendMove = async (move) => {
+    await sendMessage(referee, `${address}-${move}`)
     setNotification(`You have sent the move ${move} to referee ${referee}`)
   }
+
+  useEffect(() => {
+    // Game logic goes here, when messages are received.
+    const gameLogic = async () => {
+      const [player1, player2] = messages
+        .slice(messages.length - 2)
+        .map(move => ({ "address": move.split('-')[0], "move": move.split('-')[1] }))
+
+      // We ignore all other messages.
+      if (!player1 || !player2) return;
+      if (!player1.move || !player2.move) return;
+
+      if (player1.address != player2.address) {
+        if (
+          (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE) ||
+          (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE) ||
+          (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE)
+        ) {
+          await sendMessage(player1.address, `You tied with ${player2.address}: [1] ${player1.move}, [2] ${player2.move}`)
+          await sendMessage(player2.address, `You tied with ${player1.address}: [1] ${player1.move}, [2] ${player2.move}`)
+        } else if (
+          (player1.move == ROCK_MOVE && player2.move == SCISSORS_MOVE) ||
+          (player1.move == SCISSORS_MOVE && player2.move == PAPER_MOVE) ||
+          (player1.move == PAPER_MOVE && player2.move == ROCK_MOVE)
+        ) {
+          await sendMessage(player1.address, `You won! ${player2.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
+          await sendMessage(player2.address, `You lost... ${player1.address} won: [1] ${player1.move}, [2] ${player2.move}`)
+        } else {
+          await sendMessage(player2.address, `You won! ${player1.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
+          await sendMessage(player1.address, `You lost... ${player2.address} won: [1] ${player1.move}, [2] ${player2.move}`)
+        }
+      }
+    }
+    gameLogic()
+  }, [messages])
 
   return (
     <div>
@@ -79,13 +123,22 @@ export default function RPSGame() {
       </div>
       {address && !isReferee &&
         <>
-          <button disabled={!referee} onClick={() => sendMove('paper')}>Send "paper" move</button>
-          <button disabled={!referee} onClick={() => sendMove('scissors')}>Send "scissors" move</button>
-          <button disabled={!referee} onClick={() => sendMove('rock')}>Send "rock" move</button>
+          <button disabled={!referee} onClick={() => sendMove(PAPER_MOVE)}>Send "paper" move</button>
+          <button disabled={!referee} onClick={() => sendMove(SCISSORS_MOVE)}>Send "scissors" move</button>
+          <button disabled={!referee} onClick={() => sendMove(ROCK_MOVE)}>Send "rock" move</button>
         </>
       }
       {notification && <><br />{notification}</>}
-      <><br /><WebSocketHandler wsEndpoint={wsEndpoint} securityToken={securityToken} multipleMessages={isReferee} /></>
+      <>
+        <br />
+        <WebSocketHandler
+          wsEndpoint={wsEndpoint}
+          securityToken={securityToken}
+          multipleMessages={isReferee}
+          messages={messages}
+          setMessages={setMessages}
+        />
+      </>
     </div >
   )
 }

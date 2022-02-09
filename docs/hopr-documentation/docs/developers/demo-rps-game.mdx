@@ -15,14 +15,6 @@ In this demo app, we will also show the pros and cons of the HOPR protocol when 
 ## Requirements
 
 - a HOPR cluster, and at least a `3` HOPR nodes with their respective `HTTP_ENDPOINT`, `WS_ENDPOINT` and `API_TOKEN`
-- a React-ready web framework used to run the application. We recommend [`next.js`](https://nextjs.org/).
-
-For simplicity, you can also see the code for this demo in [Codesandbox](https://codesandbox.io/s/hopr-demo-react-hello-world-yo0uc?file=/src/App.tsx).
-To see an example of how to run this as an isolated application, you can also check our [demo chat application, MyneChat](https://github.com/hoprnet/myne-chat).
-
-## Building the RPS Game
-
-### 1. Connecting to our HOPR nodes
 
 ## Demo - Rock, Paper, Scissors Game
 
@@ -31,8 +23,9 @@ To see an example of how to run this as an isolated application, you can also ch
 <IframeLoader
   url={'/developers/containers/connector'}
   loadingMessage="Loading Player 1..."
-  callback={() => {
-    document.querySelector('iframe').contentWindow.document.querySelector('nav').style.display = 'none'
+  callback={(iframe) => {
+    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map( nav => nav.style.display = 'none' )
+    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map( footer => footer.style.display = 'none' )
   }}
   width="100%"
   height="300"
@@ -46,8 +39,9 @@ To see an example of how to run this as an isolated application, you can also ch
 <IframeLoader
   url={'/developers/containers/connector'}
   loadingMessage="Loading Referee..."
-  callback={() => {
-    document.querySelector('iframe').contentWindow.document.querySelector('nav').style.display = 'none'
+  callback={(iframe) => {
+    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map( nav => nav.style.display = 'none' )
+    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map( footer => footer.style.display = 'none' )
   }}
   width="100%"
   height="300"
@@ -61,8 +55,9 @@ To see an example of how to run this as an isolated application, you can also ch
 <IframeLoader
   url={'/developers/containers/connector'}
   loadingMessage="Loading Player 2..."
-  callback={() => {
-    document.querySelector('iframe').contentWindow.document.querySelector('nav').style.display = 'none'
+  callback={(iframe) => {
+    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map( nav => nav.style.display = 'none' )
+    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map( footer => footer.style.display = 'none' )
   }}
   width="100%"
   height="300"

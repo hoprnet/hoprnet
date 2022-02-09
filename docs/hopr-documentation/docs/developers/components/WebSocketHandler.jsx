@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import useWebsocket from '../hooks/useWebSockets'
 
-export const WebSocketHandler = ({ wsEndpoint, securityToken, multipleMessages = false }) => {
+export const WebSocketHandler = ({ wsEndpoint, securityToken, multipleMessages = false, messages = [], setMessages = () => { } }) => {
   const [message, setMessage] = useState('')
-  const [messages, setMessages] = useState([])
   const websocket = useWebsocket({ wsEndpoint, securityToken })
   const { socketRef } = websocket
   const handleReceivedMessage = async (ev) => {
