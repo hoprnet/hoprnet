@@ -124,6 +124,7 @@ class WebRTCConnection implements MultiaddrConnection<StreamType> {
             deferred.resolve()
           } catch (err: any) {
             if (err.type === 'aborted' || err.code === 'ABORT_ERR') {
+              // We can safely ignore abort errors
               deferred.resolve()
             } else {
               this.error(`sink error thrown`, err.message)

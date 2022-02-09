@@ -166,8 +166,6 @@ describe('test TCP connection', function () {
         )
     )
 
-    // Produces an error if abort error is not caught properly
-
     await stopNode(server)
   })
 })
