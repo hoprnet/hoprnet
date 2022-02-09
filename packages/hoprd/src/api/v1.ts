@@ -63,7 +63,9 @@ export function setupWsApi(
   adminServer?: AdminServer
 ) {
   server.on('connection', (socket, req) => {
-    if (!authenticateWsConnection(logs, req, options.apiToken)) {
+    const needsAuth = !!options.apiToken
+    if (needsAuth && !authenticateWsConnection(req, options.apiToken)) {
+      logs.log('ws client failed authentication')
       socket.send(
         JSON.stringify({
           type: 'auth-failed',
@@ -74,6 +76,9 @@ export function setupWsApi(
       socket.close()
       return
     }
+    if (!needsAuth) logs.log('ws client connected [ authentication DISABLED ]')
+    else logs.log('ws client connected [ authentication ENABLED ]')
+
     if (adminServer) adminServer.onConnection(socket)
   })
 }
