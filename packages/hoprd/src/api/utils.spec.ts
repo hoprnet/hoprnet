@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { authenticateWsConnection } from './utils'
+import { authenticateWsConnection, removeQueryParams } from './utils'
 
 // mocks
 const VALID_API_TOKEN = 'VALID_API_TOKEN_123_^^'
@@ -14,7 +14,7 @@ const REQ_COOKIES = {
   }
 }
 
-describe('Test API utils', function () {
+describe('Test authenticateWsConnection', function () {
   it('should throw on empty API token', function () {
     assert.throws(() => authenticateWsConnection(REQ_PARAM, ''), /Cannot authenticate empty apiToken/)
   })
@@ -50,6 +50,19 @@ describe('Test API utils', function () {
         },
         VALID_API_TOKEN
       )
+    )
+  })
+})
+
+describe('Test removeQueryParams', function () {
+  it('should strip away parameters', function () {
+    assert(removeQueryParams('/api/v2/messages/websocket?apiToken=^^LOCAL-testing-123^^'), '/api/v2/messages/websocket')
+  })
+
+  it('should strip away parameters and tailing slash', function () {
+    assert(
+      removeQueryParams('/api/v2/messages/websocket/?apiToken=^^LOCAL-testing-123^^'),
+      '/api/v2/messages/websocket'
     )
   })
 })

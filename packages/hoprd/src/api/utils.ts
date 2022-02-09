@@ -52,3 +52,14 @@ export const authenticateWsConnection = (
   debugLog('ws client failed authentication')
   return false
 }
+
+/**
+ * Given a URL path, we strip away query parameters.
+ * @param path
+ * @returns stripped path
+ * @example `/api/v2/messages/websocket?apiToken=^^LOCAL-testing-123^^` becomes `/api/v2/messages/websocket`
+ * @example `/api/v2/messages/websocket/?apiToken=^^LOCAL-testing-123^^` becomes `/api/v2/messages/websocket`
+ */
+export const removeQueryParams = (path: string): string => {
+  return path.replace(/(\?.*)|(\/\?.*)|(#.*)/g, '')
+}

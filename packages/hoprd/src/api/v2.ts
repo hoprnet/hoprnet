@@ -7,7 +7,7 @@ import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import PeerId from 'peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
-import { authenticateWsConnection } from './utils'
+import { authenticateWsConnection, removeQueryParams } from './utils'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
@@ -122,7 +122,7 @@ export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, opt
   // before upgrade to WS, we perform various checks
   server.on('upgrade', function upgrade(req, socket, head) {
     debugLog('WS client attempt to upgrade')
-    const path = req.url
+    const path = removeQueryParams(req.url)
     const needsAuth = !!options.apiToken
 
     // check if path is supported
@@ -151,7 +151,7 @@ export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, opt
 
   wss.on('connection', (socket, req) => {
     debugLog('WS client connected!')
-    const path = req.url
+    const path = removeQueryParams(req.url)
 
     socket.on('error', (err: string) => {
       debugLog('WS error', err.toString())
