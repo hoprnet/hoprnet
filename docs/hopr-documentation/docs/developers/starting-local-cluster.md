@@ -40,7 +40,7 @@ assume this local IP, so using the app will make things easier for you to read o
 If you do not want to use the Gitpod Companion App, just remember to replace the URLs in the documentation to your Gitpod service URL. You
 can obtain the specific URL per port running the tool `gp`. For knowing the URL behind port `13301` you run the following:
 
-```
+```bash
 gp url 13301
 ```
 
@@ -55,7 +55,7 @@ this configuration allows you to develop HOPR apps offline.
 1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet)[^2]
    and unzip it in your local folder (roughly `~30 Mbs` at the time of writing). For the next tasks, we will assume you are within that folder.
 
-```
+```bash
 wget https://github.com/hoprnet/hoprnet/archive/refs/heads/master.zip
 unzip master.zip
 cd hoprnet-master
@@ -64,7 +64,7 @@ cd hoprnet-master
 2. **Install the dependencies of the project and build it**: Make sure you have `nodejs@16` (we suggest installing it via [nvm](https://github.com/nvm-sh/nvm), ie `nvm install lts/gallium`), and `yarn` (included in `nodejs@16` by running `corepack enable`)
    to install and build the required packages and project modules. Ideally, you also have setup your computer with basic development toolset[^3]. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
-```
+```bash
 yarn && yarn build
 ```
 
@@ -75,7 +75,7 @@ yarn && yarn build
    before running the script, as both are used. Please be aware you also need a version of `bash` of `5.x` or superior,
    which in most macOS devices require an upgrade, the easiest being via `brew bash`.
 
-```
+```bash
 ./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
 ```
 
@@ -83,13 +83,8 @@ Afterwards, a set off accounts with their respective HTTP REST API, HOPR Admin, 
 in your screen. For the next steps, we recommend copying and pasting these URLs and `export` them to your terminal so you can
 make use of them in the following pages.
 
-```
-export apiToken=^^LOCAL-testing-123^^ \
-HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=http://127.0.0.1:19501 \
-HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=http://127.0.0.1:19502 \
-HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=http://127.0.0.1:19503 \
-HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=http://127.0.0.1:19504 \
-HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=http://127.0.0.1:19505
+```bash
+export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=http://127.0.0.1:19501 HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=http://127.0.0.1:19502 HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=http://127.0.0.1:19503 HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=http://127.0.0.1:19504 HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=http://127.0.0.1:19505
 ```
 
 [^1]:

@@ -28,7 +28,7 @@ so make sure to change it when running your own node in a public network.
 
 Make sure to export your `apiToken` to be used in the incoming commands, and every time you open a new terminal.
 
-```
+```bash
 export apiToken="^^LOCAL-testing-123^^"
 ```
 
@@ -153,13 +153,13 @@ If your node is running properly, you should see an image similar to this one:
 Given your node's `apiToken` and your `HOPR_NODE_1_HTTP_URL` from the ["Running a local HOPR Cluster"](/developers/starting-local-cluster) section (likely `127.0.0.1:3001` or `127.0.0.1:13301`), try to send a REST command to query its address with the following `curl`
 command. If you don’t have `jq` installed, just remove it at the end of the command.
 
-```
+```bash
 echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" $HOPR_NODE_1_HTTP_URL/api/v2/account/address | jq
 ```
 
 If successful, you should get a response similar to this one:
 
-```
+```json
 {
   "nativeAddress": "0x3a54dDE3ee5ACfd43C902cbecC8ED0CBA10Ff326",
   "hoprAddress": "16Uiu2HAmE9b3TSHeF25uJS1Ecf2Js3TutnaSnipdV9otEpxbRN8Q"
@@ -168,7 +168,7 @@ If successful, you should get a response similar to this one:
 
 In case you have made a mistake, like forgotten to use `-n` in your `echo` or have the wrong `apiToken`, you’ll see the following instead:
 
-```
+```json
 {
   "status": 403,
   "challenge": "Basic realm=hoprd",
@@ -186,19 +186,19 @@ open to listen to all messages sent to our HOPR node.
 With `websocat` installed, run the following command to connect to your HOPR node WebSocket server. Please pay attention that we are now using
 our `HOPR_NODE_1_WS_URL` (likely `127.0.0.1:3000` or `127.0.0.1:19501`) instead of the `HOPR_NODE_1_HTTP_URL` from last step, which is also referred as `Admin URL` in our tools.
 
-```
+```bash
 .bin/websocat "$(echo "$HOPR_NODE_1_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
 ```
 
 If worked correctly, you should see a dump of messages, the last one being:
 
-```
+```json
 {"type":"log","msg":"ws client connected [ authentication ENABLED ]","ts":"2022-02-01T19:42:34.152Z"}
 ```
 
 Now that you are connected, try typing `balance` in the same terminal, which should output as follows:
 
-```
+```json
 {"type":"log","msg":"admin > balance\n","ts":"2022-02-01T19:42:35.417Z"}
 {"type":"log","msg":"HOPR Balance:  9.6 txHOPR\nETH Balance:   0.99871794476851171 xDAI","ts":"2022-02-01T19:42:35.421Z"}
 ```
@@ -218,13 +218,13 @@ need to know your `apiToken`.
   you need to change the `http` protocol to `ws`. For instance, here's how this would look like
   in a `Gitpod.io` instance. After it's connected, you can type `balance` to see your node response.
 
-```
+```bash
 ws://127.0.0.1:19501/?apiToken=^^LOCAL-testing-123^^
 ```
 
 If you are using a Gitpod public URL, you can simply use the output of `gp url` for that particular port (`19501`) and paste it in the website.
 
-```
+```bash
 gp url 19501
 ```
 
@@ -238,20 +238,20 @@ The output should look something like this `wss://19501-hoprnet-mynechat-7x6h2gh
 
 :::info Tip
 For `apiToken` `^^LOCAL-testing-123^^` the `base64` encoded value is `Xl5MT0NBTC10ZXN0aW5nLTEyM15e`, so to use [ReqBin](https://reqbin.com/)
-with a Gitpod exposed URL (e.g. `https://13302-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/api/v2/account/address`), you can use `gp url`.
+with a Gitpod exposed URL (e.g. `https://13302-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io/api/v2/account/addresses`), you can use `gp url`.
 For a different `apiToken` value, you can use the `btoa` function of your browser Developer Tools to figure it out.
 
 <br/>
 
 **Gitpod command (paste output in the URL section of `reqbin`)**
 
-```
+```bash
 gp url 13302
 ```
 
 **Custom Header**
 
-```
+```bash
 Basic Xl5MT0NBTC10ZXN0aW5nLTEyM15e
 ```
 
