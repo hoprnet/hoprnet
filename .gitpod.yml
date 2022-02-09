@@ -20,6 +20,7 @@ tasks:
     before: |
       gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && gp await-port 13305 && sleep 15s
     command: |
+      export VIRTUAL_ENV=""
       source ./scripts/utils.sh
       export apiToken="^^LOCAL-testing-123^^"
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
@@ -44,6 +45,7 @@ tasks:
     before: |
       gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && gp await-port 13305 && sleep 15s
     command: |
+      export VIRTUAL_ENV=""
       source ./scripts/utils.sh
       export apiToken="^^LOCAL-testing-123^^"
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
@@ -67,6 +69,7 @@ tasks:
     before: |
       gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && gp await-port 13305 && sleep 15s
     command: |
+      export VIRTUAL_ENV=""
       source ./scripts/utils.sh
       export apiToken="^^LOCAL-testing-123^^"
       export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
