@@ -332,10 +332,11 @@ class Listener extends EventEmitter implements InterfaceListener {
     // Only add relay nodes if node is not directly reachable or running locally
     if (this.testingOptions.__runningLocally || natSituation.bidirectionalNAT || !natSituation.isExposed) {
       this.entry.on(RELAY_CHANGED_EVENT, this._emitListening)
-      await this.entry.updatePublicNodes()
 
-      // Attach listeners
+      // Finish startup
       this.entry.start()
+
+      await this.entry.updatePublicNodes()
     }
 
     this.state = State.LISTENING

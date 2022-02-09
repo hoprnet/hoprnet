@@ -104,14 +104,15 @@ class Indexer extends EventEmitter {
     // and feeds them to the event listener
     ;(async function (this: Indexer) {
       for await (const block of orderedBlocks.iterator()) {
-        if (block.value > latestOnChainBlock) {
-          await this.onNewBlock(block.value, true) // exceptions are handled
-        }
+        await this.onNewBlock(block.value, true) // exceptions are handled
       }
     }.call(this))
 
+    // Do not process new blocks before querying old blocks has finished
+    const newBlocks = ordered<number>()
+
     const unsubscribeBlock = this.chain.subscribeBlock(async (block: number) => {
-      orderedBlocks.push({
+      newBlocks.push({
         index: block,
         value: block
       })
@@ -119,6 +120,7 @@ class Indexer extends EventEmitter {
 
     this.unsubscribeBlock = () => {
       unsubscribeBlock()
+      newBlocks.end()
       orderedBlocks.end()
     }
 
@@ -128,6 +130,13 @@ class Indexer extends EventEmitter {
 
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
+
+    // Feed new blocks to the ordered queue
+    ;(async function (this: Indexer) {
+      for await (const newBlock of newBlocks.iterator()) {
+        orderedBlocks.push(newBlock) // exceptions are handled
+      }
+    }.call(this))
 
     log('Subscribing to events from block %d', fromBlock)
 
