@@ -54,12 +54,15 @@ export const authenticateWsConnection = (
 }
 
 /**
- * Given a URL path, we strip away query parameters.
+ * Given a URL path, we strip away query parameters and tailing slash.
  * @param path
  * @returns stripped path
  * @example `/api/v2/messages/websocket?apiToken=^^LOCAL-testing-123^^` becomes `/api/v2/messages/websocket`
  * @example `/api/v2/messages/websocket/?apiToken=^^LOCAL-testing-123^^` becomes `/api/v2/messages/websocket`
  */
 export const removeQueryParams = (path: string): string => {
-  return path.replace(/(\?.*)|(\/\?.*)|(#.*)|(\/$)/g, '')
+  const url = new URL(`https://hoprnet.org${path}`)
+  let strippedPath = url.pathname
+  if (strippedPath.endsWith('/')) strippedPath = strippedPath.slice(0, -1)
+  return strippedPath
 }
