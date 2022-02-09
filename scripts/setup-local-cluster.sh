@@ -62,7 +62,7 @@ done
 # find usable tmp dir
 declare tmp="$(find_tmp_dir)"
 
-declare node_prefix="hopr-local-node"
+declare node_prefix="local"
 
 declare node1_dir="${tmp}/${node_prefix}-1"
 declare node2_dir="${tmp}/${node_prefix}-2"
@@ -82,7 +82,7 @@ declare node3_id="${node3_dir}.id"
 declare node4_id="${node4_dir}.id"
 declare node5_id="${node5_dir}.id"
 
-declare password="local-testing-mode"
+declare password="local"
 
 declare hardhat_rpc_log="${tmp}/hopr-local-hardhat-rpc.log"
 
@@ -315,6 +315,11 @@ log "\t\tPeer Id:\t${peers[4]}"
 log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19505/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
+
+# GitPod related barrier
+if command -v gp; then
+  gp sync-done "local-cluster"
+fi
 
 log "Terminating this script will clean up the running local cluster"
 wait
