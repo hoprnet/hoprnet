@@ -54,7 +54,7 @@ describe('Test authenticateWsConnection', function () {
   })
 })
 
-describe.only('Test removeQueryParams', function () {
+describe('Test removeQueryParams', function () {
   it('should strip away parameters', function () {
     assert.equal(
       removeQueryParams('/api/v2/messages/websocket?apiToken=^^LOCAL-testing-123^^'),
