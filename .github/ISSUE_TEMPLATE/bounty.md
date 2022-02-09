@@ -17,7 +17,7 @@ assignees: ''
 
 ### Developing HOPR
 
-- [running a local environment](https://github.com/hoprnet/hoprnet#develop)
+- [running HOPR locally](https://docs.hoprnet.org/developers/starting-local-cluster#local-setup)
 
 ### What is HOPR?
 
