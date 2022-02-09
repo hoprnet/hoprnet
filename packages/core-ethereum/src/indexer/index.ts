@@ -98,13 +98,19 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
+    const hoprBalance = await this.chain.getBalance(this.address)
+    await this.db.setHoprBalance(hoprBalance)
+    log(`set own HOPR balance to ${hoprBalance.toFormattedString()}`)
+
     const orderedBlocks = ordered<number>()
 
     // Starts the asynchronous stream of indexer events
     // and feeds them to the event listener
     ;(async function (this: Indexer) {
       for await (const block of orderedBlocks.iterator()) {
-        await this.onNewBlock(block.value, true) // exceptions are handled
+        if (block.value > latestOnChainBlock) {
+          await this.onNewBlock(block.value, true) // exceptions are handled
+        }
       }
     }.call(this))
 
@@ -182,10 +188,16 @@ class Indexer extends EventEmitter {
    * channel events
    * @param fromBlock block to start from
    * @param toBlock last block (inclusive) to consider
+   * @param withTokenTransactions [optional] if true, also query for token transfer
+   * towards or from the node towards someone else
    * @returns all relevant events in the specified block range
    */
-  private async getEvents(fromBlock: number, toBlock: number): Promise<TypedEvent<any, any>[]> {
-    const events = await Promise.all([
+  private async getEvents(
+    fromBlock: number,
+    toBlock: number,
+    withTokenTransactions: boolean
+  ): Promise<TypedEvent<any, any>[]> {
+    const queries = [
       this.chain
         .getChannels()
         .queryFilter(
@@ -205,45 +217,54 @@ class Indexer extends EventEmitter {
           return events.map((event: TypedEvent<any, any>) => {
             return Object.assign(event, this.chain.getChannels().interface.parseLog(event))
           })
-        }),
-      this.chain
-        .getToken()
-        .queryFilter(
-          {
-            topics: [
-              // Token transfer *towards* us
-              [this.chain.getToken().interface.getEventTopic('Transfer')],
-              [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
-            ]
-          },
-          fromBlock,
-          toBlock
-        )
-        .then((events: TypedEvent<any, any>[]) => {
-          return events.map((event: TypedEvent<any, any>) =>
-            Object.assign(event, this.chain.getToken().interface.parseLog(event))
-          )
-        }),
-      this.chain
-        .getToken()
-        .queryFilter(
-          {
-            topics: [
-              // Token transfer *from* us towards someone else
-              [this.chain.getToken().interface.getEventTopic('Transfer')],
-              null,
-              [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
-            ]
-          },
-          fromBlock,
-          toBlock
-        )
-        .then((events: TypedEvent<any, any>[]) => {
-          return events.map((event: TypedEvent<any, any>) =>
-            Object.assign(event, this.chain.getToken().interface.parseLog(event))
-          )
         })
-    ])
+    ]
+
+    if (withTokenTransactions) {
+      queries.push(
+        ...[
+          this.chain
+            .getToken()
+            .queryFilter(
+              {
+                topics: [
+                  // Token transfer *towards* us
+                  [this.chain.getToken().interface.getEventTopic('Transfer')],
+                  [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+                ]
+              },
+              fromBlock,
+              toBlock
+            )
+            .then((events: TypedEvent<any, any>[]) => {
+              return events.map((event: TypedEvent<any, any>) =>
+                Object.assign(event, this.chain.getToken().interface.parseLog(event))
+              )
+            }),
+          this.chain
+            .getToken()
+            .queryFilter(
+              {
+                topics: [
+                  // Token transfer *from* us towards someone else
+                  [this.chain.getToken().interface.getEventTopic('Transfer')],
+                  null,
+                  [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+                ]
+              },
+              fromBlock,
+              toBlock
+            )
+            .then((events: TypedEvent<any, any>[]) => {
+              return events.map((event: TypedEvent<any, any>) =>
+                Object.assign(event, this.chain.getToken().interface.parseLog(event))
+              )
+            })
+        ]
+      )
+    }
+
+    const events = await Promise.all(queries)
 
     return (
       events
@@ -286,7 +307,7 @@ class Indexer extends EventEmitter {
       let events: Event<any>[] = []
 
       try {
-        events = await this.getEvents(fromBlock, toBlock)
+        events = await this.getEvents(fromBlock, toBlock, false)
       } catch (error) {
         failedCount++
 
@@ -383,7 +404,11 @@ class Indexer extends EventEmitter {
       }
 
       if (fetchEvents) {
-        const events = await this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations)
+        const events = await this.getEvents(
+          blockNumber - this.maxConfirmations,
+          blockNumber - this.maxConfirmations,
+          true
+        )
 
         this.onNewEvents(events)
       }

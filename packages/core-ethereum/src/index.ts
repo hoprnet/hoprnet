@@ -111,10 +111,6 @@ export default class HoprCoreEthereum extends EventEmitter {
       try {
         await this.chain.waitUntilReady()
 
-        const hoprBalance = await this.chain.getBalance(this.publicKey.toAddress())
-        await this.db.setHoprBalance(hoprBalance)
-        log(`set HOPR balance to ${hoprBalance.toFormattedString()}`)
-
         await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
         // Debug log used in e2e integration tests, please don't change
