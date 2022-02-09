@@ -23,8 +23,18 @@ Here are some of the use cases we believe the HOPR network is a great tool for:
 ### Building HOPR apps
 
 The easiest way to build HOPR apps is by launching your own local HOPR cluster, connecting to them via a REST/WebSocket
-client, and building on top of the REST API. The following three-part guide showcases how to follow each of these steps.
+client, and building on top of the REST API. Use our Walkthrough to get familiar with this entire process, and read our
+OpenAPI documentation to learn how to interact with HOPR nodes once they are up and running.
+
+#### Walkthrough
+
+The following three-part guide showcases how to get everything ready for building a HOPR app.
 
 - ["Running a local HOPR Cluster"](/developers/starting-local-cluster)
 - ["Interacting with a HOPR node"](/developers/connecting-node)
 - ["HOPR Apps - Hello world"](/developers/tutorial-hello-world)
+
+#### OpenAPI Documentation
+
+We use the [OpenAPI standard](https://swagger.io/specification/) to document our REST API. You can it in our
+["REST API"](/developers/rest-api) section.
