@@ -24,12 +24,12 @@ const redocusaurus = [
     specs: [
       {
         id: 'rest-api',
-        specUrl: 'https://raw.githubusercontent.com/hoprnet/hoprnet/master/packages/hoprd/rest-api-v2-spec.yaml',
-        routePath: '/developers/rest-api/',
-      },
-    ],
-  },
-];
+        spec: 'rest-api-v2-full-spec.yaml',
+        routePath: '/developers/rest-api/'
+      }
+    ]
+  }
+]
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
