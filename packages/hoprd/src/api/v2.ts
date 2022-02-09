@@ -126,13 +126,13 @@ export function setupRestApi(
     try {
       fs.writeFile(apiFullSpecPath, JSON.stringify(apiInstance.apiDoc), (err) => {
         if (err) {
-          logs.error(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
+          logs.log(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
           return
         }
         logs.log(`Written full Rest API v2 spec file to ${apiFullSpecPath}`)
       })
     } catch (err) {
-      logs.error(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
+      logs.log(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
     }
   }
 
