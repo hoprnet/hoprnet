@@ -108,7 +108,7 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
       )
     } catch (err: any) {
       // If aborted we can safely ignore
-      if (err.code !== 'ABORT_ERR' || err.type !== 'aborted') {
+      if (err.code !== 'ABORT_ERR' && err.type !== 'aborted') {
         // If the source errored the socket will already have been destroyed by
         // toIterable.duplex(). If the socket errored it will already be
         // destroyed. There's nothing to do here except log the error & return.
