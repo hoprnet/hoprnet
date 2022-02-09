@@ -316,6 +316,7 @@ log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19505/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
 
+# GitPod related barrier
 if command -v gp; then
   gp sync-done "local-cluster"
 fi
