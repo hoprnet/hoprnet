@@ -1680,7 +1680,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ceramicnetwork/common@npm:^1.10.0, @ceramicnetwork/common@npm:^1.10.1":
+"@ceramicnetwork/common@npm:^1.10.0":
   version: 1.10.1
   resolution: "@ceramicnetwork/common@npm:1.10.1"
   dependencies:
@@ -1699,29 +1699,49 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ceramicnetwork/http-client@npm:1.5.2":
-  version: 1.5.2
-  resolution: "@ceramicnetwork/http-client@npm:1.5.2"
+"@ceramicnetwork/common@npm:^1.11.0":
+  version: 1.11.0
+  resolution: "@ceramicnetwork/common@npm:1.11.0"
   dependencies:
-    "@ceramicnetwork/common": ^1.10.0
-    "@ceramicnetwork/stream-caip10-link": ^1.2.4
-    "@ceramicnetwork/stream-tile": ^1.5.2
-    "@ceramicnetwork/streamid": ^1.3.5
-    query-string: 7.0.1
+    "@ceramicnetwork/streamid": ^1.3.9
+    "@overnightjs/logger": 1.2.1
+    abort-controller: ^3.0.0
+    caip: ~1.0.0
+    cids: ~1.1.6
+    colors: 1.3.3
+    cross-fetch: ^3.1.4
+    flat: ^5.0.2
+    lodash.clonedeep: ^4.5.0
+    logfmt: ^1.3.2
     rxjs: ^7.0.0
-  checksum: 7a2700a61f2e8017e0f3e31825d6797e068fae08050023812986be812677b5ea2fa1a451add719b35b418dd2e483f8d0ce12527113f301844d5b2e757cdeb1cb
+    uint8arrays: ^2.0.5
+  checksum: 43931b663ef4bd785e4524c489ca3272e369abd1a8028b21ae4c5b4edba9740853e17477c5823b553091fc3f3aa1b85b0a7e9a6bc8345e70dcf8b9a2b76d74bb
   languageName: node
   linkType: hard
 
-"@ceramicnetwork/stream-caip10-link@npm:^1.2.4":
-  version: 1.2.5
-  resolution: "@ceramicnetwork/stream-caip10-link@npm:1.2.5"
+"@ceramicnetwork/http-client@npm:1.5.7":
+  version: 1.5.7
+  resolution: "@ceramicnetwork/http-client@npm:1.5.7"
   dependencies:
-    "@ceramicnetwork/common": ^1.10.1
-    "@ceramicnetwork/streamid": ^1.3.5
+    "@ceramicnetwork/common": ^1.11.0
+    "@ceramicnetwork/stream-caip10-link": ^1.2.9
+    "@ceramicnetwork/stream-tile": ^1.5.7
+    "@ceramicnetwork/streamid": ^1.3.9
+    query-string: 7.0.1
+    rxjs: ^7.0.0
+  checksum: 2d8eb1a6438bd7758deefd152c2d0cab312065f543226b846f6ff193d695401b81d7ad55c310b98e95233f367f04adf8c7e42bbaa29fe8277227a89f52e45d67
+  languageName: node
+  linkType: hard
+
+"@ceramicnetwork/stream-caip10-link@npm:^1.2.9":
+  version: 1.2.9
+  resolution: "@ceramicnetwork/stream-caip10-link@npm:1.2.9"
+  dependencies:
+    "@ceramicnetwork/common": ^1.11.0
+    "@ceramicnetwork/streamid": ^1.3.9
     caip: ~0.9.2
     did-resolver: ^3.1.3
-  checksum: fed1f12c1b2d22fd2033b9b7ed63f7416adda63446dd2696685111bbe90b620963fe72aa1c3f3f6f81a1afd7f9eac13e65ebc195dc6f94e65fcbef75cb28337e
+  checksum: f9a37e2c4d9197516cf2aa287db064b9ef665b0e9b27c58912d8fe27dcd46b0060fd6d4cdd6bbc65348207ecb118b9ed7b4230c15e6e1c6889aececd60808bcb
   languageName: node
   linkType: hard
 
@@ -1738,16 +1758,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ceramicnetwork/stream-tile@npm:^1.5.2":
-  version: 1.5.3
-  resolution: "@ceramicnetwork/stream-tile@npm:1.5.3"
+"@ceramicnetwork/stream-tile@npm:^1.5.7":
+  version: 1.5.7
+  resolution: "@ceramicnetwork/stream-tile@npm:1.5.7"
   dependencies:
-    "@ceramicnetwork/common": ^1.10.1
-    "@ceramicnetwork/streamid": ^1.3.5
+    "@ceramicnetwork/common": ^1.11.0
+    "@ceramicnetwork/streamid": ^1.3.9
     "@stablelib/random": ^1.0.0
     fast-json-patch: ^2.2.1
     uint8arrays: ^2.0.5
-  checksum: 41aa81b5a494796115f7d36bf332d6a753d6264d72e1131d97fb26934fa55f0f51a3539589fe7d4d6743b92798e7f29539b37856c65efe6a982131b2c2bff671
+  checksum: da1294a64e3becca6982a9bfa1df119235853295a18b3fe199593d403cca3aa07e67b871d904d130f3d659f3b6c3f32bf3f8532ecccd55afd75ec9964e45ef07
   languageName: node
   linkType: hard
 
@@ -1762,6 +1782,20 @@ __metadata:
     uint8arrays: ^2.0.5
     varint: ^6.0.0
   checksum: 8b7f39bf67e834dd82c91c8f7e71d6f01748705af4a67588060bbcbbb7c429179bed1f9fe9337470951355f0fb322f72e619f45958dff269a61226f4cfa991f4
+  languageName: node
+  linkType: hard
+
+"@ceramicnetwork/streamid@npm:^1.3.9":
+  version: 1.3.9
+  resolution: "@ceramicnetwork/streamid@npm:1.3.9"
+  dependencies:
+    cids: ~1.1.6
+    ipld-dag-cbor: ^0.17.0
+    multibase: ~4.0.2
+    typescript-memoize: ^1.0.0-alpha.4
+    uint8arrays: ^2.0.5
+    varint: ^6.0.0
+  checksum: 030cd674a2aa82b99c344a39269467a6d528d175892d733f630997eab2ce5a2eff2dd2eb4cc90b5e8bd502f60d24643df35d481862e2a73b79ef7a1f5b011a6b
   languageName: node
   linkType: hard
 
@@ -3303,7 +3337,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hoprd@workspace:packages/hoprd"
   dependencies:
-    "@ceramicnetwork/http-client": 1.5.2
+    "@ceramicnetwork/http-client": 1.5.7
     "@ceramicnetwork/stream-tile": 1.5.2
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
