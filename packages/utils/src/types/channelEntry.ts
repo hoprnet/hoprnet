@@ -155,6 +155,12 @@ export class ChannelEntry {
     return !!this.closureTime && now.gt(this.closureTime.toBN())
   }
 
+  /**
+   * Computes the remaining time in seconds until the channel can be closed.
+   * Outputs `0` if there is no waiting time, and `-1` if the
+   * closure time of this channel is unknown.
+   * @dev used to create more comprehensive debug logs
+   */
   public getRemainingClosureTime(): BN {
     const nowInSeconds = Math.round(new Date().getTime() / 1000)
     const now = new BN(nowInSeconds)
