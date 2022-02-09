@@ -274,7 +274,7 @@ describe('test webrtc connection', function () {
     )
   })
 
-  it.only('use abortController to end stream', async function () {
+  it('use abortController to end stream', async function () {
     const AliceBob = Pair<StreamType>()
     const BobAlice = Pair<StreamType>()
 

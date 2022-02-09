@@ -127,7 +127,7 @@ describe('test TCP connection', function () {
     )
   })
 
-  it.only('use abortController to abort streams', async function () {
+  it('use abortController to abort streams', async function () {
     const msgReceived = defer<void>()
 
     const testMessage = new TextEncoder().encode('test')
