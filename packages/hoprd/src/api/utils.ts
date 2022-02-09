@@ -61,6 +61,7 @@ export const authenticateWsConnection = (
  * @example `/api/v2/messages/websocket/?apiToken=^^LOCAL-testing-123^^` becomes `/api/v2/messages/websocket`
  */
 export const removeQueryParams = (path: string): string => {
+  // we use a placeholder domain since req.url only passes query params
   const url = new URL(`https://hoprnet.org${path}`)
   let strippedPath = url.pathname
   if (strippedPath.endsWith('/')) strippedPath = strippedPath.slice(0, -1)
