@@ -1,0 +1,72 @@
+---
+id: demo-rps-game
+title: Demo - Rock, Paper & Scissors Game
+---
+
+import IframeLoader from './components/IframeLoader'
+
+The Rock, Paper & Scissors (RPS) Game is a HOPR app which is able to use the HOPR network as a p2p gaming platform. Using a HOPR node
+as a "referee", players can send off-chain moves to it, which given a known logic (i.e. rock beats scissors, scissors beat paper, and
+paper beats rock), can produce a winner. After each node has send its move, the referee displays the winner of the game, and the moves
+made by each player.
+
+In this demo app, we will also show the pros and cons of the HOPR protocol when sending private messages.
+
+## Requirements
+
+- a HOPR cluster, and at least a `3` HOPR nodes with their respective `HTTP_ENDPOINT`, `WS_ENDPOINT` and `API_TOKEN`
+- a React-ready web framework used to run the application. We recommend [`next.js`](https://nextjs.org/).
+
+For simplicity, you can also see the code for this demo in [Codesandbox](https://codesandbox.io/s/hopr-demo-react-hello-world-yo0uc?file=/src/App.tsx).
+To see an example of how to run this as an isolated application, you can also check our [demo chat application, MyneChat](https://github.com/hoprnet/myne-chat).
+
+## Building the RPS Game
+
+### 1. Connecting to our HOPR nodes
+
+## Demo - Rock, Paper, Scissors Game
+
+#### Player 1
+
+<IframeLoader
+  url={'/developers/containers/connector'}
+  loadingMessage="Loading Player 1..."
+  callback={() => {
+    document.querySelector('iframe').contentWindow.document.querySelector('nav').style.display = 'none'
+  }}
+  width="100%"
+  height="300"
+  frameBorder="0"
+  marginHeight="0"
+  marginWidth="0"
+/>
+
+#### Referee
+
+<IframeLoader
+  url={'/developers/containers/connector'}
+  loadingMessage="Loading Referee..."
+  callback={() => {
+    document.querySelector('iframe').contentWindow.document.querySelector('nav').style.display = 'none'
+  }}
+  width="100%"
+  height="300"
+  frameBorder="0"
+  marginHeight="0"
+  marginWidth="0"
+/>
+
+#### Player 2
+
+<IframeLoader
+  url={'/developers/containers/connector'}
+  loadingMessage="Loading Player 2..."
+  callback={() => {
+    document.querySelector('iframe').contentWindow.document.querySelector('nav').style.display = 'none'
+  }}
+  width="100%"
+  height="300"
+  frameBorder="0"
+  marginHeight="0"
+  marginWidth="0"
+/>

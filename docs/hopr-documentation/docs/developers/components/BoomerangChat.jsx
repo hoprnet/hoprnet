@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import WebSocketHandler from './WebSocketHandler'
+import Connector from './atoms/Connector'
+import { getHeaders } from './utils'
 
 export default function BoomerangChat() {
   const [message, setMessage] = useState('Hello world')
@@ -8,19 +10,9 @@ export default function BoomerangChat() {
   const [httpEndpoint, setHTTPEndpoint] = useState('http://localhost:3001')
   const [address, setAddress] = useState('')
 
-  const getHeaders = (isPost = false) => {
-    const headers = new Headers()
-    if (isPost) {
-      headers.set('Content-Type', 'application/json')
-      headers.set('Accept-Content', 'application/json')
-    }
-    headers.set('Authorization', 'Basic ' + btoa(securityToken))
-    return headers
-  }
-
   useEffect(() => {
     const loadAddress = async () => {
-      const headers = getHeaders()
+      const headers = getHeaders(securityToken)
       const account = await fetch(`${httpEndpoint}/api/v2/account/addresses`, {
         headers
       })
@@ -35,7 +27,7 @@ export default function BoomerangChat() {
     if (!address) return
     await fetch(`${httpEndpoint}/api/v2/messages`, {
       method: 'POST',
-      headers: getHeaders(true),
+      headers: getHeaders(securityToken, true),
       body: JSON.stringify({
         recipient: address,
         body: message
@@ -45,36 +37,17 @@ export default function BoomerangChat() {
 
   return (
     <div>
-      <div>
-        <label>WS Endpoint</label>{' '}
-        <input
-          name="wsEndpoint"
-          placeholder={wsEndpoint}
-          value={wsEndpoint}
-          onChange={(e) => setWsEndpoint(e.target.value)}
-        />
-      </div>
-      <div>
-        <label>HTTP Endpoint</label>{' '}
-        <input
-          name="httpEndpoint"
-          placeholder={httpEndpoint}
-          value={httpEndpoint}
-          onChange={(e) => setHTTPEndpoint(e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Security Token</label>{' '}
-        <input
-          name="securityToken"
-          placeholder={securityToken}
-          value={securityToken}
-          onChange={(e) => setSecurityToken(e.target.value)}
-        />
-      </div>
+      <Connector
+        httpEndpoint={httpEndpoint}
+        setHTTPEndpoint={setHTTPEndpoint}
+        wsEndpoint={wsEndpoint}
+        setWsEndpoint={setWsEndpoint}
+        securityToken={securityToken}
+        setSecurityToken={setSecurityToken}
+      />
       <div>
         <label>Send a message</label>{' '}
-        <input name="httpEndpoint" value={message} placeholder={message} onChange={(e) => setMessage(e.target.value)} />
+        <input name="message" value={message} placeholder={message} onChange={(e) => setMessage(e.target.value)} />
       </div>
       <button onClick={() => sendMessage()}>Send message to node</button>
       <br />
