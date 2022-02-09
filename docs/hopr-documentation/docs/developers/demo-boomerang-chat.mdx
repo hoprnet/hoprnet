@@ -27,7 +27,7 @@ To see an example of how to run this as an isolated application, you can also ch
 Our React application starts as with any, just loading the application within an entry point.
 
 ```jsx {3,6} title="index.jsx (usually your React application entrypoint)"
-import { render } from "react-dom";
+import { render } from 'react-dom'
 
 import BoomerangChat from './BoomerangChat'
 
@@ -286,8 +286,8 @@ export default useWebsocket
 Used to a React component to load our HOPR node using the `useWebSocket` hook.
 
 ```jsx title="WebSocketHandler.jsx"
-import React, { useEffect, useState } from "react";
-import useWebsocket from "../hooks/useWebSockets ";
+import React, { useEffect, useState } from 'react'
+import useWebsocket from '../hooks/useWebSockets '
 
 export const WebSocketHandler = ({ wsEndpoint, securityToken }) => {
   const [message, setMessage] = useState('')
@@ -326,8 +326,8 @@ export default WebSocketHandler
 Actual HOPR application able to send and read a message to the same node it’s connected usign its HTTP/WS endpoints.
 
 ```jsx title="BoomerangChat.jsx"
-import React, { useEffect, useState } from "react";
-import WebSocketHandler from "./WebSocketHandler";
+import React, { useEffect, useState } from 'react'
+import WebSocketHandler from './WebSocketHandler'
 
 export default function BoomerangChat() {
   const [message, setMessage] = useState('Hello world')
