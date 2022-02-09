@@ -82,6 +82,8 @@ describe('entry node functionality', function () {
       {}
     )
 
+    entryNodes.start()
+
     const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
 
     entryNodes.onNewRelay(peerStoreEntry)
@@ -106,6 +108,8 @@ describe('entry node functionality', function () {
       (async () => new Promise((resolve) => setImmediate(resolve))) as any,
       {}
     )
+
+    entryNodes.start()
 
     const peerStoreEntry = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/0`)
 
@@ -141,6 +145,8 @@ describe('entry node functionality', function () {
         initialNodes: [relay]
       }
     )
+
+    entryNodes.start()
 
     await entryNodes.updatePublicNodes()
 
@@ -190,6 +196,8 @@ describe('entry node functionality', function () {
       }
     )
 
+    entryNodes.start()
+
     await entryNodes.updatePublicNodes()
 
     await Promise.all(relayNodes.map((relayNode) => relayNode[0]))
@@ -226,6 +234,8 @@ describe('entry node functionality', function () {
       async (ma: Multiaddr) => (await network.connect(ma.toString())) as any,
       {}
     )
+
+    entryNodes.start()
 
     entryNodes.uncheckedEntryNodes.push(newNode)
 
@@ -271,6 +281,8 @@ describe('entry node functionality', function () {
       {}
     )
 
+    entryNodes.start()
+
     const fakeNode = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/2`)
 
     entryNodes.uncheckedEntryNodes.push(relay)
@@ -306,6 +318,8 @@ describe('entry node functionality', function () {
       {}
     )
 
+    entryNodes.start()
+
     entryNodes.uncheckedEntryNodes.push(offlineRelay)
 
     await entryNodes.updatePublicNodes()
@@ -319,6 +333,8 @@ describe('entry node functionality', function () {
 
   it('do not emit listening event if nothing has changed', async function () {
     const entryNodes = new TestingEntryNodes(peerId, (async () => {}) as any, {})
+
+    entryNodes.start()
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 

@@ -60,6 +60,7 @@ export class EntryNodes extends EventEmitter {
 
   private _onNewRelay: EntryNodes['onNewRelay'] | undefined
   private _onRemoveRelay: EntryNodes['onRemoveRelay'] | undefined
+  private _connectToRelay: EntryNodes['connectToRelay'] | undefined
 
   constructor(
     private peerId: PeerId,
@@ -78,6 +79,7 @@ export class EntryNodes extends EventEmitter {
    * entry nodes
    */
   public start() {
+    this._connectToRelay = this.connectToRelay.bind(this)
     if (this.options.publicNodes != undefined) {
       this._onNewRelay = this.onNewRelay.bind(this)
       this._onRemoveRelay = this.onRemoveRelay.bind(this)
@@ -252,15 +254,16 @@ export class EntryNodes extends EventEmitter {
     const nodesToCheck = this.filterUncheckedNodes()
     const TIMEOUT = 3e3
 
-    const connectToRelay = this.connectToRelay.bind(this)
     const toCheck = nodesToCheck.concat(this.availableEntryNodes)
-    const args: Parameters<typeof connectToRelay>[] = new Array(toCheck.length)
+    const args: Parameters<EntryNodes['connectToRelay']>[] = new Array(toCheck.length)
 
     for (const [index, nodeToCheck] of toCheck.entries()) {
       args[index] = [nodeToCheck.id, nodeToCheck.multiaddrs[0], TIMEOUT]
     }
 
-    const results = (await nAtATime(connectToRelay, args, ENTRY_NODES_MAX_PARALLEL_DIALS))
+    const results = (
+      await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], args, ENTRY_NODES_MAX_PARALLEL_DIALS)
+    )
       .filter(
         // Filter all unsuccessful dials that cause an error
         (value): value is { entry: EntryNodeData; conn: Connection | undefined } => !(value instanceof Error)

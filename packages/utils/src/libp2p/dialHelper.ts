@@ -209,7 +209,7 @@ async function doDial(
     knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
 
     printPeerStoreAddresses(
-      `Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`,
+      `Direct dial attempt to ${destination.toB58String()} failed and DHT query has not brought any new addresses. Giving up`,
       knownAddresses
     )
     return dhtResult
