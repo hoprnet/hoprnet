@@ -1,6 +1,8 @@
 import Multiaddr from 'multiaddr'
+import { pickVersion } from '@hoprnet/hopr-utils'
 
 const { name, version } = require('../package.json')
+const NORMALIZED_VERSION = pickVersion(version)
 
 // Use name without organisation prefix
 export const NAME = name.replace(/@[a-zA-z0-9\-]+\//, '')
@@ -72,9 +74,9 @@ export const MAX_RELAYS_PER_NODE = 5
  */
 export function CAN_RELAY_PROTCOL(environment?: string): string {
   if (environment) {
-    return `/${NAME}/${environment}/can-relay/${version}`
+    return `/${NAME}/${environment}/can-relay/${NORMALIZED_VERSION}`
   }
-  return `/${NAME}/can-relay/${version}`
+  return `/${NAME}/can-relay/${NORMALIZED_VERSION}`
 }
 
 /**
@@ -83,9 +85,9 @@ export function CAN_RELAY_PROTCOL(environment?: string): string {
  */
 export function RELAY_PROTCOL(environment?: string): string {
   if (environment) {
-    return `/${NAME}/${environment}/relay/${version}`
+    return `/${NAME}/${environment}/relay/${NORMALIZED_VERSION}`
   }
-  return `/${NAME}/relay/${version}`
+  return `/${NAME}/relay/${NORMALIZED_VERSION}`
 }
 
 /**
@@ -94,7 +96,7 @@ export function RELAY_PROTCOL(environment?: string): string {
  */
 export function DELIVERY_PROTOCOL(environment?: string): string {
   if (environment) {
-    return `/${NAME}/${environment}/delivery/${version}`
+    return `/${NAME}/${environment}/delivery/${NORMALIZED_VERSION}`
   }
-  return `/${NAME}/delivery/${version}`
+  return `/${NAME}/delivery/${NORMALIZED_VERSION}`
 }

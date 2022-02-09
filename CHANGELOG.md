@@ -18,6 +18,7 @@
 - Add CLI parameter `--allowPrivateNodeConnections` to explicitly allow connections to private nodes ([#3390](https://github.com/hoprnet/hoprnet/pull/3390))
 - Fixed automatic and manual ticket redemption ([#3395](https://github.com/hoprnet/hoprnet/pull/3395))
 - In-order processing of blocks and in-order processing of on-chain events ([#3392](https://github.com/hoprnet/hoprnet/pull/3392))
+- Normalize protocol version before checking the relay usability ([#3442](https://github.com/hoprnet/hoprnet/pull/3442))
 
 ---
 
