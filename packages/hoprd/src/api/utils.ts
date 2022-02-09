@@ -36,7 +36,6 @@ export const authenticateWsConnection = (
     let cookies: ReturnType<typeof cookie.parse> | undefined
     try {
       cookies = cookie.parse(req.headers.cookie)
-      console.log('cookies', cookies)
     } catch (e) {
       debugLog(`failed parsing cookies`, e)
     }

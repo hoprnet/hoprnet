@@ -7,13 +7,13 @@ import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import PeerId from 'peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
+import { authenticateWsConnection } from './utils'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import type { StateOps } from '../types'
-import { authenticateWsConnection } from './utils'
 
 const debugLog = debug('hoprd:api:v2')
 
@@ -113,31 +113,58 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
   }) as express.ErrorRequestHandler)
 }
 
+const WS_PATHS = {
+  NONE: '/', // used for testing
+  MESSAGES: '/api/v2/messages/websocket'
+}
+
 export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, options: { apiToken?: string }) {
+  // before upgrade to WS, we perform various checks
   server.on('upgrade', function upgrade(req, socket, head) {
+    debugLog('WS client attempt to upgrade')
+    const path = req.url
     const needsAuth = !!options.apiToken
-    if (needsAuth && !authenticateWsConnection(req, options.apiToken)) {
-      debug('ws client failed authentication')
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
-      socket.destroy()
+
+    // check if path is supported
+    if (!Object.values(WS_PATHS).includes(path)) {
+      debugLog(`WS client path '${path}' does not exist`)
+      socket.end('HTTP/1.1 404 Not Found\r\n\r\n', () => socket.destroy())
       return
     }
-    if (!needsAuth) debug('ws client connected [ authentication DISABLED ]')
-    else debug('ws client connected [ authentication ENABLED ]')
 
-    wss.handleUpgrade(req, socket, head, function done(wsSocket) {
-      wss.emit('connection', wsSocket, req)
+    // check if request is authenticated
+    if (needsAuth && !authenticateWsConnection(req, options.apiToken)) {
+      debugLog('WS client failed authentication')
+      socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n', () => socket.destroy())
+      return
+    }
+
+    // log connection status
+    if (!needsAuth) debugLog('WS client connected [ authentication DISABLED ]')
+    else debugLog('WS client connected [ authentication ENABLED ]')
+
+    // upgrade to WS protocol
+    wss.handleUpgrade(req, socket, head, function done(socket_) {
+      wss.emit('connection', socket_, req)
     })
   })
 
-  wss.on('connection', (socket) => {
+  wss.on('connection', (socket, req) => {
+    debugLog('WS client connected!')
+    const path = req.url
+
     socket.on('error', (err: string) => {
-      debugLog('Websocket error', err.toString())
+      debugLog('WS error', err.toString())
     })
 
-    node.on('hopr:message', (msg: Uint8Array) => {
-      socket.emit(msg.toString())
-    })
+    if (path === WS_PATHS.MESSAGES) {
+      node.on('hopr:message', (msg: Uint8Array) => {
+        socket.send(msg.toString())
+      })
+    } else {
+      // close connection on unsupported paths
+      socket.close(1000)
+    }
   })
 }
 

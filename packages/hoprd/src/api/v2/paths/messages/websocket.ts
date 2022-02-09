@@ -18,6 +18,9 @@ GET.apiDoc = {
     },
     '401': {
       description: 'Unauthorized'
+    },
+    '404': {
+      description: 'Not found'
     }
   }
 }

@@ -129,18 +129,13 @@ export class AdminServer {
       this.logs.logFullLine(`admin > ${message}`)
 
       if (this.cmds) {
-        // used by E2E tests to test security
-        if (message === '_test') {
-          this.logs.logFullLine('OK')
-        } else {
-          this.cmds.execute((resp: string) => {
-            if (resp) {
-              // Strings may have ansi stuff in it, get rid of it:
-              resp = stripAnsi(resp)
-              this.logs.logFullLine(resp)
-            }
-          }, message.toString())
-        }
+        this.cmds.execute((resp: string) => {
+          if (resp) {
+            // Strings may have ansi stuff in it, get rid of it:
+            resp = stripAnsi(resp)
+            this.logs.logFullLine(resp)
+          }
+        }, message.toString())
       }
     })
 
