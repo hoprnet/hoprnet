@@ -18,21 +18,19 @@ tasks:
 
   - name: Command window
     before: |
-      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && gp await-port 13305 && sleep 15s
+      gp sync-await "local-cluster" && sleep 15s
     command: |
-      export VIRTUAL_ENV=""
-      source ./scripts/utils.sh
       export apiToken="^^LOCAL-testing-123^^"
-      export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
-      export HOPR_NODE_1_ADDR=$(get_hopr_address "$HOPR_NODE_1_HTTP_URL") 
+      export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501)
+      export HOPR_NODE_1_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_1_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_2_HTTP_URL=$(gp url 13302) HOPR_NODE_2_WS_URL=$(gp url 19502)
-      export HOPR_NODE_2_ADDR=$(get_hopr_address "$HOPR_NODE_2_HTTP_URL")
+      export HOPR_NODE_2_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_2_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_3_HTTP_URL=$(gp url 13303) HOPR_NODE_3_WS_URL=$(gp url 19503)
-      export HOPR_NODE_3_ADDR=$(get_hopr_address "$HOPR_NODE_3_HTTP_URL")
+      export HOPR_NODE_3_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_3_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_4_HTTP_URL=$(gp url 13304) HOPR_NODE_4_WS_URL=$(gp url 19504)
-      export HOPR_NODE_4_ADDR=$(get_hopr_address "$HOPR_NODE_4_HTTP_URL")
+      export HOPR_NODE_4_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_4_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_5_HTTP_URL=$(gp url 13305) HOPR_NODE_5_WS_URL=$(gp url 19505)
-      export HOPR_NODE_5_ADDR=$(get_hopr_address "$HOPR_NODE_5_HTTP_URL")
+      export HOPR_NODE_5_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_5_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       echo "💻 Node 1 address: $HOPR_NODE_1_ADDR"
       echo "💻 Node 2 address: $HOPR_NODE_2_ADDR"
       echo "💻 Node 3 address: $HOPR_NODE_3_ADDR"
@@ -43,21 +41,19 @@ tasks:
 
   - name: Node 1 WS
     before: |
-      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && gp await-port 13305 && sleep 15s
+      gp sync-await "local-cluster" && sleep 15s
     command: |
-      export VIRTUAL_ENV=""
-      source ./scripts/utils.sh
       export apiToken="^^LOCAL-testing-123^^"
-      export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
-      export HOPR_NODE_1_ADDR=$(get_hopr_address "$HOPR_NODE_1_HTTP_URL") 
+      export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501)
+      export HOPR_NODE_1_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_1_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_2_HTTP_URL=$(gp url 13302) HOPR_NODE_2_WS_URL=$(gp url 19502)
-      export HOPR_NODE_2_ADDR=$(get_hopr_address "$HOPR_NODE_2_HTTP_URL")
+      export HOPR_NODE_2_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_2_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_3_HTTP_URL=$(gp url 13303) HOPR_NODE_3_WS_URL=$(gp url 19503)
-      export HOPR_NODE_3_ADDR=$(get_hopr_address "$HOPR_NODE_3_HTTP_URL")
+      export HOPR_NODE_3_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_3_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_4_HTTP_URL=$(gp url 13304) HOPR_NODE_4_WS_URL=$(gp url 19504)
-      export HOPR_NODE_4_ADDR=$(get_hopr_address "$HOPR_NODE_4_HTTP_URL")
+      export HOPR_NODE_4_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_4_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_5_HTTP_URL=$(gp url 13305) HOPR_NODE_5_WS_URL=$(gp url 19505)
-      export HOPR_NODE_5_ADDR=$(get_hopr_address "$HOPR_NODE_5_HTTP_URL")
+      export HOPR_NODE_5_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_5_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       echo '📡 Node 1 WS Connection'
       echo -e "\n"
       sleep 5s
@@ -67,21 +63,19 @@ tasks:
 
   - name: Node 2 WS
     before: |
-      gp await-port 13301 && gp await-port 13302 && gp await-port 13303 && gp await-port 13304 && gp await-port 13305 && sleep 15s
+      gp sync-await "local-cluster" && sleep 15s
     command: |
-      export VIRTUAL_ENV=""
-      source ./scripts/utils.sh
       export apiToken="^^LOCAL-testing-123^^"
-      export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501) 
-      export HOPR_NODE_1_ADDR=$(get_hopr_address "$HOPR_NODE_1_HTTP_URL") 
+      export HOPR_NODE_1_HTTP_URL=$(gp url 13301) HOPR_NODE_1_WS_URL=$(gp url 19501)
+      export HOPR_NODE_1_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_1_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_2_HTTP_URL=$(gp url 13302) HOPR_NODE_2_WS_URL=$(gp url 19502)
-      export HOPR_NODE_2_ADDR=$(get_hopr_address "$HOPR_NODE_2_HTTP_URL")
+      export HOPR_NODE_2_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_2_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_3_HTTP_URL=$(gp url 13303) HOPR_NODE_3_WS_URL=$(gp url 19503)
-      export HOPR_NODE_3_ADDR=$(get_hopr_address "$HOPR_NODE_3_HTTP_URL")
+      export HOPR_NODE_3_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_3_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_4_HTTP_URL=$(gp url 13304) HOPR_NODE_4_WS_URL=$(gp url 19504)
-      export HOPR_NODE_4_ADDR=$(get_hopr_address "$HOPR_NODE_4_HTTP_URL")
+      export HOPR_NODE_4_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_4_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       export HOPR_NODE_5_HTTP_URL=$(gp url 13305) HOPR_NODE_5_WS_URL=$(gp url 19505)
-      export HOPR_NODE_5_ADDR=$(get_hopr_address "$HOPR_NODE_5_HTTP_URL")
+      export HOPR_NODE_5_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_5_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
       echo '📡 Node 2 WS Connection'
       echo -e "\n"
       sleep 5s
