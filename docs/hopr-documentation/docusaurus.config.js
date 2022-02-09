@@ -37,8 +37,8 @@ const redocusaurus = [
        * Options to pass to redoc
        * @see https://github.com/redocly/redoc#redoc-options-object
        */
-      redocOptions: {},
-    },
+      redocOptions: {}
+    }
   }
 ]
 
