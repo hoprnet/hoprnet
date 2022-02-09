@@ -123,7 +123,7 @@ class WebRTCConnection implements MultiaddrConnection<StreamType> {
             yield* getAbortableSource(toU8aStream(source), this.options?.signal)
             deferred.resolve()
           } catch (err: any) {
-            if (err.type === 'aborted') {
+            if (err.type === 'aborted' || err.code === 'ABORT_ERR') {
               deferred.resolve()
             } else {
               this.error(`sink error thrown`, err.message)

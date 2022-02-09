@@ -126,4 +126,45 @@ describe('test TCP connection', function () {
       }
     )
   })
+
+  it.only('use abortController to abort streams', async function () {
+    const msgReceived = defer<void>()
+
+    const testMessage = new TextEncoder().encode('test')
+    const testMessageReply = new TextEncoder().encode('reply')
+
+    const peerId = createPeerId()
+
+    const server = createServer((socket: Socket) => {
+      socket.on('data', (data: Uint8Array) => {
+        assert(u8aEquals(data, testMessage))
+        socket.write(testMessageReply)
+
+        msgReceived.resolve()
+      })
+    })
+
+    await waitUntilListening<undefined | number>(server, undefined)
+
+    const abort = new AbortController()
+
+    const conn = await TCPConnection.create(
+      new Multiaddr(`/ip4/127.0.0.1/tcp/${(server.address() as AddressInfo).port}`),
+      peerId,
+      {
+        signal: abort.signal
+      }
+    )
+
+    await conn.sink(
+      (async function* () {
+        abort.abort()
+        yield testMessage
+      })()
+    )
+
+    // Produces an error if not abort error is not caught
+
+    await stopNode(server)
+  })
 })
