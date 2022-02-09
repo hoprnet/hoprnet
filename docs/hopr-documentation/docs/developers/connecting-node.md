@@ -193,7 +193,7 @@ our `HOPR_NODE_1_WS_URL` (likely `127.0.0.1:3000` or `127.0.0.1:19501`) instead 
 If worked correctly, you should see a dump of messages, the last one being:
 
 ```json
-{"type":"log","msg":"ws client connected [ authentication ENABLED ]","ts":"2022-02-01T19:42:34.152Z"}
+{ "type": "log", "msg": "ws client connected [ authentication ENABLED ]", "ts": "2022-02-01T19:42:34.152Z" }
 ```
 
 Now that you are connected, try typing `balance` in the same terminal, which should output as follows:
