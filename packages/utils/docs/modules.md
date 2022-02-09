@@ -40,6 +40,7 @@
 
 ### Interfaces
 
+- [FIFO](interfaces/FIFO.md)
 - [Intermediate](interfaces/Intermediate.md)
 - [NetOptions](interfaces/NetOptions.md)
 
@@ -159,6 +160,7 @@
 - [multiaddressCompareByClassFunction](modules.md#multiaddresscomparebyclassfunction)
 - [nAtATime](modules.md#natatime)
 - [oneAtATime](modules.md#oneatatime)
+- [ordered](modules.md#ordered)
 - [parseHosts](modules.md#parsehosts)
 - [parseJSON](modules.md#parsejson)
 - [pendingAcknowledgement](modules.md#pendingacknowledgement)
@@ -906,7 +908,7 @@ ___
 
 ### FIFO
 
-▸ **FIFO**<`T`\>(): `Object`
+▸ **FIFO**<`T`\>(): [`FIFO`](modules.md#fifo)<`T`\>
 
 #### Type parameters
 
@@ -916,17 +918,11 @@ ___
 
 #### Returns
 
-`Object`
-
-| Name | Type |
-| :------ | :------ |
-| `push` | (`data`: `T`) => `number` |
-| `shift` | () => `T` \| `undefined` |
-| `size` | () => `number` |
+[`FIFO`](modules.md#fifo)<`T`\>
 
 #### Defined in
 
-[collection/fifo.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L10)
+[collection/fifo.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L19)
 
 ___
 
@@ -2299,6 +2295,60 @@ a limiter that takes additional functions
 #### Defined in
 
 [async/concurrency.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/concurrency.ts#L14)
+
+___
+
+### ordered
+
+▸ **ordered**<`T`\>(): `Object`
+
+Creates a queue that consumes items asynchronously and potentially
+unorders but outputs them ordered using an asynchronous iterator.
+Each element consists of a value and an index upon which
+elements are ordered.
+
+**`example`**
+import { ordered, wait } from '@hoprnet/hopr-utils'
+
+const order = ordered<number>()
+
+(async function () {
+  order.push({ index: 0, value: 'first' })
+  wait(50)
+  order.push({ index: 2, value: 'second' })
+  wait(50)
+  order.push({ index: 1, value: 'third' })
+  wait(50)
+  order.end()
+})()
+
+const result: string[] = []
+for await (const item of order.iterator()) {
+  result.push(item.value)
+}
+// result == ['first', 'third', 'second']
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Returns
+
+`Object`
+
+an ordered stream
+
+| Name | Type |
+| :------ | :------ |
+| `end` | () => `void` |
+| `iterator` | () => `AsyncGenerator`<`Item`<`T`\>, `void`, `unknown`\> |
+| `push` | (`newItem`: `Item`<`T`\>) => `void` |
+
+#### Defined in
+
+[async/ordering.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/ordering.ts#L35)
 
 ___
 

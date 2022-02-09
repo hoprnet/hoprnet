@@ -28,6 +28,7 @@
 
 - [closureTimePassed](ChannelEntry.md#closuretimepassed)
 - [getId](ChannelEntry.md#getid)
+- [getRemainingClosureTime](ChannelEntry.md#getremainingclosuretime)
 - [serialize](ChannelEntry.md#serialize)
 - [toString](ChannelEntry.md#tostring)
 - [createMock](ChannelEntry.md#createmock)
@@ -56,7 +57,7 @@
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:20
+packages/utils/lib/types/channelEntry.d.ts:21
 
 ## Properties
 
@@ -66,7 +67,7 @@ packages/utils/lib/types/channelEntry.d.ts:20
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:13
+packages/utils/lib/types/channelEntry.d.ts:14
 
 ___
 
@@ -76,7 +77,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:18
+packages/utils/lib/types/channelEntry.d.ts:19
 
 ___
 
@@ -86,7 +87,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:19
+packages/utils/lib/types/channelEntry.d.ts:20
 
 ___
 
@@ -96,7 +97,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:14
+packages/utils/lib/types/channelEntry.d.ts:15
 
 ___
 
@@ -106,7 +107,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:12
+packages/utils/lib/types/channelEntry.d.ts:13
 
 ___
 
@@ -116,7 +117,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:11
+packages/utils/lib/types/channelEntry.d.ts:12
 
 ___
 
@@ -126,7 +127,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:17
+packages/utils/lib/types/channelEntry.d.ts:18
 
 ___
 
@@ -136,7 +137,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:15
+packages/utils/lib/types/channelEntry.d.ts:16
 
 ___
 
@@ -146,7 +147,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:16
+packages/utils/lib/types/channelEntry.d.ts:17
 
 ## Accessors
 
@@ -160,7 +161,7 @@ packages/utils/lib/types/channelEntry.d.ts:16
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:21
+packages/utils/lib/types/channelEntry.d.ts:22
 
 ## Methods
 
@@ -174,7 +175,7 @@ packages/utils/lib/types/channelEntry.d.ts:21
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:27
+packages/utils/lib/types/channelEntry.d.ts:28
 
 ___
 
@@ -188,7 +189,27 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:26
+packages/utils/lib/types/channelEntry.d.ts:27
+
+___
+
+### getRemainingClosureTime
+
+▸ **getRemainingClosureTime**(): `BN`
+
+Computes the remaining time in seconds until the channel can be closed.
+Outputs `0` if there is no waiting time, and `-1` if the
+closure time of this channel is unknown.
+
+**`dev`** used to create more comprehensive debug logs
+
+#### Returns
+
+`BN`
+
+#### Defined in
+
+packages/utils/lib/types/channelEntry.d.ts:35
 
 ___
 
@@ -202,7 +223,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:24
+packages/utils/lib/types/channelEntry.d.ts:25
 
 ___
 
@@ -216,7 +237,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:25
+packages/utils/lib/types/channelEntry.d.ts:26
 
 ___
 
@@ -230,7 +251,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:28
+packages/utils/lib/types/channelEntry.d.ts:36
 
 ___
 
@@ -250,7 +271,7 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:22
+packages/utils/lib/types/channelEntry.d.ts:23
 
 ___
 
@@ -271,4 +292,4 @@ ___
 
 #### Defined in
 
-packages/utils/lib/types/channelEntry.d.ts:23
+packages/utils/lib/types/channelEntry.d.ts:24

@@ -489,6 +489,7 @@ export async function createChainWrapper(
       token.removeAllListeners()
     },
     getChannels: () => channels,
+    getToken: () => token,
     getPrivateKey: () => utils.arrayify(wallet.privateKey),
     getPublicKey: () => PublicKey.fromString(utils.computePublicKey(wallet.publicKey, true)),
     getInfo: () => ({

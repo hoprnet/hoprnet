@@ -401,6 +401,7 @@ close_channel 1 5 "${api1}" "${addr5}" &
 log "Waiting for nodes to finish handling close channels calls"
 wait
 
+# Also add confirmation time
 log "Waiting 70 seconds for cool-off period"
 sleep 70
 

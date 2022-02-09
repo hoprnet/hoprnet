@@ -942,7 +942,13 @@ class Hopr extends EventEmitter {
           log('finalizing closure of channel', channel.getId())
           txHash = await this.connector.finalizeClosure(counterpartyPubKey)
         } else {
-          log('ignoring finalizing closure because closure window is still active', channel.getId())
+          log(
+            `ignoring finalizing closure of channel ${channel
+              .getId()
+              .toHex()} because closure window is still active. Need to wait ${channel
+              .getRemainingClosureTime()
+              .toString(10)} seconds.`
+          )
         }
       }
     } catch (err) {
