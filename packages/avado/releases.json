@@ -1795,5 +1795,19 @@
     "uploadedTo": {
       "http://80.208.229.228:5001": "Tue, 08 Feb 2022 14:37:06 GMT"
     }
+  },
+  "1.86.24": {
+    "hash": "/ipfs/QmckQQK6h2gE9TnWdCBpEeaMyMgmvdXsXicGYeR5SD66Yy",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 08 Feb 2022 16:15:33 GMT"
+    }
+  },
+  "1.86.25": {
+    "hash": "/ipfs/QmY7JaihsD5TCVKDC8MjDB7MeH4G4XCpNUptxeftyD4ggy",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 08 Feb 2022 16:44:08 GMT"
+    }
   }
 }

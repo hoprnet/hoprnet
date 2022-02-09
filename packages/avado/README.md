@@ -1,44 +1,11 @@
-# AVADO-DNP-HOPR
+# AVADO
 
 ## Deploy
 
-The deploy should happen automatically through a github action.
+Avado images are based on the `hoprd` Docker images that can be found at [gcr.io/hoprassociation/hoprd](https://gcr.io/hoprassociation/hoprd).
 
----
+The creation of the Avado image happens automatically within the `deploy` [pipeline](../../.github/workflows/deploy.yaml) using the [build_avado.sh](../../scripts/build_avado.sh) script.
 
-## Old instructions
+## Releases
 
-### Prerequisites
-
-`sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0`
-
-### building the package
-
-First connect to the VPN or Wifi of your AVADO box, then do
-
-`dappnodesdk build`
-
-it will give you an IPFS hash as output
-
-Note: Usually you will develop locally using `docker-compose build --build-arg network="matic"` and `docker-compose up` untill your package works & use the building in the AVADO package format whenever you want to run the same on the AVADO box.
-
-### Installing the package
-
-Either install it through the DappStore (and paste in the IPFS hash there)
-
-Note: this only works when the version has been increased - otherwise the Dappstore will not recognize it as a new version.
-
-Or go to `http://go.ava.do/install/<IPFS hash>` to force the version on the machine - this works even if you have not updated the version number..
-
-### updating the version
-
-```
-dappnodesdk increase patch
-dappnodesdk build --provider http://23.254.227.151:5001
-git add dappnode_package.json docker-compose.yml releases.json
-git commit -m"new release"
-git push
-release-it
-```
-
-( the `23.254.227.151` server is an IPFS server we host to seed the data)
+Users can install Avado images using an IPFS hash such as `/ipfs/QmNwV6i2vrLKSfJocud9g8g9SgegdXbxHJYDua4t5iZ6NV`. The latest IPFS hash can be found in [releases.json](./releases.json).
