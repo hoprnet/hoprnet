@@ -24,7 +24,7 @@ const redocusaurus = [
     specs: [
       {
         id: 'rest-api',
-        specUrl: 'https://raw.githubusercontent.com/hoprnet/hoprnet/master/packages/hoprd/rest-api-v2-spec.yaml',
+        spec: 'rest-api-v2-full-spec.yaml',
         routePath: '/developers/rest-api/'
       }
     ]

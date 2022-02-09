@@ -1,5 +1,6 @@
 import process from 'process'
 import path from 'path'
+import fs from 'fs'
 import express from 'express'
 import cors from 'cors'
 import swaggerUi from 'swagger-ui-express'
@@ -45,15 +46,18 @@ export function setupRestApi(
   const cwd = process.cwd()
   const packagePath = path.dirname(require.resolve('@hoprnet/hoprd/package.json'))
   const relPath = path.relative(cwd, packagePath)
+  const apiBaseSpecPath = path.join(relPath, 'rest-api-v2-spec.yaml')
+  const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.yaml')
+  const apiPathsPath = path.join(relPath, 'lib/api/v2/paths')
 
   // useful documentation for the configuration of express-openapi can be found at:
   // https://github.com/kogosoftwarellc/open-api/tree/master/packages/express-openapi
   const apiInstance = initialize({
     app: service,
     // the spec resides in the package top-level folder
-    apiDoc: path.join(relPath, 'rest-api-v2-spec.yaml'),
+    apiDoc: apiBaseSpecPath,
     // path to generated HTTP operations
-    paths: path.join(relPath, 'lib/api/v2/paths'),
+    paths: apiPathsPath,
     // since we pass the spec directly we don't need to expose it via HTTP
     exposeApiDocs: false,
     // we use custom formats for particular internal data types
@@ -114,6 +118,23 @@ export function setupRestApi(
   // also see https://github.com/scottie1984/swagger-ui-express
   service.use(urlPath + '/_swagger', swaggerUi.serve)
   service.get(urlPath + '/_swagger', swaggerUi.setup(apiInstance.apiDoc, {}))
+
+  // Write the api spec to disk for use outside of the server.
+  // We only do this if CI or DEBUG are set to prevent this happening in
+  // production environments.
+  if (process.env.DEBUG || process.env.CI) {
+    try {
+      fs.writeFile(apiFullSpecPath, JSON.stringify(apiInstance.apiDoc), (err) => {
+        if (err) {
+          logs.error(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
+          return
+        }
+        logs.log(`Written full Rest API v2 spec file to ${apiFullSpecPath}`)
+      })
+    } catch (err) {
+      logs.error(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
+    }
+  }
 
   service.use(urlPath, ((err, _req, res, _next) => {
     res.status(err.status).json(err)
