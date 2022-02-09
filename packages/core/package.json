@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.86.29",
+  "version": "1.86.30",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
