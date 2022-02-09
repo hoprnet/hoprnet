@@ -119,13 +119,13 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
     try {
       fs.writeFile(apiFullSpecPath, JSON.stringify(apiInstance.apiDoc), (err) => {
         if (err) {
-          logs.log(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
+          debugLog(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
           return
         }
-        logs.log(`Written full Rest API v2 spec file to ${apiFullSpecPath}`)
+        debugLog(`Written full Rest API v2 spec file to ${apiFullSpecPath}`)
       })
     } catch (err) {
-      logs.log(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
+      debugLog(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
     }
   }
 
