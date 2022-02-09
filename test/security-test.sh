@@ -213,8 +213,18 @@ fi
 # continue failing on pipe errors
 set -Eeo pipefail
 
-log "websocket v2 should accept connection with correct token"
+log "websocket v2 should accept connection with correct token (cookie)"
 ws_response=$(echo "alice" | websocat ws://${host}:${api_port}/ -0 --header "Cookie:X-Auth-Token=${api_token}")
+if [[ "${ws_response}" != "" ]]; then
+  log "⛔️ Didn't succeed ws authentication"
+  log "Expected response should be empty"
+  log "Actual response:"
+  log "${ws_response}"
+  exit 1
+fi
+
+log "websocket v2 should accept connection with correct token (query param)"
+ws_response=$(echo "alice" | websocat ws://${host}:${api_port}/\?apiToken=${api_token})
 if [[ "${ws_response}" != "" ]]; then
   log "⛔️ Didn't succeed ws authentication"
   log "Expected response should be empty"

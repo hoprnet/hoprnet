@@ -114,7 +114,7 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
 }
 
 const WS_PATHS = {
-  NONE: '/', // used for testing
+  NONE: '', // used for testing
   MESSAGES: '/api/v2/messages/websocket'
 }
 
