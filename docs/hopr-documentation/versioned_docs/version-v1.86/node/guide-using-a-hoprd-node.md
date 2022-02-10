@@ -25,6 +25,10 @@ Access to the admin UI: [http://localhost:3000](http://localhost:3000)
 
 (**2**) Fund your node (fund the address you see on admin UI, which starts with **0x...**) with **xDai** tokens (details [here](https://www.xdaichain.com/for-users/get-xdai-tokens)) and **wxHOPR tokens** (details [here](/staking/how-to-get-hopr)).
 
+We recommend you to fund your node with **0.01 xDai & 1 wxHOPR**.
+
+**Note:** After funding your node, please wait until your node will start and you will see this message: **Node has started!**
+
 :::info Tip
 Please be aware that we have two types of tokens, both live in the **xDAI/Gnosis Chain network**:
 
