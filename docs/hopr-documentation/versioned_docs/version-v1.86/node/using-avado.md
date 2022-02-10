@@ -16,8 +16,10 @@ While connected to your AVADO network or via a VPN, go to the following [link](h
 If you are unable to use the link above, search for this hash in the AVADO DappStore:
 
 ```
-/ipfs/QmQsXNc5NauDwMCN3rVQuoMStp24FPttXwwAQysDy58VkC
+/ipfs/QmeudtnKae9MSDRQ4PhLhrWuc7Sf8i444Gi7Euu9McVtUH
 ```
+
+Alternatively, you can click the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmeudtnKae9MSDRQ4PhLhrWuc7Sf8i444Gi7Euu9McVtUH).
 
 ![DappStore](/img/node/avado-1.png)
 
