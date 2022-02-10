@@ -3,7 +3,7 @@ id: guide-using-a-hoprd-node
 title: Guide using a hoprd node
 ---
 
-We will provide you an example, how simply you can use hoprd. Provided example is just a one scenario which you can follow. There are no strict rules how to use `hoprd`.
+We will provide you an example on how to use `hoprd`. Provided example is just a one scenario which you can follow. There are no strict rules how to use `hoprd`.
 
 :::caution Warning
 
@@ -11,7 +11,11 @@ The HOPR client software (hoprd) is still under heavy development. Please do not
 
 :::
 
-This is a hoprd admin user interface, which is browser based. To get the access to it you have to setup and run a hoprd node, details [here](start-here).
+This is a hoprd admin user interface, which is browser based. To get the access to it you have to setup and run a `hoprd` node, details [here](start-here).
+
+:::info Tip
+Please be aware that it can take up to `10` minutes for your `hoprd` node instance to boot up.
+:::
 
 Access to the admin UI: [http://localhost:3000](http://localhost:3000)
 
