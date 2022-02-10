@@ -96,7 +96,9 @@ export async function createLibp2pInstance(
     },
     dialer: {
       addressSorter,
-      maxDialsPerPeer: 100
+      maxDialsPerPeer: 100,
+      // default timeout of 30s appears to be too long
+      dialTimeout: 10e3
     }
   })
 

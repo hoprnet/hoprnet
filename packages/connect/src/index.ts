@@ -184,7 +184,14 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @returns A TCP listener
    */
   createListener(_options: HoprConnectListeningOptions, _handler?: ConnectionHandler): Listener {
-    return new Listener(this._dialDirectly, this._upgradeInbound, this._peerId, this.options, this.testingOptions)
+    return new Listener(
+      this._dialDirectly,
+      this._upgradeInbound,
+      this._peerId,
+      this.options,
+      this.testingOptions,
+      this._addressFilter
+    )
   }
 
   /**
@@ -196,12 +203,6 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
    * @returns applicable Multiaddrs
    */
   public filter(multiaddrs: Multiaddr[]): Multiaddr[] {
-    if (this._libp2p.isStarted() && !this._addressFilter.addrsSet) {
-      this._addressFilter.setAddrs(
-        this._libp2p.transportManager.getAddrs(),
-        this._libp2p.addressManager.getListenAddrs()
-      )
-    }
     return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
       this._addressFilter.filter.bind(this._addressFilter)
     )

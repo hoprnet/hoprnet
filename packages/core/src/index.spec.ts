@@ -1,33 +1,23 @@
 import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
-import { dbMock, debug } from '@hoprnet/hopr-utils'
-import chai, { expect } from 'chai'
-import chaiAsPromised from 'chai-as-promised'
-import PeerId from 'peer-id'
-import sinon from 'sinon'
-import Hopr, { sampleOptions } from '.'
+import { dbMock, debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
+import Hopr, { type HoprOptions, sampleOptions } from '.'
+import assert from 'assert'
 
-chai.use(chaiAsPromised)
 const log = debug('hopr-core:test:index')
 
+const peerId = privKeyToPeerId('0x1c28c7f301658b4807a136e9fcf5798bc37e24b70f257fd3e6ee5adcf83a8c1f')
+
 describe('hopr core (instance)', async function () {
-  let peerId: PeerId
-  beforeEach(async function () {
-    peerId = await PeerId.create({ keyType: 'secp256k1', bits: 256 })
-  })
-
-  afterEach(function () {
-    sinon.restore()
-  })
-
   it('should be able to start a hopr node instance without crashing', async function () {
     this.timeout(5000)
     log('Creating hopr node...')
     const connectorMock = createConnectorMock(peerId)
-    const node = new Hopr(peerId, dbMock, connectorMock, sampleOptions)
+    const node = new Hopr(peerId, dbMock, connectorMock, sampleOptions as HoprOptions)
     log('Node created with Id', node.getId().toB58String())
-    expect(node instanceof Hopr)
+    assert(node instanceof Hopr)
     log('Starting node')
     await node.start()
-    return expect(node.stop()).to.not.eventually.rejected
+
+    await assert.doesNotReject(async () => await node.stop())
   })
 })

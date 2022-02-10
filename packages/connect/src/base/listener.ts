@@ -26,6 +26,7 @@ import { EntryNodes, RELAY_CHANGED_EVENT } from './entry'
 import { bindToPort, attemptClose, nodeToMultiaddr } from '../utils'
 import type HoprConnect from '..'
 import { UpnpManager } from './upnp'
+import type { Filter } from '../filter'
 
 const log = Debug('hopr-connect:listener')
 const error = Debug('hopr-connect:listener:error')
@@ -76,7 +77,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     private upgradeInbound: Upgrader['upgradeInbound'],
     private peerId: PeerId,
     private options: HoprConnectOptions,
-    private testingOptions: HoprConnectTestingOptions
+    private testingOptions: HoprConnectTestingOptions,
+    private filter: Filter
   ) {
     super()
 
@@ -101,6 +103,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     this._emitListening = function (this: Listener) {
+      // TODO check IPv6
+      this.filter.setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.peerId.toB58String()}`)])
       this.emit('listening')
     }.bind(this)
 
