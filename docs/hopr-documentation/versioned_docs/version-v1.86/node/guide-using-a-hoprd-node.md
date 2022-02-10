@@ -3,7 +3,7 @@ id: guide-using-a-hoprd-node
 title: Guide using a hoprd node
 ---
 
-We will provide you an example, how simply you can use hoprd. Provided example is just a one scenario which you can follow. There are no strict rules how to use hoprd.
+We will provide you an example, how simply you can use hoprd. Provided example is just a one scenario which you can follow. There are no strict rules how to use `hoprd`.
 
 :::caution Warning
 
@@ -19,7 +19,16 @@ Access to the admin UI: [http://localhost:3000](http://localhost:3000)
 
 (**1**) Enter the password you specified in the command.
 
-(**2**) Fund your node (fund the address you see on admin UI, which starts with **0x...**) with xDai tokens, you will find details [here](https://www.xdaichain.com/for-users/get-xdai-tokens) and wxHOPR tokens, you will find details [here](/staking/how-to-get-hopr).
+(**2**) Fund your node (fund the address you see on admin UI, which starts with **0x...**) with **xDai** tokens (details [here](https://www.xdaichain.com/for-users/get-xdai-tokens)) and **wxHOPR tokens** (details [here](/staking/how-to-get-hopr)).
+
+:::info Tip
+Please be aware that we have two types of tokens, both live in the **xDAI/Gnosis Chain network**: 
+
+- `wxHOPR`, the ERC-777 token needed to run your `hoprd` instance and,
+- `xHOPR`, the ERC-677 token, the xDAI/Ethereum bridged `HOPR` instance 
+
+You can always use our [token wrapper](https://wrapper.hoprnet.org/) to see your balances and swap tokens between each other.
+:::
 
 Brief look at the admin UI:
 
