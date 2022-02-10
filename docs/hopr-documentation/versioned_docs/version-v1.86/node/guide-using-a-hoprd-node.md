@@ -96,7 +96,7 @@ balance
 The output will look similar to this:
 
 ```
-HOPR Balance:  0.12 txHOPR
+HOPR Balance:  0.12 wxHOPR
 ETH Balance:   0.9915287 xDAI
 ```
 
@@ -199,7 +199,7 @@ fetching channels...
 Outgoing Channel:       0xb0e3f7d81f0bd6d1783f3d44cf11653128e4f9ee95b98d49a07e4a8323cceb01
 To:                     jTzjV
 Status:                 Open
-Balance:                0.03 txHOPR
+Balance:                0.03 wxHOPR
 
 No open channels to node.
 ```
@@ -250,14 +250,14 @@ finding information about tickets...
 Tickets:
 - Pending:          0
 - Unredeemed:       1
-- Unredeemed Value: 0.01 txHOPR
+- Unredeemed Value: 0.01 wxHOPR
 - Redeemed:         0
-- Redeemed Value:   0.00 txHOPR
+- Redeemed Value:   0.00 wxHOPR
 - Losing Tickets:   0
 - Win Proportion:   0%
 - Neglected:        0
 - Rejected:         0
-- Rejected Value:   0 txHOPR
+- Rejected Value:   0 wxHOPR
 ```
 
 This will show Tickets statistics on a Bob's node. On the previous step we sent a message through a Bob's node, this means we used his node to relay data packets. For this Bob got 1 ticket reward for relaying data. It will be automatically auto redeemed and Bob will receive 0.01 HOPR token.
@@ -301,7 +301,7 @@ Output will look similar to this:
 Outgoing Channel:       0xdc657b66661f2fafdafb6c81da80e928af149ac80a12291564c9195d4d7f52d9
 To:                     FskLs
 Status:                 Open
-Balance:                2 txHOPR
+Balance:                2 wxHOPR
 ```
 
 Now let's fund payment channel with Alice, this time we will fund Alice side.
@@ -333,12 +333,12 @@ Output will look similar to this:
 Outgoing Channel:       0xdc657b66661f2fafdafb6c81da80e928af149ac80a12291564c9195d4d7f52d9
 To:                     FskLs
 Status:                 Open
-Balance:                2 txHOPR
+Balance:                2 wxHOPR
 
 Incoming Channel:       0x80181642b23f69f94298f4240e2cbff85fd0410c2d80262417c728a84c87c0d2
 From:                   FskLs
 Status:                 Open
-Balance:                3 txHOPR
+Balance:                3 wxHOPR
 ```
 
 From the output above you can see that we have now incoming and outgoing payment channel with Alice. This means we can use Alice node as a HOP node and Alice can use our node as a HOP node.

@@ -71,12 +71,6 @@ const config = {
           routeBasePath: '/',
           editUrl: 'https://github.com/hoprnet/hoprnet/edit/master/docs/hopr-documentation',
           lastVersion: 'current',
-          versions: {
-            current: {
-              label: 'Current',
-              path: 'v1.86'
-            }
-          }
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css')
