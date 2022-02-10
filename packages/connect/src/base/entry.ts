@@ -139,7 +139,11 @@ export class EntryNodes extends EventEmitter {
     const tuples = ma.tuples()
 
     // Check if it's IPv4 or IPv6 address via TCP or UDP and we're not already connected to it
-    if (tuples[0].length >= 2 && [CODE_IP4, CODE_IP6].includes(tuples[0][0]) && [CODE_UDP, CODE_TCP].includes(tuples[1][0]))
+    if (
+      tuples[0].length >= 2 &&
+      [CODE_IP4, CODE_IP6].includes(tuples[0][0]) &&
+      [CODE_UDP, CODE_TCP].includes(tuples[1][0])
+    )
       return !this.usedRelays.some((usedRelay) => compareDirectConnectionInfo(usedRelay, ma))
 
     return false

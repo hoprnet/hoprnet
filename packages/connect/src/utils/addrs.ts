@@ -180,25 +180,19 @@ export function parseAddress(ma: Multiaddr): ParseResult<ValidAddress> {
  * @param b Multiaddr 2
  */
 export function compareDirectConnectionInfo(a: Multiaddr, b: Multiaddr): boolean {
-
   const va1 = parseAddress(a)
   const va2 = parseAddress(b)
 
-  if (!va1.valid || !va2.valid)
-    return false
+  if (!va1.valid || !va2.valid) return false
 
-  if (va1.address.type != va2.address.type)
-    return false
+  if (va1.address.type != va2.address.type) return false
 
-  if (va1.address.type == 'p2p')
-    return false
+  if (va1.address.type == 'p2p') return false
 
   if (va1.address.type == va2.address.type)
-    return Buffer.compare(va1.address.address, va2.address.address) == 0
-      && va1.address.port == va2.address.port
+    return Buffer.compare(va1.address.address, va2.address.address) == 0 && va1.address.port == va2.address.port
 
   // TODO: We should also compare protocol (TCP/UDP)
 
   return false
-
 }
