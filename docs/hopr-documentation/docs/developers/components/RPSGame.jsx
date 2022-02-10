@@ -81,7 +81,7 @@ export default function RPSGame() {
         }
       }
     }
-    gameLogic()
+    isReferee && gameLogic()
   }, [messages])
 
   return (
