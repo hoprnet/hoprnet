@@ -225,7 +225,7 @@ gcloud_create_or_update_instance_template() {
 
   if [ "${no_args}" = "true" ]; then
     eval gcloud compute instance-templates create-with-container "${name}" \
-      --machine-type=e2-medium \
+      --machine-type=c2-standard-4 \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
@@ -242,7 +242,7 @@ gcloud_create_or_update_instance_template() {
       ${extra_args}
   else
     eval gcloud compute instance-templates create-with-container "${name}" \
-      --machine-type=e2-medium \
+      --machine-type=c2-standard-4 \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
