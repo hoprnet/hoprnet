@@ -28,10 +28,9 @@ const INVALID_PORTS = [0]
 export class Filter {
   private announcedAddrs?: ValidAddress[]
   private listeningFamilies?: NetworkInterfaceInfo['family'][]
-  private myPublicKey: Uint8Array;
+  private myPublicKey: Uint8Array
 
   protected myPrivateNetworks: Network[]
-
 
   constructor(peerId: PeerId, private opts: HoprConnectOptions) {
     this.myPrivateNetworks = getPrivateAddresses()
