@@ -3,20 +3,18 @@ import type { TimeoutOpts } from './abortableTimeout'
 import assert from 'assert'
 import AbortController from 'abort-controller'
 import { abortableTimeout } from './abortableTimeout'
-import { defer } from '../async'
+
+enum Messages {
+  ABORT_MSG,
+  TIMEOUT_MSG,
+  RESULT_MSG
+}
 
 describe('abortable timeout', function () {
-  enum Messages {
-    ABORT_MSG,
-    TIMEOUT_MSG,
-    RESULT_MSG
-  }
-
   it('normal timeout behavior', async function () {
-    const resultPromise = defer<Messages.RESULT_MSG>()
-
     const result = abortableTimeout(
-      (_opts: TimeoutOpts) => resultPromise.promise,
+      // Promise that does not resolve
+      () => new Promise(() => {}) as any,
       Messages.ABORT_MSG,
       Messages.TIMEOUT_MSG,
       {
@@ -28,11 +26,11 @@ describe('abortable timeout', function () {
   })
 
   it('normal abort behavior', async function () {
-    const resultPromise = defer<Messages.RESULT_MSG>()
     const abort = new AbortController()
 
     const result = abortableTimeout(
-      (_opts: TimeoutOpts) => resultPromise.promise,
+      // Promise that does not resolve
+      () => new Promise(() => {}) as any,
       Messages.ABORT_MSG,
       Messages.TIMEOUT_MSG,
       {
@@ -46,22 +44,27 @@ describe('abortable timeout', function () {
   })
 
   it('normal result behavior', async function () {
-    const resultFunction = async (_opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
-      Promise.resolve(Messages.RESULT_MSG)
-
-    const result = abortableTimeout(resultFunction, Messages.ABORT_MSG, Messages.TIMEOUT_MSG, {
-      timeout: 100
-    })
+    const result = abortableTimeout(
+      // Promise that resolves with expected message
+      (_opts: TimeoutOpts): Promise<Messages.RESULT_MSG> => Promise.resolve(Messages.RESULT_MSG),
+      Messages.ABORT_MSG,
+      Messages.TIMEOUT_MSG,
+      {
+        timeout: 100
+      }
+    )
 
     assert((await result) === Messages.RESULT_MSG)
   })
 
   it('timeout result behavior', async function () {
-    const abortCalled = defer<void>()
+    let abortCalled = false
 
     const resultFunction = async (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> => {
       return new Promise<Messages.RESULT_MSG>((resolve) => {
-        opts.signal.addEventListener('abort', () => abortCalled.resolve())
+        opts.signal.addEventListener('abort', () => {
+          abortCalled = true
+        })
 
         setTimeout(() => {
           resolve(Messages.RESULT_MSG)
@@ -73,17 +76,20 @@ describe('abortable timeout', function () {
       timeout: 100
     })
 
-    await abortCalled.promise
     assert((await result) === Messages.TIMEOUT_MSG)
+
+    assert(abortCalled)
   })
 
-  it('aborted result behavior', async function () {
-    const abortCalled = defer<void>()
+  it('forward abort call', async function () {
+    let abortCalled = false
     const abort = new AbortController()
 
     const resultFunction = async (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
       new Promise<Messages.RESULT_MSG>((resolve) => {
-        opts.signal.addEventListener('abort', () => abortCalled.resolve())
+        opts.signal.addEventListener('abort', () => {
+          abortCalled = true
+        })
 
         setTimeout(() => {
           resolve(Messages.RESULT_MSG)
@@ -99,20 +105,20 @@ describe('abortable timeout', function () {
 
     setTimeout(() => abort.abort(), 50)
 
-    await abortCalled.promise
     assert((await result) === Messages.ABORT_MSG)
+
+    assert(abortCalled)
   })
 
   it('timeout after result', async function () {
     let abortCalled = false
     const abort = new AbortController()
 
-    abort.signal.addEventListener('abort', () => {
-      abortCalled = true
-    })
-
-    const resultFunction = async (_opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
+    const resultFunction = async (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
       new Promise<Messages.RESULT_MSG>((resolve) => {
+        opts.signal.addEventListener('abort', () => {
+          abortCalled = true
+        })
         setTimeout(() => {
           resolve(Messages.RESULT_MSG)
         }, 50)
@@ -130,46 +136,109 @@ describe('abortable timeout', function () {
     await new Promise<void>((resolve) => setTimeout(resolve, 150))
 
     assert(!abortCalled)
+
+    // Make sure that the outer abort is no longer forwarded
+    abort.abort()
+
+    assert(!abortCalled)
   })
 
-  it('abort after result', async function () {
+  it('abort after timeout', async function () {
+    let abortCalls = 0
     let abort = new AbortController()
 
-    const resultFunction = (_opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
-      new Promise<Messages.RESULT_MSG>((resolve) => {
-        setTimeout(() => {
-          resolve(Messages.RESULT_MSG)
-        }, 50)
-      })
-    {
-    }
+    const result = abortableTimeout(
+      // Promise that does not resolve
+      (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
+        new Promise<Messages.RESULT_MSG>(() => {
+          opts.signal.addEventListener('abort', () => {
+            abortCalls++
+          })
+        }),
+      Messages.ABORT_MSG,
+      Messages.TIMEOUT_MSG,
+      {
+        timeout: 50,
+        signal: abort.signal
+      }
+    )
 
-    const result = abortableTimeout(resultFunction, Messages.ABORT_MSG, Messages.TIMEOUT_MSG, {
-      timeout: 100,
-      signal: abort.signal
-    })
+    assert((await result) === Messages.TIMEOUT_MSG)
 
-    assert((await result) === Messages.RESULT_MSG)
+    abort.abort()
 
-    assert.doesNotThrow(() => abort.abort())
+    assert(abortCalls == 1)
+  })
+
+  it('timeout after abort', async function () {
+    let abortCalls = 0
+    let abort = new AbortController()
+
+    const result = abortableTimeout(
+      // Promise that does not resolve
+      (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
+        new Promise<Messages.RESULT_MSG>(() => {
+          opts.signal.addEventListener('abort', () => {
+            abortCalls++
+          })
+        }),
+      Messages.ABORT_MSG,
+      Messages.TIMEOUT_MSG,
+      {
+        timeout: 50,
+        signal: abort.signal
+      }
+    )
+
+    abort.abort()
+
+    assert((await result) === Messages.ABORT_MSG)
+
+    abort.abort()
+
+    assert(abortCalls == 1)
   })
 
   it('throw before timeout', async function () {
-    const resultFunction = async (_opts: TimeoutOpts): Promise<Messages.RESULT_MSG> => {
-      throw Error('boom')
-    }
+    let abortCalls = 0
+    let abort = new AbortController()
 
-    const result = abortableTimeout(resultFunction, Messages.ABORT_MSG, Messages.TIMEOUT_MSG, {
-      timeout: 50
-    })
+    const result = abortableTimeout(
+      // Produce immediately an error
+      (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> =>
+        new Promise<Messages.RESULT_MSG>((_, reject) => {
+          opts.signal.addEventListener('abort', () => {
+            abortCalls++
+          })
 
-    await assert.rejects(result, {
-      message: 'boom'
-    })
+          reject(Error(`boom`))
+        }),
+      Messages.ABORT_MSG,
+      Messages.TIMEOUT_MSG,
+      {
+        timeout: 50
+      }
+    )
+
+    await assert.rejects(result, Error('boom'))
+
+    abort.abort()
+
+    // Give abort time to happen
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    assert(abortCalls == 0)
   })
 
   it('throw after timeout', async function () {
-    const resultFunction = async (_opts: TimeoutOpts): Promise<Messages.RESULT_MSG> => {
+    let abortCalls = 0
+    let abort = new AbortController()
+
+    const resultFunction = async (opts: TimeoutOpts): Promise<Messages.RESULT_MSG> => {
+      opts.signal.addEventListener('abort', () => {
+        abortCalls++
+      })
+
       await new Promise((resolve) => setTimeout(resolve, 100))
 
       throw Error('boom')
@@ -183,5 +252,9 @@ describe('abortable timeout', function () {
 
     // Produces an uncaught promise rejection if errors are not handled properly
     await new Promise((resolve) => setTimeout(resolve, 150))
+
+    abort.abort()
+
+    assert(abortCalls == 1)
   })
 })

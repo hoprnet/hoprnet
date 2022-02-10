@@ -4,14 +4,13 @@
 import type PeerId from 'peer-id'
 import type LibP2P from 'libp2p'
 import type { Address } from 'libp2p/src/peer-store/address-book'
-import type { TimeoutOpts } from '../async'
 import { Multiaddr } from 'multiaddr'
 
-import { abortableTimeout } from '../async'
+import { abortableTimeout, type TimeoutOpts } from '../async/abortableTimeout'
 
 import { debug } from '../process'
 import { green } from 'chalk'
-import { createRelayerKey } from '.'
+import { createRelayerKey } from './relayCode'
 
 const DEBUG_PREFIX = `hopr-core:libp2p`
 
@@ -19,11 +18,6 @@ const log = debug(DEBUG_PREFIX)
 const logError = debug(DEBUG_PREFIX.concat(`:error`))
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 10000
-
-export type DialOpts = {
-  timeout?: number
-  signal?: AbortSignal
-}
 
 export enum DialStatus {
   SUCCESS = 'SUCCESS',
@@ -215,7 +209,7 @@ async function doDial(
     knownAddresses = libp2p.peerStore.get(destination)?.addresses ?? []
 
     printPeerStoreAddresses(
-      `Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`,
+      `Direct dial attempt to ${destination.toB58String()} failed and DHT query has not brought any new addresses. Giving up`,
       knownAddresses
     )
     return dhtResult
@@ -280,7 +274,7 @@ export async function dial(
   libp2p: ReducedLibp2p,
   destination: PeerId,
   protocol: string,
-  opts?: DialOpts
+  opts?: TimeoutOpts
 ): Promise<DialResponse> {
   return abortableTimeout(
     (timeoutOpts: Required<TimeoutOpts>) => doDial(libp2p, destination, protocol, timeoutOpts),
@@ -292,3 +286,5 @@ export async function dial(
     }
   )
 }
+
+export type { TimeoutOpts as DialOpts }

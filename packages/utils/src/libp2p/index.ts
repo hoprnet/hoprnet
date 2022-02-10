@@ -9,7 +9,7 @@ import type LibP2P from 'libp2p'
 
 import { debug } from '../process'
 import pipe from 'it-pipe'
-import { dial } from './dialHelper'
+import { dial, type DialOpts } from './dialHelper'
 
 export * from './addressSorters'
 export * from './dialHelper'
@@ -90,10 +90,6 @@ export function isSecp256k1PeerId(peer: PeerId): boolean {
 }
 
 const logError = debug(`hopr-core:libp2p:error`)
-
-export type DialOpts = {
-  timeout: number
-}
 
 /**
  * Asks libp2p to establish a connection to another node and

@@ -146,9 +146,9 @@ validate_node_balance_gt0() {
 
   balance="$(run_command ${1} "balance" "Balance" 600)"
   eth_balance="$(echo -e "$balance" | grep -c " xDAI" || true)"
-  hopr_balance="$(echo -e "$balance" | grep -c " txHOPR" || true)"
+  hopr_balance="$(echo -e "$balance" | grep -c " wxHOPR" || true)"
 
-  if [[ "$eth_balance" != "0" && "$hopr_balance" != "Hopr Balance: 0 txHOPR" ]]; then
+  if [[ "$eth_balance" != "0" && "$hopr_balance" != "Hopr Balance: 0 wxHOPR" ]]; then
     log "$1 is funded"
   else
     log "⛔️ $1 Node has an invalid balance: $eth_balance, $hopr_balance"
@@ -303,7 +303,7 @@ result=$(run_command ${api1} "ping ${addr7}" "Could not ping node. Timeout." 600
 log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"
-result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 txHOPR" 600)
+result=$(run_command ${api2} "tickets" "Unredeemed Value: 0 wxHOPR" 600)
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
@@ -401,6 +401,7 @@ close_channel 1 5 "${api1}" "${addr5}" &
 log "Waiting for nodes to finish handling close channels calls"
 wait
 
+# Also add confirmation time
 log "Waiting 70 seconds for cool-off period"
 sleep 70
 

@@ -36,6 +36,7 @@
 | :------ | :------ |
 | `abi` | `any` |
 | `address` | `string` |
+| `blockNumber` | `string` |
 | `transactionHash` | `string` |
 
 #### Defined in
@@ -117,4 +118,4 @@ ___
 
 #### Defined in
 
-[packages/ethereum/src/index.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L15)
+[packages/ethereum/src/index.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L16)

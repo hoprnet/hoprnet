@@ -296,10 +296,15 @@ class Hopr extends EventEmitter {
 
     this.connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
 
+    try {
+      await this.announce(this.options.announce)
+    } catch (err) {
+      console.error(`Could not announce self on-chain`)
+      console.error(`Observed error:`, err)
+      process.exit(1)
+    }
     // subscribe so we can process channel close events
     this.connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
-
-    await this.announce(this.options.announce)
 
     this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
 
@@ -678,9 +683,9 @@ class Hopr extends EventEmitter {
   public async ping(destination: PeerId): Promise<{ info?: string; latency: number }> {
     let start = Date.now()
     try {
-      const success = await this.heartbeat.pingNode(destination)
-      if (success) {
-        return { latency: Date.now() - start }
+      const pingResult = await this.heartbeat.pingNode(destination)
+      if (pingResult.lastSeen >= 0) {
+        return { latency: pingResult.lastSeen - start }
       } else {
         return { info: 'failure', latency: -1 }
       }
@@ -938,7 +943,13 @@ class Hopr extends EventEmitter {
           log('finalizing closure of channel', channel.getId())
           txHash = await this.connector.finalizeClosure(counterpartyPubKey)
         } else {
-          log('ignoring finalizing closure because closure window is still active', channel.getId())
+          log(
+            `ignoring finalizing closure of channel ${channel
+              .getId()
+              .toHex()} because closure window is still active. Need to wait ${channel
+              .getRemainingClosureTime()
+              .toString(10)} seconds.`
+          )
         }
       }
     } catch (err) {

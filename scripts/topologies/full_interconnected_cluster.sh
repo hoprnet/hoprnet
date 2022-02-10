@@ -87,9 +87,9 @@ validate_node_balance_gt0() {
 
   balance="$(run_command ${1} "balance")"
   native_balance="$(echo -e "$balance" | grep -c " xDAI" || true)"
-  hopr_balance="$(echo -e "$balance" | grep -c " txHOPR" || true)"
+  hopr_balance="$(echo -e "$balance" | grep -c " wxHOPR" || true)"
 
-  if [[ "$native_balance" = "0" || "$hopr_balance" = "Hopr Balance: 0 txHOPR" ]]; then
+  if [[ "$native_balance" = "0" || "$hopr_balance" = "Hopr Balance: 0 wxHOPR" ]]; then
     log "-- $1 Node has an invalid balance: $native_balance, $hopr_balance"
     log "-- $balance"
     exit 1

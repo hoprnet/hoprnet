@@ -30,6 +30,21 @@ function numberToChannelStatus(i: number): ChannelStatus {
   }
 }
 
+function channelStatusToString(status: ChannelStatus): string {
+  switch (status) {
+    case ChannelStatus.Closed:
+      return 'Closed'
+    case ChannelStatus.WaitingForCommitment:
+      return 'WaitingForCommitment'
+    case ChannelStatus.Open:
+      return 'Open'
+    case ChannelStatus.PendingToClose:
+      return 'PendingToClose'
+    default:
+      throw Error(`Status ${status} does not exist`)
+  }
+}
+
 function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
   return numberToChannelStatus(u8aToNumber(arr) as number)
 }
@@ -119,7 +134,7 @@ export class ChannelEntry {
       `  commitment:   ${this.commitment.toHex()}\n` +
       `  ticketEpoch:  ${this.ticketEpoch.toBN().toString(10)}\n` +
       `  ticketIndex:  ${this.ticketIndex.toBN().toString(10)}\n` +
-      `  status:       ${chalk.green(this.status)}\n` +
+      `  status:       ${chalk.green(channelStatusToString(this.status))}\n` +
       `  channelEpoch: ${this.channelEpoch.toBN().toString(10)}\n` +
       `  closureTime:  ${this.closureTime.toBN().toString(10)}\n`
     )
@@ -135,8 +150,26 @@ export class ChannelEntry {
    * @returns true if the time window passed, false if not
    */
   public closureTimePassed(): boolean {
-    const now = new BN(new Date().getTime())
+    const nowInSeconds = Math.round(new Date().getTime() / 1000)
+    const now = new BN(nowInSeconds)
     return !!this.closureTime && now.gt(this.closureTime.toBN())
+  }
+
+  /**
+   * Computes the remaining time in seconds until the channel can be closed.
+   * Outputs `0` if there is no waiting time, and `-1` if the
+   * closure time of this channel is unknown.
+   * @dev used to create more comprehensive debug logs
+   */
+  public getRemainingClosureTime(): BN {
+    const nowInSeconds = Math.round(new Date().getTime() / 1000)
+    const now = new BN(nowInSeconds)
+
+    if (this.closureTime == undefined) {
+      return new BN(-1)
+    }
+
+    return now.gt(this.closureTime.toBN()) ? new BN(0) : this.closureTime.toBN().sub(now)
   }
 
   public static createMock(): ChannelEntry {
