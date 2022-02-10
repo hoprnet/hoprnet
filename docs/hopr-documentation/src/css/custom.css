@@ -34,8 +34,9 @@ body {
 .footer {
   background: linear-gradient(#000050, #0000b4) !important;
 }
-.theme-doc-version-banner { /* Temp FIX to hide docs version notification */
-    display: none!important;
+.theme-doc-version-banner {
+  /* Temp FIX to hide docs version notification */
+  display: none !important;
 }
 a {
   color: #414141;
