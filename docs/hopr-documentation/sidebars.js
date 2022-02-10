@@ -71,7 +71,8 @@ const sidebars = {
         'developers/connecting-node',
         'developers/tutorial-hello-world',
         'developers/demo-boomerang-chat',
-        'developers/rest-api'
+        'developers/demo-rps-game',
+        'developers/rest-api',
       ]
     },
     /*{
