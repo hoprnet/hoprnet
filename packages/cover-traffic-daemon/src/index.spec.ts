@@ -1,5 +1,5 @@
 import LibP2P from 'libp2p'
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { type HoprOptions } from '@hoprnet/hopr-core'
 import { debug, PublicKey, wait, dbMock, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import sinon from 'sinon'
 import { PersistedState } from './state'
@@ -28,7 +28,7 @@ describe('cover-traffic daemon', async function () {
     stubLibp2p()
     const connectorMock = createConnectorMock(mockPeerId)
     log('Mocked chain', connectorMock)
-    node = new Hopr(mockPeerId, dbMock, connectorMock, sampleOptions)
+    node = new Hopr(mockPeerId, dbMock, connectorMock, sampleOptions as HoprOptions)
   })
 
   afterEach(function () {
