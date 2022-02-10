@@ -26,21 +26,28 @@ usage() {
 
 declare spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-full-spec.yaml"
 declare api_port=9876
+declare node_log_file="node.logs"
 
 log "Clean previously generated spec (if exists)"
 rm -f "${spec_file_path}"
 
 log "Start hoprd node"
 cd "${mydir}/.."
-CI="true" yarn run run:hoprd --environment=master-goerli --admin false --api true --apiPort ${api_port} &
+DEBUG="hopr*" CI="true" yarn run run:hoprd --environment=master-goerli --admin false --api true --apiPort ${api_port} > "${node_log_file}" 2>&1 &
 
 log "Wait 10 seconds for node startup to complete"
 sleep 10
 
 log "Verify spec has been generated at ${spec_file_path}"
-test -f "${spec_file_path}" || log "Spec file missing"
+test -f "${spec_file_path}" || {
+  log "Spec file missing, printing node logs"
+  cat "${node_log_file}"
+}
 
 log "Stop hoprd node"
 lsof -i ":${api_port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+
+log "Remove hoprd node logs"
+rm -f "${node_log_file}"
 
 wait
