@@ -176,17 +176,9 @@ More information about screen you can read [here](https://linuxize.com/post/how-
 
 We support multiple distribution mechanisms to install a `hoprd`:
 
-**[hopr-sh (recommended)](using-script)**
-
-An automated script able to install all the dependencies on your operating system alongside `hoprd`.
-
 **[Avado](using-avado)**
 
 An [AVADO](https://ava.do/) plug-n-play device able to install a HOPR node as a DappNode package from their store.
-
-**[NPM](using-npm)**
-
-The popular [Node Package Manager](https://www.npmjs.com/) (npm), which requires node.js.
 
 **[Docker](using-docker)**
 
