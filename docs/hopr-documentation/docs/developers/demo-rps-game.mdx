@@ -71,7 +71,14 @@ and `SECURITY_TOKEN` values, required to connect to our HOPR nodes.
 ```jsx title='Connector.jsx'
 import React from 'react'
 
-export default function Connector({ httpEndpoint, setHTTPEndpoint, securityToken, setSecurityToken, wsEndpoint, setWsEndpoint }) {
+export default function Connector({
+  httpEndpoint,
+  setHTTPEndpoint,
+  securityToken,
+  setSecurityToken,
+  wsEndpoint,
+  setWsEndpoint
+}) {
   return (
     <>
       <div>
@@ -103,7 +110,7 @@ export default function Connector({ httpEndpoint, setHTTPEndpoint, securityToken
       </div>
     </>
   )
-} 
+}
 ```
 
 ### WebSocketHandler
@@ -115,7 +122,13 @@ we also use a `useWebSocket` hook which does the actual binding against the sock
 import React, { useEffect, useState } from 'react'
 import useWebsocket from '../hooks/useWebSockets'
 
-export const WebSocketHandler = ({ wsEndpoint, securityToken, multipleMessages = false, messages = [], setMessages = () => { } }) => {
+export const WebSocketHandler = ({
+  wsEndpoint,
+  securityToken,
+  multipleMessages = false,
+  messages = [],
+  setMessages = () => {}
+}) => {
   const [message, setMessage] = useState('')
   const websocket = useWebsocket({ wsEndpoint, securityToken })
   const { socketRef } = websocket
@@ -126,7 +139,7 @@ export const WebSocketHandler = ({ wsEndpoint, securityToken, multipleMessages =
       console.log('WebSocket Data', data)
       if (data.type === 'message') {
         setMessage(data.msg)
-        setMessages((prevArray) => [...prevArray, data.msg]);
+        setMessages((prevArray) => [...prevArray, data.msg])
       }
     } catch (err) {
       console.error(err)
@@ -144,11 +157,15 @@ export const WebSocketHandler = ({ wsEndpoint, securityToken, multipleMessages =
 
   return (
     <>
-      {
-        multipleMessages ?
-          <div>{messages.map(message => <p>{message}</p>)}</div> :
-          <span>{message ? message : 'You have no messages.'}</span>
-      }
+      {multipleMessages ? (
+        <div>
+          {messages.map((message) => (
+            <p>{message}</p>
+          ))}
+        </div>
+      ) : (
+        <span>{message ? message : 'You have no messages.'}</span>
+      )}
     </>
   )
 }
@@ -165,35 +182,40 @@ button.
 ```jsx title='ClusterHelper'
 import React from 'react'
 
-export default function ClusterHelper({ setHTTPEndpoint, setWsEndpoint, setSecurityToken, selectedNode, setSelectedNode }) {
+export default function ClusterHelper({
+  setHTTPEndpoint,
+  setWsEndpoint,
+  setSecurityToken,
+  selectedNode,
+  setSelectedNode
+}) {
   const CLUSTER_NODES = 5
   const setEndpointsValueUsingIndex = (index) => {
     const BASE_HTTP = 'http://localhost:1330'
     const BASE_WS = 'ws://localhost:1950'
     const DEFAULT_SECURITY_TOKEN = '^^LOCAL-testing-123^^'
-    setHTTPEndpoint(BASE_HTTP + index);
-    setWsEndpoint(BASE_WS + index);
+    setHTTPEndpoint(BASE_HTTP + index)
+    setWsEndpoint(BASE_WS + index)
     setSecurityToken(DEFAULT_SECURITY_TOKEN)
   }
 
   return (
-    <div style={{ display: "inline-block " }}>
+    <div style={{ display: 'inline-block ' }}>
       Preload Cluster Node -
-      {
-        [...Array(CLUSTER_NODES)].map((_, index) => (
-          <button
-            style={{
-              background: (selectedNode == index + 1) && "blue",
-              color: (selectedNode == index + 1) && "white"
-            }}
-            onClick={() => {
-              setSelectedNode(index + 1);
-              setEndpointsValueUsingIndex(index + 1)
-            }}>
-            {index + 1}
-          </button>
-        ))
-      }
+      {[...Array(CLUSTER_NODES)].map((_, index) => (
+        <button
+          style={{
+            background: selectedNode == index + 1 && 'blue',
+            color: selectedNode == index + 1 && 'white'
+          }}
+          onClick={() => {
+            setSelectedNode(index + 1)
+            setEndpointsValueUsingIndex(index + 1)
+          }}
+        >
+          {index + 1}
+        </button>
+      ))}
     </div>
   )
 }
@@ -312,56 +334,61 @@ A `Referee` node that has received at least two messages, can execute the follow
 
 ```js {4-6,9-10,12,14-16,21-23,33} title='RockPaperScissorsGame.jsx'
 useEffect(() => {
-    // Game logic goes here, when messages are received.
-    const gameLogic = async () => {
-      const [player1, player2] = messages
-        .slice(messages.length - 2)
-        .map(move => ({ "address": move.split('-')[0], "move": move.split('-')[1] }))
+  // Game logic goes here, when messages are received.
+  const gameLogic = async () => {
+    const [player1, player2] = messages
+      .slice(messages.length - 2)
+      .map((move) => ({ address: move.split('-')[0], move: move.split('-')[1] }))
 
-      // We ignore all other messages.
-      if (!player1 || !player2) return;
-      if (!player1.move || !player2.move) return;
+    // We ignore all other messages.
+    if (!player1 || !player2) return
+    if (!player1.move || !player2.move) return
 
-      if (player1.address != player2.address) {
-        if (
-          (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE) ||
-          (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE) ||
-          (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE)
-        ) {
-          await sendMessage(player1.address, `You tied with ${player2.address}: [1] ${player1.move}, [2] ${player2.move}`)
-          await sendMessage(player2.address, `You tied with ${player1.address}: [1] ${player1.move}, [2] ${player2.move}`)
-        } else if (
-          (player1.move == ROCK_MOVE && player2.move == SCISSORS_MOVE) ||
-          (player1.move == SCISSORS_MOVE && player2.move == PAPER_MOVE) ||
-          (player1.move == PAPER_MOVE && player2.move == ROCK_MOVE)
-        ) {
-          await sendMessage(player1.address, `You won! ${player2.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
-          await sendMessage(player2.address, `You lost... ${player1.address} won: [1] ${player1.move}, [2] ${player2.move}`)
-        } else {
-          await sendMessage(player2.address, `You won! ${player1.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
-          await sendMessage(player1.address, `You lost... ${player2.address} won: [1] ${player1.move}, [2] ${player2.move}`)
-        }
+    if (player1.address != player2.address) {
+      if (
+        (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE) ||
+        (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE) ||
+        (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE)
+      ) {
+        await sendMessage(player1.address, `You tied with ${player2.address}: [1] ${player1.move}, [2] ${player2.move}`)
+        await sendMessage(player2.address, `You tied with ${player1.address}: [1] ${player1.move}, [2] ${player2.move}`)
+      } else if (
+        (player1.move == ROCK_MOVE && player2.move == SCISSORS_MOVE) ||
+        (player1.move == SCISSORS_MOVE && player2.move == PAPER_MOVE) ||
+        (player1.move == PAPER_MOVE && player2.move == ROCK_MOVE)
+      ) {
+        await sendMessage(player1.address, `You won! ${player2.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
+        await sendMessage(
+          player2.address,
+          `You lost... ${player1.address} won: [1] ${player1.move}, [2] ${player2.move}`
+        )
+      } else {
+        await sendMessage(player2.address, `You won! ${player1.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
+        await sendMessage(
+          player1.address,
+          `You lost... ${player2.address} won: [1] ${player1.move}, [2] ${player2.move}`
+        )
       }
     }
-    isReferee && gameLogic()
-  }, [messages])
+  }
+  isReferee && gameLogic()
+}, [messages])
 ```
 
 The logic can be described as follows.
 
 1. First, we make sure we parse only _moves_ and not any message sent to our nodes. In lines `4-6` we parse the messages
-given the expected format `address-move`. We need both values to know who’s playing and reply them back.
+   given the expected format `address-move`. We need both values to know who’s playing and reply them back.
 
 2. In lines `9-10` we make sure to ignore messages that do not follow the expected format.
 
 3. Line `12` makes sure the game can only be played by different users.
 
 4. Lines `14-16` and `21-23` are the ones actually comparing the moves, and send their respective lines after send the
-appropiate response to the players, concluding the game.
+   appropiate response to the players, concluding the game.
 
 5. Last but not least, line `33` ensures this logic is only called by `Referee` nodes, so even if `Player` nodes get
-messages, they do not act as a `Referee` and send messages back.
-
+   messages, they do not act as a `Referee` and send messages back.
 
 ## Demo - Rock, Paper, Scissors Game
 
@@ -371,8 +398,10 @@ messages, they do not act as a `Referee` and send messages back.
   url={'/developers/containers/connector'}
   loadingMessage="Loading Player 1..."
   callback={(iframe) => {
-    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map( nav => nav.style.display = 'none' )
-    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map( footer => footer.style.display = 'none' )
+    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map((nav) => (nav.style.display = 'none'))
+    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map(
+      (footer) => (footer.style.display = 'none')
+    )
   }}
   width="100%"
   height="300"
@@ -387,8 +416,10 @@ messages, they do not act as a `Referee` and send messages back.
   url={'/developers/containers/connector'}
   loadingMessage="Loading Referee..."
   callback={(iframe) => {
-    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map( nav => nav.style.display = 'none' )
-    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map( footer => footer.style.display = 'none' )
+    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map((nav) => (nav.style.display = 'none'))
+    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map(
+      (footer) => (footer.style.display = 'none')
+    )
   }}
   width="100%"
   height="300"
@@ -403,8 +434,10 @@ messages, they do not act as a `Referee` and send messages back.
   url={'/developers/containers/connector'}
   loadingMessage="Loading Player 2..."
   callback={(iframe) => {
-    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map( nav => nav.style.display = 'none' )
-    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map( footer => footer.style.display = 'none' )
+    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map((nav) => (nav.style.display = 'none'))
+    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map(
+      (footer) => (footer.style.display = 'none')
+    )
   }}
   width="100%"
   height="300"
@@ -423,12 +456,12 @@ With the RPS game, you can see already some of the benefits of the HOPR network 
 
 That being said, it should also be obvious there are shortcomings:
 
-- Since there are no sender-receiver linkage, anyone can pretend to send a message (this can be solved using the `/sign` API endpoint, 
-which ensures a message was sent by _your_ node and not _any_ node).
+- Since there are no sender-receiver linkage, anyone can pretend to send a message (this can be solved using the `/sign` API endpoint,
+  which ensures a message was sent by _your_ node and not _any_ node).
 - As of time of writing, the HOPR protocol does not have an acknowledge-like feature, so message senders will not have a way
-to know whether the messages arrive or not (this is currently handled on an application level, like the `Referee` sending a response back)
+  to know whether the messages arrive or not (this is currently handled on an application level, like the `Referee` sending a response back)
 - Messages can take any shape or form, so the encoding and decoding of the messages to information that’s relevant is currently handled
-on an application basis. In the future there will be a HOPR SDK which will help with some basic message parsing.
+  on an application basis. In the future there will be a HOPR SDK which will help with some basic message parsing.
 
 ### Annex: RockPaperScissorsGame.jsx
 
@@ -441,7 +474,7 @@ import { getHeaders } from './utils'
 
 export default function RPSGame() {
   const [securityToken, setSecurityToken] = useState('')
-  const [selectedNode, setSelectedNode] = useState();
+  const [selectedNode, setSelectedNode] = useState()
   const [wsEndpoint, setWsEndpoint] = useState('ws://localhost:3000')
   const [httpEndpoint, setHTTPEndpoint] = useState('http://localhost:3001')
   const [messages, setMessages] = useState([])
@@ -489,11 +522,11 @@ export default function RPSGame() {
     const gameLogic = async () => {
       const [player1, player2] = messages
         .slice(messages.length - 2)
-        .map(move => ({ "address": move.split('-')[0], "move": move.split('-')[1] }))
+        .map((move) => ({ address: move.split('-')[0], move: move.split('-')[1] }))
 
       // We ignore all other messages.
-      if (!player1 || !player2) return;
-      if (!player1.move || !player2.move) return;
+      if (!player1 || !player2) return
+      if (!player1.move || !player2.move) return
 
       if (player1.address != player2.address) {
         if (
@@ -501,18 +534,36 @@ export default function RPSGame() {
           (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE) ||
           (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE)
         ) {
-          await sendMessage(player1.address, `You tied with ${player2.address}: [1] ${player1.move}, [2] ${player2.move}`)
-          await sendMessage(player2.address, `You tied with ${player1.address}: [1] ${player1.move}, [2] ${player2.move}`)
+          await sendMessage(
+            player1.address,
+            `You tied with ${player2.address}: [1] ${player1.move}, [2] ${player2.move}`
+          )
+          await sendMessage(
+            player2.address,
+            `You tied with ${player1.address}: [1] ${player1.move}, [2] ${player2.move}`
+          )
         } else if (
           (player1.move == ROCK_MOVE && player2.move == SCISSORS_MOVE) ||
           (player1.move == SCISSORS_MOVE && player2.move == PAPER_MOVE) ||
           (player1.move == PAPER_MOVE && player2.move == ROCK_MOVE)
         ) {
-          await sendMessage(player1.address, `You won! ${player2.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
-          await sendMessage(player2.address, `You lost... ${player1.address} won: [1] ${player1.move}, [2] ${player2.move}`)
+          await sendMessage(
+            player1.address,
+            `You won! ${player2.address} lost: [1] ${player1.move}, [2] ${player2.move}`
+          )
+          await sendMessage(
+            player2.address,
+            `You lost... ${player1.address} won: [1] ${player1.move}, [2] ${player2.move}`
+          )
         } else {
-          await sendMessage(player2.address, `You won! ${player1.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
-          await sendMessage(player1.address, `You lost... ${player2.address} won: [1] ${player1.move}, [2] ${player2.move}`)
+          await sendMessage(
+            player2.address,
+            `You won! ${player1.address} lost: [1] ${player1.move}, [2] ${player2.move}`
+          )
+          await sendMessage(
+            player1.address,
+            `You lost... ${player2.address} won: [1] ${player1.move}, [2] ${player2.move}`
+          )
         }
       }
     }
@@ -541,12 +592,9 @@ export default function RPSGame() {
       <div>
         <div style={{ display: 'inline-block', marginRight: '10px' }}>
           <label htmlFor="isReferee">Is Referee</label>
-          <input
-            onChange={(e) => setIsReferee(e.target.checked)}
-            id="isReferee"
-            type="checkbox"
-          />
-        </div>{''}
+          <input onChange={(e) => setIsReferee(e.target.checked)} id="isReferee" type="checkbox" />
+        </div>
+        {''}
         <label>Referee</label>{' '}
         <input
           name="referee"
@@ -556,14 +604,25 @@ export default function RPSGame() {
           onChange={(e) => setReferee(e.target.value)}
         />
       </div>
-      {address && !isReferee &&
+      {address && !isReferee && (
         <>
-          <button disabled={!referee} onClick={() => sendMove(PAPER_MOVE)}>Send "paper" move</button>
-          <button disabled={!referee} onClick={() => sendMove(SCISSORS_MOVE)}>Send "scissors" move</button>
-          <button disabled={!referee} onClick={() => sendMove(ROCK_MOVE)}>Send "rock" move</button>
+          <button disabled={!referee} onClick={() => sendMove(PAPER_MOVE)}>
+            Send "paper" move
+          </button>
+          <button disabled={!referee} onClick={() => sendMove(SCISSORS_MOVE)}>
+            Send "scissors" move
+          </button>
+          <button disabled={!referee} onClick={() => sendMove(ROCK_MOVE)}>
+            Send "rock" move
+          </button>
         </>
-      }
-      {notification && <><br />{notification}</>}
+      )}
+      {notification && (
+        <>
+          <br />
+          {notification}
+        </>
+      )}
       <>
         <br />
         <WebSocketHandler
@@ -574,7 +633,7 @@ export default function RPSGame() {
           setMessages={setMessages}
         />
       </>
-    </div >
+    </div>
   )
 }
 ```

@@ -72,7 +72,7 @@ const sidebars = {
         'developers/tutorial-hello-world',
         'developers/demo-boomerang-chat',
         'developers/demo-rps-game',
-        'developers/rest-api',
+        'developers/rest-api'
       ]
     },
     /*{

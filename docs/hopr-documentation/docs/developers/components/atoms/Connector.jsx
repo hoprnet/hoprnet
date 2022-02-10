@@ -1,6 +1,13 @@
 import React from 'react'
 
-export default function Connector({ httpEndpoint, setHTTPEndpoint, securityToken, setSecurityToken, wsEndpoint, setWsEndpoint }) {
+export default function Connector({
+  httpEndpoint,
+  setHTTPEndpoint,
+  securityToken,
+  setSecurityToken,
+  wsEndpoint,
+  setWsEndpoint
+}) {
   return (
     <>
       <div>
@@ -32,4 +39,4 @@ export default function Connector({ httpEndpoint, setHTTPEndpoint, securityToken
       </div>
     </>
   )
-} 
+}

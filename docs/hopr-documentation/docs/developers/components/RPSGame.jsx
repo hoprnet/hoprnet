@@ -6,7 +6,7 @@ import { getHeaders } from './utils'
 
 export default function RPSGame() {
   const [securityToken, setSecurityToken] = useState('')
-  const [selectedNode, setSelectedNode] = useState();
+  const [selectedNode, setSelectedNode] = useState()
   const [wsEndpoint, setWsEndpoint] = useState('ws://localhost:3000')
   const [httpEndpoint, setHTTPEndpoint] = useState('http://localhost:3001')
   const [messages, setMessages] = useState([])
@@ -54,11 +54,11 @@ export default function RPSGame() {
     const gameLogic = async () => {
       const [player1, player2] = messages
         .slice(messages.length - 2)
-        .map(move => ({ "address": move.split('-')[0], "move": move.split('-')[1] }))
+        .map((move) => ({ address: move.split('-')[0], move: move.split('-')[1] }))
 
       // We ignore all other messages.
-      if (!player1 || !player2) return;
-      if (!player1.move || !player2.move) return;
+      if (!player1 || !player2) return
+      if (!player1.move || !player2.move) return
 
       if (player1.address != player2.address) {
         if (
@@ -66,18 +66,36 @@ export default function RPSGame() {
           (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE) ||
           (player1.move == ROCK_MOVE && player2.move == ROCK_MOVE)
         ) {
-          await sendMessage(player1.address, `You tied with ${player2.address}: [1] ${player1.move}, [2] ${player2.move}`)
-          await sendMessage(player2.address, `You tied with ${player1.address}: [1] ${player1.move}, [2] ${player2.move}`)
+          await sendMessage(
+            player1.address,
+            `You tied with ${player2.address}: [1] ${player1.move}, [2] ${player2.move}`
+          )
+          await sendMessage(
+            player2.address,
+            `You tied with ${player1.address}: [1] ${player1.move}, [2] ${player2.move}`
+          )
         } else if (
           (player1.move == ROCK_MOVE && player2.move == SCISSORS_MOVE) ||
           (player1.move == SCISSORS_MOVE && player2.move == PAPER_MOVE) ||
           (player1.move == PAPER_MOVE && player2.move == ROCK_MOVE)
         ) {
-          await sendMessage(player1.address, `You won! ${player2.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
-          await sendMessage(player2.address, `You lost... ${player1.address} won: [1] ${player1.move}, [2] ${player2.move}`)
+          await sendMessage(
+            player1.address,
+            `You won! ${player2.address} lost: [1] ${player1.move}, [2] ${player2.move}`
+          )
+          await sendMessage(
+            player2.address,
+            `You lost... ${player1.address} won: [1] ${player1.move}, [2] ${player2.move}`
+          )
         } else {
-          await sendMessage(player2.address, `You won! ${player1.address} lost: [1] ${player1.move}, [2] ${player2.move}`)
-          await sendMessage(player1.address, `You lost... ${player2.address} won: [1] ${player1.move}, [2] ${player2.move}`)
+          await sendMessage(
+            player2.address,
+            `You won! ${player1.address} lost: [1] ${player1.move}, [2] ${player2.move}`
+          )
+          await sendMessage(
+            player1.address,
+            `You lost... ${player2.address} won: [1] ${player1.move}, [2] ${player2.move}`
+          )
         }
       }
     }
@@ -106,12 +124,9 @@ export default function RPSGame() {
       <div>
         <div style={{ display: 'inline-block', marginRight: '10px' }}>
           <label htmlFor="isReferee">Is Referee</label>
-          <input
-            onChange={(e) => setIsReferee(e.target.checked)}
-            id="isReferee"
-            type="checkbox"
-          />
-        </div>{''}
+          <input onChange={(e) => setIsReferee(e.target.checked)} id="isReferee" type="checkbox" />
+        </div>
+        {''}
         <label>Referee</label>{' '}
         <input
           name="referee"
@@ -121,14 +136,25 @@ export default function RPSGame() {
           onChange={(e) => setReferee(e.target.value)}
         />
       </div>
-      {address && !isReferee &&
+      {address && !isReferee && (
         <>
-          <button disabled={!referee} onClick={() => sendMove(PAPER_MOVE)}>Send "paper" move</button>
-          <button disabled={!referee} onClick={() => sendMove(SCISSORS_MOVE)}>Send "scissors" move</button>
-          <button disabled={!referee} onClick={() => sendMove(ROCK_MOVE)}>Send "rock" move</button>
+          <button disabled={!referee} onClick={() => sendMove(PAPER_MOVE)}>
+            Send "paper" move
+          </button>
+          <button disabled={!referee} onClick={() => sendMove(SCISSORS_MOVE)}>
+            Send "scissors" move
+          </button>
+          <button disabled={!referee} onClick={() => sendMove(ROCK_MOVE)}>
+            Send "rock" move
+          </button>
         </>
-      }
-      {notification && <><br />{notification}</>}
+      )}
+      {notification && (
+        <>
+          <br />
+          {notification}
+        </>
+      )}
       <>
         <br />
         <WebSocketHandler
@@ -139,6 +165,6 @@ export default function RPSGame() {
           setMessages={setMessages}
         />
       </>
-    </div >
+    </div>
   )
 }
