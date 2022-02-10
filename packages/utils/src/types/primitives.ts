@@ -302,7 +302,7 @@ abstract class BalanceBase {
 }
 
 export class Balance extends BalanceBase {
-  static SYMBOL: string = 'wxHOPR'
+  static SYMBOL: string = 'txHOPR'
   readonly symbol: string = Balance.SYMBOL
 
   public add(b: Balance): Balance {
