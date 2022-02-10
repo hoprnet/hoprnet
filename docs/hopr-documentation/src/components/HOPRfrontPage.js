@@ -12,31 +12,31 @@ const FeatureList = [
     title: 'About HOPR',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-about.svg'} />,
     description: <>Brief explanation what is HOPR.</>,
-    docName: 'about-hopr'
+    docName: '1.86/about-hopr'
   },
   {
     title: 'Install a hoprd node',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-node-setup.svg'} />,
     description: <>Guide on how to install a hoprd node.</>,
-    docName: 'node/start-here'
+    docName: '1.86/node/start-here'
   },
   {
     title: 'Run a hoprd node',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-node.svg'} />,
     description: <>Guide on how to use a hoprd node.</>,
-    docName: 'node/guide-using-a-hoprd-node'
+    docName: '1.86/node/guide-using-a-hoprd-node'
   },
   {
     title: 'HOPR core concepts',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-core-concepts.svg'} />,
     description: <>Broader educational material for understanding HOPR</>,
-    docName: 'core/what-is-hopr'
+    docName: '1.86/core/what-is-hopr'
   },
   {
     title: 'Staking',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-staking.svg'} />,
     description: <>How to earn money by staking on HOPR smart contract.</>,
-    docName: 'staking/how-to-stake'
+    docName: '1.86/staking/how-to-stake'
   },
   {
     title: 'For Developers',
@@ -58,7 +58,7 @@ const FeatureList = [
     title: 'FAQ',
     Svg: <img class="svg_icon" src={'/img/front_icons/hopr-faqs.svg'} />,
     description: <>Frequently asked questions related to HOPR.</>,
-    docName: 'faq'
+    docName: '1.86/faq'
   }
 ]
 
