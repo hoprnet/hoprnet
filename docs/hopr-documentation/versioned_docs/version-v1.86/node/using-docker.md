@@ -58,16 +58,6 @@ Open your console based on your OS:
 
 - Terminal (Mac OS / Linux OS)
 
-You can pull the Docker image like so:
-
-```bash
-docker pull gcr.io/hoprassociation/hoprd:athens
-```
-
-:::info Tip
-The `docker pull` command has to be run as `sudo` or add the current user to the added to the docker user group as shown [here](https://techoverflow.net/2018/12/15/how-to-fix-docker-got-permission-denied-while-trying-to-connect-to-the-docker-daemon-socket/).
-:::
-
 Before starting a container, please create your own **Secret Token**. Replace "**<YOUR_SECRET_TOKEN\>**" with your own Secret Token and only then paste the command.
 
 ```bash
