@@ -26,3 +26,7 @@ Alternatively, you can click the following [link](http://my.ava.do/#/installer/%
 After you installed the HOPR package, please go to `My DApps` section and click on the HOPR client.
 
 ![MyDapps](/img/node/avado-2.png)
+
+If the HOPR client will ask you to enter the **security token**, enter this fixed phrase: `!5qxc9Lp1BE7IFQ-nrtttU`
+
+The installation process has been finished! Now you can proceed to [Guide using a hoprd node](guide-using-a-hoprd-node).
