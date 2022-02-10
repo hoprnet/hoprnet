@@ -25,6 +25,19 @@ to quickly setup everything for you to get started.
 
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/hoprnet/hoprnet)
 
+After Gitpod creates a virtual machine with our codebase, it will immediately start running a local cluster as described by our
+[Gitpod configuration file](https://github.com/hoprnet/hoprnet/blob/master/.gitpod.yml). The entire setup will take roughly 5-10
+minutes, after which it will `export` a series of endpoint URLs which you can use later.
+
+```bash
+gitpod /workspace/hoprnet (master) $ echo $HOPR_NODE_1_HTTP_URL
+https://13301-hoprnet-hoprnet-npnjfo3928b.ws-us31.gitpod.io
+gitpod /workspace/hoprnet (master) $ echo $HOPR_NODE_1_WS_URL
+https://19501-hoprnet-hoprnet-npnjfo3928b.ws-us31.gitpod.io
+gitpod /workspace/hoprnet (master) $ echo $HOPR_NODE_1_ADDR
+16Uiu2HAmE9b3TSHeF25uJS1Ecf2Js3TutnaSnipdV9otEpxbRN8Q
+```
+
 ### Gitpod URLs
 
 When running a HOPR cluster inside Gitpod, all the URLs will be exposed via their own DNS service, which resolves services to ports via
