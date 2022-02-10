@@ -58,23 +58,7 @@ Open your console based on your OS:
 
 - Terminal (Mac OS / Linux OS)
 
-You can pull the Docker image like so:
-
-```bash
-docker pull gcr.io/hoprassociation/hoprd:athens
-```
-
-:::info Tip
-The `docker pull` command has to be run as `sudo` or add the current user to the added to the docker user group as shown [here](https://techoverflow.net/2018/12/15/how-to-fix-docker-got-permission-denied-while-trying-to-connect-to-the-docker-daemon-socket/).
-:::
-
 Before starting a container, please create your own **Secret Token**. Replace "**<YOUR_SECRET_TOKEN\>**" with your own Secret Token and only then paste the command.
-
-```bash
-docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:athens --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --rest --restHost "0.0.0.0" --restPort 3001 --identity /app/db/.hopr-id-athens --apiToken '<YOUR_SECRET_TOKEN>' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
-```
-
-Also all ports are mapped to your local host, assuming you stick to the default port numbers.
 
 :::danger Important
 
@@ -91,5 +75,11 @@ Password should contain:
 This ensures the node cannot be accessed by a malicious user residing in the same network.
 
 :::
+
+```bash
+docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:athens --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --rest --restHost "0.0.0.0" --restPort 3001 --identity /app/db/.hopr-id-athens --apiToken '<YOUR_SECRET_TOKEN>' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
+```
+
+Also all ports are mapped to your local host, assuming you stick to the default port numbers.
 
 The installation process has been finished! Now you can proceed to [Guide using a hoprd node](guide-using-a-hoprd-node).

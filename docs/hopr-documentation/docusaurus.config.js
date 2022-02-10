@@ -44,8 +44,8 @@ const redocusaurus = [
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'HOPR',
-  tagline: 'HOPR docs',
+  title: 'HOPR Docs',
+  tagline: 'HOPR',
   url: DOCS_URL,
   baseUrl: '/',
   onBrokenLinks: 'throw',
