@@ -1,108 +1,209 @@
-import Heartbeat from './heartbeat'
+import Heartbeat, { type HeartbeatConfig } from './heartbeat'
 import NetworkPeerStore from './network-peers'
 import assert from 'assert'
-import { HEARTBEAT_INTERVAL, NETWORK_QUALITY_THRESHOLD } from '../constants'
-import sinon from 'sinon'
-import { fakePeerId } from '../test-utils.spec'
-import PeerId from 'peer-id'
+import { type LibP2PHandlerFunction, privKeyToPeerId } from '@hoprnet/hopr-utils'
+import { EventEmitter, once } from 'events'
+import type PeerId from 'peer-id'
+import { NETWORK_QUALITY_THRESHOLD } from '../constants'
 
 class TestingHeartbeat extends Heartbeat {
-  public setSendMessage(sendMessage: Heartbeat['sendMessage']) {
-    this.sendMessage = sendMessage
+  public async checkNodes() {
+    return await super.checkNodes()
   }
 }
 
+const Alice = privKeyToPeerId('0x427ff36aacbac09f6da4072161a6a338308c53cfb6e50ca56aa70b1a38602a9f')
+const Bob = privKeyToPeerId('0xf9bfbad938482b29076932b080fb6ac1e14616ee621fb3f77739784bcf1ee8cf')
+const Charly = privKeyToPeerId('0xfab2610822e8c973bec74c811e2f44b6b4b501e922b1d67f5367a26ce46088ea')
+
+const TESTING_ENVIRONMENT = 'unit-testing'
+
+// Overwrite default timeouts with shorter ones for unit testing
+const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
+  heartbeatDialTimeout: 50,
+  heartbeatRunTimeout: 100,
+  heartbeatInterval: 200,
+  heartbeatVariance: 1
+}
+
+/**
+ * Used to mock sending messages using events
+ * @param self peerId of the destination
+ * @param protocol protocol to speak with receiver
+ * @returns an event string that includes destination and protocol
+ */
+function reqEventName(self: PeerId, protocol: string): string {
+  return `req:${self.toB58String()}:${protocol}`
+}
+
+/**
+ * Used to mock replying to incoming messages
+ * @param self peerId of the sender
+ * @param dest peerId of the destination
+ * @param protocol protocol to speak with receiver
+ * @returns an event string that includes sender, receiver and the protocol
+ */
+function resEventName(self: PeerId, dest: PeerId, protocol: string): string {
+  return `res:${self.toB58String()}:${dest.toB58String()}:${protocol}`
+}
+/**
+ * Creates an event-based fake network
+ * @returns a fake network
+ */
+function createFakeNetwork() {
+  const network = new EventEmitter()
+
+  const subscribedPeers = new Map<string, string>()
+
+  // mocks libp2p.handle(protocol)
+  const subscribe = (
+    self: PeerId,
+    protocol: string,
+    handler: (msg: Uint8Array, remotePeer: PeerId) => Promise<Uint8Array>
+  ) => {
+    network.on(reqEventName(self, protocol), async (from: PeerId, request: Uint8Array) => {
+      const response = await handler(request, from)
+
+      network.emit(resEventName(self, from, protocol), self, response)
+    })
+
+    subscribedPeers.set(self.toB58String(), reqEventName(self, protocol))
+  }
+
+  // mocks libp2p.dialProtocol
+  const sendMessage = async (self: PeerId, dest: PeerId, protocol: string, msg: Uint8Array) => {
+    if (network.listenerCount(reqEventName(dest, protocol)) > 0) {
+      const recvPromise = once(network, resEventName(dest, self, protocol))
+
+      network.emit(reqEventName(dest, protocol), self, msg)
+
+      const result = (await recvPromise) as [from: PeerId, response: Uint8Array]
+
+      return Promise.resolve([result[1]])
+    }
+
+    return Promise.reject()
+  }
+
+  // mocks libp2p.stop
+  const unsubscribe = (peer: PeerId) => {
+    if (subscribedPeers.has(peer.toB58String())) {
+      const protocol = subscribedPeers.get(peer.toB58String())
+
+      network.removeAllListeners(protocol)
+    }
+  }
+
+  return {
+    subscribe,
+    sendMessage,
+    close: network.removeAllListeners.bind(network),
+    unsubscribe
+  }
+}
+
+function getPeer(self: PeerId, network: ReturnType<typeof createFakeNetwork>) {
+  const peers = new NetworkPeerStore([], [self])
+
+  const heartbeat = new TestingHeartbeat(
+    peers,
+    (protocol: string, handler: LibP2PHandlerFunction<any>) => network.subscribe(self, protocol, handler),
+    ((dest: PeerId, protocol: string, msg: Uint8Array) => network.sendMessage(self, dest, protocol, msg)) as any,
+    (async () => {
+      assert.fail(`must not call hangUp`)
+    }) as any,
+    TESTING_ENVIRONMENT,
+    {
+      ...SHORT_TIMEOUTS,
+      heartbeatThreshold: -3000,
+      heartbeatInterval: 2000
+    }
+  )
+
+  heartbeat.start()
+
+  return { heartbeat, peers }
+}
+
 describe('unit test heartbeat', async () => {
-  let heartbeat: TestingHeartbeat
-  let hangUp = sinon.fake.resolves(undefined)
-  let peers: NetworkPeerStore
-  let clock: any
-
-  let send = sinon.fake((_id: any, _proto: any, challenge: Uint8Array) => [Heartbeat.calculatePingResponse(challenge)])
-  let subscribe = sinon.fake()
-
-  beforeEach(async () => {
-    clock = sinon.useFakeTimers(Date.now())
-    peers = new NetworkPeerStore([], [await PeerId.create({ keyType: 'secp256k1' })])
-    heartbeat = new TestingHeartbeat(peers, subscribe, send, hangUp, 'protocolHeartbeat')
-  })
-
-  afterEach(() => {
-    clock.restore()
-  })
-
   it('check nodes is noop with empty store', async () => {
-    await heartbeat.__forTestOnly_checkNodes()
-    assert(hangUp.notCalled, 'hangup not called')
-    assert(send.notCalled, 'interact not called')
+    const heartbeat = new TestingHeartbeat(
+      new NetworkPeerStore([], [Alice]),
+      (() => {}) as any,
+      (async () => {
+        assert.fail(`must not call send`)
+      }) as any,
+      (async () => {
+        assert.fail(`must not call hangUp`)
+      }) as any,
+      TESTING_ENVIRONMENT,
+      SHORT_TIMEOUTS
+    )
+    await heartbeat.checkNodes()
+
+    heartbeat.stop()
   })
 
   it('check nodes is noop with only new peers', async () => {
-    peers.register(fakePeerId(1))
-    await heartbeat.__forTestOnly_checkNodes()
-    assert(hangUp.notCalled)
-    assert(send.notCalled)
+    const network = createFakeNetwork()
+    const peerA = getPeer(Alice, network)
+
+    const peerB = getPeer(Bob, network)
+
+    peerA.peers.register(Bob)
+    await peerA.heartbeat.checkNodes()
+
+    assert(peerA.peers.qualityOf(Bob).toFixed(1) === '0.3')
+    ;[peerA, peerB].map((peer) => peer.heartbeat.stop())
+    network.close()
   })
 
-  it('check nodes interacts with an old peer', async () => {
-    peers.register(fakePeerId(2))
-    clock.tick(HEARTBEAT_INTERVAL * 2)
-    await heartbeat.__forTestOnly_checkNodes()
-    assert(hangUp.notCalled, 'shouldnt call hangup')
-    assert(send.calledOnce, 'should call interact')
+  it('check node interacts with offline peer', async () => {
+    const network = createFakeNetwork()
+    const peerA = getPeer(Alice, network)
+
+    peerA.peers.register(Charly)
+
+    assert(peerA.peers.qualityOf(Charly).toFixed(1) === '0.2')
+
+    await peerA.heartbeat.checkNodes()
+
+    assert(peerA.peers.qualityOf(Charly).toFixed(1) === '0.1')
+
+    peerA.heartbeat.stop()
+    network.close()
   })
 
   it('test heartbeat flow', async () => {
-    let generateMock = (i: string | number) => {
-      let id = fakePeerId(i)
-      let peers = new NetworkPeerStore([], [id])
-      let heartbeat = new TestingHeartbeat(peers, subscribe, send, hangUp, 'protocolHeartbeat')
-      return { peers, id, heartbeat }
-    }
+    const network = createFakeNetwork()
+    const peerA = getPeer(Alice, network)
+    const peerB = getPeer(Bob, network)
+    const peerC = getPeer(Charly, network)
 
-    let alice = generateMock(1)
-    let bob = generateMock(2)
-    let chris = generateMock(3)
+    peerA.peers.register(Bob)
+    peerA.peers.register(Charly)
 
-    let dial = (source: any, dest: any) => {
-      source.peers.register(dest.id)
-      dest.peers.register(source.id)
-    }
-    // Setup base state
-    dial(bob, alice)
-    assert(!chris.peers.has(alice.id), `Chris should not know about Alice in the beginning.`)
-    dial(chris, alice)
-    assert(alice.peers.has(chris.id), `Alice should know about Chris now.`)
-    assert(alice.peers.has(bob.id), `Alice should know about Bob now.`)
-    assert(chris.peers.has(alice.id), `Chris should know about Alice now.`)
-    assert(bob.peers.has(alice.id), `Bob should know about Alice now.`)
+    assert(peerA.peers.has(Charly), `Alice should know about Chris now.`)
+    assert(peerA.peers.has(Bob), `Alice should know about Bob now.`)
 
-    // Alice heartbeat, all available
-    clock.tick(HEARTBEAT_INTERVAL * 2)
-    await alice.heartbeat.__forTestOnly_checkNodes()
-    clock.tick(HEARTBEAT_INTERVAL * 2)
-    await alice.heartbeat.__forTestOnly_checkNodes()
-    clock.tick(HEARTBEAT_INTERVAL * 2)
-    await alice.heartbeat.__forTestOnly_checkNodes()
-    clock.tick(HEARTBEAT_INTERVAL * 2)
-    await alice.heartbeat.__forTestOnly_checkNodes()
+    await peerA.heartbeat.checkNodes()
+    await peerA.heartbeat.checkNodes()
+    await peerA.heartbeat.checkNodes()
+    await peerA.heartbeat.checkNodes()
 
-    assert(alice.peers.qualityOf(bob.id) > NETWORK_QUALITY_THRESHOLD, 'bob is high q')
-    assert(alice.peers.qualityOf(chris.id) > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
+    assert(peerA.peers.qualityOf(Bob) > NETWORK_QUALITY_THRESHOLD, 'bob is high q')
+    assert(peerA.peers.qualityOf(Charly) > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
 
-    // Chris dies, alice heartbeats again
-    alice.heartbeat.setSendMessage(
-      sinon.fake((id: PeerId, _proto: any, challenge: Uint8Array) => {
-        if (id.equals(chris.id)) {
-          return Promise.reject()
-        }
-        return [Heartbeat.calculatePingResponse(challenge)]
-      })
-    )
+    network.unsubscribe(Charly)
+    peerC.heartbeat.stop()
 
-    clock.tick(HEARTBEAT_INTERVAL * 2)
-    await alice.heartbeat.__forTestOnly_checkNodes()
-    assert(alice.peers.qualityOf(bob.id) > NETWORK_QUALITY_THRESHOLD, 'bob is still high q')
-    assert(alice.peers.qualityOf(chris.id) <= NETWORK_QUALITY_THRESHOLD, 'chris is now low q')
+    await peerA.heartbeat.checkNodes()
+    await peerA.heartbeat.checkNodes()
+
+    assert(peerA.peers.qualityOf(Bob) > NETWORK_QUALITY_THRESHOLD, 'bob is still high q')
+    assert(peerA.peers.qualityOf(Charly) <= NETWORK_QUALITY_THRESHOLD, 'chris is now low q')
+
+    peerA.heartbeat.stop()
+    peerB.heartbeat.stop()
   })
 })

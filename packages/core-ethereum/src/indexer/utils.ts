@@ -1,20 +1,15 @@
+export type IndexerSnapshot = { blockNumber: number; transactionIndex: number; logIndex: number }
+
 /**
  * Compares the two snapshots provided.
  * @param snapA
  * @param snapB
  * @returns 0 if they're equal, negative if `a` goes up, positive if `b` goes up
  */
-export const snapshotComparator = (
-  snapA: { blockNumber: number; transactionIndex: number; logIndex: number },
-  snapB: {
-    blockNumber: number
-    transactionIndex: number
-    logIndex: number
-  }
-): number => {
-  if (snapA.blockNumber !== snapB.blockNumber) {
+export function snapshotComparator(snapA: IndexerSnapshot, snapB: IndexerSnapshot): number {
+  if (snapA.blockNumber != snapB.blockNumber) {
     return snapA.blockNumber - snapB.blockNumber
-  } else if (snapA.transactionIndex !== snapB.transactionIndex) {
+  } else if (snapA.transactionIndex != snapB.transactionIndex) {
     return snapA.transactionIndex - snapB.transactionIndex
   } else {
     return snapA.logIndex - snapB.logIndex
@@ -26,10 +21,6 @@ export const snapshotComparator = (
  * if blockNumber is considered confirmed.
  * @returns boolean
  */
-export const isConfirmedBlock = (
-  blockNumber: number,
-  onChainBlockNumber: number,
-  maxConfirmations: number
-): boolean => {
+export function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number, maxConfirmations: number): boolean {
   return blockNumber + maxConfirmations <= onChainBlockNumber
 }

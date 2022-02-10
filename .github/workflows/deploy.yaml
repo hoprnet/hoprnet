@@ -246,12 +246,20 @@ jobs:
   avado:
     name: Build Avado (master or release pushes)
     runs-on: ubuntu-latest
-    needs: [build_hoprd_docker]
+    needs: [build_deploy_sc_npm,build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
+
+      - name: Pull recent Git changes
+        if: ${{ !env.ACT }}
+        run: |
+          # need to pull changes because we've updated the package versions in
+          # the job publish_npm beforehand
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          git pull origin "${branch}" --rebase
 
       - name: Set avado version
         id: set-version

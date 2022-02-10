@@ -8,6 +8,7 @@
 - New API v2 endpoints allow fetching and redeeming tickets from specific channels ([#3367](https://github.com/hoprnet/hoprnet/pull/3367))
 - Flags `--rest`, `--restHost`, and `--restPort` are being deprecated in favor of `--api`, `--apiHost`, and `--apiPort`
 - Fixed automatic and manual ticket redemption ([#3395](https://github.com/hoprnet/hoprnet/pull/3395))
+- In-order processing of blocks and in-order processing of on-chain events ([#3392](https://github.com/hoprnet/hoprnet/pull/3392))
 
 ---
 

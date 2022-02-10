@@ -1,5 +1,4 @@
 import BN from 'bn.js'
-import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
 import { EventEmitter } from 'events'
@@ -19,19 +18,21 @@ import {
   DeferType,
   retryWithBackoff,
   Ticket,
-  Balance
+  Balance,
+  ordered,
+  u8aToHex,
+  FIFO
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
 import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } from './types'
-import { isConfirmedBlock, snapshotComparator } from './utils'
+import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
 import { errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 import { TypedEvent } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
-const ANNOUNCEMENT = 'Announcement'
 const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 /**
@@ -42,13 +43,12 @@ const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TR
 class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
-  private unconfirmedEvents = new Heap<Event<any> | TokenEvent<any>>(snapshotComparator)
+  private unconfirmedEvents: FIFO<TypedEvent<any, any>>
   private chain: ChainWrapper
   private genesisBlock: number
+  private lastSnapshot: IndexerSnapshot | undefined
 
   private unsubscribeErrors: () => void
-  private unsubscribeTokenEvents: () => void
-  private unsubscribeChannelEvents: () => void
   private unsubscribeBlock: () => void
 
   constructor(
@@ -58,6 +58,8 @@ class Indexer extends EventEmitter {
     private blockRange: number
   ) {
     super()
+
+    this.unconfirmedEvents = FIFO<TypedEvent<any, any>>()
   }
 
   /**
@@ -96,35 +98,45 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
-    this.unsubscribeBlock = this.chain.subscribeBlock(async (block: number) => {
-      await this.onNewBlock(block) // exceptions are handled
+    const orderedBlocks = ordered<number>()
+
+    // Starts the asynchronous stream of indexer events
+    // and feeds them to the event listener
+    ;(async function (this: Indexer) {
+      for await (const block of orderedBlocks.iterator()) {
+        await this.onNewBlock(block.value, true) // exceptions are handled
+      }
+    }.call(this))
+
+    // Do not process new blocks before querying old blocks has finished
+    const newBlocks = ordered<number>()
+
+    const unsubscribeBlock = this.chain.subscribeBlock(async (block: number) => {
+      newBlocks.push({
+        index: block,
+        value: block
+      })
     })
+
+    this.unsubscribeBlock = () => {
+      unsubscribeBlock()
+      newBlocks.end()
+      orderedBlocks.end()
+    }
 
     this.unsubscribeErrors = this.chain.subscribeError(async (error: any) => {
       await this.onProviderError(error) // exceptions are handled
     })
 
-    this.unsubscribeChannelEvents = this.chain.subscribeChannelEvents((channelEvent: TypedEvent<any, any>) => {
-      if (
-        channelEvent.event === ANNOUNCEMENT ||
-        channelEvent.event === 'ChannelUpdated' ||
-        channelEvent.event === 'TicketRedeemed'
-      ) {
-        this.onNewEvents([channelEvent])
-      }
-    })
-    this.unsubscribeTokenEvents = this.chain.subscribeTokenEvents((tokenEvent: TypedEvent<any, any>) => {
-      if (tokenEvent.event !== 'Transfer') return
-
-      const event = tokenEvent as TokenEvent<'Transfer'>
-      if (Address.fromString(event.args.from).eq(this.address) || Address.fromString(event.args.to).eq(this.address)) {
-        // save transfer events
-        this.onNewEvents([tokenEvent])
-      }
-    })
-
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
+
+    // Feed new blocks to the ordered queue
+    ;(async function (this: Indexer) {
+      for await (const newBlock of newBlocks.iterator()) {
+        orderedBlocks.push(newBlock) // exceptions are handled
+      }
+    }.call(this))
 
     log('Subscribing to events from block %d', fromBlock)
 
@@ -143,8 +155,6 @@ class Indexer extends EventEmitter {
 
     log(`Stopping indexer...`)
 
-    this.unsubscribeChannelEvents()
-    this.unsubscribeTokenEvents()
     this.unsubscribeBlock()
     this.unsubscribeErrors()
 
@@ -153,6 +163,11 @@ class Indexer extends EventEmitter {
     log(chalk.green('Indexer stopped!'))
   }
 
+  /**
+   * Restarts the indexer
+   * @returns a promise that resolves once the indexer
+   * has been restarted
+   */
   protected async restart(): Promise<void> {
     if (this.status === 'restarting') {
       return
@@ -174,7 +189,104 @@ class Indexer extends EventEmitter {
   }
 
   /**
-   * Query past events, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
+   * Gets all interesting on-chain events, such as Transfer events and payment
+   * channel events
+   * @param fromBlock block to start from
+   * @param toBlock last block (inclusive) to consider
+   * @param withTokenTransactions [optional] if true, also query for token transfer
+   * towards or from the node towards someone else
+   * @returns all relevant events in the specified block range
+   */
+  private async getEvents(
+    fromBlock: number,
+    toBlock: number,
+    withTokenTransactions: boolean
+  ): Promise<TypedEvent<any, any>[]> {
+    const queries = [
+      this.chain
+        .getChannels()
+        .queryFilter(
+          {
+            topics: [
+              [
+                this.chain.getChannels().interface.getEventTopic('Announcement'),
+                this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
+                this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
+              ]
+            ]
+          },
+          fromBlock,
+          toBlock
+        )
+        .then((events: TypedEvent<any, any>[]) => {
+          return events.map((event: TypedEvent<any, any>) => {
+            return Object.assign(event, this.chain.getChannels().interface.parseLog(event))
+          })
+        })
+    ]
+
+    if (withTokenTransactions) {
+      queries.push(
+        ...[
+          this.chain
+            .getToken()
+            .queryFilter(
+              {
+                topics: [
+                  // Token transfer *towards* us
+                  [this.chain.getToken().interface.getEventTopic('Transfer')],
+                  [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+                ]
+              },
+              fromBlock,
+              toBlock
+            )
+            .then((events: TypedEvent<any, any>[]) => {
+              return events.map((event: TypedEvent<any, any>) =>
+                Object.assign(event, this.chain.getToken().interface.parseLog(event))
+              )
+            }),
+          this.chain
+            .getToken()
+            .queryFilter(
+              {
+                topics: [
+                  // Token transfer *from* us towards someone else
+                  [this.chain.getToken().interface.getEventTopic('Transfer')],
+                  null,
+                  [u8aToHex(Uint8Array.from([...new Uint8Array(12).fill(0), ...this.address.serialize()]))]
+                ]
+              },
+              fromBlock,
+              toBlock
+            )
+            .then((events: TypedEvent<any, any>[]) => {
+              return events.map((event: TypedEvent<any, any>) =>
+                Object.assign(event, this.chain.getToken().interface.parseLog(event))
+              )
+            })
+        ]
+      )
+    }
+
+    const events = await Promise.all(queries)
+
+    return (
+      events
+        .flat(1)
+        .sort(snapshotComparator)
+        // @TODO fix type clash
+        .map((event) => {
+          if (event.event == undefined) {
+            return Object.assign(event, { event: event.name })
+          }
+          return event
+        })
+    )
+  }
+
+  /**
+   * Query past events, this will loop until it gets all blocks from `toBlock` to `fromBlock`.
    * If we exceed response pull limit, we switch into quering smaller chunks.
    * TODO: optimize DB and fetch requests
    * @param fromBlock
@@ -188,8 +300,7 @@ class Indexer extends EventEmitter {
     while (fromBlock < maxToBlock) {
       const blockRange = failedCount > 0 ? Math.floor(maxBlockRange / 4 ** failedCount) : maxBlockRange
       // should never be above maxToBlock
-      let toBlock = fromBlock + blockRange
-      if (toBlock > maxToBlock) toBlock = maxToBlock
+      let toBlock = Math.min(fromBlock + blockRange, maxToBlock)
 
       // log(
       //   `${failedCount > 0 ? 'Re-quering' : 'Quering'} past events from %d to %d: %d`,
@@ -201,8 +312,7 @@ class Indexer extends EventEmitter {
       let events: Event<any>[] = []
 
       try {
-        // TODO: wildcard is supported but not properly typed
-        events = await this.chain.getChannels().queryFilter('*' as any, fromBlock, toBlock)
+        events = await this.getEvents(fromBlock, toBlock, false)
       } catch (error) {
         failedCount++
 
@@ -214,7 +324,7 @@ class Indexer extends EventEmitter {
       }
 
       this.onNewEvents(events)
-      await this.onNewBlock(toBlock)
+      await this.onNewBlock(toBlock, false)
       failedCount = 0
       fromBlock = toBlock
 
@@ -266,12 +376,13 @@ class Indexer extends EventEmitter {
 
   /**
    * Called whenever a new block found.
-   * This will update {this.latestBlock},
+   * This will update `this.latestBlock`,
    * and processes events which are within
    * confirmed blocks.
-   * @param blockNumber
+   * @param blockNumber latest on-chain block number
+   * @param fetchEvents [optional] if true, query provider for events in block
    */
-  private async onNewBlock(blockNumber: number): Promise<void> {
+  private async onNewBlock(blockNumber: number, fetchEvents = false): Promise<void> {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
@@ -279,13 +390,11 @@ class Indexer extends EventEmitter {
     this.emit('block', blockNumber)
 
     // update latest block
-    if (this.latestBlock < blockNumber) {
-      this.latestBlock = blockNumber
-    }
+    this.latestBlock = Math.max(this.latestBlock, blockNumber)
 
-    let lastSnapshot
+    let lastDatabaseSnapshot: Snapshot | undefined
     try {
-      lastSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
+      lastDatabaseSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
       // This new block marks a previous block
       // (blockNumber - this.maxConfirmations) is final.
@@ -298,6 +407,16 @@ class Indexer extends EventEmitter {
           this.chain.updateConfirmedTransaction(nativeTx)
         })
       }
+
+      if (fetchEvents) {
+        const events = await this.getEvents(
+          blockNumber - this.maxConfirmations,
+          blockNumber - this.maxConfirmations,
+          true
+        )
+
+        this.onNewEvents(events)
+      }
     } catch (err) {
       log(
         `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
@@ -305,43 +424,115 @@ class Indexer extends EventEmitter {
       )
     }
 
+    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot)
+  }
+
+  /**
+   * Adds new events to the queue of unprocessed events
+   * @dev ignores events that have been processed before.
+   * @param events new unprocessed events
+   */
+  private onNewEvents(events: Event<any>[] | TokenEvent<any>[]): void {
+    if (events.length == 0) {
+      // Nothing to do
+      return
+    }
+
+    let offset = 0
+
+    // lastSnapshot ~= watermark of previously process events
+    //
+    // lastSnapshot == undefined means there is no watermark, hence
+    // all events can be considered new
+    if (this.lastSnapshot != undefined) {
+      let currentSnapshot: IndexerSnapshot = {
+        blockNumber: events[offset].blockNumber,
+        logIndex: events[offset].logIndex,
+        transactionIndex: events[offset].transactionIndex
+      }
+
+      // As long events are older than the current watermark,
+      // increase the offset to ignore them
+      while (snapshotComparator(this.lastSnapshot, currentSnapshot) >= 0) {
+        offset++
+        if (offset < events.length) {
+          currentSnapshot = {
+            blockNumber: events[offset].blockNumber,
+            logIndex: events[offset].logIndex,
+            transactionIndex: events[offset].transactionIndex
+          }
+        } else {
+          break
+        }
+      }
+    }
+
+    // Once the offset is known upon which we have
+    // received new events, add them to `unconfirmedEvents` to
+    // be processed once the next+confirmationTime block
+    // has been mined
+    for (; offset < events.length; offset++) {
+      this.unconfirmedEvents.push(events[offset])
+    }
+
+    this.lastSnapshot = {
+      blockNumber: events[events.length - 1].blockNumber,
+      logIndex: events[events.length - 1].logIndex,
+      transactionIndex: events[events.length - 1].transactionIndex
+    }
+  }
+
+  /**
+   * Process all stored but not yet processed events up to latest
+   * confirmed block (latestBlock - confirmationTime)
+   * @param blockNumber latest on-chain block number
+   * @param lastDatabaseSnapshot latest snapshot in database
+   */
+  async processUnconfirmedEvents(blockNumber: number, lastDatabaseSnapshot: Snapshot | undefined) {
     log(
       'At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
       blockNumber,
-      this.unconfirmedEvents.length,
-      this.unconfirmedEvents.length > 0
-        ? isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
+      this.unconfirmedEvents.size(),
+      this.unconfirmedEvents.size() > 0
+        ? isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
         : null,
-      this.unconfirmedEvents.length > 0 ? this.unconfirmedEvents.top(1)[0].blockNumber : 0,
+      this.unconfirmedEvents.size() > 0 ? this.unconfirmedEvents.peek().blockNumber : 0,
       this.maxConfirmations
     )
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
-      this.unconfirmedEvents.length > 0 &&
-      isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
+      this.unconfirmedEvents.size() > 0 &&
+      isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
     ) {
-      const event = this.unconfirmedEvents.pop()
-      log('Processing event %s blockNumber=%s maxConfirmations=%s', event.event, blockNumber, this.maxConfirmations)
+      const event = this.unconfirmedEvents.shift()
+      log(
+        'Processing event %s blockNumber=%s maxConfirmations=%s',
+        // @TODO: fix type clash
+        event.event,
+        blockNumber,
+        this.maxConfirmations
+      )
 
       // if we find a previous snapshot, compare event's snapshot with last processed
-      if (lastSnapshot) {
+      if (lastDatabaseSnapshot) {
         const lastSnapshotComparison = snapshotComparator(event, {
-          blockNumber: lastSnapshot.blockNumber.toNumber(),
-          logIndex: lastSnapshot.logIndex.toNumber(),
-          transactionIndex: lastSnapshot.transactionIndex.toNumber()
+          blockNumber: lastDatabaseSnapshot.blockNumber.toNumber(),
+          logIndex: lastDatabaseSnapshot.logIndex.toNumber(),
+          transactionIndex: lastDatabaseSnapshot.transactionIndex.toNumber()
         })
 
         // check if this is a duplicate or older than last snapshot
         // ideally we would have detected if this snapshot was indeed processed,
         // at the moment we don't keep all events stored as we intend to keep
         // this indexer very simple
-        if (lastSnapshotComparison === 0 || lastSnapshotComparison < 0) {
+        if (lastSnapshotComparison == 0 || lastSnapshotComparison < 0) {
           continue
         }
       }
 
+      // @TODO: fix type clash
       const eventName = event.event as EventNames | TokenEventNames
 
       // update transaction manager
@@ -379,8 +570,12 @@ class Indexer extends EventEmitter {
       }
 
       try {
-        lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
-        await this.db.updateLatestConfirmedSnapshot(lastSnapshot)
+        lastDatabaseSnapshot = new Snapshot(
+          new BN(event.blockNumber),
+          new BN(event.transactionIndex),
+          new BN(event.logIndex)
+        )
+        await this.db.updateLatestConfirmedSnapshot(lastDatabaseSnapshot)
       } catch (err) {
         log(
           `error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`,
@@ -395,14 +590,6 @@ class Indexer extends EventEmitter {
     } catch (err) {
       log(`error: failed to update database with latest block number ${blockNumber}`, err)
     }
-  }
-
-  /**
-   * Called whenever we receive new events.
-   * @param events
-   */
-  private onNewEvents(events: Event<any>[] | TokenEvent<any>[]): void {
-    this.unconfirmedEvents.addAll(events)
   }
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
@@ -430,12 +617,13 @@ class Indexer extends EventEmitter {
       multiaddrs: [account.multiAddr]
     })
     await this.db.updateAccount(account)
+    console.log(await this.db.getAccount(account.address))
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
     this.indexEvent('channel-updated', [event.transactionHash])
     log('channel-updated for hash %s', event.transactionHash)
-    const channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
+    const channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
     log(`Smart contract event`)
     log(channel.toString())
 
@@ -538,12 +726,20 @@ class Indexer extends EventEmitter {
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    return (await this.db.getAccounts((account: AccountEntry) => account.containsRouting())).map(
-      (account: AccountEntry) => ({
-        id: account.getPublicKey().toPeerId(),
+    const accounts = await this.db.getAccounts((account: AccountEntry) => account.containsRouting())
+
+    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = Array.from({ length: accounts.length })
+
+    log(`Known public nodes:`)
+    for (const [index, account] of accounts.entries()) {
+      result[index] = {
+        id: account.getPeerId(),
         multiaddrs: [account.multiAddr]
-      })
-    )
+      }
+      log(`\t${account.getPeerId().toB58String()} ${account.multiAddr.toString()}`)
+    }
+
+    return result
   }
 
   /**

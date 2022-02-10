@@ -44,6 +44,9 @@ jobs:
       - name: Generate OpenAPI spec file
         run: ./scripts/build-rest-api-spec.sh
 
+      - name: Format newly created files
+        run: yarn lint:fix
+
       - name: Move OpenAPI spec file into documentation directory
         run: mv packages/hoprd/rest-api-v2-full-spec.yaml docs/hopr-documentation/
 
