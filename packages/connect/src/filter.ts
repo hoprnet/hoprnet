@@ -28,11 +28,13 @@ const INVALID_PORTS = [0]
 export class Filter {
   private announcedAddrs?: ValidAddress[]
   private listeningFamilies?: NetworkInterfaceInfo['family'][]
+  private myPublicKey: Uint8Array
 
   protected myPrivateNetworks: Network[]
 
-  constructor(private peerId: PeerId, private opts: HoprConnectOptions) {
+  constructor(peerId: PeerId, private opts: HoprConnectOptions) {
     this.myPrivateNetworks = getPrivateAddresses()
+    this.myPublicKey = peerId.marshalPubKey()
   }
 
   /**
@@ -102,7 +104,7 @@ export class Filter {
       return false
     }
 
-    if (parsed.address.node != undefined && !u8aEquals(parsed.address.node, this.peerId.marshalPubKey())) {
+    if (parsed.address.node != undefined && !u8aEquals(parsed.address.node, this.myPublicKey)) {
       log(`Cannot listen to multiaddrs with other peerId than our own. Given addr: ${ma.toString()}`)
       return false
     }
@@ -126,12 +128,12 @@ export class Filter {
     if (parsed.address.type === 'p2p') {
       const p2pAddress = parsed.address
 
-      if (u8aEquals(p2pAddress.node, this.peerId.marshalPubKey())) {
+      if (u8aEquals(p2pAddress.node, this.myPublicKey)) {
         log(`Prevented self-dial using circuit addr. Used addr: ${ma.toString()}`)
         return false
       }
 
-      if (u8aEquals(p2pAddress.relayer, this.peerId.marshalPubKey())) {
+      if (u8aEquals(p2pAddress.relayer, this.myPublicKey)) {
         log(`Prevented dial using self as relay node. Used addr: ${ma.toString()}`)
         return false
       }
@@ -141,7 +143,7 @@ export class Filter {
 
     const address = parsed.address
 
-    if (address.node != undefined && u8aEquals(address.node, this.peerId.marshalPubKey())) {
+    if (address.node != undefined && u8aEquals(address.node, this.myPublicKey)) {
       log(`Prevented self-dial. Used addr: ${ma.toString()}`)
       return false
     }
