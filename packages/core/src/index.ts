@@ -444,7 +444,7 @@ class Hopr extends EventEmitter {
     }
 
     const currentChannels: ChannelEntry[] | undefined = await this.getAllChannels()
-    verbose('Channels obtained', currentChannels)
+    verbose('Channels obtained', currentChannels.map((entry) => entry.toString()).join(`\n`))
 
     if (currentChannels === undefined) {
       throw new Error('invalid channels retrieved from database')
