@@ -103,6 +103,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     this._emitListening = function (this: Listener) {
+      // hopr-connect does not enable IPv6 connections right now, therefore we can set `listeningAddrs` statically
+      // to `/ip4/0.0.0.0/tcp/0`, meaning listening on IPv4 using a canonical port
       // TODO check IPv6
       this.filter.setAddrs(this.getAddrs(), [new Multiaddr(`/ip4/0.0.0.0/tcp/0/p2p/${this.peerId.toB58String()}`)])
       this.emit('listening')
