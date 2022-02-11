@@ -149,12 +149,14 @@ class NetworkPeers {
     // Sort a copy of peers in-place
     peers.sort((a, b) => this.qualityOf(b) - this.qualityOf(a))
 
-    const goodAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer) == 1.0)
+    const goodAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer).toFixed(1) === '1.0')
 
-    const worstAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer) == 0.0)
+    const worstAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer).toFixed(1) === '0.0')
 
-    let out = `current: ${peers.length} nodes and ${goodAvailabilityIndex + 1} nodes with availability 1.0 and ${
-      peers.length - worstAvailabilityIndex
+    let out = `current: ${peers.length} nodes and ${
+      goodAvailabilityIndex < 0 ? 0 : goodAvailabilityIndex + 1
+    } nodes with availability 1.0 and ${
+      worstAvailabilityIndex < 0 ? 0 : peers.length - worstAvailabilityIndex
     } nodes with availability 0.0:\n`
 
     for (const peer of peers) {

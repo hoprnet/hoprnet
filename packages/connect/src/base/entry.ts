@@ -320,7 +320,7 @@ export class EntryNodes extends EventEmitter {
     if (isDifferent) {
       log(`Current relay addresses:`)
       for (const ma of this.usedRelays) {
-        log(`\t${ma.toString()}`)
+        log(` - ${ma.toString()}`)
       }
 
       this.emit(RELAY_CHANGED_EVENT)
