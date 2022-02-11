@@ -141,7 +141,7 @@ class NetworkPeers {
 
   public debugLog(): string {
     if (this.peers.length == 0) {
-      return 'no connectd peers'
+      return 'no connected peers'
     }
 
     const peers = this.peers.map((entry) => entry.id)
