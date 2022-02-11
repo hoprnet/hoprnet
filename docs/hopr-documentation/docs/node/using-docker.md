@@ -20,7 +20,7 @@ To use Docker, you will need a device that supports hardware-level virtualisatio
 
 ## Installing Docker
 
-Before doing anything else, you need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac/) on your machine. Docker is natively supported in MacOS/Linux, and will prompt you with any additional requirements, depending on your operating system. Depending on your setup, you might need to follow additional steps to ensure your computer works properly with Docker.
+Before doing anything else, you need to install **Docker Desktop** on your machine. Docker is natively supported in MacOS/Linux, and will prompt you with any additional requirements, depending on your operating system. Depending on your setup, you might need to follow additional steps to ensure your computer works properly with Docker.
 
 <Tabs>
 <TabItem value="linux" label="Linux">
@@ -35,7 +35,7 @@ Depending of your distribution, please follow the official guidelines for how to
 </TabItem>
 <TabItem value="mac" label="macOS">
 
-1. Visit [Docker Hub](https://hub.docker.com/editions/community/docker-ce-desktop-mac) and download Docker Desktop to your computer.
+1. Visit [Docker](https://www.docker.com/get-started) and download Docker Desktop to your computer.
 2. Follow the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps` in your terminal.
 
@@ -44,38 +44,40 @@ Depending of your distribution, please follow the official guidelines for how to
 
 ### Downloading HOPRd image using Docker
 
+:::info NOTE
+
+Before downloading HOPRd image and starting a container, make sure the **Docker** is running.
+
+:::
+
 All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd).
 Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
-The `wildhorn-v2` tag represents the latest community release version.
+The `lisbon` tag represents the latest community release version.
 
-You can pull the Docker image like so:
+Open your console based on your OS:
 
-```bash
-docker pull gcr.io/hoprassociation/hoprd:wildhorn-v2
-```
+- Terminal (Mac OS / Linux OS)
 
-Then start a container:
+Before starting a container, please create your own **Security Token**. Replace **YOUR_SECURITY_TOKEN** with your own and only then paste the command.
 
-```bash
-docker run --pull always -ti -v $HOME/.hoprd-db-wildhorn-v2:/app/db -p 9091:9091 -p 3000:3000 -p 8080:8080 hopr/hoprd:wildhorn-v2 --password='h0pR-w1ldhorn-v2' --init --announce --identity /app/db/.hopr-id-wildhorn-v2 --apiToken='<YOUR_SECRET_TOKEN>'
-```
+:::danger Requirements
 
-Also all ports are mapped to your local host, assuming you stick to the default port numbers.
-
-:::danger Important
-
-If you want to secure your hoprd admin UI, in the command line you must use **--apiToken** tag.
-
-**<YOUR_SECRET_TOKEN\>** - Replace it with your own password (don't use "<\>").
-
-Password should contain:
+Security token should contain:
 
 - at least 8 symbols
 - a lowercase letter
 - uppercase letter
 - a number
-- a special symbol
+- a special symbol (don't use `%` or whitespace)
 
 This ensures the node cannot be accessed by a malicious user residing in the same network.
 
 :::
+
+```bash
+docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:lisbon --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --rest --restHost "0.0.0.0" --restPort 3001 --identity /app/db/.hopr-id-lisbon --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
+```
+
+Also all ports are mapped to your local host, assuming you stick to the default port numbers.
+
+The installation process has been finished! Now you can proceed to [Guide using a hoprd node](guide-using-a-hoprd-node).
