@@ -35,6 +35,8 @@ Please be aware that we have two types of tokens, both live in the **xDAI/Gnosis
 - `wxHOPR`, the ERC-777 token needed to run your `hoprd` instance and,
 - `xHOPR`, the ERC-677 token, the xDAI/Ethereum bridged `HOPR` instance
 
+You can use [cross-chains](/staking/convert-hopr) bridge to convert from HOPR to xHOPR or vice versa.
+
 You can always use our [token wrapper](https://wrapper.hoprnet.org/) to see your balances and swap tokens between each other.
 :::
 
