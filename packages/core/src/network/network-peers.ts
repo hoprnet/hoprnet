@@ -143,19 +143,36 @@ class NetworkPeers {
     if (this.peers.length == 0) {
       return 'no connected peers'
     }
-    let out = ''
-    out += `current nodes:\n`
-    this.peers
-      .sort((a, b) => {
-        return this.qualityOf(b.id) - this.qualityOf(a.id)
-      })
-      .forEach((e: Entry) => {
-        const success =
-          e.heartbeatsSent > 0 ? ((e.heartbeatsSuccess / e.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
-        out += `- id: ${e.id.toB58String()}, quality: ${this.qualityOf(e.id).toFixed(
-          2
-        )} (backoff ${e.backoff.toFixed()}, ${success} of ${e.heartbeatsSent}) \n`
-      })
+
+    const peers = this.peers.map((entry) => entry.id)
+
+    // Sort a copy of peers in-place
+    peers.sort((a, b) => this.qualityOf(b) - this.qualityOf(a))
+
+    const goodAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer) == 1.0)
+
+    const worstAvailabilityIndex = peers.findIndex((peer) => this.qualityOf(peer) == 0.0)
+
+    let out = `current: ${peers.length} nodes and ${goodAvailabilityIndex + 1} nodes with availability 1.0 and ${
+      peers.length - worstAvailabilityIndex
+    } nodes with availability 0.0:\n`
+
+    for (const peer of peers) {
+      const entryIndex = this.findIndex(peer)
+
+      if (entryIndex < 0) {
+        continue
+      }
+
+      const entry = this.peers[entryIndex]
+
+      const success =
+        entry.heartbeatsSent > 0 ? ((entry.heartbeatsSuccess / entry.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
+      out += `- id: ${entry.id.toB58String()}, quality: ${this.qualityOf(entry.id).toFixed(
+        2
+      )} (backoff ${entry.backoff.toFixed()}, ${success} of ${entry.heartbeatsSent}) \n`
+    }
+
     return out
   }
 }
