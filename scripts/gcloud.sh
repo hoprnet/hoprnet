@@ -19,8 +19,9 @@ source "${mydir}/utils.sh"
 # not in this file, as this is intended for reuse in various scenarios.
 
 GCLOUD_INCLUDED=1 # So we can test for inclusion
-ZONE="--zone=europe-west6-a"
-declare gcloud_region="--region=europe-west6"
+# using Belgium for better access to more VM types
+ZONE="--zone=europe-west1-d"
+declare gcloud_region="--region=europe-west1"
 declare gcloud_disk_name="hoprd-data-disk"
 
 # use CPU optimized machine type
@@ -55,7 +56,7 @@ gcloud_get_ip() {
 }
 
 # $1=VM name
-gcloud_find_vm_with_name() {  
+gcloud_find_vm_with_name() {
   local vm_name="${1}"
   gcloud compute instances list | grep "${vm_name}" | grep 'RUNNING'
 }
