@@ -11,15 +11,15 @@ You will be able to run a HOPR node on your AVADO box.
 Please delete the old package first, before deleting the package make sure you withdraw all your funds.
 :::
 
-While connected to your AVADO network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmew83t5YezzGQHUPaSUbKiwMLkp2keVBKUXyzWp3aR3jy). This will show a new package version. Just click the install button and wait until you see the success message. This may take some time.
+While connected to your AVADO network or via a VPN, go to the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy). This will show a new package version. Just click the install button and wait until you see the success message. This may take some time.
 
 If you are unable to use the link above, search for this hash in the AVADO DappStore:
 
 ```
-/ipfs/Qmew83t5YezzGQHUPaSUbKiwMLkp2keVBKUXyzWp3aR3jy
+/ipfs/QmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy
 ```
 
-Alternatively, you can click the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmew83t5YezzGQHUPaSUbKiwMLkp2keVBKUXyzWp3aR3jy).
+Alternatively, you can click the following [link](http://my.ava.do/#/installer/%2Fipfs%2FQmPhSZTZbM6kd9VizvZpKDN3fQe5bqvCDooCBPYEUXdTcy).
 
 ![DappStore](/img/node/avado-1.png)
 
