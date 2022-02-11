@@ -60,7 +60,9 @@ export async function createLibp2pInstance(
             publicNodes,
             environment: options.environment.id,
             allowLocalConnections: options.allowLocalConnections,
-            allowPrivateConnections: options.allowPrivateConnections
+            allowPrivateConnections: options.allowPrivateConnections,
+            // Amount of nodes for which we are willing to act as a relay
+            maxRelayedConnections: 50_000
           },
           testing: {
             // Treat local and private addresses as public addresses
@@ -95,8 +97,16 @@ export async function createLibp2pInstance(
       }
     },
     dialer: {
+      // Use custom sorting to prevent from problems with libp2p
+      // and HOPR's relay addresses
       addressSorter,
-      maxDialsPerPeer: 100
+      // Don't try to dial a peer using multiple addresses in parallel
+      maxDialsPerPeer: 1,
+      // If we are a public node, assume that our system is able to handle
+      // more connections
+      maxParallelDials: options.announce ? 250 : 50,
+      // default timeout of 30s appears to be too long
+      dialTimeout: 10e3
     }
   })
 
