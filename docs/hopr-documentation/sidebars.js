@@ -32,7 +32,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Installing a hoprd node',
-      items: ['node/start-here', 'node/using-script', 'node/using-avado', 'node/using-npm', 'node/using-docker']
+      items: ['node/start-here', 'node/using-avado', 'node/using-docker']
     },
     {
       type: 'category',
