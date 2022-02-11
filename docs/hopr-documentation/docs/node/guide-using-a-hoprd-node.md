@@ -30,12 +30,16 @@ We recommend you to fund your node with **0.01 xDai & 10 wxHOPR**.
 **Note:** After funding your node, please wait until your node will start and you will see this message: **Node has started!**
 
 :::info Tip
+
 Please be aware that we have two types of tokens, both live in the **xDAI/Gnosis Chain network**:
 
 - `wxHOPR`, the ERC-777 token needed to run your `hoprd` instance and,
 - `xHOPR`, the ERC-677 token, the xDAI/Ethereum bridged `HOPR` instance
 
+You can use [cross-chains](/staking/convert-hopr) bridge to convert from HOPR to xHOPR or vice versa.
+
 You can always use our [token wrapper](https://wrapper.hoprnet.org/) to see your balances and swap tokens between each other.
+
 :::
 
 Brief look at the admin UI:
