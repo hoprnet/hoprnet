@@ -56,6 +56,8 @@ Brief look at the admin UI:
 
 :::info
 
+Before we start, you can find all the commands explained here: [HOPRd commands](hoprd-commands).
+
 Mentioned HOPR addresses and ETH addresses are **examples**.
 
 Search HOPR addresses on your HOPR node by using command: `peers` and search for **current nodes**. Use two of the **current nodes** instead of the examples.
