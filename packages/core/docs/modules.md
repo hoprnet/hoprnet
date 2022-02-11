@@ -328,7 +328,7 @@ ___
 
 ### sampleOptions
 
-• **sampleOptions**: [`HoprOptions`](modules.md#hoproptions)
+• **sampleOptions**: `Partial`<[`HoprOptions`](modules.md#hoproptions)\>
 
 #### Defined in
 
@@ -354,7 +354,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L139)
+[packages/core/src/main.ts:149](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L149)
 
 ___
 

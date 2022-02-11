@@ -231,7 +231,7 @@ class HoprConnect implements Transport<HoprConnectDialOptions, HoprConnectListen
 
     try {
       conn = await this._upgradeOutbound(maConn as any)
-      log(conn)
+      log(`Successfully established relayed connection to ${destination.toB58String()}`)
     } catch (err) {
       error(err)
       // libp2p needs this error to understand that this connection attempt failed but we
