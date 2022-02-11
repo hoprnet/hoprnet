@@ -15,6 +15,7 @@ import type PeerId from 'peer-id'
 import {
   PublicKey,
   Balance,
+  NativeBalance,
   HoprDB,
   libp2pSubscribe,
   libp2pSendMessage,
@@ -31,7 +32,6 @@ import {
   type LibP2PHandlerFunction,
   type AcknowledgedTicket,
   type ChannelEntry,
-  type NativeBalance,
   type Address,
   type DialOpts,
   type Hash,
@@ -209,7 +209,9 @@ class Hopr extends EventEmitter {
     const nativeCurrency =
       require('../protocol-config.json')['networks'][this.environment.network.id]['native_token_name']
     verbose(
-      `Ethereum account ${this.getEthereumAddress().toHex()} has ${balance.toBN()} ${nativeCurrency}. Mininum balance is ${MIN_NATIVE_BALANCE} ${nativeCurrency}`
+      `Ethereum account ${this.getEthereumAddress().toHex()} has ${balance.toFormattedString()} ${nativeCurrency}. Mininum balance is ${new NativeBalance(
+        MIN_NATIVE_BALANCE
+      ).toFormattedString()} ${nativeCurrency}`
     )
 
     if (!balance || balance.toBN().lte(MIN_NATIVE_BALANCE)) {

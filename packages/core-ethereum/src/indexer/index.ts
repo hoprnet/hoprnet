@@ -313,6 +313,7 @@ class Indexer extends EventEmitter {
 
       try {
         events = await this.getEvents(fromBlock, toBlock, false)
+        log(`Getting events from ${fromBlock} to ${toBlock} successful, range ${toBlock - fromBlock}`)
       } catch (error) {
         failedCount++
 
