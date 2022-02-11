@@ -1,7 +1,7 @@
 import Hopr from '@hoprnet/hopr-core'
-import { Operation } from 'express-openapi'
+import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 
 /**
  * Pings another node to check its availability.

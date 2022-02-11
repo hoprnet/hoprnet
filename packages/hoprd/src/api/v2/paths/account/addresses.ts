@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
 import type Hopr from '@hoprnet/hopr-core'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 
 /**
  * @returns Native and HOPR addresses of the account associated with the node.

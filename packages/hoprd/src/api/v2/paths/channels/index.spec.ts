@@ -4,7 +4,7 @@ import { getChannels, openChannel } from '.'
 import { Balance, ChannelEntry, NativeBalance } from '@hoprnet/hopr-utils'
 import { invalidTestPeerId, testChannelId, testPeerId, testPeerIdInstance } from '../../fixtures'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(testPeerIdInstance)

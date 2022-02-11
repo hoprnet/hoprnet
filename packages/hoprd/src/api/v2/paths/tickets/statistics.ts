@@ -1,6 +1,6 @@
 import Hopr from '@hoprnet/hopr-core'
-import { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../'
+import type { Operation } from 'express-openapi'
+import { STATUS_CODES } from '../../utils'
 
 export const getTicketsStatistics = async (node: Hopr) => {
   const stats = await node.getTicketStatistics()

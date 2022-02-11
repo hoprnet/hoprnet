@@ -1,6 +1,6 @@
 import sinon from 'sinon'
 import assert from 'assert'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 import { createTestMocks } from '../../fixtures'
 import { setSetting } from './{setting}'
 

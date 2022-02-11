@@ -50,6 +50,7 @@ type Message = {
 //
 // @implements LoggerService of nestjs
 export class LogStream {
+  private messageListeners: ((msg: Message) => void)[] = []
   private messages: Message[] = []
   private connections: Socket[] = []
   private did: DID = undefined
@@ -166,9 +167,22 @@ export class LogStream {
         }
       }
     })
+
+    // emit new message to listeners
+    for (const listener of this.messageListeners) {
+      listener(msg)
+    }
   }
 
   _sendMessage(m: Message, s: Socket) {
     s.send(JSON.stringify(m))
+  }
+
+  /**
+   * Listen to new messages
+   * @param listener callback function to call on every new message
+   */
+  public addMessageListener(listener: (msg: Message) => void) {
+    this.messageListeners.push(listener)
   }
 }

@@ -1,7 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import PeerId from 'peer-id'
-import { STATUS_CODES } from '../../../'
+import { STATUS_CODES } from '../../../utils'
 import { formatTicket } from '../../tickets'
 
 export const getTickets = async (node: Hopr, peerId: string) => {

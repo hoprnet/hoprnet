@@ -35,7 +35,7 @@ export default function setupAPI(
 
     apiV1.setupRestApi(service, '/api/v1', node, logs, stateOps, options)
     apiV2.setupRestApi(service, '/api/v2', node, stateOps, options)
-    apiV2.setupWsApi(server, new ws.Server({ noServer: true }), node, options)
+    apiV2.setupWsApi(server, new ws.Server({ noServer: true }), node, logs, options)
 
     server
       .listen(options.apiPort, options.apiHost, () => {

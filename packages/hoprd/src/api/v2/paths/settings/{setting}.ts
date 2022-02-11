@@ -1,7 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 import type { State, StateOps } from '../../../../types'
 
 /**

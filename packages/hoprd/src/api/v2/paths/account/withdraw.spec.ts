@@ -2,7 +2,7 @@ import assert from 'assert'
 import BN from 'bn.js'
 import sinon from 'sinon'
 import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 import { withdraw } from './withdraw'
 import { testEthAddress } from '../../fixtures'
 
