@@ -617,7 +617,6 @@ class Indexer extends EventEmitter {
       multiaddrs: [account.multiAddr]
     })
     await this.db.updateAccount(account)
-    console.log(await this.db.getAccount(account.address))
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
@@ -642,7 +641,8 @@ class Indexer extends EventEmitter {
     }
 
     this.emit('channel-update', channel)
-    log('channel-update for channel %s', channel)
+    log('channel-update for channel')
+    log(channel.toString())
 
     if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       this.emit('own-channel-updated', channel)
@@ -650,7 +650,8 @@ class Indexer extends EventEmitter {
       if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
-          log('channel to us waiting for commitment', channel)
+          log('channel to us waiting for commitment')
+          log(channel.toString())
           this.emit('channel-waiting-for-commitment', channel)
         }
       }
