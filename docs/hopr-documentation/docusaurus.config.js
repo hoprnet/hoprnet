@@ -3,8 +3,8 @@
 
 const lightCodeTheme = require('prism-react-renderer/themes/github')
 const darkCodeTheme = require('prism-react-renderer/themes/dracula')
-const math = require('remark-math');
-const katex = require('rehype-katex');
+const math = require('remark-math')
+const katex = require('rehype-katex')
 const { DOCS_URL } = require('./consts')
 const { DOCS_ALGOLIA_APP_ID, DOCS_ALGOLIA_API_KEY } = process.env
 
@@ -60,9 +60,8 @@ const config = {
     {
       href: 'https://cdn.jsdelivr.net/npm/katex@0.13.24/dist/katex.min.css',
       type: 'text/css',
-      integrity:
-        'sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM',
-      crossorigin: 'anonymous',
+      integrity: 'sha384-odtC+0UGzzFL/6PNoE8rX/SPcQDXBJ+uRepguP4QkPCm2LBxH3FA3y+fKSiJ+AmM',
+      crossorigin: 'anonymous'
     },
     'https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@200;300;400;500;600;700&display=swap',
     'https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;1,100;1,300;1,400&display=swap',
@@ -137,7 +136,7 @@ const config = {
         copyright: `©${new Date().getFullYear()} HOPR Association, all rights reserved`
       },
       prism: {
-        additionalLanguages: ["solidity"],
+        additionalLanguages: ['solidity'],
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme
       }
