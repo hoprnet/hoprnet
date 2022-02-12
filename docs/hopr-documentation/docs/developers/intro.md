@@ -88,6 +88,8 @@ $$
 St(N_i) = uT(N_i) + \sum_{j} B(C_{N_iN_j})
 $$
 
+In the protocol, the **importance score** is implemented as the function `importance` in the [packages/cover-traffic-daemon/src/utils.ts](https://github.com/hoprnet/hoprnet/blob/master/packages/cover-traffic-daemon/src/utils.ts)
+
 #### Deployed Channel contracts
 
 _HoprChannels_ smart contract of the last public testnet - "Wildhorn v2" is deployed on Gnosis Chain at [0xF69C45B4246FD91F17AB9851987c7F100e0273cF](https://blockscout.com/xdai/mainnet/address/0xF69C45B4246FD91F17AB9851987c7F100e0273cF/contracts).
