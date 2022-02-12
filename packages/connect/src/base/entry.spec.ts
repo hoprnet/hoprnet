@@ -429,7 +429,6 @@ describe('entry node functionality', function () {
   })
 
   it('do not contact nodes we are already connected to', async function () {
-
     const entryNodes = new TestingEntryNodes(
       peerId,
       // Make sure that call is indeed asynchronous
@@ -457,7 +456,5 @@ describe('entry node functionality', function () {
     assert(usedRelays.length == 1, `must not expose any internal addrs`)
 
     entryNodes.stop()
-
   })
-
 })

@@ -240,8 +240,7 @@ export class EntryNodes extends EventEmitter {
       const firstUsableAddress = usableAddresses[0]
 
       // Ignore if we're already connected to the address
-      if (this.usedRelays.some((usedRelay) => compareDirectConnectionInfo(usedRelay, firstUsableAddress)))
-        continue;
+      if (this.usedRelays.some((usedRelay) => compareDirectConnectionInfo(usedRelay, firstUsableAddress))) continue
 
       nodesToCheck.push({
         id: uncheckedNode.id,
