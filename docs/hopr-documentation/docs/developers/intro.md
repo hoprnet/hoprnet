@@ -11,6 +11,12 @@ HOPR apps are a key component in that equation. Developers can build application
 provide users with a private channel for exchanging information. At the same time, HOPR apps create traffic within
 the network, increasing the amount of noise mixers use to protect the entire ecosystem.
 
+There are two ways of building applications with HOPR protocol:
+
+- Building dApps on top of the REST API
+- Buildling protocol applications directly with the TypeScript source code
+  ![HOPR protocol stack](/img/developer/architecture.jpg)
+
 ### Use cases
 
 Here are some of the use cases we believe the HOPR network is a great tool for:
@@ -40,3 +46,20 @@ We use the [OpenAPI standard](https://swagger.io/specification/) to document our
 ["REST API"](/developers/rest-api) section.
 
 If you are running a hoprd node, you can see the actually exposed API endpoint of YOUR node at [http://localhost:3001/api/v2/\_swagger/](http://localhost:3001/api/v2/_swagger/)
+
+### Visualizing topology of HOPR network
+
+Before data packets can be sent between HOPR nodes, nodes need to possess **HOPR** tokens (or **tHOPR** for testnets) and open payment channels with other nodes in the _HoprChannels_ smart contract. By monitoring opening, closing and updates of payment channels through events emitted from _HoprChannels_, the topology of the current HOPR network can be effectively mapped out.
+
+The following events are relevant for visualizing the network topology:
+
+- `ChannelUpdated`
+- `ChannelOpened`
+- `ChannelFunded`
+- `ChannelClosureInitiated`
+- `ChannelClosureFinalized`
+
+A full specification of all the events from _HoprChannels_ smart contract is detailed in section ["Smart Contract Overview"](/developers/smart-contract)
+
+_HoprChannels_ smart contract of the last public testnet - "Wildhorn v2" is deployed on Gnosis Chain at [0xF69C45B4246FD91F17AB9851987c7F100e0273cF](https://blockscout.com/xdai/mainnet/address/0xF69C45B4246FD91F17AB9851987c7F100e0273cF/contracts).
+For reference, [HOPR xDAI Testnet - Wildhorn v2 Dashboard](https://dune.xyz/hoprnet/HOPR-xDAI-Testnet-Wildhorn-v2) shows some statistics about this public testnet. The analysis is done with on-chain data of emitted events and transaction calls.

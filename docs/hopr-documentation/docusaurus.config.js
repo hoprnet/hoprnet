@@ -126,6 +126,7 @@ const config = {
         copyright: `©${new Date().getFullYear()} HOPR Association, all rights reserved`
       },
       prism: {
+        additionalLanguages: ["solidity"],
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme
       }
