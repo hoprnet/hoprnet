@@ -427,4 +427,37 @@ describe('entry node functionality', function () {
     entryNodes.stop()
     network.close()
   })
+
+  it('do not contact nodes we are already connected to', async function () {
+
+    const entryNodes = new TestingEntryNodes(
+      peerId,
+      // Make sure that call is indeed asynchronous
+      (async () => new Promise((resolve) => setImmediate(resolve))) as any,
+      {}
+    )
+
+    const ma = new Multiaddr('/ip4/8.8.8.8/tcp/9091')
+
+    entryNodes.usedRelays.push(ma)
+
+    entryNodes.start()
+
+    const peerStoreEntry = getPeerStoreEntry(ma.toString())
+
+    entryNodes.onNewRelay(peerStoreEntry)
+
+    const uncheckedNodes = entryNodes.getUncheckedEntryNodes()
+
+    assert(uncheckedNodes.length == 1, `Unchecked nodes must contain one entry`)
+    assert(uncheckedNodes[0].id.equals(peerStoreEntry.id), `id must match the generated one`)
+    assert(uncheckedNodes[0].multiaddrs.length == peerStoreEntry.multiaddrs.length, `must not contain more multiaddrs`)
+
+    const usedRelays = entryNodes.getUsedRelays()
+    assert(usedRelays.length == 1, `must not expose any internal addrs`)
+
+    entryNodes.stop()
+
+  })
+
 })

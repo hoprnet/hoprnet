@@ -40,6 +40,14 @@ function latencyCompare(a: ConnectionResult, b: ConnectionResult) {
   return a.entry.latency - b.entry.latency
 }
 
+function isUsableRelay(ma: Multiaddr) {
+  const tuples = ma.tuples()
+
+  return (
+    tuples[0].length >= 2 && [CODE_IP4, CODE_IP6].includes(tuples[0][0]) && [CODE_UDP, CODE_TCP].includes(tuples[1][0])
+  )
+}
+
 export const RELAY_CHANGED_EVENT = 'relay:changed'
 
 export const ENTRY_NODES_MAX_PARALLEL_DIALS = 14
@@ -135,23 +143,9 @@ export class EntryNodes extends EventEmitter {
     return this.uncheckedEntryNodes
   }
 
-  private isUsableRelay(ma: Multiaddr) {
-    const tuples = ma.tuples()
-
-    // Check if it's IPv4 or IPv6 address via TCP or UDP and we're not already connected to it
-    if (
-      tuples[0].length >= 2 &&
-      [CODE_IP4, CODE_IP6].includes(tuples[0][0]) &&
-      [CODE_UDP, CODE_TCP].includes(tuples[1][0])
-    )
-      return !this.usedRelays.some((usedRelay) => compareDirectConnectionInfo(usedRelay, ma))
-
-    return false
-  }
-
   /**
    * Called once there is a new relay opportunity known
-   * @param peer Multiaddr of node that is added as a relay opportunity
+   * @param ma Multiaddr of node that is added as a relay opportunity
    */
   protected onNewRelay(peer: PeerStoreType) {
     if (peer.id.equals(this.peerId)) {
@@ -173,7 +167,7 @@ export class EntryNodes extends EventEmitter {
 
     this.uncheckedEntryNodes.push({
       id: peer.id,
-      multiaddrs: peer.multiaddrs.filter(this.isUsableRelay.bind(this))
+      multiaddrs: peer.multiaddrs.filter(isUsableRelay)
     })
 
     // Stop adding and checking relay nodes if we already have enough.
@@ -186,7 +180,7 @@ export class EntryNodes extends EventEmitter {
 
   /**
    * Called once a node is considered to be offline
-   * @param peer Multiaddr of node that is considered to be offline now
+   * @param ma Multiaddr of node that is considered to be offline now
    */
   protected onRemoveRelay(peer: PeerId) {
     for (const [index, publicNode] of this.availableEntryNodes.entries()) {
@@ -225,7 +219,7 @@ export class EntryNodes extends EventEmitter {
         continue
       }
 
-      const usableAddresses: Multiaddr[] = uncheckedNode.multiaddrs.filter(this.isUsableRelay.bind(this))
+      const usableAddresses: Multiaddr[] = uncheckedNode.multiaddrs.filter(isUsableRelay)
 
       if (knownNodes.has(uncheckedNode.id.toB58String())) {
         const index = this.availableEntryNodes.findIndex((entry) => entry.id.equals(uncheckedNode.id))
@@ -243,9 +237,15 @@ export class EntryNodes extends EventEmitter {
       }
 
       // Ignore if entry nodes have more than one address
+      const firstUsableAddress = usableAddresses[0]
+
+      // Ignore if we're already connected to the address
+      if (this.usedRelays.some((usedRelay) => compareDirectConnectionInfo(usedRelay, firstUsableAddress)))
+        continue;
+
       nodesToCheck.push({
         id: uncheckedNode.id,
-        multiaddrs: [usableAddresses[0]]
+        multiaddrs: [firstUsableAddress]
       })
     }
 
@@ -360,7 +360,7 @@ export class EntryNodes extends EventEmitter {
     try {
       conn = await this.dialDirectly(relay, { signal: abort.signal })
     } catch (err: any) {
-      error(`error while contacting entry node ${relay.toString()}.`, err.message)
+      error(`error while contacting entry node.`, err.message)
     } finally {
       // Prevent timeout from doing anything
       finished = true
