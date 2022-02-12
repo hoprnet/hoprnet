@@ -57,7 +57,7 @@
     "it-pipe": "1.1.0",
     "it-pushable": "1.4.2",
     "libp2p": "0.35.8",
-    "libp2p-interfaces": "2.0.0",
+    "libp2p-interfaces": "2.0.9",
     "libp2p-mplex": "0.10.7",
     "mocha": "9.1.4",
     "prettier": "2.5.1",

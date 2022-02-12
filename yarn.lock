@@ -3101,7 +3101,7 @@ __metadata:
     it-pipe: 1.1.0
     it-pushable: 1.4.2
     libp2p: 0.35.8
-    libp2p-interfaces: 2.0.0
+    libp2p-interfaces: 2.0.9
     libp2p-mplex: 0.10.7
     mocha: 9.1.4
     multiaddr: 10.0.1
@@ -15779,13 +15779,24 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-interfaces@npm:2.0.0":
-  version: 2.0.0
-  resolution: "libp2p-interfaces@npm:2.0.0"
+"libp2p-interfaces@npm:2.0.9":
+  version: 2.0.9
+  resolution: "libp2p-interfaces@npm:2.0.9"
   dependencies:
+    abortable-iterator: ^3.0.0
+    debug: ^4.3.1
+    err-code: ^3.0.1
+    it-length-prefixed: ^5.0.2
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
+    libp2p-crypto: ^0.21.0
     multiaddr: ^10.0.0
-    multiformats: ^9.4.10
-  checksum: 0c3c81cff6a74087c54f2d85222fe88dbac3a4c6a526b0964788eaa73bbb253bb7211d6bae2e2c68fa89ab5c8088d6e51ac1d1c91b21732a0e378998d096be80
+    multiformats: ^9.1.2
+    p-queue: ^6.6.2
+    peer-id: ^0.16.0
+    protobufjs: ^6.10.2
+    uint8arrays: ^3.0.0
+  checksum: 68f20f433f62ec3e52120dc1148b1a3fe4582e968b9d2d9008c64eeeb73604551d31d7eb2f728c3e2fba9b3e0736ab1b62a9f66a0220d64c3315dff68113b7d3
   languageName: node
   linkType: hard
 
