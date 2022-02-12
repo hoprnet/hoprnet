@@ -20,10 +20,13 @@
     "@svgr/webpack": "6.2.1",
     "clsx": "^1.1.1",
     "file-loader": "6.2.0",
+    "hast-util-is-element": "1.1.0",
     "prism-react-renderer": "1.2.1",
     "react": "17.0.2",
     "react-dom": "17.0.2",
     "redocusaurus": "^0.6.0",
+    "rehype-katex": "5",
+    "remark-math": "3",
     "url-loader": "4.1.1"
   },
   "browserslist": {
