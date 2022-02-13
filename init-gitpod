@@ -21,22 +21,24 @@ export HOPR_NODE_5_HTTP_URL=$(gp url 13305)
 export HOPR_NODE_5_WS_URL=$(gp url 19505)
 export HOPR_NODE_5_ADDR=$(curl --silent -H "x-auth-token: $apiToken" "$HOPR_NODE_5_HTTP_URL/api/v2/account/addresses" | jq -r '.hopr')
 
-echo "🌐 Node 1 REST API URL: $HOPR_NODE_1_HTTP_URL"
-echo "🔌 Node 1 WS URL: $HOPR_NODE_1_WS_URL"
-echo "💻 Node 1 HOPR address: $HOPR_NODE_1_ADDR"
-
-echo "🌐 Node 2 REST API URL: $HOPR_NODE_2_HTTP_URL"
-echo "🔌 Node 2 WS URL: $HOPR_NODE_2_WS_URL"
-echo "💻 Node 2 HOPR address: $HOPR_NODE_2_ADDR"
-
-echo "🌐 Node 3 REST API URL: $HOPR_NODE_3_HTTP_URL"
-echo "🔌 Node 3 WS URL: $HOPR_NODE_3_WS_URL"
-echo "💻 Node 3 HOPR address: $HOPR_NODE_3_ADDR"
-
-echo "🌐 Node 4 REST API URL: $HOPR_NODE_4_HTTP_URL"
-echo "🔌 Node 4 WS URL: $HOPR_NODE_4_WS_URL"
-echo "💻 Node 4 HOPR address: $HOPR_NODE_4_ADDR"
-
-echo "🌐 Node 5 REST API URL: $HOPR_NODE_5_HTTP_URL"
-echo "🔌 Node 5 WS URL: $HOPR_NODE_5_WS_URL"
-echo "💻 Node 5 HOPR address: $HOPR_NODE_5_ADDR"
+echo -e "\n"
+echo "🌐 Node 1 REST API URL:  $HOPR_NODE_1_HTTP_URL"
+echo "🔌 Node 1 WebSocket URL: $HOPR_NODE_1_WS_URL"
+echo "💻 Node 1 HOPR Address:  $HOPR_NODE_1_ADDR"
+echo "---"
+echo "🌐 Node 2 REST API URL:  $HOPR_NODE_2_HTTP_URL"
+echo "🔌 Node 2 WebSocket URL: $HOPR_NODE_2_WS_URL"
+echo "💻 Node 2 HOPR Address:  $HOPR_NODE_2_ADDR"
+echo "---"
+echo "🌐 Node 3 REST API URL:  $HOPR_NODE_3_HTTP_URL"
+echo "🔌 Node 3 WebSocket URL: $HOPR_NODE_3_WS_URL"
+echo "💻 Node 3 HOPR Address:  $HOPR_NODE_3_ADDR"
+echo "---"
+echo "🌐 Node 4 REST API URL:  $HOPR_NODE_4_HTTP_URL"
+echo "🔌 Node 4 WebSocket URL: $HOPR_NODE_4_WS_URL"
+echo "💻 Node 4 HOPR Address:  $HOPR_NODE_4_ADDR"
+echo "---"
+echo "🌐 Node 5 REST API URL:  $HOPR_NODE_5_HTTP_URL"
+echo "🔌 Node 5 WebSocket URL: $HOPR_NODE_5_WS_URL"
+echo "💻 Node 5 HOPR Address:  $HOPR_NODE_5_ADDR"
+echo -e "\n"
