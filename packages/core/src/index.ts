@@ -206,12 +206,11 @@ class Hopr extends EventEmitter {
     log('Starting hopr node...')
 
     const balance = await this.connector.getNativeBalance(false)
-    const nativeCurrency =
-      require('../protocol-config.json')['networks'][this.environment.network.id]['native_token_name']
+
     verbose(
-      `Ethereum account ${this.getEthereumAddress().toHex()} has ${balance.toFormattedString()} ${nativeCurrency}. Mininum balance is ${new NativeBalance(
+      `Ethereum account ${this.getEthereumAddress().toHex()} has ${balance.toFormattedString()}. Mininum balance is ${new NativeBalance(
         MIN_NATIVE_BALANCE
-      ).toFormattedString()} ${nativeCurrency}`
+      ).toFormattedString()}`
     )
 
     if (!balance || balance.toBN().lte(MIN_NATIVE_BALANCE)) {
