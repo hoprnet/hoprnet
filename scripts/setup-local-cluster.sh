@@ -318,6 +318,7 @@ log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEnd
 
 declare env_file=$(mktemp)
 {
+echo "#!/usr/bin/env bash" ;
 echo "\$(return >/dev/null 2>&1)" ;
 echo "test \"\$?\" -eq \"0\" || { echo \"This script should only be sourced.\" >&2; exit 1; }" ;
 echo "export apiToken=${api_token}" ;
