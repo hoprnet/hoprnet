@@ -1,3 +1,4 @@
+import { setImmediate } from 'timers/promises'
 import { type default as LibP2P, type Connection } from 'libp2p'
 
 import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
@@ -494,6 +495,8 @@ class Hopr extends EventEmitter {
       } catch (e) {
         log(`error when strategy trying to close channel to ${destination.toString()}`, e)
       }
+      // Give other tasks time to happen
+      await setImmediate()
     }
 
     verbose(`strategy wants to open ${nextChannelDestinations.length} new channels`)
@@ -508,6 +511,8 @@ class Hopr extends EventEmitter {
       } catch (e) {
         log(`error when strategy trying to open channel to ${channel[0].toString()}`, e)
       }
+      // Give other tasks time to happen
+      await setImmediate()
     }
   }
 
