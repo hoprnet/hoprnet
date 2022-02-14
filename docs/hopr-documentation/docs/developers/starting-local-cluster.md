@@ -1,6 +1,6 @@
 ---
 id: starting-local-cluster
-title: Running a local HOPR Cluster
+title: HOPR Cluster Development Setup
 ---
 
 The best way to learn and develop the HOPR protocol is by interacting with a HOPR node connected inside the HOPR network.

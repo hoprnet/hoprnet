@@ -73,7 +73,8 @@ const sidebars = {
         'developers/demo-boomerang-chat',
         'developers/demo-rps-game',
         'developers/rest-api',
-        'developers/smart-contract'
+        'developers/smart-contract',
+        'developers/visualising-hopr-network-topology'
       ]
     },
     /*{
