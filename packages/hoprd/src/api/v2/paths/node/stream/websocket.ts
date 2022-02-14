@@ -10,11 +10,11 @@ export const GET: Operation = [
 // This endpoint only exists to document the websocket's behaviour.
 GET.apiDoc = {
   description: generateWsApiDescription(
-    'This is a websocket endpoint which streams legacy hopr-admin logs excluding messages.',
+    'This is a websocket endpoint which streams legacy hopr-admin data excluding messages.',
     '/node/logs/websocket'
   ),
   tags: ['Node'],
-  operationId: 'nodeLogsWebsocket',
+  operationId: 'nodeStreamWebsocket',
   deprecated: true,
   responses: {
     ...WS_DEFAULT_RESPONSES,
@@ -27,28 +27,28 @@ GET.apiDoc = {
             properties: {
               type: {
                 type: 'string',
-                description: 'Type of log',
-                examples: ['log', 'fatal-error', 'status', 'connected']
+                description: 'Type of data',
+                example: ['log', 'fatal-error', 'status', 'connected']
               },
               timestamp: {
                 type: 'number',
-                description: 'Timestamp in miliseconds'
+                description: 'Timestamp in miliseconds',
+                example: 1644587213977
               },
               content: {
                 type: 'string',
-                description: 'The log message'
+                description: 'The text content',
+                example: 'Opening channel...'
               }
             }
+          },
+          example: {
+            type: 'log',
+            timestamp: 1644587213977,
+            content: 'Opening channel...'
           }
         }
-      },
-      examples: [
-        {
-          type: 'log',
-          timestamp: 1644587213977,
-          content: 'Opening channel...'
-        }
-      ]
+      }
     }
   }
 }

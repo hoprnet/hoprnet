@@ -23,10 +23,10 @@ GET.apiDoc = {
         'application/text': {
           schema: {
             type: 'string'
-          }
+          },
+          example: 'This is a super secret message'
         }
-      },
-      examples: ['This is a super secret message', "How it's going?"]
+      }
     }
   }
 }
