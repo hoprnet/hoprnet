@@ -15,7 +15,7 @@ export async function wait(milliseconds: number): Promise<void> {
  * @param options.maxDelay maximum delay, we reject once we reach this
  * @param options.delayMultiple multiplier to apply to increase running delay
  */
-export async function retryWithBackoff<T>(
+export function retryWithBackoff<T>(
   fn: () => Promise<T>,
   options: {
     minDelay?: number
@@ -24,25 +24,33 @@ export async function retryWithBackoff<T>(
   } = {}
 ): Promise<T> {
   const { minDelay = durations.seconds(1), maxDelay = durations.minutes(10), delayMultiple = 2 } = options
-  let delay = minDelay
 
   if (minDelay >= maxDelay) {
-    throw Error('minDelay should be smaller than maxDelay')
+    return Promise.reject(Error('minDelay should be smaller than maxDelay'))
   } else if (delayMultiple <= 1) {
-    throw Error('delayMultiple should be larger than 1')
+    return Promise.reject(Error('delayMultiple should be larger than 1'))
   }
 
-  while (true) {
-    try {
-      return await fn()
-    } catch (err) {
-      if (delay >= maxDelay) {
-        throw err
-      }
-      log(`failed, attempting again in ${delay} (${err})`)
+  return new Promise<T>((resolve, reject) => {
+    // Use call-by-reference
+    const state = {
+      delay: minDelay
     }
 
-    await wait(delay)
-    delay = delay * delayMultiple
-  }
+    const fetch = () => {
+      fn().then(resolve, (err: any) => {
+        if (state.delay >= maxDelay) {
+          reject(err)
+        }
+        log(`failed, attempting again in ${state.delay} (${err})`)
+
+        setImmediate(() => {
+          wait(state.delay).then(fetch)
+          state.delay = state.delay * delayMultiple
+        })
+      })
+    }
+
+    fetch()
+  })
 }
