@@ -58,26 +58,24 @@ Open your console based on your OS:
 
 - Terminal (Mac OS / Linux OS)
 
-Before starting a container, please create your own **Secret Token**. Replace "**<YOUR_SECRET_TOKEN\>**" with your own Secret Token and only then paste the command.
+Before starting a container, please create your own **Security Token**. Replace **YOUR_SECURITY_TOKEN** with your own and only then paste the command.
 
-:::danger Important
+:::danger Requirements
 
-Create your own password and replace it with **<YOUR_SECRET_TOKEN\>** (don't use "<\>").
-
-Password should contain:
+Security token should contain:
 
 - at least 8 symbols
 - a lowercase letter
 - uppercase letter
 - a number
-- a special symbol
+- a special symbol (don't use `%` or whitespace)
 
 This ensures the node cannot be accessed by a malicious user residing in the same network.
 
 :::
 
 ```bash
-docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:athens --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --rest --restHost "0.0.0.0" --restPort 3001 --identity /app/db/.hopr-id-athens --apiToken '<YOUR_SECRET_TOKEN>' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
+docker run --pull always -ti -v $HOME/.hoprd-db:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:athens --admin --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --init --rest --restHost "0.0.0.0" --restPort 3001 --identity /app/db/.hopr-id-athens --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --adminPort 3000 --host "0.0.0.0:9091"
 ```
 
 Also all ports are mapped to your local host, assuming you stick to the default port numbers.
