@@ -24,7 +24,7 @@ tasks:
       gp sync-await "local-cluster" && sleep 15s
 
     command: |
-      source ./init-gitpod
+      source ./scripts/init-gitpod.sh
 
     openMode: tab-after
 
@@ -35,7 +35,7 @@ tasks:
       gp sync-await "local-cluster" && sleep 15s
 
     command: |
-      source ./init-gitpod
+      source ./scripts/init-gitpod.sh
       echo '📡 Node 1 WS Connection'
       echo -e "\n"
       sleep 5s
@@ -50,7 +50,7 @@ tasks:
       gp sync-await "local-cluster" && sleep 15s
 
     command: |
-      source ./init-gitpod
+      source ./scripts/init-gitpod.sh
       echo '📡 Node 2 WS Connection'
       echo -e "\n"
       sleep 5s
