@@ -1,4 +1,4 @@
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 import assert from 'assert'
 import { getAliases, setAlias } from '.'
 import { createTestMocks, invalidTestPeerId, testAlias, testPeerId } from '../../fixtures'

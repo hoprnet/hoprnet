@@ -1,7 +1,7 @@
 import sinon from 'sinon'
 import assert from 'assert'
 import { ping } from './ping'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 import { invalidTestPeerId, testPeerId } from '../../fixtures'
 
 let node = sinon.fake() as any

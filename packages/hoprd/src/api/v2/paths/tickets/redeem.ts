@@ -1,5 +1,5 @@
-import { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../'
+import type { Operation } from 'express-openapi'
+import { STATUS_CODES } from '../../utils'
 
 export const POST: Operation = [
   async (req, res, _next) => {

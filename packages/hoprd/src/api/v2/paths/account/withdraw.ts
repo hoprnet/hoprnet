@@ -2,7 +2,7 @@ import type { Operation } from 'express-openapi'
 import type Hopr from '@hoprnet/hopr-core'
 import { Address } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 
 /**
  * Withdraws specified amount of specified currency from the node.

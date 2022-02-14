@@ -1,4 +1,4 @@
-import { Operation } from 'express-openapi'
+import type { Operation } from 'express-openapi'
 import { POST as original } from '../messages/sign'
 
 /*

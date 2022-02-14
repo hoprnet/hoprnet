@@ -3,7 +3,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import { ChannelStatus, PublicKey } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'

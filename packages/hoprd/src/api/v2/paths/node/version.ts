@@ -1,5 +1,5 @@
-import { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../'
+import type { Operation } from 'express-openapi'
+import { STATUS_CODES } from '../../utils'
 
 export const GET: Operation = [
   (req, res, _next) => {
