@@ -207,7 +207,7 @@ get_native_address(){
   local result
   result=$(try_cmd "${cmd}" 30 5)
 
-  echo $(echo ${result} | jq -r ".nativeAddress")
+  echo $(echo ${result} | jq -r ".native")
 }
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
@@ -219,7 +219,7 @@ get_hopr_address() {
   local result
   result=$(try_cmd "${cmd}" 30 5)
 
-  echo $(echo ${result} | jq -r ".hoprAddress")
+  echo $(echo ${result} | jq -r ".hopr")
 }
 
 # $1 = endpoint
