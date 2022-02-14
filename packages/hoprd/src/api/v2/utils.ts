@@ -28,7 +28,7 @@ export const STATUS_CODES = {
  */
 export const WS_DEFAULT_RESPONSES: Record<string, { description: string }> = {
   '101': {
-    description: 'Switcing protocols'
+    description: 'Switching protocols'
   },
   '401': {
     description: 'Unauthorized'
