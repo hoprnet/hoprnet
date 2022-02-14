@@ -193,9 +193,10 @@ export function setupWsApi(
       })
     } else if (path === WS_PATHS.LOGS) {
       logStream.addMessageListener((msg) => {
-        if (msg.type === 'log') {
+        if (msg.type !== 'message') {
           socket.send({
-            ts: msg.ts,
+            type: msg.type,
+            timestamp: msg.ts,
             content: msg.msg
           })
         }

@@ -42,7 +42,7 @@ class Queue {
 const queue = new Queue({ maxConcurrency: 1 })
 
 type Message = {
-  type: string
+  type: 'log' | 'fatal-error' | 'status' | 'connected' | 'message'
   msg: string
   ts: string
 }
@@ -71,7 +71,7 @@ export class LogStream {
   }
 
   log(...args: string[]) {
-    const msg = { type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString() }
+    const msg: Message = { type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString() }
     this._log(msg)
   }
 
@@ -81,7 +81,7 @@ export class LogStream {
   }
 
   logFatalError(message: string) {
-    const msg = { type: 'fatal-error', msg: message, ts: new Date().toISOString() }
+    const msg: Message = { type: 'fatal-error', msg: message, ts: new Date().toISOString() }
     this._log(msg)
   }
 
@@ -98,22 +98,22 @@ export class LogStream {
   }
 
   logStatus(status: 'READY' | 'PENDING') {
-    const msg = { type: 'status', msg: status, ts: new Date().toISOString() }
+    const msg: Message = { type: 'status', msg: status, ts: new Date().toISOString() }
     this._log(msg)
   }
 
   logFullLine(...args: string[]) {
-    const msg = { type: 'log', msg: args.join(' '), ts: new Date().toISOString() }
+    const msg: Message = { type: 'log', msg: args.join(' '), ts: new Date().toISOString() }
     this._log(msg)
   }
 
   logConnectedPeers(peers: string[]) {
-    const msg = { type: 'connected', msg: peers.join(','), ts: new Date().toISOString() }
+    const msg: Message = { type: 'connected', msg: peers.join(','), ts: new Date().toISOString() }
     this._log(msg)
   }
 
   logMessage(...args: string[]) {
-    const msg = { type: 'message', msg: args.join(' '), ts: new Date().toISOString() }
+    const msg: Message = { type: 'message', msg: args.join(' '), ts: new Date().toISOString() }
     this._log(msg)
   }
 
@@ -168,7 +168,7 @@ export class LogStream {
       }
     })
 
-    // emit new message to listeners
+    // send message to all listeners
     for (const listener of this.messageListeners) {
       listener(msg)
     }
@@ -184,5 +184,10 @@ export class LogStream {
    */
   public addMessageListener(listener: (msg: Message) => void) {
     this.messageListeners.push(listener)
+
+    // send cached messages to this listener
+    for (const msg of this.messages) {
+      listener(msg)
+    }
   }
 }

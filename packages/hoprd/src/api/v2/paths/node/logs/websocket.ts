@@ -10,7 +10,7 @@ export const GET: Operation = [
 // This endpoint only exists to document the websocket's behaviour.
 GET.apiDoc = {
   description: generateWsApiDescription(
-    'This is a websocket endpoint which streams legacy hopr-admin logs.',
+    'This is a websocket endpoint which streams legacy hopr-admin logs excluding messages.',
     '/node/logs/websocket'
   ),
   tags: ['Node'],
@@ -19,13 +19,18 @@ GET.apiDoc = {
   responses: {
     ...WS_DEFAULT_RESPONSES,
     '206': {
-      description: 'Incoming data',
+      description: 'Incoming data.',
       content: {
-        'application/text': {
+        'application/json': {
           schema: {
             type: 'object',
             properties: {
-              ts: {
+              type: {
+                type: 'string',
+                description: 'Type of log',
+                examples: ['log', 'fatal-error', 'status', 'connected']
+              },
+              timestamp: {
                 type: 'number',
                 description: 'Timestamp in miliseconds'
               },
@@ -34,17 +39,16 @@ GET.apiDoc = {
                 description: 'The log message'
               }
             }
-          },
-          example: JSON.stringify(
-            {
-              ts: 1644587213977,
-              content: 'Opening channel...'
-            },
-            null,
-            2
-          )
+          }
         }
-      }
+      },
+      examples: [
+        {
+          type: 'log',
+          timestamp: 1644587213977,
+          content: 'Opening channel...'
+        }
+      ]
     }
   }
 }
