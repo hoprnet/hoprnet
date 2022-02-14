@@ -318,6 +318,8 @@ log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEnd
 
 declare env_file=$(mktemp)
 {
+echo "\$(return >/dev/null 2>&1)" ;
+echo "test \"\$?\" -eq \"0\" || { echo \"This script should only be sourced.\" >&2; exit 1; }" ;
 echo "export apiToken=${api_token}" ;
 echo "export HOPR_NODE_1_ADDR=${peers[0]} HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=http://127.0.0.1:19501" ;
 echo "export HOPR_NODE_2_ADDR=${peers[1]} HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_2_WS_URL=http://127.0.0.1:19501" ;
