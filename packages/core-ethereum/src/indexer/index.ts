@@ -31,9 +31,6 @@ import { errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 import { TypedEvent } from '@hoprnet/hopr-ethereum'
 
-type WorkerType = ((err: Error, events: TypedEvent<any, any>[] | undefined) => void) &
-  ((err: Error | undefined, events: TypedEvent<any, any>[]) => void)
-
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
@@ -303,7 +300,7 @@ class Indexer extends EventEmitter {
         failedCount: 0
       }
 
-      const worker = (update: WorkerType) => {
+      const worker = (update: (err: Error | undefined, events: TypedEvent<any, any>[] | undefined) => void) => {
         const blockRange = state.failedCount > 0 ? Math.floor(maxBlockRange / 4 ** state.failedCount) : maxBlockRange
 
         // should never be above maxToBlock
@@ -328,7 +325,7 @@ class Indexer extends EventEmitter {
         )
       }
 
-      const update: WorkerType = (err: Error | undefined, events: TypedEvent<any, any>[] | undefined) => {
+      const update = (err: Error | undefined, events: TypedEvent<any, any>[] | undefined) => {
         if (state.fromBlock < maxToBlock) {
           if (err != undefined) {
             state.failedCount++

@@ -7,7 +7,7 @@
  * @param workerIndex index in the results array
  * @returns a decorated worker result
  */
-function decorateWorker<ArgType, Return, Args extends Array<ArgType>>(
+function runTask<ArgType, Return, Args extends Array<ArgType>>(
   fn: (...args: Args) => Promise<Return>,
   arg: Args,
   resultIndex: number,
@@ -53,14 +53,14 @@ export function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
     let activeWorkers = 0
 
     const update = (resultIndex: number, result: Return | Error) => {
-      console.log(
-        `updating: resultIndex ${resultIndex} currentIndex ${currentIndex} activeWorkers ${activeWorkers}`,
-        results
-      )
+      // console.log(
+      //   `updating: resultIndex ${resultIndex} currentIndex ${currentIndex} activeWorkers ${activeWorkers}`,
+      //   results
+      // )
       results[resultIndex] = result
 
       if (currentIndex < args.length) {
-        decorateWorker(fn, args[currentIndex], currentIndex, update)
+        runTask(fn, args[currentIndex], currentIndex, update)
         currentIndex++
       } else {
         if (activeWorkers == 1) {
@@ -73,7 +73,7 @@ export function nAtATime<ArgType, Return, Args extends Array<ArgType>>(
 
     for (; currentIndex < Math.min(concurrency, args.length); currentIndex++) {
       activeWorkers++
-      decorateWorker(fn, args[currentIndex], currentIndex, update)
+      runTask(fn, args[currentIndex], currentIndex, update)
     }
   })
 }

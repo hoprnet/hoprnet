@@ -112,7 +112,7 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
         // If the source errored the socket will already have been destroyed by
         // toIterable.duplex(). If the socket errored it will already be
         // destroyed. There's nothing to do here except log the error & return.
-        error(err.message)
+        error(`unexpected error in TCP sink function`, err)
       }
     }
   }
@@ -125,7 +125,7 @@ class TCPConnection implements MultiaddrConnection<StreamType> {
    */
   public static create(ma: Multiaddr, self: PeerId, options?: HoprConnectDialOptions): Promise<TCPConnection> {
     if (options?.signal?.aborted) {
-      throw new AbortError()
+      return Promise.reject(new AbortError())
     }
 
     return new Promise<TCPConnection>((resolve, reject) => {
