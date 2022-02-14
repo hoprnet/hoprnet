@@ -46,8 +46,8 @@ which jq > /dev/null || { msg "Required binary 'jq' not found in PATH"; exit 1; 
 
 declare cluster_tag=${1:-} # optional cluster tag
 declare room="${MATRIX_ROOM}"
-declare branch="master"
-#branch=$(git rev-parse --abbrev-ref HEAD)
+declare branch
+branch=$(git rev-parse --abbrev-ref HEAD)
 
 _jq() {
   echo "$1" | base64 --decode | jq -r "$2"
