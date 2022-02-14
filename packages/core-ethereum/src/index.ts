@@ -246,17 +246,37 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.redeemingAll
   }
 
-  private async redeemAllTicketsInternalLoop(): Promise<void> {
-    try {
-      for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
-        await this.redeemTicketsInChannel(ce)
-      }
-    } catch (err) {
-      log(`error during redeeming all tickets`, err)
-    }
+  private redeemAllTicketsInternalLoop(): Promise<void> {
+    return new Promise<void>(async (resolve) => {
+      // @TODO turn into async iterator to prevent locking
+      const channels = await this.db.getChannelsTo(this.publicKey.toAddress())
 
-    // whenever we finish this loop we clear the reference
-    this.redeemingAll = undefined
+      // Use call-by-reference
+      const state = {
+        index: 0
+      }
+
+      const redeem = () => {
+        if (state.index < channels.length) {
+          this.redeemTicketsInChannel(channels[state.index]).then(
+            () => {
+              state.index = state.index + 1
+              setImmediate(redeem)
+            },
+            (err) => {
+              log(`error while redeeming tickets in channel ${channels[state.index.toString()]}`, err)
+              // Try to redeem tickets in next channel
+              state.index = state.index + 1
+              setImmediate(redeem)
+            }
+          )
+        } else {
+          // whenever we finish this loop we clear the reference
+          this.redeemingAll = undefined
+          resolve()
+        }
+      }
+    })
   }
 
   public async redeemTicketsInChannelByCounterparty(counterparty: PublicKey) {
