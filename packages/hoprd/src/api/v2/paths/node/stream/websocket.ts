@@ -11,7 +11,7 @@ export const GET: Operation = [
 GET.apiDoc = {
   description: generateWsApiDescription(
     'This is a websocket endpoint which streams legacy hopr-admin data excluding messages.',
-    '/node/logs/websocket'
+    '/node/stream/websocket'
   ),
   tags: ['Node'],
   operationId: 'nodeStreamWebsocket',
