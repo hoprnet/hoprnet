@@ -97,8 +97,8 @@ async function handleAcknowledgement(
   try {
     await db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
     log(`Stored winning ticket`)
-  } catch (e) {
-    log(`ERROR: commitment could not be bumped ${e}, thus dropping ticket`)
+  } catch (err) {
+    log(`ERROR: commitment could not be bumped, thus dropping ticket`, err)
   }
 
   // store commitment in db

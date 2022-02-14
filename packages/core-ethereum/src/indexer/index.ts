@@ -32,7 +32,8 @@ import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 import { TypedEvent } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
-const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
+const getSyncPercentage = (start: number, current: number, end: number) =>
+  (((current - start) / (end - start)) * 100).toFixed(2)
 const backoffOption: Parameters<typeof retryWithBackoff>[1] = { maxDelay: MAX_TRANSACTION_BACKOFF }
 
 /**
@@ -88,15 +89,9 @@ class Indexer extends EventEmitter {
       fromBlock = fromBlock - this.maxConfirmations
     }
     // no need to query before HoprChannels existed
-    if (fromBlock < this.genesisBlock) {
-      fromBlock = this.genesisBlock
-    }
+    fromBlock = Math.max(fromBlock, this.genesisBlock)
 
-    log(
-      'Starting to index from block %d, sync progress %d%',
-      fromBlock,
-      getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
-    )
+    log('Starting to index from block %d, sync progress 0%%', fromBlock)
 
     const orderedBlocks = ordered<number>()
 
@@ -295,6 +290,7 @@ class Indexer extends EventEmitter {
    * @return past events and last queried block
    */
   private async processPastEvents(fromBlock: number, maxToBlock: number, maxBlockRange: number): Promise<number> {
+    const start = fromBlock
     let failedCount = 0
 
     while (fromBlock < maxToBlock) {
@@ -313,6 +309,7 @@ class Indexer extends EventEmitter {
 
       try {
         events = await this.getEvents(fromBlock, toBlock, false)
+        log(`Getting events from ${fromBlock} to ${toBlock} successful, range ${toBlock - fromBlock}`)
       } catch (error) {
         failedCount++
 
@@ -328,11 +325,7 @@ class Indexer extends EventEmitter {
       failedCount = 0
       fromBlock = toBlock
 
-      log(
-        'Sync progress %d% @ block %d',
-        getSyncPercentage(fromBlock - this.genesisBlock, maxToBlock - this.genesisBlock),
-        toBlock
-      )
+      log('Sync progress %d% @ block %d', getSyncPercentage(start, fromBlock, maxToBlock), toBlock)
     }
 
     return fromBlock
@@ -617,7 +610,6 @@ class Indexer extends EventEmitter {
       multiaddrs: [account.multiAddr]
     })
     await this.db.updateAccount(account)
-    console.log(await this.db.getAccount(account.address))
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>): Promise<void> {
@@ -642,7 +634,8 @@ class Indexer extends EventEmitter {
     }
 
     this.emit('channel-update', channel)
-    log('channel-update for channel %s', channel)
+    log('channel-update for channel')
+    log(channel.toString())
 
     if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       this.emit('own-channel-updated', channel)
@@ -650,7 +643,8 @@ class Indexer extends EventEmitter {
       if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
-          log('channel to us waiting for commitment', channel)
+          log('channel to us waiting for commitment')
+          log(channel.toString())
           this.emit('channel-waiting-for-commitment', channel)
         }
       }

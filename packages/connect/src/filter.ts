@@ -17,7 +17,6 @@ import {
 import { parseAddress } from './utils'
 
 import Debug from 'debug'
-import { green } from 'chalk'
 import assert from 'assert'
 import { HoprConnectOptions } from './types'
 
@@ -51,11 +50,6 @@ export class Filter {
    * @param listeningAddrs Addresses to which we are listening
    */
   setAddrs(announcedAddrs: Multiaddr[], listeningAddrs: Multiaddr[]): void {
-    log(`announcedAddrs:`)
-    announcedAddrs.forEach((ma: Multiaddr) => log(` ${green(ma.toString())}`))
-    log(`listeningAddrs:`)
-    listeningAddrs.forEach((ma: Multiaddr) => log(` ${green(ma.toString())}`))
-
     this.announcedAddrs = []
     for (const announcedAddr of announcedAddrs) {
       const parsed = parseAddress(announcedAddr)

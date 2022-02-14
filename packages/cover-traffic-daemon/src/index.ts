@@ -135,7 +135,7 @@ export async function main(update: (State: State) => void, peerId?: PeerId) {
   await node.start()
   log('node is running')
 
-  log(node.getVersion())
+  log('hopr-core version: ', node.getVersion())
   log(node.smartContractInfo())
 
   const channels = await node.getChannelsFrom(selfAddr)

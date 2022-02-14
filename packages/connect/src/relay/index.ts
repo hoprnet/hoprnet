@@ -109,7 +109,6 @@ class Relay {
     destination: PeerId,
     options?: HoprConnectDialOptions
   ): Promise<MultiaddrConnection | undefined> {
-    log(`connect relay ${relay.toB58String()}`)
     const abort = new AbortController()
     const timeout = setTimeout(abort.abort.bind(abort), RELAY_CIRCUIT_TIMEOUT)
 

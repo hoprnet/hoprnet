@@ -15,6 +15,7 @@ import type PeerId from 'peer-id'
 import {
   PublicKey,
   Balance,
+  NativeBalance,
   HoprDB,
   libp2pSubscribe,
   libp2pSendMessage,
@@ -31,7 +32,6 @@ import {
   type LibP2PHandlerFunction,
   type AcknowledgedTicket,
   type ChannelEntry,
-  type NativeBalance,
   type Address,
   type DialOpts,
   type Hash,
@@ -206,10 +206,11 @@ class Hopr extends EventEmitter {
     log('Starting hopr node...')
 
     const balance = await this.connector.getNativeBalance(false)
-    const nativeCurrency =
-      require('../protocol-config.json')['networks'][this.environment.network.id]['native_token_name']
+
     verbose(
-      `Ethereum account ${this.getEthereumAddress().toHex()} has ${balance.toBN()} ${nativeCurrency}. Mininum balance is ${MIN_NATIVE_BALANCE} ${nativeCurrency}`
+      `Ethereum account ${this.getEthereumAddress().toHex()} has ${balance.toFormattedString()}. Mininum balance is ${new NativeBalance(
+        MIN_NATIVE_BALANCE
+      ).toFormattedString()}`
     )
 
     if (!balance || balance.toBN().lte(MIN_NATIVE_BALANCE)) {
@@ -320,7 +321,7 @@ class Hopr extends EventEmitter {
     if (this.libp2p.multiaddrs !== undefined) {
       log(`Available under the following addresses:`)
       for (const ma of this.libp2p.multiaddrs) {
-        log(ma.toString())
+        log(` - ${ma.toString()}`)
       }
     } else {
       log(`No multiaddrs has been registered.`)
@@ -687,8 +688,8 @@ class Hopr extends EventEmitter {
       } else {
         return { info: 'failure', latency: -1 }
       }
-    } catch (e) {
-      log(e)
+    } catch (err) {
+      log(`Could not ping ${destination.toB58String()}.`, err)
       return { latency: -1, info: 'error' }
     }
   }
@@ -720,7 +721,7 @@ class Hopr extends EventEmitter {
 
   public startPeriodicStrategyCheck() {
     const periodicCheck = async function (this: Hopr) {
-      log('periodic check', this.status)
+      log('periodic check. Current status:', this.status)
       if (this.status != 'RUNNING') {
         return
       }
@@ -770,7 +771,7 @@ class Hopr extends EventEmitter {
 
       log(`available multiaddresses for on-chain announcement:`)
       for (const ma of multiaddrs) {
-        log(`\t${ma.toString()}`)
+        log(` - ${ma.toString()}`)
       }
 
       const ip4 = multiaddrs.find((ma) => ma.toString().startsWith('/ip4/'))
@@ -801,16 +802,16 @@ class Hopr extends EventEmitter {
 
     try {
       log(
-        `announcing address ${addrToAnnounce} ${
+        `announcing address ${addrToAnnounce.toString()} ${
           announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
         } routing`
       )
       const announceTxHash = await this.connector.announce(addrToAnnounce)
-      log(`announcing address ${addrToAnnounce} done in tx ${announceTxHash}`)
+      log(`announcing address ${addrToAnnounce.toString()} done in tx ${announceTxHash}`)
     } catch (err) {
-      log(`announcing address ${addrToAnnounce} failed`)
+      log(`announcing address ${addrToAnnounce.toString()} failed`)
       this.maybeEmitFundsEmptyEvent(err)
-      throw new Error(`Failed to announce address ${addrToAnnounce}: ${err}`)
+      throw new Error(`Failed to announce address ${addrToAnnounce.toString()}: ${err}`)
     }
   }
 
@@ -932,14 +933,14 @@ class Hopr extends EventEmitter {
     let txHash: string
     try {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
-        log('initiating closure of channel', channel.getId())
+        log('initiating closure of channel', channel.getId().toHex())
         txHash = await this.connector.initializeClosure(counterpartyPubKey)
       } else {
         // verify that we passed the closure waiting period to prevent failing
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          log('finalizing closure of channel', channel.getId())
+          log('finalizing closure of channel', channel.getId().toHex())
           txHash = await this.connector.finalizeClosure(counterpartyPubKey)
         } else {
           log(

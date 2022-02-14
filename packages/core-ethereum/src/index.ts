@@ -217,7 +217,8 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async commitToChannel(c: ChannelEntry): Promise<void> {
-    log('committing to channel', c)
+    log(`committing to channel ${c.getId().toHex()}`)
+    log(c.toString())
     const setCommitment = async (commitment: Hash) => {
       return this.chain.setCommitment(c.source.toAddress(), commitment, (tx: string) =>
         this.setTxHandler('channel-updated', tx)
@@ -294,10 +295,11 @@ export default class HoprCoreEthereum extends EventEmitter {
     while (tickets.length > 0) {
       const ticket = tickets[0]
       log(
-        `redeeming ticket in channel from ${channel.source} to ${channel.destination}`,
-        ticket,
-        ticket.ticket.toString()
+        `redeeming ticket in channel from ${channel.source} to ${
+          channel.destination
+        }, preImage ${ticket.preImage.toHex()}, porSecret ${ticket.response.toHex()}`
       )
+      log(ticket.ticket.toString())
       const result = await this.redeemTicket(channel.source, ticket)
 
       if (result.status !== 'SUCCESS') {

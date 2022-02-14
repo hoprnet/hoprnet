@@ -7,13 +7,9 @@ export const FULL_VERSION = pkg.version
 
 export const VERSION = pickVersion(pkg.version)
 
-export const DEFAULT_STUN_PORT = 3478
-
 export const HEARTBEAT_TIMEOUT = 4000
 export const HEARTBEAT_INTERVAL = 30000
 export const HEARTBEAT_INTERVAL_VARIANCE = 2000
-
-export const MAX_PARALLEL_CONNECTIONS = 5
 
 export const MAX_PACKET_DELAY = 200
 

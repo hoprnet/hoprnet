@@ -155,8 +155,8 @@ export async function createHoprNode(
 
   try {
     await db.init(options.createDbIfNotExist, VERSION, options.dbPath, options.forceCreateDB, options.environment.id)
-  } catch (err) {
-    log(`failed init db: ${err.toString()}`)
+  } catch (err: unknown) {
+    log(`failed init db:`, err)
     throw err
   }
 

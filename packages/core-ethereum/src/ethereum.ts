@@ -166,7 +166,7 @@ export async function createChainWrapper(
       // wait for the tx to be mined
       await provider.waitForTransaction(transaction.hash, 1, timeout)
     } catch (error) {
-      log(error)
+      log(`Error while waiting for transaction ${transaction.hash}`, error)
       // remove listener but not throwing error message
       deferredListener.reject()
       // this transaction was not confirmed so we just remove it

@@ -17,7 +17,7 @@ import type { Connection } from 'libp2p-interfaces/connection'
 import type PeerId from 'peer-id'
 import { Multiaddr } from 'multiaddr'
 
-import { nAtATime, retimer, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { nAtATime, retimer, u8aEquals } from '@hoprnet/hopr-utils'
 import type HoprConnect from '..'
 import { attemptClose, relayFromRelayAddress } from '../utils'
 
@@ -320,7 +320,7 @@ export class EntryNodes extends EventEmitter {
     if (isDifferent) {
       log(`Current relay addresses:`)
       for (const ma of this.usedRelays) {
-        log(`\t${ma.toString()}`)
+        log(` - ${ma.toString()}`)
       }
 
       this.emit(RELAY_CHANGED_EVENT)
@@ -388,7 +388,7 @@ export class EntryNodes extends EventEmitter {
 
     let done = false
     for await (const msg of stream.source) {
-      verbose(`can relay received msg ${u8aToHex(msg.slice())}`)
+      verbose(`can relay received ${new TextDecoder().decode(msg.slice())} from ${id.toB58String()}`)
       if (u8aEquals(msg.slice(), OK)) {
         done = true
         break
