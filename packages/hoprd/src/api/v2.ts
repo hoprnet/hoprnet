@@ -18,7 +18,6 @@ import type { StateOps } from '../types'
 import type { LogStream } from './../logs'
 
 const debugLog = debug('hoprd:api:v2')
-const textDecoder = new TextDecoder()
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
@@ -189,7 +188,7 @@ export function setupWsApi(
 
     if (path === WS_PATHS.MESSAGES) {
       node.on('hopr:message', (msg: Uint8Array) => {
-        socket.send(textDecoder.decode(msg))
+        socket.send(msg.toString())
       })
     } else if (path === WS_PATHS.LEGACY_STREAM) {
       logStream.addMessageListener((msg) => {

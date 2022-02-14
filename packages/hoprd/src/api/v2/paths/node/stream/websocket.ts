@@ -3,7 +3,7 @@ import { WS_DEFAULT_RESPONSES, generateWsApiDescription } from '../../../utils'
 
 export const GET: Operation = [
   async (_, res, _next) => {
-    return res.status(404).end('Not found. This is a websocket path.')
+    return res.status(404).end('Not found.')
   }
 ]
 
