@@ -35,7 +35,7 @@ log "Start hoprd node"
 cd "${mydir}/.."
 DEBUG="hopr*" CI="true" yarn run run:hoprd --environment=master-goerli --admin false --api true --apiPort ${api_port} > "${node_log_file}" 2>&1 &
 
-log "Wait 10 seconds for node startup to complete"
+log "Wait 15 seconds for node startup to complete"
 sleep 15
 
 log "Verify spec has been generated at ${spec_file_path}"
