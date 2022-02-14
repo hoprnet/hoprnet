@@ -1,4 +1,3 @@
-
 ## HOPR docs structure
 
 ```
@@ -57,7 +56,6 @@ Where `id` means identification of current page, `title` means page title which 
 
 Text is formated based on [Markdown markup language](https://www.markdownguide.org/cheat-sheet/)
 
-
 ## Adding a new menu item to the sidebar
 
 ```
@@ -67,7 +65,9 @@ Text is formated based on [Markdown markup language](https://www.markdownguide.o
   items: ['node/start-here', 'node/using-avado', 'node/using-docker']
 },
 ```
+
 `type` can be:
+
 - `category`, directory which will have sub-items
 - `docs`, single page without sub-items
 
@@ -75,11 +75,10 @@ Text is formated based on [Markdown markup language](https://www.markdownguide.o
 Is the name of a menu item.
 
 `items`:
-Are used only if the menu type is `category`. 
+Are used only if the menu type is `category`.
 Items can be sub-pages or it can have also sub-categories.
 
 For example: `node/star-here`, `node` means a directory, `start-here` is the `ID` of a page (See HOPR docs file structure). Specificaly for this example, `start-here` page is under the `node` directory.
-
 
 ## Adding new version of docs
 
