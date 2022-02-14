@@ -316,9 +316,21 @@ log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19505/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
 
+declare env_file=$(mktemp)
+{
+echo "export apiToken=${api_token}" ;
+echo "export HOPR_NODE_1_ADDR=${peers[0]} HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=http://127.0.0.1:19501" ;
+echo "export HOPR_NODE_2_ADDR=${peers[1]} HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_2_WS_URL=http://127.0.0.1:19501" ;
+echo "export HOPR_NODE_3_ADDR=${peers[2]} HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_3_WS_URL=http://127.0.0.1:19501" ;
+echo "export HOPR_NODE_4_ADDR=${peers[3]} HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_4_WS_URL=http://127.0.0.1:19501" ;
+echo "export HOPR_NODE_5_ADDR=${peers[4]} HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_5_WS_URL=http://127.0.0.1:19501" ;
+} > ${env_file}
+
 # GitPod related barrier
 if command -v gp; then
   gp sync-done "local-cluster"
+else
+  log "Run: 'source ${env_file}' in your shell to setup environment variables for this cluster (HOPR_NODE_1_ADDR, HOPR_NODE_1_HTTP_URL,... etc.)"
 fi
 
 log "Terminating this script will clean up the running local cluster"
