@@ -31,6 +31,9 @@ import { errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
 import { TypedEvent } from '@hoprnet/hopr-ethereum'
 
+type WorkerType = ((err: Error, events: TypedEvent<any, any>[] | undefined) => void) &
+  ((err: Error | undefined, events: TypedEvent<any, any>[]) => void)
+
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
@@ -291,44 +294,67 @@ class Indexer extends EventEmitter {
    */
   private async processPastEvents(fromBlock: number, maxToBlock: number, maxBlockRange: number): Promise<number> {
     const start = fromBlock
-    let failedCount = 0
 
-    while (fromBlock < maxToBlock) {
-      const blockRange = failedCount > 0 ? Math.floor(maxBlockRange / 4 ** failedCount) : maxBlockRange
-      // should never be above maxToBlock
-      let toBlock = Math.min(fromBlock + blockRange, maxToBlock)
-
-      // log(
-      //   `${failedCount > 0 ? 'Re-quering' : 'Quering'} past events from %d to %d: %d`,
-      //   fromBlock,
-      //   toBlock,
-      //   toBlock - fromBlock
-      // )
-
-      let events: Event<any>[] = []
-
-      try {
-        events = await this.getEvents(fromBlock, toBlock, false)
-        log(`Getting events from ${fromBlock} to ${toBlock} successful, range ${toBlock - fromBlock}`)
-      } catch (error) {
-        failedCount++
-
-        if (failedCount > 5) {
-          throw error
-        }
-
-        continue
+    return new Promise<number>((resolve) => {
+      // Use call by reference
+      let state = {
+        fromBlock: fromBlock,
+        toBlock: fromBlock,
+        failedCount: 0
       }
 
-      this.onNewEvents(events)
-      await this.onNewBlock(toBlock, false)
-      failedCount = 0
-      fromBlock = toBlock
+      const worker = (update: WorkerType) => {
+        const blockRange = state.failedCount > 0 ? Math.floor(maxBlockRange / 4 ** state.failedCount) : maxBlockRange
 
-      log('Sync progress %d% @ block %d', getSyncPercentage(start, fromBlock, maxToBlock), toBlock)
-    }
+        // should never be above maxToBlock
+        state.toBlock = Math.min(state.fromBlock + blockRange, maxToBlock)
 
-    return fromBlock
+        // log(
+        //   `${failedCount > 0 ? 'Re-quering' : 'Quering'} past events from %d to %d: %d`,
+        //   from,
+        //   toBlock,
+        //   toBlock - from
+        // )
+
+        this.getEvents(state.fromBlock, state.toBlock, false).then(
+          (events: TypedEvent<any, any>[]) => {
+            // Have some space for other logic to take place
+            setImmediate(update, undefined, events)
+          },
+          (err) => {
+            // Have some space for other logic to take place
+            setImmediate(update, err, undefined)
+          }
+        )
+      }
+
+      const update: WorkerType = (err: Error | undefined, events: TypedEvent<any, any>[] | undefined) => {
+        if (state.fromBlock < maxToBlock) {
+          if (err != undefined) {
+            state.failedCount++
+
+            if (state.failedCount > 5) {
+              throw err
+            } else {
+              worker(update)
+            }
+          } else {
+            this.onNewEvents(events)
+            this.onNewBlock(state.toBlock, false).then(() => {
+              state.failedCount = 0
+              state.fromBlock = state.toBlock
+              log('Sync progress %d% @ block %d', getSyncPercentage(start, state.fromBlock, maxToBlock), state.toBlock)
+
+              setImmediate(worker, update)
+            })
+          }
+        } else {
+          resolve(state.fromBlock)
+        }
+      }
+
+      worker(update)
+    })
   }
 
   /**
@@ -375,49 +401,76 @@ class Indexer extends EventEmitter {
    * @param blockNumber latest on-chain block number
    * @param fetchEvents [optional] if true, query provider for events in block
    */
-  private async onNewBlock(blockNumber: number, fetchEvents = false): Promise<void> {
+  private onNewBlock(blockNumber: number, fetchEvents = false): Promise<void> {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
-    log('Indexer got new block %d', blockNumber)
-    this.emit('block', blockNumber)
+    return new Promise<void>(async (resolve) => {
+      log('Indexer got new block %d', blockNumber)
+      this.emit('block', blockNumber)
 
-    // update latest block
-    this.latestBlock = Math.max(this.latestBlock, blockNumber)
+      // update latest block
+      this.latestBlock = Math.max(this.latestBlock, blockNumber)
 
-    let lastDatabaseSnapshot: Snapshot | undefined
-    try {
-      lastDatabaseSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
+      let lastDatabaseSnapshot: Snapshot | undefined
+      try {
+        lastDatabaseSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
-      // This new block marks a previous block
-      // (blockNumber - this.maxConfirmations) is final.
-      // Confirm native token transactions in that previous block.
-      const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
-      // update transaction manager
-      if (nativeTxs.length > 0) {
-        this.indexEvent('withdraw-native', nativeTxs)
-        nativeTxs.forEach((nativeTx) => {
-          this.chain.updateConfirmedTransaction(nativeTx)
-        })
+        // This new block marks a previous block
+        // (blockNumber - this.maxConfirmations) is final.
+        // Confirm native token transactions in that previous block.
+        const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
+        // update transaction manager
+        if (nativeTxs.length > 0) {
+          this.indexEvent('withdraw-native', nativeTxs)
+          nativeTxs.forEach((nativeTx) => {
+            this.chain.updateConfirmedTransaction(nativeTx)
+          })
+        }
+
+        if (fetchEvents) {
+          let state = {
+            failCount: 0
+          }
+
+          // Get the events of the block
+          const fetch = () => {
+            this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations, true).then(
+              (events) => {
+                setImmediate(() => {
+                  this.onNewEvents(events)
+
+                  // Give other tasks time to happen before writing events to db
+                  this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot).then(resolve)
+                })
+              },
+              (err) => {
+                state.failCount++
+
+                if (state.failCount < 3) {
+                  setImmediate(fetch)
+                } else {
+                  log(
+                    `Cannot fetch block ${blockNumber - this.maxConfirmations} despite 3 retries. Skipping block.`,
+                    err
+                  )
+                  resolve()
+                }
+              }
+            )
+          }
+
+          fetch()
+        } else {
+          setImmediate(() => {
+            // Give other tasks time to happen before writing events to db
+            this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot).then(resolve)
+          })
+        }
+      } catch (err) {
+        log(`Unexpected error while processing block ${blockNumber} with finality ${this.maxConfirmations}`, err)
       }
-
-      if (fetchEvents) {
-        const events = await this.getEvents(
-          blockNumber - this.maxConfirmations,
-          blockNumber - this.maxConfirmations,
-          true
-        )
-
-        this.onNewEvents(events)
-      }
-    } catch (err) {
-      log(
-        `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
-        err
-      )
-    }
-
-    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot)
+    })
   }
 
   /**

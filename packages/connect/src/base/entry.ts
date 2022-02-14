@@ -261,6 +261,7 @@ export class EntryNodes extends EventEmitter {
       args[index] = [nodeToCheck.id, nodeToCheck.multiaddrs[0], TIMEOUT]
     }
 
+    const start = Date.now()
     const results = (
       await nAtATime(this._connectToRelay as EntryNodes['connectToRelay'], args, ENTRY_NODES_MAX_PARALLEL_DIALS)
     )
@@ -269,6 +270,8 @@ export class EntryNodes extends EventEmitter {
         (value): value is { entry: EntryNodeData; conn: Connection | undefined } => !(value instanceof Error)
       )
       .sort(latencyCompare)
+
+    log(`Checking ${args.length} potential entry nodes done in ${Date.now() - start} ms.`)
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
@@ -373,7 +376,7 @@ export class EntryNodes extends EventEmitter {
     try {
       stream = (await conn.newStream([CAN_RELAY_PROTCOL(this.options.environment)]))?.stream as any
     } catch (err) {
-      error(`Cannot use relay. ${err}`)
+      error(`Cannot use relay.`, err)
     }
 
     if (stream == undefined) {

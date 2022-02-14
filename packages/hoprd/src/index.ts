@@ -37,6 +37,9 @@ function defaultEnvironment(): string {
   }
 }
 
+// Replace default process name (`node`) by `hoprd`
+process.title = 'hoprd'
+
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
     string: true,
