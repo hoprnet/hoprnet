@@ -139,7 +139,7 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
 const WS_PATHS = {
   NONE: '', // used for testing
   MESSAGES: '/api/v2/messages/websocket',
-  LOGS: '/api/v2/node/logs/websocket'
+  LEGACY_STREAM: '/api/v2/node/stream/websocket'
 }
 
 export function setupWsApi(
@@ -191,7 +191,7 @@ export function setupWsApi(
       node.on('hopr:message', (msg: Uint8Array) => {
         socket.send(textDecoder.decode(msg))
       })
-    } else if (path === WS_PATHS.LOGS) {
+    } else if (path === WS_PATHS.LEGACY_STREAM) {
       logStream.addMessageListener((msg) => {
         if (msg.type !== 'message') {
           socket.send({
