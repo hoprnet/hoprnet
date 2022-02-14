@@ -337,3 +337,4 @@ fi
 
 log "Terminating this script will clean up the running local cluster"
 wait
+rm "${env_file}"
