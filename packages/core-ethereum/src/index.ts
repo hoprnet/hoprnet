@@ -246,37 +246,43 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.redeemingAll
   }
 
-  private redeemAllTicketsInternalLoop(): Promise<void> {
-    return new Promise<void>(async (resolve) => {
+  private async redeemAllTicketsInternalLoop(): Promise<void> {
+    const fun = async (resolve) => {
       // @TODO turn into async iterator to prevent locking
-      const channels = await this.db.getChannelsTo(this.publicKey.toAddress())
+      const myAddress = this.publicKey.toAddress()
+      const channels = await this.db.getChannelsTo(myAddress)
 
-      // Use call-by-reference
-      const state = {
-        index: 0
+      // redeem operation per channel, which will schedule the next iteration
+      // upon completion
+      const redeemFun = (nextOpFun) => {
+        const channel = channels.pop()
+        this.redeemTicketsInChannel(channel).then(
+          () => {
+            // schedule next iteration, append to end of stack
+            setImmediate(nextOpFun)
+          },
+          (err) => {
+            log(`error while redeeming tickets in channel ${channels[state.index.toString()]}`, err)
+            // schedule next iteration, append to end of stack
+            setImmediate(nextOpFun)
+          }
+        )
       }
 
-      const redeem = () => {
-        if (state.index < channels.length) {
-          this.redeemTicketsInChannel(channels[state.index]).then(
-            () => {
-              state.index = state.index + 1
-              setImmediate(redeem)
-            },
-            (err) => {
-              log(`error while redeeming tickets in channel ${channels[state.index.toString()]}`, err)
-              // Try to redeem tickets in next channel
-              state.index = state.index + 1
-              setImmediate(redeem)
-            }
-          )
+      // entry function which will either start a new redemption or finish by
+      // clearing the state
+      const processChannelFun = () => {
+        if (channels.length > 0) {
+          redeemFun(processChannelFun)
         } else {
           // whenever we finish this loop we clear the reference
           this.redeemingAll = undefined
           resolve()
         }
       }
-    })
+    }
+
+    return fun
   }
 
   public async redeemTicketsInChannelByCounterparty(counterparty: PublicKey) {
