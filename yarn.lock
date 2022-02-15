@@ -3160,7 +3160,7 @@ __metadata:
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-ethereum": "workspace:packages/ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@types/chai-as-promised": 7.1.4
+    "@types/chai-as-promised": 7.1.5
     "@types/mocha": 9.1.0
     abort-controller: 3.0.0
     bn.js: 5.2.0
@@ -4625,12 +4625,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/chai-as-promised@npm:7.1.4":
-  version: 7.1.4
-  resolution: "@types/chai-as-promised@npm:7.1.4"
+"@types/chai-as-promised@npm:7.1.5":
+  version: 7.1.5
+  resolution: "@types/chai-as-promised@npm:7.1.5"
   dependencies:
     "@types/chai": "*"
-  checksum: bb974e77e0357fcc9a01f4b46eb1d3d6a40621a479654fa17539890cd59635faf9b860b8c3851f638d1e239404b1dc8e7ab1305f26dec43e19cce6796e01fe48
+  checksum: 7c1345c6e32513d52d8e562ec173c23161648d6b792046525f18803a9932d7b3ad3dca8f0181e3c529ec42b106099f174e34edeb184d61dc93e32c98b5132fd4
   languageName: node
   linkType: hard
 
