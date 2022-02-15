@@ -20,7 +20,7 @@ export default function ClusterHelper({
   return (
     <div style={{ display: 'inline-block ' }}>
       Preload Cluster Node -
-      {[...Array(CLUSTER_NODES)].map((_, index) => (
+      {Array.from({ length: 5 }, (_, index) => (
         <button
           style={{
             background: selectedNode == index + 1 && 'blue',
