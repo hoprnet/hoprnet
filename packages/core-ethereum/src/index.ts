@@ -1,3 +1,4 @@
+import { setImmediate } from 'timers/promises'
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import { ChainWrapper, createChainWrapper } from './ethereum'
@@ -246,37 +247,21 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.redeemingAll
   }
 
-  private redeemAllTicketsInternalLoop(): Promise<void> {
-    return new Promise<void>(async (resolve) => {
-      // @TODO turn into async iterator to prevent locking
-      const channels = await this.db.getChannelsTo(this.publicKey.toAddress())
+  private async redeemAllTicketsInternalLoop(): Promise<void> {
+    try {
+      for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
+        await this.redeemTicketsInChannel(ce)
 
-      // Use call-by-reference
-      const state = {
-        index: 0
+        // Give other tasks CPU time to happen
+        // Push next loop iteration to end of next event loop iteration
+        await setImmediate()
       }
+    } catch (err) {
+      log(`error during redeeming all tickets`, err)
+    }
 
-      const redeem = () => {
-        if (state.index < channels.length) {
-          this.redeemTicketsInChannel(channels[state.index]).then(
-            () => {
-              state.index = state.index + 1
-              setImmediate(redeem)
-            },
-            (err) => {
-              log(`error while redeeming tickets in channel ${channels[state.index.toString()]}`, err)
-              // Try to redeem tickets in next channel
-              state.index = state.index + 1
-              setImmediate(redeem)
-            }
-          )
-        } else {
-          // whenever we finish this loop we clear the reference
-          this.redeemingAll = undefined
-          resolve()
-        }
-      }
-    })
+    // whenever we finish this loop we clear the reference
+    this.redeemingAll = undefined
   }
 
   public async redeemTicketsInChannelByCounterparty(counterparty: PublicKey) {
@@ -303,57 +288,45 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (!channel.destination.eq(this.getPublicKey())) {
       // delete operation before returning
       delete this.ticketRedemtionInChannelOperations[channelId]
-      return Promise.reject(new Error('Cannot redeem ticket in channel that is not to us'))
+      throw new Error('Cannot redeem ticket in channel that is not to us')
+    }
+    // Because tickets are ordered and require the previous redemption to
+    // have succeeded before we can redeem the next, we need to do this
+    // sequentially.
+    // We redeem step-wise, reading only the next ticket from the db, to
+    // reduce the chance for race-conditions with db write operations on
+    // those tickets.
+    let tickets = await this.db.getAcknowledgedTickets({ channel })
+    while (tickets.length > 0) {
+      const ticket = tickets[0]
+      log(
+        `redeeming ticket in channel from ${channel.source} to ${
+          channel.destination
+        }, preImage ${ticket.preImage.toHex()}, porSecret ${ticket.response.toHex()}`
+      )
+      log(ticket.ticket.toString())
+      const result = await this.redeemTicket(channel.source, ticket)
+
+      if (result.status !== 'SUCCESS') {
+        log('Error redeeming ticket', result)
+        // We need to abort as tickets require ordered redemption.
+        // delete operation before returning
+        delete this.ticketRedemtionInChannelOperations[channelId]
+        if (result.status === 'ERROR') throw result.error
+        return
+      }
+      log('ticket was redeemed')
+
+      tickets = await this.db.getAcknowledgedTickets({ channel })
+
+      // Give other tasks CPU time to happen
+      // Push next loop iteration to end of next event loop iteration
+      await setImmediate()
     }
 
-    return new Promise<void>(async (resolve, reject) => {
-      // Use call-by-reference
-      const state = {
-        // Because tickets are ordered and require the previous redemption to
-        // have succeeded before we can redeem the next, we need to do this
-        // sequentially.
-        // We redeem step-wise, reading only the next ticket from the db, to
-        // reduce the chance for race-conditions with db write operations on
-        // those tickets.
-        tickets: await this.db.getAcknowledgedTickets({ channel })
-      }
-
-      const redeem = () => {
-        if (state.tickets.length > 0) {
-          const ticket = state.tickets[0]
-
-          log(
-            `redeeming ticket in channel from ${channel.source} to ${
-              channel.destination
-            }, preImage ${ticket.preImage.toHex()}, porSecret ${ticket.response.toHex()}`
-          )
-          log(ticket.ticket.toString())
-          this.redeemTicket(channel.source, ticket).then(async (result) => {
-            if (result.status !== 'SUCCESS') {
-              log('Error redeeming ticket', result)
-              // We need to abort as tickets require ordered redemption.
-              // delete operation before returning
-              delete this.ticketRedemtionInChannelOperations[channelId]
-              if (result.status === 'ERROR') {
-                reject(result.error)
-              } else {
-                resolve()
-              }
-            } else {
-              log('ticket was redeemed')
-              state.tickets = await this.db.getAcknowledgedTickets({ channel })
-              setImmediate(redeem)
-            }
-          })
-        } else {
-          resolve()
-        }
-      }
-    }).then(() => {
-      log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
-      // delete operation before returning
-      delete this.ticketRedemtionInChannelOperations[channelId]
-    })
+    log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
+    // delete operation before returning
+    delete this.ticketRedemtionInChannelOperations[channelId]
   }
 
   // Private as out of order redemption will break things - redeem all at once.
