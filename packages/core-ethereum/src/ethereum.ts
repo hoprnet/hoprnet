@@ -1,3 +1,4 @@
+import { setImmediate } from 'timers/promises'
 import type { ContractTransaction, BaseContract } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import { providers, utils, errors, Wallet, BigNumber, ethers } from 'ethers'
@@ -153,7 +154,8 @@ export async function createChainWrapper(
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
       deferredListener && deferredListener.reject()
-      transactions.remove(initiatedHash)
+      // @TODO what if signing the transaction failed and initiatedHash is undefined?
+      initiatedHash && transactions.remove(initiatedHash)
       nonceLock.releaseLock()
       throw error
     }
@@ -161,6 +163,10 @@ export async function createChainWrapper(
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
     transactions.moveFromQueuingToPending(transaction.hash)
     nonceLock.releaseLock()
+
+    // Give other tasks CPU time to happen
+    // Push provider call that waits for transaction to end of next event loop iteration
+    await setImmediate()
 
     try {
       // wait for the tx to be mined
@@ -186,6 +192,11 @@ export async function createChainWrapper(
 
       throw new Error(`Failed in mining transaction. ${error}`)
     }
+
+    // Give other tasks CPU time to happen
+    // Allow the indexer to update before awaiting the response
+    await setImmediate()
+
     try {
       await deferredListener.promise
       return {
@@ -365,10 +376,10 @@ export async function createChainWrapper(
         'redeemTicket',
         txHandler,
         counterparty.toHex(),
-        ackTicket.preImage.toHex(),
+        ackTicket.preImage.serialize(),
         ackTicket.ticket.epoch.serialize(),
         ackTicket.ticket.index.serialize(),
-        ackTicket.response.toHex(),
+        ackTicket.response.serialize(),
         ticket.amount.toBN().toString(),
         ticket.winProb.toBN().toString(),
         ticket.signature.serialize()

@@ -200,6 +200,12 @@ const argv = yargs(process.argv.slice(2))
     default: false,
     hidden: true
   })
+  .option('testHeartbeatInterval', {
+    number: true,
+    describe: 'Network testing: set heartbeat interval to custom values',
+    default: undefined,
+    hidden: true
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -227,6 +233,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     hosts: parseHosts(),
     environment,
     allowLocalConnections: argv.allowLocalNodeConnections,
+    heartbeatInterval: argv.testHeartbeatInterval,
     testing: {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses,

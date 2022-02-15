@@ -169,6 +169,7 @@ function setup_node() {
     --testNoUPNP \
     --allowLocalNodeConnections \
     --allowPrivateNodeConnections \
+    --testHeartbeatInterval 10000 \
     ${additional_args} \
     > "${log}" 2>&1 &
 

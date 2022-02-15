@@ -283,7 +283,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
 
     // start new operation and store it
-    this.ticketRedemtionInChannelOperations[channelId] = this.redeemTicketsInChannelLoop(channel)
+    this.ticketRedemtionInChannelOperations[channelId] = this.redeemTicketsInChannelLoop(channel).catch()
     return this.ticketRedemtionInChannelOperations[channelId]
   }
 
@@ -304,7 +304,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     while (tickets.length > 0) {
       const ticket = tickets[0]
       log(
-        `redeeming ticket in channel from ${channel.source} to ${
+        `redeeming ticket ${ticket.response.toHex()} in channel from ${channel.source} to ${
           channel.destination
         }, preImage ${ticket.preImage.toHex()}, porSecret ${ticket.response.toHex()}`
       )
@@ -319,7 +319,11 @@ export default class HoprCoreEthereum extends EventEmitter {
         if (result.status === 'ERROR') throw result.error
         return
       }
-      log('ticket was redeemed')
+      log(`ticket ${ticket.response.toHex()} was redeemed`)
+
+      // Give other tasks CPU time to happen
+      // Push database query to end of next event loop iteration
+      await setImmediate()
 
       tickets = await this.db.getAcknowledgedTickets({ channel })
 
@@ -343,6 +347,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         message: 'Invalid response to acknowledgement'
       }
     }
+
+    let receipt: string
 
     try {
       const ticket = ackTicket.ticket
@@ -368,18 +374,9 @@ export default class HoprCoreEthereum extends EventEmitter {
         }
       }
 
-      const receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket, (tx: string) =>
+      receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket, (tx: string) =>
         this.setTxHandler('channel-updated', tx)
       )
-
-      log('Successfully submitted ticket', ackTicket.response.toHex())
-      await this.db.markRedeemeed(ackTicket)
-      this.emit('ticket:redeemed', ackTicket)
-      return {
-        status: 'SUCCESS',
-        receipt,
-        ackTicket
-      }
     } catch (err) {
       // TODO delete ackTicket -- check if it's due to gas!
       log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
@@ -387,6 +384,19 @@ export default class HoprCoreEthereum extends EventEmitter {
         status: 'ERROR',
         error: err
       }
+    }
+
+    // Give other tasks CPU time to happen
+    // Push update of database to end of next event loop iteration
+    await setImmediate()
+
+    log('Successfully submitted ticket', ackTicket.response.toHex())
+    await this.db.markRedeemeed(ackTicket)
+    this.emit('ticket:redeemed', ackTicket)
+    return {
+      status: 'SUCCESS',
+      receipt,
+      ackTicket
     }
   }
 

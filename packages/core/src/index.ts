@@ -90,6 +90,7 @@ export type HoprOptions = {
     ip4?: NetOptions
     ip6?: NetOptions
   }
+  heartbeatInterval?: number
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -251,7 +252,7 @@ class Hopr extends EventEmitter {
       [this.id],
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id)
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.networkPeers.register(conn.remotePeer)
