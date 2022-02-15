@@ -56,7 +56,8 @@ fund_if_empty() {
   # we need to use yarn explicitely to ensure packages can be resolved properly
   local fundNativeCmd="yarn --silent run ts-node ${mydir}/fund-address.ts \
 	  --environment ${environment} --address ${address} --targetERC20 ${min_funds_hopr} --targetNative ${min_funds}"
-  PRIVATE_KEY=${FUNDING_PRIV_KEY} try_cmd "${fundNativeCmd}" 3
+  # wait 15 seconds in between retries to prevent race conditions
+  PRIVATE_KEY=${FUNDING_PRIV_KEY} try_cmd "${fundNativeCmd}" 3 15
 }
 
 # $1=IP
