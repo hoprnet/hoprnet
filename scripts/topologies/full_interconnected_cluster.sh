@@ -141,7 +141,7 @@ for endpoint in ${endpoints}; do
     # only perform operation if endpoints differ
     if [ "${endpoint}" != "${other_endpoint}" ]; then
       log "${endpoint} opening channel to other node at ${other_endpoint}"
-      run_command ${endpoint} "open ${peers["${other_endpoint}"]} 0.1" "Successfully opened channel" 600 &
+      run_command ${endpoint} "open ${peers["${other_endpoint}"]} 3000" "Successfully opened channel" 600 &
     fi
   done
 done
