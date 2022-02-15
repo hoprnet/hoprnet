@@ -486,8 +486,9 @@ class Hopr extends EventEmitter {
       } channels`
     )
 
-    for (const destination of closeChannelDestinations) {
-      verbose(`closing ${destination}`)
+    for (let i = 0; i < closeChannelDestinations.length; i++) {
+      const destination = closeChannelDestinations[i]
+      verbose(`closing channel to ${destination.toB58String()}`)
       try {
         await this.closeChannel(destination.toPeerId())
         verbose(`closed channel to ${destination.toString()}`)
@@ -496,14 +497,17 @@ class Hopr extends EventEmitter {
         log(`error when strategy trying to close channel to ${destination.toString()}`, e)
       }
 
-      // Give other tasks CPU time to happen
-      // Push next loop iteration to end of next event loop iteration
-      await setImmediate()
+      if (i < closeChannelDestinations.length) {
+        // Give other tasks CPU time to happen
+        // Push next loop iteration to end of next event loop iteration
+        await setImmediate()
+      }
     }
 
     verbose(`strategy wants to open ${nextChannelDestinations.length} new channels`)
 
-    for (const channel of nextChannelDestinations) {
+    for (let i = 0; i < nextChannelDestinations.length; i++) {
+      const channel = nextChannelDestinations[i]
       this.networkPeers.register(channel[0].toPeerId())
       try {
         // Opening channels can fail if we can't establish a connection.
@@ -514,9 +518,11 @@ class Hopr extends EventEmitter {
         log(`error when strategy trying to open channel to ${channel[0].toString()}`, e)
       }
 
-      // Give other tasks CPU time to happen
-      // Push next loop iteration to end of next event loop iteration
-      await setImmediate()
+      if (i < nextChannelDestinations.length) {
+        // Give other tasks CPU time to happen
+        // Push next loop iteration to end of next event loop iteration
+        await setImmediate()
+      }
     }
   }
 
