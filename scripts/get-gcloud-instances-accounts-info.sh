@@ -39,18 +39,33 @@ usage() {
 
 declare instance_group="${1?"missing parameter <instance_group>"}"
 declare api_token="${HOPRD_API_TOKEN}"
+declare info_file=$(mktemp -q)
+
+function cleanup {
+  local EXIT_CODE=$?
+
+  trap - SIGINT SIGTERM ERR EXIT
+
+  rm -f "${info_file}"
+
+  exit $EXIT_CODE
+}
+trap cleanup SIGINT SIGTERM ERR EXIT
 
 # get IPs of newly started VMs which run hoprd
 declare node_ips
 node_ips=$(gcloud_get_managed_instance_group_instances_ips "${instance_group}")
 declare node_ips_arr=( ${node_ips} )
 
-log "IP\t\t\tNATIVE ADDRESS\t\tHOPR ADDRESS\n"
+log "Gcloud machine information for cluster: ${instance_group}"
+echo "HOPR ADDRESS,NATIVE ADDRESS,IP" >> "${info_file}"
 
 declare native_address hopr_address
 for ip in ${node_ips}; do
   native_address=$(get_native_address "${api_token}@${ip}:3001")
   hopr_address=$(get_hopr_address "${api_token}@${ip}:3001")
 
-  log "${ip}\t${native_address}\t${hopr_address}"
+  echo "${hopr_address},${native_address},${ip}" >> "${info_file}"
 done
+
+column -t -s',' "${info_file}"

@@ -39,9 +39,12 @@ declare token="${MATRIX_ACCESS_TOKEN:-}"
 declare event_id="$(date -u +%y%m%d%H%M%S)${RANDOM}"
 declare url="${server}/_matrix/client/r0/rooms/%21${room}/send/m.room.message/${event_id}"
 
+# escape tabs in message, and wrap in div tag
+msg="<div>$(echo "${msg}" | sed 's/\t/\\\\t/g')</div>"
+
 curl -s -X PUT \
   -H "Authorization: Bearer ${token}" \
   -H "Accept: application/json" \
   -H "Content-Type: application/json" \
-  -d "{\"msgtype\": \"m.text\", \"body\": \"${msg}\"}" \
+  -d "{\"msgtype\": \"m.notice\", \"body\": \"${msg}\", \"formatted_body\": \"${msg}\", \"format\": \"org.matrix.custom.html\" }" \
   "${url}"

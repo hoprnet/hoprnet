@@ -32,7 +32,7 @@ usage() {
   msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:<environment>' as default"
   msg "      <cluster_size>\t\tnumber of nodes in the deployed cluster, default is 6."
   msg "      <instance_template_name>\t\tname of the gcloud instance template to use, default is <cluster_id>"
-  msg "      <announce_on_chain>\t\tset to 'true' so started nodes should not announce themselves, default is ''"
+  msg "      <announce_on_chain>\t\tset to 'true' so started nodes should announce themselves, default is ''"
   msg
   msg "Required environment variables"
   msg "------------------------------"
