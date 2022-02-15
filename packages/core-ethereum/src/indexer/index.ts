@@ -1,3 +1,4 @@
+import { setImmediate } from 'timers/promises'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -289,69 +290,66 @@ class Indexer extends EventEmitter {
    * @param maxBlockRange
    * @return past events and last queried block
    */
+
+  /**
+   * Query past events, this will loop until it gets all blocks from `toBlock` to `fromBlock`.
+   * If we exceed response pull limit, we switch into quering smaller chunks.
+   * TODO: optimize DB and fetch requests
+   * @param fromBlock
+   * @param maxToBlock
+   * @param maxBlockRange
+   * @return past events and last queried block
+   */
   private async processPastEvents(fromBlock: number, maxToBlock: number, maxBlockRange: number): Promise<number> {
     const start = fromBlock
+    let failedCount = 0
 
-    return new Promise<number>((resolve) => {
-      // Use call by reference
-      let state = {
-        fromBlock: fromBlock,
-        toBlock: fromBlock,
-        failedCount: 0
-      }
+    while (fromBlock < maxToBlock) {
+      const blockRange = failedCount > 0 ? Math.floor(maxBlockRange / 4 ** failedCount) : maxBlockRange
+      // should never be above maxToBlock
+      let toBlock = Math.min(fromBlock + blockRange, maxToBlock)
 
-      const worker = (update: (err: Error | undefined, events: TypedEvent<any, any>[] | undefined) => void) => {
-        const blockRange = state.failedCount > 0 ? Math.floor(maxBlockRange / 4 ** state.failedCount) : maxBlockRange
+      // log(
+      //   `${failedCount > 0 ? 'Re-quering' : 'Quering'} past events from %d to %d: %d`,
+      //   fromBlock,
+      //   toBlock,
+      //   toBlock - fromBlock
+      // )
 
-        // should never be above maxToBlock
-        state.toBlock = Math.min(state.fromBlock + blockRange, maxToBlock)
+      let events: Event<any>[] = []
 
-        // log(
-        //   `${failedCount > 0 ? 'Re-quering' : 'Quering'} past events from %d to %d: %d`,
-        //   from,
-        //   toBlock,
-        //   toBlock - from
-        // )
+      try {
+        events = await this.getEvents(fromBlock, toBlock, false)
+        log(`Getting events from ${fromBlock} to ${toBlock} successful, range ${toBlock - fromBlock}`)
+      } catch (error) {
+        failedCount++
 
-        this.getEvents(state.fromBlock, state.toBlock, false).then(
-          (events: TypedEvent<any, any>[]) => {
-            // Have some space for other logic to take place
-            setImmediate(update, undefined, events)
-          },
-          (err) => {
-            // Have some space for other logic to take place
-            setImmediate(update, err, undefined)
-          }
-        )
-      }
-
-      const update = (err: Error | undefined, events: TypedEvent<any, any>[] | undefined) => {
-        if (state.fromBlock < maxToBlock) {
-          if (err != undefined) {
-            state.failedCount++
-
-            if (state.failedCount > 5) {
-              throw err
-            } else {
-              worker(update)
-            }
-          } else {
-            this.onNewEvents(events)
-            this.onNewBlock(state.toBlock, false).then(() => {
-              state.failedCount = 0
-              state.fromBlock = state.toBlock
-              log('Sync progress %d% @ block %d', getSyncPercentage(start, state.fromBlock, maxToBlock), state.toBlock)
-
-              setImmediate(worker, update)
-            })
-          }
-        } else {
-          resolve(state.fromBlock)
+        if (failedCount > 5) {
+          throw error
         }
+
+        continue
       }
 
-      worker(update)
-    })
+      // Give other tasks CPU time to happen
+      // Wait until end of next event loop iteration before writing events to db
+      await setImmediate()
+
+      this.onNewEvents(events)
+      await this.onNewBlock(toBlock, false)
+      failedCount = 0
+      fromBlock = toBlock
+
+      log('Sync progress %d% @ block %d', getSyncPercentage(start, fromBlock, maxToBlock), toBlock)
+
+      if (fromBlock < maxToBlock) {
+        // Give other tasks CPU time to happen
+        // Wait until end of next event loop iteration before starting next I/O query
+        await setImmediate()
+      }
+    }
+
+    return fromBlock
   }
 
   /**
