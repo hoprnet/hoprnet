@@ -495,7 +495,9 @@ class Hopr extends EventEmitter {
       } catch (e) {
         log(`error when strategy trying to close channel to ${destination.toString()}`, e)
       }
-      // Give other tasks time to happen
+
+      // Give other tasks CPU time to happen
+      // Push next loop iteration to end of next event loop iteration
       await setImmediate()
     }
 
@@ -511,7 +513,9 @@ class Hopr extends EventEmitter {
       } catch (e) {
         log(`error when strategy trying to open channel to ${channel[0].toString()}`, e)
       }
-      // Give other tasks time to happen
+
+      // Give other tasks CPU time to happen
+      // Push next loop iteration to end of next event loop iteration
       await setImmediate()
     }
   }
