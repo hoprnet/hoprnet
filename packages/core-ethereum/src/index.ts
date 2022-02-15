@@ -249,12 +249,16 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
     try {
-      for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
-        await this.redeemTicketsInChannel(ce)
+      const channels = await this.db.getChannelsTo(this.publicKey.toAddress())
 
-        // Give other tasks CPU time to happen
-        // Push next loop iteration to end of next event loop iteration
-        await setImmediate()
+      for (let i = 0; i < channels.length; i++) {
+        await this.redeemTicketsInChannel(channels[i])
+
+        if (i < channels.length) {
+          // Give other tasks CPU time to happen
+          // Push next loop iteration to end of next event loop iteration
+          await setImmediate()
+        }
       }
     } catch (err) {
       log(`error during redeeming all tickets`, err)
@@ -319,9 +323,11 @@ export default class HoprCoreEthereum extends EventEmitter {
 
       tickets = await this.db.getAcknowledgedTickets({ channel })
 
-      // Give other tasks CPU time to happen
-      // Push next loop iteration to end of next event loop iteration
-      await setImmediate()
+      if (tickets.length > 0) {
+        // Give other tasks CPU time to happen
+        // Push next loop iteration to end of next event loop iteration
+        await setImmediate()
+      }
     }
 
     log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
