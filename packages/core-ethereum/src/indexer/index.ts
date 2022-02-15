@@ -396,76 +396,70 @@ class Indexer extends EventEmitter {
    * @param blockNumber latest on-chain block number
    * @param fetchEvents [optional] if true, query provider for events in block
    */
-  private onNewBlock(blockNumber: number, fetchEvents = false): Promise<void> {
+  private async onNewBlock(blockNumber: number, fetchEvents = false): Promise<void> {
     // NOTE: This function is also used in event handlers
     // where it cannot be 'awaited', so all exceptions need to be caught.
 
-    return new Promise<void>(async (resolve) => {
-      log('Indexer got new block %d', blockNumber)
-      this.emit('block', blockNumber)
+    log('Indexer got new block %d', blockNumber)
+    this.emit('block', blockNumber)
 
-      // update latest block
-      this.latestBlock = Math.max(this.latestBlock, blockNumber)
+    // update latest block
+    this.latestBlock = Math.max(this.latestBlock, blockNumber)
 
-      let lastDatabaseSnapshot: Snapshot | undefined
-      try {
-        lastDatabaseSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
+    let lastDatabaseSnapshot: Snapshot | undefined
+    try {
+      lastDatabaseSnapshot = await this.db.getLatestConfirmedSnapshotOrUndefined()
 
-        // This new block marks a previous block
-        // (blockNumber - this.maxConfirmations) is final.
-        // Confirm native token transactions in that previous block.
-        const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
-        // update transaction manager
-        if (nativeTxs.length > 0) {
-          this.indexEvent('withdraw-native', nativeTxs)
-          nativeTxs.forEach((nativeTx) => {
-            this.chain.updateConfirmedTransaction(nativeTx)
-          })
-        }
+      // This new block marks a previous block
+      // (blockNumber - this.maxConfirmations) is final.
+      // Confirm native token transactions in that previous block.
+      const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
+      // update transaction manager
+      if (nativeTxs.length > 0) {
+        this.indexEvent('withdraw-native', nativeTxs)
+        nativeTxs.forEach((nativeTx) => {
+          this.chain.updateConfirmedTransaction(nativeTx)
+        })
+      }
+    } catch (err) {
+      log(
+        `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
+        err
+      )
+    }
 
-        if (fetchEvents) {
-          let state = {
-            failCount: 0
-          }
+    if (fetchEvents) {
+      const RETRIES = 3
+      let events: TypedEvent<any, any>[]
 
-          // Get the events of the block
-          const fetch = () => {
-            this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations, true).then(
-              (events) => {
-                setImmediate(() => {
-                  this.onNewEvents(events)
-
-                  // Give other tasks time to happen before writing events to db
-                  this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot).then(resolve)
-                })
-              },
-              (err) => {
-                state.failCount++
-
-                if (state.failCount < 3) {
-                  setImmediate(fetch)
-                } else {
-                  log(
-                    `Cannot fetch block ${blockNumber - this.maxConfirmations} despite 3 retries. Skipping block.`,
-                    err
-                  )
-                  resolve()
-                }
-              }
+      for (let i = 0; i < RETRIES; i++) {
+        try {
+          events = await this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations, true)
+        } catch (err) {
+          if (i < RETRIES) {
+            // Give other tasks CPU time to happen
+            // Push next provider query to end of next event loop iteration
+            await setImmediate()
+            continue
+          } else {
+            log(
+              `Cannot fetch block ${blockNumber - this.maxConfirmations} despite ${RETRIES} retries. Skipping block.`,
+              err
             )
           }
-
-          fetch()
-        } else {
-          setImmediate(() => {
-            // Give other tasks time to happen before writing events to db
-            this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot).then(resolve)
-          })
         }
-      } catch (err) {
-        log(`Unexpected error while processing block ${blockNumber} with finality ${this.maxConfirmations}`, err)
+
+        break
       }
-    })
+
+      this.onNewEvents(events)
+    }
+
+    // Give other tasks CPU time to happen
+    // Push write operation to end of next event loop iteration
+    await setImmediate()
+
+    await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot)
   }
 
   /**
@@ -516,6 +510,7 @@ class Indexer extends EventEmitter {
       this.unconfirmedEvents.push(events[offset])
     }
 
+    // Update watermark for next iteration
     this.lastSnapshot = {
       blockNumber: events[events.length - 1].blockNumber,
       logIndex: events[events.length - 1].logIndex,
