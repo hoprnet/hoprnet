@@ -109,7 +109,7 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
 fi
 # }}}
 
-# create test specific instance template
+# create instance template
 # announce on-chain with routable address
 gcloud_create_instance_template_if_not_exists \
   "${instance_template_name}" \
