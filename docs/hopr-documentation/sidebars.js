@@ -74,6 +74,7 @@ const sidebars = {
         'developers/demo-rps-game',
         'developers/rest-api',
         'developers/smart-contract',
+        'developers/snippets',
         'developers/visualising-hopr-network-topology'
       ]
     },
