@@ -3145,7 +3145,7 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.11
-    typedoc-plugin-markdown: 3.11.12
+    typedoc-plugin-markdown: 3.11.14
     typescript: 4.5.5
   languageName: unknown
   linkType: soft
@@ -3185,7 +3185,7 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.11
-    typedoc-plugin-markdown: 3.11.12
+    typedoc-plugin-markdown: 3.11.14
     typescript: 4.5.5
   languageName: unknown
   linkType: soft
@@ -3212,7 +3212,7 @@ __metadata:
     rimraf: 3.0.2
     ts-node: 10.4.0
     typedoc: 0.22.11
-    typedoc-plugin-markdown: 3.11.12
+    typedoc-plugin-markdown: 3.11.14
     typescript: 4.5.5
     yargs: 17.3.1
   bin:
@@ -3249,7 +3249,7 @@ __metadata:
     ts-node: 10.4.0
     typechain: 6.0.5
     typedoc: 0.22.11
-    typedoc-plugin-markdown: 3.11.12
+    typedoc-plugin-markdown: 3.11.14
     typescript: 4.5.5
   languageName: unknown
   linkType: soft
@@ -3295,7 +3295,7 @@ __metadata:
     sinon: 12.0.1
     ts-node: 10.4.0
     typedoc: 0.22.11
-    typedoc-plugin-markdown: 3.11.12
+    typedoc-plugin-markdown: 3.11.14
     typescript: 4.5.5
   languageName: unknown
   linkType: soft
@@ -3342,7 +3342,7 @@ __metadata:
     trace-unhandled: 2.0.1
     ts-node: 10.4.0
     typedoc: 0.22.11
-    typedoc-plugin-markdown: 3.11.12
+    typedoc-plugin-markdown: 3.11.14
     typescript: 4.5.5
     ws: 8.3.0
     yamljs: 0.3.0
@@ -24418,14 +24418,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc-plugin-markdown@npm:3.11.12":
-  version: 3.11.12
-  resolution: "typedoc-plugin-markdown@npm:3.11.12"
+"typedoc-plugin-markdown@npm:3.11.14":
+  version: 3.11.14
+  resolution: "typedoc-plugin-markdown@npm:3.11.14"
   dependencies:
     handlebars: ^4.7.7
   peerDependencies:
     typedoc: ">=0.22.0"
-  checksum: 74f3e68e5fef4a39f0618b753283dfbbca54f01cb4297c7ec156985b5902952eec0e969a870ffcdb1829a2452729cc9ed68f7d2438a89c09fd6919990d281c91
+  checksum: 7eff9e5b8b6b2457b484ea16bbae453c23313c838b4ac8826bd166c5d37a18010242dd43a21010b759965d860106951ddd321f85bd0ff39b78dcb172daa60e6e
   languageName: node
   linkType: hard
 
