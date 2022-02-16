@@ -16,13 +16,13 @@ import {
   Snapshot,
   u8aConcat,
   debug,
-  DeferType,
   retryWithBackoff,
-  Ticket,
   Balance,
   ordered,
   u8aToHex,
-  FIFO
+  FIFO,
+  type DeferType,
+  type Ticket
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
@@ -30,7 +30,7 @@ import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } fr
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
 import { errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
-import { TypedEvent } from '@hoprnet/hopr-ethereum'
+import type { TypedEvent } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (start: number, current: number, end: number) =>

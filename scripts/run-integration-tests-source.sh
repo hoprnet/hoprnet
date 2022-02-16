@@ -160,8 +160,8 @@ function setup_node() {
     --testNoUPNP \
     --allowLocalNodeConnections \
     --allowPrivateNodeConnections \
-    --testHeartbeatInterval 2500 \
-    --testHeartbeatVariance 1000 \
+    --heartbeatInterval 2500 \
+    --heartbeatVariance 1000 \
     ${additional_args} \
     > "${log}" 2>&1 &
 }
