@@ -1,5 +1,5 @@
 import { NOISE } from '@chainsafe/libp2p-noise'
-import MPLEX from 'libp2p-mplex'
+import { Mplex } from 'libp2p-mplex'
 import Libp2p from 'libp2p'
 import { dial as dialHelper, DialStatus } from './dialHelper'
 import { privKeyToPeerId } from './privKeyToPeerId'
@@ -27,7 +27,7 @@ async function getNode(id: PeerId, withDHT = false, maDestination?: Multiaddr): 
     peerId: id,
     modules: {
       transport: [TCP],
-      streamMuxer: [MPLEX],
+      streamMuxer: [Mplex as any],
       connEncryption: [NOISE as any],
       dht: withDHT ? KadDHT : undefined
     },

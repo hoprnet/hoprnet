@@ -1,8 +1,7 @@
 // import assert from 'assert'
 // import libp2p from 'libp2p'
 
-// // @ts-ignore
-// import MPLEX = require('libp2p-mplex')
+// import { Mplex } from 'libp2p-mplex'
 // // @ts-ignore
 // import KadDHT = require('libp2p-kad-dht')
 // // @ts-ignore
@@ -54,7 +53,7 @@
 //       peerId,
 //       modules: {
 //         transport: [TCP],
-//         streamMuxer: [MPLEX],
+//         streamMuxer: [Mplex],
 //         connEncryption: [SECIO],
 //         dht: KadDHT
 //       },
