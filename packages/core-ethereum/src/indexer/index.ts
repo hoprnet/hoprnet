@@ -415,6 +415,7 @@ class Indexer extends EventEmitter {
     }
 
     if (fetchEvents) {
+      // Don't fail immediately when one block is temporarily not available
       const RETRIES = 3
       let events: TypedEvent<any, any>[]
 

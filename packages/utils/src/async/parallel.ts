@@ -1,10 +1,9 @@
 /**
- * Decorates the call of the worker function to return the
- * index in the array of workers.
+ * Runs the asynchronous task and fetches synchronous and asynchronously thrown errors
+ * and performs the callback at the end of the next iteration of the event loop.
  * @param fn worker function
  * @param arg a single argument to pass to the worker function
- * @param workerIndex index in the worker array
- * @param workerIndex index in the results array
+ * @param resultIndex index in the results array
  * @returns a decorated worker result
  */
 async function runTask<ArgType, Return, Args extends Array<ArgType>>(
