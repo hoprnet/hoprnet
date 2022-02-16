@@ -290,16 +290,6 @@ class Indexer extends EventEmitter {
    * @param maxBlockRange
    * @return past events and last queried block
    */
-
-  /**
-   * Query past events, this will loop until it gets all blocks from `toBlock` to `fromBlock`.
-   * If we exceed response pull limit, we switch into quering smaller chunks.
-   * TODO: optimize DB and fetch requests
-   * @param fromBlock
-   * @param maxToBlock
-   * @param maxBlockRange
-   * @return past events and last queried block
-   */
   private async processPastEvents(fromBlock: number, maxToBlock: number, maxBlockRange: number): Promise<number> {
     const start = fromBlock
     let failedCount = 0
