@@ -60,7 +60,11 @@ export abstract class SaneDefaults {
     const selfPubKey = chain.getPublicKey()
     if (!counterparty.eq(selfPubKey)) {
       log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toB58String()}`)
-      await chain.redeemTicketsInChannel(channel)
+      try {
+        await chain.redeemTicketsInChannel(channel)
+      } catch (err) {
+        log(`Could not redeem tickets in channel ${channel.getId().toHex()}`, err)
+      }
     }
   }
 
