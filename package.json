@@ -49,7 +49,7 @@
     "@types/debounce": "^1",
     "prettier": "2.5.1",
     "rimraf": "3.0.2",
-    "ts-node": "10.4.0",
+    "ts-node": "10.5.0",
     "typescript": "4.5.5",
     "yargs": "17.3.1"
   },
