@@ -35,7 +35,7 @@
     "@hoprnet/hopr-core": "workspace:packages/core",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "bn.js": "5.2.0",
-    "body-parser": "1.19.1",
+    "body-parser": "1.19.2",
     "bs58": "4.0.1",
     "chalk": "4.1.2",
     "check-password-strength": "2.0.3",
