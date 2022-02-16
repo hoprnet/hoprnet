@@ -10,7 +10,7 @@ import { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import Upgrader from 'libp2p/src/upgrader'
-import MPLEX from 'libp2p-mplex'
+import { Mplex } from 'libp2p-mplex'
 const Multistream = require('multistream-select')
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
@@ -94,7 +94,7 @@ async function main() {
 
   // As used by other HOPR nodes
   upgrader.cryptos.set(NOISE.protocol, NOISE as any)
-  upgrader.muxers.set(MPLEX.multicodec, MPLEX)
+  upgrader.muxers.set(Mplex.multicodec, Mplex as any)
 
   // Use minimal configuration for hopr-connect
   const Transport = new HoprConnect({

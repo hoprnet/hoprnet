@@ -58,7 +58,7 @@ Start a bootstrapServer
 
 ```ts
 const libp2p = require('libp2p')
-const MPLEX = require('libp2p-mplex')
+import { Mplex } from 'libp2p-mplex'
 import { NOISE } from '@chainsafe/libp2p-noise'
 const PeerId = require('peer-id')
 
@@ -71,7 +71,7 @@ const node = await libp2p.create({
   peerId,
   modules: {
     transport: [HoprConnect],
-    streamMuxer: [MPLEX],
+    streamMuxer: [Mplex],
     connEncryption: [NOISE],
     peerDiscovery: [HoprConnect.discovery]
   },
@@ -89,7 +89,7 @@ Start another client
 
 ```ts
 const libp2p = require('libp2p')
-const MPLEX = require('libp2p-mplex')
+import { Mplex } from 'libp2p-mplex'
 import { NOISE } from '@chainsafe/libp2p-noise'
 const PeerId = require('peer-id')
 
@@ -103,7 +103,7 @@ const node = await libp2p.create({
   peerId
   modules: {
     transport: [HoprConnect],
-    streamMuxer: [MPLEX],
+    streamMuxer: [Mplex],
     connEncryption: [NOISE],
     peerDiscovery: [HoprConnect.discovery]
   },
