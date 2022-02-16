@@ -1,3 +1,4 @@
+import { setImmediate } from 'timers/promises'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -15,13 +16,13 @@ import {
   Snapshot,
   u8aConcat,
   debug,
-  DeferType,
   retryWithBackoff,
-  Ticket,
   Balance,
   ordered,
   u8aToHex,
-  FIFO
+  FIFO,
+  type DeferType,
+  type Ticket
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum'
@@ -29,7 +30,7 @@ import type { Event, EventNames, IndexerEvents, TokenEvent, TokenEventNames } fr
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils'
 import { errors } from 'ethers'
 import { INDEXER_TIMEOUT, MAX_TRANSACTION_BACKOFF } from '../constants'
-import { TypedEvent } from '@hoprnet/hopr-ethereum'
+import type { TypedEvent } from '@hoprnet/hopr-ethereum'
 
 const log = debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (start: number, current: number, end: number) =>
@@ -326,6 +327,12 @@ class Indexer extends EventEmitter {
       fromBlock = toBlock
 
       log('Sync progress %d% @ block %d', getSyncPercentage(start, fromBlock, maxToBlock), toBlock)
+
+      if (fromBlock < maxToBlock) {
+        // Give other tasks CPU time to happen
+        // Wait until end of next event loop iteration before starting next I/O query
+        await setImmediate()
+      }
     }
 
     return fromBlock
@@ -400,21 +407,39 @@ class Indexer extends EventEmitter {
           this.chain.updateConfirmedTransaction(nativeTx)
         })
       }
-
-      if (fetchEvents) {
-        const events = await this.getEvents(
-          blockNumber - this.maxConfirmations,
-          blockNumber - this.maxConfirmations,
-          true
-        )
-
-        this.onNewEvents(events)
-      }
     } catch (err) {
       log(
         `error: failed to retrieve information about block ${blockNumber} with finality ${this.maxConfirmations}`,
         err
       )
+    }
+
+    if (fetchEvents) {
+      // Don't fail immediately when one block is temporarily not available
+      const RETRIES = 3
+      let events: TypedEvent<any, any>[]
+
+      for (let i = 0; i < RETRIES; i++) {
+        try {
+          events = await this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations, true)
+        } catch (err) {
+          if (i < RETRIES) {
+            // Give other tasks CPU time to happen
+            // Push next provider query to end of next event loop iteration
+            await setImmediate()
+            continue
+          } else {
+            log(
+              `Cannot fetch block ${blockNumber - this.maxConfirmations} despite ${RETRIES} retries. Skipping block.`,
+              err
+            )
+          }
+        }
+
+        break
+      }
+
+      this.onNewEvents(events)
     }
 
     await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot)
@@ -468,6 +493,7 @@ class Indexer extends EventEmitter {
       this.unconfirmedEvents.push(events[offset])
     }
 
+    // Update watermark for next iteration
     this.lastSnapshot = {
       blockNumber: events[events.length - 1].blockNumber,
       logIndex: events[events.length - 1].logIndex,
@@ -574,6 +600,15 @@ class Indexer extends EventEmitter {
           `error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`,
           err
         )
+      }
+
+      if (
+        this.unconfirmedEvents.size() > 0 &&
+        isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
+      ) {
+        // Give other tasks CPU time to happen
+        // Wait until end of next event loop iteration before starting next db write-back
+        await setImmediate()
       }
     }
 

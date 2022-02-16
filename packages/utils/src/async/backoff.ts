@@ -1,6 +1,6 @@
 import { durations } from '../time'
 import { debug } from '../process'
-import { setTimeout } from 'timers/promises'
+import { setTimeout, setImmediate } from 'timers/promises'
 
 const log = debug('hopr:utils:retry')
 
@@ -42,7 +42,12 @@ export async function retryWithBackoff<T>(
       log(`failed, attempting again in ${delay} (${err})`)
     }
 
-    await wait(delay)
+    await setTimeout(delay)
+
+    // Give other tasks CPU time to happen
+    // Push next loop iteration to end of next event loop iteration
+    await setImmediate()
+
     delay = delay * delayMultiple
   }
 }

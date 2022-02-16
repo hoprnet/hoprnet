@@ -37,6 +37,9 @@ function defaultEnvironment(): string {
   }
 }
 
+// Replace default process name (`node`) by `hoprd`
+process.title = 'hoprd'
+
 const argv = yargs(process.argv.slice(2))
   .option('environment', {
     string: true,
@@ -197,6 +200,16 @@ const argv = yargs(process.argv.slice(2))
     default: false,
     hidden: true
   })
+  .option('heartbeatInterval', {
+    number: true,
+    describe: 'Interval in milliseconds in which the availability of other nodes get measured',
+    default: undefined
+  })
+  .option('heartbeatVariance', {
+    number: true,
+    describe: 'Upper bound for variance applied to heartbeat interval in milliseconds',
+    default: undefined
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -224,6 +237,8 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     hosts: parseHosts(),
     environment,
     allowLocalConnections: argv.allowLocalNodeConnections,
+    heartbeatInterval: argv.heartbeatInterval,
+    heartbeatVariance: argv.heartbeatVariance,
     testing: {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses,

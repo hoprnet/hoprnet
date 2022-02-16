@@ -1,3 +1,4 @@
+import { setImmediate } from 'timers/promises'
 import { type default as LibP2P, type Connection } from 'libp2p'
 
 import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
@@ -89,6 +90,8 @@ export type HoprOptions = {
     ip4?: NetOptions
     ip6?: NetOptions
   }
+  heartbeatInterval?: number
+  heartbeatVariance?: number
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -250,7 +253,7 @@ class Hopr extends EventEmitter {
       [this.id],
       (peer: PeerId) => this.publicNodesEmitter.emit('removePublicNode', peer)
     )
-    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id)
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessage, hangup, this.environment.id, this.options)
 
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.networkPeers.register(conn.remotePeer)
@@ -485,8 +488,9 @@ class Hopr extends EventEmitter {
       } channels`
     )
 
-    for (const destination of closeChannelDestinations) {
-      verbose(`closing ${destination}`)
+    for (let i = 0; i < closeChannelDestinations.length; i++) {
+      const destination = closeChannelDestinations[i]
+      verbose(`closing channel to ${destination.toB58String()}`)
       try {
         await this.closeChannel(destination.toPeerId())
         verbose(`closed channel to ${destination.toString()}`)
@@ -494,11 +498,18 @@ class Hopr extends EventEmitter {
       } catch (e) {
         log(`error when strategy trying to close channel to ${destination.toString()}`, e)
       }
+
+      if (i + 1 < closeChannelDestinations.length) {
+        // Give other tasks CPU time to happen
+        // Push next loop iteration to end of next event loop iteration
+        await setImmediate()
+      }
     }
 
     verbose(`strategy wants to open ${nextChannelDestinations.length} new channels`)
 
-    for (const channel of nextChannelDestinations) {
+    for (let i = 0; i < nextChannelDestinations.length; i++) {
+      const channel = nextChannelDestinations[i]
       this.networkPeers.register(channel[0].toPeerId())
       try {
         // Opening channels can fail if we can't establish a connection.
@@ -507,6 +518,12 @@ class Hopr extends EventEmitter {
         this.emit('hopr:channel:opened', channel)
       } catch (e) {
         log(`error when strategy trying to open channel to ${channel[0].toString()}`, e)
+      }
+
+      if (i + 1 < nextChannelDestinations.length) {
+        // Give other tasks CPU time to happen
+        // Push next loop iteration to end of next event loop iteration
+        await setImmediate()
       }
     }
   }

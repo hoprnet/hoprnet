@@ -1,7 +1,7 @@
 import { findPath } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
 import { BigNumber } from 'bignumber.js'
-import { PublicKey, ChannelEntry } from '@hoprnet/hopr-utils'
+import type { PublicKey, ChannelEntry } from '@hoprnet/hopr-utils'
 import type { State, ChannelData, PersistedState } from './state'
 import { CT_PATH_RANDOMNESS, CT_INTERMEDIATE_HOPS } from './constants'
 import { debug } from '@hoprnet/hopr-utils'

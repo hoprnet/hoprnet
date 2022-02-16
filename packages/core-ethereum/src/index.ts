@@ -1,3 +1,4 @@
+import { setImmediate } from 'timers/promises'
 import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import { ChainWrapper, createChainWrapper } from './ethereum'
@@ -248,8 +249,16 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
     try {
-      for (const ce of await this.db.getChannelsTo(this.publicKey.toAddress())) {
-        await this.redeemTicketsInChannel(ce)
+      const channels = await this.db.getChannelsTo(this.publicKey.toAddress())
+
+      for (let i = 0; i < channels.length; i++) {
+        await this.redeemTicketsInChannel(channels[i])
+
+        if (i + 1 < channels.length) {
+          // Give other tasks CPU time to happen
+          // Push next loop iteration to end of next event loop iteration
+          await setImmediate()
+        }
       }
     } catch (err) {
       log(`error during redeeming all tickets`, err)
@@ -292,10 +301,22 @@ export default class HoprCoreEthereum extends EventEmitter {
     // reduce the chance for race-conditions with db write operations on
     // those tickets.
     let tickets = await this.db.getAcknowledgedTickets({ channel })
+
+    let ticket: AcknowledgedTicket
     while (tickets.length > 0) {
-      const ticket = tickets[0]
+      if (ticket != undefined && ticket.ticket.index.eq(tickets[0].ticket.index)) {
+        // @TODO handle errors
+        log(
+          `Could not redeem ticket with index ${ticket.ticket.index
+            .toBN()
+            .toString()} in channel ${channelId}. Giving up.`
+        )
+        break
+      }
+      ticket = tickets[0]
+
       log(
-        `redeeming ticket in channel from ${channel.source} to ${
+        `redeeming ticket ${ticket.response.toHex()} in channel from ${channel.source} to ${
           channel.destination
         }, preImage ${ticket.preImage.toHex()}, porSecret ${ticket.response.toHex()}`
       )
@@ -310,9 +331,19 @@ export default class HoprCoreEthereum extends EventEmitter {
         if (result.status === 'ERROR') throw result.error
         return
       }
-      log('ticket was redeemed')
+      log(`ticket ${ticket.response.toHex()} was redeemed`)
+
+      // Give other tasks CPU time to happen
+      // Push database query to end of next event loop iteration
+      await setImmediate()
 
       tickets = await this.db.getAcknowledgedTickets({ channel })
+
+      if (tickets.length > 0) {
+        // Give other tasks CPU time to happen
+        // Push next loop iteration to end of next event loop iteration
+        await setImmediate()
+      }
     }
 
     log(`redemption of tickets from ${channel.source.toB58String()} is complete`)
@@ -328,6 +359,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         message: 'Invalid response to acknowledgement'
       }
     }
+
+    let receipt: string
 
     try {
       const ticket = ackTicket.ticket
@@ -353,18 +386,9 @@ export default class HoprCoreEthereum extends EventEmitter {
         }
       }
 
-      const receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket, (tx: string) =>
+      receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, ticket, (tx: string) =>
         this.setTxHandler('channel-updated', tx)
       )
-
-      log('Successfully submitted ticket', ackTicket.response.toHex())
-      await this.db.markRedeemeed(ackTicket)
-      this.emit('ticket:redeemed', ackTicket)
-      return {
-        status: 'SUCCESS',
-        receipt,
-        ackTicket
-      }
     } catch (err) {
       // TODO delete ackTicket -- check if it's due to gas!
       log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
@@ -372,6 +396,15 @@ export default class HoprCoreEthereum extends EventEmitter {
         status: 'ERROR',
         error: err
       }
+    }
+
+    log('Successfully submitted ticket', ackTicket.response.toHex())
+    await this.db.markRedeemeed(ackTicket)
+    this.emit('ticket:redeemed', ackTicket)
+    return {
+      status: 'SUCCESS',
+      receipt,
+      ackTicket
     }
   }
 

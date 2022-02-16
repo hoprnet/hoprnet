@@ -2,7 +2,7 @@ import type { LevelUp } from 'levelup'
 import levelup from 'levelup'
 import leveldown from 'leveldown'
 import MemDown from 'memdown'
-import { existsSync, mkdirSync, rmSync } from 'fs'
+import { stat, mkdir, rm } from 'fs/promises'
 import path from 'path'
 import { debug } from './process'
 import { Hash, u8aConcat, Address, Intermediate, Ticket, generateChannelId } from '.'
@@ -77,7 +77,13 @@ export class HoprDB {
 
   constructor(private id: PublicKey) {}
 
-  async init(initialize: boolean, version: string, dbPath: string, forceCreate?: boolean, environmentId?: string) {
+  async init(
+    initialize: boolean,
+    version: string,
+    dbPath: string,
+    forceCreate: boolean = false,
+    environmentId: string
+  ) {
     if (!dbPath) {
       if (!environmentId) {
         throw new Error(`must provide environmentId if no dbPath is given`)
@@ -89,17 +95,31 @@ export class HoprDB {
 
     let setEnvironment = false
 
-    log('using db at ', dbPath)
+    log(`using db at ${dbPath}`)
     if (forceCreate) {
       log('force create - wipe old database and create a new')
-      rmSync(dbPath, { recursive: true, force: true })
-      mkdirSync(dbPath, { recursive: true })
+      await rm(dbPath, { recursive: true, force: true })
+      await mkdir(dbPath, { recursive: true })
       setEnvironment = true
     }
-    if (!existsSync(dbPath)) {
-      log('db does not exist, creating?:', initialize)
+
+    let exists = false
+
+    try {
+      exists = !(await stat(dbPath)).isDirectory()
+    } catch (err: any) {
+      if (err.code === 'ENOENT') {
+        exists = false
+      } else {
+        // Unexpected error, therefore throw it
+        throw err
+      }
+    }
+
+    if (!exists) {
+      log('db directory does not exist, creating?:', initialize)
       if (initialize) {
-        mkdirSync(dbPath, { recursive: true })
+        await mkdir(dbPath, { recursive: true })
         setEnvironment = true
       } else {
         throw new Error('Database does not exist: ' + dbPath)
@@ -110,11 +130,8 @@ export class HoprDB {
     // Fully initialize database
     await this.db.open()
 
-    log('namespacing db by pubkey: ', this.id.toAddress().toHex())
+    log(`namespacing db by native address: ${this.id.toAddress().toHex()}`)
     if (setEnvironment) {
-      if (!environmentId) {
-        throw new Error(`must provide environment id when creating db`)
-      }
       log(`setting environment id ${environmentId} to db`)
       await this.setEnvironmentId(environmentId)
     } else {
