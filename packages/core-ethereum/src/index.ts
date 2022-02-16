@@ -254,7 +254,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       for (let i = 0; i < channels.length; i++) {
         await this.redeemTicketsInChannel(channels[i])
 
-        if (i < channels.length) {
+        if (i + 1 < channels.length) {
           // Give other tasks CPU time to happen
           // Push next loop iteration to end of next event loop iteration
           await setImmediate()
