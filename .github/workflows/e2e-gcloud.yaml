@@ -57,6 +57,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          install_components: beta
 
       - name: Test
         id: test
