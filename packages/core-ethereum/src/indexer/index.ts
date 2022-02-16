@@ -321,10 +321,6 @@ class Indexer extends EventEmitter {
         continue
       }
 
-      // Give other tasks CPU time to happen
-      // Wait until end of next event loop iteration before writing events to db
-      await setImmediate()
-
       this.onNewEvents(events)
       await this.onNewBlock(toBlock, false)
       failedCount = 0
@@ -607,6 +603,15 @@ class Indexer extends EventEmitter {
           `error: failed to update latest confirmed snapshot in the database, eventBlockNum=${event.blockNumber}, txIdx=${event.transactionIndex}`,
           err
         )
+      }
+
+      if (
+        this.unconfirmedEvents.size() > 0 &&
+        isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
+      ) {
+        // Give other tasks CPU time to happen
+        // Wait until end of next event loop iteration before starting next db write-back
+        await setImmediate()
       }
     }
 
