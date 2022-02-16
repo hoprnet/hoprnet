@@ -130,7 +130,7 @@ export class HoprDB {
     // Fully initialize database
     await this.db.open()
 
-    log(`namespacing db by Ethereum address: ${this.id.toAddress().toHex()}`)
+    log(`namespacing db by native address: ${this.id.toAddress().toHex()}`)
     if (setEnvironment) {
       log(`setting environment id ${environmentId} to db`)
       await this.setEnvironmentId(environmentId)
