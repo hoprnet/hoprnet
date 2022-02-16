@@ -316,17 +316,17 @@ log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19505/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
 
-declare env_file=$(mktemp)
+declare env_file="${tmp}/local-cluster.env"
 {
 echo "#!/usr/bin/env bash" ;
 echo "\$(return >/dev/null 2>&1)" ;
 echo "test \"\$?\" -eq \"0\" || { echo \"This script should only be sourced.\" >&2; exit 1; }" ;
 echo "export apiToken=${api_token}" ;
 echo "export HOPR_NODE_1_ADDR=${peers[0]} HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:19501" ;
-echo "export HOPR_NODE_2_ADDR=${peers[1]} HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_2_WS_URL=ws://127.0.0.1:19501" ;
-echo "export HOPR_NODE_3_ADDR=${peers[2]} HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_3_WS_URL=ws://127.0.0.1:19501" ;
-echo "export HOPR_NODE_4_ADDR=${peers[3]} HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_4_WS_URL=ws://127.0.0.1:19501" ;
-echo "export HOPR_NODE_5_ADDR=${peers[4]} HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_5_WS_URL=ws://127.0.0.1:19501" ;
+echo "export HOPR_NODE_2_ADDR=${peers[1]} HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=ws://127.0.0.1:19502" ;
+echo "export HOPR_NODE_3_ADDR=${peers[2]} HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=ws://127.0.0.1:19503" ;
+echo "export HOPR_NODE_4_ADDR=${peers[3]} HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=ws://127.0.0.1:19504" ;
+echo "export HOPR_NODE_5_ADDR=${peers[4]} HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=ws://127.0.0.1:19505" ;
 } > ${env_file}
 
 # GitPod related barrier
