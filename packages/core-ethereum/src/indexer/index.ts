@@ -442,10 +442,6 @@ class Indexer extends EventEmitter {
       this.onNewEvents(events)
     }
 
-    // Give other tasks CPU time to happen
-    // Push write operation to end of next event loop iteration
-    await setImmediate()
-
     await this.processUnconfirmedEvents(blockNumber, lastDatabaseSnapshot)
   }
 
