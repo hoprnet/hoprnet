@@ -202,7 +202,7 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('heartbeatInterval', {
     number: true,
-    describe: 'Interval in miliseconds in which the availability of other nodes get measured',
+    describe: 'Interval in milliseconds in which the availability of other nodes get measured',
     default: undefined
   })
   .option('heartbeatVariance', {
