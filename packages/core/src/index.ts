@@ -91,6 +91,7 @@ export type HoprOptions = {
     ip6?: NetOptions
   }
   heartbeatInterval?: number
+  heartbeatVariance?: number
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet

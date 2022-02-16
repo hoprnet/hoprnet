@@ -206,6 +206,12 @@ const argv = yargs(process.argv.slice(2))
     default: undefined,
     hidden: true
   })
+  .option('testHeartbeatVariance', {
+    number: true,
+    describe: 'Network testing: upper bound of variance for heartbeat interval',
+    default: undefined,
+    hidden: true
+  })
   .wrap(Math.min(120, terminalWidth()))
   .parseSync()
 
@@ -234,6 +240,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
     environment,
     allowLocalConnections: argv.allowLocalNodeConnections,
     heartbeatInterval: argv.testHeartbeatInterval,
+    heartbeatVariance: argv.testHeartbeatVariance,
     testing: {
       announceLocalAddresses: argv.testAnnounceLocalAddresses,
       preferLocalAddresses: argv.testPreferLocalAddresses,
