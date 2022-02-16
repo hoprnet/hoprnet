@@ -86,7 +86,7 @@ async function startNode(
     },
     modules: {
       transport: [HoprConnect as any],
-      streamMuxer: [Mplex as any],
+      streamMuxer: [Mplex],
       connEncryption: [NOISE as any]
     },
     config: {
