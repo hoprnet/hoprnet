@@ -17,8 +17,7 @@ import {
   Hash,
   debug,
   DeferType,
-  privKeyToPeerId,
-  type UINT256
+  privKeyToPeerId
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { CONFIRMATIONS, INDEXER_BLOCK_RANGE, PROVIDER_CACHE_TTL } from './constants'
@@ -303,16 +302,18 @@ export default class HoprCoreEthereum extends EventEmitter {
     // those tickets.
     let tickets = await this.db.getAcknowledgedTickets({ channel })
 
-    let previousIndex: UINT256
+    let ticket: AcknowledgedTicket
     while (tickets.length > 0) {
-      const ticket = tickets[0]
-
-      if (previousIndex != undefined && previousIndex.eq(ticket.ticket.index)) {
+      if (ticket != undefined && ticket.ticket.index.eq(tickets[0].ticket.index)) {
         // @TODO handle errors
-        log(`Could not redeem ticket with index ${previousIndex.toBN().toString()} in channel ${channelId}. Giving up.`)
+        log(
+          `Could not redeem ticket with index ${ticket.ticket.index
+            .toBN()
+            .toString()} in channel ${channelId}. Giving up.`
+        )
         break
       }
-      previousIndex = ticket.ticket.index
+      ticket = tickets[0]
 
       log(
         `redeeming ticket ${ticket.response.toHex()} in channel from ${channel.source} to ${
