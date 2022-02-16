@@ -207,7 +207,7 @@ const argv = yargs(process.argv.slice(2))
   })
   .option('heartbeatVariance', {
     number: true,
-    describe: 'Upper bound for variance applied to heartbeat interval',
+    describe: 'Upper bound for variance applied to heartbeat interval in milliseconds',
     default: undefined
   })
   .wrap(Math.min(120, terminalWidth()))
