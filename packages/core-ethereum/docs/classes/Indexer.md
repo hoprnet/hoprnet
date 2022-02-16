@@ -98,7 +98,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L55)
+[packages/core-ethereum/src/indexer/index.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L56)
 
 ## Properties
 
@@ -140,7 +140,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L48)
+[packages/core-ethereum/src/indexer/index.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L49)
 
 ___
 
@@ -150,7 +150,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L49)
+[packages/core-ethereum/src/indexer/index.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L50)
 
 ___
 
@@ -160,7 +160,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L50)
+[packages/core-ethereum/src/indexer/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L51)
 
 ___
 
@@ -170,7 +170,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L46)
+[packages/core-ethereum/src/indexer/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L47)
 
 ___
 
@@ -180,7 +180,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L45)
+[packages/core-ethereum/src/indexer/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L46)
 
 ___
 
@@ -190,7 +190,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L47)
+[packages/core-ethereum/src/indexer/index.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L48)
 
 ___
 
@@ -208,7 +208,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L53)
+[packages/core-ethereum/src/indexer/index.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L54)
 
 ___
 
@@ -226,7 +226,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L52)
+[packages/core-ethereum/src/indexer/index.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L53)
 
 ___
 
@@ -442,7 +442,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:706](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L706)
+[packages/core-ethereum/src/indexer/index.ts:741](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L741)
 
 ___
 
@@ -456,7 +456,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:718](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L718)
+[packages/core-ethereum/src/indexer/index.ts:753](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L753)
 
 ___
 
@@ -483,7 +483,7 @@ all relevant events in the specified block range
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L195)
+[packages/core-ethereum/src/indexer/index.ts:196](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L196)
 
 ___
 
@@ -531,7 +531,7 @@ peer's open channels
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:761](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L761)
+[packages/core-ethereum/src/indexer/index.ts:796](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L796)
 
 ___
 
@@ -551,7 +551,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:710](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L710)
+[packages/core-ethereum/src/indexer/index.ts:745](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L745)
 
 ___
 
@@ -565,7 +565,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:722](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L722)
+[packages/core-ethereum/src/indexer/index.ts:757](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L757)
 
 ___
 
@@ -584,7 +584,7 @@ an open channel
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:744](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L744)
+[packages/core-ethereum/src/indexer/index.ts:779](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L779)
 
 ___
 
@@ -605,7 +605,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:702](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L702)
+[packages/core-ethereum/src/indexer/index.ts:737](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L737)
 
 ___
 
@@ -772,7 +772,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:588](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L588)
+[packages/core-ethereum/src/indexer/index.ts:623](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L623)
 
 ___
 
@@ -792,7 +792,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:683](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L683)
+[packages/core-ethereum/src/indexer/index.ts:718](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L718)
 
 ___
 
@@ -812,7 +812,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:615](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L615)
+[packages/core-ethereum/src/indexer/index.ts:650](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L650)
 
 ___
 
@@ -838,7 +838,7 @@ confirmed blocks.
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:378](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L378)
+[packages/core-ethereum/src/indexer/index.ts:385](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L385)
 
 ___
 
@@ -862,7 +862,7 @@ Adds new events to the queue of unprocessed events
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:428](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L428)
+[packages/core-ethereum/src/indexer/index.ts:453](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L453)
 
 ___
 
@@ -885,7 +885,7 @@ Will restart the indexer if needed.
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:340](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L340)
+[packages/core-ethereum/src/indexer/index.ts:347](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L347)
 
 ___
 
@@ -905,7 +905,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:654](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L654)
+[packages/core-ethereum/src/indexer/index.ts:689](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L689)
 
 ___
 
@@ -925,7 +925,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:688](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L688)
+[packages/core-ethereum/src/indexer/index.ts:723](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L723)
 
 ___
 
@@ -1082,7 +1082,7 @@ past events and last queried block
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:292](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L292)
+[packages/core-ethereum/src/indexer/index.ts:293](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L293)
 
 ___
 
@@ -1106,7 +1106,7 @@ confirmed block (latestBlock - confirmationTime)
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:484](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L484)
+[packages/core-ethereum/src/indexer/index.ts:510](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L510)
 
 ___
 
@@ -1318,7 +1318,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:767](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L767)
+[packages/core-ethereum/src/indexer/index.ts:802](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L802)
 
 ___
 
@@ -1337,7 +1337,7 @@ has been restarted
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:166](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L166)
+[packages/core-ethereum/src/indexer/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L167)
 
 ___
 
@@ -1420,7 +1420,7 @@ Starts indexing.
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L69)
+[packages/core-ethereum/src/indexer/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L70)
 
 ___
 
@@ -1436,7 +1436,7 @@ Stops indexing.
 
 #### Defined in
 
-[packages/core-ethereum/src/indexer/index.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L146)
+[packages/core-ethereum/src/indexer/index.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L147)
 
 ___
 

@@ -86,6 +86,8 @@ ___
 | `dbPath?` | `string` |
 | `environment` | [`ResolvedEnvironment`](modules.md#resolvedenvironment) |
 | `forceCreateDB?` | `boolean` |
+| `heartbeatInterval?` | `number` |
+| `heartbeatVariance?` | `number` |
 | `hosts?` | `Object` |
 | `hosts.ip4?` | `NetOptions` |
 | `hosts.ip6?` | `NetOptions` |
@@ -100,7 +102,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L77)
+[packages/core/src/index.ts:78](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L78)
 
 ___
 
@@ -110,7 +112,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L116)
+[packages/core/src/index.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L119)
 
 ___
 
@@ -140,7 +142,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L131)
+[packages/core/src/index.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L134)
 
 ___
 
@@ -150,7 +152,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:118](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L118)
+[packages/core/src/index.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L121)
 
 ## Variables
 

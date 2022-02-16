@@ -52,7 +52,7 @@
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L45)
+[packages/core-ethereum/src/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L46)
 
 ___
 
@@ -62,7 +62,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/ethereum.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L27)
+[packages/core-ethereum/src/ethereum.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L28)
 
 ___
 
@@ -72,7 +72,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L30)
+[packages/core-ethereum/src/index.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L31)
 
 ## Variables
 
@@ -152,7 +152,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/ethereum.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L33)
+[packages/core-ethereum/src/ethereum.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L34)
 
 ___
 

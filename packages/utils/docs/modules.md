@@ -2242,7 +2242,7 @@ an array containing the results
 
 #### Defined in
 
-[async/parallel.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/parallel.ts#L43)
+[async/parallel.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/parallel.ts#L37)
 
 ___
 
