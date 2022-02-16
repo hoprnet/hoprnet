@@ -3033,7 +3033,7 @@ __metadata:
     it-pushable: 1.4.2
     libp2p: 0.35.8
     libp2p-interfaces: 2.0.0
-    libp2p-mplex: 1.0.0
+    libp2p-mplex: 0.10.7
     mocha: 9.2.0
     multiaddr: 10.0.1
     multihashes: 4.0.3
@@ -3210,7 +3210,7 @@ __metadata:
     libp2p: 0.35.8
     libp2p-crypto: 0.21.2
     libp2p-kad-dht: 0.27.6
-    libp2p-mplex: 1.0.0
+    libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
     memdown: 6.1.1
     mocha: 9.2.0
@@ -5361,7 +5361,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"abortable-iterator@npm:3.0.2, abortable-iterator@npm:^3.0.0":
+"abortable-iterator@npm:3.0.2, abortable-iterator@npm:^3.0.0, abortable-iterator@npm:^3.0.2":
   version: 3.0.2
   resolution: "abortable-iterator@npm:3.0.2"
   dependencies:
@@ -14890,7 +14890,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pushable@npm:1.4.2, it-pushable@npm:^1.4.0, it-pushable@npm:^1.4.2":
+"it-pushable@npm:1.4.2, it-pushable@npm:^1.4.0, it-pushable@npm:^1.4.1, it-pushable@npm:^1.4.2":
   version: 1.4.2
   resolution: "it-pushable@npm:1.4.2"
   dependencies:
@@ -15922,6 +15922,21 @@ __metadata:
     uint8arrays: ^3.0.0
     varint: ^6.0.0
   checksum: 4d242f1fd3c1b50fb5742d2565906d4f39ad1db3694098aed74fcaee114a0e74e847258460dfdd1a85051b312ceb8f337f3c81ed50eededc1897eca7d5e6cdf5
+  languageName: node
+  linkType: hard
+
+"libp2p-mplex@npm:0.10.7":
+  version: 0.10.7
+  resolution: "libp2p-mplex@npm:0.10.7"
+  dependencies:
+    abortable-iterator: ^3.0.2
+    bl: ^5.0.0
+    debug: ^4.3.1
+    err-code: ^3.0.1
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.1
+    varint: ^6.0.0
+  checksum: f425401f254ca389572b889f4675cfc9cdbe317d97dbb7cc8403901c59813f1dc41a7f141d3945d15a32a537bb31925b826517522ecb9864013e007a3e7d7c06
   languageName: node
   linkType: hard
 

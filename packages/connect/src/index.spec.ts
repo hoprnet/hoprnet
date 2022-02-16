@@ -1,7 +1,7 @@
 // import assert from 'assert'
 // import libp2p from 'libp2p'
 
-// import { Mplex } from 'libp2p-mplex'
+// const Mplex = require('libp2p-mplex')
 // // @ts-ignore
 // import KadDHT = require('libp2p-kad-dht')
 // // @ts-ignore

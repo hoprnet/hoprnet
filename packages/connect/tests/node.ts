@@ -4,7 +4,7 @@ import fs from 'fs'
 import { setTimeout } from 'timers/promises'
 
 import { NOISE } from '@chainsafe/libp2p-noise'
-import { Mplex } from 'libp2p-mplex'
+const Mplex = require('libp2p-mplex')
 
 import { default as HoprConnect, type HoprConnectConfig } from '@hoprnet/hopr-connect'
 import { Multiaddr } from 'multiaddr'

@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 
 import Libp2p from 'libp2p'
 import TCP from 'libp2p-tcp'
-import { Mplex } from 'libp2p-mplex'
+const Mplex = require('libp2p-mplex')
 import { NOISE } from '@chainsafe/libp2p-noise'
 import KadDHT from 'libp2p-kad-dht'
 import { Multiaddr } from 'multiaddr'

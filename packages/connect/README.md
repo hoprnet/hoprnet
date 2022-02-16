@@ -58,7 +58,7 @@ Start a bootstrapServer
 
 ```ts
 const libp2p = require('libp2p')
-import { Mplex } from 'libp2p-mplex'
+const Mplex = require('libp2p-mplex')
 import { NOISE } from '@chainsafe/libp2p-noise'
 const PeerId = require('peer-id')
 
@@ -89,7 +89,7 @@ Start another client
 
 ```ts
 const libp2p = require('libp2p')
-import { Mplex } from 'libp2p-mplex'
+const MPLEX = require('libp2p-mplex')
 import { NOISE } from '@chainsafe/libp2p-noise'
 const PeerId = require('peer-id')
 
