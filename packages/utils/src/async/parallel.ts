@@ -7,20 +7,18 @@
  * @param workerIndex index in the results array
  * @returns a decorated worker result
  */
-function runTask<ArgType, Return, Args extends Array<ArgType>>(
+async function runTask<ArgType, Return, Args extends Array<ArgType>>(
   fn: (...args: Args) => Promise<Return>,
   arg: Args,
   resultIndex: number,
   update: (resultIndex: number, result: Return | Error) => void
-): void {
-  fn(...arg).then(
-    (value: Return) => {
-      setImmediate(update, resultIndex, value)
-    },
-    (err: any) => {
-      setImmediate(update, resultIndex, err)
-    }
-  )
+): Promise<void> {
+  try {
+    const value = await fn(...arg)
+    setImmediate(update, resultIndex, value)
+  } catch (err) {
+    setImmediate(update, resultIndex, err)
+  }
 }
 
 /**
