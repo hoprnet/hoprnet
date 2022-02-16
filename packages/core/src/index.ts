@@ -520,7 +520,7 @@ class Hopr extends EventEmitter {
         log(`error when strategy trying to open channel to ${channel[0].toString()}`, e)
       }
 
-      if (i < nextChannelDestinations.length) {
+      if ((i+1) < nextChannelDestinations.length) {
         // Give other tasks CPU time to happen
         // Push next loop iteration to end of next event loop iteration
         await setImmediate()
