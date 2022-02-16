@@ -398,10 +398,6 @@ export default class HoprCoreEthereum extends EventEmitter {
       }
     }
 
-    // Give other tasks CPU time to happen
-    // Push update of database to end of next event loop iteration
-    await setImmediate()
-
     log('Successfully submitted ticket', ackTicket.response.toHex())
     await this.db.markRedeemeed(ackTicket)
     this.emit('ticket:redeemed', ackTicket)
