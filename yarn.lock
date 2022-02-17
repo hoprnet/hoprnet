@@ -3218,7 +3218,7 @@ __metadata:
     multiformats: 9.6.4
     multihashes: 4.0.3
     peer-id: 0.16.0
-    pino: 7.6.2
+    pino: 7.8.0
     pino-logflare: 0.3.12
     rewiremock: 3.14.3
     rimraf: 3.0.2
@@ -19368,7 +19368,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pino@npm:*, pino@npm:7.6.2":
+"pino@npm:*":
   version: 7.6.2
   resolution: "pino@npm:7.6.2"
   dependencies:
@@ -19385,6 +19385,26 @@ __metadata:
   bin:
     pino: bin.js
   checksum: a748bda5b56e4bb357a986b9878d95e24e6dfb3ed6b741dd80a8f1101d0b7defc5131057cb2297ca76bd7cbcdb1bdc2d0986631e3899e12833cec08e690c83a8
+  languageName: node
+  linkType: hard
+
+"pino@npm:7.8.0":
+  version: 7.8.0
+  resolution: "pino@npm:7.8.0"
+  dependencies:
+    fast-redact: ^3.0.0
+    on-exit-leak-free: ^0.2.0
+    pino-abstract-transport: v0.5.0
+    pino-std-serializers: ^4.0.0
+    process-warning: ^1.0.0
+    quick-format-unescaped: ^4.0.3
+    real-require: ^0.1.0
+    safe-stable-stringify: ^2.1.0
+    sonic-boom: ^2.2.1
+    thread-stream: ^0.13.0
+  bin:
+    pino: bin.js
+  checksum: 0be8a440f81e7e2f4a22156e5886d550c618d6609572f0f262ccbc15077b702ee56c17d8bff7779361a74e64e4257f533b6038f46845e583315895ac6babc753
   languageName: node
   linkType: hard
 
