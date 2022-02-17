@@ -1,7 +1,7 @@
 import { default as LibP2P, type Connection } from 'libp2p'
 import { type AddressSorter, expandVars, HoprDB, localAddressesFirst, PublicKey } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import MPLEX from 'libp2p-mplex'
+const Mplex = require('libp2p-mplex')
 import KadDHT from 'libp2p-kad-dht'
 import { NOISE } from '@chainsafe/libp2p-noise'
 import type PeerId from 'peer-id'
@@ -47,7 +47,7 @@ export async function createLibp2pInstance(
     // libp2p modules
     modules: {
       transport: [HoprConnect as any],
-      streamMuxer: [MPLEX],
+      streamMuxer: [Mplex],
       connEncryption: [NOISE as any],
       dht: KadDHT
     },
