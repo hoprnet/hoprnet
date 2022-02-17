@@ -211,20 +211,24 @@ class Relay {
     }
   }
 
-  private onCanRelay(conn: HandlerProps) {
+  private async onCanRelay(conn: HandlerProps) {
     // Only called if protocol is supported which
     // means that environments match
-    conn.stream.sink(
-      async function* (this: Relay) {
-        // @TODO check if there is a relay slot available
+    try {
+      await conn.stream.sink(
+        async function* (this: Relay) {
+          // @TODO check if there is a relay slot available
 
-        const key = await createRelayerKey(conn.connection.remotePeer)
+          const key = await createRelayerKey(conn.connection.remotePeer)
 
-        await this.libp2p.contentRouting.provide(key)
-        log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toB58String()}`, key)
-        yield OK
-      }.call(this)
-    )
+          await this.libp2p.contentRouting.provide(key)
+          log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toB58String()}`, key)
+          yield OK
+        }.call(this)
+      )
+    } catch (err) {
+      error(`Error in CAN_RELAY protocol`, err)
+    }
   }
 
   private onRelay(conn: HandlerProps) {
