@@ -266,19 +266,18 @@ class Indexer extends EventEmitter {
     }
 
     const events = await Promise.all(queries)
+    const normalizedEvents = events
+      .flat(1)
+      .sort(snapshotComparator)
+      // @TODO fix type clash
+      .map((event) => {
+        if (event.event == undefined) {
+          return Object.assign(event, { event: event.name })
+        }
+        return event
+      })
 
-    return (
-      events
-        .flat(1)
-        .sort(snapshotComparator)
-        // @TODO fix type clash
-        .map((event) => {
-          if (event.event == undefined) {
-            return Object.assign(event, { event: event.name })
-          }
-          return event
-        })
-    )
+    return normalizedEvents
   }
 
   /**
@@ -417,7 +416,7 @@ class Indexer extends EventEmitter {
     if (fetchEvents) {
       // Don't fail immediately when one block is temporarily not available
       const RETRIES = 3
-      let events: TypedEvent<any, any>[]
+      let events: TypedEvent<any, any>[] = []
 
       for (let i = 0; i < RETRIES; i++) {
         try {
@@ -450,8 +449,8 @@ class Indexer extends EventEmitter {
    * @dev ignores events that have been processed before.
    * @param events new unprocessed events
    */
-  private onNewEvents(events: Event<any>[] | TokenEvent<any>[]): void {
-    if (events.length == 0) {
+  private onNewEvents(events: Event<any>[] | TokenEvent<any>[] | undefined): void {
+    if (events == undefined || events.length == 0) {
       // Nothing to do
       return
     }
