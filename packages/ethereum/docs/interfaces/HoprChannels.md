@@ -17,6 +17,7 @@
 - [\_wrappedEmits](HoprChannels.md#_wrappedemits)
 - [address](HoprChannels.md#address)
 - [callStatic](HoprChannels.md#callstatic)
+- [contractName](HoprChannels.md#contractname)
 - [deployTransaction](HoprChannels.md#deploytransaction)
 - [estimateGas](HoprChannels.md#estimategas)
 - [filters](HoprChannels.md#filters)
@@ -157,7 +158,17 @@ BaseContract.callStatic
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:490
+packages/ethereum/src/types/HoprChannels.ts:498
+
+___
+
+### contractName
+
+• **contractName**: ``"HoprChannels"``
+
+#### Defined in
+
+packages/ethereum/src/types/HoprChannels.ts:292
 
 ___
 
@@ -205,7 +216,7 @@ BaseContract.estimateGas
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:685
+packages/ethereum/src/types/HoprChannels.ts:693
 
 ___
 
@@ -240,7 +251,7 @@ BaseContract.filters
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:577
+packages/ethereum/src/types/HoprChannels.ts:585
 
 ___
 
@@ -274,7 +285,7 @@ BaseContract.functions
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:310
+packages/ethereum/src/types/HoprChannels.ts:318
 
 ___
 
@@ -288,7 +299,7 @@ BaseContract.interface
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:289
+packages/ethereum/src/types/HoprChannels.ts:297
 
 ___
 
@@ -302,7 +313,7 @@ BaseContract.off
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:305
+packages/ethereum/src/types/HoprChannels.ts:313
 
 ___
 
@@ -316,7 +327,7 @@ BaseContract.on
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:306
+packages/ethereum/src/types/HoprChannels.ts:314
 
 ___
 
@@ -330,7 +341,7 @@ BaseContract.once
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:307
+packages/ethereum/src/types/HoprChannels.ts:315
 
 ___
 
@@ -364,7 +375,7 @@ BaseContract.populateTransaction
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:764
+packages/ethereum/src/types/HoprChannels.ts:772
 
 ___
 
@@ -392,7 +403,7 @@ BaseContract.removeListener
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:308
+packages/ethereum/src/types/HoprChannels.ts:316
 
 ___
 
@@ -440,7 +451,7 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:79
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:402
+packages/ethereum/src/types/HoprChannels.ts:410
 
 ___
 
@@ -460,7 +471,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:404
+packages/ethereum/src/types/HoprChannels.ts:412
 
 ___
 
@@ -556,7 +567,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:406
+packages/ethereum/src/types/HoprChannels.ts:414
 
 ___
 
@@ -580,7 +591,7 @@ BaseContract.attach
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:286
+packages/ethereum/src/types/HoprChannels.ts:294
 
 ___
 
@@ -602,7 +613,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:412
+packages/ethereum/src/types/HoprChannels.ts:420
 
 ___
 
@@ -624,7 +635,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:418
+packages/ethereum/src/types/HoprChannels.ts:426
 
 ___
 
@@ -645,7 +656,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:424
+packages/ethereum/src/types/HoprChannels.ts:432
 
 ___
 
@@ -669,7 +680,7 @@ BaseContract.connect
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:285
+packages/ethereum/src/types/HoprChannels.ts:293
 
 ___
 
@@ -687,7 +698,7 @@ BaseContract.deployed
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:287
+packages/ethereum/src/types/HoprChannels.ts:295
 
 ___
 
@@ -757,7 +768,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:439
+packages/ethereum/src/types/HoprChannels.ts:447
 
 ___
 
@@ -781,7 +792,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:444
+packages/ethereum/src/types/HoprChannels.ts:452
 
 ___
 
@@ -802,7 +813,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:452
+packages/ethereum/src/types/HoprChannels.ts:460
 
 ___
 
@@ -856,7 +867,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:297
+packages/ethereum/src/types/HoprChannels.ts:305
 
 ▸ **listeners**(`eventName?`): `Listener`[]
 
@@ -876,7 +887,7 @@ BaseContract.listeners
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:300
+packages/ethereum/src/types/HoprChannels.ts:308
 
 ___
 
@@ -897,7 +908,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:457
+packages/ethereum/src/types/HoprChannels.ts:465
 
 ___
 
@@ -918,7 +929,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:462
+packages/ethereum/src/types/HoprChannels.ts:470
 
 ___
 
@@ -950,7 +961,7 @@ BaseContract.queryFilter
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:291
+packages/ethereum/src/types/HoprChannels.ts:299
 
 ___
 
@@ -978,7 +989,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:464
+packages/ethereum/src/types/HoprChannels.ts:472
 
 ___
 
@@ -1008,7 +1019,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:301
+packages/ethereum/src/types/HoprChannels.ts:309
 
 ▸ **removeAllListeners**(`eventName?`): [`HoprChannels`](HoprChannels.md)
 
@@ -1028,7 +1039,7 @@ BaseContract.removeAllListeners
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:304
+packages/ethereum/src/types/HoprChannels.ts:312
 
 ___
 
@@ -1048,7 +1059,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:476
+packages/ethereum/src/types/HoprChannels.ts:484
 
 ___
 
@@ -1068,7 +1079,7 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:478
+packages/ethereum/src/types/HoprChannels.ts:486
 
 ___
 
@@ -1094,4 +1105,4 @@ ___
 
 #### Defined in
 
-packages/ethereum/src/types/HoprChannels.ts:480
+packages/ethereum/src/types/HoprChannels.ts:488
