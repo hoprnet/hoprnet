@@ -24,7 +24,7 @@ release. The latest stable release known at the time of writing is [`lisbon`](ht
 ## Gitpod Setup
 
 The simplest and fastest way to setup a HOPR cluster is using [Gitpod](https://gitpod.io). Gitpod is a cloud tool used to create
-automated dev environments in seconds. We have configured our [HOPR monorepo](https://github.com/hoprnet/hoprnet/tree/release/lisbon)
+automated dev environments in seconds. We have configured our [HOPR monorepo](https://gitpod.io/#https://github.com/hoprnet/hoprnet/tree/release/lisbon)
 to quickly setup everything for you to get started.
 
 **How to setup development cluster with GitPod video:** [https://vimeo.com/678070260/9ef64ca41b](https://vimeo.com/678070260/9ef64ca41b)
