@@ -95,11 +95,14 @@ yarn && yarn build
 ```
 
 Afterwards, a set off accounts with their respective HTTP REST API, HOPR Admin, and WebSocket interface will be displayed
-in your screen. For the next steps, we recommend copying and pasting these URLs and `export` them to your terminal so you can
-make use of them in the following pages.
+in your screen. As soon as the script finishes starting up the local cluster, it will suggest you to `source` the `local-cluster.env` file.
+This should be done in each terminal you'll be communicating with the local cluster nodes as it will setup all the environment variables
+necessary for the following pages.
+
+Alternatively, you can copy and paste these URLs and `export` them to your terminal:
 
 ```bash
-export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=http://127.0.0.1:19501 HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=http://127.0.0.1:19502 HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=http://127.0.0.1:19503 HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=http://127.0.0.1:19504 HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=http://127.0.0.1:19505
+export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:19501 HOPR_NODE_2_HTTP_URL=ws://127.0.0.1:13302 HOPR_NODE_2_WS_URL=ws://127.0.0.1:19502 HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=ws://127.0.0.1:19503 HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=ws://127.0.0.1:19504 HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=ws://127.0.0.1:19505
 ```
 
 [^1]:
