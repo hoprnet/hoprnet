@@ -3031,7 +3031,7 @@ __metadata:
     it-pair: 1.0.0
     it-pipe: 1.1.0
     it-pushable: 1.4.2
-    libp2p: 0.35.8
+    libp2p: 0.36.2
     libp2p-interfaces: 2.0.0
     libp2p-mplex: 0.10.7
     mocha: 9.2.0
@@ -3102,7 +3102,7 @@ __metadata:
     heap-js: 2.1.6
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.35.8
+    libp2p: 0.36.2
     libp2p-kad-dht: 0.27.6
     libp2p-mplex: 0.10.7
     libp2p-tcp: 0.17.2
@@ -3207,7 +3207,7 @@ __metadata:
     jsonschema: 1.4.0
     leveldown: 6.1.0
     levelup: 5.1.1
-    libp2p: 0.35.8
+    libp2p: 0.36.2
     libp2p-crypto: 0.21.2
     libp2p-kad-dht: 0.27.6
     libp2p-mplex: 0.10.7
@@ -5761,13 +5761,20 @@ __metadata:
   languageName: node
   linkType: hard
 
-"any-signal@npm:^2.1.1, any-signal@npm:^2.1.2":
+"any-signal@npm:^2.1.2":
   version: 2.1.2
   resolution: "any-signal@npm:2.1.2"
   dependencies:
     abort-controller: ^3.0.0
     native-abort-controller: ^1.0.3
   checksum: 498603e30357f82e438ddc972086b3180ddbaf5ea9772f535d103b754711eb13d4c24577e497d5a1146e571ee38f167c316ace7dc1a03b62a8a8c7677e9d660f
+  languageName: node
+  linkType: hard
+
+"any-signal@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "any-signal@npm:3.0.0"
+  checksum: b59f11271d17391c740a903c3f422b9bda77f3d011e106b9733e298685ab9489af9b6c1b300cb778048ddad3dfdc74168f738670bf5f3cf90e04650bb822ed60
   languageName: node
   linkType: hard
 
@@ -9184,6 +9191,25 @@ __metadata:
     it-take: ^1.0.1
     uint8arrays: ^3.0.0
   checksum: 565c37e3f0a5500bb9e96f27be68f14bb5250d2885f536b1adc69f0dfa21dc7795fc98ad029219b425bcc1979535ac48f9925079cee493a6dc708e75df931e4a
+  languageName: node
+  linkType: hard
+
+"datastore-core@npm:^7.0.0":
+  version: 7.0.1
+  resolution: "datastore-core@npm:7.0.1"
+  dependencies:
+    debug: ^4.1.1
+    err-code: ^3.0.1
+    interface-datastore: ^6.0.2
+    it-drain: ^1.0.4
+    it-filter: ^1.0.2
+    it-map: ^1.0.5
+    it-merge: ^1.0.1
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
+    it-take: ^1.0.1
+    uint8arrays: ^3.0.0
+  checksum: beed275a49d871304e755c9e727f89d4f4a9fbd8f60608ae3d5f1df423597b610d3e189fae56469cc2a2c2d7a56d0e13d3ee3b72914b7d91a08028fa41ca9ecc
   languageName: node
   linkType: hard
 
@@ -14721,7 +14747,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-all@npm:^1.0.4, it-all@npm:^1.0.5":
+"it-all@npm:^1.0.4, it-all@npm:^1.0.5, it-all@npm:^1.0.6":
   version: 1.0.6
   resolution: "it-all@npm:1.0.6"
   checksum: 7ca9a528c08ebe2fc8a3c93a41409219d18325ed31fedb9834ebac2822f0b2a96d7abcb6cbfa092114ab4d5f08951e694c7a2c3929ce4b5300769e710ae665db
@@ -14756,6 +14782,13 @@ __metadata:
   version: 1.0.7
   resolution: "it-first@npm:1.0.7"
   checksum: 0c9106d29120f02e68a08118de328437fb44c966385635d672684d4f0321ee22ca470a30f390132bdb454da0d4d3abb82c796dad8e391a827f1a3446711c7685
+  languageName: node
+  linkType: hard
+
+"it-foreach@npm:^0.1.1":
+  version: 0.1.1
+  resolution: "it-foreach@npm:0.1.1"
+  checksum: f9bfdf20b49fae001f265780191c9bae1bb6a76256c34fafe0f8ddc30135c24303562086fb57c3fc472488bcd1f4848e4d1cef0561adab6fb9165df2fe572a60
   languageName: node
   linkType: hard
 
@@ -14854,6 +14887,15 @@ __metadata:
   dependencies:
     bl: ^5.0.0
   checksum: ac71dd53ee35a1cacb39d8c96c091b7fca52878b83691e7b71e2d61193abc05d4ec2dd485c2926be5f357f1fe5eafa3f5c417f1e3ffc60e4de471457fcb3f506
+  languageName: node
+  linkType: hard
+
+"it-sort@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "it-sort@npm:1.0.1"
+  dependencies:
+    it-all: ^1.0.6
+  checksum: f10ec26a3f20380d4092f785d76cb027ac336cedbd95d7f0b54bd5cfd4e45be88921f715b4851f739fad9f5707ca54356bf9b7fc496cd817f676439074ea8b2c
   languageName: node
   linkType: hard
 
@@ -15771,7 +15813,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p-crypto@npm:0.21.2, libp2p-crypto@npm:^0.21.0":
+"libp2p-crypto@npm:0.21.2, libp2p-crypto@npm:^0.21.0, libp2p-crypto@npm:^0.21.2":
   version: 0.21.2
   resolution: "libp2p-crypto@npm:0.21.2"
   dependencies:
@@ -15816,6 +15858,27 @@ __metadata:
     protobufjs: ^6.10.2
     uint8arrays: ^3.0.0
   checksum: dbb6d2adfcbac4dec047a1d48bdb995e52a7e23873d39c87c4a3322cb9d39f5ae407d0338374d16cd2ccc11b25ecea09680113985bb5f11683275c56dd9b0b0e
+  languageName: node
+  linkType: hard
+
+"libp2p-interfaces@npm:^4.0.0":
+  version: 4.0.6
+  resolution: "libp2p-interfaces@npm:4.0.6"
+  dependencies:
+    abortable-iterator: ^3.0.0
+    debug: ^4.3.1
+    err-code: ^3.0.1
+    it-length-prefixed: ^5.0.2
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
+    libp2p-crypto: ^0.21.0
+    multiaddr: ^10.0.0
+    multiformats: ^9.1.2
+    p-queue: ^6.6.2
+    peer-id: ^0.16.0
+    protobufjs: ^6.10.2
+    uint8arrays: ^3.0.0
+  checksum: 55f6c87d6278fc148863666e9f3baa0b3e232840da22440fca28b7d064c03bb9b66d7df1b3f317a25bb3ddf1776c0e6c7311c1b1ade428f2209d5d912da6f666
   languageName: node
   linkType: hard
 
@@ -15918,17 +15981,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.35.8":
-  version: 0.35.8
-  resolution: "libp2p@npm:0.35.8"
+"libp2p@npm:0.36.2":
+  version: 0.36.2
+  resolution: "libp2p@npm:0.36.2"
   dependencies:
     "@vascosantos/moving-average": ^1.1.0
-    abort-controller: ^3.0.0
     abortable-iterator: ^3.0.0
     aggregate-error: ^3.1.0
-    any-signal: ^2.1.1
+    any-signal: ^3.0.0
     bignumber.js: ^9.0.1
     class-is: ^1.1.0
+    datastore-core: ^7.0.0
     debug: ^4.3.1
     err-code: ^3.0.0
     es6-promisify: ^7.0.0
@@ -15940,23 +16003,26 @@ __metadata:
     it-drain: ^1.0.3
     it-filter: ^1.0.1
     it-first: ^1.0.4
+    it-foreach: ^0.1.1
     it-handshake: ^2.0.0
     it-length-prefixed: ^5.0.2
     it-map: ^1.0.4
     it-merge: ^1.0.0
     it-pipe: ^1.1.0
+    it-sort: ^1.0.1
     it-take: ^1.0.0
-    libp2p-crypto: ^0.21.0
-    libp2p-interfaces: ^2.0.1
+    libp2p-crypto: ^0.21.2
+    libp2p-interfaces: ^4.0.0
     libp2p-utils: ^0.4.0
     mafmt: ^10.0.0
     merge-options: ^3.0.4
+    mortice: ^2.0.1
     multiaddr: ^10.0.0
     multiformats: ^9.0.0
-    multistream-select: ^2.0.0
+    multistream-select: ^3.0.0
     mutable-proxy: ^1.0.0
     nat-api: ^0.3.1
-    node-forge: ^0.10.0
+    node-forge: ^1.2.1
     p-any: ^3.0.0
     p-fifo: ^1.0.0
     p-retry: ^4.4.0
@@ -15968,12 +16034,12 @@ __metadata:
     sanitize-filename: ^1.6.3
     set-delayed-interval: ^1.0.0
     streaming-iterables: ^6.0.0
-    timeout-abort-controller: ^2.0.0
+    timeout-abort-controller: ^3.0.0
     uint8arrays: ^3.0.0
     varint: ^6.0.0
     wherearewe: ^1.0.0
     xsalsa20: ^1.1.0
-  checksum: beb2dfab11fedc6eb06a6173c93db3e163ac24be0fb0b3a87e98be1e24c705d407a016e880aba6bf02890a77856d2807ffc044d494176f5ebc4cca9a468b8529
+  checksum: 66d9ed9f370cbfed65aab4c6085bba1fae220249f59f52bd3417b7b021b0efdd7cb8615cf57b5f760b11f44033854d1408bba025877bed771d40878bee45bf6b
   languageName: node
   linkType: hard
 
@@ -17261,6 +17327,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"mortice@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "mortice@npm:2.0.1"
+  dependencies:
+    nanoid: ^3.1.20
+    observable-webworkers: ^1.0.0
+    p-queue: ^6.0.0
+    promise-timeout: ^1.3.0
+  checksum: 58e4e19ef79814752a9c68e9a689925e86ca7d63d0cdbbc0c0d45f97c488f20266ba9186305be418d64cfdb7220e3724b21ddbd1d69d6da8e190f723165f2bb6
+  languageName: node
+  linkType: hard
+
 "mrmime@npm:^1.0.0":
   version: 1.0.0
   resolution: "mrmime@npm:1.0.0"
@@ -17430,10 +17508,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"multistream-select@npm:^2.0.0":
-  version: 2.0.1
-  resolution: "multistream-select@npm:2.0.1"
+"multistream-select@npm:^3.0.0":
+  version: 3.0.2
+  resolution: "multistream-select@npm:3.0.2"
   dependencies:
+    abortable-iterator: ^3.0.0
     bl: ^5.0.0
     debug: ^4.1.1
     err-code: ^3.0.1
@@ -17444,7 +17523,7 @@ __metadata:
     it-reader: ^3.0.0
     p-defer: ^3.0.0
     uint8arrays: ^3.0.0
-  checksum: 2246dc445774ad5a7b87af8b93e0668530933dfd370c266ce2c51d4fbdfdd45835e6983e6d3b50bf50e37a24730821e4b62268616d0be91d554df099354d34ae
+  checksum: f34eed4c30e2392ad21aae9257283f2cb23fda0ecdce18c5e3c4ef3e9a9f68d6dd79842717f18839d0fe2e9de1555b8ff5f0049a32a45a7819ff21be88927374
   languageName: node
   linkType: hard
 
@@ -17502,6 +17581,15 @@ __metadata:
   bin:
     nanoid: bin/nanoid.cjs
   checksum: 3d1d5a69fea84e538057cf64106e713931c4ef32af344068ecff153ff91252f39b0f2b472e09b0dfff43ac3cf520c92938d90e6455121fe93976e23660f4fccc
+  languageName: node
+  linkType: hard
+
+"nanoid@npm:^3.1.20":
+  version: 3.3.1
+  resolution: "nanoid@npm:3.3.1"
+  bin:
+    nanoid: bin/nanoid.cjs
+  checksum: 4ef0969e1bbe866fc223eb32276cbccb0961900bfe79104fa5abe34361979dead8d0e061410a5c03bc3d47455685adf32c09d6f27790f4a6898fb51f7df7ec86
   languageName: node
   linkType: hard
 
@@ -18385,6 +18473,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"observable-webworkers@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "observable-webworkers@npm:1.0.0"
+  checksum: e74b36bf3ee2ccb04e44d7f7e05a312588e0a76f0f44fae16c198f19ea5d8d2717186bd1040d9457907521d69eff2625a285d5a96ec33054931eca626eef8731
+  languageName: node
+  linkType: hard
+
 "obuf@npm:^1.0.0, obuf@npm:^1.1.2":
   version: 1.1.2
   resolution: "obuf@npm:1.1.2"
@@ -18798,7 +18893,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"p-queue@npm:^6.6.2":
+"p-queue@npm:^6.0.0, p-queue@npm:^6.6.2":
   version: 6.6.2
   resolution: "p-queue@npm:6.6.2"
   dependencies:
@@ -20108,6 +20203,13 @@ __metadata:
     err-code: ^2.0.2
     retry: ^0.12.0
   checksum: f96a3f6d90b92b568a26f71e966cbbc0f63ab85ea6ff6c81284dc869b41510e6cdef99b6b65f9030f0db422bf7c96652a3fff9f2e8fb4a0f069d8f4430359429
+  languageName: node
+  linkType: hard
+
+"promise-timeout@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "promise-timeout@npm:1.3.0"
+  checksum: ae81c36356806840931d0f69ddbb746bf13e2d31e6ed78b9ea02f02cfbbb1a0bb74c0372d734302af546838978eeca267617f917b59efa2d0197b0b39920f269
   languageName: node
   linkType: hard
 
@@ -23927,6 +24029,15 @@ __metadata:
     native-abort-controller: ^1.0.4
     retimer: ^3.0.0
   checksum: 7f57cb6d5f4dcdcefe9c89deacc70c07ecafdba32d51333eca6aaf91e70bbff7e6ad13d9c098480d27a6f360383685f84819a3f475a5cfe8d3f3c7da465d1da7
+  languageName: node
+  linkType: hard
+
+"timeout-abort-controller@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "timeout-abort-controller@npm:3.0.0"
+  dependencies:
+    retimer: ^3.0.0
+  checksum: c74387e6472a1e151d89b4af8c2a18ac72d566f3cd6ec9b203e3cda969fb5c54acba0a8d20cda8e9772efda52e27bea59c3423bab785b65f0287c9419184607e
   languageName: node
   linkType: hard
 
