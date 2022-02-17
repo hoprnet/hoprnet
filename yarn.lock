@@ -3247,7 +3247,7 @@ __metadata:
     bs58: 4.0.1
     chalk: 4.1.2
     check-password-strength: 2.0.3
-    cookie: 0.4.1
+    cookie: 0.4.2
     cors: 2.8.5
     debug: 4.3.3
     dids: 2.4.3
@@ -8613,6 +8613,13 @@ __metadata:
   version: 0.4.1
   resolution: "cookie@npm:0.4.1"
   checksum: bd7c47f5d94ab70ccdfe8210cde7d725880d2fcda06d8e375afbdd82de0c8d3b73541996e9ce57d35f67f672c4ee6d60208adec06b3c5fc94cebb85196084cf8
+  languageName: node
+  linkType: hard
+
+"cookie@npm:0.4.2":
+  version: 0.4.2
+  resolution: "cookie@npm:0.4.2"
+  checksum: a00833c998bedf8e787b4c342defe5fa419abd96b32f4464f718b91022586b8f1bafbddd499288e75c037642493c83083da426c6a9080d309e3bd90fd11baa9b
   languageName: node
   linkType: hard
 
