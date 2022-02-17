@@ -88,12 +88,12 @@ ___
 | `dbPath?` | `string` |
 | `environment` | [`ResolvedEnvironment`](modules.md#resolvedenvironment) |
 | `forceCreateDB?` | `boolean` |
-| `hosts?` | `Object` |
+| `hosts?` | { `ip4?`: `NetOptions` ; `ip6?`: `NetOptions`  } |
 | `hosts.ip4?` | `NetOptions` |
 | `hosts.ip6?` | `NetOptions` |
 | `password?` | `string` |
 | `strategy?` | `ChannelStrategy` |
-| `testing?` | `Object` |
+| `testing?` | { `announceLocalAddresses?`: `boolean` ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
 | `testing.noDirectConnections?` | `boolean` |
 | `testing.noUPNP?` | `boolean` |
