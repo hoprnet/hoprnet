@@ -1,4 +1,3 @@
-import { setImmediate } from 'timers/promises'
 import type { ContractTransaction, BaseContract } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import { providers, utils, errors, Wallet, BigNumber, ethers } from 'ethers'
@@ -7,17 +6,17 @@ import { getContractData } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Ticket,
-  AcknowledgedTicket,
   Balance,
   NativeBalance,
-  Hash,
   PublicKey,
   durations,
-  DeferType
+  type AcknowledgedTicket,
+  type DeferType,
+  type Hash
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
-import TransactionManager, { TransactionPayload } from './transaction-manager'
+import TransactionManager, { type TransactionPayload } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
 import { TX_CONFIRMATION_WAIT } from './constants'
 
@@ -150,6 +149,7 @@ export async function createChainWrapper(
       // with let indexer to listen to the tx
       deferredListener = handleTxListener(initiatedHash)
       // 4. send transaction to our ethereum provider
+      // throws various exceptions if tx gets rejected
       transaction = await provider.sendTransaction(signedTx)
     } catch (error) {
       log('Transaction with nonce %d failed to sent: %s', nonce, error)
@@ -157,26 +157,7 @@ export async function createChainWrapper(
       // @TODO what if signing the transaction failed and initiatedHash is undefined?
       initiatedHash && transactions.remove(initiatedHash)
       nonceLock.releaseLock()
-      throw error
-    }
 
-    log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
-    transactions.moveFromQueuingToPending(transaction.hash)
-    nonceLock.releaseLock()
-
-    // Give other tasks CPU time to happen
-    // Push provider call that waits for transaction to end of next event loop iteration
-    await setImmediate()
-
-    try {
-      // wait for the tx to be mined
-      await provider.waitForTransaction(transaction.hash, 1, timeout)
-    } catch (error) {
-      log(`Error while waiting for transaction ${transaction.hash}`, error)
-      // remove listener but not throwing error message
-      deferredListener.reject()
-      // this transaction was not confirmed so we just remove it
-      transactions.remove(transaction.hash)
       const isRevertedErr = [error?.code, String(error)].includes(errors.CALL_EXCEPTION)
       const isAlreadyKnownErr =
         [error?.code, String(error)].includes(errors.NONCE_EXPIRED) ||
@@ -193,9 +174,48 @@ export async function createChainWrapper(
       throw new Error(`Failed in mining transaction. ${error}`)
     }
 
-    // Give other tasks CPU time to happen
-    // Allow the indexer to update before awaiting the response
-    await setImmediate()
+    log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
+    transactions.moveFromQueuingToPending(transaction.hash)
+    nonceLock.releaseLock()
+
+    try {
+      // wait for the tx to be mined - mininal and scheduled implementation
+      // only fails if tx does not get mined within the specified timeout
+      await new Promise<void>((resolve, reject) => {
+        let done = false
+        const cleanUp = (err?: string) => {
+          if (done) {
+            return
+          }
+          done = true
+
+          provider.off(transaction.hash, onTransaction)
+          if (err) {
+            setImmediate(reject, Error(err))
+          } else {
+            setImmediate(resolve)
+          }
+        }
+
+        const onTransaction = (receipt: providers.TransactionReceipt) => {
+          if (receipt.confirmations >= 1) {
+            cleanUp()
+          }
+        }
+        setTimeout(cleanUp, timeout, `Timeout while waiting for transaction ${transaction.hash}`)
+
+        provider.on(transaction.hash, onTransaction)
+      })
+      await provider.waitForTransaction(transaction.hash, 1, timeout)
+    } catch (error) {
+      log(`Error while waiting for transaction ${transaction.hash}`, error)
+      // remove listener but not throwing error message
+      deferredListener.reject()
+      // this transaction was not confirmed so we just remove it
+      transactions.remove(transaction.hash)
+
+      throw error
+    }
 
     try {
       await deferredListener.promise

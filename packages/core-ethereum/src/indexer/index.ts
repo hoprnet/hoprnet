@@ -1,4 +1,4 @@
-import { setImmediate } from 'timers/promises'
+import { setImmediate as setImmediatePromise } from 'timers/promises'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -331,7 +331,7 @@ class Indexer extends EventEmitter {
       if (fromBlock < maxToBlock) {
         // Give other tasks CPU time to happen
         // Wait until end of next event loop iteration before starting next I/O query
-        await setImmediate()
+        await setImmediatePromise()
       }
     }
 
@@ -426,7 +426,7 @@ class Indexer extends EventEmitter {
           if (i < RETRIES) {
             // Give other tasks CPU time to happen
             // Push next provider query to end of next event loop iteration
-            await setImmediate()
+            await setImmediatePromise()
             continue
           } else {
             log(
@@ -608,7 +608,7 @@ class Indexer extends EventEmitter {
       ) {
         // Give other tasks CPU time to happen
         // Wait until end of next event loop iteration before starting next db write-back
-        await setImmediate()
+        await setImmediatePromise()
       }
     }
 
@@ -796,31 +796,45 @@ class Indexer extends EventEmitter {
   public async getOpenChannelsFrom(source: PublicKey): Promise<ChannelEntry[]> {
     return await this.db
       .getChannelsFrom(source.toAddress())
-      .then((channels) => channels.filter((channel) => channel.status === ChannelStatus.Open))
+      .then((channels: ChannelEntry[]) => channels.filter((channel) => channel.status === ChannelStatus.Open))
   }
 
   public resolvePendingTransaction(eventType: IndexerEvents, tx: string): DeferType<string> {
     const deferred = {} as DeferType<string>
 
     deferred.promise = new Promise((resolve, reject) => {
+      let done = false
+
       deferred.reject = () => {
-        clearTimeout(timeoutObj)
+        if (done) {
+          return
+        }
+        done = true
         this.removeListener(eventType, listener)
         log('listener %s on %s is removed due to error', eventType, tx)
-        resolve(tx)
+        setImmediate(resolve, tx)
       }
-      const timeoutObj = setTimeout(() => {
+
+      setTimeout(() => {
+        if (done) {
+          return
+        }
+        done = true
         // remove listener but throw now error
         this.removeListener(eventType, listener)
         log('listener %s on %s timed out and thus removed', eventType, tx)
-        reject(tx)
+        setImmediate(reject, tx)
       }, INDEXER_TIMEOUT)
 
       deferred.resolve = () => {
-        clearTimeout(timeoutObj)
+        if (done) {
+          return
+        }
+        done = true
         this.removeListener(eventType, listener)
         log('listener %s on %s is removed', eventType, tx)
-        resolve(tx)
+
+        setImmediate(resolve, tx)
       }
 
       const listener = (txHash: string[]) => {
