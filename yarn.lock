@@ -3246,7 +3246,7 @@ __metadata:
     body-parser: 1.19.2
     bs58: 4.0.1
     chalk: 4.1.2
-    check-password-strength: 2.0.3
+    check-password-strength: 2.0.4
     cookie: 0.4.2
     cors: 2.8.5
     debug: 4.3.3
@@ -7894,10 +7894,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"check-password-strength@npm:2.0.3":
-  version: 2.0.3
-  resolution: "check-password-strength@npm:2.0.3"
-  checksum: 1f7303e20f018d04fc3a36d7bbf6f59be195a4c442f8e22196f8fd5d5d3ad93b28cd04068682239d4b0d37dde5d635c7cbb9999c54e32a8b6396bc095201295b
+"check-password-strength@npm:2.0.4":
+  version: 2.0.4
+  resolution: "check-password-strength@npm:2.0.4"
+  checksum: e6797f2b8b94fbe1a5bcab2153fb213b0436c223328377bb5dd2ff93a34d09891479702e1b64108b303c317d89ed9e48be2895285ac23389903365204a6a1fcf
   languageName: node
   linkType: hard
 
