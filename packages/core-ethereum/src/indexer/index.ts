@@ -450,7 +450,7 @@ class Indexer extends EventEmitter {
    * @param events new unprocessed events
    */
   private onNewEvents(events: Event<any>[] | TokenEvent<any>[] | undefined): void {
-    if (events === undefined || events.length == 0) {
+    if (events == undefined || events.length == 0) {
       // Nothing to do
       return
     }
