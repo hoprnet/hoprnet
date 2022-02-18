@@ -245,7 +245,11 @@ export class EntryNodes extends EventEmitter {
       const firstUsableAddress = usableAddresses[0]
 
       // Ignore if we're already connected to the address
-      if (this.usedRelays.some((usedRelay) => compareDirectConnectionInfo(usedRelay.relayDirectAddress, firstUsableAddress)))
+      if (
+        this.usedRelays.some((usedRelay) =>
+          compareDirectConnectionInfo(usedRelay.relayDirectAddress, firstUsableAddress)
+        )
+      )
         continue
 
       nodesToCheck.push({
@@ -284,7 +288,9 @@ export class EntryNodes extends EventEmitter {
 
     const positiveOnes = results.findIndex((result: ConnectionResult) => result.entry.latency >= 0)
 
-    const previous = new Set<string>(this.usedRelays.map((ma) => relayFromRelayAddress(ma.ourCircuitAddress).toB58String()))
+    const previous = new Set<string>(
+      this.usedRelays.map((ma) => relayFromRelayAddress(ma.ourCircuitAddress).toB58String())
+    )
 
     if (positiveOnes >= 0) {
       // Close all unnecessary connections
@@ -302,14 +308,14 @@ export class EntryNodes extends EventEmitter {
       this.usedRelays = this.availableEntryNodes
         // select only those entry nodes with smallest latencies
         .slice(0, MAX_RELAYS_PER_NODE)
-        .map(
-          (entry: EntryNodeData) => {
-            return {
-              relayDirectAddress: entry.multiaddrs[0],
-              ourCircuitAddress: new Multiaddr(`/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`)
-            }
+        .map((entry: EntryNodeData) => {
+          return {
+            relayDirectAddress: entry.multiaddrs[0],
+            ourCircuitAddress: new Multiaddr(
+              `/p2p/${entry.id.toB58String()}/p2p-circuit/p2p/${this.peerId.toB58String()}`
+            )
           }
-        )
+        })
     } else {
       log(`Could not connect to any entry node. Other nodes may not or no longer be able to connect to this node.`)
       // Reset to initial state
