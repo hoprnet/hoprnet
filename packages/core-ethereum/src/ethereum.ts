@@ -171,7 +171,7 @@ export async function createChainWrapper(
         log('Transaction with nonce %d and hash failed to send: %s', nonce, transaction.hash, error)
       }
 
-      throw new Error(`Failed in mining transaction. ${error}`)
+      throw new Error(`Failed in publishing transaction. ${error}`)
     }
 
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
@@ -190,6 +190,8 @@ export async function createChainWrapper(
           done = true
 
           provider.off(transaction.hash, onTransaction)
+          // Give other tasks time to get scheduled before
+          // processing the result
           if (err) {
             setImmediate(reject, Error(err))
           } else {
@@ -206,7 +208,6 @@ export async function createChainWrapper(
 
         provider.on(transaction.hash, onTransaction)
       })
-      await provider.waitForTransaction(transaction.hash, 1, timeout)
     } catch (error) {
       log(`Error while waiting for transaction ${transaction.hash}`, error)
       // remove listener but not throwing error message
