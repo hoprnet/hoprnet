@@ -10,14 +10,6 @@ Without a HOPR cluster, app developers can only fake interactions with a HOPR no
 core protocol developers cannot replicate critical functionality over messaging such as ticket redemption
 and packet relaying.
 
-:::caution Warning
-
-This tutorial assumes you will use the `master` tag to download the latest version of `hoprnet` to spin up your nodes. This might be ideal
-    to your particular use case. However, due to the rapid development done on the project, you might be better off using a stable
-    release. The latest stable release at time of writing is [`lisbon`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/lisbon.zip).
-
-:::
-
 ## Requirements
 
 There are two ways to run a HOPR cluster: locally or via [Gitpod](https://gitpod.io). The best option will depend on your operating system:
