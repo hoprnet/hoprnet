@@ -18,6 +18,7 @@ To run a HOPR cluster, we suggest the following options to you based on your Ope
 - Linux or macOS: Gitpod or Local
 
 ## Use the latest release
+
 Due to the rapid development done on the project, you might be better off using a stable
 release. The latest stable release known at the time of writing is [`lisbon`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/lisbon.zip).
 
