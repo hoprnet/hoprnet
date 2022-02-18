@@ -92,6 +92,9 @@ async function startNode(
     localHostCheckingNAT,
     {
       setAddrs: () => {}
+    } as any,
+    {
+      setUsedRelays: () => {}
     } as any
   )
 
@@ -137,6 +140,9 @@ describe('check listening to sockets', function () {
         localHostCheckingNAT,
         {
           setAddrs: () => {}
+        } as any,
+        {
+          setUsedRelays: () => {}
         } as any
       )
 
@@ -258,6 +264,9 @@ describe('check listening to sockets', function () {
       localHostBeingExposed,
       {
         setAddrs: () => {}
+      } as any,
+      {
+        setUsedRelays: () => {}
       } as any
     )
 
@@ -406,6 +415,9 @@ describe('check listening to sockets', function () {
       localHostCheckingNAT,
       {
         setAddrs: () => {}
+      } as any,
+      {
+        setUsedRelays: () => {}
       } as any
     )
     await listener.bind(new Multiaddr(`/ip4/0.0.0.0/tcp/9091`))
@@ -430,6 +442,9 @@ describe('check listening to sockets', function () {
       localHostBeingExposed,
       {
         setAddrs: () => {}
+      } as any,
+      {
+        setUsedRelays: () => {}
       } as any
     )
 
