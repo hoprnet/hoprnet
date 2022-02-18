@@ -264,8 +264,7 @@ describe('entry node functionality', function () {
     assert(entryNodes.getUsedRelays().length == 1)
 
     assert(
-      usedRelays[0].equals(
-        new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
+      usedRelays[0].equals(new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
     )
 
     newNodeListener.removeAllListeners()
@@ -451,11 +450,12 @@ describe('entry node functionality', function () {
 
     const peerStoreEntry = getPeerStoreEntry(ma.toString())
 
-    entryNodes.usedRelays.push(
-      {
-        relayDirectAddress: ma,
-        ourCircuitAddress: new Multiaddr(`/p2p/${peerStoreEntry.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
-      }, )
+    entryNodes.usedRelays.push({
+      relayDirectAddress: ma,
+      ourCircuitAddress: new Multiaddr(
+        `/p2p/${peerStoreEntry.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`
+      )
+    })
 
     entryNodes.start()
 
