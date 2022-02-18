@@ -22,6 +22,7 @@
 - Fix connection parameters to prevent stalling of the Node.js process and update maximal number of relays ([#3471](https://github.com/hoprnet/hoprnet/pull/3471))
 - Fix locking issues in various parts of the code ([#3515](https://github.com/hoprnet/hoprnet/pull/3515))
 - Fix unhandled promise rejection in strategy code and infinite loop in ticket redemption logic ([#3515](https://github.com/hoprnet/hoprnet/pull/3515))
+- Fixed locking issues in transaction processing ([#3568](https://github.com/hoprnet/hoprnet/pull/3568))
 
 ---
 
