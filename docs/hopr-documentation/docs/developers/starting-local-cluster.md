@@ -23,7 +23,9 @@ The simplest and fastest way to setup a HOPR cluster is using [Gitpod](https://g
 automated dev environments in seconds. We have configured our [HOPR monorepo](https://gitpod.io/#https://github.com/hoprnet/hoprnet)
 to quickly setup everything for you to get started.
 
-**How to setup development cluster with GitPod video:** [https://vimeo.com/678070260/9ef64ca41b](https://vimeo.com/678070260/9ef64ca41b)
+**How to setup development cluster with GitPod** 
+
+<iframe src="https://player.vimeo.com/video/678070260?h=9ef64ca41b" width="100%" height="415" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
 
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/hoprnet/hoprnet)
 
