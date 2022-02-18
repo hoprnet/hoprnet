@@ -62,7 +62,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/ethereum.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L28)
+[packages/core-ethereum/src/ethereum.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L27)
 
 ___
 
@@ -152,7 +152,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/ethereum.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L34)
+[packages/core-ethereum/src/ethereum.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/ethereum.ts#L33)
 
 ___
 
