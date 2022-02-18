@@ -133,6 +133,8 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
   service.use(urlPath, ((err, _req, res, _next) => {
     res.status(err.status).json(err)
   }) as express.ErrorRequestHandler)
+
+  return apiInstance
 }
 
 const WS_PATHS = {

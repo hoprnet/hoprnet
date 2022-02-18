@@ -46,7 +46,11 @@
   },
   "devDependencies": {
     "@ethersproject/cli": "5.5.0",
+    "@types/chai": "^4",
     "@types/debounce": "^1",
+    "@types/supertest": "^2.0.11",
+    "chai": "^4.3.6",
+    "chai-openapi-response-validator": "^0.14.2",
     "prettier": "2.5.1",
     "rimraf": "3.0.2",
     "ts-node": "10.5.0",
@@ -68,6 +72,7 @@
   "packageManager": "yarn@3.1.1",
   "dependencies": {
     "debounce": "^1.2.1",
+    "supertest": "^6.2.2",
     "use-immer": "^0.6.0"
   }
 }
