@@ -239,7 +239,12 @@ describe('entry node functionality', function () {
 
     entryNodes.uncheckedEntryNodes.push(newNode)
 
-    entryNodes.usedRelays.push(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
+    let usedRelay = {
+      relayDirectAddress: new Multiaddr('/ip4/127.0.0.1/tcp/1234'),
+      ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
+    }
+
+    entryNodes.usedRelays.push(usedRelay)
 
     // Should have one unchecked node and one relay node
     assert(entryNodes.getUsedRelays().length == 1)
@@ -259,7 +264,8 @@ describe('entry node functionality', function () {
     assert(entryNodes.getUsedRelays().length == 1)
 
     assert(
-      usedRelays[0].equals(new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
+      usedRelays[0].equals(
+        new Multiaddr(`/p2p/${newNode.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
     )
 
     newNodeListener.removeAllListeners()
@@ -338,8 +344,13 @@ describe('entry node functionality', function () {
 
     const relay = getPeerStoreEntry(`/ip4/127.0.0.1/tcp/1`)
 
+    let usedRelay = {
+      relayDirectAddress: new Multiaddr(`/ip4/127.0.0.1/tcp/1`),
+      ourCircuitAddress: new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
+    }
+
     entryNodes.availableEntryNodes.push({ ...relay, latency: 23 })
-    entryNodes.usedRelays.push(new Multiaddr(`/p2p/${relay.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`))
+    entryNodes.usedRelays.push(usedRelay)
 
     entryNodes.once('listening', () =>
       assert.fail(`must not throw listening event if list of entry nodes has not changed`)
@@ -438,11 +449,15 @@ describe('entry node functionality', function () {
 
     const ma = new Multiaddr('/ip4/8.8.8.8/tcp/9091')
 
-    entryNodes.usedRelays.push(ma)
+    const peerStoreEntry = getPeerStoreEntry(ma.toString())
+
+    entryNodes.usedRelays.push(
+      {
+        relayDirectAddress: ma,
+        ourCircuitAddress: new Multiaddr(`/p2p/${peerStoreEntry.id.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`)
+      }, )
 
     entryNodes.start()
-
-    const peerStoreEntry = getPeerStoreEntry(ma.toString())
 
     entryNodes.onNewRelay(peerStoreEntry)
 
