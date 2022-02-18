@@ -4,26 +4,34 @@ title: HOPR Cluster Development Setup
 ---
 
 The best way to learn and develop the HOPR protocol is by interacting with a HOPR node connected inside the HOPR network.
-A series of HOPR nodes fully interconnected between each other is called a HOPR cluster.
+A series of HOPR nodes fully interconnected with each other is called a HOPR cluster.
 
-Without a HOPR cluster, app developers can only fake interactions with a HOPR node by mocking their API[^1], and
-core protocol developers can't replicate critical functionality over messaging such as ticket redemption
+Without a HOPR cluster, app developers can only fake interactions with a HOPR node by mocking up their API[^1], and
+core protocol developers cannot replicate critical functionality over messaging such as ticket redemption
 and packet relaying.
+
+:::caution Warning
+
+This tutorial assumes you will use the `master` tag to download the latest version of `hoprnet` to spin up your nodes. This might be ideal
+    to your particular use case. However, due to the rapid development done on the project, you might be better off using a stable
+    release. The latest stable release at time of writing is [`lisbon`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/lisbon.zip).
+
+:::
 
 ## Requirements
 
-To run a HOPR cluster, we suggest the following options to you based on your Operating System (OS):
+There are two ways to run a HOPR cluster: locally or via [Gitpod](https://gitpod.io). The best option will depend on your operating system:
 
 - Windows: Gitpod
 - Linux or macOS: Gitpod or Local
 
 ## Gitpod Setup
 
-The simplest and fastest way to setup a HOPR cluster is using [Gitpod](https://gitpod.io). Gitpod is a cloud tool used to create
-automated dev environments in seconds. We have configured our [HOPR monorepo](https://gitpod.io/#https://github.com/hoprnet/hoprnet)
-to quickly setup everything for you to get started.
+The simplest and fastest way to set up a HOPR cluster is using [Gitpod](https://gitpod.io). Gitpod is a cloud tool used to create
+automated developer environments in seconds. We have configured our [HOPR monorepo](https://gitpod.io/#https://github.com/hoprnet/hoprnet)
+to quickly set up everything for you to get started.
 
-**How to setup development cluster with GitPod** 
+**How to set up a development cluster with GitPod** 
 
 <iframe src="https://player.vimeo.com/video/678070260?h=9ef64ca41b" width="100%" height="415" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
 
@@ -45,29 +53,27 @@ gitpod /workspace/hoprnet (master) $ echo $HOPR_NODE_1_ADDR
 ### Gitpod URLs
 
 When running a HOPR cluster inside Gitpod, all the URLs will be exposed via their own DNS service, which resolves services to ports via
-URLs that look like this `https://13302-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io`. These URLs change every so often, and are behind
-SSL certificates within Gitpod, making them susceptible to `Mixed-content` and `CORS` erros when working locally.
+URLs that look something like this: `https://13302-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io`. These URLs change every so often, and are behind
+SSL certificates within Gitpod, making them susceptible to `Mixed-content` and `CORS` errors when working locally.
 
-To avoid these issues, we recommend installing the [Gitpod Companion App](https://www.gitpod.io/docs/develop/local-companion), which
-will forward Gitpod's services to your workstation, so you can use them via `127.0.0.1` instead of the Gitpod URLs. As all our documentation
-assume this local IP, so using the app will make things easier for you to read on.
+To avoid these issues, we recommend installing the [Gitpod Companion App](https://www.gitpod.io/docs/develop/local-companion), which will forward Gitpod's services to your workstation. You can use them via `127.0.0.1` instead of the Gitpod URLs. All our documentation
+assumes this local IP, so using the app will make things easier for you as you read on.
 
 ### Replacing URLs
 
-If you do not want to use the Gitpod Companion App, just remember to replace the URLs in the documentation to your Gitpod service URL. You
-can obtain the specific URL per port running the tool `gp`. For knowing the URL behind port `13301` you run the following:
+If you do not want to use the Gitpod Companion App, just remember to replace the URLs in the documentation with your Gitpod service URL. You
+can obtain the specific URL for each port by running the `gp` tool. For example, to learn the URL behind port `13301` run the following:
 
 ```bash
 gp url 13301
 ```
 
-which will return something like `https://13301-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io`. Please be aware that depending on whether
-the documentation refers to your `HTTP_URL` or `WS_URL`, you might need to change the protocol from `https` to `wss`.
+which will return something like `https://13301-hoprnet-mynechat-7x6h2ghc17f.ws-us30.gitpod.io`. Please be aware that you might need to change the protocol from `https` to `wss`, depending on whether the documentation refers to your `HTTP_URL` or `WS_URL`, .
 
 ## Local Setup
 
-The local setup will give you a similar setup to the one the HOPR team works with on a daily basis. After all dependencies are installed,
-this configuration allows you to develop HOPR apps offline.
+Running a local setup will give you a similar setup to the one the HOPR team works with on a daily basis. After all dependencies are installed,
+this configuration will allow you to develop HOPR apps offline.
 
 1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet)[^2]
    and unzip it in your local folder (roughly `~30 Mbs` at the time of writing). For the next tasks, we will assume you are within that folder.
@@ -78,27 +84,33 @@ unzip master.zip
 cd hoprnet-master
 ```
 
-2. **Install the dependencies of the project and build it**: Make sure you have `nodejs@16` (we suggest installing it via [nvm](https://github.com/nvm-sh/nvm), ie `nvm install lts/gallium`), and `yarn` (included in `nodejs@16` by running `corepack enable`)
-   to install and build the required packages and project modules. Ideally, you also have setup your computer with basic development toolset[^3]. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
+2. **Install the dependencies of the project and build it**: Make sure you have `nodejs@16` (we suggest installing it via [nvm](https://github.com/nvm-sh/nvm), i.e., `nvm install lts/gallium`), and `yarn` (included in `nodejs@16` by running `corepack enable`)
+   to install and build the required packages and project modules. Ideally you will also have basic development toolsets[^3] set up on your computer. Please bear in mind that this process will take at least 5-10 minutes depending on your computer.
 
 ```bash
 yarn && yarn build
 ```
 
-3. **Run the one-line setup script**: Proceed to run the following script. If you are planning to run [MyneChat](http://app.myne.chat/)
-   alongside, then make sure to pass the `-m` flag with your MyneChat instance URL. Please wait while this script creates
-   the local blockchain network and deploys the project contracts. In average, the process can take between 2-6 minutes,
-   depending on your computer capacity. **Important**, make sure to have both `curl` and `jq` installed in your computer
-   before running the script, as both are used. Please be aware you also need a version of `bash` of `5.x` or superior,
-   which in most macOS devices require an upgrade, the easiest being via `brew bash`.
+3. **Run the one-line setup script**: Run the following script: 
+
+```bash
+./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
+```
+Please wait while this script creates
+   the local blockchain network and deploys the project contracts. On average, the process can take between 2-6 minutes, depending on your computer. **Important**, make sure to have both `curl` and `jq` installed in your computer
+   before running the script, as both are used. Please be aware you also need to be running `bash` version `5.x` or higher,
+   which in most macOS devices will require an upgrade. The easiest way to do this is via `brew bash`.
+
+If you are planning to run [MyneChat](http://app.myne.chat/)
+   alongside your cluster, then make sure to pass the `-m` flag with your MyneChat instance URL, i.e.:
 
 ```bash
 ./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
 ```
 
-Afterwards, a set off accounts with their respective HTTP REST API, HOPR Admin, and WebSocket interface will be displayed
-in your screen. As soon as the script finishes starting up the local cluster, it will suggest you to `source` the `local-cluster.env` file.
-This should be done in each terminal you'll be communicating with the local cluster nodes as it will setup all the environment variables
+As the script runs, a set of accounts with their respective HTTP REST API, HOPR Admin, and WebSocket interfaces will be displayed
+on your screen. As soon as the script finishes starting up the local cluster, it will suggest that you `source` the `local-cluster.env` file.
+This should be done in each terminal you'll be communicating with the local cluster nodes as it will set up all the environment variables
 necessary for the following pages.
 
 Alternatively, you can copy and paste these URLs and `export` them to your terminal:
@@ -110,12 +122,11 @@ export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:1330
 [^1]:
     The demo application [MyneChat](https://github.com/hoprnet/myne-chat) uses a
     [mock server](https://github.com/hoprnet/myne-chat/blob/cf6501b2ffa24502834f567ab575630e302e3d34/mocks/index.js#L47-L79)
-    to simplify it’s development workflow. Nevertheless, to fully experience the extend of its features, it relies on a
-    HOPR cluster, either a local or a public one.
+    to simplify its development workflow. However, to fully experience the extent of its features, you will need either a local or public HOPR cluster.
 
 [^2]:
     By using the `master` tag, you are downloading the latest version of `hoprnet` to spin up your nodes, which might be ideal
     to your particular use case. However, due to the rapid development done on the project, you might be better off using a stable
-    release. The latest stable release known at the time of writing is [`lisbon`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/lisbon.zip).
+    release. The latest stable release at time of writing is [`lisbon`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/lisbon.zip).
 
 [^3]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.

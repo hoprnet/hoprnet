@@ -5,16 +5,16 @@ title: Demo - Boomerang Chat
 
 import BoomerangChat from './components/BoomerangChat'
 
-The Boomerang Chat is a chat that sends a message to the HOPR Network which comes back to its original recipient. Because
+Boomerang Chat is a simple app which sends a message to the HOPR Network which then returns it to the sender. Because
 nodes in the network have no idea who sent the message and who’s the final recipient, a node can always send a message to itself
-and no node would be the wiser. At the end, a HOPR node only knows who to forward the message next.
+and no other node would be any the wiser. HOPR nodes only know who to forward the message to next.
 
-This demo showcases the minimal requirements needed to build a HOPR app. The application is `React`-based web application that
-uses native WebSockets to connect to your HOPR node, and its REST API to send messages to itself.
+This demo showcases the minimal requirements needed to build a HOPR app. Boomerang Chat is a `React`-based web application that
+uses native WebSockets to connect to your HOPR node and its REST API to send messages to itself.
 
 ## Requirements
 
-- a HOPR cluster, and at least a single HOPR node with their respective `HTTP_ENDPOINT`, `WS_ENDPOINT` and `API_TOKEN`
+- a HOPR cluster, and at least a single HOPR node with its respective `HTTP_ENDPOINT`, `WS_ENDPOINT` and `API_TOKEN`
 - a React-ready web framework used to run the application. We recommend [`next.js`](https://nextjs.org/).
 
 For simplicity, you can also see the code for this demo in [Codesandbox](https://codesandbox.io/s/hopr-demo-react-hello-world-yo0uc?file=/src/App.tsx).
@@ -24,7 +24,7 @@ To see an example of how to run this as an isolated application, you can also ch
 
 ### 1. Connecting to our HOPR nodes
 
-Our React application starts as with any, just loading the application within an entry point.
+Our React application starts like any other: simply loading the application within an entry point.
 
 ```jsx {3,6} title="index.jsx (usually your React application entrypoint)"
 import { render } from 'react-dom'
@@ -69,11 +69,11 @@ export default function BoomerangChat() {
 }
 ```
 
-We can see that from line `6` to `8`, we see a series of values called `httpEndpoint`, `wsEndpoint`, and `securityToken`,
-which are needed in most HOPR Applications. Without these values, configurable by the user, a HOPR app can
-not communicate with a HOPR node, and thus, without a HOPR cluster.
+From lines `6` to `8`, we see a series of values called `httpEndpoint`, `wsEndpoint`, and `securityToken`.
+These are needed in most HOPR Applications. Without these values, which are configurable by the user, HOPR apps cannot
+not communicate with HOPR nodes.
 
-We also see in line `25` a component called `WebSocketHandler`. Here is its code:
+In line `25` we see a component called `WebSocketHandler`. Here is its code:
 
 ```jsx title="WebSocketHandler.jsx"
 import React, { useEffect, useState } from "react";
@@ -99,21 +99,21 @@ export const WebSocketHandler = ({ wsEndpoint, securityToken }) => {
 };
 ```
 
-Here things start getting interesting.
+Here's where things start getting interesting.
 
 1. We are attempting to connnect to our HOPR node WebSocket endpoint on load, and
 2. When we succeed, we attach an event handler to every message it receives.
 
 Of course, you could always just try and connect on request rather than on load. For now, the easiest way is
-to use the `useWebSocket` helper (you can find the code at the bottom) to initialize the `WebSocket` interface
-and retries on changes for the `wsEndpoint` value.
+to use the `useWebSocket` helper (you can find the code at the bottom of this page) to initialize the `WebSocket` interface
+and retries on changes to the `wsEndpoint` value.
 
 ### 2. Obtaining information about your HOPR node
 
-On top of the WebSocket endpoint, a HOPR app should also try to use a HOPR node's REST API endpoint to display
+In addition to the WebSocket endpoint, a HOPR app should also try to use a HOPR node's REST API endpoint to display
 useful information about it in the app, such as address and balance.
 
-In our previous example, inside `BoomerangChat.jsx` we had a `useEffect` call, which has something like this:
+In our previous example, inside `BoomerangChat.jsx` we had a `useEffect` call, which goes something like this:
 
 ```jsx {4-5} title="BoomerangChat.jsx"
 useEffect(() => {
@@ -130,7 +130,7 @@ useEffect(() => {
 }, [securityToken, httpEndpoint])
 ```
 
-In line `4` we are talking to the node's REST API using the native `fetch` call, to obtain its HOPR Address, since
+In line `4` we are talking to the node's REST API using the native `fetch` call to obtain its HOPR Address, since
 we’ll be using that later when we want to send a message. It's important to include the `Headers` (see next line)
 which authenticate the client against the call to avoid unauthorized calls. Here's the `getHeaders` method for reference:
 
@@ -167,8 +167,8 @@ const sendMessage = async () => {
 
 We can see that the message is being sent via the REST API endpoint, including also headers (which are now different)
 since we are doing a `POST` request. The important part is on line `7`, where we state the `recipient` of the message
-is `address`, value which we set up in the initial `useEffect` request. This is how we are signaling to the API to send
-a message to that particular address, which happens to be ourselves. To the HOPR Network the destination of the message
+is `address`, a value which we set up in the initial `useEffect` request. This is how we are signaling to the API to send
+a message to that particular address, which happens to be ourselves. For the HOPR Network the destination of the message
 is irrelevant.
 
 ### Demo: Boomerang
@@ -323,7 +323,7 @@ export default WebSocketHandler
 
 #### `BoomerangChat.jsx`
 
-Actual HOPR application able to send and read a message to the same node it’s connected usign its HTTP/WS endpoints.
+Actual HOPR application able to send and read a message to the same node it’s connected to using its HTTP/WS endpoints.
 
 ```jsx title="BoomerangChat.jsx"
 import React, { useEffect, useState } from 'react'
