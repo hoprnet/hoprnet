@@ -20,7 +20,7 @@
       "network_id": "goerli",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc",
-      "channels_contract_address": "0xA3052110A3DcCBbc5B58a076A4BB84574Fc47265",
+      "channels_contract_address": "0x7c87E2b6C49d0cA73FC8c8324d1a685000e5CC62",
       "minted_token_receiver_address": "0x8C9877a1279192448cAbeC9e8C4697b159cF645e",
       "tags": ["development"]
     },
@@ -64,7 +64,7 @@
       "network_id": "xdai",
       "channel_contract_deploy_block": 0,
       "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
-      "channels_contract_address": "",
+      "channels_contract_address": "0x1753C9eE656c54f443ce2Fe7248076f9bA4eC100",
       "tags": ["production"]
     }
   },

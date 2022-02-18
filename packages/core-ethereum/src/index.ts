@@ -241,8 +241,14 @@ export default class HoprCoreEthereum extends EventEmitter {
       log('skipping redeemAllTickets because another operation is still in progress')
       return this.redeemingAll
     }
-    this.redeemingAll = this.redeemAllTicketsInternalLoop()
-    return this.redeemingAll
+
+    return new Promise((resolve, reject) => {
+      try {
+        this.redeemingAll = this.redeemAllTicketsInternalLoop().then(resolve, reject)
+      } catch (err) {
+        reject(err)
+      }
+    })
   }
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
@@ -273,8 +279,16 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
 
     // start new operation and store it
-    this.ticketRedemtionInChannelOperations[channelId] = this.redeemTicketsInChannelLoop(channel)
-    return this.ticketRedemtionInChannelOperations[channelId]
+    return new Promise((resolve, reject) => {
+      try {
+        this.ticketRedemtionInChannelOperations[channelId] = this.redeemTicketsInChannelLoop(channel).then(
+          resolve,
+          reject
+        )
+      } catch (err) {
+        reject(err)
+      }
+    })
   }
 
   private async redeemTicketsInChannelLoop(channel: ChannelEntry): Promise<void> {

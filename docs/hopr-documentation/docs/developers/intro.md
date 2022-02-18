@@ -11,6 +11,12 @@ HOPR apps are a key component in that equation. Developers can build application
 provide users with a private channel for exchanging information. At the same time, HOPR apps create traffic within
 the network, increasing the amount of noise mixers use to protect the entire ecosystem.
 
+There are two ways of building applications with HOPR protocol:
+
+- Building dApps on top of the REST API
+- Buildling protocol applications directly with the TypeScript source code
+  ![HOPR protocol stack](/img/developer/architecture.jpg)
+
 ### Use cases
 
 Here are some of the use cases we believe the HOPR network is a great tool for:
@@ -38,3 +44,5 @@ The following three-part guide showcases how to get everything ready for buildin
 
 We use the [OpenAPI standard](https://swagger.io/specification/) to document our REST API. You can it in our
 ["REST API"](/developers/rest-api) section.
+
+If you are running a hoprd node, you can see the actually exposed API endpoint of YOUR node at [http://localhost:3001/api/v2/\_swagger/](http://localhost:3001/api/v2/_swagger/)

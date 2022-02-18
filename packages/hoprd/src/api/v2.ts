@@ -15,6 +15,7 @@ import type { Application, Request } from 'express'
 import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import type { StateOps } from '../types'
+import type { LogStream } from './../logs'
 
 const debugLog = debug('hoprd:api:v2')
 
@@ -136,10 +137,17 @@ export function setupRestApi(service: Application, urlPath: string, node: Hopr, 
 
 const WS_PATHS = {
   NONE: '', // used for testing
-  MESSAGES: '/api/v2/messages/websocket'
+  MESSAGES: '/api/v2/messages/websocket',
+  LEGACY_STREAM: '/api/v2/node/stream/websocket'
 }
 
-export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, options: { apiToken?: string }) {
+export function setupWsApi(
+  server: Server,
+  wss: WebSocketServer,
+  node: Hopr,
+  logStream: LogStream,
+  options: { apiToken?: string }
+) {
   // before upgrade to WS, we perform various checks
   server.on('upgrade', function upgrade(req, socket, head) {
     debugLog('WS client attempt to upgrade')
@@ -181,6 +189,18 @@ export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, opt
     if (path === WS_PATHS.MESSAGES) {
       node.on('hopr:message', (msg: Uint8Array) => {
         socket.send(msg.toString())
+      })
+    } else if (path === WS_PATHS.LEGACY_STREAM) {
+      logStream.addMessageListener((msg) => {
+        if (msg.type !== 'message') {
+          socket.send(
+            JSON.stringify({
+              type: msg.type,
+              timestamp: msg.ts,
+              content: msg.msg
+            })
+          )
+        }
       })
     } else {
       // close connection on unsupported paths

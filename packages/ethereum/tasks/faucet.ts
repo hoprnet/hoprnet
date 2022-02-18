@@ -169,7 +169,13 @@ async function main(
   const txs: UnsignedTransaction[] = []
   for (const identity of identities) {
     txs.push(
-      ...(await createTransaction(hoprToken, identity, utils.parseEther('1.0'), utils.parseEther('20.0'), network.name))
+      ...(await createTransaction(
+        hoprToken,
+        identity,
+        utils.parseEther('10.0'),
+        utils.parseEther('20000.0'),
+        network.name
+      ))
     )
   }
 

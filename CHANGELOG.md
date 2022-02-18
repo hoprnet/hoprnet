@@ -1,6 +1,16 @@
+<a name="1.88"></a>
+
+## [1.88](https://github.com/hoprnet/hoprnet/compare/release/lisbon...hoprnet:master) (2022-02-14)
+
+### Changes
+
+- New API v2 endpoint `/api/v2/node/stream/websockets` ([#3514](https://github.com/hoprnet/hoprnet/issues/3514))
+
+---
+
 <a name="1.87"></a>
 
-## [1.87]
+## [1.87](https://github.com/hoprnet/hoprnet/compare/release/athens...hoprnet:release/lisbon) (2022-02-10)
 
 ### Changes
 

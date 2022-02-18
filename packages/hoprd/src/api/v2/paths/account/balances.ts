@@ -1,6 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../'
+import type { Operation } from 'express-openapi'
+import { STATUS_CODES } from '../../utils'
 
 /**
  * @returns Current HOPR and native balance.

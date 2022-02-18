@@ -108,7 +108,29 @@ function cleanup {
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
-  exit $EXIT_CODE
+  local log exit_code non_zero
+  for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
+    log=$(wait_for_regex ${node_log} "Process exiting with signal [0-9]")
+
+    if [ -z "${log}" ]; then
+      log "${node_log}"
+      log "Process did not exit properly"
+      exit 1
+    fi
+
+    exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
+    if [ ${exit_code} != "0" ]; then
+      non_zero=true
+      log "${node_log}"
+      log "terminated with non-zero exit code ${exit_code}"
+    fi
+  done
+
+  if [ ${non_zero} ]; then
+    exit 1
+  else
+    exit $EXIT_CODE
+  fi
 }
 
 if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
@@ -344,8 +366,8 @@ HOPRD_API_TOKEN="${api_token}" ${mydir}/../test/integration-test.sh \
 
 # -- Verify node6 has executed the commands {{{
 log "Verifying node6 log output"
-grep -E "HOPR Balance: +20 txHOPR" "${node6_log}"
-grep -E "ETH Balance: +1 xDAI" "${node6_log}"
+grep -E "HOPR Balance: +20000 txHOPR" "${node6_log}"
+grep -E "ETH Balance: +10 xDAI" "${node6_log}"
 grep -E "Running on: hardhat" "${node6_log}"
 # }}}
 

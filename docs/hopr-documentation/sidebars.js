@@ -32,7 +32,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Installing a hoprd node',
-      items: ['node/start-here', 'node/using-script', 'node/using-avado', 'node/using-npm', 'node/using-docker']
+      items: ['node/start-here', 'node/using-avado', 'node/using-docker']
     },
     {
       type: 'category',
@@ -71,7 +71,11 @@ const sidebars = {
         'developers/connecting-node',
         'developers/tutorial-hello-world',
         'developers/demo-boomerang-chat',
-        'developers/rest-api'
+        'developers/demo-rps-game',
+        'developers/rest-api',
+        'developers/smart-contract',
+        'developers/snippets',
+        'developers/visualising-hopr-network-topology'
       ]
     },
     /*{

@@ -1,6 +1,5 @@
 import type {
   HardhatRuntimeEnvironment,
-  HardhatConfig,
   SolcUserConfig,
   HardhatUserConfig,
   NetworksUserConfig,
@@ -16,6 +15,7 @@ import '@nomiclabs/hardhat-solhint'
 import '@nomiclabs/hardhat-waffle'
 import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
+import '@nomiclabs/hardhat-etherscan'
 import 'solidity-coverage'
 import '@typechain/hardhat'
 import { utils } from 'ethers'
@@ -26,16 +26,12 @@ import { expandVars } from '@hoprnet/hopr-utils'
 import type { ResolvedEnvironment } from '@hoprnet/hopr-core'
 
 // rest
-import { task, types, extendEnvironment, extendConfig, subtask } from 'hardhat/config'
+import { task, types, extendEnvironment, subtask } from 'hardhat/config'
 import { writeFileSync, realpathSync } from 'fs'
 
 const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, HOPR_ENVIRONMENT_ID, HOPR_HARDHAT_TAG } = process.env
 
 const PROTOCOL_CONFIG = require('../core/protocol-config.json')
-
-extendConfig((config: HardhatConfig) => {
-  config.etherscan.apiKey = ETHERSCAN_KEY
-})
 
 extendEnvironment((hre: HardhatRuntimeEnvironment) => {
   hre.environment = HOPR_ENVIRONMENT_ID
@@ -135,6 +131,9 @@ const hardhatConfig: HardhatUserConfig = {
   gasReporter: {
     currency: 'USD',
     excludeContracts: ['mocks', 'utils/console.sol']
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_KEY
   }
 }
 

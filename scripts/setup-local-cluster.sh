@@ -85,6 +85,7 @@ declare node5_id="${node5_dir}.id"
 declare password="local"
 
 declare hardhat_rpc_log="${tmp}/hopr-local-hardhat-rpc.log"
+declare env_file="${tmp}/local-cluster.env"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -101,6 +102,8 @@ function cleanup {
   for port in 8545 13301 13302 13303 13304 13305 19091 19092 19093 19094 19095; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
+
+  rm ${env_file}
 
   exit $EXIT_CODE
 }
@@ -294,31 +297,69 @@ log "\tnode1"
 log "\t\tPeer Id:\t${peers[0]}"
 log "\t\tRest API:\thttp://localhost:13301/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19501/"
+log "\t\tWebSocket:\tws://localhost:19501/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13301&wsEndpoint=ws://localhost:19501&securityToken=${api_token}"
 log "\tnode2"
 log "\t\tPeer Id:\t${peers[1]}"
 log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19502/"
+log "\t\tWebSocket:\tws://localhost:19502/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13302&wsEndpoint=ws://localhost:19502&securityToken=${api_token}"
 log "\tnode3"
 log "\t\tPeer Id:\t${peers[2]}"
 log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19504/"
+log "\t\tAdmin UI:\thttp://localhost:19503/"
+log "\t\tWebSocket:\tws://localhost:19503/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13303&wsEndpoint=ws://localhost:19503&securityToken=${api_token}"
 log "\tnode4"
 log "\t\tPeer Id:\t${peers[3]}"
 log "\t\tRest API:\thttp://localhost:13304/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19504/"
+log "\t\tWebSocket:\tws://localhost:19504/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13304&wsEndpoint=ws://localhost:19504&securityToken=${api_token}"
 log "\tnode5"
 log "\t\tPeer Id:\t${peers[4]}"
 log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19505/"
+log "\t\tWebSocket:\tws://localhost:19505/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
+
+cat <<EOF > ${env_file}
+#!/usr/bin/env bash
+export apiToken="${api_token}"
+export HOPR_NODE_1_ADDR=${peers[0]} HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:19501
+export HOPR_NODE_2_ADDR=${peers[1]} HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=ws://127.0.0.1:19502
+export HOPR_NODE_3_ADDR=${peers[2]} HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=ws://127.0.0.1:19503
+export HOPR_NODE_4_ADDR=${peers[3]} HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=ws://127.0.0.1:19504
+export HOPR_NODE_5_ADDR=${peers[4]} HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=ws://127.0.0.1:19505
+echo -e "\n"
+echo "🌐 Node 1 REST API URL:  \$HOPR_NODE_1_HTTP_URL"
+echo "🔌 Node 1 WebSocket URL: \$HOPR_NODE_1_WS_URL"
+echo "💻 Node 1 HOPR Address:  \$HOPR_NODE_1_ADDR"
+echo "---" 
+echo "🌐 Node 2 REST API URL:  \$HOPR_NODE_2_HTTP_URL"
+echo "🔌 Node 2 WebSocket URL: \$HOPR_NODE_2_WS_URL"
+echo "💻 Node 2 HOPR Address:  \$HOPR_NODE_2_ADDR"
+echo "---" 
+echo "🌐 Node 3 REST API URL:  \$HOPR_NODE_3_HTTP_URL"
+echo "🔌 Node 3 WebSocket URL: \$HOPR_NODE_3_WS_URL"
+echo "💻 Node 3 HOPR Address:  \$HOPR_NODE_3_ADDR"
+echo "---"
+echo "🌐 Node 4 REST API URL:  \$HOPR_NODE_4_HTTP_URL"
+echo "🔌 Node 4 WebSocket URL: \$HOPR_NODE_4_WS_URL"
+echo "💻 Node 4 HOPR Address:  \$HOPR_NODE_4_ADDR"
+echo "---" ;
+echo "🌐 Node 5 REST API URL:  \$HOPR_NODE_5_HTTP_URL"
+echo "🔌 Node 5 WebSocket URL: \$HOPR_NODE_5_WS_URL"
+echo "💻 Node 5 HOPR Address:  \$HOPR_NODE_5_ADDR"
+echo -e "\n"
+EOF
 
 # GitPod related barrier
 if command -v gp; then
   gp sync-done "local-cluster"
+else
+  log "Run: 'source ${env_file}' in your shell to setup environment variables for this cluster (HOPR_NODE_1_ADDR, HOPR_NODE_1_HTTP_URL,... etc.)"
 fi
 
 log "Terminating this script will clean up the running local cluster"

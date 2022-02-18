@@ -22,6 +22,8 @@ Here are some of these wallets:
 | `0x93bC372b4cC142dA75a365C5cB45be996347bfeC` | Multisig #2                        | HOPR Association representative #2 (only Gnosis Safe)                             |
 | `0x50677B7e720102c5126e17f4485149208d3fce71` | Multisig #3                        | HOPR Association representative #3 (only Gnosis Wallet)                           |
 | `0x850F27C03508e8d75D69Df70e6a58F63f945F1f9` | Gitcoin Operator #1                | HOPR Gitcoin Operator #1                                                          |
+| `0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05` | HOPR Commercial team Gnosis Safe   | HOPR commercial team Gnosis Safe wallet on Gnosis Chain (aka xDai)                |
+| `0x8C9877a1279192448cAbeC9e8C4697b159cF645e` | CI/CD funding                      | Used in our CI/CD pipelines to fund nodes automatically for testing.              |
 
 There are some additional wallets used for testing, that had been label `[ Unknown ]`. They will be handled in https://github.com/hoprnet/hoprnet/issues/2893.
 

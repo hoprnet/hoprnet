@@ -1,6 +1,6 @@
 import assert from 'assert'
 import sinon from 'sinon'
-import { STATUS_CODES } from '../../'
+import { STATUS_CODES } from '../../utils'
 import { invalidTestPeerId, testPeerId } from '../../fixtures'
 import { closeChannel } from './{peerid}'
 

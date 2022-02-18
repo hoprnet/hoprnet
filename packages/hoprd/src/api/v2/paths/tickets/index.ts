@@ -1,7 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { Ticket } from '@hoprnet/hopr-utils'
-import { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../'
+import type { Operation } from 'express-openapi'
+import { STATUS_CODES } from '../../utils'
 
 export const formatTicket = (ticket: Ticket) => {
   return {

@@ -19,8 +19,9 @@ source "${mydir}/utils.sh"
 # not in this file, as this is intended for reuse in various scenarios.
 
 GCLOUD_INCLUDED=1 # So we can test for inclusion
-ZONE="--zone=europe-west6-a"
-declare gcloud_region="--region=europe-west6"
+# using Belgium for better access to more VM types
+ZONE="--zone=europe-west1-d"
+declare gcloud_region="--region=europe-west1"
 declare gcloud_disk_name="hoprd-data-disk"
 
 GCLOUD_MACHINE="--machine-type=e2-medium"
@@ -225,7 +226,7 @@ gcloud_create_or_update_instance_template() {
 
   if [ "${no_args}" = "true" ]; then
     eval gcloud compute instance-templates create-with-container "${name}" \
-      --machine-type=e2-medium \
+      --machine-type=n2-standard-4 \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
@@ -242,7 +243,7 @@ gcloud_create_or_update_instance_template() {
       ${extra_args}
   else
     eval gcloud compute instance-templates create-with-container "${name}" \
-      --machine-type=e2-medium \
+      --machine-type=n2-standard-4 \
       --metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
@@ -286,11 +287,28 @@ gcloud_create_or_update_managed_instance_group() {
 
   log "checking for managed instance group ${name}"
   if gcloud compute instance-groups managed describe "${name}" ${gcloud_region} --quiet; then
+    # get current instance template name
+    local group_instance_name="$(gcloud compute instance-groups list-instances \
+      "${name}" ${gcloud_region} --format=json | jq '.[1].instance' | tr -d '"')"
+    local previous_template="$(gcloud compute instances describe \
+      ${group_instance_name} --format=json | \
+      jq '.metadata.items[] | select(.key=="instance-template") | .value' | \
+      tr -d '"' | awk -F'/' '{ print $5; }')"
+
     log "managed instance group ${name} already present, updating..."
-    gcloud compute instance-groups managed rolling-action start-update \
+
+    # ensure instances are not replaced to prevent IP re-assignments
+    gcloud beta compute instance-groups managed rolling-action start-update \
       "${name}"\
       --version=template=${template} \
+      --minimal-action=refresh \
+      --most-disruptive-allowed-action=restart \
       ${gcloud_region}
+
+    # delete previous template if different
+    if [ "${previous_template}" != "${template}"]; then
+      gcloud_delete_instance_template "${previous_template}"
+    fi
   else
     log "creating managed instance group ${name}"
     gcloud compute instance-groups managed create "${name}" \
