@@ -25,7 +25,7 @@ to quickly setup everything for you to get started.
 
 **How to setup development cluster with GitPod** 
 
-<iframe width="100%" height="415" src="https://www.youtube.com/embed/ci19epPh8mA" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe src="https://player.vimeo.com/video/678070260?h=9ef64ca41b" width="640" height="360" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
 
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/hoprnet/hoprnet)
 
