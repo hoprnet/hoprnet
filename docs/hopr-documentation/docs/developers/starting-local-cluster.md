@@ -18,6 +18,7 @@ There are two ways to run a HOPR cluster: locally or via [Gitpod](https://gitpod
 - Linux or macOS: Gitpod or Local
 
 ## Use the latest release
+
 Due to the rapid development done on the project, you might be better off using a stable
 release. The latest stable release known at the time of writing is [`lisbon`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/lisbon.zip).
 
@@ -85,18 +86,19 @@ cd hoprnet-release-lisbon
 yarn && yarn build
 ```
 
-3. **Run the one-line setup script**: Run the following script: 
+3. **Run the one-line setup script**: Run the following script:
 
 ```bash
 ./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
 ```
+
 Please wait while this script creates
-   the local blockchain network and deploys the project contracts. On average, the process can take between 2-6 minutes, depending on your computer. **Important**, make sure to have both `curl` and `jq` installed in your computer
-   before running the script, as both are used. Please be aware you also need to be running `bash` version `5.x` or higher,
-   which in most macOS devices will require an upgrade. The easiest way to do this is via `brew bash`.
+the local blockchain network and deploys the project contracts. On average, the process can take between 2-6 minutes, depending on your computer. **Important**, make sure to have both `curl` and `jq` installed in your computer
+before running the script, as both are used. Please be aware you also need to be running `bash` version `5.x` or higher,
+which in most macOS devices will require an upgrade. The easiest way to do this is via `brew bash`.
 
 If you are planning to run [MyneChat](http://app.myne.chat/)
-   alongside your cluster, then make sure to pass the `-m` flag with your MyneChat instance URL, i.e.:
+alongside your cluster, then make sure to pass the `-m` flag with your MyneChat instance URL, i.e.:
 
 ```bash
 ./scripts/setup-local-cluster.sh -m "http://app.myne.chat" -i scripts/topologies/full_interconnected_cluster.sh
@@ -117,5 +119,5 @@ export apiToken=^^LOCAL-testing-123^^ HOPR_NODE_1_HTTP_URL=http://127.0.0.1:1330
     The demo application [MyneChat](https://github.com/hoprnet/myne-chat) uses a
     [mock server](https://github.com/hoprnet/myne-chat/blob/cf6501b2ffa24502834f567ab575630e302e3d34/mocks/index.js#L47-L79)
     to simplify its development workflow. However, to fully experience the extent of its features, you will need either a local or public HOPR cluster.
-[^2]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.
 
+[^2]: If you have installed and built another `node.js` application from your computer in the past, you likely will not need to do anything else. However, in the case your are only starting to develop in `node.js`, there's a high chance you might need to install a few extra tools. For instance, in `Linux`-based OS, you will likely also need to install `build-essentials` (e.g. in Ubuntu do `apt-get install build-essentials`), whereas in `macOS` you need Xcode developer tools, installable via `xcode-select --install`.
