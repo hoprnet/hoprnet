@@ -156,7 +156,7 @@ function setup_node() {
     --allowLocalNodeConnections \
     --allowPrivateNodeConnections \
     --healthCheck \
-    --healthCheckHost "0.0.0.0" \
+    --healthCheckHost "0.0.0.0" \q
     ${additional_args} \
     > "${log}" 2>&1 &
 }
