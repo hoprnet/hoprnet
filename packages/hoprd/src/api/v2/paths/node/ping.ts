@@ -70,6 +70,7 @@ POST.apiDoc = {
           required: ['peerId'],
           properties: {
             peerId: {
+              format: 'peerId',
               type: 'string',
               description: 'PeerId associated to the other node that we want to ping.'
             }

@@ -199,10 +199,12 @@ POST.apiDoc = {
           required: ['peerId', 'amount'],
           properties: {
             peerId: {
+              format: 'peerId',
               type: 'string',
               description: 'PeerId that we want to transact with using this channel.'
             },
             amount: {
+              format: 'amount',
               type: 'string',
               description:
                 'Amount of HOPR tokens to fund the channel. It will be used to pay for sending messages through channel'
@@ -257,29 +259,15 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            oneOf: [
-              {
-                type: 'object',
-                properties: {
-                  status: {
-                    type: 'string',
-                    example: STATUS_CODES.NOT_ENOUGH_BALANCE,
-                    description:
-                      'Insufficient balance to open channel. Amount passed in request body exeeds current balance.'
-                  }
-                }
-              },
-              {
-                type: 'object',
-                properties: {
-                  status: {
-                    type: 'string',
-                    example: STATUS_CODES.CHANNEL_ALREADY_OPEN,
-                    description: 'Channel already open. Cannot open more than one channel between two nodes.'
-                  }
-                }
+            type: 'object',
+            properties: {
+              status: {
+                type: 'string',
+                example: `${STATUS_CODES.NOT_ENOUGH_BALANCE} | ${STATUS_CODES.CHANNEL_ALREADY_OPEN}`,
+                description: `If status is ${STATUS_CODES.NOT_ENOUGH_BALANCE} it means insufficient balance to open channel. Amount passed in request body exeeds current balance.
+                  If status is ${STATUS_CODES.CHANNEL_ALREADY_OPEN} it means channel already open. Cannot open more than one channel between two nodes.`
               }
-            ]
+            }
           },
           examples: {
             NOT_ENOUGH_BALANCE: { value: { status: STATUS_CODES.NOT_ENOUGH_BALANCE } },
