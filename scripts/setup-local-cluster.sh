@@ -155,6 +155,8 @@ function setup_node() {
     --testUseWeakCrypto \
     --allowLocalNodeConnections \
     --allowPrivateNodeConnections \
+    --healthCheck \
+    --healthCheckHost "0.0.0.0" \
     ${additional_args} \
     > "${log}" 2>&1 &
 }
