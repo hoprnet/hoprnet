@@ -121,10 +121,11 @@ function setup_node() {
   local rest_port=${1}
   local node_port=${2}
   local admin_port=${3}
-  local dir=${4}
-  local log=${5}
-  local id=${6}
-  local additional_args=${7:-""}
+  local healthcheck_port=${4}
+  local dir=${5}
+  local log=${6}
+  local id=${7}
+  local additional_args=${8:-""}
 
   log "Run node ${id} on rest port ${rest_port} -> ${log}"
 
@@ -156,7 +157,8 @@ function setup_node() {
     --allowLocalNodeConnections \
     --allowPrivateNodeConnections \
     --healthCheck \
-    --healthCheckHost "0.0.0.0" \q
+    --healthCheckHost "0.0.0.0" \
+    --healthCheckPort "${healthcheck_port}" \
     ${additional_args} \
     > "${log}" 2>&1 &
 }
@@ -227,11 +229,11 @@ cp -R \
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}"
-setup_node 13302 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}"
-setup_node 13303 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 13304 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}"
-setup_node 13305 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}"
+setup_node 13301 19091 19501 18081 "${node1_dir}" "${node1_log}" "${node1_id}"
+setup_node 13302 19092 19502 18082 "${node2_dir}" "${node2_log}" "${node2_id}"
+setup_node 13303 19093 19503 18083 "${node3_dir}" "${node3_log}" "${node3_id}"
+setup_node 13304 19094 19504 18084 "${node4_dir}" "${node4_log}" "${node4_id}"
+setup_node 13305 19095 19505 18085 "${node5_dir}" "${node5_log}" "${node5_id}"
 # }}}
 
 log "Waiting for nodes bootstrap"
@@ -299,30 +301,35 @@ log "\tnode1"
 log "\t\tPeer Id:\t${peers[0]}"
 log "\t\tRest API:\thttp://localhost:13301/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19501/"
+log "\t\tHealthcheck:\thttp://localhost:18081/"
 log "\t\tWebSocket:\tws://localhost:19501/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13301&wsEndpoint=ws://localhost:19501&securityToken=${api_token}"
 log "\tnode2"
 log "\t\tPeer Id:\t${peers[1]}"
 log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19502/"
+log "\t\tHealthcheck:\thttp://localhost:18082/"
 log "\t\tWebSocket:\tws://localhost:19502/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13302&wsEndpoint=ws://localhost:19502&securityToken=${api_token}"
 log "\tnode3"
 log "\t\tPeer Id:\t${peers[2]}"
 log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19503/"
+log "\t\tHealthcheck:\thttp://localhost:18083/"
 log "\t\tWebSocket:\tws://localhost:19503/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13303&wsEndpoint=ws://localhost:19503&securityToken=${api_token}"
 log "\tnode4"
 log "\t\tPeer Id:\t${peers[3]}"
 log "\t\tRest API:\thttp://localhost:13304/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19504/"
+log "\t\tHealthcheck:\thttp://localhost:18084/"
 log "\t\tWebSocket:\tws://localhost:19504/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13304&wsEndpoint=ws://localhost:19504&securityToken=${api_token}"
 log "\tnode5"
 log "\t\tPeer Id:\t${peers[4]}"
 log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
 log "\t\tAdmin UI:\thttp://localhost:19505/"
+log "\t\tHealthcheck:\thttp://localhost:18085/"
 log "\t\tWebSocket:\tws://localhost:19505/"
 log "\t\tMyne Chat:\t${myne_chat_url}/?httpEndpoint=http://localhost:13305&wsEndpoint=ws://localhost:19505&securityToken=${api_token}"
 
