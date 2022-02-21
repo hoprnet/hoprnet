@@ -84,3 +84,8 @@ ports:
     port: 19501-19505
     visibility: public
     onOpen: ignore
+
+  - name: HOPRd healthcheck
+    port: 18081-18085
+    visibility: public
+    onOpen: ignore
