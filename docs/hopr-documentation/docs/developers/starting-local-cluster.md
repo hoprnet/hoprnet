@@ -29,7 +29,9 @@ to quickly setup everything for you to get started.
 
 **How to setup development cluster with GitPod**
 
-<iframe src="https://player.vimeo.com/video/678070260?h=9ef64ca41b" width="100%" height="415" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+<div class="embed-container">
+<iframe src="https://player.vimeo.com/video/678070260?h=9ef64ca41b" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+</div>
 
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/hoprnet/hoprnet/tree/release/lisbon)
 
