@@ -110,6 +110,7 @@ class Relay {
   }
 
   setUsedRelays(peers: PeerId[]) {
+    log(`set used relays`, peers)
     this.usedRelays = peers
   }
 
@@ -260,10 +261,20 @@ class Relay {
         async function* (this: Relay) {
           // @TODO check if there is a relay slot available
 
-          const key = await createRelayerKey(conn.connection.remotePeer)
+          // Initiate the DHT query but does not await the result which easily
+          // takes more than 10 seconds
+          ;(async function (this: Relay) {
+            try {
+              const key = await createRelayerKey(conn.connection.remotePeer)
 
-          await this.libp2p.contentRouting.provide(key)
-          log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toB58String()}`, key)
+              await this.libp2p.contentRouting.provide(key)
+
+              log(`announced in the DHT as relayer for node ${conn.connection.remotePeer.toB58String()}`, key)
+            } catch (err) {
+              error(`error while attempting to provide relayer key for ${conn.connection.remotePeer}`)
+            }
+          }.call(this))
+
           yield OK
         }.call(this)
       )
