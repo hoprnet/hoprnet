@@ -182,7 +182,7 @@ Unlike our REST API endpoint, seeing interactions with your HOPR node WebSocket 
 
 **Connecting to your HOPR node WebSocket server**
 
-With `websocat` installed, run the following command to connect to your HOPR node WebSocket server.
+With `websocat` installed, please go up one directory: `cd ..` and run the following command to connect to your HOPR node WebSocket server.
 
 ```bash
 .bin/websocat "$(echo "$HOPR_NODE_1_WS_URL" | sed "s/http/ws/")/?apiToken=$apiToken"
