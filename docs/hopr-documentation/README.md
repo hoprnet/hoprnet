@@ -80,6 +80,10 @@ Items can be sub-pages or it can have also sub-categories.
 
 For example: `node/star-here`, `node` means a directory, `start-here` is the `ID` of a page (See HOPR docs file structure). Specificaly for this example, `start-here` page is under the `node` directory.
 
+## Adding embed videos
+
+Embed code should be included into `<div class="embed-container"></div>` html tags.
+
 ## Adding new version of docs
 
 1. Copy `docs` directory from `Next` docs version

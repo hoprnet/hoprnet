@@ -38,6 +38,19 @@ body {
   /* Temp FIX to hide docs version notification */
   display: none !important;
 }
+.embed-container {
+  padding:56.25% 0 0 0;
+  position: relative;
+}
+.embed-container iframe,
+.embed-container object,
+.embed-container embed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
 a {
   color: #414141;
   text-decoration: none;
