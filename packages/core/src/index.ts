@@ -6,7 +6,7 @@ import type { HoprConnectConfig } from '@hoprnet/hopr-connect'
 import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants'
 
 import NetworkPeers from './network/network-peers'
-import Heartbeat from './network/heartbeat'
+import Heartbeat, { type HeartbeatPingResult } from './network/heartbeat'
 import { findPath } from './path'
 
 import { protocols, Multiaddr } from 'multiaddr'
@@ -698,16 +698,24 @@ class Hopr extends EventEmitter {
    */
   public async ping(destination: PeerId): Promise<{ info?: string; latency: number }> {
     let start = Date.now()
+
+    let pingResult: HeartbeatPingResult
     try {
-      const pingResult = await this.heartbeat.pingNode(destination)
-      if (pingResult.lastSeen >= 0) {
-        return { latency: pingResult.lastSeen - start }
-      } else {
-        return { info: 'failure', latency: -1 }
-      }
+      pingResult = await this.heartbeat.pingNode(destination)
     } catch (err) {
       log(`Could not ping ${destination.toB58String()}.`, err)
       return { latency: -1, info: 'error' }
+    }
+
+    if (pingResult.lastSeen >= 0) {
+      if (this.networkPeers.has(destination)) {
+        this.networkPeers.updateRecord(pingResult)
+      } else {
+        this.networkPeers.register(destination)
+      }
+      return { latency: pingResult.lastSeen - start }
+    } else {
+      return { info: 'failure', latency: -1 }
     }
   }
 

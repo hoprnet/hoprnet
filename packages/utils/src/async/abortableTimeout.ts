@@ -96,6 +96,8 @@ export function abortableTimeout<Result, AbortMsg, TimeoutMsg>(
 
     cleanUp()
 
+    console.log(`resolving at the end`, result, Date.now() - start)
+
     resolve(result)
   })
 }

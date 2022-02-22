@@ -79,6 +79,7 @@ class Indexer extends EventEmitter {
       this.db.getLatestBlockNumber(),
       this.chain.getLatestBlockNumber()
     ])
+
     this.latestBlock = latestOnChainBlock
 
     log('Latest saved block %d', latestSavedBlock)
@@ -398,7 +399,11 @@ class Indexer extends EventEmitter {
       // This new block marks a previous block
       // (blockNumber - this.maxConfirmations) is final.
       // Confirm native token transactions in that previous block.
-      const nativeTxs = await this.chain.getNativeTokenTransactionInBlock(blockNumber - this.maxConfirmations, true)
+
+      let nativeTxs: string[] = await this.chain.getNativeTokenTransactionInBlock(
+        blockNumber - this.maxConfirmations,
+        true
+      )
       // update transaction manager
       if (nativeTxs.length > 0) {
         this.indexEvent('withdraw-native', nativeTxs)
@@ -422,7 +427,7 @@ class Indexer extends EventEmitter {
         try {
           events = await this.getEvents(blockNumber - this.maxConfirmations, blockNumber - this.maxConfirmations, true)
         } catch (err) {
-          if (i < RETRIES) {
+          if (i + 1 < RETRIES) {
             // Give other tasks CPU time to happen
             // Push next provider query to end of next event loop iteration
             await setImmediatePromise()
@@ -587,12 +592,13 @@ class Indexer extends EventEmitter {
         log('error processing event:', event, err)
       }
 
+      lastDatabaseSnapshot = new Snapshot(
+        new BN(event.blockNumber),
+        new BN(event.transactionIndex),
+        new BN(event.logIndex)
+      )
+
       try {
-        lastDatabaseSnapshot = new Snapshot(
-          new BN(event.blockNumber),
-          new BN(event.transactionIndex),
-          new BN(event.logIndex)
-        )
         await this.db.updateLatestConfirmedSnapshot(lastDatabaseSnapshot)
       } catch (err) {
         log(
@@ -801,7 +807,7 @@ class Indexer extends EventEmitter {
   public resolvePendingTransaction(eventType: IndexerEvents, tx: string): DeferType<string> {
     const deferred = {} as DeferType<string>
 
-    deferred.promise = new Promise((resolve, reject) => {
+    deferred.promise = new Promise<string>((resolve, reject) => {
       let done = false
 
       deferred.reject = () => {

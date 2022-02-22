@@ -2,7 +2,7 @@ import type { Transaction as ITransaction } from './transaction-manager'
 import { debug } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import { Mutex } from 'async-mutex'
-import { Address } from '@hoprnet/hopr-utils'
+import type { Address } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core-ethereum:nonce-tracker')
 
@@ -184,7 +184,7 @@ export default class NonceTracker {
   }
 
   /**
-   * Function returns the nonce details from teh network based on the latest block
+   * Function returns the nonce details from the network based on the latest block
    * and eth_getTransactionCount method
    *
    * @param address the hex string for the address whose nonce we are calculating

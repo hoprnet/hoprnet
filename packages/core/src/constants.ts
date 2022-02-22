@@ -7,7 +7,9 @@ export const FULL_VERSION = pkg.version
 
 export const VERSION = pickVersion(pkg.version)
 
-export const HEARTBEAT_TIMEOUT = 4000
+// The timeout must include the time necessary to traverse
+// NATs which might include several round trips
+export const HEARTBEAT_TIMEOUT = 6000
 export const HEARTBEAT_INTERVAL = 30000
 export const HEARTBEAT_INTERVAL_VARIANCE = 2000
 
