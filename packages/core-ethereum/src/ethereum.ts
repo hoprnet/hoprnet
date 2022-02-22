@@ -108,22 +108,21 @@ export async function createChainWrapper(
   }
 
   const getTransactionCount = async (address: Address, blockNumber?: number): Promise<number> => {
-    let transactionCount: number
     const RETRIES = 3
     for (let i = 0; i < RETRIES; i++) {
       try {
-        transactionCount = await provider.getTransactionCount(address.toHex(), blockNumber)
-        return transactionCount
+        return await provider.getTransactionCount(address.toHex(), blockNumber)
       } catch (err) {
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
           continue
         } else {
-          log(`Could not determine latest on-chain block. Now waiting for next block.`)
-          throw Error(`Could not get latest transaction count using the given provider`)
         }
       }
     }
+
+    log(`Could not determine latest transaction count.`)
+    throw Error(`Could not get latest transaction count using the given provider`)
   }
 
   const nonceTracker = new NonceTracker(
