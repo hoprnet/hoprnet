@@ -175,10 +175,15 @@ To send a message from `node 1` to `node 2`, we need to use `node 1`'s REST API,
 or any other HTTP client, send the following request:
 
 ```bash
-echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" \
--H 'Content-Type: application/json' \
--d '{"body":"Hello world","recipient":"16Uiu2HAmKhrwGWcvaZ3ic5dgy7oFawmnELJGBrySSsNo4bzGBxHW"}' \
-$HOPR_NODE_1_HTTP_URL/api/v2/messages
+curl -X 'POST' \
+  "$HOPR_NODE_1_HTTP_URL/api/v2/messages/" \
+  -H 'accept: */*' \
+  -H "x-auth-token: $apiToken" \
+  -H 'Content-Type: application/json' \
+  -d "{
+  \"body\": \"Hello world from Node 1\",
+  \"recipient\": \"$HOPR_NODE_2_ADDR\"
+}"
 ```
 
 In the terminal of `node 2`, you will see something similar to this:
