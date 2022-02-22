@@ -174,8 +174,6 @@ information to send a message from `node 1`. Make sure to keep your WebSocket cl
 To send a message from `node 1` to `node 2`, we need to use `node 1`'s REST API, specifically the `/messages` endpoint. Using `curl`
 or any other HTTP client, send the following request:
 
-Replace `$HOPR_NODE_2_ADDR` with `node 2` address.
-
 ```bash
 curl -X 'POST' \
   "$HOPR_NODE_1_HTTP_URL/api/v2/messages/" \
