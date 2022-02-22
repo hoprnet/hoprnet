@@ -501,11 +501,8 @@ export async function createChainWrapper(
           await setImmediatePromise()
           continue
         } else {
-          log(
-            `could not retrieve native token transaction from block ${blockNumber} using the provider, assuming there are none`,
-            err
-          )
-          return []
+          log(`could not retrieve native token transactions from block ${blockNumber} using the provider.`, err)
+          throw err
         }
       }
     }
