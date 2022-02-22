@@ -177,10 +177,15 @@ or any other HTTP client, send the following request:
 Replace `$HOPR_NODE_2_ADDR` with `node 2` address.
 
 ```bash
-echo -n $apiToken | base64 | xargs -I {} curl -s -H "Authorization: Basic {}" \
--H 'Content-Type: application/json' \
--d '{"body":"Hello world","recipient":"$HOPR_NODE_2_ADDR"}' \
-$HOPR_NODE_1_HTTP_URL/api/v2/messages
+curl -X 'POST' \
+  "$HOPR_NODE_1_HTTP_URL/api/v2/messages/" \
+  -H 'accept: */*' \
+  -H "x-auth-token: $apiToken" \
+  -H 'Content-Type: application/json' \
+  -d "{
+  \"body\": \"Hello world from Node 1\",
+  \"recipient\": \"$HOPR_NODE_2_ADDR\"
+}"
 ```
 
 In the terminal of `node 2`, you will see something similar to this:
