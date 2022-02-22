@@ -74,10 +74,62 @@ export async function createChainWrapper(
   const channelClosureSecs = await channels.secsClosure()
 
   const transactions = new TransactionManager()
+
+  const subscribeBlock = (cb: (blockNumber: number) => void | Promise<void>): (() => void) => {
+    provider.on('block', cb)
+
+    return () => {
+      provider.off('block', cb)
+    }
+  }
+
+  const getLatestBlockNumber = async (): Promise<number> => {
+    const RETRIES = 3
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        return await provider.getBlockNumber()
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        } else {
+          log(`Could not determine latest on-chain block. Now waiting for next block.`)
+        }
+      }
+    }
+
+    // Wait for next block and return the blockNumber
+    return new Promise<number>((resolve) => {
+      const unsubscribeBlock = subscribeBlock((blockNumber: number) => {
+        unsubscribeBlock()
+        resolve(blockNumber)
+      })
+    })
+  }
+
+  const getTransactionCount = async (address: Address, blockNumber?: number): Promise<number> => {
+    let transactionCount: number
+    const RETRIES = 3
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        transactionCount = await provider.getTransactionCount(address.toHex(), blockNumber)
+        return transactionCount
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        } else {
+          log(`Could not determine latest on-chain block. Now waiting for next block.`)
+          throw Error(`Could not get latest transaction count using the given provider`)
+        }
+      }
+    }
+  }
+
   const nonceTracker = new NonceTracker(
     {
-      getLatestBlockNumber: provider.getBlockNumber.bind(provider),
-      getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
+      getLatestBlockNumber,
+      getTransactionCount,
       getPendingTransactions: (_addr) => transactions.getAllUnconfirmedTxs(),
       getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values())
     },
@@ -465,34 +517,6 @@ export async function createChainWrapper(
     return txs.length === 0 ? [] : txs.map((tx) => tx.hash)
   }
 
-  const getLatestBlockNumber = async (): Promise<number> => {
-    let latestOnChainBlock: number
-    const RETRIES = 3
-    for (let i = 0; i < RETRIES; i++) {
-      try {
-        latestOnChainBlock = await provider.getBlockNumber()
-        return latestOnChainBlock
-      } catch (err) {
-        if (i + 1 < RETRIES) {
-          await setImmediatePromise()
-          continue
-        } else {
-          log(`Could not determine latest on-chain block. Now waiting for next block.`)
-        }
-      }
-    }
-
-    if (latestOnChainBlock == undefined) {
-      await new Promise<void>((resolve) => {
-        const unsubscribeBlock = api.subscribeBlock((blockNumber: number) => {
-          latestOnChainBlock = blockNumber
-          unsubscribeBlock()
-          resolve()
-        })
-      })
-    }
-  }
-
   const getBalance = async (accountAddress: Address): Promise<Balance> => {
     const RETRIES = 3
     let rawBalance: BigNumber
@@ -533,7 +557,7 @@ export async function createChainWrapper(
     return new NativeBalance(new BN(rawNativeBalance.toString()))
   }
 
-  const api = {
+  return {
     getBalance,
     getNativeBalance,
     getNativeTokenTransactionInBlock,
@@ -549,13 +573,7 @@ export async function createChainWrapper(
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber, // TODO: use indexer when it's done syncing
-    subscribeBlock: (cb: (blockNumber: number) => void | Promise<void>): (() => void) => {
-      provider.on('block', cb)
-
-      return () => {
-        provider.off('block', cb)
-      }
-    },
+    subscribeBlock,
     subscribeError: (cb: (err: any) => void | Promise<void>): (() => void) => {
       provider.on('error', cb)
       channels.on('error', cb)
@@ -582,11 +600,11 @@ export async function createChainWrapper(
       hoprChannelsAddress: hoprChannelsDeployment.address,
       channelClosureSecs
     }),
-    updateConfirmedTransaction: (hash: string) => transactions.moveToConfirmed(hash),
+    updateConfirmedTransaction: transactions.moveToConfirmed.bind(
+      transactions
+    ) as TransactionManager['moveToConfirmed'],
     getAllQueuingTransactionRequests: transactions.getAllQueuingTxs.bind(
       transactions
     ) as TransactionManager['getAllQueuingTxs']
   }
-
-  return api
 }
